@@ -2,6 +2,8 @@ package com.mmg.manahub.feature.scanner.presentation
 
 import android.graphics.PointF
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.ui.components.MagicToastType
+import java.util.UUID
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Session models
@@ -19,6 +21,9 @@ data class ScannedCard(
     val condition: String,
     val setCode: String,
     val timestamp: Long,
+    // Write-path hardening audit (2026-09-06): stable identity for queue operations (edit/remove/
+    // duplicate/partial-retry) -- timestamp alone collides when two entries share a millisecond.
+    val id: String = UUID.randomUUID().toString(),
 )
 
 /**
@@ -38,7 +43,11 @@ data class ScanSession(
  * Full UI state for the no-modal scanner screen.
  *
  * @property isFlashOn              Whether the camera torch is on.
- * @property isSearching            An OCR lookup is in-flight.
+ * @property isSearching            An OCR lookup is in-flight. W3 (2026-08-24): also cleared to
+ *                                  `false` whenever a covering sheet/overlay opens — see
+ *                                  [isRecognitionPausedByUser]'s KDoc for the pause-vs-stop
+ *                                  distinction — so a resumed session never shows a stale spinner
+ *                                  left over from before the overlay.
  * @property lastDetectedCard       The most recently confirmed card from Scryfall.
  * @property error                  Transient error message shown in the bottom bar.
  * @property scanSession            Accumulated cards for the current session.
@@ -52,7 +61,11 @@ data class ScanSession(
  * @property detectedCorners        Four corner points of the detected card in frame pixel
  *                                  coordinates, or null when no card is in the frame.
  *                                  Updated by [ScannerViewModel.onRecognitionResult] so that
- *                                  the Canvas overlay reads from a single source of truth.
+ *                                  the Canvas overlay reads from a single source of truth. W3
+ *                                  (2026-08-24): also cleared to `null` whenever a covering
+ *                                  sheet/overlay opens (see `ScannerViewModel`'s private
+ *                                  `clearedForOverlay()` extension), so a resumed session never
+ *                                  shows a stale outline left over from before the overlay.
  * @property multiSelectedIds       Set of scryfallId values selected in the queue sheet.
  * @property isSoundEnabled         Whether sound effects play on successful card add.
  * @property showAmbiguitySelector  True when a card was identified as ambiguous in normal mode;
@@ -65,6 +78,18 @@ data class ScanSession(
  * @property isRecognitionPausedByUser  True when the user explicitly paused recognition via the
  *                                  top-bar toggle, independent of any sheet-driven pause (queue,
  *                                  settings, edit, variant selector, expanded image).
+ *                                  **Pause vs. stop (W3, `scanner-reliability-plan.md`,
+ *                                  2026-08-24):** this flag only stops the [CardRecognizer]
+ *                                  analyzer (`ImageAnalysis.clearAnalyzer()`/re-`setAnalyzer`) —
+ *                                  the camera preview stays bound and live, because the user
+ *                                  still wants a viewfinder. A covering sheet/overlay
+ *                                  (`showQueueSheet`, `showEditSheet`, `showVariantSelector`,
+ *                                  `expandedVariantImageUrl != null`, `selectedCardDetailId !=
+ *                                  null`, `showPriceDetailSheet`) is a DIFFERENT, stronger
+ *                                  condition handled entirely in `ScannerScreen`'s
+ *                                  `CameraPreview` (not modeled as a `ScannerUiState` field): it
+ *                                  fully unbinds the camera (`cameraProvider.unbindAll()`, ~250 ms
+ *                                  debounced) to actually save power, not just skip frames.
  * @property isAutoDeleteOnAddEnabled  True when a per-entry "Add to collection"/"Add to wishlist"
  *                                  action in [ScanQueueSheet] should also remove that entry from
  *                                  the queue once the add succeeds.
@@ -72,6 +97,12 @@ data class ScanSession(
  *                                  present in the user's collection — feeds the "already in
  *                                  collection" badge in [QueueCardItem]. Kept up to date by a
  *                                  [ScannerViewModel] collector on `UserCardRepository.observeCollection()`.
+ * @property rateLimitedUntilMs     W2.10 (scanner-reliability-plan.md, 2026-08-24). Wall-clock
+ *                                  epoch millis until which [CardRecognizer] is suspending every
+ *                                  Scryfall lookup after the shared rate limiter exhausted its
+ *                                  retries. `null` when no cooldown is active. Feeds the
+ *                                  "Scryfall busy — retrying in Ns" badge via
+ *                                  `rememberRateLimitCountdownSeconds`.
  */
 data class ScannerUiState(
     val isFlashOn: Boolean = false,
@@ -97,6 +128,10 @@ data class ScannerUiState(
     val isLoadingPrints: Boolean = false,
     // Toast
     val toastMessage: String? = null,
+    // Write-path hardening audit (2026-09-06): explicit per-toast type so a WARNING (e.g. a
+    // partial scanner commit failure) never gets rendered with a stale/default SUCCESS look —
+    // every call site that sets toastMessage must also set this.
+    val toastType: MagicToastType = MagicToastType.SUCCESS,
     // Queue multi-select
     val multiSelectedIds: Set<String> = emptySet(),
     // Card outline overlay — populated by CardRecognizer via onRecognitionResult
@@ -104,11 +139,15 @@ data class ScannerUiState(
     // Sound
     val isSoundEnabled: Boolean = true,
     // Auto-delete a queue entry once it's individually added to collection/wishlist
-    val isAutoDeleteOnAddEnabled: Boolean = false,
+    val isAutoDeleteOnAddEnabled: Boolean = true,
     // "Already in collection" badge — live identity-key set, see KDoc above
     val ownedCardIdentityKeys: Set<String> = emptySet(),
-    // Language mismatch indicator (Quick Mode only)
+    // Purely informational since W2.11 (2026-08-24): true when the resolved card is an
+    // English-fallback printing (no printing exists in the selected non-English language). The
+    // card IS still added — this only drives the "no <lang> printing found — added as EN" badge.
     val languageMismatch: Boolean = false,
+    // W2.10 (2026-08-24): active Scryfall rate-limit cooldown — see the field KDoc above.
+    val rateLimitedUntilMs: Long? = null,
     // Ambiguity resolution (normal mode only)
     val showAmbiguitySelector: Boolean = false,
     // Card Detail overlay (Phase 2 scanner UX, 2026-07-17)
@@ -125,11 +164,7 @@ data class ScannerUiState(
     // Full-screen image viewer
     val expandedVariantImageUrl: String? = null,
 
-    // COMMENTED OUT — embedding DB fields no longer needed with ML Kit OCR pipeline
-    // val embeddingDbVersionReady: Boolean = false,
-    // val embeddingDbVersion: Int = 0,
-    // val isEmbeddingDbUpdating: Boolean = false,
-    // val embeddingDbDownloadProgress: Float = 0f,
-    // val embeddingDbLoaded: Boolean = false,
-    // val embeddingDbCardCount: Int = 0,
+    // Re-entrancy guard for onAddAllToCollection -- a second tap before the first commit
+    // resolves must not double-commit the queue.
+    val isCommittingQueue: Boolean = false,
 )

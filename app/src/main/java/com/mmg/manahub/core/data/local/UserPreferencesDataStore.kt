@@ -168,8 +168,6 @@ private val KEY_LAST_CELEBRATED_LEVEL = intPreferencesKey("gamification_last_cel
 /** Sentinel meaning the level-up celebration baseline was never set (seed-without-celebrating). */
 private const val LAST_CELEBRATED_LEVEL_UNINITIALIZED = -1
 
-private val KEY_EMBEDDING_DB_VERSION = intPreferencesKey("hash_db_version")
-
 // ── Deck Doctor: scoring-weight overrides (debug-only tuning) ─────────────────
 // Seven independent nullable Float overrides for the engine ScoreWeights. Absent key = use the
 // engine default for that weight. Stored as primitives so this core-layer store never imports the
@@ -181,6 +179,15 @@ private val KEY_SCORE_WEIGHT_POWER              = floatPreferencesKey("score_wei
 private val KEY_SCORE_WEIGHT_COLOR              = floatPreferencesKey("score_weight_color")
 private val KEY_SCORE_WEIGHT_REDUNDANCY_PENALTY = floatPreferencesKey("score_weight_redundancy_penalty")
 private val KEY_SCORE_WEIGHT_POWER_FLOOR        = floatPreferencesKey("score_weight_power_floor")
+
+// Deck Analysis Engine v2 (Phase 2) — the 5 pillar-composite weight overrides. Same mechanism as
+// the 7 legacy keys above, extended rather than duplicated (separate `analysis_weight_*` key
+// namespace so a debug tuner can independently override per-card fit weights vs. pillar weights).
+private val KEY_ANALYSIS_WEIGHT_MANA_BASE  = floatPreferencesKey("analysis_weight_mana_base")
+private val KEY_ANALYSIS_WEIGHT_CURVE      = floatPreferencesKey("analysis_weight_curve")
+private val KEY_ANALYSIS_WEIGHT_PLAN_ROLES = floatPreferencesKey("analysis_weight_plan_roles")
+private val KEY_ANALYSIS_WEIGHT_SYNERGY    = floatPreferencesKey("analysis_weight_synergy")
+private val KEY_ANALYSIS_WEIGHT_LEGALITY   = floatPreferencesKey("analysis_weight_legality")
 
 // ── Privacy settings — persisted locally so SettingsScreen renders without a network call ──
 private val KEY_COLLECTION_PUBLIC  = booleanPreferencesKey("collection_public")
@@ -518,22 +525,6 @@ class UserPreferencesDataStore @Inject constructor(
         context.userPrefsDataStore.edit { it[KEY_COLLECTION_GROUPING_MODE] = mode.name }
     }
 
-    // ── Embedding database version ────────────────────────────────────────────
-
-    /** Emits the locally stored version of the downloaded embedding DB (0 = bundled asset only). */
-    val embeddingDbVersionFlow: Flow<Int> = context.userPrefsDataStore.data
-        .map { it[KEY_EMBEDDING_DB_VERSION] ?: 0 }
-        .catch { emit(0) }
-
-    /** Returns the current embedding DB version synchronously (for use in Workers). */
-    suspend fun getEmbeddingDbVersion(): Int =
-        context.userPrefsDataStore.data.map { it[KEY_EMBEDDING_DB_VERSION] ?: 0 }.first()
-
-    /** Persists the version number after a successful R2 download. */
-    suspend fun saveEmbeddingDbVersion(version: Int) {
-        context.userPrefsDataStore.edit { it[KEY_EMBEDDING_DB_VERSION] = version }
-    }
-
     // ── Deck Doctor: scoring-weight overrides (debug-only tuning) ──────────────
     //
     // A debug-only entry point for tuning the Deck Doctor scoring weights. Each field is an
@@ -558,6 +549,11 @@ class UserPreferencesDataStore @Inject constructor(
                     color = prefs[KEY_SCORE_WEIGHT_COLOR],
                     redundancyPenalty = prefs[KEY_SCORE_WEIGHT_REDUNDANCY_PENALTY],
                     powerFloor = prefs[KEY_SCORE_WEIGHT_POWER_FLOOR],
+                    analysisManaBase = prefs[KEY_ANALYSIS_WEIGHT_MANA_BASE],
+                    analysisCurve = prefs[KEY_ANALYSIS_WEIGHT_CURVE],
+                    analysisPlanRoles = prefs[KEY_ANALYSIS_WEIGHT_PLAN_ROLES],
+                    analysisSynergy = prefs[KEY_ANALYSIS_WEIGHT_SYNERGY],
+                    analysisLegality = prefs[KEY_ANALYSIS_WEIGHT_LEGALITY],
                 )
             }
             .catch { emit(ScoreWeightOverrides.NONE) }
@@ -576,6 +572,11 @@ class UserPreferencesDataStore @Inject constructor(
             putOrRemoveFloat(prefs, KEY_SCORE_WEIGHT_COLOR, overrides.color)
             putOrRemoveFloat(prefs, KEY_SCORE_WEIGHT_REDUNDANCY_PENALTY, overrides.redundancyPenalty)
             putOrRemoveFloat(prefs, KEY_SCORE_WEIGHT_POWER_FLOOR, overrides.powerFloor)
+            putOrRemoveFloat(prefs, KEY_ANALYSIS_WEIGHT_MANA_BASE, overrides.analysisManaBase)
+            putOrRemoveFloat(prefs, KEY_ANALYSIS_WEIGHT_CURVE, overrides.analysisCurve)
+            putOrRemoveFloat(prefs, KEY_ANALYSIS_WEIGHT_PLAN_ROLES, overrides.analysisPlanRoles)
+            putOrRemoveFloat(prefs, KEY_ANALYSIS_WEIGHT_SYNERGY, overrides.analysisSynergy)
+            putOrRemoveFloat(prefs, KEY_ANALYSIS_WEIGHT_LEGALITY, overrides.analysisLegality)
         }
     }
 
@@ -589,6 +590,11 @@ class UserPreferencesDataStore @Inject constructor(
             prefs.remove(KEY_SCORE_WEIGHT_COLOR)
             prefs.remove(KEY_SCORE_WEIGHT_REDUNDANCY_PENALTY)
             prefs.remove(KEY_SCORE_WEIGHT_POWER_FLOOR)
+            prefs.remove(KEY_ANALYSIS_WEIGHT_MANA_BASE)
+            prefs.remove(KEY_ANALYSIS_WEIGHT_CURVE)
+            prefs.remove(KEY_ANALYSIS_WEIGHT_PLAN_ROLES)
+            prefs.remove(KEY_ANALYSIS_WEIGHT_SYNERGY)
+            prefs.remove(KEY_ANALYSIS_WEIGHT_LEGALITY)
         }
     }
 

@@ -8,9 +8,12 @@ import com.mmg.manahub.core.data.remote.CardStrategyTagsRemoteDataSource
 import com.mmg.manahub.core.data.remote.CardStrategyTagsRemoteDataSourceContract
 import com.mmg.manahub.core.data.repository.CardStrategyTagsRepositoryImpl
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
+import com.mmg.manahub.core.domain.usecase.card.HydrateCollectionStrategyTagsUseCase
 import com.mmg.manahub.core.domain.usecase.card.RefreshCardStrategyTagsUseCase
+import com.mmg.manahub.core.domain.usecase.card.ResolveCardStrategyTagsUseCase
 import io.github.jan.supabase.SupabaseClient
 import org.koin.core.module.Module
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 /**
@@ -27,10 +30,16 @@ import org.koin.dsl.module
  * .ComputeCardTagsUseCase].
  *
  * @param cacheDao the Hilt/Room-owned [CardStrategyTagsCacheDao] singleton (this module only).
+ * @param resolveCardStrategyTags the Hilt-owned [ResolveCardStrategyTagsUseCase] singleton, bridged
+ *   in (rather than rebuilt Koin-side) so the bulk hydration path shares the exact instance — and
+ *   therefore the exact `card_strategy_tags` repository/cache — the "card add" path already uses.
  */
 fun cardStrategyTagsKoinModule(
     cacheDao: CardStrategyTagsCacheDao,
+    resolveCardStrategyTags: ResolveCardStrategyTagsUseCase,
 ): Module = module {
+
+    single { resolveCardStrategyTags }
 
     // ── Hilt → Koin bridge: the Room-owned cache DAO, used only by this module. ──
     single { cacheDao }
@@ -55,4 +64,18 @@ fun cardStrategyTagsKoinModule(
     }
 
     single { RefreshCardStrategyTagsUseCase(cardRepository = get(), cardStrategyTagsRepository = get()) }
+
+    // Bulk hydration (2026-09-07) — consumed by CardTagHydrationWorker. CardDao is bridged by
+    // surveyKoinModule; UserPreferencesDataStore, CrashReporter and named("io") all come from
+    // coreBridgeKoinModule.
+    single {
+        HydrateCollectionStrategyTagsUseCase(
+            cardDao = get(),
+            cardStrategyTagsRepository = get(),
+            resolveCardStrategyTags = get(),
+            userPreferences = get(),
+            crashReporter = get(),
+            ioDispatcher = get(named("io")),
+        )
+    }
 }

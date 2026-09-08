@@ -1,6 +1,6 @@
 {
-  "index_version": "5",
-  "last_updated": "2026-07-10",
+  "index_version": "6",
+  "last_updated": "2026-09-07",
   "sets": [
     {
       "code": "sos",
@@ -80,10 +80,10 @@
       "icon_svg_uri": "https://svgs.scryfall.io/sets/tdm.svg?1778472000",
       "released_at": "2025-04-11",
       "content_versions": {
-        "guide": "April 18, 2025",
-        "tier_list": "2026-05-16",
-        "booster": "2026-06-11",
-        "engine": "2026-06-11"
+        "guide": "2026-09-07",
+        "tier_list": "2026-09-07",
+        "booster": "2026-09-07",
+        "engine": "2026-09-07"
       }
     },
     {

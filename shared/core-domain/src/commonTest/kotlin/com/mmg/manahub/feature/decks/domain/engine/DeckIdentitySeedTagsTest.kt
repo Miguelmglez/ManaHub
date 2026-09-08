@@ -22,16 +22,18 @@ class DeckIdentitySeedTagsTest {
     private val identityCategories = setOf(TagCategory.STRATEGY, TagCategory.ARCHETYPE, TagCategory.TRIBAL)
 
     @Test
-    fun `every non-GENERIC archetype yields at least one seed tag`() {
-        ArchetypeId.entries.filter { it != ArchetypeId.GENERIC }.forEach { archetype ->
+    fun `every archetype yields at least one seed tag`() {
+        // Deck Analysis Engine v3 removed ArchetypeId.GENERIC -- every entries value is now a
+        // real, specialized macro (no more "skip the neutral default" filter needed).
+        ArchetypeId.entries.forEach { archetype ->
             val tags = DeckIdentitySeedTags.archetypeSeedTags(archetype)
             assertTrue(tags.isNotEmpty(), "ArchetypeId.$archetype must yield at least one seed tag (D2 total mapping)")
         }
     }
 
     @Test
-    fun `GENERIC archetype yields no seed tags -- documented, intentional`() {
-        assertTrue(DeckIdentitySeedTags.archetypeSeedTags(ArchetypeId.GENERIC).isEmpty())
+    fun `a null archetype yields no seed tags -- documented, intentional`() {
+        assertTrue(DeckIdentitySeedTags.archetypeSeedTags(null).isEmpty())
     }
 
     @Test
@@ -42,13 +44,13 @@ class DeckIdentitySeedTagsTest {
         }
     }
 
-    /** TOOLBOX is the one documented exception (no STRATEGY/ARCHETYPE-category tag exists yet for
-     * "silver-bullet toolbox" decks -- see [DeckIdentitySeedTags]'s `THEME_TAGS` KDoc); every OTHER
-     * theme's tags are all IDENTITY-category (STRATEGY/ARCHETYPE/TRIBAL), the only categories
-     * [DeckScorer.synergyScore] can ever match a candidate card's own tag against. */
+    /** Deck Analysis Engine v3 moved TOOLBOX to PostureId -- it is no longer a ThemeId, so the old
+     * documented exception here is gone; every ThemeId's seed tags are all IDENTITY-category
+     * (STRATEGY/ARCHETYPE/TRIBAL), the only categories [DeckScorer.synergyScore] can ever match a
+     * candidate card's own tag against. */
     @Test
-    fun `every ThemeId's seed tags are IDENTITY-category, except the documented TOOLBOX exception`() {
-        ThemeId.entries.filter { it != ThemeId.TOOLBOX }.forEach { theme ->
+    fun `every ThemeId's seed tags are IDENTITY-category`() {
+        ThemeId.entries.forEach { theme ->
             val tags = DeckIdentitySeedTags.themeSeedTags(listOf(theme))
             assertTrue(
                 tags.all { it.category in identityCategories },
@@ -83,7 +85,9 @@ class DeckIdentitySeedTagsTest {
     @Test
     fun `archetypeForTag resolves a macro archetype's own primary tag`() {
         assertEquals(ArchetypeId.AGGRO, DeckIdentitySeedTags.archetypeForTag(CardTag.AGGRO))
-        assertEquals(ArchetypeId.RAMP, DeckIdentitySeedTags.archetypeForTag(CardTag.RAMP))
+        // Deck Analysis Engine v3: RAMP moved from ArchetypeId to PostureId -- CardTag.RAMP no
+        // longer resolves to a macro archetype at all (it has no MACRO_ARCHETYPE_TAGS entry).
+        assertNull(DeckIdentitySeedTags.archetypeForTag(CardTag.RAMP))
     }
 
     @Test

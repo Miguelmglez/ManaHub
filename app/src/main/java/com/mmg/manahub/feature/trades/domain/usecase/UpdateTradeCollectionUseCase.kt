@@ -6,6 +6,7 @@ import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
 import com.mmg.manahub.core.model.TradeItem
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
+import com.mmg.manahub.core.util.recordNonFatal
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 
@@ -104,12 +105,16 @@ class UpdateTradeCollectionUseCase(
                 // have been deleted from the collection already.
                 sentItems.forEach { item ->
                     val ref = item.userCardIdRef ?: return@forEach
+                    // Individual failures are intentionally swallowed here (a missing row --
+                    // card already sold/deleted -- must not abort the whole sync), but a REAL
+                    // delete failure (Room exception, not "not found") must still be observable
+                    // rather than silently discarded (write-path hardening audit, Phase 7).
                     runCatching { userCardRepository.deleteCard(ref) }
+                        .onFailure { e -> recordNonFatal("trade_collection_delete_card_failed", e) }
                     // Removes the open_for_trade entry both locally and from Supabase.
                     // The card is no longer owned so it must not remain offered for trade.
                     runCatching { openForTradeRepository.removeByCollectionIdAndSync(ref) }
-                    // Individual failures are intentionally swallowed — a missing row
-                    // (card already sold/deleted) must not abort the whole sync.
+                        .onFailure { e -> recordNonFatal("trade_collection_remove_open_for_trade_failed", e) }
                 }
 
                 // Add cards the user received and decrement their wishlist accordingly.

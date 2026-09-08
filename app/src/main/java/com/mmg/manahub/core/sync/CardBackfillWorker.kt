@@ -16,6 +16,12 @@ import java.util.concurrent.TimeUnit
  * Backend & Performance Optimization plan, WS1+WS3 Part B item 8 (2026-07-28, §0 F3): moves the
  * oracle-id + strategy-tags opportunistic backfills OFF the cold-start path.
  *
+ * As of 2026-09-07 the strategy-tags half is no longer run here: a 40-card, one-request-per-card
+ * daily drip needed ~33 days to cover a 1300-card collection. This worker now enqueues
+ * [CardTagHydrationWorker] instead, which resolves the SAME candidate query in batched requests.
+ * The two must never both drip the same candidates, which is why the direct
+ * `backfillMissingStrategyTags` call is gone rather than merely reduced.
+ *
  * Both `CardRepository.backfillMissingOracleIds`/`backfillMissingStrategyTags` used to run
  * unconditionally inside `ManaHubApp.onCreate`'s `appScope` on EVERY app launch — competing with
  * the login-window Scryfall/Supabase burst (collection sync's `ensureCardsExist`, deck sync, Home
@@ -56,7 +62,7 @@ class CardBackfillWorker(
         // either never fails the whole worker run.
         runCatching { cardRepository.backfillMissingOracleIds(20) }
         // Must run AFTER the oracle-id backfill above — see class KDoc's ordering invariant.
-        runCatching { cardRepository.backfillMissingStrategyTags(40) }
+        CardTagHydrationWorker.enqueueImmediate(WorkManager.getInstance(applicationContext))
 
         return Result.success()
     }

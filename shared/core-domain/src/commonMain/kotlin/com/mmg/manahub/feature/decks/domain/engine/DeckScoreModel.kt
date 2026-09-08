@@ -322,7 +322,8 @@ object DeckSkeletons {
     )
 
     fun forFormat(format: DeckFormat): DeckSkeleton = when (format) {
-        DeckFormat.COMMANDER -> DeckSkeleton(
+        DeckFormat.COMMANDER,
+        DeckFormat.COMMANDER_CASUAL -> DeckSkeleton(
             format = format,
             slots = listOf(
                 RoleSlot(DeckRole.RAMP,           min = 8,  ideal = 11, max = 14),

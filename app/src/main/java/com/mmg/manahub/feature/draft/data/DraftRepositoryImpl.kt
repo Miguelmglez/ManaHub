@@ -20,6 +20,7 @@ import com.mmg.manahub.feature.draft.data.remote.toDomain
 import com.mmg.manahub.feature.draft.data.remote.toEntity
 import com.mmg.manahub.core.model.ArchetypeGuide
 import com.mmg.manahub.core.model.ArchetypeKeyCard
+import com.mmg.manahub.core.model.DraftCardStats
 import com.mmg.manahub.core.model.DraftVideo
 import com.mmg.manahub.core.model.MechanicExamples
 import com.mmg.manahub.core.model.MechanicGuide
@@ -457,10 +458,20 @@ class DraftRepositoryImpl(
         val keyGameplayNotes = overview?.getAsJsonArray("key_gameplay_notes")
             ?.map { it.asString } ?: emptyList()
 
+        val formatSpeed = overview?.get("format_speed").safeAsString()
+
         val mechanics = json.getAsJsonArray("mechanics")
             ?.map { parseMechanic(it.asJsonObject) } ?: emptyList()
 
         val archetypes = parseArchetypeTierList(json.getAsJsonObject("archetype_tier_list"))
+
+        val keyCommonsByColor = json.getAsJsonObject("key_commons_by_color")
+            ?.entrySet()
+            ?.associate { (colorLabel, cardsElement) ->
+                val cards = cardsElement.takeIf { it.isJsonArray }?.asJsonArray
+                    ?.map { parseArchetypeKeyCard(it.asJsonObject) } ?: emptyList()
+                colorLabel to cards
+            } ?: emptyMap()
 
         return SetDraftGuide(
             setCode = setCode.uppercase(),
@@ -472,6 +483,8 @@ class DraftRepositoryImpl(
             keyGameplayNotes = keyGameplayNotes,
             mechanics = mechanics,
             archetypes = archetypes,
+            keyCommonsByColor = keyCommonsByColor,
+            formatSpeed = formatSpeed,
         )
     }
 
@@ -521,6 +534,7 @@ class DraftRepositoryImpl(
     private fun parseMechanicKeyCard(obj: JsonObject): MechanicKeyCard {
         val imageUris = obj.getAsJsonObject("image_uris")
         val colors = obj.getAsJsonArray("colors")?.map { it.asString } ?: emptyList()
+        val colorIdentity = obj.getAsJsonArray("color_identity")?.map { it.asString } ?: emptyList()
         return MechanicKeyCard(
             name = obj.get("name").safeAsString(),
             scryfallId = obj.get("id").safeAsString(),
@@ -533,6 +547,11 @@ class DraftRepositoryImpl(
             rarity = obj.get("rarity").safeAsString(),
             colors = colors,
             typeLine = obj.get("type_line").safeAsString(),
+            manaCost = obj.get("mana_cost").safeAsString(),
+            cmc = obj.get("cmc").safeAsDoubleOrNull(),
+            colorIdentity = colorIdentity,
+            sourceSet = obj.get("source_set").safeAsString(),
+            stats = parseCardStats(obj.getAsJsonObject("stats")),
         )
     }
 
@@ -555,6 +574,11 @@ class DraftRepositoryImpl(
     private fun parseArchetype(obj: JsonObject): ArchetypeGuide {
         val keyCards = obj.getAsJsonArray("key_cards")
             ?.map { parseArchetypeKeyCard(it.asJsonObject) } ?: emptyList()
+        val signpostCards = obj.getAsJsonArray("signpost_cards")
+            ?.map { parseArchetypeKeyCard(it.asJsonObject) } ?: emptyList()
+        val cardsToAvoid = obj.getAsJsonArray("cards_to_avoid")
+            ?.map { parseArchetypeKeyCard(it.asJsonObject) } ?: emptyList()
+        val colorLetters = obj.getAsJsonArray("color_letters")?.map { it.asString } ?: emptyList()
 
         return ArchetypeGuide(
             colors = obj.get("colors").safeAsString(),
@@ -563,13 +587,24 @@ class DraftRepositoryImpl(
             strategy = obj.get("strategy").safeAsString(),
             difficulty = obj.get("difficulty").safeAsString(),
             keyCards = keyCards,
+            colorLetters = colorLetters,
+            signpostCards = signpostCards,
+            cardsToAvoid = cardsToAvoid,
+            archetypeWinRate = obj.get("archetype_win_rate").safeAsDoubleOrNull(),
+            archetypeGames = obj.get("archetype_games").safeAsIntOrNull(),
+            notes = obj.get("notes").safeAsString(),
         )
     }
 
+    /**
+     * Parses a guide card object (archetype key/signpost/avoid cards, key-commons-by-color entries).
+     * All four contexts share the same shape, so a single parser covers them.
+     */
     private fun parseArchetypeKeyCard(obj: JsonObject): ArchetypeKeyCard {
         val imageUris = obj.getAsJsonObject("image_uris")
         val colors = obj.getAsJsonArray("colors")
             ?.map { it.asString } ?: emptyList()
+        val colorIdentity = obj.getAsJsonArray("color_identity")?.map { it.asString } ?: emptyList()
         return ArchetypeKeyCard(
             name = obj.get("name").safeAsString(),
             scryfallId = obj.get("id").safeAsString(),
@@ -578,6 +613,13 @@ class DraftRepositoryImpl(
             artCropUri = imageUris?.get("art_crop").safeAsString(),
             imageNormalUri = imageUris?.get("normal").safeAsString(),
             rarity = obj.get("rarity").safeAsString(),
+            manaCost = obj.get("mana_cost").safeAsString(),
+            cmc = obj.get("cmc").safeAsDoubleOrNull(),
+            colorIdentity = colorIdentity,
+            sourceSet = obj.get("source_set").safeAsString(),
+            tierRating = obj.get("tier_rating").safeAsString(),
+            pickOrderRank = obj.get("pick_order_rank").safeAsInt(),
+            stats = parseCardStats(obj.getAsJsonObject("stats")),
         )
     }
 
@@ -637,6 +679,8 @@ class DraftRepositoryImpl(
         val imageUris = obj.getAsJsonObject("image_uris")
         val colors = obj.getAsJsonArray("colors")
             ?.map { it.asString } ?: emptyList()
+        val colorIdentity = obj.getAsJsonArray("color_identity")?.map { it.asString } ?: emptyList()
+        val ratingSources = obj.getAsJsonArray("rating_sources")?.map { it.asString } ?: emptyList()
         return TierCard(
             name = obj.get("name").safeAsString(),
             scryfallId = obj.get("id").safeAsString(),
@@ -649,6 +693,25 @@ class DraftRepositoryImpl(
             artCropUri = imageUris?.get("art_crop").safeAsString(),
             imageNormalUri = imageUris?.get("normal").safeAsString(),
             typeLine = obj.get("type_line").safeAsString(),
+            manaCost = obj.get("mana_cost").safeAsString(),
+            cmc = obj.get("cmc").safeAsDoubleOrNull(),
+            oracleText = obj.get("oracle_text").safeAsString(),
+            colorIdentity = colorIdentity,
+            sourceSet = obj.get("source_set").safeAsString(),
+            ratingConfidence = obj.get("rating_confidence").safeAsString(),
+            ratingSources = ratingSources,
+            stats = parseCardStats(obj.getAsJsonObject("stats")),
+            inBoosters = obj.get("in_boosters").safeAsBooleanOrNull(),
+        )
+    }
+
+    /** Parses the optional per-card 17Lands `stats` object (schema v2). Null when absent. */
+    private fun parseCardStats(obj: JsonObject?): DraftCardStats? {
+        if (obj == null) return null
+        return DraftCardStats(
+            gihWinRate = obj.get("gih_wr").safeAsDoubleOrNull(),
+            gihGames = obj.get("gih_games").safeAsIntOrNull(),
+            iwd = obj.get("iwd").safeAsDoubleOrNull(),
         )
     }
 
@@ -669,4 +732,20 @@ class DraftRepositoryImpl(
      */
     private fun JsonElement?.safeAsInt(default: Int = 0): Int =
         if (this == null || isJsonNull) default else asInt
+
+    /**
+     * Returns [JsonElement.asDouble] or null if the element is null, [com.google.gson.JsonNull],
+     * or not a valid number. Schema v2 fields (e.g. "cmc") use this instead of a numeric default
+     * because 0.0 is a legitimate value and must not be conflated with "field absent".
+     */
+    private fun JsonElement?.safeAsDoubleOrNull(): Double? =
+        if (this == null || isJsonNull) null else runCatching { asDouble }.getOrNull()
+
+    /** Returns [JsonElement.asInt] or null if the element is null, JsonNull, or not a valid int. */
+    private fun JsonElement?.safeAsIntOrNull(): Int? =
+        if (this == null || isJsonNull) null else runCatching { asInt }.getOrNull()
+
+    /** Returns [JsonElement.asBoolean] or null if the element is null, JsonNull, or not a valid boolean. */
+    private fun JsonElement?.safeAsBooleanOrNull(): Boolean? =
+        if (this == null || isJsonNull) null else runCatching { asBoolean }.getOrNull()
 }

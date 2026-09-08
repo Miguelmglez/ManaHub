@@ -160,63 +160,6 @@ fun DeckCardRow(
     }
 }
 
-// ── CommanderBanner ───────────────────────────────────────────────────────────
-
-@Composable
-fun CommanderBanner(
-    commander: Card,
-    modifier:  Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    Row(
-        modifier          = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(mc.goldMtg.copy(alpha = 0.12f))
-            .border(0.5.dp, mc.goldMtg.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-
-    ) {
-        AsyncImage(
-            model              = commander.imageNormal,
-            contentDescription = null,
-            placeholder        = painterResource(Res.drawable.mtg_card_back),
-            error              = painterResource(Res.drawable.mtg_card_back),
-            fallback           = painterResource(Res.drawable.mtg_card_back),
-            contentScale       = ContentScale.Crop,
-            modifier           = Modifier
-                .size(width = 44.dp, height = 60.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(mc.surfaceVariant),
-        )
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .height(34.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            CardName(
-                name          = commander.name,
-                showFrontOnly = true,
-                style         = MaterialTheme.magicTypography.bodyMedium,
-                color         = mc.textPrimary,
-                maxLines      = 1,
-                overflow      = TextOverflow.Ellipsis
-            )
-            Text(
-                text     = commander.typeLine,
-                style    = MaterialTheme.magicTypography.labelSmall,
-                color    = mc.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        commander.manaCost?.let { ManaCostImages(manaCost = it, symbolSize = 14.dp) }
-    }
-}
-
 // ── LandsSection ─────────────────────────────────────────────────────────────
 
 @Composable

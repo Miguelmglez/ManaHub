@@ -6,7 +6,9 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -124,7 +126,7 @@ import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRarity
-import com.mmg.manahub.core.ui.components.CardTagChip
+import com.mmg.manahub.core.ui.components.CardTagGroup
 import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.core.ui.components.FoilBadge
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
@@ -323,6 +325,7 @@ fun CardDetailScreen(
                 setCode = card.setCode,
                 setName = card.setName,
                 rarity = card.rarity,
+                manaCost = card.manaCost,
                 initialFoil = editingEntry?.userCard?.isFoil ?: false,
                 initialCondition = editingEntry?.userCard?.condition ?: "NM",
                 initialLanguage = editingEntry?.userCard?.language ?: card.lang,
@@ -357,6 +360,7 @@ fun CardDetailScreen(
                 setCode = card.setCode,
                 setName = card.setName,
                 rarity = card.rarity,
+                manaCost = card.manaCost,
                 initialFoil = editingWishlistEntry?.isFoil ?: false,
                 initialCondition = editingWishlistEntry?.condition ?: "NM",
                 initialLanguage = editingWishlistEntry?.language ?: card.lang,
@@ -642,7 +646,7 @@ private fun CardDetailContent(
 
     // High-quality curve for the shared element bounds
     val sharedBoundsTransform: BoundsTransform = BoundsTransform { _, _ ->
-        tween(durationMillis = 400, easing = FastOutSlowInEasing)
+        tween(durationMillis = 380, easing = LinearOutSlowInEasing)
     }
 
     Column(
@@ -662,13 +666,6 @@ private fun CardDetailContent(
                 modifier = Modifier
                     .fillMaxWidth(0.75f)
                     .aspectRatio(0.716f)
-                    .graphicsLayer {
-                        rotationY = rotation
-                        cameraDistance = 12f * density
-                        // Force hardware layer during transition to prevent "snapping"
-                        compositingStrategy = CompositingStrategy.Offscreen
-                    }
-                    .clip(CardShape)
                     .then(
                         if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                             with(sharedTransitionScope) {
@@ -677,13 +674,20 @@ private fun CardDetailContent(
                                         key = sharedTransitionKey ?: "card-image-${card.scryfallId}"
                                     ),
                                     animatedVisibilityScope = animatedVisibilityScope,
-                                    clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
+                                    clipInOverlayDuringTransition = OverlayClip(CardShape),
                                     boundsTransform = sharedBoundsTransform,
                                     renderInOverlayDuringTransition = true,
                                 )
                             }
                         } else Modifier
                     )
+                    .graphicsLayer {
+                        rotationY = rotation
+                        cameraDistance = 12f * density
+                        // Force hardware layer during transition to prevent "snapping"
+                        compositingStrategy = CompositingStrategy.Offscreen
+                    }
+                    .clip(CardShape)
                     .then(
                         if (card.imageBackNormal != null)
                             Modifier.clickable { showBackFace = !showBackFace }
@@ -1798,6 +1802,9 @@ private fun LegalitySection(card: Card) {
             stringResource(R.string.format_standard) to card.legalityStandard,
             stringResource(R.string.format_pioneer) to card.legalityPioneer,
             stringResource(R.string.format_modern) to card.legalityModern,
+            stringResource(R.string.format_legacy) to card.legalityLegacy,
+            stringResource(R.string.format_vintage) to card.legalityVintage,
+            stringResource(R.string.format_pauper) to card.legalityPauper,
             stringResource(R.string.format_commander) to card.legalityCommander,
         )
         FlowRow(
@@ -1885,16 +1892,10 @@ private fun TagsSection(
                     style = MaterialTheme.magicTypography.labelSmall,
                     color = mc.textSecondary,
                 )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    autoTags.forEach { tag ->
-                        // Decorative-only (no onClick) — both the collected and non-collected
-                        // renderings were previously no-op-clickable InputChip/SuggestionChip.
-                        CardTagChip(label = tag.label(), category = tag.category)
-                    }
-                }
+                CardTagGroup(
+                    tags = autoTags,
+                    tagLabel = { tag -> tag.label() }
+                )
             }
 
             // ── User tags (only when in collection) ──────────────────────────
@@ -1908,22 +1909,14 @@ private fun TagsSection(
                     color = mc.textSecondary,
                 )
                 if (userTags.isNotEmpty()) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        userTags.forEach { tag ->
-                            CardTagChip(
-                                label = tag.label(),
-                                category = tag.category,
-                                onRemove = { onRemoveUserTag(tag) },
-                                removeContentDescription = stringResource(
-                                    R.string.carddetail_tags_remove_description,
-                                    tag.label()
-                                ),
-                            )
+                    CardTagGroup(
+                        tags = userTags,
+                        tagLabel = { tag -> tag.label() },
+                        onTagRemove = { tag -> onRemoveUserTag(tag) },
+                        removeContentDescription = { tag ->
+                            stringResource(R.string.carddetail_tags_remove_description, tag.label())
                         }
-                    }
+                    )
                 } else {
                     Text(
                         text = stringResource(R.string.carddetail_tags_user_empty),
@@ -2468,72 +2461,58 @@ private fun TagPickerSection(
             style = ty.labelLarge,
             color = mc.textSecondary,
         )
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            tags.forEach { tag ->
-                if (tag.isUserDefined && (onEdit != null || onDelete != null)) {
-                    // User-defined tag: chip + optional "applied" check + edit/delete icons.
-                    // The whole chip is tappable-to-add (matching the original label-only
-                    // clickable region's intent, just with a larger — CLAUDE.md-preferred —
-                    // touch target); the icon buttons still consume their own taps first via
-                    // Compose's normal nested-clickable resolution.
-                    CardTagChip(
-                        label = tag.label,
-                        category = tag.category,
-                        onClick = if (!tag.isApplied) ({ onAdd(tag.key) }) else null,
-                        trailing = {
-                            if (tag.isApplied) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = mc.lifePositive,
-                                    modifier = Modifier
-                                        .padding(start = 4.dp)
-                                        .size(13.dp),
-                                )
-                            }
-                            if (onEdit != null) {
-                                IconButton(
-                                    onClick = { onEdit(tag.key) },
-                                    modifier = Modifier.size(28.dp),
-                                ) {
-                                    Icon(
-                                        Icons.Default.Edit,
-                                        contentDescription = stringResource(
-                                            R.string.carddetail_edit_tag_description,
-                                            tag.label
-                                        ),
-                                        tint = mc.textSecondary,
-                                        modifier = Modifier.size(13.dp),
-                                    )
-                                }
-                            }
-                            if (onDelete != null) {
-                                IconButton(
-                                    onClick = { onDelete(tag.key) },
-                                    modifier = Modifier.size(28.dp),
-                                ) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = stringResource(
-                                            R.string.carddetail_delete_tag_description,
-                                            tag.label
-                                        ),
-                                        tint = mc.lifeNegative.copy(alpha = 0.7f),
-                                        modifier = Modifier.size(13.dp),
-                                    )
-                                }
-                            }
-                        },
+        CardTagGroup(
+            tags = tags.map { CardTag(it.key, it.category) },
+            tagLabel = { tag ->
+                tags.find { it.key == tag.key }?.label ?: tag.displayLabel
+            },
+            onTagClick = { tag -> onAdd(tag.key) },
+            tagTrailing = { tag ->
+                val pickerTag = tags.find { it.key == tag.key } ?: return@CardTagGroup
+                if (pickerTag.isApplied) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = mc.lifePositive,
+                        modifier = Modifier
+                            .padding(start = 4.dp)
+                            .size(13.dp),
                     )
-                } else {
-                    // Built-in tag: tap to add.
-                    CardTagChip(label = tag.label, category = tag.category, onClick = { onAdd(tag.key) })
+                }
+                if (pickerTag.isUserDefined && onEdit != null) {
+                    IconButton(
+                        onClick = { onEdit(pickerTag.key) },
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = stringResource(
+                                R.string.carddetail_edit_tag_description,
+                                pickerTag.label
+                            ),
+                            tint = mc.textSecondary,
+                            modifier = Modifier.size(13.dp),
+                        )
+                    }
+                }
+                if (pickerTag.isUserDefined && onDelete != null) {
+                    IconButton(
+                        onClick = { onDelete(pickerTag.key) },
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(
+                                R.string.carddetail_delete_tag_description,
+                                pickerTag.label
+                            ),
+                            tint = mc.lifeNegative.copy(alpha = 0.7f),
+                            modifier = Modifier.size(13.dp),
+                        )
+                    }
                 }
             }
-        }
+        )
     }
 }
 
@@ -2566,47 +2545,85 @@ private fun NewCategoryDialog(
 //  External Links section
 // ─────────────────────────────────────────────────────────────────────────────
 
-private data class ExternalLink(val label: String, val url: String)
+private data class ExternalLink(
+    val label: String,
+    val url: String,
+    val iconUrl: String? = null
+)
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ExternalLinksSection(card: Card) {
     val uriHandler = LocalUriHandler.current
 
     val referenceLinks = buildList {
-        add(ExternalLink(stringResource(R.string.carddetail_links_scryfall), card.scryfallUri))
+        add(ExternalLink(
+            label = stringResource(R.string.carddetail_links_scryfall),
+            url = card.scryfallUri,
+            iconUrl = "https://www.google.com/s2/favicons?domain=scryfall.com&sz=64"
+        ))
         card.relatedUris["gatherer"]?.let {
-            add(ExternalLink(stringResource(R.string.carddetail_links_gatherer), it))
+            add(ExternalLink(
+                label = stringResource(R.string.carddetail_links_gatherer),
+                url = it,
+                iconUrl = "https://www.google.com/s2/favicons?domain=wizards.com&sz=64"
+            ))
         }
         card.relatedUris["edhrec"]?.let {
-            add(ExternalLink(stringResource(R.string.carddetail_links_edhrec), it))
+            add(ExternalLink(
+                label = stringResource(R.string.carddetail_links_edhrec),
+                url = it,
+                iconUrl = "https://www.google.com/s2/favicons?domain=edhrec.com&sz=64"
+            ))
         }
     }
 
     val communityLinks = buildList {
         card.relatedUris["tcgplayer_infinite_articles"]?.let {
-            add(ExternalLink(stringResource(R.string.carddetail_links_tcgplayer_articles), it))
+            add(ExternalLink(
+                label = stringResource(R.string.carddetail_links_tcgplayer_articles),
+                url = it,
+                iconUrl = "https://www.google.com/s2/favicons?domain=tcgplayer.com&sz=64"
+            ))
         }
         card.relatedUris["tcgplayer_infinite_decks"]?.let {
-            add(ExternalLink(stringResource(R.string.carddetail_links_tcgplayer_decks), it))
+            add(ExternalLink(
+                label = stringResource(R.string.carddetail_links_tcgplayer_decks),
+                url = it,
+                iconUrl = "https://www.google.com/s2/favicons?domain=tcgplayer.com&sz=64"
+            ))
         }
     }
 
     val purchaseLinks = buildList {
         card.purchaseUris["tcgplayer"]?.let {
-            add(ExternalLink(stringResource(R.string.carddetail_links_tcgplayer), it))
+            add(ExternalLink(
+                label = stringResource(R.string.carddetail_links_tcgplayer),
+                url = it,
+                iconUrl = "https://www.google.com/s2/favicons?domain=tcgplayer.com&sz=64"
+            ))
         }
         card.purchaseUris["cardmarket"]?.let {
-            add(ExternalLink(stringResource(R.string.carddetail_links_cardmarket), it))
+            add(ExternalLink(
+                label = stringResource(R.string.carddetail_links_cardmarket),
+                url = it,
+                iconUrl = "https://www.google.com/s2/favicons?domain=cardmarket.com&sz=64"
+            ))
         }
         card.purchaseUris["cardhoarder"]?.let {
-            add(ExternalLink(stringResource(R.string.carddetail_links_cardhoarder), it))
+            add(ExternalLink(
+                label = stringResource(R.string.carddetail_links_cardhoarder),
+                url = it,
+                iconUrl = "https://www.google.com/s2/favicons?domain=cardhoarder.com&sz=64"
+            ))
         }
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
             text = stringResource(R.string.carddetail_links_title),
             style = MaterialTheme.magicTypography.labelMedium,
+            color = MaterialTheme.magicColors.textPrimary
         )
 
         if (referenceLinks.isNotEmpty()) {
@@ -2638,6 +2655,7 @@ private fun ExternalLinksSection(card: Card) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LinkCategory(
     title: String,
@@ -2648,16 +2666,16 @@ private fun LinkCategory(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
 
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = mc.primaryAccent,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(16.dp),
             )
             Text(
                 text = title,
@@ -2665,48 +2683,54 @@ private fun LinkCategory(
                 color = mc.textSecondary,
             )
         }
-        links.forEach { link ->
-            LinkRow(link = link, onOpen = onOpen)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            links.forEach { link ->
+                LinkChip(link = link, onOpen = onOpen)
+            }
         }
     }
 }
 
 @Composable
-private fun LinkRow(link: ExternalLink, onOpen: (String) -> Unit) {
+private fun LinkChip(link: ExternalLink, onOpen: (String) -> Unit) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
 
     Surface(
         onClick = { onOpen(link.url) },
         color = mc.surface,
-        shape = RoundedCornerShape(8.dp),
+        shape = ChipShape,
         border = BorderStroke(0.5.dp, mc.surfaceVariant),
-        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(
-                imageVector = Icons.Default.OpenInBrowser,
-                contentDescription = null,
-                tint = mc.primaryAccent,
-                modifier = Modifier.size(16.dp),
-            )
+            Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.OpenInBrowser,
+                    contentDescription = null,
+                    tint = mc.primaryAccent.copy(alpha = 0.5f),
+                    modifier = Modifier.size(16.dp),
+                )
+                if (link.iconUrl != null) {
+                    AsyncImage(
+                        model = link.iconUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
             Text(
                 text = link.label,
-                style = ty.bodyMedium,
+                style = ty.labelMedium,
                 color = mc.textPrimary,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = mc.textDisabled,
-                modifier = Modifier.size(16.dp),
             )
         }
     }

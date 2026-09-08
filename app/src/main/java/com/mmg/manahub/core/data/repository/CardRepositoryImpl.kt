@@ -271,6 +271,25 @@ class CardRepositoryImpl @Inject constructor(
             }
         }
 
+    override suspend fun searchCardPrintedName(name: String, lang: String): DataResult<Card> =
+        withContext(ioDispatcher) {
+            val result = remote.searchCardPrintedName(name, lang)
+            if (result.isSuccess) {
+                val card = result.getOrThrow()
+                val (entity, existingTagsJson) = entityPreservingTags(card)
+                cardDao.upsert(entity)
+                scheduleTagResolution(card, existingTagsJson)
+                DataResult.Success(card)
+            } else {
+                val exception = result.exceptionOrNull()
+                if (exception is ClientRequestException && exception.response.status == HttpStatusCode.NotFound) {
+                    DataResult.Error("SCRYFALL_404")
+                } else {
+                    DataResult.Error(exception?.message ?: "Unknown error")
+                }
+            }
+        }
+
     override suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card> =
         withContext(ioDispatcher) {
             val result = remote.getCardBySetAndNumber(set, number)

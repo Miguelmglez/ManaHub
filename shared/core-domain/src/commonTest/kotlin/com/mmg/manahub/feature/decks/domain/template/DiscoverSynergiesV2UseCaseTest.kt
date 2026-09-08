@@ -42,7 +42,9 @@ class DiscoverSynergiesV2UseCaseTest {
         val discoveries = useCase(collection)
         val rampDiscovery = discoveries.single { it.key is DiscoveryClusterKey.Strategy }
         assertEquals(8, rampDiscovery.memberCount)
-        assertEquals(ArchetypeId.RAMP, rampDiscovery.archetype)
+        // Deck Analysis Engine v3: RAMP moved from ArchetypeId to PostureId -- CardTag.RAMP no
+        // longer resolves to a macro archetype via DeckIdentitySeedTags.archetypeForTag at all.
+        assertEquals(null, rampDiscovery.archetype)
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
+import com.mmg.manahub.core.model.DeckFormat
 import kotlin.math.roundToInt
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -40,24 +41,33 @@ import kotlin.math.roundToInt
 object ArchetypeSkeletonResolver {
 
     /**
-     * Composes the skeleton for (format, archetype, themes) — Appendix A.4 steps 1-3 + 5
-     * (color modulation, step 4, is NOT applied here; see [resolveWithColor]).
+     * Composes the skeleton for (format, archetype, posture, themes) — Appendix A.4 steps 1-3 + 5,
+     * plus Deck Analysis Engine v3's new layer 2.5 (color modulation, step 4, is NOT applied here;
+     * see [resolveWithColor]).
      *
-     * Algorithm (verbatim from the Python reference):
+     * Algorithm (verbatim from the Python reference, plus the new posture layer):
      *  1. Start from [ArchetypeData.generic] for [format].
-     *  2. If [archetype] is specialized (`!= GENERIC`), its `roleTargets` REPLACE the matching
-     *     generic role bands; its own `lands`/`curve`/`antiRoles` replace the generic ones wholesale.
+     *  2. [archetype]'s `roleTargets` REPLACE the matching generic role bands; its own
+     *     `lands`/`curve`/`antiRoles` replace the generic ones wholesale. Deck Analysis Engine v3
+     *     removed `ArchetypeId.GENERIC` — [archetype] is now always one of the 5 real macros, so
+     *     this step is UNCONDITIONAL (no more "is this specialized" branch).
+     *  2.5. Deck Analysis Engine v3 (spec §3), NEW: if [posture] is non-null, its `adds`/`relaxes`
+     *     bands merge in EXACTLY like a theme's (MAX-per-bound `adds`, REPLACE `relaxes`), scaled by
+     *     [PostureDefinition.sixtyScale] for [ArchetypeFormat.SIXTY], and its `landsDelta`/
+     *     `curveDelta`/`antiRoles` apply the same way a theme's do. Runs BEFORE themes (layer 3)
+     *     per the spec's own layer ordering.
      *  3. For each theme (max 2 enforced by the caller; when 2 themes are present, EVERY theme's
      *     `adds`/`relaxes` bands are additionally scaled by 0.75 — the annex's 2-theme dilution
      *     factor): scale by [ThemeDefinition.sixtyScale] for [ArchetypeFormat.SIXTY] (1.0 for
      *     Commander), merge `adds` as MAX-per-bound into the roles map, REPLACE with `relaxes`,
      *     shift `lands`/`curve` by the theme's deltas.
-     *  5. Resolve every anti-role to `[0, 0, priorMax]` (the tolerance is whatever max the role
-     *     had BEFORE the anti-role rule fires — never a hardcoded 0).
+     *  5. Resolve every anti-role (archetype + posture) to `[0, 0, priorMax]` (the tolerance is
+     *     whatever max the role had BEFORE the anti-role rule fires — never a hardcoded 0).
      */
     fun resolve(
         format: ArchetypeFormat,
-        archetype: ArchetypeId = ArchetypeId.GENERIC,
+        archetype: ArchetypeId? = null,
+        posture: PostureId? = null,
         themes: List<ThemeId> = emptyList(),
     ): ResolvedArchetypeSkeleton {
         val generic = ArchetypeData.generic(format)
@@ -67,7 +77,13 @@ object ArchetypeSkeletonResolver {
         var antiRoles: Set<RoleKey> = emptySet()
         var shape = generic.shape
 
-        if (archetype.isSpecialized) {
+        // Deck Analysis Engine v3 removed `ArchetypeId.GENERIC` -- `archetype == null` is now the
+        // sole "no specialized macro, stay on the generic baseline" signal (mirrors
+        // [ArchetypeDefinition.id]'s own `null` = generic-base convention). Every real inference/
+        // pin path resolves a non-null [ArchetypeId] (one of the 5 real macros); `null` is reserved
+        // for callers that deliberately want the bare generic skeleton (golden-baseline tests,
+        // Draft's no-op path upstream).
+        if (archetype != null) {
             val a = ArchetypeData.ARCHETYPES[archetype]?.get(format)
                 ?: error("No ArchetypeDefinition for $archetype/$format")
             // roles_override REPLACES the matching generic band; keys the archetype does not
@@ -77,6 +93,41 @@ object ArchetypeSkeletonResolver {
             curve = a.curve
             antiRoles = a.antiRoles
             shape = a.shape
+        }
+
+        // ── Layer 2.5 (Deck Analysis Engine v3, spec §3) — posture, BEFORE themes ────────────
+        if (posture != null) {
+            val p = ArchetypeData.POSTURES.getValue(posture)
+            val scale = if (format == ArchetypeFormat.COMMANDER) 1.0 else p.sixtyScale
+
+            val mutableRoles = roles.toMutableMap()
+            p.adds.forEach { (key, band) ->
+                val scaled = band.scaledBy(scale)
+                val existing = mutableRoles[key]
+                mutableRoles[key] = if (existing != null) {
+                    RoleTarget(
+                        min = maxOf(existing.min, scaled.min),
+                        ideal = maxOf(existing.ideal, scaled.ideal),
+                        max = maxOf(existing.max, scaled.max),
+                    )
+                } else {
+                    scaled
+                }
+            }
+            p.relaxes.forEach { (key, band) -> mutableRoles[key] = band.scaledBy(scale) }
+            roles = mutableRoles
+
+            if (p.landsDelta != 0) {
+                lands = RoleTarget(lands.min + p.landsDelta, lands.ideal + p.landsDelta, lands.max + p.landsDelta)
+            }
+            if (p.curveDelta != 0.0) {
+                curve = CurveBand(
+                    roundTo2(curve.min + p.curveDelta),
+                    roundTo2(curve.ideal + p.curveDelta),
+                    roundTo2(curve.max + p.curveDelta),
+                )
+            }
+            antiRoles = antiRoles + p.antiRoles
         }
 
         val multi = if (themes.size > 1) 0.75 else 1.0
@@ -117,7 +168,7 @@ object ArchetypeSkeletonResolver {
         }
 
         // Step 5 — anti-roles resolve to [0, 0, priorMax]; tolerance = whatever max the role had
-        // (from generic/archetype/theme composition), defaulting to 1 if the role was never set.
+        // (from generic/archetype/posture/theme composition), defaulting to 1 if never set.
         if (antiRoles.isNotEmpty()) {
             val mutableRoles = roles.toMutableMap()
             antiRoles.forEach { key ->
@@ -130,6 +181,7 @@ object ArchetypeSkeletonResolver {
         return ResolvedArchetypeSkeleton(
             format = format,
             archetype = archetype,
+            posture = posture,
             themes = themes,
             roleTargets = roles,
             antiRoles = antiRoles,
@@ -152,11 +204,12 @@ object ArchetypeSkeletonResolver {
      */
     fun resolveWithColorCount(
         format: ArchetypeFormat,
-        archetype: ArchetypeId = ArchetypeId.GENERIC,
+        archetype: ArchetypeId? = null,
+        posture: PostureId? = null,
         themes: List<ThemeId> = emptyList(),
         colorCount: Int,
     ): ResolvedArchetypeSkeleton {
-        val base = resolve(format, archetype, themes)
+        val base = resolve(format, archetype, posture, themes)
         if (colorCount <= 0) return base
         val bucket = ArchetypeData.colorCountBucket(colorCount)
         val modulation = ArchetypeData.COLOR_MODULATION.getValue(format).getValue(bucket)
@@ -172,8 +225,8 @@ object ArchetypeSkeletonResolver {
     }
 
     /**
-     * Production entry point (1.6 wiring, extended by WS9.2): [resolveWithColorCount] plus a
-     * color-IDENTITY-aware pass ([applyIdentityModulation]). `identity`'s non-colorless count
+     * Production entry point (1.6 wiring, extended by WS9.2 and Wave 2 B2): [resolveWithColorCount]
+     * plus a color-IDENTITY-aware pass ([applyIdentityModulation]). `identity`'s non-colorless count
      * drives the SAME color-count modulation [resolveWithColorCount] always did; when that count
      * is `> 0` (a real, at-least-mono-colored identity — the same fail-closed gate the count-only
      * function already used), the identity's SPECIFIC colors additionally reshape the
@@ -181,17 +234,55 @@ object ArchetypeSkeletonResolver {
      * (count `<= 0`, e.g. unknown/unresolved) is a strict no-op beyond color-count modulation —
      * byte-identical to pre-WS9.2 behavior, matching [resolveWithColorCount]'s own fail-closed
      * convention.
+     *
+     * [deckFormat] (Wave 2 B2) is an OPTIONAL, LAST-appended param: when non-null and [format] is
+     * [ArchetypeFormat.SIXTY], [SixtyFormatProfile.forDeckFormat] is applied as the final layering
+     * step (see [applyFormatProfile]). `null` (every pre-existing call site) or a non-SIXTY
+     * [format] (Commander) is a strict no-op, matching every other fail-closed convention in this
+     * file.
      */
     fun resolveWithColor(
         format: ArchetypeFormat,
-        archetype: ArchetypeId = ArchetypeId.GENERIC,
+        archetype: ArchetypeId? = null,
+        posture: PostureId? = null,
         themes: List<ThemeId> = emptyList(),
         identity: Set<ManaColor>,
+        deckFormat: DeckFormat? = null,
     ): ResolvedArchetypeSkeleton {
         val colorCount = identity.count { it != ManaColor.C }
-        val withColorCount = resolveWithColorCount(format, archetype, themes, colorCount)
-        if (colorCount <= 0) return withColorCount
-        return applyIdentityModulation(withColorCount, identity)
+        val withColorCount = resolveWithColorCount(format, archetype, posture, themes, colorCount = colorCount)
+        val withIdentity = if (colorCount <= 0) withColorCount else applyIdentityModulation(withColorCount, identity)
+        return applyFormatProfile(withIdentity, format, deckFormat)
+    }
+
+    /**
+     * Wave 2 B2 — the LAST layering step of [resolveWithColor]: shifts [skeleton]'s `lands`/`curve`
+     * bands by [SixtyFormatProfile.landsDelta]/[SixtyFormatProfile.curveDelta] for [deckFormat],
+     * but only when [format] is [ArchetypeFormat.SIXTY] (Commander has no [DeckFormat]-level
+     * variation — see [ArchetypeFormat.of]). `deckFormat == null` (every legacy call site) or an
+     * all-zero profile (every [DeckFormat] besides STANDARD, this wave) is a no-op that returns
+     * [skeleton] unchanged, avoiding an unnecessary `.copy()` on the hot path.
+     */
+    private fun applyFormatProfile(
+        skeleton: ResolvedArchetypeSkeleton,
+        format: ArchetypeFormat,
+        deckFormat: DeckFormat?,
+    ): ResolvedArchetypeSkeleton {
+        if (deckFormat == null || format != ArchetypeFormat.SIXTY) return skeleton
+        val profile = SixtyFormatProfile.forDeckFormat(deckFormat)
+        if (profile.landsDelta == 0 && profile.curveDelta == 0.0) return skeleton
+
+        val lands = if (profile.landsDelta == 0) skeleton.lands else RoleTarget(
+            skeleton.lands.min + profile.landsDelta,
+            skeleton.lands.ideal + profile.landsDelta,
+            skeleton.lands.max + profile.landsDelta,
+        )
+        val curve = if (profile.curveDelta == 0.0) skeleton.curve else CurveBand(
+            roundTo2(skeleton.curve.min + profile.curveDelta),
+            roundTo2(skeleton.curve.ideal + profile.curveDelta),
+            roundTo2(skeleton.curve.max + profile.curveDelta),
+        )
+        return skeleton.copy(lands = lands, curve = curve)
     }
 
     /**

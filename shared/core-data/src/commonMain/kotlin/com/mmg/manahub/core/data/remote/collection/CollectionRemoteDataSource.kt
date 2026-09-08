@@ -24,6 +24,30 @@ interface CollectionRemoteDataSource {
     suspend fun getChangesSince(since: Long): Result<List<UserCardCollectionDto>>
 
     /**
+     * Keyset-paginated counterpart of [getChangesSince] (collection sync data-loss fix,
+     * `linear-moseying-yeti` plan, Phase 1/3). `get_collection_changes_since` has no `LIMIT`, so
+     * PostgREST silently truncates its response at `db-max-rows` (1000) with no signal to the
+     * client — this is the root cause of the 2026-09 data-loss incident. Delegates to the
+     * `get_collection_changes_page` RPC, which is server-capped at 500 rows/page and paginates
+     * via a true keyset cursor on `(updated_at, id)` — NOT `p_since`, which stays fixed as the
+     * window filter for the whole drain (see [com.mmg.manahub.core.data.sync.drainPages]).
+     *
+     * @param since Epoch millis watermark — the RPC's `p_since` window filter (`updated_at >
+     *   since`), fixed for every page of one drain.
+     * @param afterUpdatedAt Keyset cursor: the previous page's LAST row's `updatedAt`, or `null`
+     *   for the first page.
+     * @param afterId Keyset cursor: the previous page's LAST row's `id`, or `null` for the first
+     *   page. Ties on `afterUpdatedAt` are broken by this column server-side.
+     * @param limit Requested page size; the server clamps to `LEAST(limit, 500)`.
+     */
+    suspend fun getChangesPage(
+        since: Long,
+        afterUpdatedAt: Long? = null,
+        afterId: String? = null,
+        limit: Int = 500,
+    ): Result<List<UserCardCollectionDto>>
+
+    /**
      * Upserts a batch of rows into Supabase using the `batch_upsert_collection` RPC.
      *
      * The RPC performs an `INSERT ... ON CONFLICT (id) DO UPDATE` server-side, so individual rows
@@ -65,4 +89,12 @@ interface CollectionRemoteDataSource {
         language: String,
         quantity: Int,
     ): Result<Boolean>
+
+    /**
+     * Calls the parameterless `get_collection_integrity()` RPC (collection sync data-loss fix,
+     * Phase 6) — server-side row counts for `auth.uid()`, used by
+     * [com.mmg.manahub.core.sync.SyncManager]'s post-sync integrity self-check to detect a
+     * client/server row-count disagreement and trigger a full re-pull automatically.
+     */
+    suspend fun getIntegrity(): Result<CollectionIntegrityDto>
 }

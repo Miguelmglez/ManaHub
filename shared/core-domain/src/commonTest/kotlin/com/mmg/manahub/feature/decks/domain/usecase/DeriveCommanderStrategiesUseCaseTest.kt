@@ -24,11 +24,14 @@ class DeriveCommanderStrategiesUseCaseTest {
         // resolve an extra ArchetypeId.AGGRO here and make this specific assertion flaky/wrong.
         // LIFEGAIN maps ONLY to ThemeId.LIFEGAIN in DeckIdentitySeedTags -- no MACRO_ARCHETYPE_TAGS
         // list references it -- so it isolates the "themes-only" resolution this test targets.
+        // Deck Analysis Engine v3: RAMP moved from ArchetypeId to PostureId -- CardTag.RAMP no
+        // longer resolves a macro archetype at all, so this test now uses CardTag.AGGRO (a real,
+        // still-mapped MACRO_ARCHETYPE_TAGS signal) to keep demonstrating archetype resolution.
         val result = useCase(
-            ownTags = listOf(CardTag.RAMP, CardTag.LIFEGAIN),
+            ownTags = listOf(CardTag.AGGRO, CardTag.LIFEGAIN),
             ownTribes = listOf("elf"),
         )
-        assertEquals(listOf(ArchetypeId.RAMP), result.archetypes)
+        assertEquals(listOf(ArchetypeId.AGGRO), result.archetypes)
         assertEquals(listOf(ThemeId.LIFEGAIN), result.themes)
         assertEquals(listOf(DerivedTribeCandidate("tribe:elf", "Elf")), result.tribes)
     }
@@ -48,21 +51,21 @@ class DeriveCommanderStrategiesUseCaseTest {
         val result = useCase(
             ownTags = emptyList(),
             edhrecThemeNames = emptyList(),
-            fallbackTags = listOf(CardTag.RAMP),
+            fallbackTags = listOf(CardTag.AGGRO),
             fallbackTribeKeys = setOf("tribe:goblin"),
         )
-        assertEquals(listOf(ArchetypeId.RAMP), result.archetypes)
+        assertEquals(listOf(ArchetypeId.AGGRO), result.archetypes)
         assertEquals(listOf(DerivedTribeCandidate("tribe:goblin", "Goblin")), result.tribes)
     }
 
     @Test
     fun `source 3 is never consulted when source 1 already resolved something`() {
         val result = useCase(
-            ownTags = listOf(CardTag.RAMP),
+            ownTags = listOf(CardTag.AGGRO),
             fallbackTags = listOf(CardTag.TOKENS),
             fallbackTribeKeys = setOf("tribe:goblin"),
         )
-        assertEquals(listOf(ArchetypeId.RAMP), result.archetypes)
+        assertEquals(listOf(ArchetypeId.AGGRO), result.archetypes)
         assertTrue(result.themes.isEmpty())
         assertTrue(result.tribes.isEmpty())
     }

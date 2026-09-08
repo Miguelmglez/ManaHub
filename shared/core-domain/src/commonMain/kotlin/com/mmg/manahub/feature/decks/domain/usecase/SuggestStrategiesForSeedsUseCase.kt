@@ -103,8 +103,9 @@ class SuggestStrategiesForSeedsUseCase {
             return selectedColors - best.first
         }
 
+        // Deck Analysis Engine v3 removed ArchetypeId.GENERIC -- every entries value is now a real,
+        // specialized macro, so no filter is needed (was previously excluding the neutral default).
         val archetypeCandidates = ArchetypeId.entries
-            .filter { it != ArchetypeId.GENERIC }
             .mapNotNull { archetype ->
                 val keys = DeckIdentitySeedTags.archetypeSeedTags(archetype).map { it.key }.toSet()
                 val fit = overlapScore(unionKeys, keys)

@@ -63,6 +63,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.components.CardRow
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaCostImages
@@ -76,7 +77,6 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
-import com.mmg.manahub.feature.decks.presentation.components.CommanderBanner
 import org.jetbrains.compose.resources.painterResource
 import org.koin.androidx.compose.koinViewModel
 
@@ -541,7 +541,14 @@ private fun ReviewStepContent(
             uiState.selectedCommander?.let { commander ->
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
                     ReviewSectionLabel(stringResource(R.string.deck_wizard_review_commander_section))
-                    CommanderBanner(commander = commander, modifier = Modifier.fillMaxWidth())
+                    CardRow(
+                        card = commander,
+                        isInCollection = true,
+                        onClick = { /* Detail already visible if needed */ },
+                        onRemove = null,
+                        isCommander = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
 
@@ -564,7 +571,7 @@ private fun ReviewStepContent(
                     ReviewChipRow(
                         label = stringResource(R.string.deck_wizard_review_direction),
                         chipText = uiState.selectedCommander?.name
-                            ?: uiState.selectedArchetype?.takeIf { it != ArchetypeId.GENERIC }?.displayName
+                            ?: uiState.selectedArchetype?.displayName
                             ?: uiState.selectedDirectionTheme?.displayName
                             ?: uiState.selectedTribeLabel
                             ?: stringResource(R.string.deck_wizard_review_direction_none),
@@ -636,7 +643,7 @@ private fun ReviewStepContent(
                 }
             }
 
-            Surface(shape = SmallCardShape, color = mc.goldMtg.copy(alpha = 0.10f), modifier = Modifier.fillMaxWidth()) {
+            Surface(shape = CardShape, color = mc.goldMtg.copy(alpha = 0.10f), modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(spacing.md), verticalAlignment = Alignment.Top) {
                     Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.goldMtg, modifier = Modifier.size(20.dp))
                     Text(

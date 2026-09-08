@@ -100,7 +100,7 @@ class DeckTemplateResolver(
             // recomputeProfile's identity fingerprint and is what gets persisted as the deck's
             // archetypeOverride, so silently dropping it here left a Direction-step pick with no
             // effect on a community-sourced build).
-            archetypeInfo = DeckTemplateArchetypeInfo(archetype = spec.strategyProfile.archetype ?: ArchetypeId.GENERIC, themes = themes),
+            archetypeInfo = DeckTemplateArchetypeInfo(archetype = spec.strategyProfile.archetype, themes = themes),
             gamePlan = gamePlan(spec.strategyProfile),
         )
     }
@@ -206,7 +206,7 @@ class DeckTemplateResolver(
 
     private fun syntheticTemplate(spec: DeckWizardSpec): DeckTemplate {
         val archetypeFormat = if (spec.format == DeckFormat.COMMANDER) ArchetypeFormat.COMMANDER else ArchetypeFormat.SIXTY
-        val archetypeId = spec.strategyProfile.archetype ?: ArchetypeId.GENERIC
+        val archetypeId = spec.strategyProfile.archetype
         val themes = spec.strategyProfile.themes
         val colorIdentity = if (spec.format == DeckFormat.COMMANDER) {
             spec.commander?.colorIdentity?.toManaColorSet() ?: spec.colorIdentity
@@ -243,11 +243,12 @@ class DeckTemplateResolver(
     }
 
     /** Deck Engine Unification (D2): a one-sentence "game plan" line for the Result screen, built
-     * from the resolved [StrategyProfile] — [ArchetypeId.GENERIC] contributes nothing (it is the
-     * neutral default, not a game plan of its own). Blank only when the profile is entirely unpinned. */
+     * from the resolved [StrategyProfile] — a `null` archetype (Deck Analysis Engine v3 removed
+     * `ArchetypeId.GENERIC`; no macro pin is now `null`) contributes nothing. Blank only when the
+     * profile is entirely unpinned. */
     private fun gamePlan(profile: StrategyProfile): String? {
         val parts = listOfNotNull(
-            profile.archetype?.takeIf { it != ArchetypeId.GENERIC }?.displayName,
+            profile.archetype?.displayName,
             profile.themes.firstOrNull()?.displayName,
         )
         return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")

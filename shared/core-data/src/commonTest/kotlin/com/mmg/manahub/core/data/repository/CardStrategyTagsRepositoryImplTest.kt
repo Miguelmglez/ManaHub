@@ -44,6 +44,26 @@ class CardStrategyTagsRepositoryImplTest {
         }
     }
 
+    /** Batch-aware fake: [rows] is the whole simulated `card_strategy_tags` table, so an id with
+     *  no entry models a genuine "no row yet" miss (a SHORT result, never an error). */
+    private class FakeBatchRemote(
+        private val rows: Map<String, CardStrategyTagsRowDto> = emptyMap(),
+        private val failChunks: Set<Int> = emptySet(),
+    ) : CardStrategyTagsRemoteDataSourceContract {
+        val requestedChunks = mutableListOf<List<String>>()
+
+        override suspend fun getByOracleId(oracleId: String): CardStrategyTagsRowDto? = rows[oracleId]
+
+        override suspend fun getByOracleIds(oracleIds: List<String>): List<CardStrategyTagsRowDto> {
+            val index = requestedChunks.size
+            requestedChunks += oracleIds
+            if (index in failChunks) throw IllegalStateException("Remote down")
+            return oracleIds.mapNotNull { rows[it] }
+        }
+
+        override suspend fun submit(oracleId: String, payload: CardStrategyTagsPayloadDto) = Unit
+    }
+
     private class FakeRemote(
         // A non-nullable behavior lambda (rather than a nullable `result: (() -> Dto?)?` defaulting
         // to null) is deliberate — a nullable-lambda-with-`?:`-fallback can't distinguish "no
@@ -60,6 +80,11 @@ class CardStrategyTagsRepositoryImplTest {
         override suspend fun getByOracleId(oracleId: String): CardStrategyTagsRowDto? {
             callCount++
             return behavior()
+        }
+
+        override suspend fun getByOracleIds(oracleIds: List<String>): List<CardStrategyTagsRowDto> {
+            callCount++
+            return listOfNotNull(behavior())
         }
 
         override suspend fun submit(oracleId: String, payload: CardStrategyTagsPayloadDto) {
@@ -259,5 +284,109 @@ class CardStrategyTagsRepositoryImplTest {
         repo.submitStrategyTags("oracle-9", CardStrategyTagsSubmission(tags = listOf("removal")))
 
         assertEquals(1, remote.submitCallCount)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  getStrategyTagsBatch — bulk collection hydration (2026-09-07)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given more ids than one chunk when getStrategyTagsBatch then requests are chunked and every id is resolved`() = runTest {
+        val ids = (1..250).map { "oracle-$it" }
+        val remote = FakeBatchRemote(rows = ids.associateWith { row(it) })
+        val repo = repository(remote)
+
+        val results = repo.getStrategyTagsBatch(ids.toSet())
+
+        assertEquals(listOf(100, 100, 50), remote.requestedChunks.map { it.size })
+        assertEquals(250, results.size)
+        assertTrue(results.values.all { it is CardStrategyTagsResult.Found })
+    }
+
+    @Test
+    fun `given some ids already cached fresh when getStrategyTagsBatch then only the rest hit the network`() = runTest {
+        val cache = FakeCache()
+        cache.store["oracle-1"] = CachedCardStrategyTagsEntry(
+            oracleId = "oracle-1",
+            payloadJson = json.encodeToString(
+                CardStrategyTagsPayloadDto.serializer(),
+                CardStrategyTagsPayloadDto(tags = listOf("ramp")),
+            ),
+            pipelineVersion = "1",
+            generatedAt = "2026-07-21T00:00:00Z",
+            fetchedAt = 1_999_000L,
+        )
+        val remote = FakeBatchRemote(rows = mapOf("oracle-2" to row("oracle-2")))
+        val repo = repository(remote, cache)
+
+        val results = repo.getStrategyTagsBatch(setOf("oracle-1", "oracle-2"))
+
+        assertEquals(listOf(listOf("oracle-2")), remote.requestedChunks)
+        assertEquals(listOf("ramp"), (results.getValue("oracle-1") as CardStrategyTagsResult.Found).tags.map { it.key })
+        assertIs<CardStrategyTagsResult.Found>(results.getValue("oracle-2"))
+    }
+
+    @Test
+    fun `given the table has no row for some ids when getStrategyTagsBatch then those are NotFound and the rest still resolve`() = runTest {
+        val remote = FakeBatchRemote(rows = mapOf("oracle-1" to row("oracle-1")))
+        val cache = FakeCache()
+        val repo = repository(remote, cache)
+
+        val results = repo.getStrategyTagsBatch(setOf("oracle-1", "oracle-missing"))
+
+        assertIs<CardStrategyTagsResult.Found>(results.getValue("oracle-1"))
+        assertIs<CardStrategyTagsResult.NotFound>(results.getValue("oracle-missing"))
+        // A short result is "those ids have no row", never "stop early" -- the hit is still cached,
+        // and the miss deliberately writes NO cache row (submitStrategyTags is what caches those).
+        assertTrue(cache.store.containsKey("oracle-1"))
+        assertTrue(!cache.store.containsKey("oracle-missing"))
+    }
+
+    @Test
+    fun `given one chunk fails when getStrategyTagsBatch then only that chunk degrades and later chunks still run`() = runTest {
+        val ids = (1..150).map { "oracle-$it" }
+        val remote = FakeBatchRemote(rows = ids.associateWith { row(it) }, failChunks = setOf(0))
+        val repo = repository(remote)
+
+        val results = repo.getStrategyTagsBatch(ids.toSet())
+
+        assertEquals(2, remote.requestedChunks.size)
+        assertEquals(150, results.size)
+        assertIs<CardStrategyTagsResult.Error>(results.getValue("oracle-1"))
+        assertIs<CardStrategyTagsResult.Found>(results.getValue("oracle-150"))
+    }
+
+    @Test
+    fun `given a failing chunk with a stale cache entry when getStrategyTagsBatch then the stale entry is served`() = runTest {
+        val cache = FakeCache()
+        cache.store["oracle-1"] = CachedCardStrategyTagsEntry(
+            oracleId = "oracle-1",
+            payloadJson = json.encodeToString(
+                CardStrategyTagsPayloadDto.serializer(),
+                CardStrategyTagsPayloadDto(tags = listOf("ramp")),
+            ),
+            pipelineVersion = "1",
+            generatedAt = "2026-07-21T00:00:00Z",
+            fetchedAt = 0L,
+        )
+        val remote = FakeBatchRemote(failChunks = setOf(0))
+        // Clock well past the 14-day freshness window, so fetchedAt = 0 is genuinely expired.
+        val repo = repository(remote, cache, clock = { 2_000_000_000L })
+
+        val found = repo.getStrategyTagsBatch(setOf("oracle-1")).getValue("oracle-1")
+
+        assertIs<CardStrategyTagsResult.Found>(found)
+        assertTrue(found.isStale)
+    }
+
+    @Test
+    fun `given blank ids when getStrategyTagsBatch then they are dropped and no request is made`() = runTest {
+        val remote = FakeBatchRemote()
+        val repo = repository(remote)
+
+        val results = repo.getStrategyTagsBatch(setOf("", "   "))
+
+        assertTrue(results.isEmpty())
+        assertTrue(remote.requestedChunks.isEmpty())
     }
 }

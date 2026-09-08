@@ -726,7 +726,10 @@ class DeckWizardViewModel(
      */
     fun onNextFromStrategy() {
         val state = _uiState.value
-        val archetype = state.selectedArchetype ?: ArchetypeId.GENERIC
+        // Deck Analysis Engine v3: ArchetypeId.GENERIC no longer exists -- an unpinned selection is
+        // `null` directly (see BuildDeckFromTemplateUseCase.resolveArchetypeSkeleton's own compat
+        // note for the same substitution).
+        val archetype = state.selectedArchetype
         val themes = state.selectedStrategyThemes
         // Fix 5 (edge-case audit, 2026-07-28): mirrors BuildDeckFromTemplateUseCase
         // .resolveArchetypeSkeleton's own GENERIC-with-no-themes gate -- the REAL build never
@@ -734,7 +737,7 @@ class DeckWizardViewModel(
         // zero theme bonus in that case), so this UI-only preview must not either. Without this
         // gate, a Commander player picking "Balanced" would see a MANUAL_ADDS role chip reflecting
         // an archetype-flavored skeleton the real build never actually applies.
-        val skeleton = if (archetype == ArchetypeId.GENERIC && themes.isEmpty()) {
+        val skeleton = if (archetype == null && themes.isEmpty()) {
             null
         } else {
             ArchetypeSkeletonResolver.resolveWithColor(
@@ -1323,7 +1326,9 @@ class DeckWizardViewModel(
         // Workstream 3 -- every Casual flow now resolves the SAME shared MANUAL_ADDS skeleton
         // Commander's STRATEGY step resolves (mirrors onNextFromStrategy exactly) and lands on that
         // step, never IDENTITY/REVIEW directly.
-        val direction = state.selectedArchetype ?: ArchetypeId.GENERIC
+        // Deck Analysis Engine v3: ArchetypeId.GENERIC no longer exists -- an unpinned selection is
+        // `null` directly (see onNextFromStrategy's own compat note for the same substitution).
+        val direction = state.selectedArchetype
         val directionThemes = listOfNotNull(state.selectedDirectionTheme)
         // Fix 5 (edge-case audit, 2026-07-28): same GENERIC-with-no-themes gate as
         // onNextFromStrategy -- mirrors BuildDeckFromTemplateUseCase.resolveArchetypeSkeleton so
@@ -1332,7 +1337,7 @@ class DeckWizardViewModel(
         // guards) already requires a real pick before reaching this line for every entry flow that
         // enforces it -- this gate is defense-in-depth for any current/future path that reaches here
         // without a pick.
-        val skeleton = if (direction == ArchetypeId.GENERIC && directionThemes.isEmpty()) {
+        val skeleton = if (direction == null && directionThemes.isEmpty()) {
             null
         } else {
             ArchetypeSkeletonResolver.resolveWithColor(
@@ -1569,7 +1574,7 @@ class DeckWizardViewModel(
         // flow -- this function shouldn't silently trust an out-of-band-constructed spec.
         val commander = spec.commander.takeIf { spec.format == DeckFormat.COMMANDER }
         val profile = spec.strategyProfile
-        val archetypeName = profile.archetype?.takeIf { it != ArchetypeId.GENERIC }?.displayName
+        val archetypeName = profile.archetype?.displayName
         val themeName = profile.themes.firstOrNull()?.displayName
         return when {
             commander != null -> commander.name

@@ -37,7 +37,7 @@ enum class QuickStartAction(val persistedId: String) {
          * Default shortcut set for zero-data users: scan a card, build a deck,
          * search for a card, or view collection stats.
          */
-        val defaults = listOf(SCAN_CARD, CREATE_DECK, SEARCH_CARD, STATS)
+        val defaults = listOf(SCAN_CARD, DECKS, SEARCH_CARD, STATS)
 
         /** Resolves a persisted id back to its action, or null if unknown/removed. */
         fun fromPersistedId(id: String): QuickStartAction? =

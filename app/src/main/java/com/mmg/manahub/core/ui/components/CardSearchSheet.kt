@@ -32,9 +32,6 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,10 +44,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -72,13 +69,22 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.AddCardRow
+import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.components.ManaCostImages
+import com.mmg.manahub.core.ui.components.SetSymbol
+import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.ui.components.CardRow
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -122,6 +128,49 @@ fun CardSearchSheet(
      * When true, renders 3 tabs including the Wishlist tab — used by the Trades feature.
      */
     showWishlistTab: Boolean = false,
+    /**
+     * Pre-decomposed structured filters — the Analysis tab's "Browse for &lt;Category&gt;" entry
+     * point. Never rendered into the plain search bar: [onAdvancedSearch] is invoked once so the
+     * caller runs the real search against the translated filters (results already filtered, search
+     * bar left EMPTY). The user can still open [AdvancedSearchSheet] via the Tune icon, where these
+     * same filters show pre-selected. `null` (default) is a no-op.
+     */
+    initialAdvancedQuery: AdvancedSearchQuery? = null,
+    /**
+     * Structured-search sink: invoked once for a non-empty [initialAdvancedQuery], and again
+     * whenever the user presses SEARCH CARDS inside [AdvancedSearchSheet]. `null` (default) falls
+     * back to the legacy `onScryfallSearch(rawQuery)` route for callers with no structured
+     * handler (Trades), which writes the raw Scryfall string into the visible search bar.
+     */
+    onAdvancedSearch: ((AdvancedSearchQuery) -> Unit)? = null,
+    /**
+     * The structured query the caller currently has APPLIED (e.g. `DeckStudioUiState
+     * .activeCollectionQuery`), forwarded to [AdvancedSearchSheet] so its shared ViewModel is
+     * re-seeded from live state on every open instead of keeping an invisible filter from an
+     * earlier, unrelated open. Falls back to [initialAdvancedQuery] until the preset's own
+     * [onAdvancedSearch] round-trip lands; `null` on both means nothing is filtered.
+     */
+    appliedAdvancedQuery: AdvancedSearchQuery? = null,
+    /**
+     * [CardTag][com.mmg.manahub.core.model.CardTag] keys used to pre-filter the Collection tab on
+     * open — a different key space from [initialAdvancedQuery]'s criteria, so both can apply.
+     * Applying the filter is delegated to [onFilterCollectionByTags] (the sheet has no direct
+     * access to the collection); an empty set (default) is a no-op.
+     */
+    initialCollectionTagKeys: Set<String> = emptySet(),
+    /**
+     * Invoked once when [initialCollectionTagKeys] is non-empty — mirrors [onScryfallSearch] but
+     * for the Collection tab (e.g. `DeckStudioViewModel::searchCollectionByTags`). No-op default.
+     */
+    onFilterCollectionByTags: (Set<String>) -> Unit = {},
+    /**
+     * Hoisted tab selection. Non-null hands tab ownership to the caller, which is what lets the
+     * selected tab survive this sheet being unmounted and remounted (Deck Studio unmounts it while
+     * navigating to CardDetail). `null` (default) keeps the tab in this sheet's own state, and the
+     * preset effects below then pick the opening tab themselves.
+     */
+    selectedTabIndex: Int? = null,
+    onSelectedTabChange: (Int) -> Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -137,8 +186,33 @@ fun CardSearchSheet(
         confirmValueChange = { it != SheetValue.Hidden }
     )
     
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var internalSelectedTab by remember { mutableIntStateOf(0) }
+    val selectedTab = selectedTabIndex ?: internalSelectedTab
+    val setSelectedTab: (Int) -> Unit = { tab ->
+        internalSelectedTab = tab
+        onSelectedTabChange(tab)
+    }
     var showAdvancedSearch by remember { mutableStateOf(false) }
+
+    // Tab indices shift by one when the Wishlist tab (Trades feature) is present.
+    val scryfallTabIndex = if (showWishlistTab) 2 else 1
+    val collectionTabIndex = if (showWishlistTab) 1 else 0
+
+    // Structured preset entry point: the caller runs the real, already-filtered search; the plain
+    // search bar stays empty. Tab selection is skipped when the caller hoists it — re-asserting a
+    // preset tab on every remount would undo the tab the user picked before navigating away.
+    LaunchedEffect(initialAdvancedQuery) {
+        if (initialAdvancedQuery != null && !initialAdvancedQuery.isEmpty()) {
+            if (selectedTabIndex == null) setSelectedTab(scryfallTabIndex)
+            onAdvancedSearch?.invoke(initialAdvancedQuery)
+        }
+    }
+    LaunchedEffect(initialCollectionTagKeys) {
+        if (initialCollectionTagKeys.isNotEmpty()) {
+            if (selectedTabIndex == null) setSelectedTab(collectionTabIndex)
+            onFilterCollectionByTags(initialCollectionTagKeys)
+        }
+    }
 
     val displayTitle = if (friendName != null) {
         "Search cards from $friendName"
@@ -146,38 +220,44 @@ fun CardSearchSheet(
         title
     }
 
-    val forceHideKeyboard = {
-        // 1. Move focus to the sheet container (stealing it from TextField)
-        sheetFocusRequester.requestFocus()
-        
-        // 2. Direct SoftwareKeyboardController call
+    // Focus-free half of the hide, safe to run while this composable is being torn down.
+    val hideKeyboard = {
         keyboardController?.hide()
-        
-        // 3. Native WindowInsets call (Brute force)
         val activity = view.context.findActivity()
         if (activity != null) {
             WindowInsetsControllerCompat(activity.window, view).hide(WindowInsetsCompat.Type.ime())
         }
-        
-        // 4. FocusManager fallback
         focusManager.clearFocus(force = true)
     }
 
+    val forceHideKeyboard = {
+        // Steals focus from the TextField; only valid while the focusable container is attached.
+        sheetFocusRequester.requestFocus()
+        hideKeyboard()
+    }
+
+    // Must NOT request focus here: Deck Studio unmounts this sheet on every navigate-away, and
+    // FocusRequester.requestFocus() throws once its node is detached.
     DisposableEffect(Unit) {
-        onDispose {
-            forceHideKeyboard()
-        }
+        onDispose { hideKeyboard() }
     }
 
     if (showAdvancedSearch) {
         AdvancedSearchSheet(
             onDismiss = { showAdvancedSearch = false },
-            onSearch = { _, rawQuery ->
+            onSearch = { advancedQuery, rawQuery ->
                 showAdvancedSearch = false
-                selectedTab = if (showWishlistTab) 2 else 1
-                onScryfallSearch(rawQuery)
+                if (onAdvancedSearch != null) {
+                    // Structured route: the search bar stays clean and BOTH tabs honor the query,
+                    // so the user's current tab is left alone.
+                    onAdvancedSearch(advancedQuery)
+                } else {
+                    setSelectedTab(scryfallTabIndex)
+                    onScryfallSearch(rawQuery)
+                }
                 forceHideKeyboard()
             },
+            appliedQuery = appliedAdvancedQuery ?: initialAdvancedQuery,
         )
     }
 
@@ -185,7 +265,7 @@ fun CardSearchSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = mc.backgroundSecondary,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textDisabled) },
+        dragHandle = null,
     ) {
         Column(
             modifier = Modifier
@@ -277,7 +357,7 @@ fun CardSearchSheet(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = {
-                            selectedTab = 0
+                            setSelectedTab(0)
                             forceHideKeyboard()
                         },
                         text = {
@@ -291,9 +371,9 @@ fun CardSearchSheet(
                     )
                 }
                 Tab(
-                    selected = selectedTab == (if (showWishlistTab) 1 else 0),
+                    selected = selectedTab == collectionTabIndex,
                     onClick = {
-                        selectedTab = if (showWishlistTab) 1 else 0
+                        setSelectedTab(collectionTabIndex)
                         forceHideKeyboard()
                     },
                     text = {
@@ -306,9 +386,9 @@ fun CardSearchSheet(
                     }
                 )
                 Tab(
-                    selected = selectedTab == (if (showWishlistTab) 2 else 1),
+                    selected = selectedTab == scryfallTabIndex,
                     onClick = {
-                        selectedTab = if (showWishlistTab) 2 else 1
+                        setSelectedTab(scryfallTabIndex)
                         forceHideKeyboard()
                     },
                     text = {
@@ -321,9 +401,6 @@ fun CardSearchSheet(
                     }
                 )
             }
-
-            val scryfallTabIndex = if (showWishlistTab) 2 else 1
-            val collectionTabIndex = if (showWishlistTab) 1 else 0
 
             val results = when {
                 showWishlistTab && selectedTab == 0 -> wishlistResults
@@ -455,26 +532,65 @@ fun CardSearchSheet(
                 }
             }
 
-            Button(onClick = {
-                forceHideKeyboard()
-                onConfirm()
-                onDismiss()
-            }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent), shape = RoundedCornerShape(8.dp)) {
-                Text(stringResource(R.string.action_confirm), style = ty.titleMedium, color = mc.background)
-            }
-            
-            TextButton(onClick = {
-                forceHideKeyboard()
-                onCancel()
-                onDismiss()
-            }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp)) {
-                Text(stringResource(R.string.action_cancel), style = ty.titleMedium, color = mc.textSecondary)
-            }
+            MagicCtaButton(
+                onClick = {
+                    forceHideKeyboard()
+                    onConfirm()
+                    onDismiss()
+                },
+                text = stringResource(R.string.action_confirm),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                color = MagicCtaColor.Accent
+            )
+
+            MagicCtaButton(
+                onClick = {
+                    forceHideKeyboard()
+                    onCancel()
+                    onDismiss()
+                },
+                text = stringResource(R.string.action_cancel),
+                style = MagicCtaStyle.Ghost,
+                color = MagicCtaColor.Neutral,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            )
         }
     }
 }
 
 @Composable
+/**
+ * The card row shown by the Build tab's add-cards sheet AND (Deck Analysis Category Sections
+ * rework, W6) the Analysis tab's category "Browse" entry point — same sheet, same row. Rewritten
+ * on top of [CardListItem] (shared/core-ui) so mana cost renders here for free, per "el coste de
+ * maná va a estar incluido ahora en todos las vistas". [CardListItem] owns the leading
+ * image/name/set/type/mana-cost layout; the `-`/count/`+` controls and the commander/over-limit
+ * icons stay bespoke trailing content beside it (no `trailingContent` slot exists on
+ * [CardListItem] itself — adding one was out of this pass's scope since nothing else needs it yet).
+ *
+ * Two intentional visual deltas vs. the pre-W6 hand-rolled row, neither asked for by the plan but
+ * unavoidable once routed through [CardListItem]'s fixed layout — flagged for the design reviewer:
+ * 1. The leading thumbnail switches from [Card.imageArtCrop] (a 52×38 landscape crop) to
+ *    [Card.imageNormal] in [CardListItem]'s fixed 56×80 portrait slot (`SmallCardShape`) — the same
+ *    field/shape every other [CardListItem] consumer already uses; there is no portrait/landscape
+ *    switch on the shared component.
+ * 2. The current-commander name highlight (`color = mc.goldMtg`) is dropped — [CardListItem] does
+ *    not expose a name-color override. The gold background tint + border (still applied via the
+ *    outer [Surface], unchanged) plus the star icon on the trailing side keep the commander state
+ *    visible.
+ *
+ * Edge-case QA fix (CRITICAL, 2026-09-06): a rewrite of this row on top of [CardRow] dropped the
+ * guard that used to keep the commander's own row read-only from this ordinary Add Cards sheet.
+ * [showLiveControls] restores it: the deck's CURRENT commander must never expose live +/-
+ * controls here — tapping "-" would delete the singleton commander slot outright
+ * ([DeckStudioViewModel.removeCardFromDeck]'s `currentQty <= 1` branch), tapping "+" would
+ * duplicate it. It renders read-only (the [Icons.Default.Star] badge below is the only affordance)
+ * whenever [isCurrentCommander] is true outside commander-picker mode. Inside commander-picker
+ * mode ([isCommanderMode]), EVERY row goes control-less too — a card already in the mainboard used
+ * to show a live-looking "-"/quantity pair wired to a no-op [onRemove] (confusing dead UI); picking
+ * a commander is "tap the row" only (`onClick` here navigates to the inline detail sheet with the
+ * "Choose as commander" CTA, C3), never a +/- affordance.
+ */
 private fun AddCardSheetRow(
     row: AddCardRow,
     isCommanderMode: Boolean = false,
@@ -486,103 +602,69 @@ private fun AddCardSheetRow(
     onInteraction: () -> Unit
 ) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     val card = row.card
+    val showLiveControls = !isCommanderMode && !isCurrentCommander
 
-    Surface(
-        onClick = {
-            onInteraction()
-            onClick()
-        },
-        shape = RoundedCornerShape(8.dp),
-        color = when {
-            isCurrentCommander -> mc.goldMtg.copy(alpha = 0.1f)
-            row.quantityInDeck > 0 -> mc.primaryAccent.copy(alpha = 0.05f)
-            else -> mc.surface
-        },
-        border = when {
-            isCurrentCommander -> BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.4f))
-            row.quantityInDeck > 0 -> BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.3f))
-            else -> null
-        }
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            AsyncImage(model = card.imageArtCrop, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(width = 52.dp, height = 38.dp).clip(RoundedCornerShape(4.dp)))
-            Column(modifier = Modifier.weight(1f)) {
-                CardName(
-                    name          = card.name,
-                    showFrontOnly = true,
-                    style         = ty.bodyMedium,
-                    color         = if (isCurrentCommander) mc.goldMtg else mc.textPrimary,
-                    maxLines      = 1,
-                    overflow      = TextOverflow.Ellipsis
-                )
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    SetSymbol(
-                        setCode = card.setCode,
-                        rarity = CardRarity.fromString(card.rarity),
-                        size = 13.dp,
-                    )
-                    Text(
-                        text = card.setName,
-                        style = ty.labelSmall,
-                        color = mc.textSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
+    Box {
+        CardRow(
+            card = card,
+            isInCollection = row.isOwned,
+            onClick = {
+                onInteraction()
+                onClick()
+            },
+            onRemove = if (showLiveControls) {
+                {
+                    onInteraction()
+                    onRemove()
                 }
+            } else null,
+            onAdd = if (showLiveControls) {
+                {
+                    onInteraction()
+                    onAdd()
+                }
+            } else null,
+            quantity = row.quantityInDeck,
+            selected = isCurrentCommander,
+            extraSupportingContent = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (isTradeMode) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val isFoil = row.wishlistEntry?.isFoil == true || row.offerEntry?.isFoil == true
+                            val condition = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM"
+                            val language = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en"
 
-                Text(
-                    text = card.typeLine,
-                    style = ty.labelSmall,
-                    color = mc.textDisabled,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                if (isTradeMode) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(vertical = 2.dp)
-                    ) {
-                        val isFoil = row.wishlistEntry?.isFoil == true || row.offerEntry?.isFoil == true
-                        val condition = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM"
-                        val language = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en"
-
-                        LanguageBadge(langCode = language)
-                        CopyBadge(label = condition)
-                        if (isFoil) FoilBadge()
+                            LanguageBadge(langCode = language)
+                            CopyBadge(label = condition)
+                            if (isFoil) FoilBadge()
+                        }
                     }
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (!isCommanderMode && isCurrentCommander) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = mc.goldMtg,
-                        modifier = Modifier.size(18.dp)
-                    )
-                } else {
+
                     if (isTradeMode && !row.isOwned && row.availableQuantity == 0 && row.wishlistEntry == null && row.offerEntry == null) {
-                        Icon(
-                            imageVector = Icons.Default.PriorityHigh,
-                            contentDescription = stringResource(com.mmg.manahub.R.string.trades_warning_not_in_list),
-                            tint = mc.goldMtg,
-                            modifier = Modifier.size(14.dp)
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.PriorityHigh,
+                                contentDescription = stringResource(R.string.trades_warning_not_in_list),
+                                tint = mc.goldMtg,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = stringResource(R.string.trades_warning_not_in_list),
+                                style = MaterialTheme.magicTypography.labelSmall,
+                                color = mc.goldMtg
+                            )
+                        }
                     }
+                    
                     if (row.availableQuantity > 0) {
                         val overLimit = row.quantityInDeck > row.availableQuantity
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             if (overLimit) {
                                 Icon(
@@ -593,39 +675,26 @@ private fun AddCardSheetRow(
                                 )
                             }
                             Text(
-                                text = "${row.availableQuantity}",
-                                style = ty.labelSmall,
+                                text = "Available: ${row.availableQuantity}",
+                                style = MaterialTheme.magicTypography.labelSmall,
                                 color = if (overLimit) mc.lifeNegative else mc.textSecondary
                             )
                         }
                     }
-
-                    if (row.quantityInDeck > 0 && !isCommanderMode) {
-                        IconButton(onClick = {
-                            onInteraction()
-                            onRemove()
-                        }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Remove, null, tint = mc.textSecondary, modifier = Modifier.size(16.dp))
-                        }
-                        Text("${row.quantityInDeck}", style = ty.labelMedium, color = mc.primaryAccent)
-                    }
-
-                    val icon = if (isCommanderMode) {
-                        if (isCurrentCommander) Icons.Default.Check else Icons.Default.Add
-                    } else Icons.Default.Add
-
-                    IconButton(
-                        onClick = {
-                            onInteraction()
-                            onAdd()
-                        },
-                        enabled = !(isCommanderMode && isCurrentCommander),
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(icon, null, tint = if (isCurrentCommander) mc.goldMtg else mc.primaryAccent, modifier = Modifier.size(16.dp))
-                    }
                 }
             }
+        )
+
+        if (!isCommanderMode && isCurrentCommander) {
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = null,
+                tint = mc.goldMtg,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(18.dp)
+            )
         }
     }
 }

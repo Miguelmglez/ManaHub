@@ -84,6 +84,21 @@ interface CardStrategyTagsRepository {
     suspend fun getStrategyTags(oracleId: String): CardStrategyTagsResult
 
     /**
+     * Batched sibling of [getStrategyTags] for bulk collection hydration — same cache-first
+     * semantics per id (a fresh cache entry is served without any network work), with the
+     * remaining ids resolved in chunked batch requests instead of one request per card
+     * (ADR-005's batching rule).
+     *
+     * Returns an entry for EVERY non-blank id in [oracleIds] — [CardStrategyTagsResult.NotFound]
+     * for an id the table has no row for, [CardStrategyTagsResult.Error] for one whose chunk
+     * failed with no usable cache to fall back to. Blank ids are dropped (they can never have a
+     * row). Deliberately NOT declared with a default implementation: an implementation that
+     * silently loops [getStrategyTags] would re-create exactly the per-card request storm this
+     * method exists to remove.
+     */
+    suspend fun getStrategyTagsBatch(oracleIds: Set<String>): Map<String, CardStrategyTagsResult>
+
+    /**
      * Pushes a device-computed [submission] back to the precomputed table (plan §8a addendum),
      * so it converges toward completeness from real usage between offline pipeline runs. Fire-
      * and-forget from the caller's perspective: implementations MUST NEVER throw — a failure

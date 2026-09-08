@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -22,13 +21,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.mtg_card_back
-import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
+import org.jetbrains.compose.resources.painterResource
 
 private const val CARD_ASPECT_RATIO = 63f / 88f
 

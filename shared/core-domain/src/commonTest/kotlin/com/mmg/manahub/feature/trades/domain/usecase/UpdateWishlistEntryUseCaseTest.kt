@@ -28,6 +28,7 @@ private class FakeCardRepository(
     private val errorMessage: String? = null,
 ) : CardRepository {
     override suspend fun searchCardByName(query: String): DataResult<Card> = error("unused")
+    override suspend fun searchCardPrintedName(name: String, lang: String): DataResult<Card> = error("unused")
     override suspend fun searchCards(query: String, page: Int, bypassCache: Boolean): DataResult<List<Card>> = error("unused")
     override suspend fun searchCardsPaginated(query: String, page: Int, bypassCache: Boolean): DataResult<com.mmg.manahub.core.model.PaginatedCards> = error("unused")
     override suspend fun getCardById(scryfallId: String): DataResult<Card> =
@@ -136,6 +137,9 @@ private class FakeAuthRepository(initialState: SessionState = SessionState.Unaut
     override suspend fun updatePassword(newPassword: String, currentPassword: String?): AuthResult<Unit> = error("unused")
     override suspend fun unlinkIdentity(identityId: String): AuthResult<Unit> = error("unused")
     override suspend fun linkGoogleIdentityNative(redirectUrl: String): AuthResult<String?> = error("unused")
+    override suspend fun confirmPasswordReset(newPassword: String): AuthResult<Unit> = error("unused")
+    override suspend fun confirmEmailUpdate(newEmail: String): AuthResult<Unit> = error("unused")
+    override suspend fun cancelPendingEmailChange(): AuthResult<Unit> = error("unused")
 }
 
 private fun buildCard(scryfallId: String = "scry-new") = Card(

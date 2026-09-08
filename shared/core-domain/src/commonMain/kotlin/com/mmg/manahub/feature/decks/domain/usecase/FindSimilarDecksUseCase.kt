@@ -17,6 +17,16 @@ data class SimilarDeckResult(
     /** 0f..1f color-identity Jaccard similarity against the user's own deck. See the class KDoc's
      * "Scope note" for why this is the ONLY similarity signal (no mainboard-overlap term). */
     val colorSimilarity: Float,
+    // Suggestions Tab UI Polish plan (W10, 2026-08-25): threaded straight through from
+    // CommunityDeckSummary (the SAME upstream Archidekt search result HomeWidgets.kt's
+    // CommunityDecksWidget already gets these 4 fields from) so the UI can render this result via
+    // the shared DeckItem component instead of the bespoke SimilarDeckCard — see
+    // HomeWidgets.kt:toDeckSummary()'s exact precedent, mirrored by DeckStudioScreen's own
+    // toDeckSummary() mapper. Appended LAST so this stays source-compatible.
+    val format: String = "",
+    val cardCount: Int = 0,
+    val colorIdentity: Set<String> = emptySet(),
+    val coverImageUrl: String? = null,
 )
 
 /**
@@ -95,6 +105,10 @@ class FindSimilarDecksUseCase(
                             ownerUsername = deck.owner.username,
                             viewCount = deck.viewCount,
                             colorSimilarity = similarity,
+                            format = deck.format,
+                            cardCount = deck.size,
+                            colorIdentity = deck.colorIdentity.toSet(),
+                            coverImageUrl = deck.featuredImageUrl,
                         )
                     }
                 DataResult.Success(ranked)

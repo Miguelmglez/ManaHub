@@ -2,6 +2,8 @@ package com.mmg.manahub.core.sync.di
 
 import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.core.sync.CardBackfillWorker
+import com.mmg.manahub.core.sync.CardHydrationWorker
+import com.mmg.manahub.core.sync.CardTagHydrationWorker
 import com.mmg.manahub.core.sync.CollectionStatsSyncWorker
 import com.mmg.manahub.core.sync.PriceRefreshWorker
 import org.koin.android.ext.koin.androidContext
@@ -77,6 +79,32 @@ fun syncKoinModule(statsDao: StatsDao): Module = module {
             workerParams = it.get(),
             cardRepository = get(),
             syncManager = get(),
+        )
+    }
+
+    // Collection sync data-loss fix, Phase 4 (2026-09-06) — see CardHydrationWorker's own KDoc.
+    // CardDao is already a Koin single (bridged by SurveyKoinModule); ScryfallRemoteDataSource and
+    // SyncManager are both bridged singles in coreBridgeKoinModule, resolved via get().
+    // Bulk strategy-tag hydration (2026-09-07) — see CardTagHydrationWorker's own KDoc.
+    // HydrateCollectionStrategyTagsUseCase is a native single in core.di.cardStrategyTagsKoinModule.
+    worker {
+        CardTagHydrationWorker(
+            appContext = androidContext(),
+            workerParams = it.get(),
+            hydrateCollectionStrategyTags = get(),
+            syncManager = get(),
+            crashReporter = get(),
+        )
+    }
+
+    worker {
+        CardHydrationWorker(
+            appContext = androidContext(),
+            workerParams = it.get(),
+            cardDao = get(),
+            scryfallRemote = get(),
+            syncManager = get(),
+            crashReporter = get(),
         )
     }
 }

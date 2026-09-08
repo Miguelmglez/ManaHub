@@ -11,7 +11,7 @@ package com.mmg.manahub.core.model
  * values there would leak into that unrelated screen.
  */
 enum class CollectionGroupingMode {
-    NONE, TYPE, COLOR, CMC, SET, RARITY, TAG,
+    NONE, TYPE, COLOR, CMC, SET, RARITY,
     ;
 
     companion object {
@@ -61,22 +61,6 @@ private val TYPE_ORDER = listOf(
 /** Fixed section-order for [CollectionGroupingMode.COLOR]. No "Other" bucket — every [Card] here is resolved. */
 private val COLOR_ORDER = listOf("W", "U", "B", "R", "G", "Multicolor", "Colorless", "Land")
 
-/** Sentinel [CollectionSection.labelToken] for [CollectionGroupingMode.TAG] cards with no tags at all. */
-private const val UNTAGGED_TOKEN = "untagged"
-
-/**
- * The "identity" tag categories — STRATEGY/ARCHETYPE/TRIBAL — used by [CollectionGroupingMode.TAG]
- * to decide which tags describe "what kind of deck/strategy is this card for" (as opposed to
- * TYPE/KEYWORD/ROLE/CUSTOM, which are either derived-from-the-card-itself or functional-role
- * signals like "removal"/"tutor"). This exact three-category set is the established precedent used
- * deck-engine-wide (`IDENTITY_CATEGORIES` in `shared/core-domain`'s `DeckScorer`,
- * `InferDeckIdentityUseCase`, `RankOwnedCardsForProfileUseCase`, `BuildDeckFromTemplateUseCase`,
- * `DeckDoctorOrchestrator`) — duplicated here as a private val rather than imported because
- * `core-model` sits BELOW `core-domain` in the module graph and cannot depend on it. Keep the two
- * definitions in sync by hand if either ever changes.
- */
-private val IDENTITY_CATEGORIES = setOf(TagCategory.STRATEGY, TagCategory.ARCHETYPE, TagCategory.TRIBAL)
-
 /**
  * Duplicates [com.mmg.manahub.feature.collection.presentation.CollectionViewModel]'s private
  * `rarityWeight` ordering table (`:app` cannot be depended on FROM `core-model`, so this can't be
@@ -97,18 +81,6 @@ private fun rarityWeight(rarity: String) = when (rarity.lowercase()) {
  * Pure, commonMain-only, and stateless — safe to call from a ViewModel or from a unit test with
  * no platform dependency. Every mode preserves the RELATIVE ORDER of items as they arrived; only
  * bucket membership is computed here, never re-sorting.
- *
- * [CollectionGroupingMode.TAG] is the one mode where a single [CollectionCardGroup] can
- * legitimately appear in MULTIPLE returned sections (one per tag it carries) — this is
- * intentional, not a bug; callers building a Lazy list/grid MUST key items by
- * `"$labelToken|${item.groupKey}"`, never the bare `groupKey`, to avoid a duplicate-key crash.
- * [CollectionGroupingMode.TAG] only considers the "identity" categories — [TagCategory.STRATEGY],
- * [TagCategory.ARCHETYPE], [TagCategory.TRIBAL] (see [IDENTITY_CATEGORIES]) — deliberately, a
- * Collection-only scope restriction: TYPE/KEYWORD/ROLE/CUSTOM tags would flood the section list
- * with noise (ROLE especially, despite being numerous, since "removal"/"tutor"-style functional
- * tags aren't a deck identity signal). A card whose only tags fall outside that set buckets as
- * untagged. CardDetail and Deck Studio show every category and are unaffected.
- *
  * An empty [groups] input always returns an empty list, regardless of [mode].
  */
 fun groupCollection(
@@ -166,32 +138,7 @@ fun groupCollection(
                 )
         }
 
-        CollectionGroupingMode.TAG -> {
-            // Collection's TAG grouping is deliberately restricted to the "identity" categories
-            // (STRATEGY/ARCHETYPE/TRIBAL, see IDENTITY_CATEGORIES) — CardDetail/Deck Studio show
-            // ALL categories (color-coded), but here every other category (TYPE/KEYWORD/ROLE/
-            // CUSTOM) would flood the section list with noise. ROLE is excluded on purpose too,
-            // even though it's numerous, since functional-role tags ("removal"/"tutor") aren't a
-            // deck-identity signal. See CLAUDE.md's "Card tagging engine" section for the rationale.
-            val buckets = LinkedHashMap<String, MutableList<CollectionCardGroup>>()
-            groups.forEach { group ->
-                val keys = (group.card.tags + group.card.userTags)
-                    .filter { it.category in IDENTITY_CATEGORIES }
-                    .map { it.key }
-                    .distinct()
-                if (keys.isEmpty()) {
-                    buckets.getOrPut(UNTAGGED_TOKEN) { mutableListOf() }.add(group)
-                } else {
-                    keys.forEach { key ->
-                        buckets.getOrPut(key) { mutableListOf() }.add(group)
-                    }
-                }
-            }
-            buckets.entries
-                .filter { it.value.isNotEmpty() }
-                .sortedByDescending { it.value.size }
-                .map { (token, items) -> CollectionSection(token, items) }
-        }
+
     }
 }
 

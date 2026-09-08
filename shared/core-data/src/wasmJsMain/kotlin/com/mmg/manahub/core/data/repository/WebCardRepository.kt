@@ -103,6 +103,9 @@ class WebCardRepository(
     override suspend fun getCardByExactName(name: String): Result<Card> =
         remote.getCardByExactName(name).onSuccess(::cacheCard)
 
+    override suspend fun searchCardPrintedName(name: String, lang: String): DataResult<Card> =
+        remote.searchCardPrintedName(name, lang).toDataResult(onSuccess = ::cacheCard)
+
     override suspend fun searchWithRawQuery(query: String, order: String?, page: Int): List<Card> =
         remote.searchWithRawQuery(query, order, page).also(::cacheCards)
 

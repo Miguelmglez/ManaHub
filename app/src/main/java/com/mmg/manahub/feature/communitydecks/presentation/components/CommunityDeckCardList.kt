@@ -97,9 +97,11 @@ fun LazyListScope.communityDeckCardItems(
     commanderExpanded: Boolean = true,
     mainboardExpanded: Boolean = true,
     sideboardExpanded: Boolean = true,
+    collapsedSections: Set<String> = emptySet(),
     onToggleCommander: () -> Unit = {},
     onToggleMainboard: () -> Unit = {},
     onToggleSideboard: () -> Unit = {},
+    onToggleSection: (String) -> Unit = {},
     onCardClick: (String) -> Unit = {},
     ownedCardIdentityKeys: Set<String> = emptySet(),
     sharedTransitionScope: SharedTransitionScope? = null,
@@ -146,21 +148,28 @@ fun LazyListScope.communityDeckCardItems(
                 if (group.isEmpty()) null else label to group
             }
             groupedMainboard.forEach { (label, group) ->
+                val sectionKey = "main_$label"
+                val isExpanded = sectionKey !in collapsedSections
                 item(key = "header_mainboard_$label") {
                     GroupHeader(
                         label = label,
                         count = group.sumOf { it.quantity },
+                        expandable = true,
+                        expanded = isExpanded,
+                        onToggleExpand = { onToggleSection(sectionKey) },
                         modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg),
                     )
                 }
-                cardRows(
-                    items = group,
-                    prefix = "main_$label",
-                    onCardClick = onCardClick,
-                    ownedCardIdentityKeys = ownedCardIdentityKeys,
-                    sharedTransitionScope = sharedTransitionScope,
-                    animatedVisibilityScope = animatedVisibilityScope,
-                )
+                if (isExpanded) {
+                    cardRows(
+                        items = group,
+                        prefix = "main_$label",
+                        onCardClick = onCardClick,
+                        ownedCardIdentityKeys = ownedCardIdentityKeys,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    )
+                }
             }
         }
     }
@@ -174,14 +183,34 @@ fun LazyListScope.communityDeckCardItems(
             )
         }
         if (sideboardExpanded) {
-            cardRows(
-                items = sideboard,
-                prefix = "side",
-                onCardClick = onCardClick,
-                ownedCardIdentityKeys = ownedCardIdentityKeys,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope,
-            )
+            val groupedSideboard = MAINBOARD_TYPE_ORDER.mapNotNull { label ->
+                val group = sideboard.filter { typeGroupOf(it) == label }
+                if (group.isEmpty()) null else label to group
+            }
+            groupedSideboard.forEach { (label, group) ->
+                val sectionKey = "side_$label"
+                val isExpanded = sectionKey !in collapsedSections
+                item(key = "header_sideboard_$label") {
+                    GroupHeader(
+                        label = label,
+                        count = group.sumOf { it.quantity },
+                        expandable = true,
+                        expanded = isExpanded,
+                        onToggleExpand = { onToggleSection(sectionKey) },
+                        modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg),
+                    )
+                }
+                if (isExpanded) {
+                    cardRows(
+                        items = group,
+                        prefix = "side_$label",
+                        onCardClick = onCardClick,
+                        ownedCardIdentityKeys = ownedCardIdentityKeys,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    )
+                }
+            }
         }
     }
 }
@@ -206,6 +235,7 @@ fun CommunityDeckCardList(
     var commanderExpanded by remember { mutableStateOf(true) }
     var mainboardExpanded by remember { mutableStateOf(true) }
     var sideboardExpanded by remember { mutableStateOf(false) }
+    val collapsedSections = remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
 
     LazyColumn(modifier = modifier) {
         communityDeckCardItems(
@@ -213,9 +243,17 @@ fun CommunityDeckCardList(
             commanderExpanded = commanderExpanded,
             mainboardExpanded = mainboardExpanded,
             sideboardExpanded = sideboardExpanded,
+            collapsedSections = collapsedSections.keys,
             onToggleCommander = { commanderExpanded = !commanderExpanded },
             onToggleMainboard = { mainboardExpanded = !mainboardExpanded },
             onToggleSideboard = { sideboardExpanded = !sideboardExpanded },
+            onToggleSection = { label ->
+                if (collapsedSections.containsKey(label)) {
+                    collapsedSections.remove(label)
+                } else {
+                    collapsedSections[label] = true
+                }
+            },
             onCardClick = onCardClick,
             ownedCardIdentityKeys = ownedCardIdentityKeys,
         )

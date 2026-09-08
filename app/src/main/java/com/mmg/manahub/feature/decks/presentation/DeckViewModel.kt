@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.receiveAsFlow
 
 /**
  * Backs the deck list screen ([DeckListScreen]). Resolved by Koin via `koinViewModel()`
@@ -31,8 +32,26 @@ class DeckViewModel(
         }
     }
 
+    private val _events = kotlinx.coroutines.channels.Channel<DeckListEvent>(kotlinx.coroutines.channels.Channel.BUFFERED)
+    val events = _events.receiveAsFlow()
+
     fun onShowImportSheet() = _uiState.update { it.copy(showImportSheet = true) }
     fun onDismissImportSheet() = _uiState.update { it.copy(showImportSheet = false, importError = null) }
+
+    fun createDeck(name: String, format: com.mmg.manahub.core.model.DeckFormat) {
+        viewModelScope.launch {
+            try {
+                val deckId = deckRepo.createDeck(
+                    name = name.ifBlank { "New Deck" },
+                    description = "",
+                    format = format.name
+                )
+                _events.send(DeckListEvent.NavigateToDeck(deckId))
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
 
     fun deleteDeck(deckId: String) {
         viewModelScope.launch {
@@ -87,6 +106,10 @@ class DeckViewModel(
     }
 
     fun onErrorDismissed() = _uiState.update { it.copy(error = null) }
+}
+
+sealed interface DeckListEvent {
+    data class NavigateToDeck(val deckId: String, val format: String? = null) : DeckListEvent
 }
 
 data class DeckListUiState(

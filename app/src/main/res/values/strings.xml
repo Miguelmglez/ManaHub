@@ -90,6 +90,19 @@
     <string name="collection_no_results_title">No cards match your search</string>
     <string name="collection_no_results_subtitle">Try a different search term or adjust your filters</string>
     <string name="collection_no_results_action">Clear filters</string>
+    <string name="collection_wishlist_empty_title">Your wishlist is empty</string>
+    <string name="collection_wishlist_empty_subtitle">Cards you mark as wanted show up here.</string>
+    <string name="collection_for_trade_empty_title">No cards marked for trade</string>
+    <string name="collection_for_trade_empty_subtitle">Cards you offer for trade show up here.</string>
+    <string name="collection_source_hydrating_title">Still loading this list</string>
+    <plurals name="collection_source_hydrating_subtitle">
+        <item quantity="one">%1$d card has not finished downloading yet. It will appear here on its own.</item>
+        <item quantity="other">%1$d cards have not finished downloading yet. They will appear here on their own.</item>
+    </plurals>
+    <plurals name="collection_source_hydrating_notice">
+        <item quantity="one">%1$d more card is still downloading</item>
+        <item quantity="other">%1$d more cards are still downloading</item>
+    </plurals>
     <string name="collection_stale_banner">Prices may be outdated. Tap to refresh.</string>
     <string name="collection_sort_date">Date added</string>
     <string name="collection_sort_name">Name</string>
@@ -292,6 +305,8 @@
     <string name="scanner_toast_added_to_wishlist">%1$s added to Wishlist</string>
     <string name="scanner_toast_added_all_to_wishlist">%1$d items added to Wishlist</string>
     <string name="scanner_toast_added_all_to_collection">%1$d items added to Collection</string>
+    <string name="scanner_toast_add_failed">Could not add %1$s — try again</string>
+    <string name="scanner_toast_add_all_partial_failure">%1$d of %2$d cards could not be added — kept in queue</string>
     <string name="scanner_queue_title">%1$d cards scanned</string>
     <string name="scanner_queue_search_hint">Filter by name…</string>
     <string name="scanner_queue_button_desc">Scan queue</string>
@@ -307,6 +322,8 @@
     <string name="scanner_view_detail">View card detail</string>
     <string name="scanner_sound_effects">Sound effects</string>
     <string name="scanner_language_mismatch">Language mismatch</string>
+    <string name="scanner_language_fallback_added_as_en">No %1$s printing found — added as EN</string>
+    <string name="scanner_rate_limited_retrying">Scryfall busy — retrying in %1$ds</string>
     <string name="scanner_ambiguous_match">Ambiguous match — confirm or skip</string>
     <string name="scanner_confirm">Confirm</string>
     <string name="scanner_skip">Skip</string>
@@ -333,7 +350,7 @@
     <string name="scanner_name_zone_label">CARD NAME</string>
     <string name="scanner_queue_search_placeholder">Filter cards</string>
     <string name="scanner_queue_clear">Clear</string>
-    <string name="scanner_queue_add_all">Add to collection</string>
+    <string name="scanner_queue_add_all">Add all to collection</string>
     <string name="scanner_recently_added">Just now</string>
     <string name="scanner_edit_quantity">Quantity</string>
     <string name="scanner_edit_foil_label">Foil</string>
@@ -753,6 +770,131 @@
     <string name="deck_health_warning_archetype_anti_role">%1$s wants at most %3$d %2$s — you have %4$d.</string>
     <string name="deck_health_warning_curve_outside_archetype_band">%1$s\'s mana curve should average %3$s–%4$s — yours averages %2$s.</string>
 
+    <!-- Deck Analysis Engine v2 (Phase 2) findings: keys/copy only in this phase, the Compose
+         mapper (Finding.label()) is Phase 3 UI work. Distinct deck_analysis_finding_ prefix so
+         these never collide with the legacy deck_health_warning_ rows above (both sets stay
+         live: the legacy rows back the still-visible health ring, these back the new pillar UI). -->
+    <string name="deck_analysis_finding_land_count_off_target">Land count is %1$d — the plan wants about %2$d (band %3$d–%4$d).</string>
+    <string name="deck_analysis_finding_color_source_shortage">Not enough %1$s sources: %2$d (aim for about %3$d to cast your %1$s spells reliably).</string>
+    <string name="deck_analysis_finding_unfixed_splash">Your %1$s is unfixed: almost no lands make %1$s mana. Add fixing or cut the color.</string>
+    <string name="deck_analysis_finding_mana_fix_shortage">Not enough dedicated mana fixing: %1$d (aim for at least %2$d).</string>
+    <string name="deck_analysis_finding_land_mix_off_target">Basic/non-basic land mix is %1$d%% basics — aim for %2$d%%–%3$d%%.</string>
+    <string name="deck_analysis_finding_curve_off_band">Mana curve should average %2$s–%3$s — yours averages %1$s.</string>
+    <string name="deck_analysis_finding_curve_shape_mismatch">Your curve\'s shape does not match this plan\'s expected %1$s shape.</string>
+    <string name="deck_analysis_finding_role_gap">%1$s wants at least %3$d — you have %2$d.</string>
+    <string name="deck_analysis_finding_role_below_ideal">%1$s\'s ideal is %3$d — you have %2$d, consider adding more.</string>
+    <string name="deck_analysis_finding_anti_role_over_max">%1$s wants at most %3$d — you have %2$d.</string>
+    <!-- Deck Analysis Engine v3, Phase 4 (spec §5.4/§7): anti-synergy conflict findings, replacing
+         deck_analysis_finding_low_synergy_density (retired this phase). -->
+    <string name="deck_analysis_finding_self_defeating_graveyard_hate">You are running %1$d graveyard hate cards while your own plan depends on the graveyard — they cancel each other out.</string>
+    <string name="deck_analysis_finding_orphan_producers">%2$d %1$s cards but 0 payoffs to use them — add a payoff, or trim some of the %2$d down.</string>
+    <string name="deck_analysis_finding_orphan_payoffs">%2$d %1$s payoffs but almost no producers to feed them — aim for at least %3$d.</string>
+    <string name="deck_analysis_finding_stax_vs_own_engine">%1$d stax pieces are also choking your own card-draw engine (%2$d — Control decks want at least %3$d).</string>
+    <string name="deck_analysis_finding_deck_too_small">Deck is too small: %1$d cards (this format needs at least %2$d).</string>
+    <string name="deck_analysis_finding_too_many_copies">Too many copies of %1$s: %2$d (limit is %3$d).</string>
+    <string name="deck_analysis_finding_singleton_violation">%1$s breaks the singleton rule: %2$d copies (Commander allows 1).</string>
+    <string name="deck_analysis_finding_off_color_identity">%1$s is outside your commander\'s color identity.</string>
+    <string name="deck_analysis_finding_illegal_card">%1$s is not legal in this format.</string>
+    <string name="deck_analysis_finding_sideboard_oversized">Sideboard has %1$d cards — 60-card constructed formats allow at most 15.</string>
+    <string name="deck_analysis_finding_unresolved_cards">%1$d card(s) could not be loaded and were left out of this analysis.</string>
+
+    <!-- Deck Analysis Engine v2 Phase 3: pillar-tile labels (plan §3.4 item 3). -->
+    <string name="deck_analysis_pillar_mana_base">Mana base</string>
+    <string name="deck_analysis_pillar_curve">Curve</string>
+    <string name="deck_analysis_pillar_plan_roles">Plan roles</string>
+    <string name="deck_analysis_pillar_synergy">Synergy</string>
+    <string name="deck_analysis_pillar_legality">Legality</string>
+
+    <!-- Deck Analysis Engine v2 Phase 3: the plan-role table row's "anti-role" inverted text
+         ("Board wipes 3 / max 1", plan §3.4 item 3) — the normal (non-anti) role case reuses the
+         legacy RoleCoverageRow's plain "current/ideal" interpolation (no string needed, see
+         RoleCoverageEntryRow in HealthComponents.kt). -->
+    <string name="deck_analysis_role_anti_max_format">%1$d / max %2$d</string>
+    <!-- Suggestions Tab UI Polish plan (W4, D5, 2026-08-25): FindingsList's "show first N" toggle
+         — replaces the old inert "+N more" caption (deck_analysis_findings_collapsed_count,
+         deleted) now that PillarResult.findings carries the FULL list and the UI itself owns the
+         fold/unfold interaction. -->
+    <string name="deck_analysis_findings_show_more">Show %1$d more</string>
+    <string name="deck_analysis_findings_show_less">Show less</string>
+
+    <!-- Deck Analysis Category Sections rework (W2, 2026-08-21): SYNERGY-pillar-only sub-caption
+         under the pillar detail header, explaining the subscore's raw N/M (PillarResult
+         .alignedNonLandCopies / .totalNonLandCopies). SYNERGY is the weakest-calibrated pillar
+         (see AnalysisEngine.evaluateSynergy's KDoc); this is the "honest framing" the plan calls
+         for instead of extra visual authority. -->
+    <string name="deck_analysis_synergy_alignment_caption">Aligned %1$d / %2$d non-lands</string>
+
+    <!-- Deck Analysis Engine v2 "score limiter" follow-up (2026-08-20): a small, tappable hint row
+         near the score ring when ONE specific thing is dominantly holding totalScore back — live-
+         device finding, a Standard deck stuck at ILLEGAL_DECK_SCORE_CAP regardless of strategy pick
+         was misread as "the strategy switcher is broken" (it wasn't). Tapping either row expands the
+         relevant pillar tile via the SAME expandedPillar mechanism a tile tap already uses. -->
+    <string name="deck_analysis_limiter_legality_capped">Score capped by legality issues — your real plan score is %1$d. Fix the Legality findings below to unlock it.</string>
+    <string name="deck_analysis_limiter_dominant_pillar">%1$s is the main thing holding back your score right now.</string>
+    <string name="deck_analysis_limiter_action">View pillar details</string>
+
+    <!-- Deck Analysis Category Sections rework (W7, 2026-08-24): the per-category section list
+         inside each expanded pillar tile — CardSectionComponents.kt. Replaces the old flat
+         role-coverage-bar list; every pillar (not just Plan roles) renders sections now. -->
+    <string name="deck_analysis_section_progress_format">%1$d / %2$d</string>
+    <string name="deck_analysis_section_browse">Browse for %1$s</string>
+    <!-- Suggestions Tab UI Polish plan (W3, 2026-08-25): placeholder shown in a CardSectionRow
+         whose section.contributions is empty — every section now renders a consistent visual
+         anchor instead of the LazyRow simply being absent. -->
+    <string name="deck_analysis_section_empty">No cards yet</string>
+
+    <!-- Deck Analysis Engine v3, Phase 5 (UI, 2026-08-27): PillarTile's "not applicable" state
+         (PillarResult.notApplicable) — SYNERGY on a zero-edge deck. Never renders as "0". -->
+    <string name="deck_analysis_pillar_not_applicable_badge">N/A</string>
+
+    <!-- Deck Analysis Engine v3, Phase 5 (UI): the synergy-package section list inside the SYNERGY
+         pillar detail — one card per live axis, producers -> payoffs, ArchetypeResemblanceComponents/
+         SynergyAxisComponents.kt. -->
+    <string name="deck_analysis_synergy_packages_header">Synergy packages</string>
+    <string name="deck_analysis_synergy_not_applicable_title">No detectable synergy plan</string>
+    <string name="deck_analysis_synergy_not_applicable_body">This deck has no producer→payoff pairs the engine can detect. That doesn\'t mean it\'s poorly built — a straightforward removal-and-card-advantage plan can legitimately have no synergy graph at all — it just means this pillar has nothing to measure, so it\'s excluded from your score instead of scored as zero.</string>
+    <string name="deck_analysis_synergy_no_live_packages">No live synergy package yet — a package needs both producers and payoffs to count.</string>
+    <string name="deck_analysis_axis_package_header">%1$s package</string>
+    <string name="deck_analysis_axis_producers_label">Producers</string>
+    <string name="deck_analysis_axis_payoffs_label">Payoffs</string>
+    <string name="deck_analysis_axis_live_badge">LIVE</string>
+    <string name="deck_analysis_axis_health_caption">%1$d producers → %2$d payoffs · %3$d%% healthy</string>
+
+    <!-- Deck Analysis Engine v3, Phase 5 (UI): per-AxisKey English fallback labels — a presentation-
+         layer mirror of AnalysisEngine's own private AXIS_LABELS map (core-domain stays string-free
+         per Finding's own discipline; this is the SAME "each layer keeps its own fallback" precedent
+         as CardTag.displayLabel/ArchetypeRoleClassifier.label). Keep in sync with that map by hand
+         if a new axis is ever added. -->
+    <string name="deck_analysis_axis_life">Life</string>
+    <string name="deck_analysis_axis_death">Death</string>
+    <string name="deck_analysis_axis_tokens">Tokens</string>
+    <string name="deck_analysis_axis_counters">Counters</string>
+    <string name="deck_analysis_axis_landfall">Landfall</string>
+    <string name="deck_analysis_axis_graveyard">Graveyard</string>
+    <string name="deck_analysis_axis_etb">ETB</string>
+    <string name="deck_analysis_axis_spells">Spells</string>
+    <string name="deck_analysis_axis_artifacts">Artifacts</string>
+    <string name="deck_analysis_axis_enchantments">Enchantments</string>
+    <string name="deck_analysis_axis_attached">Equipment / Auras</string>
+    <string name="deck_analysis_axis_attack">Attack</string>
+    <string name="deck_analysis_axis_planeswalkers">Planeswalkers</string>
+    <string name="deck_analysis_axis_group">Group Effects</string>
+    <string name="deck_analysis_axis_mill_opp">Mill (Opponent)</string>
+    <string name="deck_analysis_axis_lock">Stax Lock</string>
+    <string name="deck_analysis_axis_engine">Engine</string>
+    <string name="deck_analysis_axis_tribe_format">%1$s (Tribe)</string>
+
+    <!-- Deck Analysis Engine v3, Phase 5 (UI): the archetype resemblance card — macro/posture/
+         themes + the full 5-way resemblance profile (ArchetypeResemblanceComponents.kt). Never a
+         "no plan" bucket: there is always a nearest plan with an honest confidence beside it. -->
+    <string name="deck_analysis_archetype_header">Archetype signal</string>
+    <string name="deck_analysis_archetype_custom_label">Custom</string>
+    <string name="deck_analysis_archetype_hybrid_format">%1$s / %2$s</string>
+    <string name="deck_analysis_archetype_confidence_margin">%1$d%% margin over runner-up</string>
+    <string name="deck_analysis_archetype_ambiguous_caption">No single archetype is confident enough yet — here\'s how this deck resembles each one.</string>
+    <string name="deck_analysis_resemblance_row_format">%1$d%%</string>
+    <string name="deck_analysis_posture_prefix">Posture: %1$s</string>
+
     <!-- ══════════════════════════════════════════
          DECK DOCTOR — CUT &amp; ADD SUGGESTIONS
     ═══════════════════════════════════════════ -->
@@ -788,7 +930,6 @@
     <string name="deck_studio_suggestions_similar_decks_header">Decks like yours</string>
     <string name="deck_doctor_community_inclusion">%1$d%% of %2$s decks</string>
     <string name="deck_doctor_community_fills_gap">Fills a gap</string>
-    <string name="deck_doctor_community_color_match">%1$d%% color match</string>
     <string name="deck_doctor_community_view_decks_cd">View decks containing %1$s</string>
     <string name="deck_doctor_community_unavailable">Community data unavailable</string>
     <string name="deck_doctor_community_empty">No community data for this deck yet.</string>
@@ -828,17 +969,20 @@
     <string name="deck_studio_include_outside_collection_toggle">Include cards outside my collection</string>
     <string name="deck_studio_outside_collection_unavailable">Couldn\'t search outside your collection right now — showing what we found in it.</string>
     <string name="deck_studio_tab_build">Build</string>
-    <string name="deck_studio_tab_suggestions">Suggestions</string>
+    <string name="deck_studio_tab_suggestions">Analysis</string>
 
     <!-- Archetype plan (Deck Doctor Community/Archetype plan, Phase 1.7) -->
     <string name="deck_studio_archetype_chip_prefix">Deck plan: %1$s</string>
     <string name="deck_studio_archetype_chip_action">Edit deck plan</string>
     <string name="deck_studio_archetype_low_confidence_hint">Set your deck\'s plan for better advice</string>
     <string name="deck_studio_archetype_sheet_title">Deck plan</string>
+    <string name="deck_studio_archetype_sheet_subtitle">Choose a strategy to get personalized advice</string>
     <string name="deck_studio_archetype_sheet_macro_label">Archetype</string>
     <string name="deck_studio_archetype_sheet_themes_label">Themes (up to 2)</string>
     <string name="deck_studio_archetype_auto_detect">Auto-detect</string>
     <string name="deck_studio_archetype_apply">Apply</string>
+    <!-- Deck Analysis Engine v2 Phase 0 carve-out (interim StrategyCatalog.isValidCombination guard) -->
+    <string name="deck_studio_archetype_invalid_combo_warning">This archetype and theme combination isn\'t supported yet.</string>
     <string name="deck_studio_archetype_plan_updated">Deck plan updated</string>
     <string name="deck_studio_strategy_unlocked">Strategy unlocked</string>
     <string name="deck_studio_strategy_locked_title">Built by the wizard</string>
@@ -861,6 +1005,11 @@
     <string name="deck_studio_import_in_progress">Import in progress…</string>
     <string name="deck_studio_suggestions_coming_soon_title">Suggestions coming soon</string>
     <string name="deck_studio_suggestions_coming_soon_subtitle">Deck Doctor analysis arrives in a future update.</string>
+    <!-- Deck Analysis Engine v2 Wave 2 (A2): shown when health is present but health.analysis is
+         null, i.e. the v2 pillar engine threw and EvaluateDeckUseCase's runCatching guard
+         degraded it (logged as deck_analysis_v2_engine_failed). Distinct from the "coming soon"
+         copy above, which means analysis has not run at all yet. -->
+    <string name="deck_analysis_error_message">Analysis couldn\'t complete. Something went wrong evaluating this deck.</string>
     <string name="deck_studio_seed_coming_soon">Build from seed arrives in a future update.</string>
     <string name="deck_studio_inspirations_coming_soon">Inspirations arrive in a future update.</string>
     <string name="deck_studio_create_failed">Couldn\'t create the deck. Please try again.</string>
@@ -1013,6 +1162,23 @@
     <string name="deck_strategy_picker_tribe_empty">No tribe candidates detected yet.</string>
     <string name="deck_strategy_picker_max_themes_reason">Remove one of your picks to choose this instead</string>
 
+    <!-- Deck Analysis Engine v2 Phase 3 (plan §3.4 item 1) — CuratedStrategyPickerSheet, the flat
+         curated-strategy replacement for ArchetypePlanSheet in Deck Studio. Deliberately its OWN
+         "deck_curated_strategy_picker_" prefix (never "deck_strategy_picker_") so these never
+         collide with the UNRELATED, already-live 3-axis StrategyPickerSheet above (Deck Wizard &
+         Engine Rework plan WS1.2) — the two components share a similar name but are NOT the same
+         picker; see this phase's report for the full naming-collision note. -->
+    <string name="deck_curated_strategy_picker_search_placeholder">Search strategies</string>
+    <string name="deck_curated_strategy_picker_core_plans_header">Core plans</string>
+    <string name="deck_curated_strategy_picker_themed_header">Build-around themes</string>
+    <string name="deck_curated_strategy_picker_no_results">No strategies match your search.</string>
+    <string name="deck_curated_strategy_picker_auto_detect_hint_current">Currently: %1$s</string>
+    <string name="deck_curated_strategy_picker_auto_detect_hint_manual">Let ManaHub pick your plan from the cards already in this deck</string>
+    <string name="deck_curated_strategy_picker_tribe_prompt">Choose a tribe for %1$s</string>
+    <string name="deck_curated_strategy_picker_tribe_cancel">Back to strategies</string>
+    <string name="deck_curated_strategy_picker_chip_detected">%1$s (detected)</string>
+    <string name="deck_curated_strategy_picker_chip_manual">%1$s (manual)</string>
+
     <!-- Deck Wizard & Engine Rework plan (WS 2) — Commander-only COMMANDER_PICK / STRATEGY / MANUAL_ADDS steps -->
     <string name="deck_wizard_commander_pick_title">Pick your commander</string>
     <string name="deck_wizard_commander_pick_subtitle">Filter by color, then search your collection or beyond.</string>
@@ -1058,10 +1224,7 @@
          the wizard's own "Generating" stage copy above; same visual language, separate strings
          since this is the Suggestions tab's full-analysis pass, not a deck build. -->
     <string name="deck_doctor_stage_reading_deck_plan">Reading your deck plan…</string>
-    <string name="deck_doctor_stage_evaluating_collection">Evaluating your collection…</string>
     <string name="deck_doctor_stage_searching_community">Searching similar community decks…</string>
-    <string name="deck_doctor_stage_searching_card_pool">Searching card pool (exhaustive)…</string>
-    <string name="deck_doctor_stage_ranking_suggestions">Ranking suggestions…</string>
     <!-- Result -->
     <string name="deck_wizard_gaps_title">Couldn\'t fill from your collection</string>
     <string name="deck_wizard_gap_row_with_colors">Missing %1$d %2$s in %3$s</string>
@@ -1959,7 +2122,6 @@
     <string name="advsearch_section_type">Card type</string>
     <string name="advsearch_type_hint">e.g. Legendary Creature Elf</string>
     <string name="advsearch_section_colors">Colors</string>
-    <string name="advsearch_colors_exact">Exactly these colors</string>
     <string name="advsearch_section_mana">Mana value (CMC)</string>
     <string name="advsearch_section_rarity">Rarity</string>
     <string name="advsearch_section_stats">Power / Toughness</string>
@@ -2079,8 +2241,29 @@
     <string name="advsearch_section_collection_status">Collection status</string>
     <string name="advsearch_filter_wishlist">In wishlist</string>
     <string name="advsearch_filter_for_trade">Marked for trade</string>
+    <string name="advsearch_filter_in_collection">In collection</string>
+    <string name="advsearch_colormatch_label">Color match</string>
+    <string name="advsearch_colormatch_any">Any of these colors (OR)</string>
+    <string name="advsearch_colormatch_any_desc">Cards with at least one of the selected colors</string>
+    <string name="advsearch_colormatch_all">All of these colors (AND)</string>
+    <string name="advsearch_colormatch_all_desc">Cards that contain every selected color</string>
+    <string name="advsearch_colormatch_exactly">Exactly these colors</string>
+    <string name="advsearch_colormatch_exactly_desc">Cards whose colors are exactly the selection</string>
+    <string name="advsearch_colormatch_at_most">At most these colors</string>
+    <string name="advsearch_colormatch_at_most_desc">Cards that fit inside the selection (Commander identity)</string>
+    <string name="advsearch_colormatch_picker_title">Color match</string>
     <string name="advsearch_section_tags">Tags</string>
     <string name="advsearch_tags_hint">Any card or user tag</string>
+    <string name="advsearch_section_function">Card function</string>
+    <string name="advsearch_function_hint">e.g. Ramp, Board Wipe, Recursion…</string>
+    <string name="advsearch_function_selected_count">%1$d functions selected</string>
+    <!-- Suggestions Tab UI Polish plan (W11, 2026-08-25): 2 new sections seeded ONLY from Deck
+         Analysis's "Browse for X" structured translation (SectionSearchQuery.toAdvancedQuery),
+         no manual picker exists for either, they render read-only chips + a single clear action. -->
+    <string name="advsearch_section_mana_production">Mana production</string>
+    <string name="advsearch_mana_production_colors">Lands producing: %1$s</string>
+    <string name="advsearch_mana_production_threshold">Produces %1$d+ colors</string>
+    <string name="advsearch_section_oracle_terms">Curated oracle match</string>
     <string name="collection_active_filters">%1$d active filter(s)</string>
     <string name="collection_clear_filters">Clear filters</string>
 
@@ -2205,6 +2388,9 @@
     <string name="draft_mechanic_key_cards">Key Cards</string>
     <string name="draft_archetype_difficulty">Difficulty: %1$s</string>
     <string name="draft_pick_order_rank">Pick #%1$d</string>
+    <string name="draft_cards_to_avoid_label">Cards to Avoid</string>
+    <string name="draft_archetype_win_rate">%1$.1f%% Win Rate</string>
+    <string name="draft_key_commons_by_color">Key Commons by Color</string>
 
     <!-- Draft Simulator -->
     <string name="draft_sim_setup_title">Draft Simulator</string>
@@ -3124,7 +3310,7 @@
     <string name="quick_start_sheet_build_deck">Build deck</string>
     <string name="quick_start_sheet_draft_guide">Draft guide</string>
     <string name="quick_start_sheet_search_card">Search card</string>
-    <string name="quick_start_sheet_decks">Decks</string>
+    <string name="quick_start_sheet_decks">My decks</string>
     <string name="quick_start_sheet_news">News</string>
     <string name="quick_start_sheet_stats">Stats</string>
     <string name="quick_start_sheet_friends">Friends</string>

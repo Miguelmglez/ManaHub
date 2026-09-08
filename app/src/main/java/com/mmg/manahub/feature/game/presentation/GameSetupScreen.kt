@@ -20,6 +20,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -57,6 +60,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
@@ -90,13 +94,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
@@ -479,45 +488,139 @@ private fun PlayerAvatarStrip(
     playerCount: Int,
     onAvatarTap: (Int) -> Unit,
 ) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        itemsIndexed(playerConfigs.take(playerCount), key = { _, config -> config.id }) { idx, config ->
+            PlayerAvatarItem(
+                config = config,
+                index = idx,
+                onTap = { onAvatarTap(idx) },
+                modifier = Modifier.animateItem()
+            )
+        }
+    }
+}
+
+/**
+ * An individual player avatar with enhanced visuals: radial gradients, icons,
+ * and a stylized name badge.
+ */
+@Composable
+private fun PlayerAvatarItem(
+    config: PlayerConfig,
+    index: Int,
+    onTap: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
 
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-        contentPadding = PaddingValues(horizontal = 4.dp),
-        modifier = Modifier.fillMaxWidth(),
+    val entranceAlpha by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = tween(400, delayMillis = index * 50),
+        label = "avatarAlpha"
+    )
+    val entranceScale by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+        label = "avatarScale"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier
+            .graphicsLayer {
+                alpha = entranceAlpha
+                scaleX = entranceScale
+                scaleY = entranceScale
+            }
+            .clickable(
+                onClick = onTap,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            )
     ) {
-        itemsIndexed(playerConfigs.take(playerCount)) { idx, config ->
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+        Box(contentAlignment = Alignment.Center) {
+            // Glow effect
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .drawBehind {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(config.theme.glow, Color.Transparent),
+                                center = center,
+                                radius = size.width / 2f
+                            ),
+                            radius = size.width / 2f
+                        )
+                    }
+            )
+
+            // Main avatar circle
+            Surface(
+                shape = CircleShape,
+                color = config.theme.background,
+                border = BorderStroke(2.dp, config.theme.accent.copy(alpha = 0.5f)),
+                modifier = Modifier.size(56.dp),
+                shadowElevation = 4.dp
             ) {
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(config.theme.accent)
-                        .clickable { onAvatarTap(idx) },
-                    contentAlignment = Alignment.Center,
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    config.theme.accent.copy(alpha = 0.3f),
+                                    config.theme.accent.copy(alpha = 0.05f)
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Inner white highlight circle
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = config.theme.accent,
+                        modifier = Modifier.size(28.dp)
+                    )
+
+                    // Inner highlight
                     Box(
                         modifier = Modifier
-                            .size(22.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f)),
+                            .fillMaxSize()
+                            .padding(4.dp)
+                            .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
                     )
                 }
-                Text(
-                    text = when {
-                        config.isAppUser -> stringResource(R.string.game_setup_you_badge)
-                        config.name.isNotBlank() -> config.name.take(8)
-                        else -> stringResource(R.string.gamesetup_player_placeholder, idx + 1)
-                    },
-                    style = ty.labelSmall,
-                    color = mc.textSecondary,
-                )
             }
+
+        }
+
+        // Name badge
+        Surface(
+            color = if (config.isAppUser) mc.primaryAccent.copy(alpha = 0.1f) else Color.Transparent,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.padding(horizontal = 4.dp)
+        ) {
+            Text(
+                text = when {
+                    config.isAppUser -> stringResource(R.string.game_setup_you_badge)
+                    config.name.isNotBlank() -> config.name
+                    else -> stringResource(R.string.gamesetup_player_placeholder, index + 1)
+                },
+                style = ty.labelSmall.copy(
+                    fontWeight = if (config.isAppUser) FontWeight.Bold else FontWeight.Medium
+                ),
+                color = if (config.isAppUser) mc.primaryAccent else mc.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+            )
         }
     }
 }
@@ -897,8 +1000,8 @@ private fun ButtonsModePreview() {
             tapYOffset.value = if (isGoingUp) (-20).dp else 20.dp
             launch {
                 tapAlpha.snapTo(0.6f)
-                tapScale.snapTo(0.6f)
-                tapScale.animateTo(1.2f, tween(300))
+                tapScale.snapTo(0.8f)
+                tapScale.animateTo(1.1f, tween(300))
                 tapAlpha.animateTo(0f, tween(300))
             }
             
@@ -1002,17 +1105,17 @@ private fun TapModePreview() {
 
     LaunchedEffect(pulseTrigger) {
         if (pulseTrigger == 0) return@LaunchedEffect
-        numberScale.snapTo(0.82f)
+        numberScale.snapTo(0.92f)
         floatY.snapTo(0f)
         floatAlpha.snapTo(1f)
         scope.launch {
-            numberScale.animateTo(1.15f, spring(dampingRatio = 0.35f, stiffness = 700f))
+            numberScale.animateTo(1.08f, spring(dampingRatio = 0.35f, stiffness = 700f))
             numberScale.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = 500f))
         }
         if (lastDelta > 0) {
             scope.launch {
                 heartScale.snapTo(1f)
-                heartScale.animateTo(1.5f, spring(dampingRatio = 0.3f, stiffness = 700f))
+                heartScale.animateTo(1.25f, spring(dampingRatio = 0.3f, stiffness = 700f))
                 heartScale.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f))
             }
         }

@@ -13,38 +13,24 @@ import javax.inject.Singleton
 /**
  * Hilt module that provides scanner-related singleton dependencies.
  *
- * The embedding-database and TFLite-model providers are commented out because the
- * pipeline now uses ML Kit Text Recognition (OCR) instead of cosine nearest-neighbour
- * search over a downloaded embedding binary.
+ * The pipeline uses ML Kit Text Recognition (OCR) — see [CardOcrAnalyzer] and
+ * `CardRecognizer`. The earlier embedding-database / TFLite cosine nearest-neighbour pipeline
+ * was removed (WS5, `scanner-reliability-plan.md`, 2026-08-25); it is preserved in git history
+ * if it is ever needed again.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object ScannerModule {
 
-    // COMMENTED OUT — replaced by ML Kit OCR provider below.
-    /*
-    @Provides
-    @Singleton
-    fun provideEmbeddingDatabase(@ApplicationContext context: Context): EmbeddingDatabase {
-        val db = EmbeddingDatabase(context)
-        val downloadedFile = java.io.File(context.filesDir, "card_embeddings.bin")
-        if (downloadedFile.exists()) db.loadFromFile(downloadedFile)
-        else db.loadFromAssets()
-        return db
-    }
-
-    @Provides
-    @Singleton
-    fun provideCardEmbeddingModel(@ApplicationContext context: Context): CardEmbeddingModel =
-        CardEmbeddingModel(context)
-    */
-
     /**
      * Provides the [CardOcrAnalyzer] singleton.
      *
-     * Initialises the ML Kit Latin text recognizer client eagerly.
-     * No asset downloads or device-side model caching are required — ML Kit
-     * bundles the base model in the app and updates it transparently via Google Play Services.
+     * Deliberately `@Singleton` (one instance per process) and never closed by the UI — see
+     * [CardOcrAnalyzer]'s KDoc lifecycle contract (WS1, 2026-08-24). ML Kit's bundled Latin
+     * recognizer is cheap to hold and expensive to re-init per screen entry, and once closed
+     * a `TextRecognizer` client never recovers on its own; [CardOcrAnalyzer] self-heals
+     * instead by recreating its internal client on demand, so downgrading this to a
+     * non-singleton scope is unnecessary.
      */
     @Provides
     @Singleton

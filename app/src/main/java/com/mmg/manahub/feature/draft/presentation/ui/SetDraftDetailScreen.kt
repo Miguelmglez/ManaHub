@@ -1,22 +1,20 @@
 package com.mmg.manahub.feature.draft.presentation.ui
 
-import android.content.Intent
-import android.net.Uri
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -29,9 +27,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,16 +51,12 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -66,30 +64,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import coil3.svg.SvgDecoder
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import coil3.svg.SvgDecoder
 import com.mmg.manahub.R
-import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.FeatureFlags
+import com.mmg.manahub.core.model.ArchetypeGuide
+import com.mmg.manahub.core.model.ArchetypeKeyCard
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.MechanicGuide
+import com.mmg.manahub.core.model.MechanicKeyCard
+import com.mmg.manahub.core.model.TierCard
+import com.mmg.manahub.core.ui.components.CardRow
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.ManaColorPicker
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
-import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
-import com.mmg.manahub.core.ui.components.SetSymbol
-import com.mmg.manahub.core.ui.components.SetSymbolFallbackIcon
+import com.mmg.manahub.core.ui.components.search.SearchSection
 import com.mmg.manahub.core.ui.theme.MagicColors
+import com.mmg.manahub.core.ui.theme.MagicTypography
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.core.model.ArchetypeGuide
-import com.mmg.manahub.core.model.DraftVideo
-import com.mmg.manahub.core.model.MechanicGuide
-import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.feature.draft.presentation.viewmodel.SetDraftDetailUiState
 import com.mmg.manahub.feature.draft.presentation.viewmodel.SetDraftDetailViewModel
 import kotlinx.datetime.LocalDate
+import org.koin.androidx.compose.koinViewModel
 
 private val VALID_YOUTUBE_VIDEO_ID = Regex("^[a-zA-Z0-9_-]{11}$")
 
@@ -130,13 +131,135 @@ private val RARITY_ITEMS = listOf(
     Triple("mythic", "M", Color(0xFFE8A030)),
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+private fun MechanicKeyCard.toCard(setCode: String): Card = Card(
+    scryfallId = scryfallId,
+    name = name,
+    printedName = null,
+    manaCost = manaCost,
+    cmc = cmc ?: 0.0,
+    colors = colors,
+    colorIdentity = colorIdentity,
+    typeLine = typeLine,
+    printedTypeLine = null,
+    oracleText = null,
+    printedText = null,
+    keywords = emptyList(),
+    power = null,
+    toughness = null,
+    loyalty = null,
+    setCode = setCode,
+    setName = "",
+    collectorNumber = "",
+    rarity = rarity,
+    releasedAt = "",
+    frameEffects = emptyList(),
+    promoTypes = emptyList(),
+    lang = "en",
+    imageNormal = imageNormalUri,
+    imageArtCrop = artCropUri,
+    imageBackNormal = null,
+    priceUsd = null,
+    priceUsdFoil = null,
+    priceEur = null,
+    priceEurFoil = null,
+    legalityStandard = "legal",
+    legalityPioneer = "legal",
+    legalityModern = "legal",
+    legalityCommander = "legal",
+    flavorText = null,
+    artist = null,
+    scryfallUri = "",
+)
+
+private fun ArchetypeKeyCard.toCard(setCode: String): Card = Card(
+    scryfallId = scryfallId,
+    name = name,
+    printedName = null,
+    manaCost = manaCost,
+    cmc = cmc ?: 0.0,
+    colors = colors,
+    colorIdentity = colorIdentity,
+    typeLine = typeLine,
+    printedTypeLine = null,
+    oracleText = null,
+    printedText = null,
+    keywords = emptyList(),
+    power = null,
+    toughness = null,
+    loyalty = null,
+    setCode = setCode,
+    setName = "",
+    collectorNumber = "",
+    rarity = rarity,
+    releasedAt = "",
+    frameEffects = emptyList(),
+    promoTypes = emptyList(),
+    lang = "en",
+    imageNormal = imageNormalUri,
+    imageArtCrop = artCropUri,
+    imageBackNormal = null,
+    priceUsd = null,
+    priceUsdFoil = null,
+    priceEur = null,
+    priceEurFoil = null,
+    legalityStandard = "legal",
+    legalityPioneer = "legal",
+    legalityModern = "legal",
+    legalityCommander = "legal",
+    flavorText = null,
+    artist = null,
+    scryfallUri = "",
+)
+
+private fun TierCard.toCard(setCode: String): Card = Card(
+    scryfallId = scryfallId,
+    name = name,
+    printedName = null,
+    manaCost = manaCost,
+    cmc = cmc ?: 0.0,
+    colors = colors,
+    colorIdentity = colorIdentity,
+    typeLine = typeLine,
+    printedTypeLine = null,
+    oracleText = oracleText,
+    printedText = null,
+    keywords = emptyList(),
+    power = null,
+    toughness = null,
+    loyalty = null,
+    setCode = setCode,
+    setName = "",
+    collectorNumber = "",
+    rarity = rarity,
+    releasedAt = "",
+    frameEffects = emptyList(),
+    promoTypes = emptyList(),
+    lang = "en",
+    imageNormal = imageNormalUri,
+    imageArtCrop = artCropUri,
+    imageBackNormal = null,
+    priceUsd = stats?.gihWinRate,
+    priceUsdFoil = null,
+    priceEur = null,
+    priceEurFoil = null,
+    legalityStandard = "legal",
+    legalityPioneer = "legal",
+    legalityModern = "legal",
+    legalityCommander = "legal",
+    flavorText = null,
+    artist = null,
+    scryfallUri = "",
+)
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun SetDraftDetailScreen(
     onBack: () -> Unit,
-    onCardClick: (String) -> Unit,
+    onCardClick: (String, String?) -> Unit,
     onSimulateDraft: (String) -> Unit = {},
     viewModel: SetDraftDetailViewModel = koinViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val colors = MaterialTheme.magicColors
@@ -149,10 +272,14 @@ fun SetDraftDetailScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         ThemeBackground(modifier = Modifier.fillMaxSize())
-        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+        Column(modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()) {
             // Top bar
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
@@ -229,14 +356,28 @@ fun SetDraftDetailScreen(
             }
 
             when (state.selectedTab) {
-                0 -> GuideTab(state, state.setIconUri, onCardClick)
+                0 -> GuideTab(
+                    state = state,
+                    setIconUri = state.setIconUri,
+                    onCardClick = onCardClick,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope
+                )
                 1 -> TierListSubTab(
                     state = state,
                     onToggleColor = viewModel::toggleTierListColorFilter,
                     onSearchQueryChanged = viewModel::onSearchQueryChanged,
                     onCardClick = onCardClick,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope
                 )
-                else -> GuideTab(state, state.setIconUri, onCardClick)
+                else -> GuideTab(
+                    state = state,
+                    setIconUri = state.setIconUri,
+                    onCardClick = onCardClick,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope
+                )
             }
         }
     }
@@ -246,11 +387,14 @@ fun SetDraftDetailScreen(
 //  Tab 0: Guide
 // ═══════════════════════════════════════════════════════════════════════════════
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun GuideTab(
     state: SetDraftDetailUiState,
     setIconUri: String,
-    onCardClick: (String) -> Unit,
+    onCardClick: (String, String?) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -264,77 +408,57 @@ private fun GuideTab(
             val guide = state.guide
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 // Overview: summary + color ranking + gameplay notes
                 item {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = colors.surface.copy(alpha = 0.4f),
-                        border = BorderStroke(1.dp, colors.surfaceVariant.copy(alpha = 0.2f))
+                    SearchSection(
+                        title = stringResource(R.string.draft_guide_overview),
+                        icon = Icons.Default.FilterList,
+                        titleColor = colors.primaryAccent,
+                        iconColor = colors.primaryAccent
                     ) {
-                        Column(
-                            modifier = Modifier.padding(20.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.FilterList,
-                                    contentDescription = null,
-                                    tint = colors.primaryAccent,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(Modifier.width(12.dp))
+                        if (guide.summary.isNotBlank()) {
+                            Text(
+                                guide.summary,
+                                style = typography.bodyLarge,
+                                color = colors.textPrimary,
+                                lineHeight = typography.bodyLarge.lineHeight * 1.2f,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                        }
+                        
+                        if (guide.keyGameplayNotes.isNotEmpty()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
                                 Text(
-                                    stringResource(R.string.draft_guide_overview),
-                                    style = typography.titleMedium,
-                                    color = colors.primaryAccent,
-                                    fontWeight = FontWeight.Bold
+                                    stringResource(R.string.draft_key_notes_label),
+                                    style = typography.labelLarge,
+                                    color = colors.secondaryAccent,
+                                    fontWeight = FontWeight.Bold,
                                 )
-                            }
-                            
-                            if (guide.summary.isNotBlank()) {
-                                Text(
-                                    guide.summary,
-                                    style = typography.bodyMedium,
-                                    color = colors.textPrimary,
-                                    lineHeight = typography.bodyMedium.lineHeight * 1.2f
-                                )
-                            }
-                            
-                            if (guide.keyGameplayNotes.isNotEmpty()) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(colors.surfaceVariant.copy(alpha = 0.2f))
-                                        .padding(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Text(
-                                        stringResource(R.string.draft_key_notes_label),
-                                        style = typography.labelSmall,
-                                        color = colors.textDisabled,
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = with(density) { 0.5.dp.toSp() }
-                                    )
-                                    guide.keyGameplayNotes.forEach { note ->
-                                        Row(verticalAlignment = Alignment.Top) {
-                                            Icon(
-                                                Icons.Default.Lightbulb,
-                                                contentDescription = null,
-                                                tint = colors.goldMtg,
-                                                modifier = Modifier.size(16.dp).padding(top = 2.dp),
-                                            )
-                                            Spacer(Modifier.width(10.dp))
-                                            Text(
-                                                note,
-                                                style = typography.bodySmall,
-                                                color = colors.textPrimary,
-                                                lineHeight = typography.bodySmall.lineHeight * 1.1f
-                                            )
-                                        }
+                                guide.keyGameplayNotes.forEach { note ->
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        Icon(
+                                            Icons.Default.Lightbulb,
+                                            contentDescription = null,
+                                            tint = colors.goldMtg,
+                                            modifier = Modifier
+                                                .size(20.dp)
+                                                .padding(top = 2.dp),
+                                        )
+                                        Spacer(Modifier.width(10.dp))
+                                        Text(
+                                            note,
+                                            style = typography.bodyMedium,
+                                            color = colors.textPrimary,
+                                            lineHeight = typography.bodyMedium.lineHeight * 1.1f
+                                        )
                                     }
                                 }
                             }
@@ -345,15 +469,13 @@ private fun GuideTab(
                 // Color Ranking
                 if (guide.colorRanking.isNotEmpty()) {
                     item {
-                        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                            Text(
-                                stringResource(R.string.draft_color_ranking_label),
-                                style = typography.labelLarge,
-                                color = colors.textPrimary,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-                            
+                        SearchSection(
+                            title = stringResource(R.string.draft_color_ranking_label),
+                            icon = Icons.Default.BarChart,
+                            titleColor = colors.textPrimary,
+                            iconColor = colors.goldMtg,
+                            collapsedByDefault = true
+                        ) {
                             guide.colorRanking.forEachIndexed { index, colorEntry ->
                                 ColorRankingItem(
                                     rank = index + 1,
@@ -362,9 +484,6 @@ private fun GuideTab(
                                     colors = colors,
                                     typography = typography
                                 )
-                                if (index < guide.colorRanking.size - 1) {
-                                    Spacer(Modifier.height(10.dp))
-                                }
                             }
                         }
                     }
@@ -373,16 +492,21 @@ private fun GuideTab(
                 // Mechanics
                 if (guide.mechanics.isNotEmpty()) {
                     item {
-                        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                            Text(
-                                stringResource(R.string.draft_guide_mechanics),
-                                style = typography.labelLarge,
-                                color = colors.textPrimary,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                guide.mechanics.forEach { MechanicCard(mechanic = it, setCode = state.setCode, onCardClick = onCardClick) }
+                        SearchSection(
+                            title = stringResource(R.string.draft_guide_mechanics),
+                            icon = Icons.Default.Bolt,
+                            titleColor = colors.textPrimary,
+                            iconColor = colors.goldMtg,
+                            collapsedByDefault = true
+                        ) {
+                            guide.mechanics.forEach { 
+                                MechanicCard(
+                                    mechanic = it, 
+                                    setCode = state.setCode, 
+                                    onCardClick = onCardClick,
+                                    sharedTransitionScope = sharedTransitionScope,
+                                    animatedVisibilityScope = animatedVisibilityScope
+                                ) 
                             }
                         }
                     }
@@ -391,17 +515,46 @@ private fun GuideTab(
                 // Archetypes
                 if (guide.archetypes.isNotEmpty()) {
                     item {
-                        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                            Text(
-                                stringResource(R.string.draft_guide_archetypes),
-                                style = typography.labelLarge,
-                                color = colors.textPrimary,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                guide.archetypes.forEach { arch ->
-                                    ArchetypeCard(arch, onCardClick, state)
+                        SearchSection(
+                            title = stringResource(R.string.draft_guide_archetypes),
+                            icon = Icons.Default.Layers,
+                            titleColor = colors.textPrimary,
+                            iconColor = colors.goldMtg,
+                            collapsedByDefault = false
+                        ) {
+                            guide.archetypes.forEach { arch ->
+                                ArchetypeCard(
+                                    archetype = arch, 
+                                    onCardClick = onCardClick, 
+                                    state = state,
+                                    sharedTransitionScope = sharedTransitionScope,
+                                    animatedVisibilityScope = animatedVisibilityScope
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Key commons by color
+                if (guide.keyCommonsByColor.isNotEmpty()) {
+                    item {
+                        SearchSection(
+                            title = stringResource(R.string.draft_key_commons_by_color),
+                            icon = Icons.Default.LocalOffer,
+                            titleColor = colors.textPrimary,
+                            iconColor = colors.goldMtg,
+                            collapsedByDefault = true
+                        ) {
+                            guide.keyCommonsByColor.forEach { (colorLabel, cards) ->
+                                if (cards.isNotEmpty()) {
+                                    KeyCommonsByColorGroup(
+                                        colorLabel = colorLabel, 
+                                        cards = cards, 
+                                        setCode = state.setCode, 
+                                        onCardClick = onCardClick,
+                                        sharedTransitionScope = sharedTransitionScope,
+                                        animatedVisibilityScope = animatedVisibilityScope
+                                    )
                                 }
                             }
                         }
@@ -411,24 +564,6 @@ private fun GuideTab(
                 // Videos
                 if (state.videos.isNotEmpty()) {
                     item {
-                        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                            Text(
-                                stringResource(R.string.draft_guide_videos),
-                                style = typography.labelLarge,
-                                color = colors.textPrimary,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                state.videos.forEach { video ->
-                                    VideoCard(video) {
-                                        if (VALID_YOUTUBE_VIDEO_ID.matches(video.videoId)) {
-                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${video.videoId}")))
-                                        }
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -442,69 +577,62 @@ private fun ColorRankingItem(
     entry: String,
     note: String?,
     colors: MagicColors,
-    typography: com.mmg.manahub.core.ui.theme.MagicTypography,
+    typography: MagicTypography,
 ) {
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = colors.surface.copy(alpha = 0.6f),
-        border = BorderStroke(1.dp, colors.surfaceVariant.copy(alpha = 0.3f)),
-        tonalElevation = 2.dp
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(colors.primaryAccent.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val rankingToken = Regex("\\{([WUBRGC])\\}").find(entry)?.groupValues?.getOrNull(1)
-                    if (rankingToken != null) {
-                        ManaSymbolImage(token = rankingToken, size = 20.dp)
-                    } else {
-                        Text(
-                            "#$rank",
-                            style = typography.labelLarge,
-                            color = colors.primaryAccent,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                
-                Spacer(Modifier.width(16.dp))
-
-                Text(
-                    entry.replace(Regex("\\{[^}]+\\}\\s*"), "").trim(),
-                    style = typography.bodyLarge,
-                    color = colors.textPrimary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-
-                if (Regex("\\{([WUBRGC])\\}").find(entry) != null) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(colors.primaryAccent.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                val rankingToken = Regex("\\{([WUBRGC])\\}").find(entry)?.groupValues?.getOrNull(1)
+                if (rankingToken != null) {
+                    ManaSymbolImage(token = rankingToken, size = 18.dp)
+                } else {
                     Text(
                         "#$rank",
-                        style = typography.titleMedium,
-                        color = colors.goldMtg,
-                        fontWeight = FontWeight.ExtraBold,
+                        style = typography.labelSmall,
+                        color = colors.primaryAccent,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
+            
+            Spacer(Modifier.width(10.dp))
 
-            if (!note.isNullOrBlank()) {
-                Spacer(Modifier.height(12.dp))
-                HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = colors.surfaceVariant.copy(alpha = 0.2f))
-                Spacer(Modifier.height(8.dp))
+            Text(
+                entry.replace(Regex("\\{[^}]+\\}\\s*"), "").trim(),
+                style = typography.bodyLarge,
+                color = colors.textPrimary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+
+            if (Regex("\\{([WUBRGC])\\}").find(entry) != null) {
                 Text(
-                    note,
-                    style = typography.bodySmall,
-                    color = colors.textSecondary,
-                    modifier = Modifier.padding(start = 52.dp),
-                    lineHeight = typography.bodySmall.lineHeight * 1.1f
+                    "#$rank",
+                    style = typography.titleMedium,
+                    color = colors.goldMtg,
+                    fontWeight = FontWeight.ExtraBold,
                 )
             }
         }
+
+        if (!note.isNullOrBlank()) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                note,
+                style = typography.bodyMedium,
+                color = colors.textSecondary,
+                modifier = Modifier.padding(start = 42.dp),
+                lineHeight = typography.bodyMedium.lineHeight * 1.05f
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        HorizontalDivider(color = colors.surfaceVariant.copy(alpha = 0.1f))
     }
 }
 
@@ -512,111 +640,15 @@ private fun ColorRankingItem(
 //  Guide sub-components
 // ═══════════════════════════════════════════════════════════════════════════════
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun DraftCardListItem(
-    name: String,
-    artCropUri: String,
-    colors: List<String>,
-    typeLine: String,
-    rarity: String,
-    setCode: String,
-    onClick: () -> Unit,
+private fun MechanicCard(
+    mechanic: MechanicGuide, 
+    setCode: String, 
+    onCardClick: (String, String?) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
-    val mc = MaterialTheme.magicColors
-    val typography = MaterialTheme.magicTypography
-    var imageError by remember(artCropUri) { mutableStateOf(false) }
-    val showArtCrop = artCropUri.isNotBlank() && !imageError
-
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = mc.surfaceVariant.copy(alpha = 0.3f),
-        modifier = Modifier.clickable(onClick = onClick)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.Top) {
-            // Art crop thumbnail
-            Box(
-                modifier = Modifier
-                    .width(72.dp)
-                    .height(52.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(mc.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (showArtCrop) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(artCropUri).crossfade(true).build(),
-                        contentDescription = name,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                        onError = { imageError = true },
-                    )
-                } else {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data("https://svgs.scryfall.io/sets/${setCode.lowercase()}.svg") // Fallback to set symbol
-                            .decoderFactory(SvgDecoder.Factory())
-                            .build(),
-                        contentDescription = null,
-                        modifier = Modifier.size(28.dp),
-                        colorFilter = ColorFilter.tint(mc.textDisabled.copy(alpha = 0.5f)),
-                        error = rememberVectorPainter(SetSymbolFallbackIcon),
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f).heightIn(min = 52.dp)) {
-                Row(verticalAlignment = Alignment.Top) {
-                    Text(
-                        name,
-                        style = typography.bodyMedium,
-                        color = mc.textPrimary,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    
-                    val displayColors = colors.ifEmpty { listOf("C") }
-                    Spacer(Modifier.width(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        displayColors.forEach { colorLetter ->
-                            colorToManaToken(colorLetter)?.let { token ->
-                                ManaSymbolImage(token = token, size = 14.dp)
-                                Spacer(Modifier.width(2.dp))
-                            }
-                        }
-                    }
-                }
-                if (typeLine.isNotBlank()) {
-                    Text(
-                        typeLine,
-                        style = typography.labelSmall,
-                        color = mc.textSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                Spacer(Modifier.weight(1f))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SetSymbol(
-                        setCode = setCode,
-                        rarity = CardRarity.fromString(rarity),
-                        size = 18.dp
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MechanicCard(mechanic: MechanicGuide, setCode: String, onCardClick: (String) -> Unit) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
 
@@ -627,13 +659,8 @@ private fun MechanicCard(mechanic: MechanicGuide, setCode: String, onCardClick: 
         examples.overperformers.isNotEmpty() &&
         examples.underperformers.isEmpty()
 
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = colors.surface.copy(alpha = 0.6f),
-        border = BorderStroke(1.dp, colors.surfaceVariant.copy(alpha = 0.2f)),
-        tonalElevation = 2.dp
-    ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+
+        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 mechanic.name,
                 style = typography.titleMedium,
@@ -644,9 +671,10 @@ private fun MechanicCard(mechanic: MechanicGuide, setCode: String, onCardClick: 
             if (mechanic.summary.isNotBlank()) {
                 Text(
                     mechanic.summary,
-                    style = typography.bodyMedium,
+                    style = typography.bodyLarge,
                     color = colors.textPrimary,
-                    lineHeight = typography.bodyMedium.lineHeight * 1.1f
+                    lineHeight = typography.bodyLarge.lineHeight * 1.1f,
+                    modifier = Modifier.padding(start = 4.dp, end = 4.dp)
                 )
             }
 
@@ -663,24 +691,26 @@ private fun MechanicCard(mechanic: MechanicGuide, setCode: String, onCardClick: 
                         Icons.Default.Lightbulb,
                         null,
                         tint = colors.goldMtg,
-                        modifier = Modifier.size(16.dp).padding(top = 2.dp)
+                        modifier = Modifier
+                            .size(20.dp)
+                            .padding(top = 2.dp)
                     )
                     Spacer(Modifier.width(10.dp))
-                    Text(mechanic.performance, style = typography.bodySmall, color = colors.textPrimary)
+                    Text(mechanic.performance, style = typography.bodyMedium, color = colors.textPrimary)
                 }
             }
 
             if (examples != null) {
                 if (examples.overperformers.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (!isFlatArray) {
                             // Two-bucket variant: show the labelled "Overperformers" header
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.AutoMirrored.Filled.TrendingUp, null, tint = Color(0xFF81C784), modifier = Modifier.size(16.dp))
+                                Icon(Icons.AutoMirrored.Filled.TrendingUp, null, tint = Color(0xFF81C784), modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Text(
                                     stringResource(R.string.draft_mechanic_overperformers),
-                                    style = typography.labelMedium,
+                                    style = typography.labelLarge,
                                     color = Color(0xFF81C784),
                                     fontWeight = FontWeight.Bold,
                                 )
@@ -689,21 +719,27 @@ private fun MechanicCard(mechanic: MechanicGuide, setCode: String, onCardClick: 
                             // Flat-array variant: generic "Key Cards" label
                             Text(
                                 stringResource(R.string.draft_mechanic_key_cards),
-                                style = typography.labelMedium,
-                                color = colors.textDisabled,
+                                style = typography.labelLarge,
+                                color = colors.secondaryAccent,
                                 fontWeight = FontWeight.Bold,
                             )
                         }
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(start = 4.dp, end = 4.dp)) {
                             examples.overperformers.forEach { card ->
-                                DraftCardListItem(
-                                    name = card.name,
-                                    artCropUri = card.artCropUri,
-                                    colors = card.colors,
-                                    typeLine = card.typeLine,
-                                    rarity = card.rarity,
-                                    setCode = setCode,
-                                    onClick = { if (card.scryfallId.isNotBlank()) onCardClick(card.scryfallId) }
+                                CardRow(
+                                    card = card.toCard(setCode),
+                                    isInCollection = false,
+                                    onClick = { 
+                                        if (card.scryfallId.isNotBlank()) {
+                                            val key = "mechanic-${mechanic.name}-over-${card.scryfallId}"
+                                            onCardClick(card.scryfallId, key) 
+                                        }
+                                    },
+                                    onRemove = null,
+                                    sharedTransitionScope = sharedTransitionScope,
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                    sharedTransitionKey = "mechanic-${mechanic.name}-over-${card.scryfallId}"
                                 )
                             }
                         }
@@ -711,27 +747,32 @@ private fun MechanicCard(mechanic: MechanicGuide, setCode: String, onCardClick: 
                 }
 
                 if (examples.underperformers.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.AutoMirrored.Filled.TrendingDown, null, tint = Color(0xFFE57373), modifier = Modifier.size(16.dp))
+                            Icon(Icons.AutoMirrored.Filled.TrendingDown, null, tint = Color(0xFFE57373), modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 stringResource(R.string.draft_mechanic_underperformers),
-                                style = typography.labelMedium,
+                                style = typography.labelLarge,
                                 color = Color(0xFFE57373),
                                 fontWeight = FontWeight.Bold,
                             )
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             examples.underperformers.forEach { card ->
-                                DraftCardListItem(
-                                    name = card.name,
-                                    artCropUri = card.artCropUri,
-                                    colors = card.colors,
-                                    typeLine = card.typeLine,
-                                    rarity = card.rarity,
-                                    setCode = setCode,
-                                    onClick = { if (card.scryfallId.isNotBlank()) onCardClick(card.scryfallId) }
+                                CardRow(
+                                    card = card.toCard(setCode),
+                                    isInCollection = false,
+                                    onClick = { 
+                                        if (card.scryfallId.isNotBlank()) {
+                                            val key = "mechanic-${mechanic.name}-under-${card.scryfallId}"
+                                            onCardClick(card.scryfallId, key) 
+                                        }
+                                    },
+                                    onRemove = null,
+                                    sharedTransitionScope = sharedTransitionScope,
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                    sharedTransitionKey = "mechanic-${mechanic.name}-under-${card.scryfallId}"
                                 )
                             }
                         }
@@ -739,113 +780,225 @@ private fun MechanicCard(mechanic: MechanicGuide, setCode: String, onCardClick: 
                 }
             }
         }
-    }
+
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun ArchetypeCard(
     archetype: ArchetypeGuide,
-    onCardClick: (String) -> Unit,
-    state: SetDraftDetailUiState
+    onCardClick: (String, String?) -> Unit,
+    state: SetDraftDetailUiState,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
     val tierColor = TIER_COLORS[archetype.tier.take(1)] ?: colors.textSecondary
 
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = colors.surface.copy(alpha = 0.6f),
-        border = BorderStroke(1.dp, colors.surfaceVariant.copy(alpha = 0.2f)),
-        tonalElevation = 2.dp
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            // Header row: mana symbols + name + tier badge
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    extractColorLetters(archetype.colors).forEach { letter ->
+
+        Column(modifier = Modifier.padding(8.dp)) {
+            // Header row: mana symbols + tier badge
+            // Schema v2 sets color_letters directly; v1 guides fall back to parsing archetype.colors.
+            val colorLetters = archetype.colorLetters.ifEmpty { extractColorLetters(archetype.colors) }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    colorLetters.forEach { letter ->
                         colorToManaToken(letter)?.let { token ->
-                            ManaSymbolImage(token = token, size = 26.dp)
+                            ManaSymbolImage(token = token, size = 24.dp)
                         }
                     }
                 }
-                Spacer(Modifier.width(14.dp))
-                Text(
-                    archetype.name,
-                    style = typography.titleMedium,
-                    color = colors.textPrimary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                )
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = tierColor.copy(alpha = 0.15f),
                     border = BorderStroke(1.dp, tierColor.copy(alpha = 0.3f))
                 ) {
                     Text(
-                        archetype.tier.substringBefore(" ").substringBefore("—").trim(),
-                        style = typography.labelMedium,
+                        archetype.tier,
+                        style = typography.labelLarge,
                         color = tierColor,
                         fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
             }
 
+            Spacer(Modifier.height(4.dp))
+            Text(
+                archetype.name,
+                style = typography.titleLarge,
+                color = colors.goldMtg,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth()
+            )
+
             if (archetype.difficulty.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         stringResource(R.string.draft_archetype_difficulty, ""),
-                        style = typography.labelSmall,
-                        color = colors.textDisabled,
-                    )
-                    Text(
-                        archetype.difficulty,
-                        style = typography.labelSmall,
-                        color = colors.textSecondary,
+                        style = typography.labelLarge,
+                        color = colors.primaryAccent,
                         fontWeight = FontWeight.Bold
                     )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        archetype.difficulty,
+                        style = typography.labelLarge,
+                        color = colors.secondaryAccent,
+                    )
+                    val archetypeWinRate = archetype.archetypeWinRate
+                    if (archetypeWinRate != null) {
+                        Spacer(Modifier.weight(1f))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.TrendingUp,
+                                contentDescription = null,
+                                tint = colors.goldMtg,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                stringResource(R.string.draft_archetype_win_rate, archetypeWinRate * 100),
+                                style = typography.labelMedium,
+                                color = colors.goldMtg,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
                 }
             }
 
             if (archetype.strategy.isNotBlank()) {
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(16.dp))
                 Text(
                     archetype.strategy,
-                    style = typography.bodyMedium,
+                    style = typography.bodyLarge,
                     color = colors.textPrimary,
-                    lineHeight = typography.bodyMedium.lineHeight * 1.2f
+                    lineHeight = typography.bodyLarge.lineHeight * 1.2f,
+                    modifier = Modifier.padding(start = 4.dp, end = 4.dp)
                 )
             }
 
-            // Key cards as an art-crop grid
+            // Key cards
             if (archetype.keyCards.isNotEmpty()) {
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(24.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(4.dp).background(colors.primaryAccent, CircleShape))
-                    Spacer(Modifier.width(8.dp))
                     Text(
                         stringResource(R.string.draft_key_cards_label),
-                        style = typography.labelMedium,
-                        color = colors.primaryAccent,
+                        style = typography.labelLarge,
+                        color = colors.secondaryAccent,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = with(LocalDensity.current) { 0.5.dp.toSp() }
                     )
                 }
                 Spacer(Modifier.height(12.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(start = 4.dp, end = 4.dp)) {
                     archetype.keyCards.forEach { card ->
-                        DraftCardListItem(
-                            name = card.name,
-                            artCropUri = card.artCropUri,
-                            colors = card.colors,
-                            typeLine = card.typeLine,
-                            rarity = card.rarity,
-                            setCode = state.setCode,
-                            onClick = { onCardClick(card.scryfallId) }
+                        CardRow(
+                            card = card.toCard(state.setCode),
+                            isInCollection = false,
+                            onClick = { 
+                                val key = "archetype-${archetype.name}-key-${card.scryfallId}"
+                                onCardClick(card.scryfallId, key) 
+                            },
+                            onRemove = null,
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            sharedTransitionKey = "archetype-${archetype.name}-key-${card.scryfallId}"
                         )
                     }
                 }
+            }
+
+            // Cards to avoid
+            if (archetype.cardsToAvoid.isNotEmpty()) {
+                Spacer(Modifier.height(24.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.draft_cards_to_avoid_label),
+                        style = typography.labelLarge,
+                        color = colors.lifeNegative,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, end = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    archetype.cardsToAvoid.forEach { card ->
+                        CardRow(
+                            card = card.toCard(state.setCode),
+                            isInCollection = false,
+                            onClick = { 
+                                val key = "archetype-${archetype.name}-avoid-${card.scryfallId}"
+                                onCardClick(card.scryfallId, key) 
+                            },
+                            onRemove = null,
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            sharedTransitionKey = "archetype-${archetype.name}-avoid-${card.scryfallId}"
+                        )
+                    }
+                }
+            }
+        }
+
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun KeyCommonsByColorGroup(
+    colorLabel: String,
+    cards: List<ArchetypeKeyCard>,
+    setCode: String,
+    onCardClick: (String, String?) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+) {
+    val colors = MaterialTheme.magicColors
+    val typography = MaterialTheme.magicTypography
+    val token = Regex("\\{([WUBRGC])\\}").find(colorLabel)?.groupValues?.getOrNull(1)
+    val label = colorLabel.replace(Regex("\\{[^}]+\\}\\s*"), "").trim().ifBlank { colorLabel }
+
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            token?.let {
+                ManaSymbolImage(token = it, size = 20.dp)
+                Spacer(Modifier.width(10.dp))
+            }
+            Text(
+                label,
+                style = typography.labelLarge,
+                color = colors.textPrimary,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            cards.forEach { card ->
+                CardRow(
+                    card = card.toCard(setCode),
+                    isInCollection = false,
+                    onClick = { 
+                        if (card.scryfallId.isNotBlank()) {
+                            val key = "key-commons-${colorLabel}-${card.scryfallId}"
+                            onCardClick(card.scryfallId, key) 
+                        }
+                    },
+                    onRemove = null,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
+                    sharedTransitionKey = "key-commons-${colorLabel}-${card.scryfallId}"
+                )
             }
         }
     }
@@ -855,13 +1008,15 @@ private fun ArchetypeCard(
 //  Tier List tab
 // ═══════════════════════════════════════════════════════════════════════════════
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 private fun TierListSubTab(
     state: SetDraftDetailUiState,
     onToggleColor: (String) -> Unit,
     onSearchQueryChanged: (String) -> Unit,
-    onCardClick: (String) -> Unit,
+    onCardClick: (String, String?) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -877,76 +1032,76 @@ private fun TierListSubTab(
             ) {
                 item {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(colors.surface.copy(alpha = 0.5f))
-                            .padding(16.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Search Bar
-                        OutlinedTextField(
-                            value = state.tierListSearchQuery,
-                            onValueChange = onSearchQueryChanged,
-                            placeholder = {
-                                Text(
-                                    stringResource(R.string.draft_search_cards_hint),
-                                    style = typography.bodyMedium,
-                                    color = colors.textDisabled
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            singleLine = true,
-                            leadingIcon = {
-                                Icon(Icons.Default.Search, contentDescription = null, tint = colors.textDisabled)
-                            },
-                            trailingIcon = {
-                                if (state.tierListSearchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { onSearchQueryChanged("") }) {
-                                        Icon(Icons.Default.Clear, contentDescription = null, tint = colors.textDisabled)
+                        SearchSection(
+                            title = stringResource(R.string.deckbuilder_filter_title),
+                            icon = Icons.Default.FilterList,
+                            collapsedByDefault = true,
+                            titleColor = colors.textPrimary,
+                            iconColor = colors.goldMtg
+                        ) {
+                            // Search Bar
+                            OutlinedTextField(
+                                value = state.tierListSearchQuery,
+                                onValueChange = onSearchQueryChanged,
+                                placeholder = {
+                                    Text(
+                                        stringResource(R.string.draft_search_cards_hint),
+                                        style = typography.bodyMedium,
+                                        color = colors.textDisabled
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                singleLine = true,
+                                leadingIcon = {
+                                    Icon(Icons.Default.Search, contentDescription = null, tint = colors.textDisabled)
+                                },
+                                trailingIcon = {
+                                    if (state.tierListSearchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { onSearchQueryChanged("") }) {
+                                            Icon(Icons.Default.Clear, contentDescription = null, tint = colors.textDisabled)
+                                        }
                                     }
-                                }
-                            },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = colors.primaryAccent,
-                                unfocusedBorderColor = colors.surfaceVariant.copy(alpha = 0.5f),
-                                focusedTextColor = colors.textPrimary,
-                                unfocusedTextColor = colors.textPrimary,
-                                cursorColor = colors.primaryAccent,
+                                },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = colors.primaryAccent,
+                                    unfocusedBorderColor = colors.surfaceVariant.copy(alpha = 0.5f),
+                                    focusedTextColor = colors.textPrimary,
+                                    unfocusedTextColor = colors.textPrimary,
+                                    cursorColor = colors.primaryAccent,
+                                )
                             )
-                        )
 
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                stringResource(R.string.draft_filter_by_color),
-                                style = typography.labelSmall,
-                                color = colors.textDisabled,
-                                fontWeight = FontWeight.Bold
-                            )
-                            ManaColorPicker(
-                                selectedColors = state.tierListColorFilter,
-                                onToggleColor = onToggleColor,
-                                itemSize = 40.dp,
-                                symbolSize = 26.dp
-                            )
-                        }
-                        
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.FilterList, null, tint = colors.textDisabled, modifier = Modifier.size(12.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                stringResource(R.string.draft_tier_updated, state.tierList.lastUpdated),
-                                style = typography.labelSmall,
-                                color = colors.textDisabled,
-                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    stringResource(R.string.draft_filter_by_color),
+                                    style = typography.labelSmall,
+                                    color = colors.textDisabled,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                ManaColorPicker(
+                                    selectedColors = state.tierListColorFilter,
+                                    onToggleColor = onToggleColor,
+                                    itemSize = 40.dp,
+                                    symbolSize = 26.dp
+                                )
+                            }
                         }
                     }
                 }
 
                 state.tierList.tiers.forEach { tier ->
                     val filteredCards = tier.cards.filter { card ->
-                        val matchesColor = state.tierListColorFilter.isEmpty() || 
-                                          card.colors.any { it in state.tierListColorFilter }
+                        val matchesColor = if (state.tierListColorFilter.isEmpty()) {
+                            true
+                        } else {
+                            val filter = state.tierListColorFilter
+                            val cardColors = card.colors.ifEmpty { listOf("C") }
+                            cardColors.any { it in filter }
+                        }
                         val matchesSearch = state.tierListSearchQuery.isEmpty() || 
                                            card.name.contains(state.tierListSearchQuery, ignoreCase = true)
                         
@@ -960,14 +1115,17 @@ private fun TierListSubTab(
 
                         items(filteredCards, key = { it.scryfallId }) { card ->
                             Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                                DraftCardListItem(
-                                    name = card.name,
-                                    artCropUri = card.artCropUri,
-                                    colors = card.colors,
-                                    typeLine = card.typeLine,
-                                    rarity = card.rarity,
-                                    setCode = state.setCode,
-                                    onClick = { onCardClick(card.scryfallId) }
+                                CardRow(
+                                    card = card.toCard(state.setCode),
+                                    isInCollection = false,
+                                    onClick = { 
+                                        val key = "tier-list-${card.scryfallId}"
+                                        onCardClick(card.scryfallId, key) 
+                                    },
+                                    onRemove = null,
+                                    sharedTransitionScope = sharedTransitionScope,
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                    sharedTransitionKey = "tier-list-${card.scryfallId}"
                                 )
                             }
                         }
@@ -989,50 +1147,63 @@ private fun TierListSubTab(
 private fun TierBanner(tier: String, label: String, description: String) {
     val tierColor = TIER_COLORS[tier] ?: Color.Gray
     val typography = MaterialTheme.magicTypography
-    Surface(shape = RoundedCornerShape(8.dp), color = tierColor.copy(alpha = 0.15f)) {
-        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(tier, style = typography.displayMedium, color = tierColor, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(label, style = typography.labelLarge, color = tierColor, fontWeight = FontWeight.Bold)
-                if (description.isNotBlank()) {
-                    Text(description, style = typography.labelSmall, color = tierColor.copy(alpha = 0.7f))
+    val mc = MaterialTheme.magicColors
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(mc.background)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = tierColor.copy(alpha = 0.25f)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        tier,
+                        style = typography.displayMedium,
+                        color = tierColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            label,
+                            style = typography.labelLarge,
+                            color = tierColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (description.isNotBlank()) {
+                            Text(
+                                description,
+                                style = typography.labelSmall,
+                                color = tierColor.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
                 }
             }
         }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Video card
-// ═══════════════════════════════════════════════════════════════════════════════
-
-@Composable
-private fun VideoCard(video: DraftVideo, onClick: () -> Unit) {
-    val colors = MaterialTheme.magicColors
-    val typography = MaterialTheme.magicTypography
-    Surface(shape = RoundedCornerShape(12.dp), color = colors.surface, modifier = Modifier.clickable(onClick = onClick)) {
-        Column {
-            Box {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current).data(video.thumbnailUrl).crossfade(true).build(),
-                    contentDescription = video.title,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
-                    contentScale = ContentScale.Crop,
+        // Sutil diffusion gradient
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(mc.background, Color.Transparent)
+                    )
                 )
-                Icon(Icons.Default.PlayCircle, stringResource(R.string.nav_play), tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(48.dp).align(Alignment.Center))
-            }
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(video.title, style = typography.bodyMedium, color = colors.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.height(4.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(video.channelName, style = typography.labelSmall, color = colors.textSecondary)
-                    Text(formatVideoDate(video.publishedAt), style = typography.labelSmall, color = colors.textDisabled)
-                }
-            }
-        }
+        )
     }
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Shared components
@@ -1047,7 +1218,9 @@ private fun LoadingIndicator() {
 
 @Composable
 private fun PlaceholderMessage(message: String) {
-    Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .padding(32.dp), contentAlignment = Alignment.Center) {
         Text(
             message,
             style = MaterialTheme.magicTypography.bodyMedium,

@@ -833,7 +833,9 @@ private fun PlayerCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Column {
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Text(
                                 text = player.name,
                                 style = if (tier == CardTier.LARGE)
@@ -857,6 +859,7 @@ private fun PlayerCard(
                             )
                         }
                         if (isActive) {
+                            Spacer(modifier = Modifier.width(8.dp))
                             EndTurnButton(tier = tier, theme = theme, onClick = onEndTurn)
                         }
                     }
@@ -1025,17 +1028,17 @@ private fun PlayerCard(
                                 val delta = player.life - prevLife.intValue
                                 if (delta != 0) {
                                     lastDelta = delta
-                                    numberScale.snapTo(0.82f)
+                                    numberScale.snapTo(0.92f)
                                     floatY.snapTo(0f)
                                     floatAlpha.snapTo(1f)
                                     launch {
-                                        numberScale.animateTo(1.18f, spring(dampingRatio = 0.35f, stiffness = 700f))
+                                        numberScale.animateTo(1.08f, spring(dampingRatio = 0.35f, stiffness = 700f))
                                         numberScale.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = 500f))
                                     }
                                     if (delta > 0) {
                                         launch {
                                             heartScale.snapTo(1f)
-                                            heartScale.animateTo(1.55f, spring(dampingRatio = 0.3f, stiffness = 700f))
+                                            heartScale.animateTo(1.25f, spring(dampingRatio = 0.3f, stiffness = 700f))
                                             heartScale.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f))
                                         }
                                     }

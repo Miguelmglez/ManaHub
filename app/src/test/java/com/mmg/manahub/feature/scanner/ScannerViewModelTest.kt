@@ -5,6 +5,7 @@ import android.graphics.PointF
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.usecase.collection.CommitScanResult
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
@@ -12,12 +13,15 @@ import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel
 import com.mmg.manahub.feature.scanner.presentation.SoundManager
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.util.TestFixtures
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -25,6 +29,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -42,7 +47,13 @@ import org.junit.Test
  *   confirms the card ([HIGH_CONFIDENCE_FRAMES]=1)
  * - Anti-duplicate guard: same card within 800 ms is blocked
  * - Set lock filter: mismatched setCode is rejected before stability
- * - Language mismatch: language != "en" sets languageMismatch flag
+ * - Language fallback (W2.11, 2026-08-24): informational only — a fallback add sets
+ *   languageMismatch as a badge but the card IS added; a genuine localized-printing hit never
+ *   sets it
+ * - Rate-limit cooldown (W2.10): RecognitionResult.RateLimited sets rateLimitedUntilMs
+ * - onLanguageSelected resets: clears rateLimitedUntilMs/languageMismatch (the CardRecognizer-side
+ *   reset — negative cache/generation/stability buffer — is Composable-scoped, covered by
+ *   CardRecognizerTest instead, see that class's KDoc)
  * - Ambiguity selector: ambiguous → showAmbiguitySelector=true
  * - UI toggle actions: flash, queue sheet, sound
  *
@@ -96,15 +107,22 @@ class ScannerViewModelTest {
      * Default [similarity] is 0.85f — above the acceptance threshold (0.80) but below the
      * high-confidence threshold (0.90) — so tests that call this without overriding similarity
      * exercise the 3-frame stability path.  Pass similarity ≥ 0.90f to test the 1-frame path.
+     *
+     * [languageFallback] defaults to false — W2.11 (scanner-reliability-plan.md, 2026-08-24):
+     * true simulates `CardRecognizer` resolving an English-fallback printing because no printing
+     * exists in the selected language (informational badge, card is still added).
      */
     private fun identified(
         ambiguous: Boolean = false,
         similarity: Float = 0.85f,
+        card: com.mmg.manahub.core.model.Card = defaultCard,
+        languageFallback: Boolean = false,
     ) = RecognitionResult.Identified(
-        card = defaultCard,
+        card = card,
         similarity = similarity,
         ambiguous = ambiguous,
         corners = fakeCorners,
+        languageFallback = languageFallback,
     )
 
     // ── Setup / Teardown ───────────────────────────────────────────────────────
@@ -164,6 +182,7 @@ class ScannerViewModelTest {
         assertTrue(state.isSoundEnabled)
         assertTrue(state.hasFlash)             // defaults to true until hardware confirms
         assertFalse(state.isFlashOn)
+        assertNull(state.rateLimitedUntilMs)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -283,31 +302,113 @@ class ScannerViewModelTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 6 — Language mismatch
+    //  GROUP 6 — Language fallback (W2.11, 2026-08-24 — informational, never blocks the add)
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun onRecognitionResult_languageMismatch_setsFlag() = runTest {
-        // Arrange — selectedLanguage = "ja", card.lang = "en"
-        // The language filter only triggers when selectedLanguage != "en"
-        viewModel.onLanguageSelected("ja")
+    fun onRecognitionResult_languageFallback_addsCardAndSetsInformationalBadge() = runTest {
+        // Arrange — user selected "es", but CardRecognizer found no Spanish printing and fell
+        // back to the English one (languageFallback = true on the incoming result).
+        viewModel.onLanguageSelected("es")
 
         // Act
-        viewModel.onRecognitionResult(identified(similarity = 1.0f))
+        viewModel.onRecognitionResult(identified(similarity = 1.0f, languageFallback = true))
         advanceUntilIdle()
 
-        // Assert — languageMismatch is true; card was NOT auto-added
+        // Assert — languageMismatch surfaces the informational badge, but the card IS added.
         val state = viewModel.uiState.value
         assertTrue(
-            "Language mismatch flag should be set when card.lang != selectedLanguage",
+            "languageMismatch must be set as an informational badge for a fallback add",
             state.languageMismatch,
         )
-        // Card is shown in bottom bar (lastDetectedCard set) but session is empty
         assertNotNull(state.lastDetectedCard)
-        assertTrue(
-            "Session should be empty when language mismatch",
+        assertFalse(
+            "A language-fallback result must still be added to the session, never silently refused",
             state.scanSession.cards.isEmpty(),
         )
+        assertEquals(defaultCard.scryfallId, state.scanSession.cards.first().card.scryfallId)
+    }
+
+    @Test
+    fun onRecognitionResult_localizedPrinting_neverSetsLanguageMismatch() = runTest {
+        // Arrange — the normal (non-fallback) case: CardRecognizer resolved the ACTUAL localized
+        // printing, so languageFallback = false even though selectedLanguage != "en".
+        viewModel.onLanguageSelected("es")
+
+        // Act
+        viewModel.onRecognitionResult(identified(similarity = 1.0f, languageFallback = false))
+        advanceUntilIdle()
+
+        // Assert — no badge, card added normally.
+        val state = viewModel.uiState.value
+        assertFalse(
+            "A genuine localized-printing hit must never show the fallback badge",
+            state.languageMismatch,
+        )
+        assertFalse(state.scanSession.cards.isEmpty())
+    }
+
+    @Test
+    fun onRecognitionResult_englishSelected_languageFallbackNeverFires() = runTest {
+        // Arrange — default selectedLanguage = "en"; CardRecognizer never sets languageFallback
+        // = true on the English ladder, but this asserts the ViewModel trusts the flag either way.
+        // Act
+        viewModel.onRecognitionResult(identified(similarity = 1.0f, languageFallback = false))
+        advanceUntilIdle()
+
+        // Assert
+        assertFalse(viewModel.uiState.value.languageMismatch)
+        assertFalse(viewModel.uiState.value.scanSession.cards.isEmpty())
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 6b — RecognitionResult.RateLimited (W2.10, 2026-08-24)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onRecognitionResult_rateLimited_setsRateLimitedUntilMsAndStopsSearching() = runTest {
+        // Arrange
+        val beforeMs = System.currentTimeMillis()
+
+        // Act
+        viewModel.onRecognitionResult(RecognitionResult.RateLimited(retryAfterMs = 5_000L))
+        advanceUntilIdle()
+
+        // Assert
+        val state = viewModel.uiState.value
+        assertFalse(state.isSearching)
+        assertNotNull(state.rateLimitedUntilMs)
+        assertTrue(
+            "rateLimitedUntilMs must be roughly now + retryAfterMs",
+            state.rateLimitedUntilMs!! >= beforeMs + 5_000L,
+        )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 6c — onLanguageSelected resets (W2.11, 2026-08-24)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onLanguageSelected_clearsRateLimitedUntilMsAndLanguageMismatch() = runTest {
+        // Arrange — reach a state with both flags set.
+        viewModel.onLanguageSelected("es")
+        viewModel.onRecognitionResult(RecognitionResult.RateLimited(retryAfterMs = 30_000L))
+        viewModel.onRecognitionResult(identified(similarity = 1.0f, languageFallback = true))
+        advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.rateLimitedUntilMs)
+        assertTrue(viewModel.uiState.value.languageMismatch)
+
+        // Act — switching language again is a fresh scanning intent.
+        viewModel.onLanguageSelected("de")
+
+        // Assert
+        val state = viewModel.uiState.value
+        assertEquals("de", state.selectedLanguage)
+        assertNull(
+            "onLanguageSelected must clear a stale rate-limit cooldown badge from the OLD language",
+            state.rateLimitedUntilMs,
+        )
+        assertFalse(state.languageMismatch)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -438,5 +539,266 @@ class ScannerViewModelTest {
         // Assert
         assertTrue(viewModel.uiState.value.scanSession.cards.isEmpty())
         assertFalse(viewModel.uiState.value.showQueueSheet)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 11 — W3 (scanner-reliability-plan.md, 2026-08-24): opening a covering
+    //  sheet/overlay clears the transient detection overlay (detectedCorners/isSearching),
+    //  since ScannerScreen's CameraPreview fully unbinds the camera for the same conditions and
+    //  no new RecognitionResult will arrive to refresh them while the overlay is open.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Puts the ViewModel into a state with a live detection overlay (corners + searching).
+     * [onRecognitionResult] dispatches via `viewModelScope.launch(Dispatchers.Main.immediate)`,
+     * which on the [StandardTestDispatcher] used here only QUEUES the block — hence the
+     * [TestScope] receiver and the [advanceUntilIdle] call to actually run it before asserting.
+     */
+    private suspend fun TestScope.reachDetectionOverlayState() {
+        viewModel.onRecognitionResult(
+            RecognitionResult.Detected(corners = fakeCorners),
+        )
+        advanceUntilIdle()
+        assertNotNull(
+            "Precondition: Detected must populate detectedCorners",
+            viewModel.uiState.value.detectedCorners,
+        )
+        assertTrue(
+            "Precondition: Detected must set isSearching",
+            viewModel.uiState.value.isSearching,
+        )
+    }
+
+    private fun sampleScannedCard() = com.mmg.manahub.feature.scanner.presentation.ScannedCard(
+        card = defaultCard,
+        quantity = 1,
+        isFoil = false,
+        language = "en",
+        condition = "NM",
+        setCode = "lea",
+        timestamp = 1L,
+    )
+
+    @Test
+    fun onOpenQueue_clearsDetectionOverlay() = runTest {
+        reachDetectionOverlayState()
+
+        viewModel.onOpenQueue()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.showQueueSheet)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onCloseQueue_restoresScannableState() = runTest {
+        reachDetectionOverlayState()
+        viewModel.onOpenQueue()
+
+        viewModel.onCloseQueue()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.showQueueSheet)
+        assertNull(
+            "Closing must not resurrect a stale outline from before the overlay opened",
+            state.detectedCorners,
+        )
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onEditScannedCard_clearsDetectionOverlay() = runTest {
+        reachDetectionOverlayState()
+        // cardRepository is a relaxed mock (see class field) — the async getCardPrints() call
+        // this launches is irrelevant to this assertion, which only checks the SYNCHRONOUS state
+        // update onEditScannedCard makes before launching that coroutine.
+
+        viewModel.onEditScannedCard(sampleScannedCard())
+
+        val state = viewModel.uiState.value
+        assertTrue(state.showEditSheet)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onCloseEditSheet_restoresScannableState() = runTest {
+        reachDetectionOverlayState()
+        viewModel.onEditScannedCard(sampleScannedCard())
+
+        viewModel.onCloseEditSheet()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.showEditSheet)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onOpenVariantSelector_clearsDetectionOverlay() = runTest {
+        reachDetectionOverlayState()
+
+        viewModel.onOpenVariantSelector(sampleScannedCard())
+
+        val state = viewModel.uiState.value
+        assertTrue(state.showVariantSelector)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onCloseVariantSelector_restoresScannableState() = runTest {
+        reachDetectionOverlayState()
+        viewModel.onOpenVariantSelector(sampleScannedCard())
+
+        viewModel.onCloseVariantSelector()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.showVariantSelector)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onExpandVariantImage_clearsDetectionOverlay() = runTest {
+        reachDetectionOverlayState()
+
+        viewModel.onExpandVariantImage("https://example.com/card.jpg")
+
+        val state = viewModel.uiState.value
+        assertEquals("https://example.com/card.jpg", state.expandedVariantImageUrl)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onCloseExpandedImage_restoresScannableState() = runTest {
+        reachDetectionOverlayState()
+        viewModel.onExpandVariantImage("https://example.com/card.jpg")
+
+        viewModel.onCloseExpandedImage()
+
+        val state = viewModel.uiState.value
+        assertNull(state.expandedVariantImageUrl)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onOpenCardDetail_clearsDetectionOverlay() = runTest {
+        reachDetectionOverlayState()
+
+        viewModel.onOpenCardDetail(defaultCard.scryfallId)
+
+        val state = viewModel.uiState.value
+        assertEquals(defaultCard.scryfallId, state.selectedCardDetailId)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onCloseCardDetail_restoresScannableState() = runTest {
+        reachDetectionOverlayState()
+        viewModel.onOpenCardDetail(defaultCard.scryfallId)
+
+        viewModel.onCloseCardDetail()
+
+        val state = viewModel.uiState.value
+        assertNull(state.selectedCardDetailId)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onOpenPriceDetail_clearsDetectionOverlay() = runTest {
+        reachDetectionOverlayState()
+
+        viewModel.onOpenPriceDetail()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.showPriceDetailSheet)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onClosePriceDetail_restoresScannableState() = runTest {
+        reachDetectionOverlayState()
+        viewModel.onOpenPriceDetail()
+
+        viewModel.onClosePriceDetail()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.showPriceDetailSheet)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Write-path hardening audit (2026-09-06): onAddAllToCollection
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onAddAllToCollection_calledTwiceBeforeFirstResolves_commitsOnlyOnce() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        assertEquals(1, viewModel.uiState.value.scanSession.cards.size) // precondition
+
+        coEvery { commitScannedCards(any()) } returns CommitScanResult(
+            committedCopies = 1, failedEntries = 0, entrySucceeded = listOf(true),
+        )
+
+        viewModel.onAddAllToCollection()
+        assertTrue(
+            "isCommittingQueue must flip synchronously, before the commit coroutine suspends",
+            viewModel.uiState.value.isCommittingQueue,
+        )
+        viewModel.onAddAllToCollection() // second tap while the first is still in flight
+
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { commitScannedCards(any()) }
+        assertFalse(viewModel.uiState.value.isCommittingQueue)
+    }
+
+    @Test
+    fun onAddAllToCollection_partialFailure_keepsFailedEntryByStableId_evenWithASharedTimestamp() = runTest {
+        val cardB = TestFixtures.buildCard(scryfallId = "card-b-999", name = "Counterspell", setCode = "lea")
+        viewModel.onRecognitionResult(identified(card = defaultCard))
+        advanceUntilIdle()
+        viewModel.onRecognitionResult(identified(card = cardB))
+        advanceUntilIdle()
+
+        val seeded = viewModel.uiState.value.scanSession.cards
+        assertEquals(2, seeded.size) // precondition
+
+        // Force both entries to share the EXACT same timestamp (burst recognition, or a
+        // duplicate-entry action firing twice) via the public edit path, while their auto-assigned
+        // ids stay distinct -- reproduces the MEDIUM-6 collision deterministically.
+        val collidingTimestamp = 123_456_789L
+        seeded.forEach { entry ->
+            viewModel.onEditScannedCard(entry)
+            viewModel.onUpdateScannedCard(entry.copy(timestamp = collidingTimestamp))
+        }
+        val collided = viewModel.uiState.value.scanSession.cards
+        assertEquals(2, collided.size)
+        assertTrue(collided.all { it.timestamp == collidingTimestamp })
+        assertNotEquals(collided[0].id, collided[1].id)
+
+        // Entry 0 (defaultCard) fails, entry 1 (cardB) succeeds.
+        coEvery { commitScannedCards(any()) } returns CommitScanResult(
+            committedCopies = 1, failedEntries = 1, entrySucceeded = listOf(false, true),
+        )
+
+        viewModel.onAddAllToCollection()
+        advanceUntilIdle()
+
+        val remaining = viewModel.uiState.value.scanSession.cards
+        assertEquals(
+            "The FAILED entry must survive -- a shared timestamp must never drop it alongside the succeeded one",
+            1, remaining.size,
+        )
+        assertEquals(defaultCard.scryfallId, remaining[0].card.scryfallId)
     }
 }

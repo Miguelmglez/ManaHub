@@ -46,10 +46,11 @@ import javax.inject.Singleton
  * ## KMP migration — Hilt→Koin cutover batch 6
  * All 7 non-excluded `@HiltWorker`s were converted to plain [androidx.work.CoroutineWorker]s resolved
  * by Koin's `worker { }` DSL (registered across `gamificationEngineKoinModule`, `collectionKoinModule`,
- * `core.sync.di.syncKoinModule` and `core.push.di.pushKoinModule`). The excluded scanner feature's
- * `EmbeddingDatabaseUpdateWorker` (`@HiltWorker`) stays on Hilt — it is currently fully commented out
- * (replaced by ML Kit OCR) but the coexistence path below is kept so a future re-instated `@HiltWorker`
- * keeps working without touching this file again.
+ * `core.sync.di.syncKoinModule` and `core.push.di.pushKoinModule`). The excluded scanner feature
+ * currently has no `@HiltWorker` of its own — the embedding-database pipeline that once used one was
+ * removed in WS5 of `docs/plans/scanner-reliability-plan.md` (2026-08-25) — but the Hilt/Koin
+ * coexistence path below is kept so a future `@HiltWorker` in an excluded feature keeps working
+ * without touching this file again.
  *
  * [WorkManager] now dispatches to TWO factories via [DelegatingWorkerFactory]:
  * - [SafeKoinWorkerFactory] (wraps [KoinWorkerFactory] from `koin-androidx-workmanager`) resolves the 7

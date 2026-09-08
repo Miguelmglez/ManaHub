@@ -22,6 +22,28 @@ data class ScannedCardCommit(
 )
 
 /**
+ * Outcome of [CommitScannedCardsUseCase.invoke].
+ *
+ * @property committedCopies Total card copies successfully written to the collection.
+ * @property failedEntries Number of [ScannedCardCommit] entries that either returned a non-success
+ *   [DataResult] or threw while being written — write-path hardening audit (2026-09-06): a
+ *   throwing entry used to abort the WHOLE batch (an uncaught exception from
+ *   [AddCardToCollectionUseCase.addReturningOutcome] propagated straight out of the `forEach`),
+ *   silently stranding every entry after it. The caller (`ScannerViewModel`) surfaces a non-zero
+ *   [failedEntries] as a warning naming the shortfall instead of clearing the whole scan session.
+ * @property entrySucceeded Per-entry success flag, SAME ORDER AND SIZE as the `entries` list
+ *   passed to [CommitScannedCardsUseCase.invoke] — lets the caller remove only the entries that
+ *   actually committed (e.g. by zipping against its own queue) rather than either clearing
+ *   everything (losing a failed entry's data) or nothing (risking a double-add on retry for the
+ *   entries that already succeeded).
+ */
+data class CommitScanResult(
+    val committedCopies: Int,
+    val failedEntries: Int,
+    val entrySucceeded: List<Boolean>,
+)
+
+/**
  * Commits a batch of scanner-recognised cards to the collection and emits a SINGLE
  * [ProgressionEvent.CardScanned] for the whole batch after the writes succeed (ADR-002 §1).
  *
@@ -39,30 +61,48 @@ class CommitScannedCardsUseCase(
     private val progressionEventBus: ProgressionEventBus,
 ) {
     /**
-     * Adds every entry in [entries] to the collection. Returns the total number of card copies
-     * successfully committed. Individual failures are skipped so one bad entry never aborts the
-     * batch; the scan event reports only the copies that actually landed.
+     * Adds every entry in [entries] to the collection. Individual failures (a non-success
+     * [DataResult] OR a thrown exception) are isolated per entry — see [CommitScanResult
+     * .failedEntries] — so one bad entry never strands the rest of the batch. A
+     * [kotlinx.coroutines.CancellationException] is never treated as a per-entry failure: it is
+     * rethrown immediately so cooperative cancellation (e.g. the screen closing mid-commit)
+     * propagates normally instead of being counted as a failed card.
      *
      * @param userId resolved user id (null for guest) forwarded to the collection write.
      */
     suspend operator fun invoke(
         entries: List<ScannedCardCommit>,
         userId: String? = null,
-    ): Int {
-        if (entries.isEmpty()) return 0
+    ): CommitScanResult {
+        if (entries.isEmpty()) {
+            return CommitScanResult(committedCopies = 0, failedEntries = 0, entrySucceeded = emptyList())
+        }
 
         var committedCopies = 0
+        var failedEntries = 0
+        val entrySucceeded = ArrayList<Boolean>(entries.size)
         entries.forEach { entry ->
-            val result = addCardToCollection.addReturningOutcome(
-                scryfallId = entry.scryfallId,
-                isFoil     = entry.isFoil,
-                condition  = entry.condition,
-                language   = entry.language,
-                userId     = userId,
-                quantity   = entry.quantity,
-            )
-            if (result is DataResult.Success) {
-                committedCopies += entry.quantity
+            try {
+                val result = addCardToCollection.addReturningOutcome(
+                    scryfallId = entry.scryfallId,
+                    isFoil     = entry.isFoil,
+                    condition  = entry.condition,
+                    language   = entry.language,
+                    userId     = userId,
+                    quantity   = entry.quantity,
+                )
+                if (result is DataResult.Success) {
+                    committedCopies += entry.quantity
+                    entrySucceeded.add(true)
+                } else {
+                    failedEntries++
+                    entrySucceeded.add(false)
+                }
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c
+            } catch (t: Throwable) {
+                failedEntries++
+                entrySucceeded.add(false)
             }
         }
 
@@ -76,6 +116,10 @@ class CommitScannedCardsUseCase(
                 )
             )
         }
-        return committedCopies
+        return CommitScanResult(
+            committedCopies = committedCopies,
+            failedEntries = failedEntries,
+            entrySucceeded = entrySucceeded,
+        )
     }
 }

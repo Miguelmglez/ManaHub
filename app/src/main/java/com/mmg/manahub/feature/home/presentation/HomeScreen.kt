@@ -130,8 +130,23 @@ fun HomeScreen(
     // can show that the user was on Home. Fires once per entry (keyed on Unit).
     LaunchedEffect(Unit) { FirebaseCrashlytics.getInstance().log("screen_viewed: home") }
 
+    val availableQuickStartActions = remember {
+        QuickStartAction.entries.filter {
+            it != QuickStartAction.MULTI_ADD_CARD || FeatureFlags.MassiveAdd.MASSIVE_CARDS_ENABLED
+        }
+    }
+
+    val effectiveQuickStartActions = remember(uiState.quickStartActions, availableQuickStartActions) {
+        val valid = uiState.quickStartActions.filter { it in availableQuickStartActions }.toMutableList()
+        if (valid.size < 4) {
+            val remaining = availableQuickStartActions.filter { it !in valid }
+            valid.addAll(remaining.take(4 - valid.size))
+        }
+        valid.take(4)
+    }
+
     // The active game override is disabled for now (user request: only show Welcome and Loading).
-    val effectiveState = uiState
+    val effectiveState = uiState.copy(quickStartActions = effectiveQuickStartActions)
 
     HomeScreen(
         uiState = effectiveState,
@@ -183,15 +198,9 @@ fun HomeScreen(
         // Breadcrumb: the quick-start customize sheet was opened (fires once per open).
         LaunchedEffect(Unit) { FirebaseCrashlytics.getInstance().log("home_quick_start_customize_opened") }
 
-        val availableActions = remember {
-            QuickStartAction.entries.filter {
-                it != QuickStartAction.MULTI_ADD_CARD || FeatureFlags.MassiveAdd.MASSIVE_CARDS_ENABLED
-            }
-        }
-
         QuickStartCustomizeSheet(
-            allActions = availableActions,
-            selectedActions = uiState.quickStartActions,
+            allActions = availableQuickStartActions,
+            selectedActions = effectiveState.quickStartActions,
             onSave = { selected ->
                 viewModel.saveQuickStartActions(selected)
                 showCustomizeSheet = false
@@ -669,7 +678,7 @@ private val QuickStartAction.label: String
     @ReadOnlyComposable
     get() = when (this) {
         QuickStartAction.SCAN_CARD -> stringResource(R.string.quick_start_sheet_scan_card)
-        QuickStartAction.CREATE_DECK -> stringResource(R.string.quick_start_sheet_build_deck)
+        QuickStartAction.CREATE_DECK -> stringResource(R.string.quick_start_sheet_decks)
         QuickStartAction.DRAFT_GUIDE -> stringResource(R.string.quick_start_sheet_draft_guide)
         QuickStartAction.SEARCH_CARD -> stringResource(R.string.quick_start_sheet_search_card)
         QuickStartAction.DECKS -> stringResource(R.string.quick_start_sheet_decks)

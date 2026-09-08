@@ -45,6 +45,7 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.components.CardRow
 import com.mmg.manahub.core.ui.components.ManaColorPicker
 import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
@@ -60,8 +61,6 @@ import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.StrategyPickerSelection
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
-import com.mmg.manahub.feature.decks.presentation.components.CardRow
-import com.mmg.manahub.feature.decks.presentation.components.CommanderBanner
 import com.mmg.manahub.feature.decks.presentation.components.StrategyPickerSheet
 import com.mmg.manahub.feature.decks.presentation.components.TribeOption
 import org.jetbrains.compose.resources.painterResource
@@ -86,7 +85,7 @@ import org.jetbrains.compose.resources.painterResource
  * .DeckStudioScreen]'s exact "Choose Commander" wiring precedent.
  *
  * Once [DeckWizardUiState.selectedCommander] is set, this step shows the picked commander's
- * [CommanderBanner] + a "Change commander" affordance instead of the candidate list (same as the
+ * [CardRow] (commander style) + a "Change commander" affordance instead of the candidate list (same as the
  * old Direction-embedded commander picker's UX).
  */
 @Composable
@@ -140,7 +139,14 @@ internal fun CommanderPickStepContent(
             if (commander != null) {
                 item(key = "commander_banner") {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                        CommanderBanner(commander = commander, modifier = Modifier.fillMaxWidth())
+                        CardRow(
+                    card = commander,
+                    isInCollection = true, // It's a selected commander from a pool/collection
+                    onClick = { /* Detail already visible if needed */ },
+                    onRemove = null,
+                    isCommander = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
                         Row(
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClick = onClearCommander),
                             verticalAlignment = Alignment.CenterVertically,

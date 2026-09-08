@@ -28,6 +28,7 @@ interface StatsDao {
         FROM user_card_collection uc
         INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -42,6 +43,7 @@ interface StatsDao {
             ELSE COALESCE(c.price_usd, 0) END), 0)
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -56,6 +58,7 @@ interface StatsDao {
             ELSE COALESCE(c.price_eur, 0) END), 0)
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -75,6 +78,7 @@ interface StatsDao {
                     THEN c.price_eur_foil ELSE COALESCE(c.price_eur, 0) END AS priceEur
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -90,6 +94,7 @@ interface StatsDao {
         SELECT c.color_identity AS colorIdentity, SUM(uc.quantity) AS count
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -103,6 +108,7 @@ interface StatsDao {
         SELECT c.rarity AS rarity, SUM(uc.quantity) AS count
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -116,6 +122,7 @@ interface StatsDao {
         SELECT c.type_line AS typeLine, SUM(uc.quantity) AS count
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -130,6 +137,7 @@ interface StatsDao {
                SUM(uc.quantity) AS count
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND c.type_line NOT LIKE '%Land%'
           AND (:colorFilter IS NULL
@@ -145,6 +153,7 @@ interface StatsDao {
         SELECT c.set_code AS setCode, SUM(uc.quantity) AS count
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -161,6 +170,7 @@ interface StatsDao {
         FROM user_card_collection uc
         INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND uc.is_foil = 1
           AND (:colorFilter IS NULL
@@ -175,6 +185,7 @@ interface StatsDao {
         FROM user_card_collection uc
         INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (c.frame_effects LIKE '%fullart%' OR c.frame_effects LIKE '%borderless%' OR c.promo_types LIKE '%boosterfun%')
           AND (:colorFilter IS NULL
@@ -188,6 +199,7 @@ interface StatsDao {
         SELECT artist, SUM(uc.quantity) as count FROM cards c
         INNER JOIN user_card_collection uc ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -201,6 +213,7 @@ interface StatsDao {
         SELECT AVG(c.cmc) FROM cards c
         INNER JOIN user_card_collection uc ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND c.type_line NOT LIKE '%Land%'
           AND (:colorFilter IS NULL
@@ -214,6 +227,7 @@ interface StatsDao {
         SELECT AVG(CAST(c.power AS REAL)) FROM cards c
         INNER JOIN user_card_collection uc ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND c.power IS NOT NULL AND c.power NOT LIKE '%*%' AND c.power NOT LIKE '%+%'
           AND c.power NOT IN ('X', '∞')
@@ -228,6 +242,7 @@ interface StatsDao {
         SELECT AVG(CAST(c.toughness AS REAL)) FROM cards c
         INNER JOIN user_card_collection uc ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND c.toughness IS NOT NULL AND c.toughness NOT LIKE '%*%' AND c.toughness NOT LIKE '%+%'
           AND c.toughness NOT IN ('X', '∞')
@@ -249,6 +264,7 @@ interface StatsDao {
                     THEN c.price_eur_foil ELSE COALESCE(c.price_eur, 0) END AS priceEur
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -269,6 +285,7 @@ interface StatsDao {
                     THEN c.price_eur_foil ELSE COALESCE(c.price_eur, 0) END AS priceEur
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -282,6 +299,7 @@ interface StatsDao {
         SELECT c.set_code AS setCode, SUM(uc.quantity) AS count
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -299,6 +317,7 @@ interface StatsDao {
         END) AS totalValue
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -312,6 +331,7 @@ interface StatsDao {
         SELECT c.tags FROM cards c
         INNER JOIN user_card_collection uc ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -326,6 +346,7 @@ interface StatsDao {
         FROM user_card_collection uc
         INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
     """)
     fun observeCollectionSetCodes(userId: String?): Flow<List<String>>
@@ -344,6 +365,7 @@ interface StatsDao {
                COALESCE(c.price_eur, 0) AS priceEur
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -357,6 +379,7 @@ interface StatsDao {
             WHEN c.price_usd_foil IS NOT NULL THEN c.price_usd_foil ELSE COALESCE(c.price_usd, 0) END), 0)
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND uc.is_foil = 1
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
@@ -371,6 +394,7 @@ interface StatsDao {
             WHEN c.price_eur_foil IS NOT NULL THEN c.price_eur_foil ELSE COALESCE(c.price_eur, 0) END), 0)
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND uc.is_foil = 1
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
@@ -391,6 +415,7 @@ interface StatsDao {
                SUM(uc.quantity) AS totalQuantity
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -409,6 +434,7 @@ interface StatsDao {
             COUNT(DISTINCT CASE WHEN c.legality_standard = 'legal' THEN c.scryfall_id END) AS standardCount
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -421,6 +447,7 @@ interface StatsDao {
         SELECT c.keywords FROM cards c
         INNER JOIN user_card_collection uc ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -438,6 +465,7 @@ interface StatsDao {
         SELECT c.set_code AS setCode, COUNT(DISTINCT uc.scryfall_id) AS count
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
         GROUP BY c.set_code
     """)
@@ -463,6 +491,7 @@ interface StatsDao {
                MAX(c.released_at) AS releasedAt
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND c.oracle_id != ''
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
@@ -491,6 +520,7 @@ interface StatsDao {
                     THEN c.price_eur_foil ELSE COALESCE(c.price_eur, 0) END AS priceEur
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND c.artist = :artist
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
@@ -513,6 +543,7 @@ interface StatsDao {
                COALESCE(SUM(uc.quantity), 0) AS count
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
+          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')

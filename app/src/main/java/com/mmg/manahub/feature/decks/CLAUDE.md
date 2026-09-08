@@ -1,9 +1,283 @@
 ### Deck Studio (`feature/decks/presentation/DeckStudio*`)
-**Suggestions tab (`DeckFeatureFlags.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED`) is currently `true`** —
-it went through a hide/re-enable cycle (hidden 2026-07-14, re-enabled for the Community/Archetype
-plan, hidden again 2026-07-21, re-enabled during the Deck Wizard & Engine Rework campaign); flip to
-`false` to hide it again. Manual editing and Import are unaffected either way. See
-`docs/hidden-features/deck-studio-suggestions.md`.
+**Suggestions tab (`FeatureFlags.Decks.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED`, in
+`core/FeatureFlags.kt` — NOT the stale `feature/decks/presentation/DeckFeatureFlags.kt` path this
+doc used to cite) is currently `true`** — it went through a hide/re-enable cycle (hidden
+2026-07-14, re-enabled for the Community/Archetype plan, hidden again 2026-07-21, re-enabled during
+the Deck Wizard & Engine Rework campaign); flip to `false` to hide it again. Manual editing and
+Import are unaffected either way. The tab's user-facing label is **"Analysis"** (Deck Analysis
+Engine v2, 2026-08-19 — see below); the flag/enum/class names are still `SUGGESTIONS`-prefixed
+(string-only rename). `docs/hidden-features/deck-studio-suggestions.md` (the old
+Cuts/Adds/Community sub-flag's doc) was DELETED (Deck Analysis Category Sections rework, W0,
+2026-08-21) alongside the sub-flag it documented — see the next paragraph.
+
+**Deck Analysis Engine v2 (2026-08-19).** Score/Role-Coverage/Findings are now ONE unified
+pipeline, all deriving from the resolved strategy skeleton (RoleKey vocabulary) — replacing the
+old split where `healthScore`/`roleCoverage` came from the legacy `DeckRole`-keyed `DeckScorer`
+while warnings alone came from the archetype-aware `ArchetypeEvaluator` (the bug where changing
+archetype/themes moved warnings but never the score). Landed ADDITIVELY, not a hard swap:
+`DeckHealth.analysis: DeckAnalysis?` (new) sits alongside the untouched legacy
+`DeckHealth.evaluation` (dormant — no longer read by any UI, kept compiling for the still-flagged-
+off suggestion use cases below). New engine, pure `commonMain`,
+`shared/core-domain/.../feature/decks/domain/engine/`:
+- `CuratedStrategyCatalog.kt` — 29 curated strategies (6 pure archetypes incl. "balanced"/GENERIC +
+  23 themed presets), each resolving to an (ArchetypeId, themes[, tribe]) composition validated
+  against `StrategyCatalog.isValidCombination()`; `nearestFor(archetype, themes, format = null)`
+  maps an (archetype, themes) pair (e.g. from inference) to the nearest catalog entry, optionally
+  filtered to a `DeckFormat`'s availability (Wave 2 B4), `null` = "Custom" (unmatched legacy pin).
+  Since Wave 2 B1, `CuratedStrategy.formats: Set<DeckFormat>` (not the coarser `ArchetypeFormat`) —
+  see the Wave 2 block below for why.
+- `DeckAnalysis.kt` — result models: `DeckAnalysis`, `PillarResult`, `PillarId` (MANA_BASE / CURVE /
+  PLAN_ROLES / SYNERGY / LEGALITY), `Finding` (sealed, 17 variants — corrected 2026-08-24, an earlier
+  count of 18 was stale, `grep -c "    data class .*: Finding"` is the way to re-verify after any
+  future addition), severity-tiered BLOCKER/WARNING/INFO), `RoleCoverageEntry`, `CardContribution`/
+  `CardSection`/`PillarResult.sections` (Category Sections rework, see below), `AnalysisWeights`
+  (defaults 0.20/0.15/0.35/0.15/0.15,
+  `planRoles` heaviest since that role table IS the score's literal explanation — reasoning as KDoc
+  on the class, overridable via the existing `ScoreWeightOverrides` DataStore mechanism, extended
+  not duplicated).
+- `AnalysisEngine.kt` — the 5 pillar evaluators + score composition + finding budget (top 3 per
+  pillar + collapsed count, BLOCKERs never collapse). `ILLEGAL_DECK_SCORE_CAP = 40` (flat cap, no
+  severity gradient within P5 — reasoning as KDoc, reviewed during calibration, kept as-is).
+  Calibrated 2026-08-19 against 2 realistic-density Commander fixtures (~65 real cards + 35-38 real
+  lands, `DeckAnalysisEngineCalibrationTest.kt`) to a documented 65-95 "well-built, on-plan deck"
+  band — the original sparse golden fixtures (`DeckAnalysisEngineGoldenTest.kt`, ~17-28 real cards
+  padded to 100 with basics) score artificially low (50-64) purely from the land-count skew; that's
+  expected and doesn't indicate a miscalibration — those fixtures only assert RELATIVE behavior
+  (strategy-switch deltas, anti-role firing, illegal-cap), never absolute score bands.
+- `usecase/EvaluateDeckUseCaseV2.kt` — thin wrapper around `AnalysisEngine.evaluate()`, called from
+  inside `EvaluateDeckUseCase` (which still also runs the legacy path for the dormant `.evaluation`
+  field). The v2 call is wrapped in `runCatching` (optional `crashReporter` param, appended last) —
+  it is new, uncalibrated-in-production code, so a pillar-evaluator exception degrades to
+  `analysis = null` instead of propagating uncaught through `DeckDoctorOrchestrator.loadAnalysis`'s
+  `scope.launch` and crashing the whole app.
+- UI: `CuratedStrategyPickerSheet.kt` (replaces the deleted `ArchetypePlanSheet.kt` — flat curated
+  list, grouped "Core plans"/"Build-around themes", search, tribe sub-picker, Auto-detect) +
+  `HealthComponents.kt`'s `PillarTile`/`RoleCoverageEntryRow`/`FindingRow` (replace the deleted
+  legacy `RoleCoverageRow`/`WarningChip`). **Do not name a new component `StrategyPickerSheet`** —
+  that name is already taken by an unrelated 3-axis archetype/theme/tribe picker from the Deck
+  Wizard Rework plan (WS1.2), still live in `DeckWizardCommanderSteps.kt`.
+- **Cuts/Adds/Community (Motor A/B, the "make suggestions" half of Deck Doctor) were DELETED
+  end-to-end** in the Deck Analysis Category Sections rework (W0, 2026-08-21, D3/D5) — not
+  re-hidden behind a flag this time, genuinely removed: the UI block in `DeckStudioScreen.kt`, the
+  `DeckStudioViewModel`/`DeckDoctorOrchestrator` state fields and functions
+  (`cuts`/`adds`/budget/`onAddSuggestion`/`onCutSuggestion`/`recomputeAddsInternal`/
+  `setIncludeOutsideCollection`), `SuggestCutsUseCase`'s only consumer, `BudgetConstraints.kt`, and
+  the now-pointless `DECK_STUDIO_SUGGESTIONS_ENGINE_ENABLED` sub-flag (deleted, not just flipped
+  off). Score/pillars/findings ("Analysis") are unaffected — they were never gated by that
+  sub-flag. Category-scoped browse-for-cards sections are the planned replacement (later
+  workstreams of the same plan). **`SuggestCutsUseCase` itself SURVIVES undeleted** (kept alive
+  only for `app/src/test/.../harness/HarnessDoctorPipeline.kt`'s unrelated Wizard Quality Campaign
+  QA gate — see that file's KDoc — no production/DI consumer resolves it any more).
+  **`SuggestAddsFromCollectionUseCase`/`SuggestAddsFromCommunityUseCase` also SURVIVE** — Motor
+  A/B's own ranking logic is now DUAL-PURPOSE: `DeckDoctorOrchestrator` no longer calls them, but
+  `BuildDeckFromTemplateUseCase` (the Deck Wizard's build engine, `domain/template/`) independently
+  depends on both as its own fill-from-collection/community placement engine. Do not delete either
+  class without first checking `BuildDeckFromTemplateUseCase`'s own call sites.
+- **"Decks like yours" (Motor B's OTHER half — `FindSimilarDecksUseCase`, "which real Archidekt
+  decks look like this one") is UNCHANGED and SURVIVES**, re-homed as a top-level `LazyColumn` item
+  gated only on `uiState.communityEngineEnabled && uiState.similarDecks.isNotEmpty()` — it was
+  always a separate use case/state field/DI binding from the deleted Cuts/Adds machinery (see D4 of
+  the rework plan).
+- **Category Sections rework (W0-W8, 2026-08-21/24, `docs/plans/deck-analysis-category-sections-plan.md`
+  + its progress/decisions docs, gitignored — durable record in memory) — the Cuts/Adds replacement,
+  SHIPPED.** Instead of recommending specific cards, each expanded pillar tile now renders one
+  `CardSectionRow` per category (`presentation/components/CardSectionComponents.kt`, new): a title,
+  `current/ideal` band bar (reuses `RoleCoverageEntryRow`'s exact bar geometry), a `LazyRow` of the
+  deck's own cards filling that category (stable key `"${section.id}:${scryfallId}"` — a card can
+  legitimately appear in more than one section, e.g. a dual land across two `produces:X` sections, or
+  two SYNERGY fingerprints), and a "Browse for X" button opening the SAME `CardSearchSheet` the Build
+  tab uses, pre-seeded with a curated Scryfall query + a collection-tag filter.
+  - **Suggestions Tab UI Polish plan (2026-08-25, `docs/plans/deck-analysis-suggestions-ui-polish-plan.md`,
+    gitignored) superseded several of the visual details below, in the SAME uncommitted working
+    tree.** Every `CardSectionRow` is now individually collapsible (composite
+    `"${pillarId}:${section.id}"` key, mirrors `CollectionScreen.kt`'s `CollectionGroupHeader`),
+    wrapped in its own subtle gradient "card" surface for visual separation between sections, and
+    its header is rendered by the new shared `SectionHeader` component
+    (`shared/core-ui/.../components/SectionHeader.kt`) instead of a bespoke title Row — a banded
+    section's linear band bar was replaced by a compact `MiniProgressRing`
+    (`shared/core-ui/.../components/MiniProgressRing.kt`, new — NOT a resize of
+    `CircularDistribution`, which is a multi-segment chart unsuited to a single-value inline ring)
+    in `SectionHeader`'s trailing slot; the `RoleBandMarker` min/max ticks were dropped (not
+    translated onto the ring, a documented simplicity trade-off). **The per-card 🔗 "find decks
+    with this card" link icon/button under each thumbnail (and its `onOpenCommunityDecks` wiring,
+    `deck_analysis_community_decks_opened` telemetry, `deck_analysis_section_find_community_decks_for`
+    string) was DELETED outright** — the thumbnail is now a single tappable art box, enlarged
+    56×80dp → 72×104dp into the freed space. An empty section (`contributions.isEmpty()`) now
+    renders a muted placeholder instead of omitting the card row entirely. Mana Base's per-color
+    sections render a real `ManaSymbolImage` (via `SectionHeader`'s `leading` slot) instead of a
+    raw `"{W}"` token baked into `CardSection.label` — `AnalysisEngine.kt` emits a plain color name
+    (`ManaColor.displayName`) for these labels now. Curve section labels read `"$mv Cost"`/
+    `"7+ Cost"`, not `"MV $mv"`/`"MV 7+"`. Findings no longer hard-truncate at the engine level —
+    `AnalysisEngine.budgetFindings` was renamed `sortFindings` and now only sorts (never drops);
+    `PillarResult.collapsedFindingsCount` was deleted; the app-module `FindingsList` component
+    (`presentation/components/HealthComponents.kt`) owns the "show first 3 / Show more / Show
+    less" folding entirely client-side, and `FindingRow` itself gained a severity icon-in-circle
+    badge in place of the old flat color dot.
+  - **The engine emits the attribution — never re-derive it in the UI.**
+    `ArchetypeRoleClassifier.deckRoleAttribution()` is a sibling of `deckRoleCounts()` (same
+    classification pass, keeps what the counts-only version throws away) →
+    `Map<RoleKey, List<CardContribution>>`. `AnalysisEngine.kt`'s 5 pillar evaluators populate
+    `PillarResult.sections: List<CardSection>` (appended last, `roleCoverage` stays untouched —
+    existing golden/calibration tests still key off it). **`CardSection.current` is NOT
+    `contributions.sumOf { it.quantity }`** — role counts are `round(Σ quantity × confidence)`, so a
+    partially-confident card contributes a fraction; `current` is what the SCORE uses, the
+    `contributions` list (sorted confidence-descending) is what produced it. **Never reconcile one
+    from the other** — this is a documented-on-purpose mismatch, not a bug to "fix". Sections render
+    UNFILTERED, including 0/N gaps (the old `filter { it.current > 0 }` was deleted — a gap is exactly
+    what the user needs to see; this also exposed and fixed a pre-existing bug where
+    `tribe_members` had a band but no `RoleSpec`, so it was permanently absent from `roleCounts` on
+    every TRIBAL skeleton — now wired via `ArchetypeRoleClassifier.tribeMemberCount`/
+    `dominantTribeKey`).
+  - **SYNERGY sections** are the deck's top `profile.tagFingerprint` keys over the alignment
+    threshold (strategy + `tribe:` keys) plus a mandatory **"Off-plan"** section (`id = "offplan"`)
+    listing every non-aligned card that depresses the subscore — `offplan` never gets a Browse button
+    (nothing to search for). `subscore` math is UNCHANGED (still `density × 100`); the pillar's
+    sub-caption reads `"aligned N / M non-lands"` so the number stays explainable without granting
+    SYNERGY extra visual authority — it remains the weakest-calibrated pillar (KDoc warning kept).
+  - **`SectionSearchQuery.kt` (new, `shared/core-domain/.../engine/`) owns ALL Scryfall query
+    building — the engine itself stays 100% query-syntax-free.** `fragmentFor`/`buildFor`/
+    `collectionTagKeysFor` per section id: direct `function:` oracle tags where one exists, a handful
+    of hardcoded structural fragments where none does (`mana_fix` → `produces>=2`, never
+    `function:mana-fixing` — verified 0 results), and everything else MECHANICALLY TRANSLATED from
+    `TagDictionary`'s `DetectionRule`s (allOf→AND, anyOf→OR-group, noneOf→`-oracle:`, etc.) so a
+    dictionary edit propagates instead of drifting from a hardcoded copy. **These fragments are
+    compile-time constants and MUST NEVER be passed through `BuildScryfallQueryUseCase.escapeValue()`**
+    — it strips to `[a-zA-Z0-9\-',.\s]`, which corrupts `oracle:"+1/+1 counter"` and drops `{1}` from
+    stax patterns; the curated strings are zero-injection-surface by construction, escaping them would
+    only break them.
+  - **"Card function" facet** (W4, `CardFunctionOption.kt` new in `shared/core-model/`) — a closed,
+    validated list of ~93 Scryfall function tags across 8 UI sections, added to Advanced Search
+    (`AdvancedSearchQuery.CardFunction`, `BuildScryfallQueryUseCase`, `AdvancedSearchViewModel/Sheet`,
+    `CollectionViewModel.matchesCriterion`). **Deliberately keeps its OWN `collectionTagKeys` mapping,
+    separate from `SectionSearchQuery.collectionTagKeysFor`** — audited 2026-08-24 and confirmed these
+    are genuinely different key spaces (Scryfall function-tag strings vs. internal section/role ids),
+    not accidental duplication; do not "simplify" them into one without re-verifying that premise.
+  - **Mana cost is now part of every `CardListItem`/`AddCardSheet` row** (W6,
+    `shared/core-ui/.../CardListItem.kt` gained `manaCost: String?`, rendered via `ManaCostImages`
+    beside the name) — `CardSearchSheet.kt`'s `AddCardSheetRow` was rewritten on top of `CardListItem`
+    for this (2 known small visual deltas from the pre-rework row, flagged not fixed: it now uses
+    `imageNormal` instead of `imageArtCrop`, and lost the commander gold-tint on the name — see the
+    plan's decisions doc for detail if these turn out to matter).
+  - **`CardSearchSheet` gained a preset entry point** (W5): `initialAdvancedQuery` (structured, W11 —
+    the original `initialScryfallQuery: String?` is long deleted)/`initialCollectionTagKeys` params
+    (appended last, defaulted), so the Analysis tab's "Browse" button opens the exact same
+    sheet/`onAdd`/`onRemove` the Build tab uses, pre-filtered, and clears
+    `addCardsQuery`/`scryfallResults` on dismiss the same way the Build tab's own call site already
+    does (the two share that mutable VM state — always clear it on close of EITHER entry point).
+    **Both tabs are filtered from that ONE query since 2026-09-07** — `DeckStudioViewModel
+    .applyStructuredSearch` (bound to the now-nullable `onAdvancedSearch`, which also serves
+    `AdvancedSearchSheet`'s SEARCH CARDS CTA) sends the Scryfall fragment to All Cards and runs
+    `AdvancedSearchCardMatcher` (`shared/core-domain/.../core/domain/search/`, `lenient = true`)
+    over the collection; the visible search bar stays name-filter-only in every path. The sheet is
+    rendered only while the destination is `RESUMED`, so a card tap can navigate to `CardDetailScreen`
+    with working transitions. → memory: `project_deck_studio_structured_search_both_tabs`,
+    `feedback_modal_sheet_blocks_nav_transition`
+  - Telemetry added: `deck_analysis_section_browse` (section/pillar id + `has_gap`) and
+    `deck_analysis_section_card_added` (attributed to a section-driven add via a `sectionBrowseSectionId`
+    VM-local flag, sibling of `sectionBrowseQuery`, reset at the same 4 sites). Nothing else was
+    removed at the time — W0's deletion had already taken its own telemetry down with it, verified
+    by grep, not just assumed from the plan. **`deck_analysis_community_decks_opened` (the per-card
+    🔗 chip → `Screen.CommunityDecksByCard`, D7) was itself DELETED in the Suggestions Tab UI
+    Polish plan (2026-08-25, W2/D4) — see the polish-pass bullet above.**
+  - **Known debt, NOT fixed by this rework (pre-existing, out of scope):** `AnalysisEngine.kt`'s
+    `nearestFor` call still uses the 2-arg, format-unfiltered overload while
+    `CuratedStrategyPickerSheet` filters by format — a chip/sheet mismatch that can show a strategy
+    chip the picker itself wouldn't offer for the deck's format. `SuggestCutsUseCase`/
+    `SuggestAddsFromCollectionUseCase`/`SuggestAddsFromCommunityUseCase` were NOT deleted despite the
+    original plan's intent, because live dependents (`BuildDeckFromTemplateUseCase`, and a Wizard
+    Quality Campaign QA harness for the first one) appeared after the plan was written — see the bullet
+    two above and the plan's decisions doc for the full reasoning; re-check both dependents before ever
+    revisiting that deletion.
+  - → memory: `project_deck_analysis_category_sections`, `feedback_scryfall_function_tag_validation`,
+    `feedback_tagdictionary_to_scryfall_translation`
+- Telemetry: `deck_analysis_strategy_pick`, `deck_analysis_completed` (score bucket + weakest-pillar
+  id/score, ONLY on the full `loadAnalysis` pass, never `recomputeIncremental`),
+  `deck_analysis_picker_abandoned`, `deck_analysis_v2_engine_failed` (non-fatal). → memory:
+  `project_deck_analysis_engine_v2`
+- **Wave 2 — Standard (60-card) support (2026-08-20, `docs/plans/deck-analysis-engine-v2-wave2-
+  standard-plan.md`).** The engine now analyzes `DeckFormat.STANDARD` decks through the SAME
+  pipeline as Commander — Standard is re-enabled in `STUDIO_FORMATS`
+  (`DeckEditorComponents.kt`; Modern/Pioneer/Pauper/Legacy/Vintage stay commented out, explicit
+  FUTURE DEBT below). **Design contract (B0): only TWO extension points are `DeckFormat`-keyed** —
+  `CuratedStrategy.formats` (which strategies a format offers) and `SixtyFormatProfile` (a numeric
+  modulation layer). Everything else (`ArchetypeData` bands, `ArchetypeSkeletonResolver`,
+  `COLOR_MODULATION`, `LAND_MIX`, Karsten tables) stays keyed by the coarser `ArchetypeFormat`
+  (COMMANDER/SIXTY) exactly as before — `ArchetypeData` is NOT forked per `DeckFormat`. Adding a
+  future 60-card format therefore needs only: a `SixtyFormatProfile` entry, a strategy-availability
+  row, uncommenting its `STUDIO_FORMATS` chip, and calibration fixtures — zero engine-shape changes.
+  - **B1 — Standard v1 strategy list (15 of 29 catalog entries):** balanced, aggro, midrange,
+    control, tempo, big_mana, tokens, spellslinger, reanimator, landfall, lifegain,
+    plus1_counters, tribal, artifacts, vehicles. Landfall and Reanimator were ADDED beyond the
+    plan's original proposal after a live Standard-metagame check (mtggoldfish, Aug 2026 snapshot)
+    showed both clearly meta-real (curation rationale + full metagame snapshot: Appendix A of the
+    wave2 plan doc, gitignored). CASUAL stays permissive (every non-structurally-Commander-only
+    entry) — unchanged in effect from Wave 1.
+  - **B2 — `SixtyFormatProfile.kt`** (sibling of `ArchetypeData`): `STANDARD =
+    SixtyFormatProfile(landsDelta = 2, curveDelta = 0.3)` (Standard runs higher land counts/curves
+    than the generic Modern-ish SIXTY baseline — a documented judgment call, not a hard citation).
+    `roleBandScale` is reserved, unused (1.0) this wave. Applied by
+    `ArchetypeSkeletonResolver.resolveWithColor`'s new `deckFormat: DeckFormat? = null` param
+    (appended last, defaulted — Commander is byte-identical) only when
+    `ArchetypeFormat.of(deckFormat) == SIXTY`.
+  - **B3 — see the Standard-specifics paragraph above this one** (legality dispatch verified,
+    `Finding.SideboardOversized`, rotation-staleness caveat).
+  - **B4 — format-aware `nearestFor`:** see the `CuratedStrategyCatalog.kt` bullet above.
+  - **B5 — UI:** `STUDIO_FORMATS` now offers 4 chips (Commander/Standard/Casual/Draft); the
+    strategy picker filters via `availableIn(currentFormat)`.
+  - **B6 — calibration:** 2 realistic-density Standard fixtures (mono-Red AGGRO scored 86/100,
+    Azorius CONTROL scored 82/100 — both in the documented 65-95 band at UNCHANGED default
+    weights, no retuning needed) in `DeckAnalysisEngineCalibrationTest.kt`; 3 new sparse
+    SIXTY/STANDARD golden decks in `DeckAnalysisEngineGoldenTest.kt` asserting relative behavior
+    only (same discipline as the Commander golden decks — never assert absolute scores on sparse
+    fixtures). SYNERGY subscores recorded for the future P4 retune (A4): Standard AGGRO=57,
+    CONTROL=19.
+  - **Wave 3 — Modern/Pioneer/Legacy/Vintage/Pauper analysis SHIPPED (2026-09-06).** Closes the
+    Wave 2 future-debt item above (deck CREATION in these 5 formats was already live via
+    `DeckCreationSheet.kt` — that part of the old debt note was stale; the real gap was purely the
+    archetype/strategy layer). `SixtyFormatProfile` gained 5 new blanket judgment-call entries
+    (documented per-format in its KDoc, live-cross-checked where sources were reachable —
+    mtggoldfish again 403'd automated fetch): MODERN `(0, 0.0)` (already reads as the generic
+    SIXTY/AGGRO baseline), PIONEER `(+1, +0.15)` (half of Standard's shift), LEGACY `(-1, -0.2)`
+    and VINTAGE `(-2, -0.3)` (true duals/fetches/fast-mana → leaner manabases, one full step
+    apart), PAUPER `(+1, -0.1)` (commons-only fixing is weaker despite a low curve).
+    `CuratedStrategyCatalog`'s `COMMANDER_CASUAL_STANDARD` was renamed **`COMMANDER_CASUAL_SIXTY`**
+    and now also covers these 5 formats (all ~15 v1-curated strategies, unchanged list — no
+    per-format metagame curation attempted, a deliberate scope call vs. redoing Wave 2 B1's
+    research 5x); `storm` (bespoke, Commander-excluded by design) extended the same way after a
+    live check confirmed Storm/Reanimator are real, actively-played Pauper archetypes today
+    (contrary to the initial hypothesis that Pauper's card pool was too weak for them). One AGGRO
+    calibration fixture per format added to `DeckAnalysisEngineCalibrationTest.kt` (Modern 85,
+    Pioneer 90, Legacy 84, Vintage 85 — reuses Legacy's core cards, its pool is a Legacy superset
+    with nothing restricted/banned relevant here, Pauper 76 — lowest, thinner creature curve),
+    all inside the existing 65-98 defensible band; matching golden (relative-only) fixtures per
+    format in `DeckAnalysisEngineGoldenTest.kt`; new `ArchetypeSkeletonResolverTest` cases proving
+    each format's deltas actually apply; `CuratedStrategyCatalogTest` extended to round-trip
+    `nearestFor` across all 5 new formats. 46→62 tests, `:app:assembleDebug` green. → memory:
+    `project_deck_analysis_wave3_sixty_formats`
+  - **Future debt (unchanged by Wave 3):** sideboard analysis beyond the size check (role coverage
+    of the 15, matchup guidance); the SYNERGY (P4) pillar retune; rotation-aware legality refresh UX
+    (respect ADR-005 unless real users hit stale verdicts); Deck Analysis "Detected: X" live preview
+    while manually pinned (still deferred from Wave 1); per-format (vs. shared Standard-derived)
+    strategy curation for Modern/Pioneer/Legacy/Vintage/Pauper, if a future pass wants real
+    per-format metagame data instead of the Wave 3 shortcut above. The category-scoped
+    browse-for-cards sections that replace the deleted Cuts/Adds suggestion engine SHIPPED (Deck
+    Analysis Category Sections rework, W0-W8, 2026-08-21/24 — see the dedicated block below); no
+    longer future debt.
+- **Standard specifics (Wave 2 B3):** P5 already dispatched `DeckFormat.STANDARD` to
+  `Card.legalityStandard` correctly since Phase 2 — verified, not fixed. New `Finding
+  .SideboardOversized(count)` (WARNING) fires when a 60-card constructed deck
+  (`DeckFormat.isSixtyCardConstructed`) carries more than 15 sideboard cards; `AnalysisEngine
+  .evaluate()`/`EvaluateDeckUseCaseV2`/`EvaluateDeckUseCase` all gained a `sideboardCount: Int = 0`
+  param (appended last) to carry it in, and `DeckDoctorOrchestrator` computes it once from
+  `deckWithCards.sideboard` per `loadAnalysis` pass (cached on `AnalysisCache`, reused unchanged by
+  `recomputeIncremental`). Unlike every other P5 finding, a `SideboardOversized`-only pillar result
+  stays at subscore 100 (the binary 0/100 P5 subscore is now gated on BLOCKER severity specifically,
+  not "any finding") — it is advisory, not construction-breaking. **Legality findings carry no
+  "verified current as of right now" guarantee** — `legalityStandard` et al. are read from the
+  already-cached `Card`, never a live Scryfall call; after a real Standard rotation a stale cache
+  entry can report a wrong verdict until it refreshes through one of the EXISTING paths (Backend
+  call budget / ADR-005 above) — per ADR-005 this pillar deliberately does NOT add a new on-demand
+  refresh path to compensate. Sideboard role-coverage/matchup analysis remains FUTURE DEBT.
 
 **Deck Builder v2 wizard (`Screen.DeckWizard`) and Discoveries v2 (`DiscoverSynergiesV2UseCase`,
 identity-only clustering) are the SOLE "Build from seed" / "Browse inspirations" entry points** —
@@ -60,11 +334,14 @@ draft. Fuses manual editing + inline Deck Doctor suggestions + seed-build + Disc
   `DeckStudioViewModel`). Do not re-add this route or screen.
   **`DeckImprovementScreen`/`DeckImprovementViewModel`/`Screen.DeckImprovement` were RETIRED (D10)** — the
   Studio Suggestions tab is the sole Deck Doctor UI surface.
-- **Motor B (community suggestions, Phase 4) + community seed-build (Phase 5)**: the Suggestions tab
-  gains a flag-gated (`communityEngineEnabledFlow`, D4) "Popular in similar decks" section +
-  "Decks like yours" carousel, entirely additive to Motor A; the seed sheet gains a flag-gated
-  "Use community data" toggle that re-orders `BuildDeckFromSeedsUseCase`'s fill priority. Flag off =
-  zero community UI, byte-identical to pre-Phase-4.
+- **Motor B (Phase 4) + community seed-build (Phase 5)**: the Suggestions/Analysis tab shows a
+  flag-gated (`communityEngineEnabledFlow`, D4) "Decks like yours" carousel (`FindSimilarDecksUseCase`).
+  Its sibling, "Popular in similar decks" (the `SuggestAddsFromCommunityUseCase`-ranked add list),
+  was DELETED in the Deck Analysis Category Sections rework (W0, 2026-08-21) along with the rest of
+  the Cuts/Adds engine — "Decks like yours" was always a separate use case/state field and is
+  unaffected. The wizard's own seed-build "Use community data" toggle
+  (`BuildDeckFromTemplateUseCase.fetchCommunityOwnedCandidates`, ANDed with this same global flag)
+  is UNRELATED to the Studio Suggestions tab and untouched by W0.
 - → memory: `project_deck_studio`, `feedback_budget_input_free_text_pattern`,
   `project_deck_doctor_orchestrator_extraction`, `project_deck_studio_improvement_retirement`,
   `project_motor_b_community_suggestions`, `project_community_hub_seedbuild_trending`
@@ -87,9 +364,12 @@ archetype-aware warnings when non-GENERIC/themed — a GENERIC deck's evaluation
 before. Deck Studio's Suggestions header carries a "Deck plan" chip/sheet (still behind the same
 `DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` flag). Phase 2 added **Motor A**
 (`SuggestAddsFromCollectionUseCase`, same package): the offline, always-on, collection-only add
-source, now `DeckDoctorOrchestrator`'s SOLE adds source (it REPLACED, not supplemented, the since-
-retired `SuggestAddsWithBudgetUseCase`). → memory: `project_archetype_engine`,
-`project_deck_doctor_phase2_motor_a`.
+source that REPLACED the since-retired `SuggestAddsWithBudgetUseCase` as `DeckDoctorOrchestrator`'s
+adds source. **`DeckDoctorOrchestrator` no longer has an adds source at all** — the whole
+Cuts/Adds suggestion engine was deleted end-to-end in the Deck Analysis Category Sections rework
+(W0, 2026-08-21); `SuggestAddsFromCollectionUseCase` survives only as `BuildDeckFromTemplateUseCase`
+(the Deck Wizard's build engine)'s own placement source — see the "Deck Studio" section above for
+the full W0 narrative. → memory: `project_archetype_engine`, `project_deck_doctor_phase2_motor_a`.
 Key invariants:
 - `DeckFormat.valueOf()` must NOT be used — use `DeckFormat.entries.firstOrNull { ... } ?: STANDARD`.
 - The wizard's `DeckWizardViewModel.onGenerate()` re-entrancy-guards a double-tap via a synchronous
@@ -103,15 +383,21 @@ Key invariants:
 - `BudgetOptimizer`/`SuggestAddsWithBudgetUseCase` (D5 dormant pipeline) were DELETED in the Deck
   Wizard & Engine Rework plan, Workstream 7.3 (2026-07-28, D-H: the budget feature is not coming
   back). **`CandidatePoolGenerator` SURVIVED** — it gained a live caller (the wizard's Scryfall
-  backstop fill, WS4) before the D5 pipeline was deleted, and a second live caller since (the
-  Suggestions tab's own "include outside collection" toggle, WS8.2); do not delete it. `BudgetConstraints`
-  also survived (moved to its own file, `.../domain/usecase/BudgetConstraints.kt`) — still threaded
-  through `DeckDoctorOrchestrator`'s API and `DeckStudioViewModel`'s free-text budget state (U7)
-  even though Motor A ignores its values entirely. `Card.colors`/`colorIdentity`/`producedMana`
-  (D14) are persisted as compact WUBRG-subset strings (not JSON); Motor A's pip-intensity multiplier
-  and unknown-color-identity fail-closed filter (Commander only) consume them. → memory:
-  `project_dormant_budget_pool` (retirement recorded), `project_card_model_produced_mana`,
-  `project_deck_doctor_phase2_motor_a`, `feedback_candidatepoolgenerator_no_longer_dormant`
+  backstop fill, WS4) before the D5 pipeline was deleted; do not delete it. Its SECOND live caller,
+  the Suggestions tab's own "include outside collection" toggle (WS8.2,
+  `setIncludeOutsideCollection`), was itself deleted in the Deck Analysis Category Sections rework
+  (W0, 2026-08-21) along with the whole Cuts/Adds engine — the wizard's Scryfall backstop fill is
+  now `CandidatePoolGenerator`'s ONLY live caller again. **`BudgetConstraints` did NOT survive
+  that same W0 pass** — it was genuinely deleted (`.../domain/usecase/BudgetConstraints.kt` no
+  longer exists); `DeckDoctorOrchestrator`'s public API and `DeckStudioViewModel`'s free-text
+  budget state (U7, `rawPerCardText`/`rawTotalText`/`onPerCardBudgetChange`/etc.) are gone with it
+  — there is no more budget UI OR budget wiring anywhere in Deck Studio. `Card.colors`/
+  `colorIdentity`/`producedMana` (D14) are persisted as compact WUBRG-subset strings (not JSON);
+  Motor A's pip-intensity multiplier and unknown-color-identity fail-closed filter (Commander only,
+  still live inside `SuggestAddsFromCollectionUseCase` for `BuildDeckFromTemplateUseCase`'s sake)
+  consume them. → memory: `project_dormant_budget_pool` (retirement recorded),
+  `project_card_model_produced_mana`, `project_deck_doctor_phase2_motor_a`,
+  `feedback_candidatepoolgenerator_no_longer_dormant`
 - **Phase 3** added a new Cloudflare Worker `cloudflare/manahub-community/` (TypeScript, Wrangler,
   vitest+miniflare) aggregating community deck data — EDHREC for Commander, Archidekt for 60-card
   (D16) — behind KV (7-day snapshot TTL) + D1 (anonymous weekly trending counters, no PII), plus a

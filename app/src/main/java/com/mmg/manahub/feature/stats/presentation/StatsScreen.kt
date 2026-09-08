@@ -114,7 +114,7 @@ import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.search.SetPickerSheet
 import com.mmg.manahub.core.ui.theme.MagicColors
-import com.mmg.manahub.core.ui.theme.SmallCardShape
+import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -463,7 +463,7 @@ private fun SetFilterRow(
     val sp = MaterialTheme.spacing
     Surface(
         onClick = onClick,
-        shape = SmallCardShape,
+        shape = CardShape,
         color = mc.surface,
         border = BorderStroke(
             width = if (selectedSet != null) 1.5.dp else 0.5.dp,
@@ -613,7 +613,7 @@ private fun CurrencyStatCard(label: String, value: String, modifier: Modifier = 
     val sp = MaterialTheme.spacing
     Card(
         modifier = modifier,
-        shape = SmallCardShape,
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = mc.surfaceVariant),
     ) {
         Column(
@@ -657,7 +657,7 @@ private fun CombatMechanicsSection(stats: CollectionStats) {
             
             Card(
                 modifier = Modifier.weight(0.8f).height(100.dp),
-                shape = SmallCardShape,
+                shape = CardShape,
                 colors = CardDefaults.cardColors(containerColor = mc.surfaceVariant),
                 border = BorderStroke(1.dp, manaGradient)
             ) {
@@ -696,7 +696,7 @@ private fun CombatStatsBox(avgPower: Double, avgToughness: Double, modifier: Mod
     val sp = MaterialTheme.spacing
     Card(
         modifier = modifier.height(100.dp),
-        shape = SmallCardShape,
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = mc.surfaceVariant),
         border = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.5f))
     ) {
@@ -828,14 +828,14 @@ private fun ArtistCardTile(
     val imageModifier = Modifier
         .width(100.dp)
         .aspectRatio(0.717f) // full MTG card aspect ratio (745:1040)
-        .clip(SmallCardShape)
+        .clip(CardShape)
 
     val finalImageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
         with(sharedTransitionScope) {
             imageModifier.sharedBounds(
                 sharedContentState = rememberSharedContentState(key = sharedTransitionKey),
                 animatedVisibilityScope = animatedVisibilityScope,
-                clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
+                clipInOverlayDuringTransition = OverlayClip(CardShape),
                 boundsTransform = { _, _ -> tween(durationMillis = 500, easing = FastOutSlowInEasing) },
                 renderInOverlayDuringTransition = true,
             )
@@ -873,7 +873,7 @@ private fun AestheticStatCard(
 
     Card(
         modifier = modifier.height(115.dp),
-        shape = SmallCardShape,
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = mc.surface),
         border = if (isFoil) BorderStroke(1.5.dp, foilBrush) else BorderStroke(1.dp, mc.surfaceVariant)
     ) {
@@ -1060,7 +1060,7 @@ private fun HallOfFameCardTile(
     val sp = MaterialTheme.spacing
     Card(
         modifier = modifier.clickable { onCardClick() },
-        shape = SmallCardShape,
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = mc.surface),
     ) {
         Column {
@@ -1070,7 +1070,7 @@ private fun HallOfFameCardTile(
                     imageModifier.sharedBounds(
                         sharedContentState = rememberSharedContentState(key = sharedTransitionKey),
                         animatedVisibilityScope = animatedVisibilityScope,
-                        clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
+                        clipInOverlayDuringTransition = OverlayClip(CardShape),
                         boundsTransform = { _, _ -> tween(durationMillis = 500, easing = FastOutSlowInEasing) },
                         renderInOverlayDuringTransition = true,
                     )
@@ -1224,7 +1224,7 @@ private fun FormatCoverageRow(coverage: Map<String, Int>, mc: MagicColors) {
             coverage.forEach { (label, count) ->
                 Card(
                     modifier = Modifier.weight(1f),
-                    shape = SmallCardShape,
+                    shape = CardShape,
                     colors = CardDefaults.cardColors(containerColor = mc.surface),
                 ) {
                     Column(
@@ -1252,7 +1252,7 @@ private fun StatCard(
     val sp = MaterialTheme.spacing
     Card(
         modifier = modifier,
-        shape = SmallCardShape,
+        shape = CardShape,
         colors   = CardDefaults.cardColors(containerColor = mc.surfaceVariant),
     ) {
         Column(
@@ -1280,7 +1280,7 @@ private fun CuriousStatBox(
     val sp = MaterialTheme.spacing
     Card(
         modifier = modifier,
-        shape = SmallCardShape,
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = mc.surface),
     ) {
         Column(Modifier.padding(sp.md)) {
@@ -1337,7 +1337,7 @@ private fun HistoryCard(
     val sp = MaterialTheme.spacing
     Card(
         modifier = modifier.clickable { onCardClick() },
-        shape = SmallCardShape,
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = mc.surface),
     ) {
         Column {
@@ -1347,7 +1347,7 @@ private fun HistoryCard(
                     imageModifier.sharedBounds(
                         sharedContentState = rememberSharedContentState(key = sharedTransitionKey),
                         animatedVisibilityScope = animatedVisibilityScope,
-                        clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
+                        clipInOverlayDuringTransition = OverlayClip(CardShape),
                         boundsTransform = { _, _ -> tween(durationMillis = 500, easing = FastOutSlowInEasing) },
                         renderInOverlayDuringTransition = true,
                     )
@@ -1415,7 +1415,7 @@ private fun MostValuableSection(
     if (filteredCards.isEmpty()) return
 
     Card(
-        shape = SmallCardShape,
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = mc.surface)
     ) {
         Column {
@@ -1440,13 +1440,13 @@ private fun MostValuableSection(
                                 color = mc.primaryAccent.copy(alpha = 0.8f),
                                 modifier = Modifier.width(36.dp)
                             )
-                            val imageModifier = Modifier.width(40.dp).height(56.dp).clip(SmallCardShape)
+                            val imageModifier = Modifier.width(40.dp).height(56.dp).clip(CardShape)
                             val finalImageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                                 with(sharedTransitionScope) {
                                     imageModifier.sharedBounds(
                                         sharedContentState = rememberSharedContentState(key = key),
                                         animatedVisibilityScope = animatedVisibilityScope,
-                                        clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
+                                        clipInOverlayDuringTransition = OverlayClip(CardShape),
                                         boundsTransform = { _, _ -> tween(durationMillis = 500, easing = FastOutSlowInEasing) },
                                         renderInOverlayDuringTransition = true,
                                     )
@@ -1492,7 +1492,7 @@ private fun SetStatsSection(
         stats.topSetByCount?.let { (setCode, count) ->
             Card(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
-                shape = SmallCardShape,
+                shape = CardShape,
                 colors = CardDefaults.cardColors(containerColor = mc.surface)
             ) {
                 Column(
@@ -1513,7 +1513,7 @@ private fun SetStatsSection(
         stats.topSetByValue?.let { (setCode, value) ->
             Card(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
-                shape = SmallCardShape,
+                shape = CardShape,
                 colors = CardDefaults.cardColors(containerColor = mc.surface)
             ) {
                 Column(
@@ -1549,7 +1549,7 @@ private fun CircularDistributionSection(
         Text(title, style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
         
         Card(
-            shape = SmallCardShape,
+            shape = CardShape,
             colors = CardDefaults.cardColors(containerColor = mc.surface),
         ) {
             CircularDistribution(
@@ -1571,7 +1571,7 @@ private fun DistributionSection(title: String, data: Map<String, Int>) {
     Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
         Text(title, style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
         Card(
-            shape = SmallCardShape,
+            shape = CardShape,
             colors = CardDefaults.cardColors(containerColor = mc.surface),
             modifier = Modifier.padding(bottom = sp.xs)
         ) {
@@ -1619,7 +1619,7 @@ private fun SetCompletionSection(completions: List<SetCompletion>) {
     val mc = MaterialTheme.magicColors
     val sp = MaterialTheme.spacing
     Card(
-        shape = SmallCardShape,
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = mc.surface),
     ) {
         Column(Modifier.padding(sp.lg), verticalArrangement = Arrangement.spacedBy(sp.lg)) {
@@ -1784,7 +1784,7 @@ private fun GameStatsContent(
 //                if (gs.pendingSurveys > 0) {
 //                    Card(
 //                        modifier = Modifier.fillMaxWidth(),
-//                        shape    = SmallCardShape,
+//                        shape    = CardShape,
 //                        colors   = CardDefaults.cardColors(containerColor = mc.goldMtg.copy(alpha = 0.15f)),
 //                        border   = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.4f)),
 //                    ) {
@@ -1811,7 +1811,7 @@ private fun GameStatsContent(
                     letterSpacing = 2.sp,
                 )
                 Card(
-                    shape  = SmallCardShape,
+                    shape  = CardShape,
                     colors = CardDefaults.cardColors(containerColor = mc.surface),
                 ) {
                     Column(
@@ -1836,7 +1836,7 @@ private fun GameStatsContent(
                     letterSpacing = 2.sp,
                 )
                 Card(
-                    shape  = SmallCardShape,
+                    shape  = CardShape,
                     colors = CardDefaults.cardColors(containerColor = mc.surface),
                 ) {
                     Column(
@@ -1868,7 +1868,7 @@ private fun GameStatsContent(
                 )
             } else {
                 Card(
-                    shape  = SmallCardShape,
+                    shape  = CardShape,
                     colors = CardDefaults.cardColors(containerColor = mc.surface),
                 ) {
                     Column(
@@ -1899,7 +1899,7 @@ private fun GameStatsContent(
                     letterSpacing = 2.sp,
                 )
                 Card(
-                    shape  = SmallCardShape,
+                    shape  = CardShape,
                     colors = CardDefaults.cardColors(containerColor = mc.surface),
                 ) {
                     Column(
@@ -1954,7 +1954,7 @@ private fun GameStatsContent(
                 )
             } else {
                 Card(
-                    shape  = SmallCardShape,
+                    shape  = CardShape,
                     colors = CardDefaults.cardColors(containerColor = mc.surface),
                 ) {
                     Column {
@@ -2174,7 +2174,7 @@ private fun PlayerCountWinrateRow(item: PlayerCountWinrateItem, mc: MagicColors)
 private fun RecentFormBadge(isWin: Boolean, mc: MagicColors) {
     val ty = MaterialTheme.magicTypography
     Surface(
-        shape    = SmallCardShape,
+        shape    = CardShape,
         color    = if (isWin) mc.lifePositive.copy(alpha = 0.2f) else mc.lifeNegative.copy(alpha = 0.15f),
         modifier = Modifier.size(28.dp),
     ) {
@@ -2305,7 +2305,7 @@ private fun TradeStatsContent(
                                     letterSpacing = 2.sp,
                                 )
                                 Card(
-                                    shape  = SmallCardShape,
+                                    shape  = CardShape,
                                     colors = CardDefaults.cardColors(containerColor = mc.surface),
                                 ) {
                                     Row(
@@ -2360,7 +2360,7 @@ private fun SessionHistoryRow(
     ) {
         // Win/loss badge
         Surface(
-            shape = SmallCardShape,
+            shape = CardShape,
             color = if (item.isWin) mc.lifePositive.copy(alpha = 0.2f)
                     else mc.lifeNegative.copy(alpha = 0.15f),
         ) {

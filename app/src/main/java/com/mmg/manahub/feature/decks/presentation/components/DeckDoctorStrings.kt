@@ -3,12 +3,18 @@ package com.mmg.manahub.feature.decks.presentation.components
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.mmg.manahub.R
+import com.mmg.manahub.feature.decks.domain.engine.AxisKey
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.CurveShape
 import com.mmg.manahub.feature.decks.domain.engine.DeckRole
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
+import com.mmg.manahub.feature.decks.domain.engine.Finding
+import com.mmg.manahub.feature.decks.domain.engine.PillarId
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.ScoreReason
 import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
+import com.mmg.manahub.feature.decks.domain.usecase.ArchetypeResolution
+import kotlin.math.roundToInt
 
 /**
  * Presentation-side localization for the scoring engine's structured outputs.
@@ -91,10 +97,7 @@ fun RoleKey.archetypeRoleLabel(): String = replace('_', ' ').split(' ')
 fun DoctorAnalysisStage.label(): String = stringResource(
     when (this) {
         DoctorAnalysisStage.READING_DECK_PLAN -> R.string.deck_doctor_stage_reading_deck_plan
-        DoctorAnalysisStage.EVALUATING_COLLECTION -> R.string.deck_doctor_stage_evaluating_collection
         DoctorAnalysisStage.SEARCHING_COMMUNITY -> R.string.deck_doctor_stage_searching_community
-        DoctorAnalysisStage.SEARCHING_CARD_POOL -> R.string.deck_doctor_stage_searching_card_pool
-        DoctorAnalysisStage.RANKING_SUGGESTIONS -> R.string.deck_doctor_stage_ranking_suggestions
     }
 )
 
@@ -121,6 +124,176 @@ val DeckWarning.key: String
 
 /** One-decimal CMC formatting, locale-stable. */
 private fun formatCmc(value: Double): String = String.format(java.util.Locale.US, "%.1f", value)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Deck Analysis Engine v2 (Phase 3 UI) — Finding / PillarId localization
+//
+//  Mirrors DeckWarning.label()/.key above exactly (same pattern, new sealed type): the engine
+//  (AnalysisEngine) stays string-free and emits [Finding] values; this mapper turns them into the
+//  ALREADY-AUTHORED `deck_analysis_finding_*` strings.xml copy (Phase 2 landed the strings, this
+//  phase is the first consumer).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** User-facing message for a [Finding]. */
+@Composable
+fun Finding.label(): String = when (this) {
+    is Finding.LandCountOffTarget ->
+        stringResource(R.string.deck_analysis_finding_land_count_off_target, current, karstenTarget, bandMin, bandMax)
+    is Finding.ColorSourceShortage ->
+        stringResource(R.string.deck_analysis_finding_color_source_shortage, color.displayName, have, need)
+    is Finding.UnfixedSplash ->
+        stringResource(R.string.deck_analysis_finding_unfixed_splash, color.displayName)
+    is Finding.ManaFixShortage ->
+        stringResource(R.string.deck_analysis_finding_mana_fix_shortage, current, min)
+    is Finding.LandMixOffTarget ->
+        stringResource(
+            R.string.deck_analysis_finding_land_mix_off_target,
+            (basicsRatio * 100).roundToInt(),
+            (targetMin * 100).roundToInt(),
+            (targetMax * 100).roundToInt(),
+        )
+    is Finding.CurveOffBand ->
+        stringResource(R.string.deck_analysis_finding_curve_off_band, formatCmc(avgMv), formatCmc(bandMin), formatCmc(bandMax))
+    is Finding.CurveShapeMismatch ->
+        stringResource(R.string.deck_analysis_finding_curve_shape_mismatch, shape.displayLabel())
+    is Finding.RoleGap ->
+        stringResource(R.string.deck_analysis_finding_role_gap, label, current, min)
+    is Finding.RoleBelowIdeal ->
+        stringResource(R.string.deck_analysis_finding_role_below_ideal, label, current, ideal)
+    is Finding.AntiRoleOverMax ->
+        stringResource(R.string.deck_analysis_finding_anti_role_over_max, label, current, max)
+    is Finding.SelfDefeatingGraveyardHate ->
+        stringResource(R.string.deck_analysis_finding_self_defeating_graveyard_hate, graveyardHateCopies)
+    is Finding.OrphanProducers ->
+        stringResource(R.string.deck_analysis_finding_orphan_producers, axisLabel, producerCopies)
+    is Finding.OrphanPayoffs ->
+        stringResource(R.string.deck_analysis_finding_orphan_payoffs, axisLabel, payoffCopies, payoffIdeal)
+    is Finding.StaxVsOwnEngine ->
+        stringResource(R.string.deck_analysis_finding_stax_vs_own_engine, staxPieceCopies, cardDrawCopies, controlCardDrawIdeal)
+    is Finding.DeckTooSmall ->
+        stringResource(R.string.deck_analysis_finding_deck_too_small, current, minimum)
+    is Finding.TooManyCopies ->
+        stringResource(R.string.deck_analysis_finding_too_many_copies, cardName, copies, maxCopies)
+    is Finding.SingletonViolation ->
+        stringResource(R.string.deck_analysis_finding_singleton_violation, cardName, copies)
+    is Finding.OffColorIdentity ->
+        stringResource(R.string.deck_analysis_finding_off_color_identity, cardName)
+    is Finding.IllegalCard ->
+        stringResource(R.string.deck_analysis_finding_illegal_card, cardName)
+    is Finding.SideboardOversized ->
+        stringResource(R.string.deck_analysis_finding_sideboard_oversized, count)
+    is Finding.UnresolvedCards ->
+        stringResource(R.string.deck_analysis_finding_unresolved_cards, count)
+}
+
+/** Stable identity for a [Finding], used as a LazyColumn key. */
+val Finding.key: String
+    get() = when (this) {
+        is Finding.LandCountOffTarget -> "land_count_off_target"
+        is Finding.ColorSourceShortage -> "color_source_shortage_${color.name}"
+        is Finding.UnfixedSplash -> "unfixed_splash_${color.name}"
+        is Finding.ManaFixShortage -> "mana_fix_shortage"
+        is Finding.LandMixOffTarget -> "land_mix_off_target"
+        is Finding.CurveOffBand -> "curve_off_band"
+        is Finding.CurveShapeMismatch -> "curve_shape_mismatch"
+        is Finding.RoleGap -> "role_gap_$roleKey"
+        is Finding.RoleBelowIdeal -> "role_below_ideal_$roleKey"
+        is Finding.AntiRoleOverMax -> "anti_role_over_max_$roleKey"
+        is Finding.SelfDefeatingGraveyardHate -> "self_defeating_graveyard_hate"
+        is Finding.OrphanProducers -> "orphan_producers_$axis"
+        is Finding.OrphanPayoffs -> "orphan_payoffs_$axis"
+        is Finding.StaxVsOwnEngine -> "stax_vs_own_engine"
+        is Finding.DeckTooSmall -> "deck_too_small"
+        is Finding.TooManyCopies -> "too_many_copies_$cardName"
+        is Finding.SingletonViolation -> "singleton_violation_$cardName"
+        is Finding.OffColorIdentity -> "off_color_identity_$cardName"
+        is Finding.IllegalCard -> "illegal_card_$cardName"
+        is Finding.SideboardOversized -> "sideboard_oversized"
+        is Finding.UnresolvedCards -> "unresolved_cards"
+    }
+
+/** English-only display word for a [CurveShape] — a closed, 3-value engine enum with no
+ * `displayName` of its own (mirrors [RoleKey.archetypeRoleLabel]'s "plain function, not a
+ * `stringResource`" precedent for small closed vocabularies below). */
+private fun CurveShape.displayLabel(): String = when (this) {
+    CurveShape.FRONT -> "front-loaded"
+    CurveShape.BELL -> "bell-shaped"
+    CurveShape.BACK -> "back-loaded"
+}
+
+/** Human-readable display name for a [PillarId] (Phase 3's pillar-tile row, plan §3.4 item 3). */
+@Composable
+fun PillarId.label(): String = stringResource(
+    when (this) {
+        PillarId.MANA_BASE -> R.string.deck_analysis_pillar_mana_base
+        PillarId.CURVE -> R.string.deck_analysis_pillar_curve
+        PillarId.PLAN_ROLES -> R.string.deck_analysis_pillar_plan_roles
+        PillarId.SYNERGY -> R.string.deck_analysis_pillar_synergy
+        PillarId.LEGALITY -> R.string.deck_analysis_pillar_legality
+    }
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Deck Analysis Engine v3, Phase 5 (UI) — AxisKey labels + archetype resemblance copy.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * English display label for an [AxisKey] (Synergy package sections) — a presentation-layer mirror
+ * of [com.mmg.manahub.feature.decks.domain.engine.AnalysisEngine]'s own private `AXIS_LABELS`
+ * table/fallback (core-domain stays string-free per [Finding]'s own discipline — same "each layer
+ * keeps its own fallback" precedent as [RoleKey.archetypeRoleLabel]/`CardTag.displayLabel`). Falls
+ * back to a humanized `snake_case -> Title Case` reading for any axis this table doesn't know about
+ * (mirrors the engine's own fallback shape), so a future new axis never renders a raw key.
+ */
+@Composable
+fun AxisKey.axisDisplayLabel(): String = when {
+    startsWith("TRIBE:") -> stringResource(
+        R.string.deck_analysis_axis_tribe_format,
+        removePrefix("TRIBE:").replaceFirstChar { it.uppercase() },
+    )
+    this == "LIFE" -> stringResource(R.string.deck_analysis_axis_life)
+    this == "DEATH" -> stringResource(R.string.deck_analysis_axis_death)
+    this == "TOKENS" -> stringResource(R.string.deck_analysis_axis_tokens)
+    this == "COUNTERS" -> stringResource(R.string.deck_analysis_axis_counters)
+    this == "LANDFALL" -> stringResource(R.string.deck_analysis_axis_landfall)
+    this == "GRAVEYARD" -> stringResource(R.string.deck_analysis_axis_graveyard)
+    this == "ETB" -> stringResource(R.string.deck_analysis_axis_etb)
+    this == "SPELLS" -> stringResource(R.string.deck_analysis_axis_spells)
+    this == "ARTIFACTS" -> stringResource(R.string.deck_analysis_axis_artifacts)
+    this == "ENCHANTMENTS" -> stringResource(R.string.deck_analysis_axis_enchantments)
+    this == "ATTACHED" -> stringResource(R.string.deck_analysis_axis_attached)
+    this == "ATTACK" -> stringResource(R.string.deck_analysis_axis_attack)
+    this == "PLANESWALKERS" -> stringResource(R.string.deck_analysis_axis_planeswalkers)
+    this == "GROUP" -> stringResource(R.string.deck_analysis_axis_group)
+    this == "MILL_OPP" -> stringResource(R.string.deck_analysis_axis_mill_opp)
+    this == "LOCK" -> stringResource(R.string.deck_analysis_axis_lock)
+    this == "ENGINE" -> stringResource(R.string.deck_analysis_axis_engine)
+    else -> replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
+}
+
+/**
+ * The archetype/hybrid display label for an [ArchetypeResolution] (Deck Analysis Engine v3, spec
+ * §2.1) — mirrors [com.mmg.manahub.feature.decks.domain.engine.ResolvedStrategyInfo.displayName]'s
+ * OWN "never silently coerce" contract, but built from [ArchetypeResolution.resemblance] (always
+ * populated on the inference path, see that field's own KDoc) rather than
+ * `ResolvedStrategyInfo`'s `runnerUpArchetype` — no production call site threads a runner-up
+ * through to that type today, and every input this function needs is already on
+ * [ArchetypeResolution] itself. A confident [ArchetypeResolution.macro] renders its own
+ * [ArchetypeId.displayName] verbatim; an ambiguous (`null`) resolution renders a real hybrid label
+ * from the TOP TWO resemblance shares (e.g. "Control / Midrange") when at least two exist, or the
+ * bare "Custom" sentinel only when [ArchetypeResolution.resemblance] itself is empty (a completely
+ * empty deck) — NEVER a silent fallback to a single confident-looking name.
+ */
+@Composable
+fun ArchetypeResolution.planLabel(): String {
+    macro?.let { return it.displayName }
+    val top = resemblance.take(2)
+    return if (top.size >= 2) {
+        stringResource(R.string.deck_analysis_archetype_hybrid_format, top[0].macro.displayName, top[1].macro.displayName)
+    } else {
+        stringResource(R.string.deck_analysis_archetype_custom_label)
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ScoreReason localization (Cut / Add suggestion tags)

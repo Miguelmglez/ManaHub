@@ -4,8 +4,10 @@ import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.cache.CachedCardStrategyTagsEntry
 import com.mmg.manahub.core.data.cache.CardStrategyTagsCache
+import com.mmg.manahub.core.data.remote.CARD_STRATEGY_TAGS_ORACLE_ID_CHUNK
 import com.mmg.manahub.core.data.remote.CardStrategyTagsRemoteDataSourceContract
 import com.mmg.manahub.core.data.remote.dto.CardStrategyTagsPayloadDto
+import com.mmg.manahub.core.data.remote.dto.CardStrategyTagsRowDto
 import com.mmg.manahub.core.data.tagging.TagDictionary
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
@@ -59,14 +61,7 @@ class CardStrategyTagsRepositoryImpl(
                     markSource("remote_not_found")
                     return@withContext cached?.let { decode(it, isStale = true) } ?: CardStrategyTagsResult.NotFound
                 }
-                val entry = CachedCardStrategyTagsEntry(
-                    oracleId        = oracleId,
-                    payloadJson     = strategyTagsJson.encodeToString(CardStrategyTagsPayloadDto.serializer(), row.payload),
-                    pipelineVersion = row.pipelineVersion,
-                    generatedAt     = row.generatedAt,
-                    fetchedAt       = now(),
-                )
-                cache.insert(entry)
+                cache.insert(row.toCacheEntry())
                 markSource("remote_found")
                 toFound(row.payload, isStale = false)
             } catch (e: Exception) {
@@ -74,6 +69,68 @@ class CardStrategyTagsRepositoryImpl(
                 markSource("error_fallback")
                 cached?.let { decode(it, isStale = true) } ?: CardStrategyTagsResult.Error("Strategy tags unavailable")
             }
+        }
+
+    /**
+     * Bulk collection hydration (2026-09-07) — the batched read behind `CardTagHydrationWorker`.
+     * Per-id semantics are IDENTICAL to [getStrategyTags]: a fresh cache entry is served with no
+     * network work at all, only the remainder is fetched, and every returned row is written to the
+     * cache so `CardDao.getScryfallIdsMissingStrategyTags` stays self-terminating. A genuine remote
+     * miss still writes NO cache row (unchanged behavior — `ResolveCardStrategyTagsUseCase`'s
+     * on-device [submitStrategyTags] write-back is what eventually caches those ids).
+     *
+     * A chunk that comes back shorter than it was asked for means "those ids have no row", never
+     * "stop early": every remaining chunk is still fetched, and a chunk-level failure degrades only
+     * that chunk's ids (stale cache if any, otherwise [CardStrategyTagsResult.Error]).
+     */
+    override suspend fun getStrategyTagsBatch(oracleIds: Set<String>): Map<String, CardStrategyTagsResult> =
+        withContext(dispatcherProvider.io) {
+            val ids = oracleIds.filter { it.isNotBlank() }
+            if (ids.isEmpty()) return@withContext emptyMap()
+
+            val results = mutableMapOf<String, CardStrategyTagsResult>()
+            val staleCached = mutableMapOf<String, CachedCardStrategyTagsEntry>()
+            val toFetch = mutableListOf<String>()
+
+            ids.forEach { oracleId ->
+                val cached = cache.get(oracleId)
+                if (cached != null && isFresh(cached.fetchedAt)) {
+                    results[oracleId] = decode(cached, isStale = false) ?: CardStrategyTagsResult.NotFound
+                } else {
+                    cached?.let { staleCached[oracleId] = it }
+                    toFetch += oracleId
+                }
+            }
+            if (toFetch.isEmpty()) {
+                markSource("batch_cache_fresh")
+                return@withContext results
+            }
+
+            var anyChunkFailed = false
+            toFetch.chunked(CARD_STRATEGY_TAGS_ORACLE_ID_CHUNK).forEach { chunk ->
+                try {
+                    val rows = remote.getByOracleIds(chunk).associateBy { it.oracleId }
+                    chunk.forEach { oracleId ->
+                        val row = rows[oracleId]
+                        if (row == null) {
+                            results[oracleId] = staleCached[oracleId]?.let { decode(it, isStale = true) }
+                                ?: CardStrategyTagsResult.NotFound
+                        } else {
+                            cache.insert(row.toCacheEntry())
+                            results[oracleId] = toFound(row.payload, isStale = false)
+                        }
+                    }
+                } catch (e: Exception) {
+                    anyChunkFailed = true
+                    recordBatchFailure(chunk.size, e)
+                    chunk.forEach { oracleId ->
+                        results[oracleId] = staleCached[oracleId]?.let { decode(it, isStale = true) }
+                            ?: CardStrategyTagsResult.Error("Strategy tags unavailable")
+                    }
+                }
+            }
+            markSource(if (anyChunkFailed) "batch_error_fallback" else "batch_remote")
+            results
         }
 
     /**
@@ -148,6 +205,21 @@ class CardStrategyTagsRepositoryImpl(
             tribes  = payload.tribes,
             isStale = isStale,
         )
+
+    private fun CardStrategyTagsRowDto.toCacheEntry(): CachedCardStrategyTagsEntry =
+        CachedCardStrategyTagsEntry(
+            oracleId        = oracleId,
+            payloadJson     = strategyTagsJson.encodeToString(CardStrategyTagsPayloadDto.serializer(), payload),
+            pipelineVersion = pipelineVersion,
+            generatedAt     = generatedAt,
+            fetchedAt       = now(),
+        )
+
+    private fun recordBatchFailure(chunkSize: Int, e: Exception) {
+        crashReporter.log("card_strategy_tags_batch_fetch_failed")
+        crashReporter.recordException(e)
+        crashReporter.setCustomKey("card_strategy_tags_batch_size", chunkSize.toString())
+    }
 
     private fun recordFailure(oracleId: String, e: Exception) {
         crashReporter.log("card_strategy_tags_fetch_failed")

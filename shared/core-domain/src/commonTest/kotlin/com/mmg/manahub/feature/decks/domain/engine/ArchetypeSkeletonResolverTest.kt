@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
+import com.mmg.manahub.core.model.DeckFormat
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -62,20 +63,21 @@ class ArchetypeSkeletonResolverTest {
 
     @Test
     fun twoThemesScaleAdditionallyBy075() {
-        // ARISTOCRATS alone (commander, scale 1.0): sac_outlet ideal 9.
+        // Deck Analysis Engine v3 (spec §4.2): SELF_MILL retargeted onto `mill_self` (was
+        // `graveyard_enabler`, now owned exclusively by REANIMATOR).
         val single = ArchetypeSkeletonResolver.resolve(
-            ArchetypeFormat.SIXTY, ArchetypeId.COMBO, listOf(ThemeId.SELF_MILL),
+            ArchetypeFormat.SIXTY, ArchetypeId.COMBO, themes = listOf(ThemeId.SELF_MILL),
         )
         // SELF_MILL sixty_scale 0.55; single-theme scale = 0.55 * 1.0 = 0.55.
-        // graveyard_enabler ideal 12 * 0.55 = 6.6 -> round 7.
-        assertEquals(7, single.roleTargets.getValue("graveyard_enabler").ideal)
+        // mill_self ideal 12 * 0.55 = 6.6 -> round 7.
+        assertEquals(7, single.roleTargets.getValue("mill_self").ideal)
 
         val two = ArchetypeSkeletonResolver.resolve(
-            ArchetypeFormat.SIXTY, ArchetypeId.COMBO, listOf(ThemeId.SELF_MILL, ThemeId.ARISTOCRATS),
+            ArchetypeFormat.SIXTY, ArchetypeId.COMBO, themes = listOf(ThemeId.SELF_MILL, ThemeId.ARISTOCRATS),
         )
         // With a 2nd theme, SELF_MILL's own scale becomes 0.55 * 0.75 = 0.4125.
-        // graveyard_enabler ideal 12 * 0.4125 = 4.95 -> round 5 (< the single-theme 7).
-        val twoThemeIdeal = two.roleTargets.getValue("graveyard_enabler").ideal
+        // mill_self ideal 12 * 0.4125 = 4.95 -> round 5 (< the single-theme 7).
+        val twoThemeIdeal = two.roleTargets.getValue("mill_self").ideal
         assertTrue(twoThemeIdeal < 7, "2-theme dilution should shrink the band (was $twoThemeIdeal)")
     }
 
@@ -88,4 +90,159 @@ class ArchetypeSkeletonResolverTest {
         // band, whose ideal already matched 37 -- close to, but not exactly, ep.658's 38).
         assertEquals(RoleTarget(36, 38, 40), generic.lands)
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  Wave 2 B2 -- SixtyFormatProfile's deckFormat layer, applied by resolveWithColor as the
+    //  LAST step (after archetype+theme+color-count+identity resolution). Isolated from B1's
+    //  CuratedStrategyCatalog work -- these tests only exercise ArchetypeSkeletonResolver.
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun resolveWithColorAppliesStandardLandsAndCurveShift() {
+        val withoutFormat = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = null,
+        )
+        val withStandard = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = DeckFormat.STANDARD,
+        )
+
+        // SixtyFormatProfile.STANDARD: landsDelta = +2, curveDelta = +0.3.
+        assertEquals(withoutFormat.lands.min + 2, withStandard.lands.min)
+        assertEquals(withoutFormat.lands.ideal + 2, withStandard.lands.ideal)
+        assertEquals(withoutFormat.lands.max + 2, withStandard.lands.max)
+
+        assertEquals(roundTo2ForTest(withoutFormat.curve.min + 0.3), withStandard.curve.min, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.ideal + 0.3), withStandard.curve.ideal, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.max + 0.3), withStandard.curve.max, 0.001)
+    }
+
+    @Test
+    fun resolveWithColorIsPassthroughForNullAndCasualAndModernDeckFormats() {
+        // MODERN swapped in for the old PIONEER example (Wave 2 future-debt closeout, 2026-09-06):
+        // Pioneer now has its own non-zero SixtyFormatProfile entry (see the dedicated test below),
+        // so it no longer demonstrates passthrough behavior. MODERN is the format this pass
+        // deliberately calibrated to (0, 0.0) -- see SixtyFormatProfile.MODERN's KDoc for why --
+        // so it still is a genuine passthrough example, same as CASUAL (which has no entry at all).
+        val baseline = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.MIDRANGE,
+            identity = setOf(ManaColor.G, ManaColor.W), deckFormat = null,
+        )
+        val casual = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.MIDRANGE,
+            identity = setOf(ManaColor.G, ManaColor.W), deckFormat = DeckFormat.CASUAL,
+        )
+        val modern = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.MIDRANGE,
+            identity = setOf(ManaColor.G, ManaColor.W), deckFormat = DeckFormat.MODERN,
+        )
+
+        assertEquals(baseline, casual)
+        assertEquals(baseline, modern)
+    }
+
+    @Test
+    fun resolveWithColorAppliesPioneerLandsAndCurveShift() {
+        val withoutFormat = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = null,
+        )
+        val withPioneer = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = DeckFormat.PIONEER,
+        )
+
+        // SixtyFormatProfile.PIONEER: landsDelta = +1, curveDelta = +0.15.
+        assertEquals(withoutFormat.lands.min + 1, withPioneer.lands.min)
+        assertEquals(withoutFormat.lands.ideal + 1, withPioneer.lands.ideal)
+        assertEquals(withoutFormat.lands.max + 1, withPioneer.lands.max)
+
+        assertEquals(roundTo2ForTest(withoutFormat.curve.min + 0.15), withPioneer.curve.min, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.ideal + 0.15), withPioneer.curve.ideal, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.max + 0.15), withPioneer.curve.max, 0.001)
+    }
+
+    @Test
+    fun resolveWithColorAppliesLegacyLandsAndCurveShift() {
+        val withoutFormat = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = null,
+        )
+        val withLegacy = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = DeckFormat.LEGACY,
+        )
+
+        // SixtyFormatProfile.LEGACY: landsDelta = -1, curveDelta = -0.2.
+        assertEquals(withoutFormat.lands.min - 1, withLegacy.lands.min)
+        assertEquals(withoutFormat.lands.ideal - 1, withLegacy.lands.ideal)
+        assertEquals(withoutFormat.lands.max - 1, withLegacy.lands.max)
+
+        assertEquals(roundTo2ForTest(withoutFormat.curve.min - 0.2), withLegacy.curve.min, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.ideal - 0.2), withLegacy.curve.ideal, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.max - 0.2), withLegacy.curve.max, 0.001)
+    }
+
+    @Test
+    fun resolveWithColorAppliesVintageLandsAndCurveShift() {
+        val withoutFormat = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = null,
+        )
+        val withVintage = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = DeckFormat.VINTAGE,
+        )
+
+        // SixtyFormatProfile.VINTAGE: landsDelta = -2, curveDelta = -0.3.
+        assertEquals(withoutFormat.lands.min - 2, withVintage.lands.min)
+        assertEquals(withoutFormat.lands.ideal - 2, withVintage.lands.ideal)
+        assertEquals(withoutFormat.lands.max - 2, withVintage.lands.max)
+
+        assertEquals(roundTo2ForTest(withoutFormat.curve.min - 0.3), withVintage.curve.min, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.ideal - 0.3), withVintage.curve.ideal, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.max - 0.3), withVintage.curve.max, 0.001)
+    }
+
+    @Test
+    fun resolveWithColorAppliesPauperLandsAndCurveShift() {
+        val withoutFormat = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = null,
+        )
+        val withPauper = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = DeckFormat.PAUPER,
+        )
+
+        // SixtyFormatProfile.PAUPER: landsDelta = +1, curveDelta = -0.1.
+        assertEquals(withoutFormat.lands.min + 1, withPauper.lands.min)
+        assertEquals(withoutFormat.lands.ideal + 1, withPauper.lands.ideal)
+        assertEquals(withoutFormat.lands.max + 1, withPauper.lands.max)
+
+        assertEquals(roundTo2ForTest(withoutFormat.curve.min - 0.1), withPauper.curve.min, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.ideal - 0.1), withPauper.curve.ideal, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.max - 0.1), withPauper.curve.max, 0.001)
+    }
+
+    @Test
+    fun resolveWithColorIgnoresDeckFormatForCommander() {
+        val withoutFormat = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.COMMANDER, archetype = ArchetypeId.CONTROL,
+            identity = setOf(ManaColor.U, ManaColor.W), deckFormat = null,
+        )
+        val withStandard = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.COMMANDER, archetype = ArchetypeId.CONTROL,
+            identity = setOf(ManaColor.U, ManaColor.W), deckFormat = DeckFormat.STANDARD,
+        )
+
+        // A nonsensical (Commander, STANDARD) combination must still be a no-op: the profile is
+        // gated on `format == ArchetypeFormat.SIXTY`, never on deckFormat alone.
+        assertEquals(withoutFormat, withStandard)
+    }
+
+    /** Mirrors the resolver's own private `roundTo2` (round-half-up to 2dp) so these tests can
+     * predict the exact curve-shift result without depending on the resolver's implementation. */
+    private fun roundTo2ForTest(value: Double): Double = kotlin.math.round(value * 100.0) / 100.0
 }

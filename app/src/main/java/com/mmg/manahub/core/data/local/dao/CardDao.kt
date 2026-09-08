@@ -59,6 +59,23 @@ abstract class CardDao {
     @Query("SELECT * FROM cards WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
     abstract fun searchByName(query: String): Flow<List<CardEntity>>
 
+    /**
+     * Scanner reliability plan, W2.7 (2026-08-24): local-first card-name lookup for
+     * `CardRecognizer` so a card the user already owns/has cached resolves with ZERO network
+     * calls. Exact, case-insensitive name match (unlike [searchByName]'s substring `LIKE`).
+     * Prefers a row already cached in [lang] (`ORDER BY CASE WHEN lang = :lang THEN 0 ELSE 1 END`)
+     * but falls back to the most recently cached printing in ANY language rather than returning
+     * nothing -- the caller (`CardRecognizer`) treats a language-mismatched local hit the same way
+     * as a language-mismatched network hit (informational "added as EN" badge), never a hard miss.
+     */
+    @Query("""
+        SELECT * FROM cards
+        WHERE LOWER(name) = LOWER(:name)
+        ORDER BY CASE WHEN lang = :lang THEN 0 ELSE 1 END, cached_at DESC
+        LIMIT 1
+    """)
+    abstract suspend fun findByExactNameForLanguage(name: String, lang: String): CardEntity?
+
     @Query("SELECT COUNT(*) > 0 FROM cards WHERE scryfall_id = :id AND cached_at > :minCachedAt")
     abstract suspend fun isCacheValid(id: String, minCachedAt: Long): Boolean
 
@@ -78,6 +95,24 @@ abstract class CardDao {
 
     @Query("SELECT * FROM cards WHERE is_stale = 1")
     abstract fun observeStaleCards(): Flow<List<CardEntity>>
+
+    // Collection sync data-loss fix, Phase 4 (2026-09-06). Feeds CardHydrationWorker: finds ids
+    // still carrying SyncManager's `stale_reason = "pending_hydration"` placeholder (written by
+    // `ensureCardsExist` for a card Scryfall did not return during a collection/deck pull) that
+    // are still referenced by a LIVE collection row or ANY deck_cards row, capped at [limit]. Same
+    // cross-table-subquery shape as getScryfallIdsWithBlankOracleId/getScryfallIdsMissingStrategyTags
+    // above -- once a placeholder is resolved (is_stale flips to 0 via cardDao.upsertAll's @Update
+    // path), it drops out of future candidate lists on its own.
+    @Query("""
+        SELECT scryfall_id FROM cards
+        WHERE is_stale = 1 AND stale_reason = 'pending_hydration'
+          AND (
+              scryfall_id IN (SELECT scryfall_id FROM user_card_collection WHERE is_deleted = 0)
+              OR scryfall_id IN (SELECT scryfall_id FROM deck_cards)
+          )
+        LIMIT :limit
+    """)
+    abstract suspend fun getPendingHydrationIds(limit: Int): List<String>
 
     // Edge-case audit A3 (2026-07-15). Feeds CardRepositoryImpl.backfillMissingOracleIds: finds
     // cards referenced by a LIVE collection row OR any wishlist row whose cached row predates the
@@ -121,6 +156,38 @@ abstract class CardDao {
         LIMIT :limit
     """)
     abstract suspend fun getScryfallIdsMissingStrategyTags(limit: Int): List<String>
+
+    // Per-printing write-gap repair (2026-09-07). getScryfallIdsMissingStrategyTags above excludes a
+    // card as soon as ANY row with its oracle_id is cached, but the tag write targets a single
+    // scryfall_id -- so a user who owns two printings of one card had the second printing excluded
+    // forever, before it was ever written (8 such rows measured on device). The same shape stranded
+    // any card whose write did not land before an interrupted run died. This is the repair net for
+    // rows already in that state: owned cards still carrying the empty default whose oracle_id IS
+    // cached, so they can be rewritten from the cache with no network work at all.
+    //
+    // `tags = '[]'` is a deliberate exception to the "never key off tags = '[]'" rule that governs
+    // getScryfallIdsMissingStrategyTags: a card genuinely resolved to zero tags stays in this query
+    // forever, but it costs one indexed local read per run and NEVER a request or a write, so it is
+    // a stable fixed point rather than the request storm that rule exists to prevent. It must
+    // therefore never drive the worker's retry chain.
+    @Query("""
+        SELECT DISTINCT c.scryfall_id FROM cards c
+        WHERE c.oracle_id != '' AND c.tags = '[]'
+          AND EXISTS (SELECT 1 FROM card_strategy_tags_cache t WHERE t.oracle_id = c.oracle_id)
+          AND (
+              c.scryfall_id IN (SELECT scryfall_id FROM user_card_collection WHERE is_deleted = 0)
+              OR c.scryfall_id IN (SELECT scryfall_id FROM local_wishlists)
+              OR c.scryfall_id IN (SELECT scryfall_id FROM deck_cards)
+          )
+        LIMIT :limit
+    """)
+    abstract suspend fun getScryfallIdsWithUnwrittenStrategyTags(limit: Int): List<String>
+
+    // Strategy tags are an ORACLE-wide property shared by every printing, but they are stored per
+    // scryfall_id -- this is how a resolution fans out to all of a card's cached printings instead
+    // of only the one that happened to be the batch candidate. `cards` is indexed on oracle_id.
+    @Query("SELECT * FROM cards WHERE oracle_id IN (:oracleIds)")
+    abstract suspend fun getByOracleIds(oracleIds: List<String>): List<CardEntity>
 
     @Query("UPDATE cards SET tags = :tagsJson WHERE scryfall_id = :scryfallId")
     abstract suspend fun updateTags(scryfallId: String, tagsJson: String)
@@ -191,6 +258,24 @@ abstract class CardDao {
      * Batch price update to reduce Room invalidation noise during large refreshes
      * (e.g. RefreshCollectionPricesUseCase).
      */
+    /**
+     * Batch tag write, mirroring [updatePricesBatch]'s rationale: bulk hydration rewrites hundreds
+     * of rows per run, and one Room invalidation per row is the pattern behind the Stats
+     * production OOM (`feedback_stats_room_invalidation_oom`). Each entry still carries its OWN
+     * already-unioned json, so a per-printing user-confirmed tag is never clobbered by a sibling's
+     * payload — this is why it is not a single `UPDATE ... WHERE oracle_id = ?`.
+     */
+    @Transaction
+    open suspend fun updateTagsAndSuggestionsBatch(updates: List<CardTagsUpdate>) {
+        updates.forEach { update ->
+            updateTagsAndSuggestions(
+                scryfallId = update.scryfallId,
+                tagsJson = update.tagsJson,
+                suggestedJson = update.suggestedJson,
+            )
+        }
+    }
+
     @Transaction
     open suspend fun updatePricesBatch(updates: List<CardPriceUpdate>) {
         updates.forEach { update ->
@@ -205,3 +290,10 @@ abstract class CardDao {
         }
     }
 }
+
+/** One row's already-resolved tag columns, for [CardDao.updateTagsAndSuggestionsBatch]. */
+data class CardTagsUpdate(
+    val scryfallId: String,
+    val tagsJson: String,
+    val suggestedJson: String,
+)

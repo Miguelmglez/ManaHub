@@ -1,6 +1,5 @@
 package com.mmg.manahub.app
 
-// import com.mmg.manahub.feature.scanner.EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -56,6 +55,7 @@ import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.core.domain.usecase.card.ResolveCardStrategyTagsUseCase
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncWorker
 import com.mmg.manahub.core.gamification.data.sync.QuestRotationWorker
@@ -79,6 +79,8 @@ import com.mmg.manahub.core.online.domain.usecase.UpdateCounterUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateLifeUseCase
 import com.mmg.manahub.core.push.di.pushKoinModule
 import com.mmg.manahub.core.sync.CardBackfillWorker
+import com.mmg.manahub.core.sync.CardHydrationWorker
+import com.mmg.manahub.core.sync.CollectionMergeConflictResolver
 import com.mmg.manahub.core.sync.CollectionStatsSyncWorker
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.PriceRefreshWorker
@@ -182,7 +184,6 @@ class ManaHubApp : Application(), KoinComponent {
     @Inject lateinit var pushTokenRemoteDataSource: PushTokenRemoteDataSource
     @Inject lateinit var okHttpClient: OkHttpClient
     @Inject lateinit var userPreferencesDataStore: UserPreferencesDataStore
-    // @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 
     // ── KMP migration — Hilt→Koin bridge dependencies ───────────────────────────────────────────
     // These singletons are still owned by Hilt. ManaHubApp is the bridge: it @Inject's them from the
@@ -273,6 +274,11 @@ class ManaHubApp : Application(), KoinComponent {
     // SharedDomainUseCaseModule provider (same DAO singleton, see that provider's KDoc for why).
     @Inject lateinit var cardStrategyTagsCacheDao: CardStrategyTagsCacheDao
 
+    // Bulk strategy-tag hydration (2026-09-07): CardTagHydrationWorker resolves this through Koin.
+    // Bridged from Hilt rather than rebuilt Koin-side so the bulk path shares the SAME repository
+    // (and therefore the same cache-write behaviour) as the card-add path.
+    @Inject lateinit var resolveCardStrategyTagsUseCase: ResolveCardStrategyTagsUseCase
+
     // Daily Puzzle feature (Batch B1 foundation). Serves puzzleKoinModule — the Room-owned
     // PuzzleDao bridge, same pattern as cardStrategyTagsCacheDao above.
     @Inject lateinit var puzzleDao: PuzzleDao
@@ -360,6 +366,13 @@ class ManaHubApp : Application(), KoinComponent {
     // collectionKoinModule now resolves both via get(). Only SyncManager stays a bridge field here.
     @Inject lateinit var syncManager: SyncManager
 
+    // Collection sync data-loss fix, Phase 7 (write-path hardening, 2026-09-06): bridge field for
+    // CollectionMergeConflictResolver — resolves pending guest/account collection conflicts left
+    // behind by UserCardCollectionDao.assignUserId's NOT EXISTS collision guard. Consumed only by
+    // CollectionViewModel today; bridged here (not directly in collectionKoinModule) following the
+    // same "cross-cutting-owned-once, feature-consumed-via-get()" convention as syncManager above.
+    @Inject lateinit var collectionMergeConflictResolver: CollectionMergeConflictResolver
+
     // Decks island (KMP migration batch 3) bridge dep. The feature-private Hilt DeckDoctorModule was
     // CONVERTED and DELETED: the entire Deck Doctor scoring engine (DeckScorer + its graph) and all six
     // deck use cases are now natively Koin-built in decksKoinModule (they were already plain classes in
@@ -444,6 +457,7 @@ class ManaHubApp : Application(), KoinComponent {
                     supabaseClient = supabaseClient,
                     userCardRepository = { userCardRepository.get() },
                     syncManager = syncManager,
+                    collectionMergeConflictResolver = collectionMergeConflictResolver,
                     appScope = appScope,
                 ),
                 // The gamification engine graph (ADR-002), natively Koin-built (batch 4; Hilt
@@ -488,6 +502,7 @@ class ManaHubApp : Application(), KoinComponent {
                 ),
                 cardStrategyTagsKoinModule(
                     cacheDao = cardStrategyTagsCacheDao,
+                    resolveCardStrategyTags = resolveCardStrategyTagsUseCase,
                 ),
                 puzzleKoinModule(
                     puzzleDao = puzzleDao,
@@ -589,6 +604,13 @@ class ManaHubApp : Application(), KoinComponent {
         // CardBackfillWorker's KDoc for the ordering invariant + sync-window deferral it preserves.
         CardBackfillWorker.scheduleDaily(workManager)
 
+        // Collection sync data-loss fix, Phase 4 (2026-09-06): hourly retry of any
+        // pending-hydration card placeholder SyncManager.ensureCardsExist wrote when Scryfall
+        // couldn't resolve a card during a pull — see CardHydrationWorker's KDoc for why this is
+        // a separate, more frequent worker than CardBackfillWorker above. Ungated by auth (a
+        // placeholder can belong to a guest's local-only collection too).
+        CardHydrationWorker.schedulePeriodic(workManager)
+
         // ── Gamification backend gate (WS1+WS3 Part A, backend-performance-optimization-plan.md §1,
         //    F1) ────────────────────────────────────────────────────────────────────────────────
         // `gamificationEnabledFlow` defaults to false (the UI is hidden for this release) but
@@ -687,17 +709,32 @@ class ManaHubApp : Application(), KoinComponent {
         PriceRefreshWorker.scheduleDailyRefresh(workManager)
         CollectionStatsSyncWorker.scheduleDailySync(workManager)
 
-        // COMMENTED OUT — Cloudflare R2 embedding DB download replaced by ML Kit OCR
-        // embeddingDatabaseUpdater.scheduleUpdateCheck()
-
         // Schedule/cancel the periodic background sync based on auth state.
         // CollectionViewModel also does this for the collection screen, but this
         // global observer ensures sync is cancelled even when that screen is not alive.
+        //
+        // Collection sync data-loss fix, Phase 5 (2026-09-06): the offline-to-online
+        // first-login full pull (SyncManager.assignUserIdAndSync) used to be launched from
+        // `CollectionViewModel.observeSessionChanges` on `viewModelScope` — navigating away from
+        // the Collection screen mid-pull cancelled it, silently leaving a first-login account
+        // partially migrated with no automatic retry. It is now dispatched here as durable
+        // WorkManager unique work (CollectionSyncWorker.enqueueFirstLoginSync), which survives
+        // both navigation and process death, mirroring why this observer already lives at the
+        // app scope for periodic scheduling. `previousUserId` (captured by this launch's closure,
+        // living for the app process) is the app-scope equivalent of the ViewModel's old
+        // `previouslyAuthenticated` flag: it guards against a rapid second `Authenticated` emission
+        // (profile enrichment) re-triggering the first-login pull for the SAME user, while still
+        // firing again if a DIFFERENT user signs in after a sign-out.
+        var previousUserId: String? = null
         appScope.launch {
             authRepository.sessionState.collect { state ->
                 when (state) {
                     is SessionState.Authenticated -> {
                         CollectionSyncWorker.schedulePeriodicSync(workManager)
+                        if (previousUserId != state.user.id) {
+                            previousUserId = state.user.id
+                            CollectionSyncWorker.enqueueFirstLoginSync(workManager)
+                        }
                         appScope.launch {
                             runCatching {
                                 val token = FirebaseMessaging.getInstance().token.await()
@@ -706,8 +743,13 @@ class ManaHubApp : Application(), KoinComponent {
                         }
                     }
                     is SessionState.Unauthenticated -> {
+                        previousUserId = null
                         workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_PERIODIC)
                         workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_ONE_TIME)
+                        // Own unique name (write-path hardening audit, 2026-09-06): must be
+                        // cancelled too, or a stale first-login work would KEEP-block the next
+                        // account's enqueueFirstLoginSync call.
+                        workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_FIRST_LOGIN)
                         appScope.launch {
                             runCatching {
                                 val token = FirebaseMessaging.getInstance().token.await()

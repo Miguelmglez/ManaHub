@@ -37,21 +37,33 @@ import com.mmg.manahub.core.model.TagCategory
 object DeckIdentitySeedTags {
 
     /**
-     * Macro archetype → seed tags. [ArchetypeId.GENERIC] intentionally contributes nothing (the
-     * neutral default has no identity signal of its own — its seed contribution comes entirely from
-     * [themeSeedTags]/[tribeSeedTag] when present). Every OTHER archetype yields >=1 tag (Deck Engine
-     * Unification plan D2 "total mapping" requirement) — AGGRO/CONTROL/COMBO/MIDRANGE/RAMP read
-     * straight off [SeedStrategy.primaryTags] (a reference, not a copy, so the two vocabularies can
-     * never drift); TEMPO has no [SeedStrategy] equivalent, so it gets an explicit tag list here.
+     * Macro archetype → seed tags. `null` (Deck Analysis Engine v3 removed `ArchetypeId.GENERIC` —
+     * "no macro pin" is now `null`, not a neutral enum value) intentionally contributes nothing (the
+     * unpinned state has no identity signal of its own — its seed contribution comes entirely from
+     * [themeSeedTags]/[tribeSeedTag] when present). Every REAL archetype yields >=1 tag (Deck Engine
+     * Unification plan D2 "total mapping" requirement, still honored for the current 5-member
+     * [ArchetypeId]) — AGGRO/CONTROL/COMBO/MIDRANGE read straight off [SeedStrategy.primaryTags] (a
+     * reference, not a copy, so the two vocabularies can never drift); PRISON has no [SeedStrategy]
+     * equivalent, so it reuses the old STAX theme's tag (PRISON absorbed STAX's identity, spec §4.1).
+     * `RAMP`/`TEMPO` moved to [PostureId] — see [postureSeedTags].
      */
-    fun archetypeSeedTags(archetype: ArchetypeId): List<CardTag> = MACRO_ARCHETYPE_TAGS[archetype].orEmpty()
+    fun archetypeSeedTags(archetype: ArchetypeId?): List<CardTag> =
+        archetype?.let { MACRO_ARCHETYPE_TAGS[it].orEmpty() }.orEmpty()
 
     /**
-     * Theme → seed tags. TOTAL mapping over all 22 [ThemeId]s (Deck Engine Unification plan D2) —
-     * every theme yields >=1 [CardTag], several yield 2 for richer signal (see [THEME_TAGS]'s KDoc
-     * for the per-theme rationale, including two documented proxy/limitation cases: VEHICLES and
-     * TOOLBOX have no dedicated `*_matter`/STRATEGY-category dictionary tag yet — see those entries'
-     * inline comments).
+     * Posture → seed tags (Deck Analysis Engine v3). Not yet wired to any production caller — the
+     * posture layer is new this phase and the Wizard-facing identity-seeding flow ([forArchetype]/
+     * [forProfile]) has not been extended to accept a posture pin yet (out of Phase 3a's scope, a
+     * follow-up). Kept for symmetry/future use, mirroring [archetypeSeedTags]'s own shape.
+     */
+    fun postureSeedTags(posture: PostureId?): List<CardTag> =
+        posture?.let { POSTURE_TAGS[it].orEmpty() }.orEmpty()
+
+    /**
+     * Theme → seed tags. TOTAL mapping over the current 21 [ThemeId]s (Deck Engine Unification plan
+     * D2) — every theme yields >=1 [CardTag], several yield 2 for richer signal (see [THEME_TAGS]'s
+     * KDoc for the per-theme rationale, including documented proxy/limitation cases: VEHICLES has no
+     * dedicated `*_matter`/STRATEGY-category dictionary tag yet — see that entry's inline comment).
      */
     fun themeSeedTags(themes: List<ThemeId>): List<CardTag> = themes.flatMap { THEME_TAGS[it].orEmpty() }
 
@@ -62,13 +74,13 @@ object DeckIdentitySeedTags {
         tribe?.takeIf { it.isNotBlank() }?.let { listOf(CardTag(key = it, category = TagCategory.TRIBAL)) }.orEmpty()
 
     /** Combines all three — the full seed-tag contribution of a resolved/pinned
-     * (archetype, themes, tribe) triple. */
-    fun forArchetype(archetype: ArchetypeId, themes: List<ThemeId>, tribe: String? = null): List<CardTag> =
+     * (archetype, themes, tribe) triple. `archetype == null` = no macro pin. */
+    fun forArchetype(archetype: ArchetypeId?, themes: List<ThemeId>, tribe: String? = null): List<CardTag> =
         (archetypeSeedTags(archetype) + themeSeedTags(themes) + tribeSeedTag(tribe)).distinct()
 
     /** Convenience overload taking a [StrategyProfile] directly. */
     fun forProfile(profile: StrategyProfile): List<CardTag> =
-        forArchetype(profile.archetype ?: ArchetypeId.GENERIC, profile.themes, profile.tribe)
+        forArchetype(profile.archetype, profile.themes, profile.tribe)
 
     /**
      * Reverse lookup: which [ArchetypeId] (if any) does [tag] represent? Used by the wizard's
@@ -88,11 +100,29 @@ object DeckIdentitySeedTags {
         ArchetypeId.CONTROL to SeedStrategy.CONTROL.primaryTags,
         ArchetypeId.COMBO to SeedStrategy.COMBO.primaryTags,
         ArchetypeId.MIDRANGE to SeedStrategy.MIDRANGE.primaryTags,
-        ArchetypeId.RAMP to SeedStrategy.RAMP.primaryTags,
-        // TEMPO has no SeedStrategy equivalent -- efficient threats + protection/counterspells to
-        // hold the tempo advantage (D2: every non-GENERIC archetype must yield >=1 seed tag).
-        ArchetypeId.TEMPO to listOf(CardTag.TEMPO, CardTag.COUNTERSPELL, CardTag.PROTECTION),
-        // GENERIC intentionally omitted -- see archetypeSeedTags' KDoc.
+        // PRISON reuses the old STAX theme's tag -- PRISON absorbed STAX's identity (spec §4.1).
+        ArchetypeId.PRISON to listOf(CardTag.STAX),
+        // RAMP/TEMPO moved to PostureId -- see POSTURE_TAGS.
+    )
+
+    /** [PostureId] → seed tags. See [postureSeedTags]'s KDoc — not yet wired to a production
+     * caller. RAMP/TEMPO reuse their old macro-archetype tag lists verbatim; ATTRITION/TOOLBOX/
+     * VOLTRON/GROUP_HUG/GROUP_SLUG reuse their old theme tag lists verbatim (both moves are pure
+     * relabeling, per spec §3/§4.1 -- zero new tag-matching logic). ATTRITION is genuinely new (no
+     * prior macro/theme owned this identity) and gets an inline STRATEGY tag that has no
+     * TagDictionary registration yet -- same documented "honest no-op until Phase 5" limitation
+     * [THEME_TAGS]'s own KDoc already accepts for VEHICLES. */
+    private val POSTURE_TAGS: Map<PostureId, List<CardTag>> = mapOf(
+        PostureId.RAMP to SeedStrategy.RAMP.primaryTags,
+        PostureId.TEMPO to listOf(CardTag.TEMPO, CardTag.COUNTERSPELL, CardTag.PROTECTION),
+        PostureId.ATTRITION to listOf(CardTag("attrition", TagCategory.STRATEGY)),
+        PostureId.TOOLBOX to listOf(CardTag.TUTOR),
+        PostureId.VOLTRON to listOf(
+            CardTag("voltron", TagCategory.ARCHETYPE),
+            CardTag("equipment_matters", TagCategory.STRATEGY),
+        ),
+        PostureId.GROUP_HUG to listOf(CardTag("group_hug", TagCategory.STRATEGY)),
+        PostureId.GROUP_SLUG to listOf(CardTag("group_slug", TagCategory.STRATEGY)),
     )
 
     /**
@@ -130,47 +160,46 @@ object DeckIdentitySeedTags {
         ThemeId.SELF_MILL to listOf(CardTag.GRAVEYARD),
         ThemeId.ARISTOCRATS to listOf(CardTag.SACRIFICE, CardTag("death_triggers", TagCategory.STRATEGY)),
         ThemeId.TOKENS to listOf(CardTag.TOKENS),
-        ThemeId.STAX to listOf(CardTag.STAX),
+        // STAX: MOVED to ArchetypeId.PRISON's seed tags (see MACRO_ARCHETYPE_TAGS) -- STAX is no
+        // longer a theme (spec §4.1).
         ThemeId.LIFEGAIN to listOf(CardTag.LIFEGAIN),
         ThemeId.TRIBAL to listOf(CardTag.TRIBAL),
         ThemeId.ENCHANTRESS to listOf(CardTag.ENCHANTRESS),
-        ThemeId.MILL to listOf(CardTag.GRAVEYARD),
+        // MILL -> MILL_OPPONENT (spec §4.2 split).
+        ThemeId.MILL_OPPONENT to listOf(CardTag.GRAVEYARD),
         ThemeId.BLINK to listOf(CardTag.BLINK, CardTag("etb", TagCategory.STRATEGY)),
         // ── 12 newly mapped themes (D2 total-mapping requirement) ─────────────────────────────
         ThemeId.SPELLSLINGER to listOf(
             CardTag("spellslinger", TagCategory.STRATEGY),
             CardTag("spell_copy", TagCategory.STRATEGY),
         ),
-        ThemeId.VOLTRON to listOf(
-            CardTag("voltron", TagCategory.ARCHETYPE),
-            CardTag("equipment_matters", TagCategory.STRATEGY),
-        ),
+        // VOLTRON: MOVED to PostureId.VOLTRON (see POSTURE_TAGS) -- no longer a theme (spec §4.1).
         ThemeId.LANDFALL to listOf(CardTag("lands_matter", TagCategory.STRATEGY)),
         ThemeId.PLUS1_COUNTERS to listOf(CardTag.PLUS_COUNTERS, CardTag.PROLIFERATE),
         ThemeId.ARTIFACTS to listOf(CardTag("artifacts_matter", TagCategory.STRATEGY)),
         ThemeId.WHEELS to listOf(CardTag("wheel", TagCategory.STRATEGY)),
-        ThemeId.GROUP_HUG to listOf(CardTag("group_hug", TagCategory.STRATEGY)),
-        ThemeId.GROUP_SLUG to listOf(CardTag("group_slug", TagCategory.STRATEGY)),
+        // GROUP_HUG/GROUP_SLUG: MOVED to PostureId (see POSTURE_TAGS) -- no longer themes (spec §4.1).
         // SUPERFRIENDS: no dedicated "planeswalkers_matter" STRATEGY tag exists in TagDictionary yet
         // (only a ROLE-category "planeswalker" card-type tag, which would be inert here -- see this
         // map's own KDoc). PROLIFERATE/doublers are the closest real STRATEGY-category proxies
         // (loyalty-counter growth is core to most superfriends shells) -- documented limitation,
         // tracked for the Phase 5 tag pipeline to add a real dedicated tag.
         ThemeId.SUPERFRIENDS to listOf(CardTag.PROLIFERATE, CardTag("doublers", TagCategory.STRATEGY)),
-        // VEHICLES: same limitation as SUPERFRIENDS -- only a ROLE-category "vehicle" card-type tag
-        // exists. "artifacts_matter" is the nearest STRATEGY-category proxy (Vehicles are artifacts).
+        // VEHICLES: no dedicated "vehicles_matter" tag exists -- only a ROLE-category "vehicle"
+        // card-type tag. "artifacts_matter" is the nearest STRATEGY-category proxy (Vehicles are
+        // artifacts).
         ThemeId.VEHICLES to listOf(CardTag("artifacts_matter", TagCategory.STRATEGY)),
-        // TOOLBOX: no STRATEGY/ARCHETYPE-category tag exists for "silver-bullet toolbox" decks at
-        // all -- only the ROLE-category "tutor" tag, which is INERT here (see this map's own KDoc).
-        // Deliberately NOT substituted with an unrelated IDENTITY-category tag (e.g. COMBO would
-        // actively mis-seed the fingerprint toward combo pieces) -- an honest no-op is safer than a
-        // wrong signal. Satisfies the D2 ">=1 seed tag" mapping without corrupting scoring; tracked
-        // for the Phase 5 tag pipeline to add a real dedicated "toolbox" STRATEGY tag.
-        ThemeId.TOOLBOX to listOf(CardTag.TUTOR),
+        // TOOLBOX: MOVED to PostureId.TOOLBOX (see POSTURE_TAGS) -- no longer a theme (spec §4.1).
         ThemeId.CLONES_THEFT to listOf(
             CardTag("clones", TagCategory.STRATEGY),
             CardTag("theft", TagCategory.STRATEGY),
         ),
+        // Deck Analysis Engine v3 (spec §4.2, NEW themes) -- no dedicated TagDictionary tag exists
+        // yet for any of the 3; each gets the nearest real STRATEGY-category proxy already
+        // registered, same documented-limitation discipline as VEHICLES/SUPERFRIENDS above.
+        ThemeId.TREASURE to listOf(CardTag("artifacts_matter", TagCategory.STRATEGY)),
+        ThemeId.EQUIPMENT to listOf(CardTag("equipment_matters", TagCategory.STRATEGY)),
+        ThemeId.STORM to listOf(CardTag("spellslinger", TagCategory.STRATEGY)),
     )
 
     // putIfAbsent is JVM-only (java.util.Map) -- not part of the common kotlin.collections

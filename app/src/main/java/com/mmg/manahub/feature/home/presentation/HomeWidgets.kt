@@ -2645,7 +2645,7 @@ private fun DiscoverCardThumb(
                                 key = sharedTransitionKey ?: "card-image-${card.scryfallId}"
                             ),
                             animatedVisibilityScope = animatedVisibilityScope,
-                            clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
+                            clipInOverlayDuringTransition = OverlayClip(CardShape),
                             renderInOverlayDuringTransition = true,
                         )
                     }
@@ -2693,7 +2693,7 @@ private fun RandomCardWidget(
                 modifier = Modifier
                     .fillMaxWidth(0.62f)
                     .aspectRatio(0.717f) // Keep footprint identical during load/fail/show
-                    .clip(SmallCardShape)
+                    .clip(CardShape)
                     .background(MaterialTheme.magicColors.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
@@ -2718,7 +2718,7 @@ private fun RandomCardWidget(
                                                     key = "random_card|${card.scryfallId}"
                                                 ),
                                                 animatedVisibilityScope = animatedVisibilityScope,
-                                                clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
+                                                clipInOverlayDuringTransition = OverlayClip(CardShape),
                                                 renderInOverlayDuringTransition = true,
                                             )
                                         }
@@ -3844,7 +3844,7 @@ private val QuickStartAction.navLabel: String
     @ReadOnlyComposable
     get() = when (this) {
         QuickStartAction.SCAN_CARD -> stringResourceSafe(R.string.quick_start_scan_card)
-        QuickStartAction.CREATE_DECK -> stringResourceSafe(R.string.quick_start_deck_builder)
+        QuickStartAction.CREATE_DECK -> stringResourceSafe(R.string.quick_start_my_decks)
         QuickStartAction.DRAFT_GUIDE -> stringResourceSafe(R.string.quick_start_draft_guides)
         QuickStartAction.SEARCH_CARD -> stringResourceSafe(R.string.quick_start_search_card)
         QuickStartAction.DECKS -> stringResourceSafe(R.string.quick_start_my_decks)
@@ -3860,7 +3860,7 @@ private val QuickStartAction.navLabel: String
 /** Maps a Quick Start action to its navigation intent. */
 private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
     QuickStartAction.SCAN_CARD -> HomeAction.ScanCard
-    QuickStartAction.CREATE_DECK -> HomeAction.CreateDeck
+    QuickStartAction.CREATE_DECK -> HomeAction.OpenDecks
     QuickStartAction.DRAFT_GUIDE -> HomeAction.DraftGuide
     QuickStartAction.SEARCH_CARD -> HomeAction.SearchCard
     QuickStartAction.DECKS -> HomeAction.OpenDecks

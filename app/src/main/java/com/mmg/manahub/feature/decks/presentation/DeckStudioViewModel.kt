@@ -9,6 +9,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.model.AddCardRow
+import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.BASIC_LAND_NAMES
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
@@ -21,29 +22,30 @@ import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
+import com.mmg.manahub.core.domain.search.AdvancedSearchCardMatcher
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
+import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
-import com.mmg.manahub.feature.decks.domain.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.LandTargetResolver
 import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.SectionQueryContext
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
+import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 import com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorEvent
 import com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorOrchestrator
 import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
-import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
-import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
-import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
-import com.mmg.manahub.feature.decks.domain.usecase.CommunityAddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.FindSimilarDecksUseCase
@@ -53,15 +55,11 @@ import com.mmg.manahub.feature.decks.domain.usecase.ImportOutcome
 import com.mmg.manahub.feature.decks.domain.usecase.ImportSource
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SimilarDeckResult
-import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2
 import com.mmg.manahub.feature.decks.domain.template.DiscoverSynergiesV2UseCase
 import com.mmg.manahub.feature.decks.domain.template.DiscoverySearchFilter
 import com.mmg.manahub.feature.decks.domain.model.ComboResult
 import com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase
-import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -153,6 +151,7 @@ data class DeckStudioUiState(
 
     val mainboardExpanded: Boolean = true,
     val sideboardExpanded: Boolean = false,
+    val collapsedSections: Set<String> = emptySet(),
 
     // ── Search / Add cards state ──────────────────────────────────────────────
     val addCardsQuery: String = "",
@@ -160,6 +159,38 @@ data class DeckStudioUiState(
     val isSearchingCards: Boolean = false,
     val scryfallResults: List<AddCardRow> = emptyList(),
     val isSearchingScryfall: Boolean = false,
+    /**
+     * Suggestions Tab UI Polish plan (W11 bug-fix pass, 2026-08-25): the raw Scryfall fragment
+     * built from the Analysis tab's "Browse for X" structured filter (via
+     * [searchScryfallStructured]/[BuildScryfallQueryUseCase]), kept SEPARATE from [addCardsQuery]
+     * (which always mirrors exactly what the user has typed into the visible search bar, nothing
+     * more). Non-null only while a structured-preset [CardSearchSheet][com.mmg.manahub.core.ui.components.CardSearchSheet]
+     * session is active; [searchScryfallDirect] ANDs it onto every subsequent keystroke instead of
+     * overwriting it, and it is reset to null wherever [DeckStudioScreen]'s own UI-local
+     * `sectionBrowseSectionId` is reset (every sheet dismiss/reopen site), plus folded into
+     * [clearAddCardsState] for the two dismiss sites that already call it.
+     */
+    val activeStructuredSearchFragment: String? = null,
+    /**
+     * Edge-case QA fix (MEDIUM, 2026-09-06): the Collection-tab counterpart of
+     * [activeStructuredSearchFragment] -- the [com.mmg.manahub.core.model.CardTag] key set from
+     * the Analysis tab's "Browse for X" entry point (via [searchCollectionByTags]), kept SEPARATE
+     * from [addCardsQuery] for the exact same reason as the Scryfall fragment. Non-null only while
+     * a tag-filtered Collection-tab session is active; [onAddCardsQueryChange] ANDs it onto every
+     * subsequent keystroke instead of overwriting it (the pre-fix bug: typing after a tag-filtered
+     * Browse-for-X search silently dropped back to a plain name-only filter over the WHOLE
+     * collection). Reset at the same sites [activeStructuredSearchFragment] is.
+     */
+    val activeCollectionTagFilter: Set<String>? = null,
+    /**
+     * The Analysis tab's "Browse for X" structured query, evaluated LOCALLY (leniently) against the
+     * collection so the Collection tab is filtered by the same criteria
+     * [activeStructuredSearchFragment] sends to Scryfall for the All Cards tab. Complements — never
+     * replaces — [activeCollectionTagFilter]: the two operate on different key spaces (structured
+     * search criteria vs. internal `CardTag` keys, see `feature/decks/CLAUDE.md`), and many sections
+     * (curve / mana / legality) have no tag keys at all. Reset at the same sites as the other two.
+     */
+    val activeCollectionQuery: AdvancedSearchQuery? = null,
 
     // ── Commander (Commander format only) ─────────────────────────────────────
     val commanderCard: DeckSlotEntry? = null,
@@ -196,18 +227,8 @@ data class DeckStudioUiState(
     // ── Suggestions surface (Deck Doctor inline, Phase 2) ─────────────────────
     /** Read-only Health evaluation from the scoring engine. Null until first computed. */
     val health: DeckHealth? = null,
-    /** Cut candidates (worst fit first), excluding lands / commander / combo cores. */
-    val cuts: List<CardFit> = emptyList(),
-    /** Add suggestions (collection + wishlist + external), budget-filtered, best fit first. */
-    val adds: List<AddSuggestion> = emptyList(),
-    /** Total € the currently shown adds would cost to buy (owned/free cards excluded). */
-    val addsTotalCostEur: Double = 0.0,
-    /** How many of the shown adds have a non-zero price (i.e. need buying). */
-    val addsCardsToBuy: Int = 0,
-    /** True while the full analysis (Health + Cut + Add) is being computed. */
+    /** True while the full analysis (Health) is being computed. */
     val isSuggestionsLoading: Boolean = false,
-    /** True while only the external (Scryfall) ADD pool is being fetched/recomputed. */
-    val isAddsLoading: Boolean = false,
     /** True once the Suggestions surface has been opened at least once (lazy first analysis). */
     val suggestionsLoaded: Boolean = false,
     /** Deck Wizard & Engine Rework plan, Workstream 8.4 -- non-null while the FULL analysis pass
@@ -219,36 +240,15 @@ data class DeckStudioUiState(
      * shown under [doctorStage]'s current label. */
     val doctorCompletedStages: List<DoctorAnalysisStage> = emptyList(),
 
-    // ── Scryfall backstop -- 3rd adds source (Deck Wizard & Engine Rework plan WS8.2) ──────────
-    /** The Suggestions tab's own "include outside collection" toggle -- see
-     * [com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorState.includeOutsideCollection]'s
-     * KDoc (a SEPARATE choice from the wizard's own per-build toggle). */
-    val includeOutsideCollection: Boolean = false,
-    /** True when the toggle above is on but the last Scryfall backstop fetch failed -- [adds]
-     * still shows Motor A's (and Motor B's) results, this is a per-source degrade notice only. */
-    val outsideCollectionUnavailable: Boolean = false,
-
-    // ── Motor B — community suggestions (Deck Doctor Community/Archetype plan, Phase 4) ────────
+    // ── Motor B — "Decks like yours" (Deck Doctor Community/Archetype plan, Phase 4) ────────────
+    // Deck Analysis Category Sections rework (W0, D3/D4/D5): the old Motor A/B "Adds"/"Cuts"
+    // suggestion engine (budget, Scryfall backstop toggle, "Popular in similar decks") was DELETED
+    // end-to-end here. `similarDecks`/`communityEngineEnabled` SURVIVE — independent state field,
+    // independent use case ([com.mmg.manahub.feature.decks.domain.usecase.FindSimilarDecksUseCase]).
     /** Whether Motor B / the Community Hub Discover surface is enabled (`communityEngineEnabledFlow`). */
     val communityEngineEnabled: Boolean = false,
-    /** "Popular in similar decks" — see [com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorState.communityAdds]. */
-    val communityAdds: List<CommunityAddSuggestion> = emptyList(),
     /** "Decks like yours" carousel. */
     val similarDecks: List<SimilarDeckResult> = emptyList(),
-    val isCommunityLoading: Boolean = false,
-    val communityUnavailable: Boolean = false,
-
-    // ── Free-text budget state (U7) ───────────────────────────────────────────
-    /** Raw per-card € text exactly as typed (may be blank or invalid mid-typing). */
-    val rawPerCardText: String = "",
-    /** Raw total € text exactly as typed (may be blank or invalid mid-typing). */
-    val rawTotalText: String = "",
-    /** Whether owned cards are treated as 0 € (mirrors [BudgetConstraints.ownedCardsAreFree]). */
-    val ownedCardsAreFree: Boolean = true,
-    /** The LAST VALID parsed budget (default unconstrained); never an invalid object. */
-    val budgetConstraints: BudgetConstraints = BudgetConstraints(),
-    /** True when the current raw text failed to parse — the inline error is shown and the last valid budget is kept. */
-    val budgetError: Boolean = false,
 
     // ── Inspirations (Discoveries, Phase 4) ───────────────────────────────────
     /** Discoveries (identity-only clustering: STRATEGY/ARCHETYPE tags + derived `tribe:<x>` keys)
@@ -326,8 +326,6 @@ class DeckStudioViewModel(
     private val suggestTagsUseCase: SuggestTagsUseCase,
     private val evaluateDeckUseCase: EvaluateDeckUseCase,
     private val inferDeckIdentityUseCase: InferDeckIdentityUseCase,
-    private val suggestCutsUseCase: SuggestCutsUseCase,
-    private val suggestAddsFromCollectionUseCase: SuggestAddsFromCollectionUseCase,
     private val getDeckGameStatsUseCase: GetDeckGameStatsUseCase,
     private val importDeckUseCase: ImportDeckUseCase,
     private val wishlistRepository: WishlistRepository,
@@ -335,12 +333,10 @@ class DeckStudioViewModel(
     private val crashReporter: CrashReporter,
     private val appContext: Context,
     savedStateHandle: SavedStateHandle,
-    // ── Motor B (Phase 4) — appended last, nullable-defaulted so no existing test call site
-    // (all named-arg) needs to change; a `null` value means this ViewModel behaves exactly as
-    // before Phase 4 (no community state is ever populated).
-    private val suggestAddsFromCommunityUseCase: SuggestAddsFromCommunityUseCase? = null,
+    // ── Motor B, "Decks like yours" only (Phase 4) — appended last, nullable-defaulted so no
+    // existing test call site (all named-arg) needs to change; a `null` value means this
+    // ViewModel behaves exactly as before Phase 4 (no community state is ever populated).
     private val findSimilarDecksUseCase: FindSimilarDecksUseCase? = null,
-    private val communityAggregateRepository: CommunityAggregateRepository? = null,
     // Deck Doctor Community/Archetype plan, Phase 6 (D17 deckstats.net import-by-URL). Reuses the
     // SAME paste-a-deck-list text field the Studio already has — a pasted deckstats.net URL is
     // detected and routed through the unified pipeline instead of the plain-text parser.
@@ -360,11 +356,13 @@ class DeckStudioViewModel(
     // crash, never a silently wrong number. See calculateLandDeltas'/resolveStudioLandTarget's KDoc.
     private val deckScorer: DeckScorer? = null,
     private val manaBaseAnalyzer: ManaBaseAnalyzer = ManaBaseAnalyzer(),
-    // Deck Wizard & Engine Rework plan, Workstream 8.2 -- appended last, nullable-defaulted so no
-    // existing test call site needs to change; `null` means the Suggestions tab's "include outside
-    // collection" toggle is inert (adds stays Motor-A-only regardless of the toggle's UI state).
-    // Shares the SAME CandidatePoolGenerator singleton the wizard's own build-time backstop uses.
-    private val candidatePoolGenerator: CandidatePoolGenerator? = null,
+    // Suggestions Tab UI Polish plan (W11 bug-fix pass, 2026-08-25) -- appended last,
+    // nullable-defaulted so no existing test call site needs to change. Builds the raw Scryfall
+    // fragment consumed by [searchScryfallStructured]. `BuildScryfallQueryUseCase` has zero
+    // dependencies (already a Koin `single` in SharedDomainKoinModule), so a `null` value (every
+    // test call site that doesn't pass it) is never actually a degraded behavior -- see
+    // searchScryfallStructured's own fallback.
+    private val buildScryfallQueryUseCase: BuildScryfallQueryUseCase? = null,
 ) : ViewModel() {
 
     /**
@@ -383,11 +381,13 @@ class DeckStudioViewModel(
     /**
      * Owns the Suggestions-surface (Deck Doctor) incremental-analysis machinery — see
      * [DeckDoctorOrchestrator] (Phase 0.4 extraction,
-     * `docs/claude-code-prompt-deck-doctor-community.md`). [uiState.health]/`cuts`/`adds`/
-     * `isSuggestionsLoading`/`isAddsLoading`/`suggestionsLoaded` are kept in sync with
+     * `docs/claude-code-prompt-deck-doctor-community.md`). [uiState.health]/
+     * `isSuggestionsLoading`/`suggestionsLoaded` are kept in sync with
      * [DeckDoctorOrchestrator.state] via the collector in [init]; this ViewModel otherwise only
-     * delegates ([onSelectTab], [onAddSuggestion], [onCutSuggestion], [invalidateSuggestions],
-     * budget changes in [reparseBudget]).
+     * delegates ([onSelectTab], [invalidateSuggestions]). Deck Analysis Category Sections rework
+     * (W0, D3/D5): the old Adds/Cuts/budget suggestion engine was deleted end-to-end, so this
+     * orchestrator now only computes Health (score/pillars/findings) plus the independent "Decks
+     * like yours" carousel (Motor B).
      */
     private val deckDoctorOrchestrator = DeckDoctorOrchestrator(
         scope = viewModelScope,
@@ -395,17 +395,12 @@ class DeckStudioViewModel(
         userCardRepository = userCardRepository,
         wishlistRepository = wishlistRepository,
         evaluateDeckUseCase = evaluateDeckUseCase,
-        suggestCutsUseCase = suggestCutsUseCase,
-        suggestAddsFromCollectionUseCase = suggestAddsFromCollectionUseCase,
         inferDeckIdentityUseCase = inferDeckIdentityUseCase,
         crashReporter = crashReporter,
         resolveCard = ::resolveCard,
         weightsProvider = { userPreferences.observeScoreWeightOverrides().first() },
-        communityAggregateRepository = communityAggregateRepository,
-        suggestAddsFromCommunityUseCase = suggestAddsFromCommunityUseCase,
         findSimilarDecksUseCase = findSimilarDecksUseCase,
         isCommunityEngineEnabled = { userPreferences.communityEngineEnabledFlow.first() },
-        candidatePoolGenerator = candidatePoolGenerator,
     )
 
     /**
@@ -471,21 +466,11 @@ class DeckStudioViewModel(
                 _uiState.update { s ->
                     s.copy(
                         health = doctorState.health,
-                        cuts = doctorState.cuts,
-                        adds = doctorState.adds,
-                        addsTotalCostEur = doctorState.addsTotalCostEur,
-                        addsCardsToBuy = doctorState.addsCardsToBuy,
                         isSuggestionsLoading = doctorState.isSuggestionsLoading,
-                        isAddsLoading = doctorState.isAddsLoading,
                         suggestionsLoaded = doctorState.isLoaded,
                         doctorStage = doctorState.stage,
                         doctorCompletedStages = doctorState.completedStages,
-                        includeOutsideCollection = doctorState.includeOutsideCollection,
-                        outsideCollectionUnavailable = doctorState.outsideCollectionUnavailable,
-                        communityAdds = doctorState.communityAdds,
                         similarDecks = doctorState.similarDecks,
-                        isCommunityLoading = doctorState.isCommunityLoading,
-                        communityUnavailable = doctorState.communityUnavailable,
                     )
                 }
             }
@@ -614,7 +599,17 @@ class DeckStudioViewModel(
                     .filterNot { cardCache.containsKey(it) }
                 if (unresolvedIds.isNotEmpty()) {
                     cardRepository.warmCacheForIds(unresolvedIds)
-                    val resolved = cardRepository.getCardsByIds(unresolvedIds).associateBy { it.scryfallId }
+                    // Collection sync data-loss fix, Phase 4 guard audit: a pending-hydration
+                    // placeholder (SyncManager.ensureCardsExist) carries fabricated cmc=0/empty
+                    // colors -- feeding it into the deck analysis engine as a "real" card would
+                    // skew curve/color/synergy scoring. Excluded here rather than filtered inside
+                    // the (heavily calibrated) engine itself: an excluded id simply stays out of
+                    // cardCache, so resolveCard()/DeckSlotEntry.card fall back to the SAME
+                    // null/"unresolved" path the engine already handles gracefully
+                    // (Finding.UnresolvedCards) for any id Room/Scryfall can't resolve at all.
+                    val resolved = cardRepository.getCardsByIds(unresolvedIds)
+                        .filterNot { it.staleReason == "pending_hydration" }
+                        .associateBy { it.scryfallId }
                     cardCache = cardCache + resolved
                 }
 
@@ -647,7 +642,10 @@ class DeckStudioViewModel(
 
     private suspend fun resolveCard(scryfallId: String): Card? {
         cardCache[scryfallId]?.let { return it }
-        return (cardRepository.getCardById(scryfallId) as? DataResult.Success)?.data
+        val fetched = (cardRepository.getCardById(scryfallId) as? DataResult.Success)?.data
+        // See the batch-resolve path above (observeDeck) for why a pending-hydration placeholder
+        // must not reach the analysis engine as a "real" card.
+        return fetched?.takeUnless { it.staleReason == "pending_hydration" }
     }
 
     private fun rebuildUiState(deck: Deck, allEntries: List<DeckSlotEntry>) {
@@ -837,12 +835,14 @@ class DeckStudioViewModel(
         mainboardNonLands: List<DeckCard>,
         commanderIdentitySymbols: Set<String>?,
     ): Int {
+        // Deck Analysis Engine v3: ArchetypeId.GENERIC no longer exists -- an unpinned archetype
+        // (no override, or a stale override string from before the taxonomy migration, e.g. old
+        // "RAMP"/"TEMPO"/"GENERIC" values that no longer parse) is represented as `null` directly.
         val archetype = deck.archetypeOverride?.let { name -> ArchetypeId.entries.firstOrNull { it.name == name } }
-            ?: ArchetypeId.GENERIC
         val themes = deck.themesOverride.mapNotNull { name -> ThemeId.entries.firstOrNull { it.name == name } }
         val colorIdentity = deriveStudioColorIdentity(mainboardNonLands, commanderIdentitySymbols)
         val archetypeFormat = ArchetypeFormat.of(format)
-        val skeleton = if (archetypeFormat == null || (archetype == ArchetypeId.GENERIC && themes.isEmpty())) {
+        val skeleton = if (archetypeFormat == null || (archetype == null && themes.isEmpty())) {
             null
         } else {
             ArchetypeSkeletonResolver.resolveWithColor(
@@ -850,6 +850,12 @@ class DeckStudioViewModel(
                 archetype = archetype,
                 themes = themes,
                 identity = colorIdentity,
+                // Edge-case QA fix (MEDIUM, 2026-09-06): AnalysisEngine.evaluate() already passes
+                // deckFormat here (Wave 2 B2's SixtyFormatProfile land/curve delta) -- this call
+                // site was the one remaining Wave 2 gap, widened by Wave 3's per-format deltas
+                // (up to a 4-land spread between Vintage and Standard) into a real Build-tab vs.
+                // Analysis-tab disagreement on the same deck's suggested land count.
+                deckFormat = format,
             )
         }
         val mainboardEntries = mainboardNonLands.map { deckCard ->
@@ -876,6 +882,39 @@ class DeckStudioViewModel(
             commanderIdentitySymbols?.let { addAll(it) }
         }
         return symbols.mapNotNull { symbol -> ManaColor.entries.firstOrNull { it.symbol.equals(symbol, ignoreCase = true) } }.toSet()
+    }
+
+    /**
+     * Builds the [SectionQueryContext] a category section's "Browse for &lt;Category&gt;" button
+     * needs (Deck Analysis Category Sections rework, W7): color identity + format + dominant tribe
+     * for the LIVE deck currently open. Neither value is exposed on [DeckHealth]/[DeckAnalysis]/
+     * [DeckStudioUiState] today — the v2 engine derives an equivalent color identity/dominant tribe
+     * INTERNALLY to build [com.mmg.manahub.feature.decks.domain.engine.CardSection]s in the first
+     * place ([AnalysisEngine.evaluate]/`evaluatePlanRoles`), but never returns either — so this
+     * recomputes them from the SAME [DeckStudioUiState.cards]/[DeckStudioUiState.commanderCard]
+     * source [deriveStudioColorIdentity] already reads for the land-target resolver, reusing that
+     * exact helper rather than inventing a third derivation.
+     * [ArchetypeRoleClassifier.dominantTribeKey] is the SAME function [AnalysisEngine]'s
+     * `evaluatePlanRoles` calls to attribute `role:tribe_members` (W1) — calling it again here over
+     * the SAME full mainboard (lands included, exactly as the engine's own call does — a land
+     * essentially never carries a creature-type subtype so this is a no-op difference in practice)
+     * keeps the Browse button's `t:&lt;tribe&gt;` fragment in agreement with whichever tribe the
+     * engine itself attributed the section to.
+     */
+    fun sectionQueryContext(): SectionQueryContext {
+        val state = _uiState.value
+        val format = deckFormat ?: DeckFormat.COMMANDER
+        val mainboardEntries = state.cards
+            .filter { it.card != null && !it.isSideboard }
+            .map { entry -> DeckEntry(card = entry.card!!, quantity = entry.quantity, isOwned = true, isSideboard = false) }
+        val mainboardNonLands = mainboardEntries
+            .filter { !BasicLandCalculator.isLand(it.card) }
+            .map { entry -> DeckCard(entry.card, entry.quantity, isOwned = true) }
+        val commanderIdentitySymbols = state.commanderCard?.card?.colorIdentity?.toSet()
+        val colorIdentity = deriveStudioColorIdentity(mainboardNonLands, commanderIdentitySymbols)
+        val dominantTribe = ArchetypeRoleClassifier.dominantTribeKey(mainboardEntries)
+            ?.removePrefix(TribeDeriver.TRIBE_PREFIX)
+        return SectionQueryContext(colorIdentity = colorIdentity, format = format, dominantTribe = dominantTribe)
     }
 
     /**
@@ -923,6 +962,7 @@ class DeckStudioViewModel(
     // ── Tab / UI toggles ──────────────────────────────────────────────────────
 
     fun onSelectTab(tab: DeckStudioTab) {
+        if (tab == DeckStudioTab.SUGGESTIONS && deckFormat == DeckFormat.DRAFT) return
         _uiState.update { it.copy(selectedTab = tab) }
         // Lazily run the first Deck Doctor analysis the first time the user opens
         // Suggestions — never on init (keeps Phase-1 "straight into the editor" fast
@@ -930,11 +970,36 @@ class DeckStudioViewModel(
         // orchestrator's TRUE current state directly (not the merged _uiState, which is
         // only eventually-consistent via the init collector) so this gate is race-free.
         if (tab == DeckStudioTab.SUGGESTIONS && !deckDoctorOrchestrator.state.value.isLoaded && ::deckId.isInitialized) {
-            deckDoctorOrchestrator.loadAnalysis(deckId, _uiState.value.budgetConstraints)
+            deckDoctorOrchestrator.loadAnalysis(deckId)
+        }
+    }
+
+    /**
+     * Deck Analysis Engine v2 Wave 2 (A2): re-triggers the full [DeckDoctorOrchestrator.loadAnalysis]
+     * pass from the Analysis tab's error state (`health != null` but `health.analysis == null` --
+     * a caught v2-engine failure). Unlike [onSelectTab]'s lazy first-load, this does NOT gate on
+     * [DeckDoctorOrchestrator.state]'s `isLoaded` flag: a caught engine failure still completes the
+     * pass and sets `isLoaded = true`, so that gate would silently no-op a retry tap forever.
+     */
+    fun retryAnalysis() {
+        if (::deckId.isInitialized) {
+            deckDoctorOrchestrator.loadAnalysis(deckId)
         }
     }
     fun toggleMainboard() = _uiState.update { it.copy(mainboardExpanded = !it.mainboardExpanded) }
     fun toggleSideboard() = _uiState.update { it.copy(sideboardExpanded = !it.sideboardExpanded) }
+
+    /** Toggles the collapsed state of a sub-section (category) within a board. */
+    fun toggleSection(sectionLabel: String) {
+        _uiState.update { current ->
+            val newCollapsed = if (sectionLabel in current.collapsedSections) {
+                current.collapsedSections - sectionLabel
+            } else {
+                current.collapsedSections + sectionLabel
+            }
+            current.copy(collapsedSections = newCollapsed)
+        }
+    }
     fun setGroupingMode(mode: GroupingMode) = _uiState.update { it.copy(groupingMode = mode) }
 
     /** Toggles the basic-land suggestion strip in the Lands group (C4). */
@@ -950,8 +1015,22 @@ class DeckStudioViewModel(
 
     // ── Manual mutations (write straight through the repository) ───────────────
 
-    /** Adds one copy of [scryfallId] to the deck (resolving + caching its Card). */
+    /**
+     * Adds one copy of [scryfallId] to the deck (resolving + caching its Card).
+     *
+     * Edge-case QA fix (CRITICAL, 2026-09-06): guards against duplicating the deck's singleton
+     * commander mainboard slot via this generic path — [CardSearchSheet]'s ordinary Add Cards
+     * sheet row now hides its +/- controls for the current commander (see `AddCardSheetRow`'s own
+     * KDoc), but this VM-level check is the defense-in-depth backstop so a future UI regression
+     * can't silently re-open the data-loss hole. [setCommander] is unaffected — it writes through
+     * [DeckRepository.addCardToDeck] directly, bypassing this wrapper entirely. A sideboard copy
+     * of the commander card is a legitimate, separate slot and is never blocked.
+     */
     fun addCardToDeck(scryfallId: String, isSideboard: Boolean = false) {
+        if (!isSideboard && scryfallId == _uiState.value.deck?.commanderCardId) {
+            FirebaseCrashlytics.getInstance().log("deck_studio_commander_mutation_blocked")
+            return
+        }
         invalidateSuggestions()
         viewModelScope.launch {
             // resolveCard hits getCardById, which can throw. Keep it INSIDE the
@@ -983,8 +1062,19 @@ class DeckStudioViewModel(
         }
     }
 
-    /** Removes one copy of [scryfallId]; deletes the slot when it hits zero. */
+    /**
+     * Removes one copy of [scryfallId]; deletes the slot when it hits zero.
+     *
+     * Edge-case QA fix (CRITICAL, 2026-09-06): mirrors [addCardToDeck]'s guard — blocks removing
+     * the deck's singleton commander mainboard slot through this generic path (the commander's
+     * quantity is always 1, so the pre-fix behavior deleted it outright via the `currentQty <= 1`
+     * branch below). [removeCommander] is unaffected (writes through the repository directly).
+     */
     fun removeCardFromDeck(scryfallId: String, isSideboard: Boolean = false) {
+        if (!isSideboard && scryfallId == _uiState.value.deck?.commanderCardId) {
+            FirebaseCrashlytics.getInstance().log("deck_studio_commander_mutation_blocked")
+            return
+        }
         invalidateSuggestions()
         viewModelScope.launch {
             val currentQty = currentQuantity(scryfallId, isSideboard)
@@ -1247,31 +1337,99 @@ class DeckStudioViewModel(
         }
     }
 
+    /**
+     * The Collection tab's search bar. Delegates to [collectionCardsMatching] so the typed name is
+     * ANDed onto any active structured/tag filter instead of replacing it -- the Scryfall-tab
+     * counterpart of [searchScryfallDirect]'s fragment combining.
+     */
     fun onAddCardsQueryChange(query: String) {
         _uiState.update { it.copy(addCardsQuery = query) }
-        if (query.isBlank()) {
-            showCollectionCards()
-            return
+        publishCollectionResults(collectionCardsMatching(query))
+    }
+
+    /**
+     * [collectionCards] filtered by [DeckStudioUiState.activeCollectionQuery] AND
+     * [DeckStudioUiState.activeCollectionTagFilter] AND [query] (each applied only when set) -- the
+     * shared predicate behind [onAddCardsQueryChange], [searchCollectionByTags] and
+     * [applyStructuredSearch]. With none of the three set this is exactly [collectionCards]
+     * unfiltered (byte-identical to the [showCollectionCards] fallback).
+     *
+     * The structured query is matched in LENIENT mode: a criterion with no local equivalent (a
+     * Scryfall-only `function:` facet) is skipped rather than failing every card, so a
+     * Scryfall-only section never renders a falsely-empty Collection tab.
+     */
+    private fun collectionCardsMatching(query: String): List<Card> {
+        val state = _uiState.value
+        val structuredQuery = state.activeCollectionQuery
+        val activeTagFilter = state.activeCollectionTagFilter
+        return collectionCards.filter { card ->
+            (structuredQuery == null ||
+                AdvancedSearchCardMatcher.matches(card, structuredQuery, lenient = true)) &&
+                (activeTagFilter.isNullOrEmpty() ||
+                    (card.tags + card.userTags).any { it.key in activeTagFilter }) &&
+                (query.isBlank() || card.name.contains(query, ignoreCase = true))
         }
-        val filtered = collectionCards.filter { it.name.contains(query, ignoreCase = true) }
+    }
+
+    /** Republishes [DeckStudioUiState.addCardsResults] from an already-filtered card list. */
+    private fun publishCollectionResults(cards: List<Card>) {
         _uiState.update { s ->
             s.copy(
-                addCardsResults = filtered.map { card ->
+                addCardsResults = cards.map { card ->
                     AddCardRow(card, quantityInMainboard(s.cards + listOfNotNull(s.commanderCard), card.scryfallId), isOwned = true)
                 },
             )
         }
     }
 
+    /**
+     * The Analysis tab's category-browse [CardTag] pre-filter for the Collection tab. [keys] are a
+     * `CardSection`'s equivalent tag keys (`SectionSearchQuery.collectionTagKeysFor`) — a DIFFERENT
+     * key space from the structured criteria of [applyStructuredSearch], so the two AND together
+     * rather than replacing each other.
+     *
+     * Empty [keys] is a no-op filter (falls back to whatever the structured query and typed name
+     * leave), never an empty result — many sections (curve / mana / legality) have no tag keys at
+     * all and would otherwise render a dead-looking Collection tab.
+     */
+    fun searchCollectionByTags(keys: Set<String>) {
+        _uiState.update { it.copy(activeCollectionTagFilter = keys.takeIf { k -> k.isNotEmpty() }) }
+        publishCollectionResults(collectionCardsMatching(_uiState.value.addCardsQuery))
+    }
+
+    /**
+     * Bound to [CardSearchSheet][com.mmg.manahub.core.ui.components.CardSearchSheet]'s
+     * `onScryfallSearch` -- fires on every keystroke in the Scryfall/All-Cards tab's search bar,
+     * plus once (with an empty [query]) from [searchScryfallStructured] when a structured preset
+     * first opens the sheet.
+     *
+     * Suggestions Tab UI Polish plan (W11 bug-fix pass, 2026-08-25): filter-combining aware.
+     * [DeckStudioUiState.activeStructuredSearchFragment] is null for every OTHER
+     * `CardSearchSheet` call site (the Build tab FAB, `onReplaceCard`; the commander picker uses
+     * [searchCommander] instead, never this function) -- for those, and for the normal Build-tab
+     * flow in general, this function's observable behavior is BYTE-IDENTICAL to before this fix.
+     * It is non-null ONLY while an Analysis-tab "Browse for X" structured-preset session is
+     * active; in that case [query] (exactly what the user typed, possibly blank) is combined with
+     * the structured fragment via a space join for the ACTUAL network search only -- Scryfall's
+     * query grammar already treats adjacent terms as AND, matching how every other multi-clause
+     * query in this app is built. [DeckStudioUiState.addCardsQuery] (bound to the visible search
+     * bar) always holds exactly [query] -- the combined string is never surfaced to the user.
+     */
     fun searchScryfallDirect(query: String) {
         _uiState.update { it.copy(addCardsQuery = query) }
-        if (query.isBlank()) {
+        val structuredFragment = _uiState.value.activeStructuredSearchFragment
+        val effectiveQuery = if (structuredFragment != null) {
+            listOfNotNull(query.takeIf { it.isNotBlank() }, structuredFragment).joinToString(" ")
+        } else {
+            query
+        }
+        if (effectiveQuery.isBlank()) {
             _uiState.update { it.copy(scryfallResults = emptyList(), isSearchingScryfall = false) }
             return
         }
         viewModelScope.launch {
             _uiState.update { it.copy(isSearchingScryfall = true) }
-            val cards = when (val result = searchCardsUseCase(query)) {
+            val cards = when (val result = searchCardsUseCase(effectiveQuery)) {
                 is DataResult.Success -> result.data.cards
                 is DataResult.Error -> {
                     // No Throwable is carried by DataResult.Error — log only (no recordException).
@@ -1298,6 +1456,77 @@ class DeckStudioViewModel(
         }
     }
 
+    /**
+     * Suggestions Tab UI Polish plan (W11 bug-fix pass, 2026-08-25): the Analysis tab's
+     * "Browse for &lt;Category&gt;" entry point. Replaces the earlier flow where
+     * `CardSearchSheet`'s own `initialAdvancedQuery` `LaunchedEffect` auto-popped
+     * `AdvancedSearchSheet` up on top of the search sheet AND [searchScryfallDirect] (fired once
+     * `AdvancedSearchSheet`'s `onSearch` ran) dumped the full raw Scryfall string into
+     * [DeckStudioUiState.addCardsQuery] -- the exact text field the user sees.
+     *
+     * Converts [query] to a raw Scryfall fragment via [buildScryfallQueryUseCase] (falls back to
+     * a fresh instance when it wasn't injected -- the class has zero dependencies, so this never
+     * actually degrades behavior), stores it SEPARATELY in
+     * [DeckStudioUiState.activeStructuredSearchFragment] (never in [DeckStudioUiState.addCardsQuery]),
+     * and runs the search on the fragment alone via [searchScryfallDirect] with an empty query --
+     * which also clears the visible search bar. The sheet's own tab switch to All-Cards/Scryfall
+     * is [CardSearchSheet][com.mmg.manahub.core.ui.components.CardSearchSheet]'s own
+     * responsibility (it owns `selectedTab`), not this function's.
+     */
+    fun searchScryfallStructured(query: AdvancedSearchQuery) = applyStructuredSearch(query)
+
+    /**
+     * The SINGLE entry point for a structured search — filters BOTH tabs from one
+     * [AdvancedSearchQuery]: the All Cards tab remotely (the query rendered as a Scryfall fragment,
+     * kept out of the visible search bar) and the Collection tab locally
+     * ([AdvancedSearchCardMatcher], lenient).
+     *
+     * Bound to `CardSearchSheet`'s `onAdvancedSearch`, so it serves both the Analysis tab's
+     * "Browse for X" preset and the Advanced Search sheet's own SEARCH CTA.
+     */
+    fun applyStructuredSearch(query: AdvancedSearchQuery) {
+        val fragment = (buildScryfallQueryUseCase ?: BuildScryfallQueryUseCase())(query)
+        _uiState.update {
+            it.copy(
+                activeStructuredSearchFragment = fragment.takeIf { f -> f.isNotBlank() },
+                activeCollectionQuery = query.takeIf { q -> !q.isEmpty() },
+            )
+        }
+        // Clears addCardsQuery, so the collection refresh below sees the same empty name filter.
+        searchScryfallDirect("")
+        val collectionMatches = collectionCardsMatching(_uiState.value.addCardsQuery)
+        publishCollectionResults(collectionMatches)
+        // Counts only -- a zero-hit structured search over a non-empty collection is the exact
+        // shape of the 2026-09-07 "Card Advantage returns nothing" report and is otherwise silent.
+        FirebaseCrashlytics.getInstance().apply {
+            setCustomKey("deck_studio_structured_criteria", query.criteria.size)
+            setCustomKey("deck_studio_structured_collection_hits", collectionMatches.size)
+            log("deck_studio_structured_search_applied")
+        }
+    }
+
+    /**
+     * Clears the Analysis-tab "Browse for X" structured-search fragment AND its Collection-tab
+     * counterpart (see [DeckStudioUiState.activeStructuredSearchFragment] /
+     * [searchScryfallStructured] and [DeckStudioUiState.activeCollectionTagFilter] /
+     * [searchCollectionByTags] -- edge-case QA fix, 2026-09-06: the tag filter is reset at every
+     * site this function already covers). Called from [DeckStudioScreen] alongside its own
+     * UI-local `sectionBrowseSectionId` reset at every sheet OPEN site that does not already call
+     * [clearAddCardsState] (the FAB, `onReplaceCard`) -- the two DISMISS sites get this for free
+     * via [clearAddCardsState] below. Without this, a later "normal" Build-tab open of the same
+     * sheet instance would silently keep combining with a stale structured/tag filter left over
+     * from a previous Analysis-tab visit.
+     */
+    fun clearActiveStructuredSearchFragment() {
+        _uiState.update {
+            it.copy(
+                activeStructuredSearchFragment = null,
+                activeCollectionTagFilter = null,
+                activeCollectionQuery = null,
+            )
+        }
+    }
+
     /** Commander-mode search: shares Scryfall results but is invoked separately. */
     fun searchCommander(query: String) {
         _uiState.update { it.copy(addCardsQuery = query) }
@@ -1311,7 +1540,19 @@ class DeckStudioViewModel(
     }
 
     fun clearAddCardsState() {
-        _uiState.update { it.copy(addCardsQuery = "", addCardsResults = emptyList(), scryfallResults = emptyList()) }
+        _uiState.update {
+            it.copy(
+                addCardsQuery = "",
+                addCardsResults = emptyList(),
+                scryfallResults = emptyList(),
+                // W11 bug-fix pass: folds the activeStructuredSearchFragment reset into this
+                // function since both real dismiss sites (handleBack's showAddCardsSheet branch,
+                // CardSearchSheet's own onDismiss) already call it -- see that field's KDoc.
+                activeStructuredSearchFragment = null,
+                activeCollectionTagFilter = null,
+                activeCollectionQuery = null,
+            )
+        }
     }
 
     // ── Card details ────────────────────────────────────────────────────────────
@@ -1426,141 +1667,26 @@ class DeckStudioViewModel(
         }
     }
 
+    /** Deletes the deck unconditionally and navigates back. */
+    fun deleteDeckUnconditionally(onNavigateBack: () -> Unit) {
+        if (!::deckId.isInitialized) return
+        viewModelScope.launch {
+            FirebaseCrashlytics.getInstance().log("deck_studio_deck_deleted_by_user")
+            runCatching { deckRepository.deleteDeck(deckId) }
+                .onFailure { logFailure("deck_studio_delete_failed", it) }
+            onNavigateBack()
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
-    //  Suggestions surface — Deck Doctor inline (Phase 2)
+    //  Analysis surface — Deck Doctor inline (Phase 2)
     //
-    //  The AnalysisCache / GapSignature / loadAnalysis / recomputeIncremental /
-    //  recomputeAdds incremental pattern lives in [DeckDoctorOrchestrator] (Phase
-    //  0.4 extraction — this VM only delegates and merges its state; see the
-    //  collectors in [init]).
+    //  The AnalysisCache / loadAnalysis / recomputeIncremental incremental pattern lives in
+    //  [DeckDoctorOrchestrator] (Phase 0.4 extraction — this VM only delegates and merges its
+    //  state; see the collectors in [init]). Deck Analysis Category Sections rework (W0, D3/D5):
+    //  the old Adds/Cuts/budget suggestion engine (onAddSuggestion/onCutSuggestion, the free-text
+    //  budget fields, onToggleIncludeOutsideCollection) was deleted end-to-end here.
     // ─────────────────────────────────────────────────────────────────────────
-
-    // ── Budget free-text (U7) ─────────────────────────────────────────────────
-
-    /**
-     * Updates the raw per-card € text and re-parses the budget. The parse guard keeps
-     * the LAST VALID [BudgetConstraints] and flips [DeckStudioUiState.budgetError] on an
-     * invalid amount — it NEVER constructs an invalid constraints object. Blank ⇒ null cap.
-     */
-    fun onPerCardBudgetChange(text: String) {
-        _uiState.update { it.copy(rawPerCardText = text) }
-        reparseBudget()
-    }
-
-    fun onTotalBudgetChange(text: String) {
-        _uiState.update { it.copy(rawTotalText = text) }
-        reparseBudget()
-    }
-
-    fun onOwnedCardsFreeChange(free: Boolean) {
-        _uiState.update { it.copy(ownedCardsAreFree = free) }
-        reparseBudget()
-    }
-
-    /** Clears both budget fields back to "no constraint". */
-    fun onClearBudget() {
-        _uiState.update { it.copy(rawPerCardText = "", rawTotalText = "") }
-        reparseBudget()
-    }
-
-    /**
-     * Parses the current raw text into a [BudgetConstraints]. A blank field maps to a
-     * null cap. [BudgetConstraints.init] THROWS on ≤0/non-finite values; on that
-     * [IllegalArgumentException] we keep the previous valid budget and set
-     * [DeckStudioUiState.budgetError] = true. On success we clear the error and
-     * recompute the ADD suggestions (external pool re-fetched: a budget change alters
-     * the external USD pre-filter).
-     */
-    private fun reparseBudget() {
-        val state = _uiState.value
-        // M1: `toDoubleOrNull()` accepts "Infinity"/"NaN" and zero/negative values, all of
-        // which BudgetConstraints rejects in its init block (a thrown IAE down below). Treat a
-        // non-finite or non-positive amount as a parse error here so we keep the last valid
-        // budget WITHOUT ever invoking the throwing constructor.
-        val perCard = state.rawPerCardText.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
-            ?.takeIf { it.isFinite() && it > 0.0 }
-        val total = state.rawTotalText.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
-            ?.takeIf { it.isFinite() && it > 0.0 }
-        // A non-blank-but-unparseable field (e.g. "1.2.3") is an error without ever
-        // calling the throwing constructor.
-        val perCardBlank = state.rawPerCardText.isBlank()
-        val totalBlank = state.rawTotalText.isBlank()
-        if ((!perCardBlank && perCard == null) || (!totalBlank && total == null)) {
-            logBudgetParseError("non_numeric")
-            _uiState.update { it.copy(budgetError = true) }
-            return
-        }
-        try {
-            val constraints = BudgetConstraints(
-                maxPerCardEur = perCard,
-                maxTotalEur = total,
-                ownedCardsAreFree = state.ownedCardsAreFree,
-            )
-            _uiState.update { it.copy(budgetConstraints = constraints, budgetError = false) }
-            deckDoctorOrchestrator.recomputeAdds(constraints)
-        } catch (e: IllegalArgumentException) {
-            // Keep the last valid budgetConstraints; just flag the error.
-            logBudgetParseError("non_positive_or_constructor_rejected")
-            _uiState.update { it.copy(budgetError = true) }
-        }
-    }
-
-    private fun logBudgetParseError(type: String) {
-        FirebaseCrashlytics.getInstance().apply {
-            log("deck_studio_budget_parse_error")
-            setCustomKey("deck_studio_budget_error_type", type)
-        }
-    }
-
-    // ── Suggestion add / cut (write-through + incremental recompute) ───────────
-
-    /**
-     * Adds one copy of a suggested card to the live deck's mainboard, then recomputes
-     * INCREMENTALLY via [DeckDoctorOrchestrator.onAddCard]. Falls back to a full
-     * [DeckDoctorOrchestrator.loadAnalysis] only when the cache is missing or the card cannot
-     * be resolved from any cached source (see [DeckDoctorOrchestrator.onAddCard]'s return contract).
-     */
-    fun onAddSuggestion(scryfallId: String, cardName: String) {
-        viewModelScope.launch {
-            val currentQty = currentQuantity(scryfallId, false)
-            // Deck Engine Unification (D4/RUN 1 follow-up): a Suggestions-tab accept persists
-            // DeckCardSource.SUGGESTION (never the default USER) so a future strategyLocked cut-gate
-            // change can distinguish "the Doctor suggested this" from "the user typed it in manually"
-            // if that distinction is ever needed -- today both stay equally cuttable, this is
-            // provenance-correctness only.
-            runCatching { deckRepository.addCardToDeck(deckId, scryfallId, currentQty + 1, false, DeckCardSource.SUGGESTION) }
-                .onFailure { logFailure("deck_studio_suggestion_add_failed", it); return@launch }
-            _events.send(DeckStudioEvent.CardAdded(cardName))
-
-            if (!deckDoctorOrchestrator.onAddCard(scryfallId, _uiState.value.budgetConstraints)) {
-                deckDoctorOrchestrator.loadAnalysis(deckId, _uiState.value.budgetConstraints)
-            }
-        }
-    }
-
-    /**
-     * Removes a cut-candidate card from the live deck's mainboard, then recomputes
-     * INCREMENTALLY via [DeckDoctorOrchestrator.onCutCard]. Falls back to
-     * [DeckDoctorOrchestrator.loadAnalysis] when the cache is missing.
-     */
-    fun onCutSuggestion(scryfallId: String, cardName: String) {
-        viewModelScope.launch {
-            // C1: cut ONE copy, not the whole slot. A 3-of must become a 2-of (mirrors the
-            // Build-tab decrement). Previously this removed the entire slot, silently dropping
-            // every copy — a data-loss bug for multi-copy 60-card decks.
-            val currentQty = deckDoctorOrchestrator.cachedMainboardQuantity(scryfallId)
-                ?: currentQuantity(scryfallId, false)
-            runCatching {
-                if (currentQty <= 1) deckRepository.removeCardFromDeck(deckId, scryfallId, false)
-                else deckRepository.addCardToDeck(deckId, scryfallId, currentQty - 1, false)
-            }.onFailure { logFailure("deck_studio_suggestion_cut_failed", it); return@launch }
-            _events.send(DeckStudioEvent.CardCut(cardName))
-
-            if (!deckDoctorOrchestrator.onCutCard(scryfallId, _uiState.value.budgetConstraints)) {
-                deckDoctorOrchestrator.loadAnalysis(deckId, _uiState.value.budgetConstraints)
-            }
-        }
-    }
 
     /**
      * Pins the deck's archetype/theme plan (Deck Doctor Community/Archetype plan, Phase 1.7
@@ -1568,39 +1694,52 @@ class DeckStudioViewModel(
      * [DeckDoctorOrchestrator.setArchetypeOverride], which writes through the repository and
      * re-runs a full analysis. A no-op when `deckId` never resolved (defensive — the chip is
      * only reachable once the deck has loaded).
+     *
+     * @param tribe Deck Analysis Engine v2 Phase 3 — forwarded to
+     *        [DeckDoctorOrchestrator.setArchetypeOverride]'s own `tribe` param (the curated
+     *        strategy picker's tribe sub-pick); `null` for every non-tribal strategy.
      */
-    fun onSetArchetypeOverride(archetypeId: ArchetypeId?, themes: List<ThemeId>) {
+    fun onSetArchetypeOverride(archetypeId: ArchetypeId?, themes: List<ThemeId>, tribe: String? = null) {
         if (!::deckId.isInitialized) return
-        deckDoctorOrchestrator.setArchetypeOverride(deckId, _uiState.value.budgetConstraints, archetypeId, themes)
+        deckDoctorOrchestrator.setArchetypeOverride(deckId, archetypeId, themes, tribe)
+    }
+
+    /**
+     * Deck Analysis Engine v2 Phase 3 — convenience wrapper the [CuratedStrategyPickerSheet]
+     * ([com.mmg.manahub.feature.decks.presentation.components.CuratedStrategyPickerSheet]) calls
+     * directly with the [CuratedStrategy] the player tapped, instead of unpacking its
+     * archetype/themes at the call site.
+     */
+    fun onApplyCuratedStrategy(strategy: CuratedStrategy, tribe: String?) {
+        crashReporter.setCustomKey("deck_analysis_strategy_pick_id", strategy.id)
+        crashReporter.setCustomKey("deck_analysis_strategy_pick_tribe", tribe ?: "none")
+        crashReporter.log("deck_analysis_strategy_pick")
+        // Deck Analysis Engine v3: CuratedStrategy.archetype (singular) widened to .archetypes (a
+        // set, spec §4.2) -- the FIRST declared archetype is the entry's primary/most
+        // representative macro, used as the actual PIN (the persisted override is still a single
+        // ArchetypeId, never a set).
+        onSetArchetypeOverride(strategy.archetypes.firstOrNull(), strategy.themes, tribe)
     }
 
     /** "Auto-detect" — clears the pin and re-infers the archetype/themes from the live deck. */
     fun onClearArchetypeOverride() {
         if (!::deckId.isInitialized) return
-        deckDoctorOrchestrator.clearArchetypeOverride(deckId, _uiState.value.budgetConstraints)
-    }
-
-    /**
-     * Deck Wizard & Engine Rework plan WS8.2: the Suggestions tab's own "include outside
-     * collection" toggle (a SEPARATE choice from the wizard's per-build one). Delegates straight
-     * to [DeckDoctorOrchestrator.setIncludeOutsideCollection], which re-ranks `adds` incrementally
-     * (no full [DeckDoctorOrchestrator.loadAnalysis] reload needed — only the ADD candidate
-     * sources change, never the deck's health/cuts).
-     */
-    fun onToggleIncludeOutsideCollection(enabled: Boolean) {
-        deckDoctorOrchestrator.setIncludeOutsideCollection(enabled, _uiState.value.budgetConstraints)
+        crashReporter.setCustomKey("deck_analysis_strategy_pick_id", "auto_detect")
+        crashReporter.setCustomKey("deck_analysis_strategy_pick_tribe", "none")
+        crashReporter.log("deck_analysis_strategy_pick")
+        deckDoctorOrchestrator.clearArchetypeOverride(deckId)
     }
 
     /**
      * Deck Engine Unification plan (D4): the deck's own explicit "Unlock strategy" action (Studio
      * shows a confirmation dialog before calling this — see [DeckStudioScreen]). Delegates straight
      * to [DeckDoctorOrchestrator.unlockStrategy], which flips `Deck.strategyLocked` off and re-runs a
-     * full analysis so [DeckDoctorState.cuts] immediately reflects the unlocked candidate pool.
+     * full analysis.
      */
     fun onUnlockStrategy() {
         if (!::deckId.isInitialized) return
         crashReporter.log("deck_studio_unlock_strategy_confirmed")
-        deckDoctorOrchestrator.unlockStrategy(deckId, _uiState.value.budgetConstraints)
+        deckDoctorOrchestrator.unlockStrategy(deckId)
     }
 
     /**
@@ -1613,9 +1752,6 @@ class DeckStudioViewModel(
     private fun invalidateSuggestions() {
         if (deckDoctorOrchestrator.state.value.isLoaded) {
             deckDoctorOrchestrator.invalidate()
-            // M9: clear any stale budget parse error too, so the next time the user opens
-            // Suggestions the inline error doesn't linger from a previous editing session.
-            _uiState.update { it.copy(budgetError = false) }
         }
     }
 

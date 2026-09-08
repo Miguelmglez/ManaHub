@@ -26,6 +26,19 @@ interface DeckRemoteDataSource {
     suspend fun getDeckChangesSince(since: Long): Result<List<DeckSyncDto>>
 
     /**
+     * Keyset-paginated counterpart of [getDeckChangesSince] (collection sync data-loss fix,
+     * `linear-moseying-yeti` plan, Phase 1/3) — see [com.mmg.manahub.core.data.remote.collection
+     * .CollectionRemoteDataSource.getChangesPage]'s KDoc for the full rationale and cursor
+     * contract; this is the same shape over `get_deck_changes_page`.
+     */
+    suspend fun getDeckChangesPage(
+        since: Long,
+        afterUpdatedAt: Long? = null,
+        afterId: String? = null,
+        limit: Int = 500,
+    ): Result<List<DeckSyncDto>>
+
+    /**
      * Upserts a batch of deck rows using the `batch_upsert_decks` RPC.
      *
      * Deck metadata only — call [upsertDeckCards] separately for card slots.

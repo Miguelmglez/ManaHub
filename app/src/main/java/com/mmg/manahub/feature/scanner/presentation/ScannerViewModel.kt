@@ -13,6 +13,7 @@ import com.mmg.manahub.core.domain.usecase.collection.ScannedCardCommit
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.WishlistEntry
+import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.ANTI_DUPLICATE_MS
@@ -33,11 +34,16 @@ import org.json.JSONObject
 import java.util.UUID
 import javax.inject.Inject
 
-// COMMENTED OUT — no longer needed with ML Kit OCR pipeline
-// import androidx.lifecycle.asFlow
-// import androidx.work.WorkInfo
-// import androidx.work.WorkManager
-// import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+/**
+ * Clears the transient per-frame detection overlay ([ScannerUiState.detectedCorners],
+ * [ScannerUiState.isSearching]) before a covering sheet/overlay opens (W3,
+ * `scanner-reliability-plan.md`, 2026-08-24). See [ScannerViewModel]'s class KDoc, "Camera stop
+ * vs. recognition pause", for why this lives on every overlay-opening action rather than being
+ * driven from the camera-binding side (this project has no Compose UI test infrastructure to
+ * exercise that cross-layer wiring directly — see `CardRecognizerTest`/`ScannerViewModelTest`).
+ */
+private fun ScannerUiState.clearedForOverlay(): ScannerUiState =
+    copy(detectedCorners = null, isSearching = false)
 
 /**
  * ViewModel for the scanner screen.
@@ -50,11 +56,26 @@ import javax.inject.Inject
  *   hasn't moved the camera.
  * - **Set lock filter**: when [ScannerUiState.lockedSetCode] is non-null, only cards
  *   whose [Card.setCode] matches are processed; others are silently ignored.
- * - **Language mismatch**: when [ScannerUiState.selectedLanguage] is not "en" and the
- *   scanned card's [Card.lang] differs, the card is displayed but not auto-added in
- *   Quick Mode, and a [ScannerUiState.languageMismatch] indicator is shown.
+ * - **Language fallback (informational only, W2.11)**: [CardRecognizer] resolves the LOCALIZED
+ *   printing whenever one exists, so [Card.lang] normally matches [ScannerUiState.selectedLanguage]
+ *   already. When no printing exists in the selected language, [CardRecognizer] falls back to the
+ *   English printing and flags [RecognitionResult.Identified.languageFallback] — the card is
+ *   still added (never silently refused), with [ScannerUiState.languageMismatch] surfacing a
+ *   non-blocking "no <lang> printing found — added as EN" badge.
+ * - **Rate-limit cooldown (W2.10)**: [RecognitionResult.RateLimited] sets
+ *   [ScannerUiState.rateLimitedUntilMs] — the recognizer suspends all further lookups until it
+ *   elapses, and the UI shows a countdown badge instead of a card.
  * - **Ambiguity selector**: when the recognition result is ambiguous and the scanner is
  *   in normal mode (not Quick, not Lookup Only), a dialog is shown to let the user confirm.
+ * - **Camera stop vs. recognition pause (W3, `scanner-reliability-plan.md`, 2026-08-24)**: every
+ *   action that opens a covering sheet/overlay ([onOpenQueue], [onEditScannedCard],
+ *   [onOpenVariantSelector], [onExpandVariantImage], [onOpenCardDetail], [onOpenPriceDetail])
+ *   clears [ScannerUiState.detectedCorners]/[ScannerUiState.isSearching] via
+ *   [ScannerUiState.clearedForOverlay] — `ScannerScreen`'s `CameraPreview` fully unbinds the
+ *   camera for these same conditions, so no new [RecognitionResult] will arrive to refresh them
+ *   while the overlay is open, and a resumed session must not show a stale outline/spinner left
+ *   over from before it opened. This is independent of [onToggleRecognitionPaused] (the top-bar
+ *   toggle), which only stops the analyzer while keeping the preview live.
  *
  * **Queue persistence**: the [ScanSession] is serialized to [SharedPreferences] on every
  * mutation, using [PREF_KEY_QUEUE] inside the [PREF_FILE] preferences file.
@@ -74,10 +95,6 @@ class ScannerViewModel @Inject constructor(
     private val analyticsHelper: AnalyticsHelper,
     private val soundManager: SoundManager,
     @ApplicationContext private val context: Context,
-    // COMMENTED OUT — embedding DB and WorkManager no longer injected with OCR pipeline
-    // val embeddingDatabase: EmbeddingDatabase,
-    // private val userPreferencesDataStore: UserPreferencesDataStore,
-    // private val workManager: WorkManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ScannerUiState())
@@ -116,9 +133,6 @@ class ScannerViewModel @Inject constructor(
 
         /** Minimum time in ms before the same card can be added again. */
         private const val ANTI_DUPLICATE_MS = 800L
-
-        /** Default language code — used to determine when the language filter is active. */
-        private const val DEFAULT_LANGUAGE = "en"
 
         /** SharedPreferences file name for scanner settings. */
         private const val PREF_FILE = "scanner_prefs"
@@ -179,6 +193,7 @@ class ScannerViewModel @Inject constructor(
                 put("language",         entry.language)
                 put("condition",        entry.condition)
                 put("timestamp",        entry.timestamp)
+                put("id",               entry.id)
             }
             array.put(obj)
         }
@@ -244,6 +259,9 @@ class ScannerViewModel @Inject constructor(
                         condition = obj.getString("condition"),
                         setCode   = obj.getString("setCode"),
                         timestamp = obj.getLong("timestamp"),
+                        // Backward-compat: a queue persisted before this field existed has no
+                        // "id" key -- fall back to a fresh one rather than failing the whole restore.
+                        id        = obj.optString("id").ifBlank { UUID.randomUUID().toString() },
                     )
                 )
             }
@@ -312,6 +330,20 @@ class ScannerViewModel @Inject constructor(
                 }
             }
 
+            is RecognitionResult.RateLimited -> {
+                // W2.10: the shared Scryfall rate limiter exhausted its retries. OCR keeps
+                // running (CardRecognizer only suspends the NETWORK half of the pipeline), so
+                // the detected-card overlay/searching indicator just steps back to idle while
+                // the countdown badge (rememberRateLimitCountdownSeconds, fed by
+                // rateLimitedUntilMs) takes over.
+                _uiState.update {
+                    it.copy(
+                        isSearching = false,
+                        rateLimitedUntilMs = System.currentTimeMillis() + result.retryAfterMs,
+                    )
+                }
+            }
+
             is RecognitionResult.Identified -> {
                 _uiState.update {
                     it.copy(detectedCorners = result.corners.ifEmpty { null })
@@ -353,11 +385,14 @@ class ScannerViewModel @Inject constructor(
 
                 val confirmedState = _uiState.value
 
-                // Skip adding if already in session with same attributes
+                // Skip adding if already in session with same attributes. Language identity
+                // tracks the RESOLVED printing's language (result.card.lang), not the mode-bar
+                // filter (confirmedState.selectedLanguage) — see addToSession's KDoc (W2.11):
+                // ScannedCard.language must be truthful data, so its identity key must match.
                 val isInSession = confirmedState.scanSession.cards.any { entry ->
                     entry.card.scryfallId == result.card.scryfallId &&
                             entry.isFoil == confirmedState.selectedIsFoil &&
-                            entry.language == confirmedState.selectedLanguage &&
+                            entry.language == result.card.lang &&
                             entry.condition == confirmedState.selectedCondition
                 }
 
@@ -366,14 +401,14 @@ class ScannerViewModel @Inject constructor(
                     return
                 }
 
-                if (confirmedState.selectedLanguage != DEFAULT_LANGUAGE &&
-                    result.card.lang != confirmedState.selectedLanguage
-                ) {
-                    _uiState.update { it.copy(languageMismatch = true) }
-                    return
-                }
-
-                _uiState.update { it.copy(languageMismatch = false) }
+                // W2.11 (2026-08-24): with the localized resolution ladder (CardRecognizer), a
+                // non-English selection normally resolves the LOCALIZED printing directly, so
+                // result.card.lang == confirmedState.selectedLanguage in the common case and
+                // languageMismatch never fires. result.languageFallback is set ONLY when no
+                // printing exists in the selected language and CardRecognizer fell back to the
+                // English printing — that case is now purely informational (a badge), never a
+                // reason to refuse the add.
+                _uiState.update { it.copy(languageMismatch = result.languageFallback) }
 
                 if (result.ambiguous) {
                     _uiState.update {
@@ -406,7 +441,7 @@ class ScannerViewModel @Inject constructor(
         lastAddedId = card.scryfallId
         lastAddedTime = System.currentTimeMillis()
 
-        _uiState.update { it.copy(toastMessage = card.name) }
+        _uiState.update { it.copy(toastMessage = card.name, toastType = MagicToastType.SUCCESS) }
 
         if (_uiState.value.isSoundEnabled) {
             soundManager.playForPrice(
@@ -420,13 +455,21 @@ class ScannerViewModel @Inject constructor(
      * Merges [card] into the current [ScanSession] and persists the updated queue.
      * Increments quantity if an entry with the same key (scryfallId + isFoil + language + condition)
      * already exists; otherwise appends a new [ScannedCard].
+     *
+     * [ScannedCard.language] stores [Card.lang] (the RESOLVED printing's real language), NOT
+     * [ScannerUiState.selectedLanguage] (the mode-bar filter) — W2.11 (scanner-reliability-plan.md,
+     * 2026-08-24). The two coincide in the normal case (the resolution ladder resolves the
+     * localized printing when one exists), but on an English-fallback add
+     * ([RecognitionResult.Identified.languageFallback] = true) `card.lang` is `"en"` while
+     * [ScannerUiState.selectedLanguage] might still be e.g. `"es"` — the user's collection must
+     * reflect the actual printing they now own, not the filter they had selected when scanning.
      */
     private fun addToSession(card: Card) {
         _uiState.update { state ->
             val existingIndex = state.scanSession.cards.indexOfFirst { entry ->
                 entry.card.scryfallId == card.scryfallId &&
                     entry.isFoil == state.selectedIsFoil &&
-                    entry.language == state.selectedLanguage &&
+                    entry.language == card.lang &&
                     entry.condition == state.selectedCondition
             }
             val updatedCards = if (existingIndex >= 0) {
@@ -440,7 +483,7 @@ class ScannerViewModel @Inject constructor(
                     card = card,
                     quantity = state.selectedQuantity,
                     isFoil = state.selectedIsFoil,
-                    language = state.selectedLanguage,
+                    language = card.lang,
                     condition = state.selectedCondition,
                     setCode = card.setCode,
                     timestamp = System.currentTimeMillis(),
@@ -485,16 +528,31 @@ class ScannerViewModel @Inject constructor(
         viewModelScope.launch {
             // Route through the scanner commit use case so this counts as a scan
             // (CardScanned XP) rather than a manual add — and is never double-counted.
-            commitScannedCards(listOf(entry.toCommit()))
+            val result = commitScannedCards(listOf(entry.toCommit()))
             analyticsHelper.logEvent(
                 "scanner_entry_to_collection",
                 mapOf("card_id" to entry.card.scryfallId)
             )
-            _uiState.update {
-                it.copy(toastMessage = context.getString(R.string.scanner_toast_added_to_collection, entry.card.name))
-            }
-            if (_uiState.value.isAutoDeleteOnAddEnabled) {
-                onRemoveSessionCard(entry)
+            // Write-path hardening audit (2026-09-06): a failed write must not report success or
+            // remove the entry from the queue — the user would lose track of a card that was
+            // never actually saved.
+            if (result.failedEntries == 0) {
+                _uiState.update {
+                    it.copy(
+                        toastMessage = context.getString(R.string.scanner_toast_added_to_collection, entry.card.name),
+                        toastType = MagicToastType.SUCCESS,
+                    )
+                }
+                if (_uiState.value.isAutoDeleteOnAddEnabled) {
+                    onRemoveSessionCard(entry)
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        toastMessage = context.getString(R.string.scanner_toast_add_failed, entry.card.name),
+                        toastType = MagicToastType.ERROR,
+                    )
+                }
             }
         }
     }
@@ -522,7 +580,10 @@ class ScannerViewModel @Inject constructor(
                 mapOf("card_id" to entry.card.scryfallId)
             )
             _uiState.update {
-                it.copy(toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name))
+                it.copy(
+                    toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name),
+                    toastType = MagicToastType.SUCCESS,
+                )
             }
             if (_uiState.value.isAutoDeleteOnAddEnabled) {
                 onRemoveSessionCard(entry)
@@ -557,7 +618,10 @@ class ScannerViewModel @Inject constructor(
                 )
                 addToWishlist(wishlistEntry)
                 _uiState.update {
-                    it.copy(toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name))
+                    it.copy(
+                        toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name),
+                        toastType = MagicToastType.SUCCESS,
+                    )
                 }
                 kotlinx.coroutines.delay(100)
             }
@@ -566,7 +630,10 @@ class ScannerViewModel @Inject constructor(
                 mapOf("count" to cards.size.toString()),
             )
             _uiState.update {
-                it.copy(toastMessage = context.getString(R.string.scanner_toast_added_all_to_wishlist, cards.size))
+                it.copy(
+                    toastMessage = context.getString(R.string.scanner_toast_added_all_to_wishlist, cards.size),
+                    toastType = MagicToastType.SUCCESS,
+                )
             }
         }
     }
@@ -591,7 +658,7 @@ class ScannerViewModel @Inject constructor(
 
     /** Opens the price detail [ModalBottomSheet] for the currently detected card. */
     fun onOpenPriceDetail() {
-        _uiState.update { it.copy(showPriceDetailSheet = true) }
+        _uiState.update { it.clearedForOverlay().copy(showPriceDetailSheet = true) }
     }
 
     /** Closes the price detail [ModalBottomSheet]. */
@@ -626,9 +693,29 @@ class ScannerViewModel @Inject constructor(
         _uiState.update { it.copy(selectedIsFoil = !it.selectedIsFoil) }
     }
 
-    /** Updates the selected language code. */
+    /**
+     * Updates the selected scan language.
+     *
+     * Also clears [ScannerUiState.rateLimitedUntilMs] (W2.11, scanner-reliability-plan.md,
+     * 2026-08-24) — switching language is a strong signal the user is starting a fresh scanning
+     * intent, so the badge shouldn't keep counting down against the OLD language's failed
+     * attempt; the shared `com.mmg.manahub.core.data.network.RateLimitedQueue` still enforces its
+     * own cooldown server-side regardless, so this only affects how eagerly the UI lets a new
+     * attempt be tried, never bypasses the shared limiter.
+     *
+     * The CardRecognizer-side half of the reset (negative cache, resolution generation,
+     * pre-resolution stability buffer, local 3s memo — see `CardRecognizer`'s KDoc) fires via
+     * `CardRecognizer.selectedLanguage`'s custom setter when `ScannerScreen`'s
+     * `LaunchedEffect(selectedLanguage)` forwards this new value on the next recomposition.
+     * `CardRecognizer` is a Composable-scoped dependency (excluded from KMP, Hilt-entry-point
+     * constructed per screen entry), not a ViewModel-owned one, so that half of the reset is unit
+     * tested in `CardRecognizerTest`, not here — this project has no Compose UI test
+     * infrastructure to exercise the cross-layer wiring directly.
+     */
     fun onLanguageSelected(language: String) {
-        _uiState.update { it.copy(selectedLanguage = language, languageMismatch = false) }
+        _uiState.update {
+            it.copy(selectedLanguage = language, languageMismatch = false, rateLimitedUntilMs = null)
+        }
     }
 
     /** Updates the selected condition code. */
@@ -656,7 +743,7 @@ class ScannerViewModel @Inject constructor(
      */
     fun onEditScannedCard(entry: ScannedCard) {
         _uiState.update {
-            it.copy(
+            it.clearedForOverlay().copy(
                 editingCard = entry,
                 showEditSheet = true,
                 availablePrints = emptyList(),
@@ -687,7 +774,7 @@ class ScannerViewModel @Inject constructor(
         val original = _uiState.value.editingCard ?: return
         _uiState.update { state ->
             val updatedList = state.scanSession.cards.map {
-                if (it.timestamp == original.timestamp) updatedEntry else it
+                if (it.id == original.id) updatedEntry else it
             }
             state.copy(
                 scanSession = state.scanSession.copy(cards = updatedList),
@@ -739,7 +826,7 @@ class ScannerViewModel @Inject constructor(
 
     /** Opens the scan-queue bottom sheet. */
     fun onOpenQueue() {
-        _uiState.update { it.copy(showQueueSheet = true, multiSelectedIds = emptySet()) }
+        _uiState.update { it.clearedForOverlay().copy(showQueueSheet = true, multiSelectedIds = emptySet()) }
     }
 
     /** Closes the scan-queue bottom sheet. */
@@ -752,9 +839,11 @@ class ScannerViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(
                 scanSession = state.scanSession.copy(
-                    cards = state.scanSession.cards.filter { it.timestamp != entry.timestamp },
+                    cards = state.scanSession.cards.filter { it.id != entry.id },
                 ),
                 multiSelectedIds = state.multiSelectedIds - entry.card.scryfallId,
+                // W2026-09-06: clearing the overlay when the card is removed from queue
+                lastDetectedCard = if (state.lastDetectedCard?.scryfallId == entry.card.scryfallId) null else state.lastDetectedCard
             )
         }
         persistQueue()
@@ -811,29 +900,71 @@ class ScannerViewModel @Inject constructor(
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Persists every [ScannedCard] in the session to the collection,
-     * then clears the queue and closes the sheet.
+     * Persists every [ScannedCard] in the session to the collection in ONE batched
+     * [CommitScannedCardsUseCase] call, then clears the queue and closes the sheet.
+     *
+     * Write-path hardening audit (2026-09-06): this used to loop one
+     * `commitScannedCards(listOf(entry.toCommit()))` call per entry with a `delay(100)` between
+     * them and NO try/catch — a single throwing entry aborted the whole `viewModelScope.launch`
+     * coroutine uncaught, silently stranding every entry after it AND never reaching
+     * `onClearSession()`, so the already-committed entries stayed in the queue too (a retry would
+     * then double-add them). [CommitScannedCardsUseCase] already isolates per-entry failures
+     * internally (see its KDoc), so the batch call below cannot itself throw for a single bad
+     * card; only a fully successful batch clears the whole session, a partial one removes just the
+     * entries that actually committed and surfaces a [MagicToastType.WARNING] naming the shortfall.
+     *
+     * Re-entrancy guard (write-path hardening audit, 2026-09-06): [ScannerUiState.isCommittingQueue]
+     * blocks a second tap while a commit is already in flight -- without it, two fast taps could
+     * commit the whole queue twice (doubled quantities, duplicate `CardScanned` XP events).
      */
     fun onAddAllToCollection() {
-        val cards = _uiState.value.scanSession.cards
-        if (cards.isEmpty()) return
+        val state = _uiState.value
+        val cards = state.scanSession.cards
+        if (cards.isEmpty() || state.isCommittingQueue) return
 
+        _uiState.update { it.copy(isCommittingQueue = true) }
         viewModelScope.launch {
-            for (entry in cards) {
-                commitScannedCards(listOf(entry.toCommit()))
-                _uiState.update {
-                    it.copy(toastMessage = context.getString(R.string.scanner_toast_added_to_collection, entry.card.name))
+            try {
+                val result = commitScannedCards(cards.map { it.toCommit() })
+
+                analyticsHelper.logEvent(
+                    "scanner_add_all",
+                    mapOf("count" to cards.size.toString(), "failed" to result.failedEntries.toString()),
+                )
+
+                if (result.failedEntries == 0) {
+                    _uiState.update {
+                        it.copy(
+                            toastMessage = context.getString(R.string.scanner_toast_added_all_to_collection, cards.size),
+                            toastType = MagicToastType.SUCCESS,
+                        )
+                    }
+                    onClearSession()
+                } else {
+                    // Stable id, not timestamp: two queue entries can share a millisecond (burst
+                    // recognition, or a duplicate-entry action firing twice), which would silently
+                    // drop the failed one from this filter alongside the succeeded one.
+                    val succeededIds = cards.filterIndexed { index, _ ->
+                        result.entrySucceeded.getOrElse(index) { false }
+                    }.mapTo(mutableSetOf()) { it.id }
+                    _uiState.update { s ->
+                        s.copy(
+                            scanSession = s.scanSession.copy(
+                                cards = s.scanSession.cards.filterNot { it.id in succeededIds },
+                            ),
+                            toastMessage = context.getString(
+                                R.string.scanner_toast_add_all_partial_failure,
+                                result.failedEntries,
+                                cards.size,
+                            ),
+                            toastType = MagicToastType.WARNING,
+                        )
+                    }
+                    persistQueue()
                 }
-                kotlinx.coroutines.delay(100)
+            } finally {
+                _uiState.update { it.copy(isCommittingQueue = false) }
             }
-            analyticsHelper.logEvent(
-                "scanner_add_all",
-                mapOf("count" to cards.size.toString()),
-            )
-            _uiState.update {
-                it.copy(toastMessage = context.getString(R.string.scanner_toast_added_all_to_collection, cards.size))
-            }
-            onClearSession()
         }
     }
 
@@ -856,7 +987,7 @@ class ScannerViewModel @Inject constructor(
      */
     fun onOpenCardDetail(id: String, fromQueue: Boolean = false) {
         _uiState.update {
-            it.copy(
+            it.clearedForOverlay().copy(
                 selectedCardDetailId = id,
                 showQueueSheet = if (fromQueue) false else it.showQueueSheet,
                 returnToQueueOnDetailClose = fromQueue
@@ -884,7 +1015,7 @@ class ScannerViewModel @Inject constructor(
     fun onOpenVariantSelector(entry: ScannedCard) {
         variantLoadJob?.cancel()
         _uiState.update {
-            it.copy(
+            it.clearedForOverlay().copy(
                 showVariantSelector = true,
                 variantSelectorEntry = entry,
                 cardVariants = emptyList(),
@@ -919,13 +1050,13 @@ class ScannerViewModel @Inject constructor(
         val original = _uiState.value.variantSelectorEntry ?: return
         _uiState.update { state ->
             val updatedCards = state.scanSession.cards.map {
-                if (it.timestamp == original.timestamp) it.copy(card = variant, setCode = variant.setCode) else it
+                if (it.id == original.id) it.copy(card = variant, setCode = variant.setCode) else it
             }
             state.copy(
                 scanSession = state.scanSession.copy(cards = updatedCards),
                 showVariantSelector = false,
                 variantSelectorEntry = null,
-                editingCard = if (state.editingCard?.timestamp == original.timestamp) {
+                editingCard = if (state.editingCard?.id == original.id) {
                     state.editingCard.copy(card = variant, setCode = variant.setCode)
                 } else state.editingCard
             )
@@ -935,7 +1066,7 @@ class ScannerViewModel @Inject constructor(
 
     fun onExpandVariantImage(imageUrl: String) {
         if (imageUrl.isBlank()) return
-        _uiState.update { it.copy(expandedVariantImageUrl = imageUrl) }
+        _uiState.update { it.clearedForOverlay().copy(expandedVariantImageUrl = imageUrl) }
     }
 
     fun onCloseExpandedImage() {
@@ -946,6 +1077,42 @@ class ScannerViewModel @Inject constructor(
     //  Duplicate scanned card
     // ─────────────────────────────────────────────────────────────────────────
 
+    fun onIncrementSessionCardQuantity(entry: ScannedCard) {
+        _uiState.update { state ->
+            val updatedCards = state.scanSession.cards.map {
+                if (it.id == entry.id) it.copy(quantity = it.quantity + 1) else it
+            }
+            state.copy(scanSession = state.scanSession.copy(cards = updatedCards))
+        }
+        persistQueue()
+    }
+
+    fun onDecrementSessionCardQuantity(entry: ScannedCard) {
+        if (entry.quantity <= 1) {
+            onRemoveSessionCard(entry)
+            return
+        }
+        _uiState.update { state ->
+            val updatedCards = state.scanSession.cards.map {
+                if (it.id == entry.id) it.copy(quantity = (it.quantity - 1).coerceAtLeast(1)) else it
+            }
+            state.copy(scanSession = state.scanSession.copy(cards = updatedCards))
+        }
+        persistQueue()
+    }
+
+    fun onRemoveLastDetectedCard() {
+        val lastCard = _uiState.value.lastDetectedCard ?: return
+        val entryToRemove = _uiState.value.scanSession.cards.lastOrNull {
+            it.card.scryfallId == lastCard.scryfallId
+        }
+        if (entryToRemove != null) {
+            onRemoveSessionCard(entryToRemove)
+        } else {
+            _uiState.update { it.copy(lastDetectedCard = null) }
+        }
+    }
+
     /**
      * Duplicates [original] and inserts the copy immediately after it in the scan queue (in
      * place, NOT appended at the end), so quickly stamping several physical copies of the same
@@ -955,9 +1122,11 @@ class ScannerViewModel @Inject constructor(
      * no longer reachable from inside [EditScannedCardSheet].
      */
     fun onDuplicateSessionCard(original: ScannedCard) {
-        val duplicate = original.copy(timestamp = System.currentTimeMillis())
+        // id must also be regenerated -- copy() otherwise carries the original's id, giving two
+        // distinct queue entries the same identity.
+        val duplicate = original.copy(id = UUID.randomUUID().toString(), timestamp = System.currentTimeMillis())
         _uiState.update { state ->
-            val index = state.scanSession.cards.indexOfFirst { it.timestamp == original.timestamp }
+            val index = state.scanSession.cards.indexOfFirst { it.id == original.id }
             val updatedCards = if (index >= 0) {
                 state.scanSession.cards.toMutableList().apply { add(index + 1, duplicate) }
             } else {
@@ -968,12 +1137,10 @@ class ScannerViewModel @Inject constructor(
         persistQueue()
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Cleanup
-    // ─────────────────────────────────────────────────────────────────────────
-
-    override fun onCleared() {
-        super.onCleared()
-        soundManager.release()
-    }
+    // Note (WS5, `scanner-reliability-plan.md`, 2026-08-25): this ViewModel deliberately does
+    // NOT override onCleared() to release [soundManager]. [SoundManager] is a Hilt @Singleton
+    // alive for the whole app process, while this ViewModel is scoped to the scanner screen and
+    // is cleared every time the user navigates away — releasing a process-wide singleton from a
+    // screen-scoped lifecycle would permanently kill scan sounds on the next visit, the same
+    // class of bug fixed for `CardOcrAnalyzer` in WS1. See [SoundManager]'s class KDoc.
 }

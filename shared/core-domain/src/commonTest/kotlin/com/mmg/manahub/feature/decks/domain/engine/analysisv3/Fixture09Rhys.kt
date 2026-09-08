@@ -1,0 +1,106 @@
+package com.mmg.manahub.feature.decks.domain.engine.analysisv3
+
+import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.card
+import com.mmg.manahub.feature.decks.domain.engine.entry
+
+/**
+ * Fixture #9 (spec §9) — Rhys the Redeemed, Tokens Aggro. Commander, Selesnya (GW).
+ * Expected: macro AGGRO, no posture, theme TOKENS.
+ */
+fun fixture09Rhys(): AnalysisV3Fixture {
+    val commander = card(
+        id = "cmd-rhys", name = "Rhys the Redeemed", typeLine = "Legendary Creature — Elf Warrior",
+        cmc = 2.0, colorIdentity = listOf("G", "W"), power = "1", toughness = "1",
+        oracleText = "{4}{G/W}, {T}: Create a token that's a copy of target token you control. {1}{G/W}, {T}: Create a 1/1 green and white Elf Warrior creature token.",
+    )
+    val nonland = listOf(
+        entry(commander),
+        entry(card(id = "midnight-guard", name = "Midnight Guard", typeLine = "Creature — Human Soldier", cmc = 1.0, colorIdentity = listOf("W"), power = "1", toughness = "1")),
+        entry(card(id = "trostani-discordant", name = "Trostani Discordant", typeLine = "Legendary Creature — Dryad", cmc = 4.0, colorIdentity = listOf("G", "W"), power = "4", toughness = "4", tags = listOf(roleTag("token_generator")))),
+        entry(card(id = "avenger-of-zendikar-rh", name = "Avenger of Zendikar", typeLine = "Creature — Plant", cmc = 6.0, colorIdentity = listOf("G"), power = "5", toughness = "5", tags = listOf(roleTag("token_generator")))),
+        entry(card(id = "hardened-scales", name = "Hardened Scales", typeLine = "Enchantment", cmc = 1.0, colorIdentity = listOf("G"))),
+        entry(card(id = "anointed-procession", name = "Anointed Procession", typeLine = "Enchantment", cmc = 3.0, colorIdentity = listOf("W"), tags = listOf(roleTag("token_generator")))),
+        entry(card(id = "doubling-season", name = "Doubling Season", typeLine = "Enchantment", cmc = 4.0, colorIdentity = listOf("G"))),
+        entry(card(id = "intangible-virtue", name = "Intangible Virtue", typeLine = "Enchantment", cmc = 2.0, colorIdentity = listOf("W"), oracleText = "Creature tokens you control get +1/+1 and have vigilance.", tags = listOf(roleTag("anthem")))),
+        entry(card(id = "beckon-apparition", name = "Secure the Wastes", typeLine = "Instant", cmc = 2.0, colorIdentity = listOf("W"), tags = listOf(roleTag("token_generator")))),
+        entry(card(id = "trostanis-summoner", name = "Trostani's Summoner", typeLine = "Creature — Human Advisor", cmc = 5.0, colorIdentity = listOf("G", "W"), power = "3", toughness = "3", tags = listOf(roleTag("token_generator")))),
+        entry(card(id = "elspeth-tk9", name = "Elspeth, Sun's Champion", typeLine = "Legendary Planeswalker — Elspeth", cmc = 6.0, colorIdentity = listOf("W"), tags = listOf(roleTag("token_generator")))),
+        entry(card(id = "skullclamp-tk9", name = "Skullclamp", typeLine = "Artifact — Equipment", cmc = 1.0, colorIdentity = emptyList(), oracleText = "Equipped creature gets +1/-1. Whenever equipped creature dies, draw two cards. Equip {1}.", tags = listOf(roleTag("death_payoff")))),
+        entry(card(id = "beastmaster-ascension", name = "Beastmaster Ascension", typeLine = "Enchantment", cmc = 3.0, colorIdentity = listOf("G"), oracleText = "Whenever a creature you control attacks, if it isn't a Human, put a quest counter on Beastmaster Ascension. Then if there are six or more quest counters on it, creatures you control get +5/+5.", tags = listOf(roleTag("anthem")))),
+        entry(card(id = "swords-tk9", name = "Swords to Plowshares", typeLine = "Instant", cmc = 1.0, colorIdentity = listOf("W"), tags = listOf(CardTag.REMOVAL))),
+        entry(card(id = "path-tk9", name = "Path to Exile", typeLine = "Instant", cmc = 1.0, colorIdentity = listOf("W"), tags = listOf(CardTag.REMOVAL))),
+        entry(card(id = "beast-within-tk9", name = "Beast Within", typeLine = "Sorcery", cmc = 3.0, colorIdentity = listOf("G"), tags = listOf(CardTag.REMOVAL))),
+        entry(card(id = "sol-ring-tk9", name = "Sol Ring", typeLine = "Artifact", cmc = 1.0, colorIdentity = emptyList(), tags = listOf(CardTag.RAMP))),
+        entry(card(id = "arcane-signet-tk9", name = "Arcane Signet", typeLine = "Artifact", cmc = 1.0, colorIdentity = emptyList())),
+        entry(card(id = "llanowar-elves-tk9", name = "Llanowar Elves", typeLine = "Creature — Elf Druid", cmc = 1.0, colorIdentity = listOf("G"), power = "1", toughness = "1", tags = listOf(CardTag.RAMP))),
+        entry(card(id = "wren-warden", name = "Emeria Angel", typeLine = "Creature — Angel", cmc = 5.0, colorIdentity = listOf("W"), power = "3", toughness = "4", tags = listOf(roleTag("token_generator")))),
+        entry(card(id = "parallel-lives", name = "Parallel Lives", typeLine = "Enchantment", cmc = 4.0, colorIdentity = listOf("G"))),
+        entry(card(id = "rishkar-peema-renegade", name = "Rishkar, Peema Renegade", typeLine = "Legendary Creature — Elf Druid", cmc = 2.0, colorIdentity = listOf("G"), power = "2", toughness = "2", tags = listOf(CardTag.RAMP))),
+        entry(card(id = "shalai-voice", name = "Shalai, Voice of Plenty", typeLine = "Legendary Creature — Angel", cmc = 4.0, colorIdentity = listOf("G"), power = "3", toughness = "4", tags = listOf(CardTag.PROTECTION))),
+        entry(card(id = "wolfir-silverheart", name = "Wolfir Silverheart", typeLine = "Creature — Wolf", cmc = 6.0, colorIdentity = listOf("G"), power = "7", toughness = "7", tags = listOf(roleTag("token_generator")))),
+        // Phase 2b (deck-analysis-engine-v3-spec.md §5.2 TOKENS fix): this fixture tagged 8 real
+        // `token_generator` producers but zero TOKENS payoffs (death_payoff/counters_payoff/
+        // combat_payoff) -- a real Rhys go-wide deck runs exactly these three payoff shapes. All
+        // three are colorless or green, legal within the deck's declared G/W identity.
+        entry(card(id = "sword-fire-ice-rh", name = "Sword of Fire and Ice", typeLine = "Legendary Artifact — Equipment", cmc = 2.0, colorIdentity = emptyList(), oracleText = "Equipped creature gets +2/+2 and has protection from red and from blue. Whenever equipped creature deals combat damage to a player, Sword of Fire and Ice deals 2 damage to any target and you draw a card. Equip {2}", tags = listOf(roleTag("combat_payoff")))),
+        entry(card(id = "bastion-remembrance-rh", name = "Bastion of Remembrance", typeLine = "Artifact", cmc = 2.0, colorIdentity = emptyList(), oracleText = "When Bastion of Remembrance enters the battlefield, create a 1/1 white Human Soldier creature token. Whenever a creature you control dies, each opponent loses 1 life and you gain 1 life.", tags = listOf(roleTag("death_payoff")))),
+        entry(card(id = "cathars-crusade-rh", name = "Cathars' Crusade", typeLine = "Enchantment", cmc = 5.0, colorIdentity = listOf("G"), oracleText = "Whenever a creature you control enters the battlefield, put a +1/+1 counter on each creature you control.", tags = listOf(roleTag("counters_payoff")))),
+        // Batch B expansion — additional token producers.
+        entry(card(id = "growing-ranks-rh", name = "Growing Ranks", typeLine = "Sorcery", cmc = 5.0, colorIdentity = listOf("W"), oracleText = "Convoke. Create a 1/1 white Elf Warrior creature token for each Elf you control.", tags = listOf(roleTag("token_generator")))),
+        entry(card(id = "march-multitudes-rh", name = "March of the Multitudes", typeLine = "Sorcery", cmc = 6.0, colorIdentity = listOf("W", "G"), oracleText = "Convoke. Create X 1/1 white Elf Warrior creature tokens.", tags = listOf(roleTag("token_generator")))),
+        entry(card(id = "hanweir-garrison-rh", name = "Hanweir Garrison", typeLine = "Creature — Human Soldier", cmc = 3.0, colorIdentity = listOf("W"), power = "2", toughness = "2", oracleText = "Whenever Hanweir Garrison attacks, create a 1/1 red and white Human Soldier creature token that's tapped and attacking.", tags = listOf(roleTag("token_generator")))),
+        entry(card(id = "master-wild-hunt-rh", name = "Master of the Wild Hunt", typeLine = "Creature — Elf Shaman", cmc = 4.0, colorIdentity = listOf("G"), power = "3", toughness = "3", oracleText = "{2}{G}: Create a 2/2 green Wolf creature token. At the beginning of combat on your turn, you may sacrifice a Wolf. If you do, target creature gets +1/+1 and gains trample until end of turn for each Wolf you control.", tags = listOf(roleTag("token_generator")))),
+        entry(card(id = "kami-whispered-hopes-rh", name = "Kami of Whispered Hopes", typeLine = "Creature — Spirit", cmc = 4.0, colorIdentity = listOf("G"), power = "3", toughness = "2", oracleText = "When Kami of Whispered Hopes enters the battlefield, return a land you control to its owner's hand. {2}{G}, {T}: Choose one — Create a 1/1 green Snake creature token; or proliferate.", tags = listOf(roleTag("token_generator")))),
+        entry(card(id = "voice-resurgence-rh", name = "Voice of Resurgence", typeLine = "Creature — Elemental", cmc = 2.0, colorIdentity = listOf("G", "W"), power = "1", toughness = "1", oracleText = "If a spell or ability an opponent controls causes you to discard Voice of Resurgence, put it onto the battlefield instead. When Voice of Resurgence leaves the battlefield, create a green and white Elemental creature token with 'This creature's power and toughness are each equal to the number of creatures you control.'", tags = listOf(roleTag("token_generator")))),
+        entry(card(id = "selesnya-guildmage-rh", name = "Selesnya Guildmage", typeLine = "Creature — Elf Wizard", cmc = 3.0, colorIdentity = listOf("W", "G"), power = "2", toughness = "2", oracleText = "{2}{G}: Put a +1/+1 counter on target creature. {2}{W}: Create a 1/1 white Saproling creature token.", tags = listOf(roleTag("token_generator")))),
+        entry(card(id = "wingmate-roc-rh", name = "Wingmate Roc", typeLine = "Creature — Bird", cmc = 5.0, colorIdentity = listOf("W"), power = "3", toughness = "4", oracleText = "Flying. Raid — When Wingmate Roc enters the battlefield, if you attacked this turn, create a 3/4 white Bird creature token with flying.", tags = listOf(roleTag("token_generator")))),
+        // Batch B expansion — TOKENS payoffs/amplifiers (death/counters/combat + anthem).
+        entry(card(id = "metallic-mimic-rh", name = "Metallic Mimic", typeLine = "Artifact Creature — Shapeshifter", cmc = 2.0, colorIdentity = emptyList(), power = "2", toughness = "2", oracleText = "As Metallic Mimic enters the battlefield, choose a creature type. Other creatures you control of the chosen type enter the battlefield with an additional +1/+1 counter on them.", tags = listOf(roleTag("counters_payoff")))),
+        entry(card(id = "bow-of-nylea-rh", name = "Bow of Nylea", typeLine = "Legendary Enchantment Artifact", cmc = 3.0, colorIdentity = listOf("G"), oracleText = "Creatures you control have deathtouch. {2}{G}, {T}: Distribute two +1/+1 counters among one or two target creatures you control. {1}{G}, {T}: You gain 2 life. {3}{G}, {T}: Create a 1/1 green Cat creature token.", tags = listOf(roleTag("counters_payoff")))),
+        entry(card(id = "angel-of-invention-rh", name = "Angel of Invention", typeLine = "Legendary Creature — Angel", cmc = 4.0, colorIdentity = listOf("W"), power = "2", toughness = "2", oracleText = "Flying. As Angel of Invention enters the battlefield, choose one — It enters with three +1/+1 counters on it; or create two 1/1 colorless Servo artifact creature tokens. Other creatures you control get +1/+1.", tags = listOf(roleTag("counters_payoff")))),
+        entry(card(id = "trostani-selesnyas-voice-rh", name = "Trostani, Selesnya's Voice", typeLine = "Legendary Creature — Human Advisor", cmc = 5.0, colorIdentity = listOf("G", "W"), power = "4", toughness = "4", oracleText = "Other creature tokens you control get +1/+1. Whenever a creature token enters the battlefield under your control, you gain 1 life.", tags = listOf(roleTag("anthem")))),
+        entry(card(id = "spear-of-heliod-rh", name = "Spear of Heliod", typeLine = "Enchantment", cmc = 2.0, colorIdentity = listOf("W"), oracleText = "Creatures you control get +1/+1. {1}{W}: Spear of Heliod deals 1 damage to target attacking or blocking creature.", tags = listOf(roleTag("anthem")))),
+        entry(card(id = "elesh-norn-rh", name = "Elesh Norn, Grand Cenobite", typeLine = "Legendary Creature — Phyrexian Praetor", cmc = 7.0, colorIdentity = listOf("W"), power = "4", toughness = "7", oracleText = "Other creatures you control get +2/+2. Creatures your opponents control get -2/-2.", tags = listOf(roleTag("anthem")))),
+        entry(card(id = "wiltleaf-liege-rh", name = "Wilt-Leaf Liege", typeLine = "Creature — Elemental", cmc = 4.0, colorIdentity = listOf("G", "W"), power = "4", toughness = "4", oracleText = "Protection from black. Other green and/or white creatures you control get +1/+1. Creatures your opponents control that are neither green nor white get -1/-1.", tags = listOf(roleTag("anthem")))),
+        // Batch B expansion — removal.
+        entry(card(id = "councils-judgment-rh", name = "Council's Judgment", typeLine = "Sorcery", cmc = 3.0, colorIdentity = listOf("W"), oracleText = "Starting with you, each player votes for a nonland permanent you don't control. Exile each permanent with the most votes or tied for most votes.", tags = listOf(CardTag.REMOVAL))),
+        entry(card(id = "fell-the-mighty-rh", name = "Fell the Mighty", typeLine = "Sorcery", cmc = 3.0, colorIdentity = listOf("W"), oracleText = "Destroy target creature with the greatest power among creatures on the battlefield. Create a 3/3 white Elephant creature token.", tags = listOf(CardTag.REMOVAL))),
+        // Batch B expansion — card draw fueled by a wide board.
+        entry(card(id = "guardian-project-rh", name = "The Guardian Project", typeLine = "Enchantment", cmc = 2.0, colorIdentity = listOf("G"), oracleText = "Whenever a nontoken creature you control enters the battlefield, if it's not the first creature you controlled this turn, draw a card.", tags = listOf(CardTag.DRAW_ENGINE))),
+        entry(card(id = "shamanic-revelation-rh", name = "Shamanic Revelation", typeLine = "Sorcery", cmc = 4.0, colorIdentity = listOf("G"), oracleText = "You gain 1 life for each creature you control. Ferocious — Then if you control a creature with power 4 or greater, draw a card for each creature you control.", tags = listOf(CardTag.DRAW_ENGINE))),
+        entry(card(id = "rishkars-expertise-rh", name = "Rishkar's Expertise", typeLine = "Sorcery", cmc = 5.0, colorIdentity = listOf("G"), oracleText = "Draw cards equal to the greatest power among creatures you control. You may cast a spell with mana value 4 or less from your hand without paying its mana cost.", tags = listOf(CardTag.DRAW_ENGINE))),
+        entry(card(id = "return-wildspeaker-rh", name = "Return of the Wildspeaker", typeLine = "Sorcery", cmc = 5.0, colorIdentity = listOf("G"), oracleText = "Ferocious — Draw a card for each creature you control. If you control a creature with power 4 or greater, instead draw two cards for each creature you control.", tags = listOf(CardTag.DRAW_ENGINE))),
+        // Batch B expansion — ramp.
+        entry(card(id = "three-visits-rh", name = "Three Visits", typeLine = "Sorcery", cmc = 2.0, colorIdentity = listOf("G"), oracleText = "Search your library for a basic land card, put it onto the battlefield tapped, then shuffle.", tags = listOf(CardTag.RAMP))),
+        entry(card(id = "cultivate-rh", name = "Cultivate", typeLine = "Sorcery", cmc = 3.0, colorIdentity = listOf("G"), oracleText = "Search your library for up to two basic land cards, reveal them, put one onto the battlefield tapped and the other into your hand, then shuffle.", tags = listOf(CardTag.RAMP))),
+        entry(card(id = "karametras-acolyte-rh", name = "Karametra's Acolyte", typeLine = "Creature — Human Cleric", cmc = 2.0, colorIdentity = listOf("G"), power = "1", toughness = "3", oracleText = "{T}: Add one mana of any color for each untapped creature you control.", tags = listOf(CardTag.RAMP))),
+        entry(card(id = "migration-path-rh", name = "Migration Path", typeLine = "Sorcery", cmc = 3.0, colorIdentity = listOf("G"), oracleText = "Search your library for up to two basic land cards, reveal them, put them into your hand, then shuffle. You gain 1 life.", tags = listOf(CardTag.RAMP))),
+        entry(card(id = "growing-rites-rh", name = "Growing Rites of Itlimoc", typeLine = "Legendary Enchantment", cmc = 3.0, colorIdentity = listOf("G"), oracleText = "At the beginning of your end step, if you control three or more creatures with power 4 or greater, transform Growing Rites of Itlimoc.", tags = listOf(CardTag.RAMP))),
+        entry(card(id = "nissa-vastwood-seer-rh", name = "Nissa, Vastwood Seer", typeLine = "Legendary Creature — Elf Scout", cmc = 3.0, colorIdentity = listOf("G"), power = "3", toughness = "3", oracleText = "Whenever a land enters the battlefield under your control, you may reveal the top card of your library. If it's a land card, put it into your hand.", tags = listOf(CardTag.RAMP))),
+        // Batch B expansion — protection.
+        entry(card(id = "selfless-savior-rh", name = "Selfless Savior", typeLine = "Creature — Dog", cmc = 1.0, colorIdentity = listOf("W"), power = "1", toughness = "1", oracleText = "Sacrifice Selfless Savior: Target creature you control gains indestructible until end of turn.", tags = listOf(CardTag.PROTECTION))),
+        entry(card(id = "heroic-intervention-rh", name = "Heroic Intervention", typeLine = "Instant", cmc = 2.0, colorIdentity = listOf("G"), oracleText = "Permanents you control gain hexproof and indestructible until end of turn.", tags = listOf(CardTag.PROTECTION))),
+        entry(card(id = "selfless-spirit-rh", name = "Selfless Spirit", typeLine = "Creature — Spirit", cmc = 2.0, colorIdentity = listOf("W"), power = "2", toughness = "1", oracleText = "Flying. Sacrifice Selfless Spirit: Creatures you control gain indestructible until end of turn.", tags = listOf(CardTag.PROTECTION))),
+        // Batch B expansion — generic Selesnya go-wide staples (curve, value, no dedicated axis role).
+        entry(card(id = "esper-sentinel-rh", name = "Esper Sentinel", typeLine = "Artifact Creature — Human Soldier", cmc = 1.0, colorIdentity = listOf("W"), power = "1", toughness = "1", oracleText = "Whenever an opponent casts their first noncreature spell each turn, you may draw a card unless that player pays {X}, where X is Esper Sentinel's power.")),
+        entry(card(id = "adanto-vanguard-rh", name = "Adanto Vanguard", typeLine = "Creature — Human Soldier", cmc = 2.0, colorIdentity = listOf("W"), power = "3", toughness = "2", oracleText = "As long as Adanto Vanguard is attacking, it gets +1/+0. Pay 2 life: Adanto Vanguard gains indestructible until end of turn.")),
+        entry(card(id = "sun-titan-rh", name = "Sun Titan", typeLine = "Creature — Giant Soldier", cmc = 6.0, colorIdentity = listOf("W"), power = "6", toughness = "6", oracleText = "Vigilance. Whenever Sun Titan enters the battlefield or attacks, you may return target permanent card with mana value 3 or less from your graveyard to the battlefield.")),
+        entry(card(id = "divine-visitation-rh", name = "Divine Visitation", typeLine = "Enchantment", cmc = 4.0, colorIdentity = listOf("W"), oracleText = "If you would create one or more tokens, instead create that many 4/4 white Angel creature tokens with flying.")),
+        entry(card(id = "emmara-soul-accord-rh", name = "Emmara, Soul of the Accord", typeLine = "Legendary Creature — Elf Warrior", cmc = 2.0, colorIdentity = listOf("W"), power = "1", toughness = "3", oracleText = "Whenever Emmara, Soul of the Accord or another creature enters the battlefield under your control tapped, you gain 1 life. Whenever Emmara attacks, if it's a Saturday, untap her.")),
+        entry(card(id = "loxodon-smiter-rh", name = "Loxodon Smiter", typeLine = "Creature — Elephant Soldier", cmc = 4.0, colorIdentity = listOf("G"), power = "5", toughness = "4", oracleText = "Hexproof as long as your hand has seven or more cards.")),
+        entry(card(id = "fleecemane-lion-rh", name = "Fleecemane Lion", typeLine = "Creature — Cat", cmc = 2.0, colorIdentity = listOf("G", "W"), power = "3", toughness = "3", oracleText = "Bestow {4}{G}{W}. Hexproof as long as Fleecemane Lion is untapped. Monstrosity 2 — {2}{G}{W}: If Fleecemane Lion is monstrous, it gets +1/+1 and gains hexproof and indestructible for as long as it remains monstrous.")),
+    )
+    val mainboard = withBasicsCommander(nonland, "Forest", "G")
+    return AnalysisV3Fixture(
+        id = 9, name = "Rhys the Redeemed (Tokens Aggro)", anchor = "Rhys the Redeemed",
+        format = DeckFormat.COMMANDER, mainboard = mainboard,
+        colorIdentity = setOf(ManaColor.G, ManaColor.W),
+        // Commander prior workstream: Rhys the Redeemed (token-doubling) is THE poster child of
+        // fast, go-wide GW token-swarm aggro in EDH -- honest, well-established real-world read.
+        commanderTags = listOf(CardTag.AGGRO, CardTag.TOKENS),
+        expectedMacro = "AGGRO", expectedPosture = NO_POSTURE, expectedThemes = "TOKENS",
+    )
+}

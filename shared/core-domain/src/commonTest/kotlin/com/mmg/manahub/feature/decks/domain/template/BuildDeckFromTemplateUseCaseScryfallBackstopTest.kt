@@ -73,6 +73,7 @@ class BuildDeckFromTemplateUseCaseScryfallBackstopTest {
         }
 
         override suspend fun searchCardByName(query: String): DataResult<Card> = error("unused")
+        override suspend fun searchCardPrintedName(name: String, lang: String): DataResult<Card> = error("unused")
         override suspend fun searchCards(query: String, page: Int, bypassCache: Boolean): DataResult<List<Card>> = error("unused")
         override suspend fun searchCardsPaginated(query: String, page: Int, bypassCache: Boolean): DataResult<PaginatedCards> = error("unused")
         override suspend fun getCardById(scryfallId: String): DataResult<Card> = error("unused")

@@ -120,7 +120,6 @@ private fun CollectionGroupingMode.toDisplayLabel(): String = when (this) {
     CollectionGroupingMode.CMC -> "Mana value"
     CollectionGroupingMode.SET -> "Set"
     CollectionGroupingMode.RARITY -> "Rarity"
-    CollectionGroupingMode.TAG -> "Tag"
 }
 
 /**

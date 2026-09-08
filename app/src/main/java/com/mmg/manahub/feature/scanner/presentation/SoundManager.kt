@@ -5,6 +5,8 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.PI
@@ -22,7 +24,35 @@ import kotlin.math.sin
  *
  * Each tone is 200 ms, 44 100 Hz, mono, 16-bit PCM.
  *
- * Playback runs on a background thread so the main thread is never blocked.
+ * ### Playback strategy (WS5, `scanner-reliability-plan.md`, 2026-08-25)
+ * One [AudioTrack] per tone is built ONCE, in [AudioTrack.MODE_STATIC], with its PCM buffer
+ * written exactly once at construction time — [trackNeutral], [trackHigh] and [trackTriumph]
+ * live for the whole process. A play request simply rewinds the track's playback head to 0 and
+ * calls [AudioTrack.play] again, the standard documented technique for replaying a static-mode
+ * track without reallocating it (`setPlaybackHeadPosition(0)` is only valid while the track is
+ * stopped, which is why [playBuffer] always calls [AudioTrack.stop] first — a harmless no-op if
+ * the track had already finished playing on its own).
+ *
+ * This replaces the previous implementation, which spawned a brand-new [Thread] and built a
+ * brand-new [AudioTrack] on every single successful scan — significant thread and audio-HAL
+ * churn over the long scanning sessions this whole reliability plan targets.
+ *
+ * Track-control calls (`stop` / `setPlaybackHeadPosition` / `play`) are dispatched on a single
+ * bounded background executor ([playbackExecutor]) so the caller (the scanner's recognition
+ * pipeline) is never blocked. Those calls return in microseconds — the actual audio plays out
+ * asynchronously on the system's audio mixer, not on the executor thread — so a burst of scans
+ * landing close together is simply serialized as a queue of near-instant control calls; no sound
+ * is ever dropped, and the executor never backs up.
+ *
+ * [SoundManager] is a Hilt `@Singleton`, alive for the whole app process (see
+ * `ScannerModule.provideSoundManager`). [release] genuinely stops and releases all three
+ * [AudioTrack]s and shuts down [playbackExecutor], but **nothing should call it from a
+ * screen-scoped lifecycle** (e.g. a `ViewModel.onCleared()`) — doing so would permanently kill
+ * scan sounds for the rest of the process the next time the user opens the scanner, the exact
+ * class of bug fixed for `CardOcrAnalyzer` in WS1 of the scanner reliability plan. `release()` is
+ * therefore intentionally uncalled today (verified: no call site remains anywhere in the app)
+ * and exists only for a future owner of the singleton's full lifecycle (e.g. process shutdown
+ * hooks), should one ever be added.
  */
 @Singleton
 class SoundManager @Inject constructor(
@@ -33,12 +63,7 @@ class SoundManager @Inject constructor(
     private val sampleRate = 44_100
     private val durationMs = 200
 
-    // ── Pre-generated PCM buffers ────────────────────────────────────────────
-    private val toneNeutral: ShortArray = generateTone(440.0)
-    private val toneHigh: ShortArray = generateTone(880.0)
-    private val toneTriumph: ShortArray = generateChord(1047.0, 784.0)
-
-    // ── Shared AudioAttributes for all tracks ────────────────────────────────
+    // ── Shared AudioAttributes/format for all tracks ─────────────────────────
     private val audioAttributes = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -50,11 +75,16 @@ class SoundManager @Inject constructor(
         .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
         .build()
 
-    private val minBufferSize = AudioTrack.getMinBufferSize(
-        sampleRate,
-        AudioFormat.CHANNEL_OUT_MONO,
-        AudioFormat.ENCODING_PCM_16BIT,
-    )
+    // ── One long-lived, pre-written AudioTrack per tone ──────────────────────
+    private val trackNeutral: AudioTrack = buildStaticTrack(generateTone(440.0))
+    private val trackHigh: AudioTrack = buildStaticTrack(generateTone(880.0))
+    private val trackTriumph: AudioTrack = buildStaticTrack(generateChord(1047.0, 784.0))
+
+    // ── Single bounded executor serializing playback control calls ──────────
+    private val playbackExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+
+    @Volatile
+    private var released = false
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Public API
@@ -73,22 +103,36 @@ class SoundManager @Inject constructor(
      */
     fun playForPrice(priceEur: Double?, priceUsdFallback: Double? = null) {
         val price = priceEur ?: (priceUsdFallback?.times(0.9))
-        val buffer = when {
-            price == null || price < 1.0 -> toneNeutral
-            price < 10.0 -> toneHigh
-            else -> toneTriumph
+        val track = when {
+            price == null || price < 1.0 -> trackNeutral
+            price < 10.0 -> trackHigh
+            else -> trackTriumph
         }
-        playBuffer(buffer)
+        playBuffer(track)
     }
 
     /**
-     * Releases any resources held by the [SoundManager].
+     * Releases the [AudioTrack]s and background executor held by this [SoundManager].
      *
-     * After calling this, no further playback should be requested.
+     * After calling this, no further playback should be requested — see the class KDoc for
+     * why this must never be wired to a screen-scoped lifecycle while [SoundManager] remains a
+     * process-wide singleton.
      */
     fun release() {
-        // Buffers are plain ShortArrays — no native resources to release.
-        // AudioTrack instances are created per-play and released inside the thread.
+        if (released) return
+        released = true
+        playbackExecutor.execute {
+            for (track in listOf(trackNeutral, trackHigh, trackTriumph)) {
+                try {
+                    track.stop()
+                } catch (_: Exception) {
+                    // Track may already be stopped/uninitialized — non-critical.
+                } finally {
+                    track.release()
+                }
+            }
+        }
+        playbackExecutor.shutdown()
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -134,37 +178,49 @@ class SoundManager @Inject constructor(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Playback
+    //  Track construction & playback
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Writes [buffer] to a new [AudioTrack] and plays it on a daemon background thread.
+     * Builds a [AudioTrack.MODE_STATIC] track sized for [buffer] and writes it exactly once.
+     * The returned track is replayed for the lifetime of this [SoundManager] via [playBuffer]
+     * instead of being rebuilt on every play.
      *
-     * The track is released automatically after playback completes.
-     *
-     * @param buffer PCM samples to play.
+     * @param buffer PCM samples to write into the track's static buffer.
      */
-    private fun playBuffer(buffer: ShortArray) {
-        Thread {
-            val bufferSizeBytes = maxOf(minBufferSize, buffer.size * 2)
-            val track = AudioTrack.Builder()
-                .setAudioAttributes(audioAttributes)
-                .setAudioFormat(audioFormat)
-                .setBufferSizeInBytes(bufferSizeBytes)
-                .setTransferMode(AudioTrack.MODE_STATIC)
-                .build()
+    private fun buildStaticTrack(buffer: ShortArray): AudioTrack {
+        val minBufferSize = AudioTrack.getMinBufferSize(
+            sampleRate,
+            AudioFormat.CHANNEL_OUT_MONO,
+            AudioFormat.ENCODING_PCM_16BIT,
+        )
+        val bufferSizeBytes = maxOf(minBufferSize, buffer.size * 2)
+        val track = AudioTrack.Builder()
+            .setAudioAttributes(audioAttributes)
+            .setAudioFormat(audioFormat)
+            .setBufferSizeInBytes(bufferSizeBytes)
+            .setTransferMode(AudioTrack.MODE_STATIC)
+            .build()
+        track.write(buffer, 0, buffer.size)
+        return track
+    }
+
+    /**
+     * Rewinds [track] to its start and plays it, on [playbackExecutor] so the caller is never
+     * blocked. Control calls return immediately; the audio itself plays out on the system mixer.
+     *
+     * @param track One of the pre-built, pre-written tone tracks.
+     */
+    private fun playBuffer(track: AudioTrack) {
+        if (released) return
+        playbackExecutor.execute {
             try {
-                track.write(buffer, 0, buffer.size)
-                track.play()
-                // Wait for playback to finish before releasing
-                val durationMillis = (buffer.size.toLong() * 1000L / sampleRate) + 50L
-                Thread.sleep(durationMillis)
-            } catch (_: Exception) {
-                // Silently swallow any audio errors — sound is non-critical
-            } finally {
                 track.stop()
-                track.release()
+                track.setPlaybackHeadPosition(0)
+                track.play()
+            } catch (_: Exception) {
+                // Silently swallow any audio errors — sound is non-critical.
             }
-        }.apply { isDaemon = true }.start()
+        }
     }
 }

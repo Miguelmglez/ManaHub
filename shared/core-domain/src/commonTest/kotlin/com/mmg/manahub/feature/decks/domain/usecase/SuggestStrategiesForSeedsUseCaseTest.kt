@@ -28,31 +28,31 @@ class SuggestStrategiesForSeedsUseCaseTest {
 
     @Test
     fun `a single seed is trivially coherent -- nothing to disagree with`() {
-        val seed = card(id = "s1", name = "Ramp Spell", tags = listOf(CardTag.RAMP))
+        val seed = card(id = "s1", name = "Aggro Spell", tags = listOf(CardTag.AGGRO))
         val result = useCase(listOf(seed))
         assertTrue(result.isCoherent)
         assertEquals(1f, result.coherenceScore)
     }
 
     @Test
-    fun `a RAMP-tagged seed ranks the RAMP archetype as a viable candidate`() {
-        val seed = card(id = "s1", name = "Ramp Spell", tags = listOf(CardTag.RAMP))
+    fun `an AGGRO-tagged seed ranks the AGGRO archetype as a viable candidate`() {
+        val seed = card(id = "s1", name = "Aggro Spell", tags = listOf(CardTag.AGGRO))
         val result = useCase(listOf(seed))
-        assertTrue(result.candidates.any { it.profile.archetype == ArchetypeId.RAMP })
+        assertTrue(result.candidates.any { it.profile.archetype == ArchetypeId.AGGRO })
     }
 
     @Test
     fun `a candidate with zero tag overlap is never returned`() {
-        val seed = card(id = "s1", name = "Ramp Spell", tags = listOf(CardTag.RAMP))
+        val seed = card(id = "s1", name = "Aggro Spell", tags = listOf(CardTag.AGGRO))
         val result = useCase(listOf(seed))
-        // Nothing in the RAMP seed's tag set overlaps STAX's seed tags -- STAX must not appear.
-        assertTrue(result.candidates.none { it.profile.themes.contains(ThemeId.STAX) })
+        // Nothing in the AGGRO seed's tag set overlaps MILL_OPPONENT's seed tags -- MILL_OPPONENT must not appear.
+        assertTrue(result.candidates.none { it.profile.themes.contains(ThemeId.MILL_OPPONENT) })
     }
 
     @Test
     fun `two seeds sharing an identity tag are coherent`() {
-        val seedA = card(id = "s1", name = "Ramp Spell A", tags = listOf(CardTag.RAMP))
-        val seedB = card(id = "s2", name = "Ramp Spell B", tags = listOf(CardTag.RAMP))
+        val seedA = card(id = "s1", name = "Aggro Spell A", tags = listOf(CardTag.AGGRO))
+        val seedB = card(id = "s2", name = "Aggro Spell B", tags = listOf(CardTag.AGGRO))
         val result = useCase(listOf(seedA, seedB))
         assertTrue(result.isCoherent)
         assertEquals(1f, result.coherenceScore)
@@ -60,7 +60,7 @@ class SuggestStrategiesForSeedsUseCaseTest {
 
     @Test
     fun `two seeds with completely disjoint identity tags are flagged incoherent, but still ranked`() {
-        val seedA = card(id = "s1", name = "Ramp Piece", tags = listOf(CardTag.RAMP))
+        val seedA = card(id = "s1", name = "Aggro Piece", tags = listOf(CardTag.AGGRO))
         val seedB = card(id = "s2", name = "Mill Piece", tags = listOf(CardTag.GRAVEYARD))
         val result = useCase(listOf(seedA, seedB))
         assertTrue(!result.isCoherent)
@@ -75,7 +75,7 @@ class SuggestStrategiesForSeedsUseCaseTest {
         // derivable tribe (non-creature type line, so TribeDeriver.subtypeKeys is also empty) aren't
         // in TENSION with each other, they just carry no signal -- pairwiseCoherence must not
         // conflate "no data" with "conflicting data" the way it would flag a genuinely disjoint pair
-        // (RAMP vs GRAVEYARD) as incoherent. Uses the default "Instant" typeLine + no tags/oracleText
+        // (AGGRO vs GRAVEYARD) as incoherent. Uses the default "Instant" typeLine + no tags/oracleText
         // so BOTH seeds' identity-key sets are genuinely empty, not just tag-empty.
         val untaggedA = card(id = "s1", name = "Plain Bolt")
         val untaggedB = card(id = "s2", name = "Plain Zap")
@@ -94,7 +94,7 @@ class SuggestStrategiesForSeedsUseCaseTest {
 
     @Test
     fun `candidates are sorted best-fit first`() {
-        val seed = card(id = "s1", name = "Ramp Spell", tags = listOf(CardTag.RAMP))
+        val seed = card(id = "s1", name = "Aggro Spell", tags = listOf(CardTag.AGGRO))
         val result = useCase(listOf(seed))
         val scores = result.candidates.map { it.fitScore }
         assertEquals(scores.sortedDescending(), scores)
@@ -104,22 +104,22 @@ class SuggestStrategiesForSeedsUseCaseTest {
 
     @Test
     fun `a seed sharing nothing with a candidate surfaces as that candidate's misfitSeeds`() {
-        val rampSeed = card(id = "s1", name = "Ramp Piece", tags = listOf(CardTag.RAMP))
+        val rampSeed = card(id = "s1", name = "Aggro Piece", tags = listOf(CardTag.AGGRO))
         val offSeed = card(id = "s2", name = "Graveyard Piece", tags = listOf(CardTag.GRAVEYARD))
         val result = useCase(listOf(rampSeed, offSeed))
 
-        val rampCandidate = result.candidates.first { it.profile.archetype == ArchetypeId.RAMP }
+        val rampCandidate = result.candidates.first { it.profile.archetype == ArchetypeId.AGGRO }
         assertTrue(rampCandidate.misfitSeeds.any { it.scryfallId == "s2" })
         assertTrue(rampCandidate.misfitSeeds.none { it.scryfallId == "s1" })
     }
 
     @Test
     fun `a candidate every seed supports has no misfitSeeds`() {
-        val seedA = card(id = "s1", name = "Ramp Piece A", tags = listOf(CardTag.RAMP))
-        val seedB = card(id = "s2", name = "Ramp Piece B", tags = listOf(CardTag.RAMP))
+        val seedA = card(id = "s1", name = "Aggro Piece A", tags = listOf(CardTag.AGGRO))
+        val seedB = card(id = "s2", name = "Aggro Piece B", tags = listOf(CardTag.AGGRO))
         val result = useCase(listOf(seedA, seedB))
 
-        val rampCandidate = result.candidates.first { it.profile.archetype == ArchetypeId.RAMP }
+        val rampCandidate = result.candidates.first { it.profile.archetype == ArchetypeId.AGGRO }
         assertTrue(rampCandidate.misfitSeeds.isEmpty())
     }
 
@@ -132,14 +132,23 @@ class SuggestStrategiesForSeedsUseCaseTest {
     }
 
     @Test
-    fun `a selected color absent from every curated combo for a candidate is flagged as a misfit`() {
-        // AGGRO's curated ColorStrategyAffinity combos (mono-W, mono-R, Rakdos, Gruul, Boros,
-        // Naya, Mardu...) never include Blue -- picking Blue alongside an AGGRO candidate must
-        // surface it as a misfit, regardless of which specific combo the tie-break lands on.
+    fun `a selected color combination absent from every curated combo for a candidate is flagged as a misfit`() {
+        // Deck Analysis Engine v3 taxonomy migration (2026-08-26, phase 3a compat shim) folded
+        // ArchetypeId.TEMPO into AGGRO as a posture (spec §2): every ColorStrategyAffinity entry
+        // that used to declare `archetype = ArchetypeId.TEMPO` alone (Azorius/Izzet/Jeskai/Grixis --
+        // all Blue) now declares `archetype = ArchetypeId.AGGRO, posture = PostureId.TEMPO`, and
+        // combosFor/misfitColorsFor match on `archetype` only (posture is display-only here, not
+        // yet threaded into this use case -- see its own KDoc). That genuinely widened AGGRO's
+        // curated color footprint to all 5 colors (verified: W/R/U/B/G each appear in at least one
+        // AGGRO-tagged combo now), so no SINGLE selected color can be guaranteed a misfit anymore --
+        // the old `ManaColor.U` assertion encoded the PRE-migration table, not a resolver bug.
+        // U+G together still are: no AGGRO combo contains both Blue and Green at once, so at least
+        // one of the two is always excluded from whichever combo wins the best-fit tie-break --
+        // asserting non-empty (not a specific color) keeps this robust to future weight retunes.
         val seed = card(id = "s1", name = "Aggro Beater", tags = listOf(CardTag.AGGRO))
-        val result = useCase(listOf(seed), selectedColors = setOf(ManaColor.U))
+        val result = useCase(listOf(seed), selectedColors = setOf(ManaColor.U, ManaColor.G))
         val aggroCandidate = result.candidates.first { it.profile.archetype == ArchetypeId.AGGRO }
-        assertTrue(ManaColor.U in aggroCandidate.misfitColors)
+        assertTrue(aggroCandidate.misfitColors.isNotEmpty())
     }
 
     @Test
@@ -166,7 +175,7 @@ class SuggestStrategiesForSeedsUseCaseTest {
 
     @Test
     fun `every returned candidate passes StrategyCatalog-isValidCombination`() {
-        val rampSeed = card(id = "s1", name = "Ramp Spell", tags = listOf(CardTag.RAMP))
+        val rampSeed = card(id = "s1", name = "Aggro Spell", tags = listOf(CardTag.AGGRO))
         val elf = card(id = "s2", name = "Elf Warrior", typeLine = "Creature — Elf Warrior")
         val result = useCase(listOf(rampSeed, elf))
         assertTrue(result.candidates.isNotEmpty())

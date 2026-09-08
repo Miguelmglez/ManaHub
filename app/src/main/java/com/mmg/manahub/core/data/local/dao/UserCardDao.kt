@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.data.local.dao
+// COMMENTS_REVIEWED: 2026-09-06
 
 import androidx.paging.PagingSource
 import androidx.room.Dao
@@ -16,22 +17,33 @@ interface UserCardCollectionDao {
 
     // ── Write operations ──────────────────────────────────────────────────────
 
-    // Room 2.x @Upsert: inserts if the PK doesn't exist, updates otherwise.
     @Upsert
     fun upsert(entity: UserCardCollectionEntity): Long
 
     @Upsert
     fun upsertAll(entities: List<UserCardCollectionEntity>)
 
-    // Soft-delete: sets is_deleted = 1 and bumps updated_at so the sync system
-    // picks up the tombstone and propagates the deletion to Supabase.
     @Query("UPDATE user_card_collection SET is_deleted = 1, updated_at = :updatedAt WHERE id = :id")
     fun softDelete(id: String, updatedAt: Long = System.currentTimeMillis())
 
-    // Assigns a real userId to all rows created during a guest session (user_id IS NULL or '').
-    // Called once on login/registration. Returns count of updated rows so the caller can
-    // decide whether to trigger a full sync.
-    @Query("UPDATE user_card_collection SET user_id = :newUserId, updated_at = :updatedAt WHERE user_id IS NULL OR user_id = ''")
+    // Write-path hardening audit (2026-09-06): the guard now matches the composite UNIQUE index
+    // EXACTLY (no is_deleted filter) -- Room's @Index cannot express a partial index, so a
+    // tombstoned row still occupies its tuple and would throw SQLiteConstraintException on this
+    // UPDATE if the guard let it through. A colliding guest row (live OR tombstoned collider)
+    // simply stays parked at user_id NULL as a pending conflict; CollectionMergeConflictResolver
+    // surfaces it for the user to resolve explicitly instead.
+    @Query("""
+        UPDATE user_card_collection SET user_id = :newUserId, updated_at = :updatedAt
+        WHERE (user_id IS NULL OR user_id = '')
+          AND NOT EXISTS (
+              SELECT 1 FROM user_card_collection existing
+              WHERE existing.user_id = :newUserId
+                AND existing.scryfall_id = user_card_collection.scryfall_id
+                AND existing.is_foil = user_card_collection.is_foil
+                AND existing.condition = user_card_collection.condition
+                AND existing.language = user_card_collection.language
+          )
+    """)
     fun assignUserId(newUserId: String, updatedAt: Long = System.currentTimeMillis()): Int
 
     // ── Read operations ───────────────────────────────────────────────────────
@@ -39,103 +51,89 @@ interface UserCardCollectionDao {
     @Query("SELECT * FROM user_card_collection WHERE id = :id AND is_deleted = 0")
     fun getById(id: String): UserCardCollectionEntity?
 
-    // Used by the sync PULL loop for LWW comparison. Unlike getById, this includes
-    // soft-deleted rows (tombstones) so a local deletion is never overwritten by an
-    // older remote row that hasn't been deleted yet.
+    // Includes tombstones so an older remote row can never resurrect a local deletion.
     @Query("SELECT * FROM user_card_collection WHERE id = :id")
     fun getByIdIncludingDeleted(id: String): UserCardCollectionEntity?
 
-    // UUID reconciliation: finds a local row that matches the Supabase composite key but
-    // may have a different UUID (guest-generated vs. Supabase-canonical). Used in the
-    // PULL loop to detect and fix UUID mismatches before upserting the remote row.
+    // Includes tombstones -- must match assignUserId's guard predicate exactly so a
+    // tombstone-collision conflict is surfaced the same way it was parked.
     @Query("SELECT * FROM user_card_collection WHERE user_id = :userId AND scryfall_id = :scryfallId AND is_foil = :isFoil AND condition = :condition AND language = :language LIMIT 1")
     fun getByCompositeKey(userId: String, scryfallId: String, isFoil: Boolean, condition: String, language: String): UserCardCollectionEntity?
 
-    // Guest-session variant: matches rows where user_id is NULL or empty.
     @Query("SELECT * FROM user_card_collection WHERE (user_id IS NULL OR user_id = '') AND scryfall_id = :scryfallId AND is_foil = :isFoil AND condition = :condition AND language = :language LIMIT 1")
     fun getByCompositeKeyGuest(scryfallId: String, isFoil: Boolean, condition: String, language: String): UserCardCollectionEntity?
 
-    // Hard-delete used only for UUID reconciliation: removes the stale guest-UUID row so
-    // the Supabase-canonical UUID row can be inserted without a composite UNIQUE conflict.
+    // Hard-delete: only safe where PUSH already flushed this row's state this cycle (UUID
+    // reconciliation) or the row is being folded into another via resolveMergeConflict.
     @Query("DELETE FROM user_card_collection WHERE id = :id")
     fun deleteById(id: String)
 
-    // Atomic UUID reconciliation: deletes the stale local row and inserts the
-    // Supabase-canonical row in a single transaction so a process-kill between the
-    // two operations can never leave the collection in a partially-updated state.
     @Transaction
     fun reconcileAndUpsert(deleteId: String, entity: UserCardCollectionEntity) {
         deleteById(deleteId)
         upsert(entity)
     }
 
-    // Returns all rows modified after :since — includes is_deleted = 1 rows so tombstones
-    // are also pushed during incremental sync.
+    // Write-path hardening audit (2026-09-06): atomic counterpart to
+    // CollectionMergeConflictResolver.resolve -- a process-kill between the account-row write and
+    // the guest-row delete would otherwise double-count on the next resolve attempt.
+    // [resolvedAccountRow] is null for KEEP_ACCOUNT (nothing to write, guest row just drops).
+    @Transaction
+    fun resolveMergeConflict(resolvedAccountRow: UserCardCollectionEntity?, guestRowId: String) {
+        resolvedAccountRow?.let { upsert(it) }
+        deleteById(guestRowId)
+    }
+
     @Query("SELECT * FROM user_card_collection WHERE (user_id = :userId OR user_id IS NULL) AND updated_at > :since")
     fun getAllSince(userId: String, since: Long): List<UserCardCollectionEntity>
 
-    // Returns all rows without a userId (guest/offline rows). Used by SyncManager to
-    // resolve UNIQUE-constraint conflicts before calling assignUserId on login.
     @Query("SELECT * FROM user_card_collection WHERE user_id IS NULL OR user_id = ''")
     fun getAllGuestRows(): List<UserCardCollectionEntity>
 
-    // Reactive stream of all non-deleted entries for this user (or guest rows).
-    // @Transaction prevents inconsistent reads across the two Room-internal queries for @Relation.
     @Transaction
     @Query("SELECT * FROM user_card_collection WHERE (user_id = :userId OR user_id IS NULL) AND is_deleted = 0 ORDER BY created_at DESC")
     fun observeAll(userId: String?): Flow<List<UserCardWithCard>>
 
-    // Reactive stream of ALL non-deleted entries regardless of userId.
-    // Used when the user is logged out so that locally-stored cards remain visible.
+    // Used when logged out so locally-stored cards remain visible.
     @Transaction
     @Query("SELECT * FROM user_card_collection WHERE is_deleted = 0 ORDER BY created_at DESC")
     fun observeAllLocal(): Flow<List<UserCardWithCard>>
 
-    // Newest-first, capped stream for the Home dashboard's Recently Added widget.
-    // Reuses the existing created_at index — no schema change (UserCardCollectionEntity
-    // already carries createdAt/updatedAt).
     @Transaction
     @Query("SELECT * FROM user_card_collection WHERE (user_id = :userId OR user_id IS NULL) AND is_deleted = 0 ORDER BY created_at DESC LIMIT :limit")
     fun observeRecent(userId: String?, limit: Int): Flow<List<UserCardWithCard>>
 
-    // Guest/logged-out variant: all local rows regardless of userId, capped.
     @Transaction
     @Query("SELECT * FROM user_card_collection WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT :limit")
     fun observeRecentLocal(limit: Int): Flow<List<UserCardWithCard>>
 
-    // Reactive stream for all variants of a single scryfall card.
     @Query("SELECT * FROM user_card_collection WHERE scryfall_id = :scryfallId AND (user_id = :userId OR user_id IS NULL) AND is_deleted = 0")
     fun observeByScryfall(scryfallId: String, userId: String?): Flow<List<UserCardCollectionEntity>>
 
-    // Live count of non-deleted collection entries for UI display.
     @Query("SELECT COUNT(*) FROM user_card_collection WHERE (user_id = :userId OR user_id IS NULL) AND is_deleted = 0")
     fun observeCount(userId: String?): Flow<Int>
 
     @Query("SELECT DISTINCT scryfall_id FROM user_card_collection WHERE is_deleted = 0")
     fun getAllScryfallIds(): List<String>
 
-    // Returns the number of non-deleted collection rows owned by [userId].
-    // Used by SyncManager.assignUserIdAndSync to detect a wiped Room DB (count == 0
-    // after assignUserId ran but no guest rows were migrated), which means the DataStore
-    // watermark must be cleared to force a full pull from Supabase.
+    // Used by SyncManager.assignUserIdAndSync to detect a wiped Room DB and force a full re-pull.
     @Query("SELECT COUNT(*) FROM user_card_collection WHERE user_id = :userId AND is_deleted = 0")
     fun getCountForUser(userId: String): Int
 
-    // Counts rows (including tombstones) modified after [since] for the exact [userId].
-    // Used by SyncManager.countPendingChanges to drive the "Sync your collection" banner.
-    // Unlike getAllSince this does NOT include NULL-userId guest rows — those must be
-    // migrated via assignUserIdAndSync first and must not inflate the banner count.
+    // Excludes NULL-userId guest rows -- those must migrate via assignUserId first, or the "Sync
+    // your collection" banner count would be inflated by rows that aren't safe to push yet.
     @Query("SELECT COUNT(*) FROM user_card_collection WHERE user_id = :userId AND updated_at > :since")
     fun countPendingSync(userId: String, since: Long): Int
 
-    // Card Versions & Languages, Phase 1A. Every non-deleted collection row for ANY
-    // printing/language sharing the same oracle identity as the card being viewed — feeds
-    // CardDetail's "your other copies" section (Phase 1B). The subquery matches by oracle_id
-    // when it is known; rows whose cached CardEntity predates the oracle_id column (oracle_id =
-    // '') are related by an exact match on the English oracle `name` instead. When [oracleId]
-    // itself is blank (the viewed card's own cache row predates oracle_id), the first branch is
-    // never true, so matching correctly falls through to name-only — it does NOT widen to every
-    // other oracle_id='' card in the table.
+    // Includes tombstones to mirror get_collection_integrity().total_rows exactly.
+    @Query("SELECT COUNT(*) FROM user_card_collection WHERE user_id = :userId")
+    fun getTotalRowCountForUser(userId: String): Int
+
+    @Query("SELECT COALESCE(SUM(quantity), 0) FROM user_card_collection WHERE user_id = :userId AND is_deleted = 0")
+    fun getLiveQuantityForUser(userId: String): Int
+
+    // Matches by oracle_id when known; falls back to exact English name for cache rows that
+    // predate the oracle_id backfill (never widens to every oracle_id='' row when oracleId is blank).
     @Transaction
     @Query("""
         SELECT * FROM user_card_collection
@@ -152,8 +150,6 @@ interface UserCardCollectionDao {
 
     // ── Paging 3 support ──────────────────────────────────────────────────────
 
-    // Returns a PagingSource backed by Room. Requires room-paging dependency.
-    // @Transaction ensures @Relation (card join) is consistent across paged loads.
     @Transaction
     @Query("SELECT * FROM user_card_collection WHERE (user_id = :userId OR user_id IS NULL) AND is_deleted = 0 ORDER BY created_at DESC")
     fun getCollectionPagingSource(userId: String?): PagingSource<Int, UserCardWithCard>

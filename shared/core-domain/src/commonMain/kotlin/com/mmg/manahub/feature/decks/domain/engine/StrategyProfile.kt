@@ -10,8 +10,9 @@ package com.mmg.manahub.feature.decks.domain.engine
  * (RC1 -- "vocabulary fragmentation"). [DeckIdentitySeedTags] remains the ONLY profile -> [com.mmg
  * .manahub.core.model.CardTag] seed-tag bridge; this type never carries tags itself.
  *
- * @param archetype the macro [ArchetypeId] pin. `null` = unpinned (the build/evaluation falls back
- *   to [ArchetypeId.GENERIC]).
+ * @param archetype the macro [ArchetypeId] pin. `null` = unpinned (the build/evaluation resolves
+ *   against the bare generic baseline skeleton -- Deck Analysis Engine v3 removed
+ *   `ArchetypeId.GENERIC`, so `null` is now the sole "no macro pin" representation).
  * @param themes at most 2 [ThemeId] picks (mirrors [ArchetypeSkeletonResolver]'s own 2-theme cap).
  *   In the wizard, index 0 is the Direction step's pick, index 1 (when present) is the Identity
  *   step's own EDHREC theme picker -- both slots exist independently, same as the pre-unification

@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -45,7 +44,7 @@ import coil3.compose.AsyncImage
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.ui.components.CardName
-import com.mmg.manahub.core.ui.components.CardTagChip
+import com.mmg.manahub.core.ui.components.CardTagGroup
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCard
@@ -375,15 +374,10 @@ private fun CardDetailTextBlock(card: Card, strategyTags: List<CardTag>) {
 
 @Composable
 private fun CardTagsRow(tags: List<CardTag>) {
-    val spacing = MaterialTheme.spacing
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-        verticalArrangement = Arrangement.spacedBy(spacing.xs),
-    ) {
-        tags.forEach { tag ->
-            CardTagChip(label = tag.displayLabel, category = tag.category)
-        }
-    }
+    CardTagGroup(
+        tags = tags,
+        tagLabel = { it.displayLabel }
+    )
 }
 
 @Composable

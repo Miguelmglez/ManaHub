@@ -178,7 +178,9 @@ object HarnessSpecs {
         )
 
         // ── Flow C -- strategy-first ────────────────────────────────────────────────────────
-        val flowCArchetype = ArchetypeId.RAMP
+        // Deck Analysis Engine v3: RAMP moved from ArchetypeId to PostureId -- swapped to a real
+        // macro (StrategyProfile does not model posture, out of this harness's scope).
+        val flowCArchetype = ArchetypeId.MIDRANGE
         val flowCColors = ColorStrategyAffinity.combosFor(flowCArchetype, null).firstOrNull()?.first ?: setOf(ManaColor.G)
         val flowCProfile = StrategyProfile(archetype = flowCArchetype, colors = flowCColors)
         val flowCSeeds = RankOwnedCardsForProfileUseCase()(flowCProfile, fixtures.ownedCardsByName).take(2)

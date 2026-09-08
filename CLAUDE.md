@@ -44,6 +44,20 @@ XML, `strings.xml`, Composables, DAO queries, names, comments, KDoc.
 UI-facing strings in any other language. `TimeAgoFormatter` (`core/util/`) uses only its English
 output; do not restore `es`/`de` locale branches. → memory: `feedback_language_rules`
 
+## Comments & Code Style
+
+**Comments: precise, concise, or none.** Default to NO comments — well-named identifiers already show WHAT the code does. Add a comment ONLY when WHY is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific bug, or behavior that would surprise a reader. Never comment WHAT; never reference the feature/task/issue that prompted the code (belongs in commit messages, not code).
+
+**One-line comments max** (never multi-line comment blocks or docstrings for implementation code). Write as a sentence fragment:
+```kotlin
+// DAO uses INSERT OR IGNORE + @Update, never REPLACE (which cascades)
+// StateFlow self-assignment is a no-op on cold flow, safe to call
+```
+
+**Removing stale comments is mandatory:** `android-kotlin-architect` + `kmp-web-fullstack-dev` agents MUST, on first touch of a file, delete all outdated/obvious/multi-line comments. **Mark the file with a gitignored `.comments-reviewed` tag** (add `// COMMENTS_REVIEWED: 2026-09-06` as the first line after the package declaration) so agents skip it on future edits — never re-review a marked file unless the comment itself changes.
+
+→ memory: `feedback_comment_precision_2026-09-06`
+
 ## Build commands
 
 - YouTube API key is optional (Draft Guide video is silently disabled without it). Add
@@ -104,16 +118,42 @@ Broadly-applicable rules (feature-specific detail → memory):
 and silently deletes all `UserCardEntity` rows for that card. The DAO uses INSERT OR IGNORE + `@Update`
 in a `@Transaction`. Regression test: `CardDao CASCADE regression`.
 
-### Database (Room v51)
-- DB file `mtg_collection.db`. `UserCardEntity` FK to `CardEntity` is `ON DELETE RESTRICT` (v38).
-- Migration chain 1→51, gaps at 7–10 and 15–17 covered by `fallbackToDestructiveMigration()` (dev-only;
+### Collection sync — data-loss invariants (ADR-008)
+Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-sync-safe-watermark.md`.
+- **A sync watermark must never advance past a row that was not both fetched AND applied.**
+  `min(syncStartTime, minUnappliedUpdatedAt - 1).coerceAtLeast(lastSync)`. Never
+  `max(updatedAt seen)` — "seen" is not "applied", and that is precisely the bug that permanently
+  stranded 377 of one user's 1377 collection rows.
+- **Every `RETURNS SETOF` RPC must be keyset-paginated below `db-max-rows`.** PostgREST silently
+  truncates at 1000 with no signal to the client. Paginate on `(updated_at, id)` — tie-safe — keeping
+  the window filter and the cursor as separate predicates, and cap the page size **server-side**.
+  Drain via `PagedSync.drainPages` (`:shared:core-data` commonMain). Still unpaginated: the five
+  gamification `*_changes_since` RPCs.
+- **Ownership data never depends on cache metadata.** A `user_card_collection` row inserts whether or
+  not its `CardEntity` is cached; unresolved ids get a `stale_reason = "pending_hydration"`
+  placeholder so the row stays visible and counted. Consumers that aggregate card fields (stats,
+  price refresh, deck analysis) must exclude placeholders.
+- → memory: `feedback_sync_watermark_never_past_unapplied`, `feedback_setof_rpc_must_be_paginated`,
+  `feedback_idempotency_gate_tests_own_completion`, `project_collection_sync_data_loss_2026-09`
+
+### Database (Room v53)
+- DB file `mtg_collection.db`. The `UserCardEntity` → `CardEntity` FK was **removed in v53** (ADR-008);
+  do not reintroduce it. It was `ON DELETE RESTRICT` from v38 to v52.
+- Migration chain 1→53, gaps at 7–10 and 15–17 covered by `fallbackToDestructiveMigration()` (dev-only;
   not safe for production data). v39 = 6 gamification tables; v40 = additive `legality_legacy`/
   `legality_vintage`/`legality_pauper` on `cards` (Deck Doctor Phase 4 D2); v41 = Community Decks
   attribution columns on `decks` + `community_deck_cache` table; v42 = additive `produced_mana`
   (compact WUBRG string, not JSON) on `cards` (Deck Doctor Community/Archetype plan Phase 0.3, D14);
   v43–v49 = additive per-feature tables/columns (see each `Migration_x_y.kt`'s KDoc for what it
-  added); **v50 = `puzzle_results` table (Daily Puzzle, Batch B1); v51 = `competitive_meta_cache` +
-  `competitive_limited_ratings_cache` tables** (Competitive feature, Worker-backed JSON-blob caches).
+  added); v50 = `puzzle_results` table (Daily Puzzle, Batch B1); v51 = `competitive_meta_cache` +
+  `competitive_limited_ratings_cache` tables (Competitive feature, Worker-backed JSON-blob caches);
+  v52 = Deck Analysis Engine v3 taxonomy migration (`ArchetypeId`/`ThemeId` renames, defensively
+  parsed so stale persisted strings degrade rather than crash);
+  **v53 = table recreate of `user_card_collection` to DROP its FK to `cards`** — the one migration
+  that is not additive. SQLite has no `DROP CONSTRAINT`, so it recreates + copies + recreates all five
+  indices; those index names must match Room's generated names byte for byte or
+  `runMigrationsAndValidate` crash-loops every user at launch (destructive fallback covers only
+  v1–24). Guarded by `Migration52To53Test`.
   Every migration since v39 follows the same pattern: a top-level `val MIGRATION_x_y` in its own file,
   `CREATE TABLE IF NOT EXISTS …` / `ADD COLUMN … TEXT NOT NULL DEFAULT '…'` guarded by a
   `columnExists` check where applicable, CardDao upsert untouched → no CASCADE risk.
@@ -348,7 +388,7 @@ valuable user metrics:
 **All Android/Kotlin (`.kt`) work goes through the `android-kotlin-architect` agent** — net-new feature
 code included, not only bug fixes. The main agent must not edit `.kt` files directly; delegate (passing
 file path + line, the exact problem/feature, the proposed solution logic, and any CLAUDE.md constraints).
-Non-Kotlin work (Python `scripts/draftsim_py/`, Worker JS, Gradle, docs, memory) is handled directly.
+Non-Kotlin work (the Python draft-content pipeline, Worker JS, Gradle, docs, memory) is handled directly.
 → memory: `feedback_delegate_kotlin_to_architect`
 
 **All WEB-target work (implement / translate / fix) goes through the `kmp-web-fullstack-dev` agent** —

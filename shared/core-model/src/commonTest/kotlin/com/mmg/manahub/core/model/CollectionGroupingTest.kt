@@ -216,79 +216,7 @@ class CollectionGroupingTest {
         assertEquals(listOf(""), sections.map { it.labelToken })
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  TAG
-    // ══════════════════════════════════════════════════════════════════════════
 
-    @Test
-    fun tag_cardWithMultipleStrategyTags_appearsInEverySectionItCarries() {
-        val group = buildGroup(buildCard(tags = listOf(CardTag.TOKENS, CardTag.GRAVEYARD)))
-        val sections = groupCollection(listOf(group), CollectionGroupingMode.TAG)
-
-        val tokens = sections.map { it.labelToken }.toSet()
-        assertTrue("tokens" in tokens)
-        assertTrue("graveyard" in tokens)
-        assertEquals(2, sections.size)
-    }
-
-    @Test
-    fun tag_noTags_bucketsAsUntaggedSentinel() {
-        val group = buildGroup(buildCard(tags = emptyList(), userTags = emptyList()))
-        val sections = groupCollection(listOf(group), CollectionGroupingMode.TAG)
-
-        assertEquals(listOf("untagged"), sections.map { it.labelToken })
-    }
-
-    @Test
-    fun tag_sameKeyInBothTagsAndUserTags_countedOnceInThatSection() {
-        val group = buildGroup(buildCard(tags = listOf(CardTag.TOKENS), userTags = listOf(CardTag.TOKENS)))
-        val sections = groupCollection(listOf(group), CollectionGroupingMode.TAG)
-
-        assertEquals(1, sections.size)
-        assertEquals(1, sections[0].items.size)
-    }
-
-    @Test
-    fun tag_onlyNonIdentityCategoryTags_bucketsAsUntaggedSentinel() {
-        // CardTag.REMOVAL and CardTag.TUTOR are both TagCategory.ROLE — not one of the "identity"
-        // categories (STRATEGY/ARCHETYPE/TRIBAL) Collection's TAG grouping is restricted to, unlike
-        // CardDetail/Deck Studio which show every category — so this card must still be untagged.
-        val group = buildGroup(buildCard(tags = listOf(CardTag.REMOVAL, CardTag.TUTOR)))
-        val sections = groupCollection(listOf(group), CollectionGroupingMode.TAG)
-
-        assertEquals(listOf("untagged"), sections.map { it.labelToken })
-    }
-
-    @Test
-    fun tag_mixedIdentityAndRoleCategoryTags_bucketsOnlyUnderIdentityTag() {
-        // CardTag.TOKENS is STRATEGY (an identity category); CardTag.REMOVAL (ROLE) is not and
-        // must be ignored — the card should land in exactly one section, "tokens".
-        val group = buildGroup(buildCard(tags = listOf(CardTag.TOKENS, CardTag.REMOVAL)))
-        val sections = groupCollection(listOf(group), CollectionGroupingMode.TAG)
-
-        assertEquals(listOf("tokens"), sections.map { it.labelToken })
-    }
-
-    @Test
-    fun tag_archetypeOnlyTag_isIncludedAsIdentitySection() {
-        // CardTag.RAMP is TagCategory.ARCHETYPE — one of the three "identity" categories
-        // (STRATEGY/ARCHETYPE/TRIBAL) widened into scope on 2026-08-17 (was STRATEGY-only, which
-        // incorrectly bucketed ARCHETYPE/TRIBAL-only cards as "untagged").
-        val group = buildGroup(buildCard(tags = listOf(CardTag.RAMP)))
-        val sections = groupCollection(listOf(group), CollectionGroupingMode.TAG)
-
-        assertEquals(listOf("ramp"), sections.map { it.labelToken })
-    }
-
-    @Test
-    fun tag_tribalCategoryOnlyTag_isIncludedAsIdentitySection() {
-        // A TagCategory.TRIBAL tag (e.g. a tribal-synergy "goblin" tag) is an identity category
-        // too — must NOT fall into "untagged".
-        val group = buildGroup(buildCard(tags = listOf(CardTag("goblin", TagCategory.TRIBAL))))
-        val sections = groupCollection(listOf(group), CollectionGroupingMode.TAG)
-
-        assertEquals(listOf("goblin"), sections.map { it.labelToken })
-    }
 
     // ══════════════════════════════════════════════════════════════════════════
     //  Order stability

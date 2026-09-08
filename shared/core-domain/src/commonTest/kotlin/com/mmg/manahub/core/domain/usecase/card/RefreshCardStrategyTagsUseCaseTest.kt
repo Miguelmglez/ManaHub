@@ -34,11 +34,15 @@ class RefreshCardStrategyTagsUseCaseTest {
             callCount++
             return result
         }
+        override suspend fun getStrategyTagsBatch(oracleIds: Set<String>): Map<String, CardStrategyTagsResult> =
+            oracleIds.associateWith { result }
         override suspend fun submitStrategyTags(oracleId: String, submission: CardStrategyTagsSubmission) = Unit
     }
 
     private class ThrowingCardStrategyTagsRepository : CardStrategyTagsRepository {
         override suspend fun getStrategyTags(oracleId: String): CardStrategyTagsResult =
+            throw IllegalStateException("offline")
+        override suspend fun getStrategyTagsBatch(oracleIds: Set<String>): Map<String, CardStrategyTagsResult> =
             throw IllegalStateException("offline")
         override suspend fun submitStrategyTags(oracleId: String, submission: CardStrategyTagsSubmission) = Unit
     }
@@ -68,6 +72,7 @@ class RefreshCardStrategyTagsUseCaseTest {
         // Unused by this use case — minimal no-op implementations to satisfy the interface.
         override suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")
         override suspend fun searchCardByName(query: String): DataResult<Card> = error("unused")
+        override suspend fun searchCardPrintedName(name: String, lang: String): DataResult<Card> = error("unused")
         override suspend fun searchCards(query: String, page: Int, bypassCache: Boolean): DataResult<List<Card>> = error("unused")
         override suspend fun searchCardsPaginated(query: String, page: Int, bypassCache: Boolean): DataResult<PaginatedCards> = error("unused")
         override suspend fun getCardPrints(name: String): DataResult<List<Card>> = error("unused")

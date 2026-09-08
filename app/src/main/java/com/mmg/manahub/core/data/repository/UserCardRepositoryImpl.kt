@@ -1,9 +1,5 @@
 package com.mmg.manahub.core.data.repository
 
-import androidx.paging.ExperimentalPagingApi
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
-import androidx.paging.PagingData
 import androidx.room.withTransaction
 import com.mmg.manahub.core.data.local.MtgDatabase
 import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
@@ -11,13 +7,11 @@ import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.dao.UserCardWithCard
 import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
-import com.mmg.manahub.core.data.local.paging.CollectionRemoteMediator
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.domain.repository.AddOutcome
-import com.mmg.manahub.core.domain.repository.CollectionPagerSource
 import com.mmg.manahub.core.domain.repository.UpdateEntryOutcome
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.auth.SessionState
@@ -59,7 +53,7 @@ class UserCardRepositoryImpl @Inject constructor(
     // type — see the class KDoc below for why this repository reaches into it directly).
     private val localOpenForTradeDao: LocalOpenForTradeDao,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-) : UserCardRepository, CollectionPagerSource {
+) : UserCardRepository {
 
     // Emits null for unauthenticated/loading, userId for authenticated.
     // Used by all observe methods so they re-subscribe when the user changes.
@@ -173,20 +167,6 @@ class UserCardRepositoryImpl @Inject constructor(
                     .map { list -> list.mapNotNull { it.toDomain() } }
             }
         }
-
-    @OptIn(ExperimentalPagingApi::class)
-    override fun getCollectionPager(userId: String?): Flow<PagingData<UserCardWithCard>> =
-        Pager(
-            config = PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = false),
-            remoteMediator = CollectionRemoteMediator(
-                userId = userId,
-                supabaseClient = supabaseClient,
-                userCardCollectionDao = userCardCollectionDao,
-                remoteKeyDao = remoteKeyDao,
-                db = database,
-            ),
-            pagingSourceFactory = { userCardCollectionDao.getCollectionPagingSource(userId) },
-        ).flow
 
     // ── Mutations ─────────────────────────────────────────────────────────────
 
@@ -334,8 +314,7 @@ class UserCardRepositoryImpl @Inject constructor(
         userId: String?,
     ): UpdateEntryOutcome = withContext(ioDispatcher) {
         // Cross-DAO atomicity (user_card_collection + local_open_for_trade) is achieved via
-        // database.withTransaction { } — the same pattern CollectionRemoteMediator already uses
-        // for its Room writes — rather than a single-DAO @Transaction default method: Room only
+        // database.withTransaction { } rather than a single-DAO @Transaction default method: Room only
         // allows a @Transaction default method to call OTHER methods on the SAME DAO instance, and
         // this edit must also re-point/merge a linked LocalOpenForTradeDao row atomically with the
         // collection-row change (a process death between the two would otherwise leave either a
@@ -510,9 +489,5 @@ class UserCardRepositoryImpl @Inject constructor(
             createdAt = userCard.createdAt,
         )
         return DomainUserCardWithCard(userCard = userCardDomain, card = cardEntity.toDomainCard())
-    }
-
-    companion object {
-        private const val PAGE_SIZE = 50
     }
 }

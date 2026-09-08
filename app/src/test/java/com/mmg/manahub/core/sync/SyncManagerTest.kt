@@ -22,6 +22,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -165,8 +166,8 @@ class SyncManagerTest {
         every { collectionDao.getAllSince(any(), any()) } returns emptyList()
         every { deckDao.getDecksSince(any(), any()) } returns emptyList()
         every { deckDao.getDeckCards(any()) } returns emptyList()
-        coEvery { collectionRemote.getChangesSince(any()) } returns Result.success(emptyList())
-        coEvery { deckRemote.getDeckChangesSince(any()) } returns Result.success(emptyList())
+        coEvery { collectionRemote.getChangesPage(any(), any(), any(), any()) } returns Result.success(emptyList())
+        coEvery { deckRemote.getDeckChangesPage(any(), any(), any(), any()) } returns Result.success(emptyList())
         coEvery { collectionRemote.batchUpsert(any()) } returns Result.success(Unit)
         coEvery { deckRemote.batchUpsertDecks(any()) } returns Result.success(Unit)
         coEvery { deckRemote.upsertDeckCards(any(), any()) } returns Result.success(Unit)
@@ -181,6 +182,15 @@ class SyncManagerTest {
         coEvery { cardDao.getByIds(any()) } answers {
             firstArg<List<String>>().map { id -> mockk<CardEntity>(relaxed = true) { every { scryfallId } returns id } }
         }
+
+        // Phase 6 integrity self-check: default to "in sync" (0 remote rows, matching the
+        // relaxed-mock default of 0 for collectionDao.getTotalRowCountForUser) so it is a no-op
+        // unless a test explicitly overrides it.
+        coEvery { collectionRemote.getIntegrity() } returns Result.success(
+            com.mmg.manahub.core.data.remote.collection.CollectionIntegrityDto(
+                totalRows = 0, liveRows = 0, liveQuantity = 0, maxUpdatedAt = null,
+            )
+        )
 
         syncManager = SyncManager(
             collectionDao    = collectionDao,
@@ -290,7 +300,7 @@ class SyncManagerTest {
         every {
             collectionDao.getByCompositeKey(remoteDto.userId, remoteDto.scryfallId, remoteDto.isFoil, remoteDto.condition, remoteDto.language)
         } returns localRow
-        coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDto))
+        coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteDto))
 
         // Act
         val result = syncManager.sync(USER_ID)
@@ -309,7 +319,7 @@ class SyncManagerTest {
         every {
             collectionDao.getByCompositeKey(remoteDto.userId, remoteDto.scryfallId, remoteDto.isFoil, remoteDto.condition, remoteDto.language)
         } returns localRow
-        coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDto))
+        coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteDto))
 
         // Act
         val result = syncManager.sync(USER_ID)
@@ -329,7 +339,7 @@ class SyncManagerTest {
         every {
             collectionDao.getByCompositeKey(remoteDto.userId, remoteDto.scryfallId, remoteDto.isFoil, remoteDto.condition, remoteDto.language)
         } returns localRow
-        coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDto))
+        coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteDto))
 
         // Act
         val result = syncManager.sync(USER_ID)
@@ -347,7 +357,7 @@ class SyncManagerTest {
         every {
             collectionDao.getByCompositeKey(remoteDto.userId, remoteDto.scryfallId, remoteDto.isFoil, remoteDto.condition, remoteDto.language)
         } returns null
-        coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDto))
+        coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteDto))
 
         // Act
         val result = syncManager.sync(USER_ID)
@@ -367,7 +377,7 @@ class SyncManagerTest {
         val localDeck  = buildDeckEntity(updatedAt = 2_000L)
         val remoteDeck = buildDeckSyncDto(updatedAt = 3_000L)
         every { deckDao.getDeckByIdForSync(DECK_ID) } returns localDeck
-        coEvery { deckRemote.getDeckChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDeck))
+        coEvery { deckRemote.getDeckChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteDeck))
 
         // Act
         val result = syncManager.sync(USER_ID)
@@ -383,7 +393,7 @@ class SyncManagerTest {
         val localDeck  = buildDeckEntity(updatedAt = 9_000L)
         val remoteDeck = buildDeckSyncDto(updatedAt = 1_000L)
         every { deckDao.getDeckByIdForSync(DECK_ID) } returns localDeck
-        coEvery { deckRemote.getDeckChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDeck))
+        coEvery { deckRemote.getDeckChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteDeck))
 
         // Act
         val result = syncManager.sync(USER_ID)
@@ -432,16 +442,23 @@ class SyncManagerTest {
     }
 
     @Test
-    fun `given pull fails when sync then watermark is NOT saved`() = runTest(testDispatcher) {
-        // Arrange: make collection pull throw
-        coEvery { collectionRemote.getChangesSince(any()) } returns Result.failure(RuntimeException("timeout"))
+    fun `given pull page fetch fails when sync then sync still succeeds and watermark is capped at lastSync`() = runTest(testDispatcher) {
+        // Arrange: the first collection page fetch fails (network/RPC error). Collection sync
+        // data-loss fix, Phase 3: a page-FETCH failure no longer aborts the whole cycle as
+        // SyncState.ERROR (push already succeeded) -- it caps the safe watermark instead, per the
+        // drainPages/safe-watermark contract (min(syncStartTime, minUnappliedUpdatedAt - 1)
+        // .coerceAtLeast(lastSync)). With zero pages ever consumed, minUnappliedUpdatedAt resolves
+        // to lastSync itself, so the saved watermark is exactly LAST_SYNC -- unchanged, never
+        // regressed, never advanced past the untried window.
+        coEvery { collectionRemote.getChangesPage(any(), any(), any(), any()) } returns Result.failure(RuntimeException("timeout"))
 
         // Act
         val result = syncManager.sync(USER_ID)
 
         // Assert
-        assertEquals(SyncState.ERROR, result.state)
-        coVerify(exactly = 0) { syncPrefs.saveLastSyncMillis(any(), any()) }
+        assertEquals(SyncState.SUCCESS, result.state)
+        assertEquals(0, result.collectionPulled)
+        coVerify(exactly = 1) { syncPrefs.saveLastSyncMillis(USER_ID, LAST_SYNC) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -493,7 +510,7 @@ class SyncManagerTest {
             commanderCardId = COMMANDER_ID,
         )
         every { deckDao.getDeckById(DECK_ID) } returns buildDeckEntity(updatedAt = 1_000L)
-        coEvery { deckRemote.getDeckChangesSince(any()) } returns Result.success(listOf(remoteDeck))
+        coEvery { deckRemote.getDeckChangesPage(any(), any(), any(), any()) } returns Result.success(listOf(remoteDeck))
         val capturedEntity = slot<DeckEntity>()
         every { deckDao.upsertDeck(capture(capturedEntity)) } returns Unit
 
@@ -619,6 +636,25 @@ class SyncManagerTest {
         coVerify(exactly = 0) { deckRemote.batchUpsertDecks(any()) }
     }
 
+    // Write-path hardening audit (CRITICAL 2, 2026-09-06): collectionDao.assignUserId used to run
+    // BEFORE _syncState was set to SYNCING and OUTSIDE the runCatching boundary -- a constraint
+    // failure there escaped uncaught to CollectionSyncWorker, leaving syncState stuck at IDLE
+    // forever with no ERROR ever surfaced to the UI. It now runs INSIDE that boundary.
+    @Test
+    fun `given assignUserId throws when assignUserIdAndSync runs then the exception is caught, ERROR is returned, and syncState is ERROR (never stuck at IDLE)`() =
+        runTest(testDispatcher) {
+            every { collectionDao.assignUserId(any(), any()) } throws RuntimeException("SQLITE_CONSTRAINT")
+
+            // Act: must NOT throw -- the whole point of the fix.
+            val result = syncManager.assignUserIdAndSync(USER_ID)
+            advanceUntilIdle()
+
+            // Assert
+            assertEquals(SyncState.ERROR, result.state)
+            assertEquals(SyncState.ERROR, syncManager.syncState.value)
+            verify(exactly = 1) { crashReporter.recordException(any()) }
+        }
+
     // ══════════════════════════════════════════════════════════════════════════
     //  GROUP 10 — SyncState transitions
     // ══════════════════════════════════════════════════════════════════════════
@@ -677,7 +713,7 @@ class SyncManagerTest {
         every {
             collectionDao.getByCompositeKey(remoteDeleted.userId, remoteDeleted.scryfallId, remoteDeleted.isFoil, remoteDeleted.condition, remoteDeleted.language)
         } returns localRow
-        coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDeleted))
+        coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteDeleted))
         val capturedEntity = slot<UserCardCollectionEntity>()
         every { collectionDao.upsert(capture(capturedEntity)) } returns 1L
 
@@ -700,7 +736,7 @@ class SyncManagerTest {
             // Arrange: override the default setUp() stub (which pretends every id is cached) so
             // CARD_ID_A genuinely reports missing, forcing the Scryfall-fetch-and-persist path.
             val remoteRow = buildCollectionDto(scryfallId = CARD_ID_A, updatedAt = 9_000L)
-            coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteRow))
+            coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteRow))
             coEvery { cardDao.getByIds(listOf(CARD_ID_A)) } returns emptyList()
             every { collectionDao.getByIdIncludingDeleted(any()) } returns null
             every { collectionDao.getByCompositeKey(any(), any(), any(), any(), any()) } returns null
@@ -724,7 +760,7 @@ class SyncManagerTest {
             // /cards/collection hard limit ensureCardsExist chunks against.
             val missingIds = (1..80).map { "missing-card-$it" }
             val remoteRows = missingIds.map { id -> buildCollectionDto(id = "col-$id", scryfallId = id, updatedAt = 9_000L) }
-            coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(remoteRows)
+            coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(remoteRows)
             coEvery { cardDao.getByIds(missingIds) } returns emptyList()
             every { collectionDao.getByIdIncludingDeleted(any()) } returns null
             every { collectionDao.getByCompositeKey(any(), any(), any(), any(), any()) } returns null
@@ -748,10 +784,21 @@ class SyncManagerTest {
         }
 
     @Test
-    fun `given a Scryfall batch failure for one chunk when ensureCardsExist runs then the failure is isolated and does not throw`() =
+    fun `given a Scryfall batch failure for one chunk when ensureCardsExist runs then a placeholder is written and the collection row still inserts`() =
         runTest(testDispatcher) {
+            // Collection sync data-loss fix, Phase 4 (2026-09-06): this test used to assert the
+            // OPPOSITE of what it asserts now. Before Phase 4, a card Scryfall couldn't resolve
+            // meant ensureCardsExist's cachedIds set stayed empty, and SyncManager's
+            // `if (dto.scryfallId !in cachedIds) continue` gate SKIPPED the collection row
+            // entirely -- the row was silently never inserted, and (via the pre-Phase-3 watermark
+            // bug) permanently stranded. That gate is now GONE: ensureCardsExist always writes a
+            // `stale_reason = "pending_hydration"` placeholder CardEntity for anything Scryfall
+            // didn't return, so the ownership row ALWAYS inserts. The row is treated as
+            // successfully APPLIED (not skipped), so the safe watermark advances past it exactly
+            // like any other applied row -- CardHydrationWorker resolves the placeholder later,
+            // completely decoupled from the sync watermark.
             val remoteRow = buildCollectionDto(scryfallId = CARD_ID_A, updatedAt = 9_000L)
-            coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteRow))
+            coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteRow))
             coEvery { cardDao.getByIds(listOf(CARD_ID_A)) } returns emptyList()
             every { collectionDao.getByIdIncludingDeleted(any()) } returns null
             every { collectionDao.getByCompositeKey(any(), any(), any(), any(), any()) } returns null
@@ -759,15 +806,118 @@ class SyncManagerTest {
                 Result.failure(RuntimeException("Scryfall down"))
 
             // Act: must not throw -- a chunk-level Scryfall failure is non-fatal, logged, and the
-            // id simply stays "missing" for retry on the next sync cycle (per the KDoc on
-            // ensureCardsExist / this method's onFailure branch).
+            // id gets a placeholder immediately rather than staying "missing".
             val result = syncManager.sync(USER_ID)
             advanceUntilIdle()
 
-            // Assert: sync itself still completes (the failure doesn't propagate as an exception),
-            // and upsertAll/upsert are never called for the unresolved chunk.
-            assertNotNull(result)
-            coVerify(exactly = 0) { cardDao.upsertAll(any()) }
+            // Assert: sync completes successfully, the collection row is inserted despite the
+            // unresolved card, ONE placeholder CardEntity is written via insertAllIgnore -- write-
+            // path hardening audit (HIGH 4, 2026-09-06): NEVER upsertAll (whose @Update fallback
+            // could overwrite real metadata a concurrent writer cached for this id during the
+            // Scryfall round-trip above) -- and the watermark advances all the way to
+            // syncStartTime (nothing was left unapplied this cycle).
+            assertEquals(SyncState.SUCCESS, result.state)
+            assertEquals(1, result.collectionPulled)
+            verify(exactly = 1) { collectionDao.upsert(any()) }
+            coVerify(exactly = 1) {
+                cardDao.insertAllIgnore(match { cards -> cards.size == 1 && cards[0].staleReason == "pending_hydration" })
+            }
+            coVerify(exactly = 0) {
+                cardDao.upsertAll(match { cards -> cards.any { it.staleReason == "pending_hydration" } })
+            }
             coVerify(exactly = 0) { cardDao.upsert(any()) }
+            val savedMillis = slot<Long>()
+            coVerify(exactly = 1) { syncPrefs.saveLastSyncMillis(eq(USER_ID), capture(savedMillis)) }
+            assert(savedMillis.captured > LAST_SYNC) {
+                "Watermark should advance past LAST_SYNC since the row was successfully applied (via placeholder)"
+            }
+        }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Pagination + safe watermark (collection sync data-loss fix,
+    //  linear-moseying-yeti plan, Phase 3/8)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given 1377 remote collection rows across 3 pages when sync then all rows are applied and the drain completes`() =
+        runTest(testDispatcher) {
+            // Arrange: 500 + 500 + 377 = 1377, matching the forensic 2026-09 incident's exact
+            // row count. Each page's size relative to the 500 limit is what drives drainPages'
+            // termination (the 3rd, short page signals "no more").
+            val page1 = (1..500).map { i -> buildCollectionDto(id = "row-$i", scryfallId = "scryfall-$i", updatedAt = LAST_SYNC + i) }
+            val page2 = (501..1000).map { i -> buildCollectionDto(id = "row-$i", scryfallId = "scryfall-$i", updatedAt = LAST_SYNC + i) }
+            val page3 = (1001..1377).map { i -> buildCollectionDto(id = "row-$i", scryfallId = "scryfall-$i", updatedAt = LAST_SYNC + i) }
+            coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returnsMany listOf(
+                Result.success(page1), Result.success(page2), Result.success(page3),
+            )
+            every { collectionDao.getByIdIncludingDeleted(any()) } returns null
+            every { collectionDao.getByCompositeKey(any(), any(), any(), any(), any()) } returns null
+
+            // Act
+            val result = syncManager.sync(USER_ID)
+            advanceUntilIdle()
+
+            // Assert: every row applied, the drain reached the short (< limit) 3rd page and
+            // stopped there (never a 4th fetch), and the watermark advances all the way to
+            // syncStartTime since nothing was left unapplied.
+            assertEquals(SyncState.SUCCESS, result.state)
+            assertEquals(1377, result.collectionPulled)
+            verify(exactly = 1377) { collectionDao.upsert(any()) }
+            coVerify(exactly = 3) { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) }
+            val savedMillis = slot<Long>()
+            coVerify(exactly = 1) { syncPrefs.saveLastSyncMillis(eq(USER_ID), capture(savedMillis)) }
+            assert(savedMillis.captured > LAST_SYNC + 1377) {
+                "A fully-drained, fully-applied pull should advance the watermark to syncStartTime"
+            }
+        }
+
+    @Test
+    fun `given a page-2 fetch failure when sync then the watermark is capped below page-2's lowest updated_at`() =
+        runTest(testDispatcher) {
+            // Arrange: page 1 succeeds (500 rows), page 2 fails outright (network/RPC error).
+            val page1 = (1..500).map { i -> buildCollectionDto(id = "row-$i", scryfallId = "scryfall-$i", updatedAt = LAST_SYNC + i) }
+            val page2LowestUpdatedAt = LAST_SYNC + 501L
+            coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returnsMany listOf(
+                Result.success(page1),
+                Result.failure(RuntimeException("network blip on page 2")),
+            )
+            every { collectionDao.getByIdIncludingDeleted(any()) } returns null
+            every { collectionDao.getByCompositeKey(any(), any(), any(), any(), any()) } returns null
+
+            // Act
+            val result = syncManager.sync(USER_ID)
+            advanceUntilIdle()
+
+            // Assert: page 1's 500 rows applied; sync still reports SUCCESS (push succeeded, pull
+            // partially degraded); the saved watermark is strictly below page 2's lowest
+            // updated_at (so page 2 -- and anything sharing its boundary millisecond -- is
+            // re-fetched next cycle) and never regresses below the original lastSync.
+            assertEquals(SyncState.SUCCESS, result.state)
+            assertEquals(500, result.collectionPulled)
+            val savedMillis = slot<Long>()
+            coVerify(exactly = 1) { syncPrefs.saveLastSyncMillis(eq(USER_ID), capture(savedMillis)) }
+            assert(savedMillis.captured < page2LowestUpdatedAt) {
+                "Watermark ${savedMillis.captured} must stay below page-2's lowest updated_at ($page2LowestUpdatedAt)"
+            }
+            assert(savedMillis.captured >= LAST_SYNC) { "Watermark must never regress below lastSync" }
+        }
+
+    @Test
+    fun `given a CancellationException during sync when sync runs then it propagates instead of becoming SyncResult ERROR`() =
+        runTest(testDispatcher) {
+            // Arrange: simulate real coroutine cancellation partway through the push phase.
+            every { collectionDao.getAllSince(any(), any()) } throws CancellationException("scope cancelled")
+
+            // Act + Assert: the CancellationException must propagate out of sync() itself --
+            // never be downgraded to a SyncResult(state = ERROR), which would let a cancelled
+            // caller (e.g. a screen navigated away from) misinterpret cooperative cancellation as
+            // a real sync failure.
+            var thrown: CancellationException? = null
+            try {
+                syncManager.sync(USER_ID)
+            } catch (e: CancellationException) {
+                thrown = e
+            }
+            assertNotNull("A CancellationException must propagate out of sync()", thrown)
         }
 }

@@ -69,6 +69,9 @@ class ResolveCardStrategyTagsUseCaseTest {
             return result
         }
 
+        override suspend fun getStrategyTagsBatch(oracleIds: Set<String>): Map<String, CardStrategyTagsResult> =
+            oracleIds.associateWith { result }
+
         override suspend fun submitStrategyTags(oracleId: String, submission: CardStrategyTagsSubmission) {
             submitCallCount++
             lastSubmission = submission
@@ -78,6 +81,8 @@ class ResolveCardStrategyTagsUseCaseTest {
     private class ThrowingRepository : CardStrategyTagsRepository {
         var submitCallCount = 0
         override suspend fun getStrategyTags(oracleId: String): CardStrategyTagsResult =
+            throw IllegalStateException("offline")
+        override suspend fun getStrategyTagsBatch(oracleIds: Set<String>): Map<String, CardStrategyTagsResult> =
             throw IllegalStateException("offline")
         override suspend fun submitStrategyTags(oracleId: String, submission: CardStrategyTagsSubmission) {
             submitCallCount++
@@ -285,5 +290,62 @@ class ResolveCardStrategyTagsUseCaseTest {
         useCase(testCard(oracleId = "oracle-8", oracleText = ""), existingTagsJson = null)
 
         assertTrue(edhrec.lastCandidates.isEmpty())
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  resolveWithPrefetched — bulk hydration entry point (2026-09-07)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given a prefetched Found when resolveWithPrefetched then the repository is never re-asked`() = runTest {
+        val repo = FakeRepository(CardStrategyTagsResult.NotFound)
+        val edhrec = FakeEdhrecEnrichment()
+        val useCase = ResolveCardStrategyTagsUseCase(computeCardTagsWithSuggestedBlink, repo, edhrec)
+        val card = testCard(oracleId = "oracle-1", oracleText = "Exile target creature.")
+
+        val result = useCase.resolveWithPrefetched(
+            card = card,
+            existingTagsJson = null,
+            prefetched = CardStrategyTagsResult.Found(tags = listOf(CardTag.REMOVAL)),
+        )
+
+        assertEquals(listOf(CardTag.REMOVAL), result.confirmedTags)
+        assertTrue(result.suggestedTags.isEmpty())
+        assertEquals(0, repo.callCount)
+        assertEquals(0, repo.submitCallCount)
+        assertEquals(0, edhrec.callCount)
+    }
+
+    @Test
+    fun `given a prefetched Found and existing user tags when resolveWithPrefetched then both survive`() = runTest {
+        val repo = FakeRepository(CardStrategyTagsResult.NotFound)
+        val useCase = ResolveCardStrategyTagsUseCase(computeCardTags, repo, FakeEdhrecEnrichment())
+
+        val result = useCase.resolveWithPrefetched(
+            card = testCard(oracleId = "oracle-2"),
+            existingTagsJson = """[{"k":"my_custom_tag","c":"CUSTOM"}]""",
+            prefetched = CardStrategyTagsResult.Found(tags = listOf(CardTag.REMOVAL)),
+        )
+
+        assertTrue(CardTag.REMOVAL in result.confirmedTags)
+        assertTrue(result.confirmedTags.any { it.key == "my_custom_tag" })
+    }
+
+    @Test
+    fun `given a prefetched NotFound when resolveWithPrefetched then the on-device fallback runs and writes back`() = runTest {
+        val repo = FakeRepository(CardStrategyTagsResult.Found(tags = listOf(CardTag.RAMP)))
+        val edhrec = FakeEdhrecEnrichment()
+        val useCase = ResolveCardStrategyTagsUseCase(computeCardTagsWithSuggestedBlink, repo, edhrec)
+
+        val result = useCase.resolveWithPrefetched(
+            card = testCard(oracleId = "oracle-3", oracleText = "Exile target creature, then return it."),
+            existingTagsJson = null,
+            prefetched = CardStrategyTagsResult.NotFound,
+        )
+
+        // The prefetched miss is authoritative: the repository is never read again, only written to.
+        assertEquals(0, repo.callCount)
+        assertEquals(1, repo.submitCallCount)
+        assertTrue(CardTag.RAMP !in result.confirmedTags)
     }
 }
