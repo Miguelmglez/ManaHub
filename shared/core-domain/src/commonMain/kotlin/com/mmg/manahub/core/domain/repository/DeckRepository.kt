@@ -7,6 +7,14 @@ import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DeckWithCards
 import kotlinx.coroutines.flow.Flow
 
+/** One slot for [DeckRepository.replaceAllCardsWithSource] -- see that function's KDoc. */
+data class CardSlotWrite(
+    val scryfallId: String,
+    val quantity: Int,
+    val isSideboard: Boolean = false,
+    val source: DeckCardSource = DeckCardSource.USER,
+)
+
 /**
  * Contract for all deck persistence operations.
  *
@@ -105,6 +113,35 @@ interface DeckRepository {
      * @param slots List of (scryfallId, quantity, isSideboard) triples.
      */
     suspend fun replaceAllCards(deckId: String, slots: List<Triple<String, Int, Boolean>>)
+
+    /**
+     * Deck Wizard Commander v3 plan (Phase 2.6, D12/D13): an ADDITIVE overload of [replaceAllCards]
+     * that also carries per-slot [DeckCardSource] provenance (engine-placed + commander = WIZARD,
+     * manual adds = USER) -- [replaceAllCards] itself has no source parameter and always writes
+     * [DeckCardSource.USER], so a straight delegation would silently lose provenance.
+     *
+     * DEFAULT implementation (best-effort, not a single Room transaction): [clearDeck] then
+     * [addCardToDeck] once per slot with its own [DeckCardSource]. This keeps the interface
+     * additive with ZERO changes required to any existing implementer (Android's Room-backed
+     * `DeckRepositoryImpl`, `WebDeckRepository`) — both automatically get a working implementation
+     * built from primitives they already have. A genuinely single-transaction Room override (the
+     * literal "ONE atomic write" the plan's D12 asks for) is deferred to the phase that wires this
+     * into the wizard VM (Phase 6): that is also when a cancelled build's "leave the draft
+     * untouched" guarantee actually matters end-to-end, and hardening it then avoids touching
+     * `androidMain`'s DAO twice. Callers on the Commander build path today (Phase 2's
+     * `BuildCommanderDeckUseCase`) are not yet wired into any real wizard flow (Phase 3-6), so this
+     * default is exercised only by this phase's own tests until then.
+     *
+     * @param slots (scryfallId, quantity, isSideboard, source) — the sideboard flag exists for API
+     *        symmetry with [replaceAllCards]; the Commander build path always writes `false`
+     *        (Commander has no sideboard slot in this campaign's scope).
+     */
+    suspend fun replaceAllCardsWithSource(deckId: String, slots: List<CardSlotWrite>) {
+        clearDeck(deckId)
+        slots.forEach { slot ->
+            addCardToDeck(deckId, slot.scryfallId, slot.quantity, slot.isSideboard, slot.source)
+        }
+    }
 
     /**
      * Pins (or clears) the deck's archetype/theme override (Deck Doctor Phase 1.5, D2).

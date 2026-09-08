@@ -61,8 +61,45 @@ object BasicLandCalculator {
             colorWeights["G"] = colorWeights["G"]!! + manaCost.count { it == 'G' } * qty
         }
 
+        return allocate(colorWeights, nonBasicLands, totalLandTarget, commanderIdentity)
+    }
+
+    /**
+     * Deck Wizard Commander v3 plan (Phase 2 / D10, F9): a NEW overload taking already-resolved
+     * WUBRG pip weights instead of re-deriving them from raw [DeckCard.card.manaCost] char counting
+     * -- the existing [calculate] overloads count a Phyrexian symbol's letter (`{W/P}` contains
+     * `'W'`) as full coloured demand, which is the exact F9 bug (Phyrexian pips are always payable
+     * with 2 life, so [com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer] correctly
+     * counts them as ZERO demand). Callers that already have a correctly-parsed pip map -- e.g.
+     * `BuildCommanderDeckUseCase` via [com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
+     * .pipDistribution] over the mainboard PLUS the commander's own [Card.manaCost] (D10: "commander
+     * pips included") -- pass it here instead. [pipsByColor] keys are the same `"W"/"U"/"B"/"R"/"G"`
+     * strings [calculate]'s own `colorWeights` map uses; missing keys default to 0. Existing
+     * [calculate] overloads are UNCHANGED (this is purely additive -- both now delegate to the same
+     * private [allocate] tail, byte-identical output for every pre-existing call site).
+     */
+    fun calculateFromPips(
+        pipsByColor: Map<String, Int>,
+        nonBasicLands: List<DeckCard>,
+        totalLandTarget: Int,
+        commanderIdentity: Set<String>? = null,
+    ): BasicLandDistribution {
+        val colorWeights = LAND_FOR_COLOR.keys.associateWith { pipsByColor[it] ?: 0 }
+        return allocate(colorWeights, nonBasicLands, totalLandTarget, commanderIdentity)
+    }
+
+    private fun allocate(
+        colorWeights: Map<String, Int>,
+        nonBasicLands: List<DeckCard>,
+        totalLandTarget: Int,
+        commanderIdentity: Set<String>?,
+    ): BasicLandDistribution {
+        val nonBasicCount = nonBasicLands.sumOf { it.quantity }
+        val basicSlotsAvailable = (totalLandTarget - nonBasicCount).coerceAtLeast(0)
+        if (basicSlotsAvailable == 0) return BasicLandDistribution()
+
         val totalWeight = colorWeights.values.sum()
-        
+
         // If no weights (e.g. all colorless or all cards filtered out), 
         // we fallback to equal distribution if we have a commander identity, 
         // or return empty if no weights at all and no identity.
