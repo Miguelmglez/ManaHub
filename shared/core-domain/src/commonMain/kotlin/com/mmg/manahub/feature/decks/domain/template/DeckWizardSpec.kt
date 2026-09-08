@@ -1,9 +1,24 @@
 package com.mmg.manahub.feature.decks.domain.template
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.PostureId
+import com.mmg.manahub.feature.decks.domain.engine.StrategyPick
 import com.mmg.manahub.feature.decks.domain.engine.StrategyProfile
+import com.mmg.manahub.feature.decks.domain.engine.toPin
+
+/**
+ * One manually-added card (Deck Wizard Commander v3 plan, D7/1.2): the ONLY way an unowned card
+ * can enter a Commander build (R5 — no Scryfall backstop). Always kept by the placement engine
+ * (Phase 2), even off-plan.
+ *
+ * @property isOwned `false` for a card added via the Advanced Search "All cards" tab that the user
+ *           does not own — persisted honestly (see [com.mmg.manahub.core.model.DeckCardSource],
+ *           though provenance itself is `USER` regardless of ownership — D13).
+ */
+data class ManualAdd(val card: Card, val isOwned: Boolean)
 
 /**
  * Deck Builder v2 wizard input (plan §3.2). Built by the wizard screens; consumed by
@@ -42,7 +57,25 @@ import com.mmg.manahub.feature.decks.domain.engine.StrategyProfile
  *   list resolution both run dry, this toggle decides whether the build queries Scryfall directly
  *   (via the revived [com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator]) as a
  *   last-resort fill source before declaring a [DeckGap]. Defaults to `false` (collection-only,
- *   byte-identical to pre-Workstream-4 behavior).
+ *   byte-identical to pre-Workstream-4 behavior). **Deck Wizard Commander v3 plan (D7): CASUAL-ONLY
+ *   going forward.** [BuildDeckFromTemplateUseCase]/Motor A (Casual's build engine) still reads and
+ *   needs this field exactly as before — deleting it would change Casual's behavior, which this
+ *   campaign's scope explicitly excludes (plan's escape hatch, Phase 1.2). The Commander path
+ *   (Phase 2+, `BuildCommanderDeckUseCase`) is collection-only BY CONSTRUCTION (R5/D7 — the engine
+ *   never queries Scryfall at all) and MUST NEVER read this field.
+ * @param strategyPick Deck Wizard Commander v3 plan (D4/1.2) — the Commander path's SINGLE strategy
+ *   choice (a [StrategyPick.Curated] pick or [StrategyPick.Custom]), replacing [strategyProfile] for
+ *   Commander builds. `null` for every Casual call site (which still uses [strategyProfile]) and for
+ *   a Commander spec that has not reached the strategy step yet. Appended near the end, defaulted,
+ *   so every existing call site keeps compiling unchanged.
+ * @param manualAdds Deck Wizard Commander v3 plan (D7/1.2, R5) — cards the user explicitly added in
+ *   the Plan Sections step (Phase 5), owned or not. The ONLY way an unowned card enters a Commander
+ *   build; always kept by the placement engine (Phase 2), never dropped as filler.
+ * @param posture derived from [strategyPick] — `null` for [StrategyPick.Custom] or a Casual spec,
+ *   otherwise the curated pick's own [com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
+ *   .toPin]-resolved posture. A COMPUTED property (not a constructor param): posture is entirely a
+ *   function of [strategyPick] and has no independent state to carry, so deriving it avoids a
+ *   second field that could disagree with the pick it was supposedly read from.
  */
 data class DeckWizardSpec(
     val format: DeckFormat,
@@ -53,4 +86,9 @@ data class DeckWizardSpec(
     val fillLands: Boolean = true,
     val useCommunityData: Boolean = false,
     val includeOutsideCollection: Boolean = false,
-)
+    val strategyPick: StrategyPick? = null,
+    val manualAdds: List<ManualAdd> = emptyList(),
+) {
+    val posture: PostureId?
+        get() = (strategyPick as? StrategyPick.Curated)?.let { it.strategy.toPin(it.tribe).posture }
+}

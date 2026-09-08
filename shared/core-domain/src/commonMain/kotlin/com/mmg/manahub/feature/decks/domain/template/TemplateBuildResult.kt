@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.decks.domain.template
 
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.feature.decks.domain.engine.CardSection
+import com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 
@@ -105,3 +107,66 @@ data class TemplateBuildResult(
      */
     val gaps: List<DeckGap> = emptyList(),
 )
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Deck Wizard Commander v3 plan, Phase 1.2 — Commander-path contracts. Neither type below is
+//  wired into any use case yet: `BuildCommanderDeckUseCase` (Phase 2) is the first real producer of
+//  a [WizardBuildResult]; [CommanderBuildStage] is not yet emitted by any build loop. Pure type
+//  additions, zero behavior change.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * How many mainboard slots [WizardBuildResult.entries] came from, by source — the Commander
+ * result screen's provenance summary (D13: WIZARD-placed vs. USER manual adds vs. lands).
+ * [placedByWizard]/[placedManual] count NON-LAND cards only; [lands] counts every land placed
+ * (owned non-basics + basics), regardless of source, since D10's land fill is a single stage that
+ * does not itself distinguish "wizard-chosen" from "user-added" lands beyond what
+ * [WizardBuildResult.entries]' own [DeckEntry] already carries.
+ */
+data class WizardFillStats(
+    val placedByWizard: Int,
+    val placedManual: Int,
+    val lands: Int,
+)
+
+/**
+ * The Commander build path's terminal result (Deck Wizard Commander v3 plan, Phase 1.2) — replaces
+ * [TemplateBuildResult] for Commander/Commander Casual builds (`BuildCommanderDeckUseCase`, Phase
+ * 2). Unlike [TemplateBuildResult], every field here speaks the SAME vocabulary the Studio Analysis
+ * tab already renders (D2/D8): no `SuggestionCategory`/`DeckGap`/`CategoryFill` third vocabulary.
+ *
+ * @property entries the finished mainboard (commander included, per D12/D13's write contract),
+ *           source-tagged (WIZARD for engine-placed + commander, USER for manual adds — D13).
+ * @property analysis the SAME [DeckAnalysis] `DeckAnalysisPipeline.analyze` produces for this
+ *           mainboard — the Result screen renders this directly (D15: "the Result screen shows the
+ *           same DeckAnalysis Studio will show").
+ * @property gapSections D8: the verification analysis's own [CardSection]s with `current < min` —
+ *           the same sections/ids the Analysis tab shows, never a separate gap vocabulary.
+ * @property fillStats provenance summary for the result screen's "X placed by the wizard, Y kept
+ *           from your manual adds, Z lands" copy.
+ * @property refinementSwaps D11: how many of the ≤`MAX_REFINEMENT_SWAPS` (8) refinement-pass swaps
+ *           were actually accepted (each one strictly increased `analysis.totalScore`). `0` until
+ *           Phase 2 implements the refinement pass — this field exists as a contract only.
+ */
+data class WizardBuildResult(
+    val entries: List<DeckEntry>,
+    val analysis: DeckAnalysis,
+    val gapSections: List<CardSection>,
+    val fillStats: WizardFillStats,
+    val refinementSwaps: Int = 0,
+)
+
+/**
+ * Deck Wizard Commander v3 plan, Phase 1.2 — the Commander build loop's own staged-progress list
+ * (plan §3's stage list: "plan resolve → manual adds → placement → land fill → verify+refine →
+ * write"). Deliberately a SEPARATE enum from [BuildStage], not an extension of it:
+ * `DeckWizardGenerationResult.kt`'s `BuildStage.label()` mapper is an EXHAUSTIVE `when` with no
+ * `else` branch (one `R.string` per case) — appending cases to the shared enum would force an
+ * unrelated Casual-UI change (new strings) for stages the Commander build (Phase 2+) does not use
+ * yet, and would blur "which stages can a Casual build actually emit" (Casual keeps
+ * [BuildDeckFromTemplateUseCase]/[BuildStage] untouched, D7's escape hatch). Not yet emitted by any
+ * build loop or wizard VM (Phase 2/6 wire it) — a pure type addition.
+ */
+enum class CommanderBuildStage {
+    RESOLVING_PLAN, PLACING_MANUAL_ADDS, PLACING_CARDS, FILLING_LANDS, VERIFYING_AND_REFINING, WRITING_DECK, DONE,
+}
