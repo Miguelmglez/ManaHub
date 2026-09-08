@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.engine
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.mmg.manahub.core.model.DeckFormat
 
@@ -611,8 +612,14 @@ fun CuratedStrategyCatalog.nearestFor(
  * pre-B1 picker behavior: [ArchetypeFormat.of] returns `null` for Draft because Draft has no
  * archetype skeleton at all ([ArchetypeFormat]'s own KDoc), so a strategy pin there is inert
  * either way and every entry stays pickable.
+ *
+ * [DeckFormat.COMMANDER_CASUAL] is checked against every entry's [CuratedStrategy.formats] as if
+ * it were [DeckFormat.COMMANDER] (fixes F4, Deck Wizard Commander v3 plan): no catalog entry's
+ * `formats` set lists `COMMANDER_CASUAL` explicitly, so without this the Commander Casual picker
+ * was always empty and the analysis chip always fell back to "Custom".
  */
 fun CuratedStrategy.availableIn(format: DeckFormat): Boolean {
     if (ArchetypeFormat.of(format) == null) return true
-    return format in formats
+    val effectiveFormat = if (format == DeckFormat.COMMANDER_CASUAL) DeckFormat.COMMANDER else format
+    return effectiveFormat in formats
 }

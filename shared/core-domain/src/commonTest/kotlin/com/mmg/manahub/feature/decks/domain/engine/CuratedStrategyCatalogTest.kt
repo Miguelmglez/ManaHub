@@ -268,6 +268,44 @@ class CuratedStrategyCatalogTest {
         }
     }
 
+    // ── Deck Wizard Commander v3 Phase 0 / E1 (fixes F4): COMMANDER_CASUAL resolves like COMMANDER ──
+
+    @Test
+    fun `every entry available for COMMANDER is also available for COMMANDER_CASUAL`() {
+        CuratedStrategyCatalog.ALL.filter { it.availableIn(DeckFormat.COMMANDER) }.forEach { strategy ->
+            assertTrue(
+                strategy.availableIn(DeckFormat.COMMANDER_CASUAL),
+                "Entry '${strategy.id}' is available for COMMANDER but not COMMANDER_CASUAL",
+            )
+        }
+    }
+
+    @Test
+    fun `no entry is available for COMMANDER_CASUAL but not COMMANDER`() {
+        CuratedStrategyCatalog.ALL.filter { it.availableIn(DeckFormat.COMMANDER_CASUAL) }.forEach { strategy ->
+            assertTrue(
+                strategy.availableIn(DeckFormat.COMMANDER),
+                "Entry '${strategy.id}' is available for COMMANDER_CASUAL but not COMMANDER",
+            )
+        }
+    }
+
+    @Test
+    fun `nearestFor COMMANDER_CASUAL round-trips to the same entry as COMMANDER`() {
+        val commanderEntries = CuratedStrategyCatalog.ALL.filter { it.availableIn(DeckFormat.COMMANDER) }
+        assertTrue(commanderEntries.isNotEmpty())
+        commanderEntries.forEach { strategy ->
+            val archetype = strategy.archetypes.first()
+            val posture = strategy.postures.firstOrNull()
+            val viaCommander = CuratedStrategyCatalog.nearestFor(archetype, strategy.themes, DeckFormat.COMMANDER, posture)
+            val viaCasual = CuratedStrategyCatalog.nearestFor(archetype, strategy.themes, DeckFormat.COMMANDER_CASUAL, posture)
+            assertEquals(
+                assertNotNull(viaCommander, "nearestFor(..., COMMANDER) resolved null for '${strategy.id}'").id,
+                assertNotNull(viaCasual, "nearestFor(..., COMMANDER_CASUAL) resolved null for '${strategy.id}'").id,
+            )
+        }
+    }
+
     @Test
     fun `catalog is non-empty and every entry id is unique (exact count intentionally not pinned)`() {
         // The exact entry count is a moving target across this taxonomy migration (5 pure
