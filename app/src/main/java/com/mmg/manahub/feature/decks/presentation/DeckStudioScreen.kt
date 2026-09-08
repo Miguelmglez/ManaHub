@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation
+// COMMENTS_REVIEWED: 2026-09-08
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
@@ -383,7 +384,8 @@ fun DeckStudioScreen(
     }
 
     val isCommanderFormat = uiState.deck?.format
-        ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } } == DeckFormat.COMMANDER
+        ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
+        ?.isCommanderFormat == true
 
     Box(modifier = Modifier.fillMaxSize()) {
         androidx.compose.material3.Scaffold(

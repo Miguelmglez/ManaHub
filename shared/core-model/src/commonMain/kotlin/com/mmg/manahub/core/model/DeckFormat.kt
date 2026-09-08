@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.model
+// COMMENTS_REVIEWED: 2026-09-08
 
 /**
  * Deck construction format.
@@ -112,4 +113,14 @@ enum class DeckFormat(
     val isSixtyCardConstructed: Boolean
         get() = this == STANDARD || this == PIONEER || this == MODERN || this == LEGACY ||
             this == VINTAGE || this == PAUPER || this == CASUAL
+
+    /**
+     * Deck Wizard Commander v3 plan (fixes F5): [COMMANDER] and [COMMANDER_CASUAL] share the same
+     * deck shape (100-card, singleton, commander required) and should behave identically at every
+     * build/validation site EXCEPT strict tournament legality, where [COMMANDER_CASUAL] stays
+     * permissive (see `AnalysisEngine.isLegal` / `SectionSearchQuery.legalityClause`, which already
+     * treat it that way and must not be tightened).
+     */
+    val isCommanderFormat: Boolean
+        get() = this == COMMANDER || this == COMMANDER_CASUAL
 }

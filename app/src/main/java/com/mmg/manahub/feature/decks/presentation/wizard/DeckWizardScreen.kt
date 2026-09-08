@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
+// COMMENTS_REVIEWED: 2026-09-08
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -91,7 +92,7 @@ import org.koin.androidx.compose.koinViewModel
  * entry flow at all; kept as a function (not a `val`) for parity with the Commander branch above it.
  */
 private fun stepPhasesFor(uiState: DeckWizardUiState): List<WizardPhase> {
-    if (uiState.selectedFormat == DeckFormat.COMMANDER) {
+    if (uiState.selectedFormat?.isCommanderFormat == true) {
         return listOf(WizardPhase.FORMAT, WizardPhase.COMMANDER_PICK, WizardPhase.STRATEGY, WizardPhase.MANUAL_ADDS, WizardPhase.REVIEW)
     }
     return listOf(WizardPhase.FORMAT, WizardPhase.ENTRY, WizardPhase.DIRECTION, WizardPhase.MANUAL_ADDS, WizardPhase.REVIEW)

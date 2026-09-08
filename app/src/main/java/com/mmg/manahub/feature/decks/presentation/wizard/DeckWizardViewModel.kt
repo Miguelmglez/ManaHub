@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
+// COMMENTS_REVIEWED: 2026-09-08
 
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
@@ -450,10 +451,10 @@ class DeckWizardViewModel(
     // ── Step 1 — Format ───────────────────────────────────────────────────────
 
     fun onSelectFormat(format: DeckFormat) {
-        // v1 targets Commander + Casual only (plan D1) — the other 6 restored 60-card formats
-        // render "coming soon" and disabled in the UI, but guard here too since this is the actual
-        // source of truth (never trust the UI-only disabled state).
-        if (format != DeckFormat.COMMANDER && format != DeckFormat.CASUAL) return
+        // v1 targets Commander (+ Commander Casual) and Casual only (plan D1) — the other 6
+        // restored 60-card formats render "coming soon" and disabled in the UI, but guard here too
+        // since this is the actual source of truth (never trust the UI-only disabled state).
+        if (!format.isCommanderFormat && format != DeckFormat.CASUAL) return
         // QA fix (RUN 3b): FORMAT is reachable via back-navigation at any point after Direction-step
         // state has already been populated (see resetDirectionScratchState's KDoc) -- an ACTUAL
         // format change wipes every per-flow scratch field and resets the entry chooser to CARDS, so
@@ -1187,7 +1188,7 @@ class DeckWizardViewModel(
     /** No-op for Commander (colors are read-only, derived from the commander). */
     fun onToggleColor(color: ManaColor) {
         val state = _uiState.value
-        if (state.selectedFormat == DeckFormat.COMMANDER) return
+        if (state.selectedFormat?.isCommanderFormat == true) return
         _uiState.update {
             it.copy(colorIdentity = if (color in it.colorIdentity) it.colorIdentity - color else it.colorIdentity + color)
         }
@@ -1220,7 +1221,7 @@ class DeckWizardViewModel(
      */
     fun onNextFromFormat() {
         val format = _uiState.value.selectedFormat ?: return
-        if (format == DeckFormat.COMMANDER) {
+        if (format.isCommanderFormat) {
             logStep("commander_pick")
             _uiState.update { it.copy(phase = WizardPhase.COMMANDER_PICK, entryFlow = WizardEntryFlow.CARDS) }
         } else {
@@ -1240,7 +1241,7 @@ class DeckWizardViewModel(
      */
     fun onNextFromDirection() {
         val state = _uiState.value
-        if (state.selectedFormat == DeckFormat.COMMANDER && state.selectedCommander == null) {
+        if (state.selectedFormat?.isCommanderFormat == true && state.selectedCommander == null) {
             // Unreachable post-Workstream-2 (Commander never visits DIRECTION anymore) -- defensive
             // dead branch only, kept for the same reason WS2 left its own dead branches in place.
             crashReporter.log("deck_wizard_step_direction_blocked_no_commander")
@@ -1306,7 +1307,7 @@ class DeckWizardViewModel(
         // colorIdentity is populated well before this point via recomputeSeedLockedColors (every seed
         // add/remove) plus any manual onToggleCardsFlowColor pick -- there is no separate "prefill at
         // Next time" step to run anymore.
-        if (state.entryFlow == WizardEntryFlow.CARDS && state.selectedFormat != DeckFormat.COMMANDER) {
+        if (state.entryFlow == WizardEntryFlow.CARDS && state.selectedFormat?.isCommanderFormat != true) {
             if (!hasStrategyPick) {
                 crashReporter.log("deck_wizard_step_direction_blocked_no_strategy_for_cards")
                 viewModelScope.launch {
@@ -1370,7 +1371,7 @@ class DeckWizardViewModel(
             // Workstream 3 -- MANUAL_ADDS is now shared by BOTH Commander (from STRATEGY) and every
             // Casual flow (from DIRECTION, see onNextFromDirection). Format-aware back target.
             WizardPhase.MANUAL_ADDS -> {
-                val target = if (state.selectedFormat == DeckFormat.COMMANDER) WizardPhase.STRATEGY else WizardPhase.DIRECTION
+                val target = if (state.selectedFormat?.isCommanderFormat == true) WizardPhase.STRATEGY else WizardPhase.DIRECTION
                 _uiState.update { it.copy(phase = target) }
                 false
             }
@@ -1378,7 +1379,7 @@ class DeckWizardViewModel(
             // STRATEGY/MANUAL_ADDS above) -- this branch is Casual-only now, kept byte-identical
             // (the `selectedFormat == COMMANDER` arm is defensive dead code, harmless to leave).
             WizardPhase.DIRECTION -> {
-                val target = if (state.selectedFormat == DeckFormat.COMMANDER) WizardPhase.FORMAT else WizardPhase.ENTRY
+                val target = if (state.selectedFormat?.isCommanderFormat == true) WizardPhase.FORMAT else WizardPhase.ENTRY
                 _uiState.update { it.copy(phase = target) }
                 false
             }
@@ -1434,7 +1435,7 @@ class DeckWizardViewModel(
             crashlytics.setCustomKey("deck_wizard_entry_flow", state.entryFlow.name)
             crashlytics.setCustomKey("deck_wizard_use_community_data", state.useCommunityData)
 
-            val colorIdentity = if (format == DeckFormat.COMMANDER) {
+            val colorIdentity = if (format.isCommanderFormat) {
                 state.selectedCommander?.colorIdentity?.toManaColorSet() ?: state.colorIdentity
             } else {
                 state.colorIdentity
@@ -1445,7 +1446,7 @@ class DeckWizardViewModel(
             // below (which stays byte-identical to before this workstream -- Commander never visits
             // either of those steps anymore, so `state.selectedDirectionTheme`/`selectedThemeHint`
             // are always their initial empty/null values for a Commander build here).
-            val strategyProfile = if (format == DeckFormat.COMMANDER) {
+            val strategyProfile = if (format.isCommanderFormat) {
                 StrategyProfile(
                     archetype = state.selectedArchetype,
                     themes = state.selectedStrategyThemes,
@@ -1548,7 +1549,7 @@ class DeckWizardViewModel(
         pendingDeckId = deckId
 
         val commander = spec.commander
-        if (spec.format == DeckFormat.COMMANDER && commander != null) {
+        if (spec.format.isCommanderFormat && commander != null) {
             val created = deckRepository.observeDeckWithCards(deckId).first()?.deck
             if (created != null) {
                 deckRepository.updateDeck(
@@ -1572,7 +1573,7 @@ class DeckWizardViewModel(
         // Defense in depth (RUN 3b): gate on format even though onSelectFormat's reset (above)
         // already makes a non-null commander on a non-Commander spec unreachable via normal UI
         // flow -- this function shouldn't silently trust an out-of-band-constructed spec.
-        val commander = spec.commander.takeIf { spec.format == DeckFormat.COMMANDER }
+        val commander = spec.commander.takeIf { spec.format.isCommanderFormat }
         val profile = spec.strategyProfile
         val archetypeName = profile.archetype?.displayName
         val themeName = profile.themes.firstOrNull()?.displayName

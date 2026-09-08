@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
+// COMMENTS_REVIEWED: 2026-09-08
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
@@ -179,7 +180,7 @@ private fun CardsFlowDirectionContent(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    val isCommanderFormat = uiState.selectedFormat == DeckFormat.COMMANDER
+    val isCommanderFormat = uiState.selectedFormat?.isCommanderFormat == true
     // Workstream 3 -- Commander never reaches this composable anymore (it routes through
     // COMMANDER_PICK/STRATEGY/MANUAL_ADDS, see WizardPhase's KDoc); every Casual flow now requires a
     // real strategy pick + a color set before advancing (D-B, generalized -- see
@@ -847,7 +848,7 @@ internal fun IdentityStepContent(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    val isCommanderFormat = uiState.selectedFormat == DeckFormat.COMMANDER
+    val isCommanderFormat = uiState.selectedFormat?.isCommanderFormat == true
 
     // D2: only offer EDHREC theme strings that resolve onto a real ThemeId -- an unresolvable
     // free-form aggregate tag has nowhere to bind under the unified taxonomy (mirrors

@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.template
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.repository.CardRepository
@@ -283,11 +284,11 @@ class BuildDeckFromTemplateUseCase(
         emit(TemplateBuildProgress.Complete(result))
     }.flowOn(ioDispatcher)
 
-    /** Mainboard target (excludes the commander itself for [DeckFormat.COMMANDER], which is written
-     * to a separate `Deck.commanderCardId` slot, never a [DeckEntry] row — see
+    /** Mainboard target (excludes the commander itself for [DeckFormat.isCommanderFormat], which is
+     * written to a separate `Deck.commanderCardId` slot, never a [DeckEntry] row — see
      * [com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardViewModel.writeResultIntoNewDeck]). */
     private fun mainboardTargetSize(spec: DeckWizardSpec): Int =
-        if (spec.format == DeckFormat.COMMANDER) spec.format.targetDeckSize - 1 else spec.format.targetDeckSize
+        if (spec.format.isCommanderFormat) spec.format.targetDeckSize - 1 else spec.format.targetDeckSize
 
     // ── VALIDATING ──────────────────────────────────────────────────────────────
 
@@ -306,9 +307,9 @@ class BuildDeckFromTemplateUseCase(
     }
 
     private fun validate(spec: DeckWizardSpec): String? {
-        if (spec.format == DeckFormat.COMMANDER) {
+        if (spec.format.isCommanderFormat) {
             val commander = spec.commander ?: return "A commander is required for the Commander format."
-            if (!isLegal(commander, DeckFormat.COMMANDER)) {
+            if (!isLegal(commander, spec.format)) {
                 return "${commander.name} is not legal as a Commander."
             }
             val identity = commander.colorIdentity.toSet()
@@ -338,7 +339,7 @@ class BuildDeckFromTemplateUseCase(
             .filter { isLegal(it, spec.format) }
             .filter { card ->
                 when {
-                    spec.format == DeckFormat.COMMANDER && commanderIdentity != null ->
+                    spec.format.isCommanderFormat && commanderIdentity != null ->
                         commanderIdentity.containsAll(card.colorIdentity)
                     // D9: Casual has no identity rule -- the wizard's chosen colors are a spell
                     // COLOR filter, not a color-identity restriction. Colorless cards always pass.
@@ -664,7 +665,7 @@ class BuildDeckFromTemplateUseCase(
         return runCatching {
             val archetypeFormat = ArchetypeFormat.of(spec.format)
             val aggregateResult: DataResult<CommunityAggregate>? = when {
-                spec.format == DeckFormat.COMMANDER && spec.commander != null ->
+                spec.format.isCommanderFormat && spec.commander != null ->
                     aggregateRepository.getCommanderAggregate(spec.commander.name)
                 archetypeFormat != null -> {
                     val signature = spec.seeds.map { it.name }.distinct().sorted().take(SIGNATURE_CARD_COUNT)
@@ -789,7 +790,7 @@ class BuildDeckFromTemplateUseCase(
         // Defense in depth (RUN 3b QA fix): same commander-is-Commander-only gate as recomputeProfile
         // above -- defensive only, since the commander is never placed as a mainboard DeckEntry to
         // begin with (mainboardTargetSize's KDoc), but keeps this set correct if that ever changes.
-        val protectedIds = if (spec.format == DeckFormat.COMMANDER) setOfNotNull(spec.commander?.scryfallId) else emptySet()
+        val protectedIds = if (spec.format.isCommanderFormat) setOfNotNull(spec.commander?.scryfallId) else emptySet()
         val profile = recomputeProfile(spec, template, state.placedEntries)
 
         val trimmed = MainboardTrimmer.trim(
@@ -843,7 +844,7 @@ class BuildDeckFromTemplateUseCase(
         // spec.colorIdentity is the correct color-restriction fallback here, mirroring what the
         // Commander branch already does with the commander's identity.
         val landColorIdentity = when {
-            spec.format == DeckFormat.COMMANDER -> spec.commander?.colorIdentity?.toSet()
+            spec.format.isCommanderFormat -> spec.commander?.colorIdentity?.toSet()
             spec.colorIdentity.isNotEmpty() -> spec.colorIdentity.map { it.symbol }.toSet()
             // Genuinely 0-color ("Colorless") Casual pick: 0 basics is the best available result --
             // this calculator has no "Wastes"/colorless-land concept. Known, out-of-scope limitation
@@ -1091,13 +1092,13 @@ class BuildDeckFromTemplateUseCase(
             themes = template.archetypeInfo.themes,
             tribe = spec.strategyProfile.tribe,
         )
-        // Defense in depth (RUN 3b QA fix): commander is only meaningful for DeckFormat.COMMANDER
+        // Defense in depth (RUN 3b QA fix): commander is only meaningful for a Commander format
         // (see DeckWizardSpec's KDoc) -- gate it here too, mirroring the same format check already
         // applied to spec.commander everywhere else in this class (analyzeCollection, validate,
         // fillLands' landColorIdentity). The wizard VM's onSelectFormat now resets selectedCommander
         // on a format switch so a non-null commander on a non-Commander spec is unreachable via
         // normal UI flow, but this use case must stay correct independent of that VM-side fix.
-        val commanderSeed = spec.commander.takeIf { spec.format == DeckFormat.COMMANDER }
+        val commanderSeed = spec.commander.takeIf { spec.format.isCommanderFormat }
         val inferredSeedTags = inferDeckIdentityUseCase(inferenceSeedCards(commanderSeed, mainboardSoFar)).seedTags
         val seedTags = (explicitSeedTags + inferredSeedTags).distinct()
         return deckScorer.profile(

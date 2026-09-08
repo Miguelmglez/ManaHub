@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.orchestrator
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.repository.DeckRepository
@@ -447,7 +448,7 @@ class DeckDoctorOrchestrator(
                 runCatching {
                     similarUseCase(
                         seedQuery = seed,
-                        deckFormat = if (context.format == DeckFormat.COMMANDER) ArchidektFormat.COMMANDER.apiId else SIXTY_ARCHIDEKT_FORMAT_ID,
+                        deckFormat = if (context.format.isCommanderFormat) ArchidektFormat.COMMANDER.apiId else SIXTY_ARCHIDEKT_FORMAT_ID,
                         userColorIdentity = health.profile.colorIdentity.map { it.symbol }.toSet(),
                     )
                 }.getOrNull()

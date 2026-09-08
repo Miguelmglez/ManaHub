@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation
+// COMMENTS_REVIEWED: 2026-09-08
 
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
@@ -650,7 +651,7 @@ class DeckStudioViewModel(
 
     private fun rebuildUiState(deck: Deck, allEntries: List<DeckSlotEntry>) {
         val format = DeckFormat.entries.firstOrNull { it.name.equals(deck.format, ignoreCase = true) }
-        val isCommanderFormat = format == DeckFormat.COMMANDER
+        val isCommanderFormat = format?.isCommanderFormat == true
         val commanderId = deck.commanderCardId
 
         val mainEntries = allEntries.filter { !it.isSideboard }
