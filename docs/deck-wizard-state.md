@@ -19,9 +19,9 @@ ships — this file survives).
 | Formats reachable in this wave | `COMMANDER`, `COMMANDER_CASUAL` |
 | Formats deferred | `CASUAL`, `STANDARD`, `PIONEER`, `MODERN`, `LEGACY`, `VINTAGE`, `PAUPER` (§7) |
 | Engine used by the wizard | today: legacy Motor A (`DeckScorer.fit`); target: Deck Analysis Engine v3 primitives + `AnalysisEngine.evaluate` verification |
-| Campaign phase | P0 done except item 0.5 (baseline measurement, deferred to the P1+P2 run) |
+| Campaign phase | P0 done (incl. 0.5); P1 done (contracts only — P2 placement engine not started) |
 
-Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/E1/E2/E3/E4/E5) · P1 — · P2 — · P3 — · P4 — · P5 — · P6 — · P7 — · P8 —`
+Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 — · P3 — · P4 — · P5 — · P6 — · P7 — · P8 —`
 
 ---
 
@@ -120,13 +120,30 @@ byte-identical during wizard work.
 
 | Metric | Before (P0 baseline) | After (P7) |
 |---|---|---|
-| Real collection: cards / unique / eligible commanders | 1300+ (exact: P0) | — |
-| Real-collection Commander builds: median total score | — | — |
-| Share of builds with 0 BLOCKER | — | — |
-| Median off-plan share (wizard-placed) | — | — |
+| Real collection: cards / unique / eligible commanders | 1344 / 1309 / 93 (P0.2) | — |
+| Real-collection Commander builds: score distribution (min/p25/median/p75/max) | 40 / 82 / 85 / 88 / 91 (legacy Motor A build, scored by `DeckAnalysisPipeline`, 99 builds) | — |
+| Share of builds with 0 BLOCKER | 97.0% (3/99 had ≥1 BLOCKER) | — |
+| Median off-plan share (wizard-placed) | 0.0 (min 0.0, max 0.136) | — |
+| Gap sections (`current < min`) | avg 3.17 sections/build, avg 12.96 total missing count | — |
 | MockCollectionRich reconstruction delta vs fixture score | n/a | — |
 | Final `PlacementScorer` weights | n/a | roles · axes · curve · power · community |
-| Runtime per build (JVM, real collection) | — | — |
+| Runtime per build (JVM, real collection) | min 40 ms / median 99 ms / max 332 ms (build + analyze) | — |
+
+**P0.5 baseline reproduction:** `./gradlew :app:testDebugUnitTest --tests
+"com.mmg.manahub.feature.decks.harness.P0BaselineTest"` (requires `testdata/wizard-harness/`
+checked out — gitignored real user data, Assume-skips otherwise). Full matrix run (99 of
+`HarnessSpecs.commanderMatrix`'s 101 specs — 2 dropped by the matrix's own
+`HarnessMetricsCalculator.isLegal` filter, nothing to do with sampling); no sampling was needed,
+runtime was well inside a single JVM test run (2m36s total build+test). Scored via
+`DeckAnalysisPipeline` against the LEGACY Motor A build (`BuildDeckFromTemplateUseCase`) — this is
+the two-engine mismatch this whole campaign exists to close (F1/F2): a legacy-built deck already
+scores decently (median 85) against the v3 engine on this real collection, which is expected — most
+owned commander-eligible pools skew toward generically-good cards Motor A's tag-fingerprint scoring
+already favors; the campaign's win condition is closing the LONG TAIL (the min=40/max-offplan-0.136
+outliers) and making score/sections/findings the SAME object the wizard shows, not necessarily
+raising the median further. The min=40 score is `AnalysisEngine.ILLEGAL_DECK_SCORE_CAP` territory —
+at least one of the 99 builds tripped a P5 BLOCKER (color-identity/legality), consistent with the
+3% BLOCKER share above.
 
 Acceptance bands in force: see plan §5 until P7 replaces them here.
 
