@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.di
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
@@ -10,6 +11,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
 import com.mmg.manahub.feature.decks.domain.engine.PowerResolver
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
 import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
+import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.DeckstatsFetcher
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCaseV2
@@ -125,6 +127,10 @@ fun decksKoinModule(): Module = module {
             crashReporter = get(),
         )
     }
+    // Deck Wizard Commander v3 plan (Phase 0 / E4, D2): the ONE shared analysis entry point --
+    // built from the same EvaluateDeckUseCase/InferDeckIdentityUseCase/CrashReporter singletons
+    // above, consumed by DeckDoctorOrchestrator today and by the Commander builder in a later phase.
+    single { DeckAnalysisPipeline(evaluateDeckUseCase = get(), inferDeckIdentityUseCase = get(), crashReporter = get()) }
     single { SuggestAddsUseCase(deckScorer = get()) }
     // Deck Analysis Category Sections rework (W0, D3): the old Deck Doctor "Cuts" suggestion tab
     // was deleted, so NOTHING in production resolves `SuggestCutsUseCase` via Koin any more --

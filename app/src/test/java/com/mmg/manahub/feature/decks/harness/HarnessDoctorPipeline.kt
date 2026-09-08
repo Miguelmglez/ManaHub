@@ -1,23 +1,21 @@
 package com.mmg.manahub.feature.decks.harness
+// COMMENTS_REVIEWED: 2026-09-08
 
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckFormat
-import com.mmg.manahub.core.model.TagCategory
-import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
-import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
-import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.NeutralPowerResolver
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
-import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
+import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
@@ -26,26 +24,30 @@ import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Wizard Quality Campaign -- Phase H harness. Drives the SAME Deck Doctor Studio-Suggestions-tab
-//  pipeline (EvaluateDeckUseCase -> SuggestCutsUseCase / SuggestAddsFromCollectionUseCase, Motor A)
-//  over a wizard-built deck, mirroring DeckDoctorOrchestrator.loadAnalysis /
-//  recomputeAddsInternal's seed-inference and archetype-skeleton resolution EXACTLY (down to the
-//  MAX_SEED_CARDS=8 cap and the IDENTITY_CATEGORIES set) -- located via
-//  `graphify query "DeckDoctorOrchestrator DeckTemplateResolver"`. The orchestrator itself is not
-//  reused directly: it is a stateful class wired to Room/Flow repositories the harness has no need
-//  for; this object re-derives its two pure decision points (seed inference, skeleton resolution)
-//  and calls the SAME three use cases the orchestrator calls.
+//  pipeline (DeckAnalysisPipeline -> SuggestCutsUseCase / SuggestAddsFromCollectionUseCase, Motor A)
+//  over a wizard-built deck. Deck Wizard Commander v3 plan (E4, D2): the seed-inference + pin-fold +
+//  evaluate slice now delegates to the SAME DeckAnalysisPipeline the orchestrator and (later) the
+//  wizard use -- this object no longer re-derives that sequence itself. The orchestrator ITSELF is
+//  still not reused directly: it is a stateful class wired to Room/Flow repositories the harness has
+//  no need for; this object calls the shared pipeline plus the SAME two Motor A use cases the
+//  orchestrator used to call before Motor A was retired from its own path.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-object HarnessDoctorPipeline {
+/** A silent [CrashReporter] for the harness -- a pure JVM test tool, no real crash/log backend. */
+private object NoOpCrashReporter : CrashReporter {
+    override fun recordException(throwable: Throwable) = Unit
+    override fun log(message: String) = Unit
+    override fun setCustomKey(key: String, value: String) = Unit
+}
 
-    private const val MAX_SEED_CARDS = 8
-    private val IDENTITY_CATEGORIES = setOf(TagCategory.STRATEGY, TagCategory.ARCHETYPE, TagCategory.TRIBAL)
+object HarnessDoctorPipeline {
 
     private val deckScorer = DeckScorer(RoleClassifier(), NeutralPowerResolver)
     private val evaluateDeckUseCase = EvaluateDeckUseCase(deckScorer, ProgressionEventBus())
     private val suggestCutsUseCase = SuggestCutsUseCase(deckScorer)
     private val suggestAddsFromCollectionUseCase = SuggestAddsFromCollectionUseCase(deckScorer)
     private val inferDeckIdentityUseCase = InferDeckIdentityUseCase()
+    private val deckAnalysisPipeline = DeckAnalysisPipeline(evaluateDeckUseCase, inferDeckIdentityUseCase, NoOpCrashReporter)
 
     data class DoctorResult(
         val health: DeckHealth,
@@ -69,23 +71,18 @@ object HarnessDoctorPipeline {
         strategyLocked: Boolean = false,
         wizardSourcedIds: Set<String> = emptySet(),
     ): DoctorResult {
-        val commanderIdentity = commander?.colorIdentity?.toSet().orEmpty()
-        val commanderTags = commander?.let { it.tags + it.userTags }.orEmpty()
-        val seedCards = inferenceSeeds(commander, mainboard)
-        val inferredSeedTags = inferDeckIdentityUseCase(seedCards).seedTags
-        // Wizard Quality Campaign Wave 4 (Task 1); tribeOverride added Deck Engine Unification (D2):
-        // mirrors DeckDoctorOrchestrator.loadAnalysis's pin fold-in EXACTLY -- see
-        // DeckDoctorOrchestrator.pinSeedTags's KDoc for why.
-        val seedTags = (inferredSeedTags + pinSeedTags(archetypeOverride, themesOverride, tribeOverride)).distinct()
-
-        val health = evaluateDeckUseCase(
+        // Deck Wizard Commander v3 plan (E4, D2): seed inference + pin fold + evaluate now live in
+        // the ONE shared DeckAnalysisPipeline (also used by DeckDoctorOrchestrator and, later, the
+        // wizard) -- see that class's KDoc. emitProgression=false: this is a pure measurement tool,
+        // not a real user session, so it must never advance the Deck Doctor exploration quest.
+        val health = deckAnalysisPipeline.analyze(
             mainboard = mainboard,
             format = format,
-            commanderIdentity = commanderIdentity,
-            seedTags = seedTags,
+            commander = commander,
             archetypeOverride = archetypeOverride,
             themesOverride = themesOverride,
-            commanderTags = commanderTags,
+            tribeOverride = tribeOverride,
+            emitProgression = false,
         )
         val protectedIds = setOfNotNull(commander?.scryfallId) + (if (strategyLocked) wizardSourcedIds else emptySet())
         val resolvedSkeleton = resolveArchetypeSkeleton(health)
@@ -127,32 +124,6 @@ object HarnessDoctorPipeline {
         protectedIds = protectedIds,
         resolvedSkeleton = resolvedSkeleton,
     )
-
-    /** Mirrors DeckDoctorOrchestrator.inferenceSeeds EXACTLY. */
-    private fun inferenceSeeds(commander: Card?, mainboard: List<DeckEntry>): List<Card> {
-        val ranked = mainboard
-            .map { it.card }
-            .filter { it.scryfallId != commander?.scryfallId }
-            .map { card -> card to identityTagCount(card) }
-            .filter { it.second > 0 }
-            .sortedByDescending { it.second }
-            .take(MAX_SEED_CARDS)
-            .map { it.first }
-        return (listOfNotNull(commander) + ranked).distinctBy { it.scryfallId }
-    }
-
-    private fun identityTagCount(card: Card): Int =
-        (card.tags + card.userTags).count { it.category in IDENTITY_CATEGORIES }
-
-    /** Mirrors DeckDoctorOrchestrator.pinSeedTags EXACTLY. */
-    private fun pinSeedTags(archetypeOverride: String?, themesOverride: List<String>, tribeOverride: String? = null): List<CardTag> {
-        val archetype = archetypeOverride?.let { name -> ArchetypeId.entries.firstOrNull { it.name == name } }
-        val themes = themesOverride.mapNotNull { name -> ThemeId.entries.firstOrNull { it.name == name } }
-        if (archetype == null && themes.isEmpty() && tribeOverride.isNullOrBlank()) return emptyList()
-        // Deck Analysis Engine v3 removed ArchetypeId.GENERIC -- forArchetype now takes a nullable
-        // archetype directly (null = no macro pin), no fallback coercion needed.
-        return DeckIdentitySeedTags.forArchetype(archetype, themes, tribeOverride)
-    }
 
     /** Mirrors DeckDoctorOrchestrator.resolveArchetypeSkeleton EXACTLY. Public (not private) so
      * [HarnessMatrixRunner]'s WS8.1 round-trip UNLOCKED re-rank can resolve the SAME skeleton

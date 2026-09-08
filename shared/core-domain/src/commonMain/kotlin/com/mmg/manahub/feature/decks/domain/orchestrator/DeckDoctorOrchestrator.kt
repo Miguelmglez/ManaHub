@@ -11,10 +11,8 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.ScoreWeightOverrides
-import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
-import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
 import com.mmg.manahub.feature.decks.domain.engine.PillarId
 import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
@@ -22,6 +20,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.toAnalysisWeights
 import com.mmg.manahub.feature.decks.domain.engine.toScoreWeights
 import com.mmg.manahub.feature.decks.domain.engine.withUnresolvedFinding
+import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.FindSimilarDecksUseCase
@@ -175,6 +174,11 @@ class DeckDoctorOrchestrator(
     private val isCommunityEngineEnabled: suspend () -> Boolean = { false },
 ) {
 
+    /** Deck Wizard Commander v3 plan (E4, D2): the ONE shared analysis entry point — see its own
+     * class KDoc. Built from this orchestrator's own constructor deps so no existing call site
+     * needs a new positional/named argument. */
+    private val deckAnalysisPipeline = DeckAnalysisPipeline(evaluateDeckUseCase, inferDeckIdentityUseCase, crashReporter)
+
     private val _state = MutableStateFlow(DeckDoctorState())
     val state: StateFlow<DeckDoctorState> = _state.asStateFlow()
 
@@ -295,24 +299,26 @@ class DeckDoctorOrchestrator(
             val tribeOverride = deckWithCards.deck.tribeOverride
             val strategyLocked = deckWithCards.deck.strategyLocked
 
-            val seedCards = inferenceSeeds(commanderCard, mainboardEntries)
-            val inferredSeedTags = inferDeckIdentityUseCase(seedCards).seedTags
-            val seedTags = (inferredSeedTags + pinSeedTags(archetypeOverride, themesOverride, tribeOverride)).distinct()
             val weightOverrides = weightsProvider()
             val weights = weightOverrides.toScoreWeights()
             // Wave 2 / B3: P5's SideboardOversized check needs the sideboard count; the mainboard
             // resolution above never touches deckWithCards.sideboard.
             val sideboardCount = deckWithCards.sideboard.sumOf { it.quantity }
 
-            val health = evaluateDeckUseCase(
+            // Deck Wizard Commander v3 plan (E4, D2): seed inference + pin fold + evaluate now live
+            // in the ONE shared DeckAnalysisPipeline (also used by the wizard and the harness) --
+            // see that class's KDoc for why this replaced the inline sequence that used to be here.
+            // seedTags is resolved once here (not inside analyze) because AnalysisCache.seedTags
+            // caches it verbatim for every later recomputeIncremental call this session.
+            val seedTags = deckAnalysisPipeline.resolveSeedTags(mainboardEntries, commanderCard, archetypeOverride, themesOverride, tribeOverride)
+            val health = deckAnalysisPipeline.analyze(
                 mainboard = mainboardEntries,
                 format = format,
-                commanderIdentity = commanderIdentity,
-                seedTags = seedTags,
-                weights = weights,
+                commander = commanderCard,
                 archetypeOverride = archetypeOverride,
                 themesOverride = themesOverride,
-                commanderTags = commanderTags,
+                tribeOverride = tribeOverride,
+                weights = weights,
                 // Deck Analysis Engine v2 Phase 2 -- same DataStore-backed debug-tuning mechanism,
                 // extended (not duplicated) to also carry the 5 pillar weights. Deck Analysis Engine
                 // v3 (spec §8): passed RAW (not pre-mapped) since the macro-dependent base weights
@@ -320,6 +326,7 @@ class DeckDoctorOrchestrator(
                 // method's own KDoc for [scoreWeightOverrides].
                 scoreWeightOverrides = weightOverrides,
                 sideboardCount = sideboardCount,
+                precomputedSeedTags = seedTags,
             )
 
             val collectionCards = collection.map { it.card }
@@ -601,76 +608,9 @@ class DeckDoctorOrchestrator(
         }
     }
 
-    /**
-     * Picks the inference seed cards: the commander (when present) plus the deck's highest-weight
-     * identity cards (most STRATEGY / ARCHETYPE / TRIBAL tags), capped so one off-theme card can't
-     * skew the seed.
-     */
-    private fun inferenceSeeds(commander: Card?, mainboard: List<DeckEntry>): List<Card> {
-        val ranked = mainboard
-            .map { it.card }
-            .filter { it.scryfallId != commander?.scryfallId }
-            .map { card -> card to identityTagCount(card) }
-            .filter { it.second > 0 }
-            .sortedByDescending { it.second }
-            .take(MAX_SEED_CARDS)
-            .map { it.first }
-        return (listOfNotNull(commander) + ranked).distinctBy { it.scryfallId }
-    }
-
-    private fun identityTagCount(card: Card): Int =
-        (card.tags + card.userTags).count { it.category in IDENTITY_CATEGORIES }
-
-    /**
-     * Wizard Quality Campaign Wave 4 (Task 1): folds a deck's PERSISTED `archetypeOverride`/
-     * `themesOverride` pin into the seed-tag basis via the SAME [DeckIdentitySeedTags] table
-     * [com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase.recomputeProfile]
-     * uses at build time -- without this, a deck built with an explicit Direction hint (e.g. the
-     * wizard's GRAVEYARD strategy) scored its own placed cards against a richer basis DURING the
-     * build than the Doctor scores them against AFTERWARD (inference-only), so a card that legitimately
-     * cleared the wizard's category-fill floor could fall below the Doctor's cut floor purely from
-     * the missing explicit signal -- see `project_wizard_quality_campaign_wave3` memory's bucket-(ii)
-     * root cause and [DeckIdentitySeedTags]'s class KDoc.
-     *
-     * [archetypeOverride]/[themesOverride] are persisted as raw enum-name STRINGS
-     * ([com.mmg.manahub.core.model.Deck.archetypeOverride]/`themesOverride`) -- mapped back
-     * defensively via `entries.firstOrNull`; an unknown/stale name (e.g. a renamed enum entry)
-     * resolves to "no pin contribution" for that piece, never a guess or a crash. A deck with no
-     * override (both null/empty -- the common case) contributes an empty list here, so
-     * [loadAnalysis]'s `seedTags` is BYTE-IDENTICAL to before this change for every unpinned/GENERIC
-     * deck.
-     *
-     * A stale/unresolvable override string is now ALSO reported as a non-fatal (never silently
-     * swallowed): the persisted string was written by this same app and should always resolve, so a
-     * miss means enum drift (a renamed/removed [ArchetypeId]/[ThemeId] entry without a data
-     * migration) -- an actionable bug, not an expected runtime state, and exactly the class of
-     * silent-degradation this campaign exists to catch early.
-     */
-    private fun pinSeedTags(archetypeOverride: String?, themesOverride: List<String>, tribeOverride: String? = null): List<CardTag> {
-        val archetype = archetypeOverride?.let { name -> ArchetypeId.entries.firstOrNull { it.name == name } }
-        val themes = themesOverride.mapNotNull { name -> ThemeId.entries.firstOrNull { it.name == name } }
-        val archetypeStale = archetypeOverride != null && archetype == null
-        val themesLostCount = themesOverride.size - themes.size
-        if (archetypeStale || themesLostCount > 0) {
-            crashReporter.log("deck_doctor_pin_seed_tags_unresolved")
-            crashReporter.setCustomKey("deck_doctor_pin_archetype_stale", archetypeStale.toString())
-            crashReporter.setCustomKey("deck_doctor_pin_themes_lost_count", themesLostCount.toString())
-            crashReporter.recordException(
-                RuntimeException(
-                    "[DeckDoctorOrchestrator] deck_doctor_pin_seed_tags_unresolved: " +
-                        "archetypeOverride=$archetypeOverride themesOverride=$themesOverride"
-                )
-            )
-        }
-        // Deck Engine Unification (D2): tribeOverride is a SEPARATE pin column (never folded into
-        // themesOverride's JSON list -- see Deck.tribeOverride's KDoc), so it never participates in
-        // the stale-pin detection above (a blank/absent tribe is simply "no tribe pin", not a data
-        // hazard the way an unresolvable ArchetypeId/ThemeId name is).
-        if (archetype == null && themes.isEmpty() && tribeOverride.isNullOrBlank()) return emptyList()
-        // Deck Analysis Engine v3: ArchetypeId.GENERIC no longer exists -- forArchetype now takes a
-        // nullable archetype directly (null = no macro pin), no fallback coercion needed.
-        return DeckIdentitySeedTags.forArchetype(archetype, themes, tribeOverride)
-    }
+    // Deck Wizard Commander v3 plan (E4, D2): the former inferenceSeeds/identityTagCount/
+    // pinSeedTags private helpers moved to DeckAnalysisPipeline (see deckAnalysisPipeline's KDoc
+    // above and loadAnalysis's call site) — this orchestrator no longer needs its own copies.
 
     // ── Archetype override (Phase 1.7 Studio UI entry point) ───────────────────────
 
@@ -762,12 +702,6 @@ class DeckDoctorOrchestrator(
     }
 
     private companion object {
-        /** Identity tag categories used to rank inference seed cards (mirrors the scorer's set). */
-        val IDENTITY_CATEGORIES = setOf(TagCategory.STRATEGY, TagCategory.ARCHETYPE, TagCategory.TRIBAL)
-
-        /** Cap on auto-selected identity seed cards (plus the commander) so one card can't skew the seed. */
-        const val MAX_SEED_CARDS = 8
-
         /** Signature-card count for the 60-card canonical aggregate key (Phase 3.2 precedent: 2-3). */
         const val SIGNATURE_CARD_COUNT = 3
 
