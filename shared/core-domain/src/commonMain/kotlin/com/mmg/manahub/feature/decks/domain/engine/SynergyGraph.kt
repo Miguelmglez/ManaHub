@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.engine
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.model.Card
@@ -208,7 +209,11 @@ object SynergyGraph {
      * -- excluding the axis KEY from [axisKeys] is sufficient, no need to thread the flag deeper. */
     private const val ENGINE_AXIS = "ENGINE"
 
-    private data class AxisIdeal(val producerIdeal: Int, val payoffIdeal: Int)
+    /** Deck Wizard Commander v3 plan (Phase 0 / E5): promoted from `private` so [axisIdeals] can
+     * hand these numbers to a caller outside this file (e.g. a future builder's placement scorer)
+     * without re-deriving the ideal table itself. No behavior change -- every existing internal
+     * caller is unaffected by a visibility widening. */
+    data class AxisIdeal(val producerIdeal: Int, val payoffIdeal: Int)
 
     /** See this file's header for the sourcing discipline (cited where a real band exists,
      * PROVISIONAL where flagged). All Commander-scale; see [effectiveIdeal] for the density scale.
@@ -311,7 +316,11 @@ object SynergyGraph {
      * never re-scanning oracle text inside the O(n^2) edge loop -- task 5's perf requirement).
      * `Confidence` maps use [AxisKey] with the TRIBE substitution already applied (`"TRIBE:elf"`,
      * never the generic `"TRIBE"` a [RoleSpec] declares). */
-    private data class CardAxisProfile(
+    /** Deck Wizard Commander v3 plan (Phase 0 / E5): promoted from `private` so [cardAxisProfile]
+     * can hand a single card's axis signal to a caller outside this file, without re-implementing
+     * [ArchetypeRoleClassifier.classify] + [ROLE_SPECS_BY_KEY] lookups a second time. No behavior
+     * change to [build]'s own internal use of this class. */
+    data class CardAxisProfile(
         val cardId: String,
         val quantity: Int,
         val produces: Map<AxisKey, Float>,
@@ -423,6 +432,56 @@ object SynergyGraph {
         }
 
         return CardAxisProfile(card.scryfallId, entry.quantity, produces, consumes, amplifies)
+    }
+
+    /**
+     * Deck Wizard Commander v3 plan (Phase 0 / E5): a single card's producer/consumer/amplifier
+     * axis signal, computed the SAME way [build] computes it per-card internally -- read-only,
+     * no [health]/edge computation, no deck-wide state. Lets a future caller (e.g. a Commander
+     * builder's placement scorer) ask "what axes does this candidate card touch" without building
+     * a whole [DeckSynergyGraph] over a partial mainboard.
+     *
+     * [format] is accepted for API symmetry with [axisIdeals] and in case a future role
+     * classification becomes format-conditional; today's [ArchetypeRoleClassifier.classify] and
+     * [ROLE_SPECS_BY_KEY] are format-agnostic, so this parameter does not currently change the
+     * result.
+     *
+     * [dominantTribeAxis]/[dominantTribeKey] are the SAME deck-scoped tribal context [build]
+     * derives once per deck (via [ArchetypeRoleClassifier.dominantTribeKey]/the `TRIBE:<subtype>`
+     * substitution) -- a per-card query has no deck to derive them from, so a caller that wants
+     * tribal axis credit must resolve and pass them itself; they default to `null` (no tribal
+     * credit), matching [build]'s own behavior for a tribeless deck.
+     */
+    fun cardAxisProfile(
+        card: Card,
+        format: ArchetypeFormat,
+        dominantTribeAxis: AxisKey? = null,
+        dominantTribeKey: String? = null,
+    ): CardAxisProfile {
+        val entry = DeckEntry(card = card, quantity = 1, isOwned = true, isSideboard = false)
+        return buildCardProfile(entry, dominantTribeAxis, dominantTribeKey)
+    }
+
+    /**
+     * Deck Wizard Commander v3 plan (Phase 0 / E5): the per-axis producer/payoff ideals [health]
+     * scores against, scaled by [effectiveIdeal] the SAME way [build] scales them internally.
+     * [nonLandCount] defaults to this [format]'s own realistic-density baseline
+     * ([REALISTIC_COMMANDER_NONLAND]/[REALISTIC_SIXTY_NONLAND]) -- passing that baseline back in
+     * is a no-op scale, so the default returns the raw [COMMANDER_AXIS_IDEALS] table unscaled;
+     * pass a real deck's non-land count to get the SAME scaled ideals [build] would use for that
+     * deck's size. Covers every axis in [COMMANDER_AXIS_IDEALS] (includes `ENGINE`); `TRIBE:<x>`
+     * axes are deliberately excluded here (their ideal is a fixed constant independent of format,
+     * see [TRIBE_PRODUCER_IDEAL]/[TRIBE_PAYOFF_IDEAL], not part of this per-format table).
+     */
+    fun axisIdeals(format: ArchetypeFormat, nonLandCount: Int? = null): Map<AxisKey, AxisIdeal> {
+        val realisticBaseline = if (format == ArchetypeFormat.COMMANDER) REALISTIC_COMMANDER_NONLAND else REALISTIC_SIXTY_NONLAND
+        val scaleTo = nonLandCount ?: realisticBaseline
+        return COMMANDER_AXIS_IDEALS.mapValues { (_, ideal) ->
+            AxisIdeal(
+                producerIdeal = effectiveIdeal(ideal.producerIdeal, scaleTo, realisticBaseline),
+                payoffIdeal = effectiveIdeal(ideal.payoffIdeal, scaleTo, realisticBaseline),
+            )
+        }
     }
 
     /** Substitutes the generic `"TRIBE"` axis a [RoleSpec] declares (e.g. `tribe_payoff.consumes`,
