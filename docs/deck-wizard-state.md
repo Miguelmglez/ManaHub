@@ -241,3 +241,22 @@ Things that differ from Commander and are NOT solved by this campaign:
      (the golden/corpus suites were calibrated without posture-aware inference skeletons). If a
      future phase wants inference-detected postures to also shape the skeleton, that is new work,
      not a bug fix, and needs its own calibration pass.
+- 2026-09-08 — Phase 0.5 + Phase 1 done (Run 2): see the progress tracker's Run 2 log for per-item
+  notes. Three things future phases should know:
+  1. **The P0.5 baseline already scores decently against v3** (median 85/100, 97% zero-BLOCKER,
+     median off-plan share 0.0) even though it is the LEGACY Motor A build. This is not evidence the
+     rebuild is unnecessary — it means the real collection is broad enough that Motor A's
+     tag-fingerprint greedy fill usually lands on decks the v3 engine also likes; the campaign's win
+     condition is closing the LONG TAIL (min score 40, max off-plan 13.6%) and making the wizard's
+     OWN shown score/sections the same object Studio shows, not chasing a higher median.
+  2. **No existing engine table maps a `ThemeId` onto a `SynergyGraph` `AxisKey`.** `CommanderPlanResolver
+     .THEME_TARGET_AXES` is Phase 1's own documented judgment-call table (15 of 21 non-tribal themes
+     get a clean 1:1 axis; `WHEELS`/`CLONES_THEFT`/`VEHICLES`/`TREASURE` are left unmapped, no static
+     axis fits). `CommanderPlan.targetAxes` is a Phase-1 contract nothing reads yet — Phase 2's
+     `PlacementScorer` is the first real consumer, and should re-examine this table rather than treat
+     it as settled.
+  3. **`BuildStage` was NOT extended for Commander.** `CommanderBuildStage` is a separate enum
+     because `DeckWizardGenerationResult.kt`'s `BuildStage.label()` is an exhaustive `when` with no
+     `else` branch — adding cases to the shared enum would force an unrelated Casual-UI string change.
+     Phase 6 (wizard VM wiring) should keep this split when it wires the Commander build loop's
+     progress UI.
