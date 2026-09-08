@@ -1,11 +1,17 @@
 package com.mmg.manahub.core.domain.usecase.search
 
 import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.ColorMatchMode
 import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.SearchOrder
 import com.mmg.manahub.core.model.SearchPrefer
 
 class BuildScryfallQueryUseCase {
+
+    private companion object {
+        /** The picker's colorless option; not a Scryfall color letter (see [buildColorPart]). */
+        const val COLORLESS = "C"
+    }
 
     operator fun invoke(query: AdvancedSearchQuery): String {
         val parts = query.criteria.mapNotNull { buildPart(it) }
@@ -63,18 +69,8 @@ class BuildScryfallQueryUseCase {
                     parts.joinToString(",", prefix = "(", postfix = ")")
                 }
             }
-            is SearchCriterion.Colors -> {
-                if (criterion.colors.isEmpty()) return null
-                val colorStr = criterion.colors.joinToString("") { it.lowercase() }
-                val op = if (criterion.exactly) "=" else ":"
-                "c$op$colorStr"
-            }
-            is SearchCriterion.ColorIdentity -> {
-                if (criterion.colors.isEmpty()) return null
-                val colorStr = criterion.colors.joinToString("") { it.lowercase() }
-                val op = if (criterion.exactly) "=" else ":"
-                "id$op$colorStr"
-            }
+            is SearchCriterion.Colors -> buildColorPart("c", criterion.colors, criterion.mode)
+            is SearchCriterion.ColorIdentity -> buildColorPart("id", criterion.colors, criterion.mode)
             is SearchCriterion.ManaCost ->
                 "mv${criterion.operator.symbol}${criterion.value}"
             is SearchCriterion.Rarity ->
@@ -140,6 +136,42 @@ class BuildScryfallQueryUseCase {
             // Collection-local filters have no Scryfall equivalent
             is SearchCriterion.CollectionStatus,
             is SearchCriterion.HasTag -> null
+        }
+    }
+
+    /**
+     * Renders one color facet — [prefix] is `c` (printed colors) or `id` (color identity).
+     *
+     * Every mode renders its EXPLICIT operator rather than the bare `:` alias: `:` means at-least
+     * after `c` but at-most after `id`, and relying on that asymmetry is what let the local matcher
+     * drift into the opposite semantics (see `ColorMatchMode`). The `when` is exhaustive with no
+     * `else` on purpose — a new mode must not silently inherit another's rendering.
+     *
+     * `"C"` (colorless) is not a letter Scryfall accepts inside a color string, so it renders as
+     * its own `=c` clause; under a set-comparison mode it is DROPPED when real colors are also
+     * selected (`{W,C}` at-least is just `c>=w` — every colorless card already fails "contains W").
+     *
+     * @return `null` when nothing is selected, matching every other criterion's "not a constraint".
+     */
+    private fun buildColorPart(prefix: String, colors: Set<String>, mode: ColorMatchMode): String? {
+        if (colors.isEmpty()) return null
+        val nonColorless = colors.filterNot { it.equals(COLORLESS, ignoreCase = true) }
+        val wantsColorless = nonColorless.size != colors.size
+        // Case-duplicate letters (e.g. {"W","w"}) must collapse to one — otherwise this renders
+        // c>=ww / a duplicate OR-branch for what the local matcher treats as a single letter.
+        val letters = nonColorless.map { it.lowercase() }.distinct()
+        return when (mode) {
+            ColorMatchMode.ANY_OF -> {
+                val alternatives = letters.map { "$prefix${ColorMatchMode.AT_LEAST.colorsOperator}$it" } +
+                    if (wantsColorless) listOf("$prefix=c") else emptyList()
+                if (alternatives.size == 1) alternatives.first()
+                else alternatives.joinToString(" or ", prefix = "(", postfix = ")")
+            }
+            ColorMatchMode.AT_MOST,
+            ColorMatchMode.EXACTLY,
+            ColorMatchMode.AT_LEAST ->
+                if (letters.isEmpty()) "$prefix=c"
+                else "$prefix${mode.colorsOperator}${letters.joinToString("")}"
         }
     }
 

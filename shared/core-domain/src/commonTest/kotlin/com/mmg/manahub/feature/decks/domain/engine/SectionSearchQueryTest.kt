@@ -558,12 +558,18 @@ class SectionSearchQueryTest {
         val context = ctx(colors = setOf(ManaColor.W, ManaColor.U), format = DeckFormat.COMMANDER)
         val query = SectionSearchQuery.toAdvancedQuery("role:ramp", context)!!
         assertTrue(
-            query.criteria.contains(com.mmg.manahub.core.model.SearchCriterion.ColorIdentity(colors = setOf("W", "U"), exactly = false)),
+            query.criteria.contains(
+                com.mmg.manahub.core.model.SearchCriterion.ColorIdentity(
+                    colors = setOf("W", "U"),
+                    mode = com.mmg.manahub.core.model.ColorMatchMode.AT_MOST,
+                )
+            ),
             "expected a ColorIdentity(W,U) criterion in $query",
         )
-        // id: is Scryfall's own subset ("at most these colors") default for IDENTITY searches --
-        // functionally equivalent to buildFor's "id<=WU", not a different filter.
-        assertEquals("id:wu", com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase()
+        // The subset meaning is now carried by the mode and rendered as an EXPLICIT operator, so
+        // this matches buildFor's own "id<=WU" character for character instead of relying on `id:`
+        // being Scryfall's at-most alias for identity searches.
+        assertEquals("id<=wu", com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase()
             .let { it(com.mmg.manahub.core.model.AdvancedSearchQuery(listOf(query.criteria.first { c -> c is com.mmg.manahub.core.model.SearchCriterion.ColorIdentity }))) })
     }
 

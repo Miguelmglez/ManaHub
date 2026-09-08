@@ -66,6 +66,7 @@ data class CardFaceDto(
     @SerialName("oracle_id")   val oracleId:   String?  = null,
     @SerialName("printed_name") val printedName: String? = null,
     @SerialName("mana_cost")   val manaCost:   String?  = null,
+    @SerialName("colors")      val colors:     List<String>? = null,
     @SerialName("type_line")   val typeLine:   String?  = null,
     @SerialName("oracle_text") val oracleText: String?  = null,
     @SerialName("power")       val power:      String?  = null,

@@ -842,6 +842,8 @@ class ScannerViewModel @Inject constructor(
                     cards = state.scanSession.cards.filter { it.id != entry.id },
                 ),
                 multiSelectedIds = state.multiSelectedIds - entry.card.scryfallId,
+                // W2026-09-06: clearing the overlay when the card is removed from queue
+                lastDetectedCard = if (state.lastDetectedCard?.scryfallId == entry.card.scryfallId) null else state.lastDetectedCard
             )
         }
         persistQueue()
@@ -1074,6 +1076,42 @@ class ScannerViewModel @Inject constructor(
     // ─────────────────────────────────────────────────────────────────────────
     //  Duplicate scanned card
     // ─────────────────────────────────────────────────────────────────────────
+
+    fun onIncrementSessionCardQuantity(entry: ScannedCard) {
+        _uiState.update { state ->
+            val updatedCards = state.scanSession.cards.map {
+                if (it.id == entry.id) it.copy(quantity = it.quantity + 1) else it
+            }
+            state.copy(scanSession = state.scanSession.copy(cards = updatedCards))
+        }
+        persistQueue()
+    }
+
+    fun onDecrementSessionCardQuantity(entry: ScannedCard) {
+        if (entry.quantity <= 1) {
+            onRemoveSessionCard(entry)
+            return
+        }
+        _uiState.update { state ->
+            val updatedCards = state.scanSession.cards.map {
+                if (it.id == entry.id) it.copy(quantity = (it.quantity - 1).coerceAtLeast(1)) else it
+            }
+            state.copy(scanSession = state.scanSession.copy(cards = updatedCards))
+        }
+        persistQueue()
+    }
+
+    fun onRemoveLastDetectedCard() {
+        val lastCard = _uiState.value.lastDetectedCard ?: return
+        val entryToRemove = _uiState.value.scanSession.cards.lastOrNull {
+            it.card.scryfallId == lastCard.scryfallId
+        }
+        if (entryToRemove != null) {
+            onRemoveSessionCard(entryToRemove)
+        } else {
+            _uiState.update { it.copy(lastDetectedCard = null) }
+        }
+    }
 
     /**
      * Duplicates [original] and inserts the copy immediately after it in the scan queue (in

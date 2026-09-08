@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.ui.components.search
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -87,6 +88,9 @@ import coil3.request.crossfade
 import coil3.svg.SvgDecoder
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.CollectionGroupingMode
+import com.mmg.manahub.core.model.CollectionSource
+import com.mmg.manahub.core.model.ColorMatchMode
 import com.mmg.manahub.core.model.ComparisonOperator
 import com.mmg.manahub.core.model.SearchDirection
 import com.mmg.manahub.core.model.SearchOrder
@@ -99,6 +103,8 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import com.mmg.manahub.feature.collection.presentation.SortDirection as CollectionSortDirection
+import com.mmg.manahub.feature.collection.presentation.SortOrder as CollectionSortOrder
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -108,16 +114,23 @@ fun AdvancedSearchSheet(
     isCollectionMode: Boolean = false,
     getAvailableTags: () -> Set<com.mmg.manahub.core.model.CardTag> = { emptySet() },
     /**
-     * A pre-decomposed structured query to seed this sheet's fields with on open (Suggestions Tab
-     * UI Polish plan, W11/D8 — Deck Analysis's "Browse for &lt;Category&gt;" entry point,
-     * [com.mmg.manahub.core.ui.components.CardSearchSheet]'s own `initialAdvancedQuery` param).
-     * `null` (default) keeps every existing call site unchanged. Applied via
-     * [AdvancedSearchViewModel.seedFrom] in a one-shot [androidx.compose.runtime.LaunchedEffect]
-     * below, keyed on this value's own identity/content — see that effect's comment for the known
-     * caveat around a cached `koinViewModel()` instance across repeated fixed-position opens
-     * (mirrors `feedback_koin_viewmodel_overlay_key_trap` memory's documented risk shape).
+     * The structured query the CALLER currently has applied — its own ViewModel state, not a
+     * one-shot preset. `null` means nothing is filtered right now.
+     *
+     * This is the sheet's single source of truth: [AdvancedSearchViewModel] is resolved with
+     * `koinViewModel()` from a fixed-position overlay, so one instance is shared by every open
+     * within a navigation destination and its state outlives any individual open. Seeding from
+     * what the caller has applied (see the effect below) is what keeps the form and the search in
+     * agreement; the caller therefore owns "what is filtered", and this sheet only edits it.
      */
-    initialAdvancedQuery: AdvancedSearchQuery? = null,
+    appliedQuery: AdvancedSearchQuery? = null,
+    // ── Collection-mode sort & group state (only used when isCollectionMode == true) ──
+    collectionSortOrder: CollectionSortOrder? = null,
+    collectionSortDirection: CollectionSortDirection? = null,
+    collectionGroupingMode: CollectionGroupingMode? = null,
+    onCollectionSortChange: ((CollectionSortOrder) -> Unit)? = null,
+    onCollectionSortDirectionChange: ((CollectionSortDirection) -> Unit)? = null,
+    onCollectionGroupingChange: ((CollectionGroupingMode) -> Unit)? = null,
     viewModel: AdvancedSearchViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -126,14 +139,11 @@ fun AdvancedSearchSheet(
     val scope = rememberCoroutineScope()
     var canDismiss by remember { mutableStateOf(false) }
 
-    // W11 — one-shot seed from a caller-supplied structured preset. Runs once per distinct
-    // [initialAdvancedQuery] value (mirrors CardSearchSheet's own initialScryfallQuery/
-    // initialCollectionTagKeys preset pattern) so the sheet opens ALREADY SHOWING the translated
-    // filters instead of a blank form.
-    LaunchedEffect(initialAdvancedQuery) {
-        if (initialAdvancedQuery != null && !initialAdvancedQuery.isEmpty()) {
-            viewModel.seedFrom(initialAdvancedQuery)
-        }
+    // Seeds once per open from what the caller has applied, an empty query INCLUDED -- skipping
+    // the empty case is what let a filter from an earlier, unrelated open stay live and invisible,
+    // silently zeroing the next search (Card Advantage regression, 2026-09-07).
+    LaunchedEffect(Unit) {
+        viewModel.seedFrom(appliedQuery ?: AdvancedSearchQuery())
     }
 
     val nestedScrollConnection = remember {
@@ -214,7 +224,9 @@ fun AdvancedSearchSheet(
                 item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_name),
-                        icon = Icons.Default.Search
+                        icon = Icons.Default.Search,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
                     ) {
                         OutlinedTextField(
                             value = uiState.nameValue,
@@ -253,7 +265,9 @@ fun AdvancedSearchSheet(
                 item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_oracle),
-                        icon = Icons.Default.Description
+                        icon = Icons.Default.Description,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
                     ) {
                         OutlinedTextField(
                             value = uiState.oracleText,
@@ -279,7 +293,7 @@ fun AdvancedSearchSheet(
                         title = stringResource(R.string.advsearch_section_type),
                         icon = Icons.Default.Style,
                         titleColor = mc.textPrimary,
-                        iconColor = mc.primaryAccent,
+                        iconColor = mc.goldMtg,
                     ) {
                         var showTypePicker by remember { mutableStateOf(false) }
 
@@ -491,6 +505,8 @@ fun AdvancedSearchSheet(
                         SearchSection(
                             title = stringResource(R.string.advsearch_section_mana_production),
                             icon = Icons.Default.Bolt,
+                            titleColor = mc.textPrimary,
+                            iconColor = mc.goldMtg,
                         ) {
                             val minDistinctColors = mp.minDistinctColors
                             val summary = when {
@@ -527,6 +543,8 @@ fun AdvancedSearchSheet(
                         SearchSection(
                             title = stringResource(R.string.advsearch_section_oracle_terms),
                             icon = Icons.Default.Description,
+                            titleColor = mc.textPrimary,
+                            iconColor = mc.goldMtg,
                         ) {
                             val allTerms = terms.allOf + terms.anyOfGroups.flatten() + terms.typeLineAnyOf
                             FlowRow(
@@ -558,7 +576,9 @@ fun AdvancedSearchSheet(
                 item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_colors),
-                        icon = Icons.Default.Palette
+                        icon = Icons.Default.Palette,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(
@@ -578,19 +598,53 @@ fun AdvancedSearchSheet(
                             modifier = Modifier.fillMaxWidth(),
                             colors = listOf("W", "U", "B", "R", "G", "C")
                         )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+
+                        var showColorModePicker by remember { mutableStateOf(false) }
+                        val isNonDefaultColorMode = uiState.colorMode != ColorMatchMode.ANY_OF
+
+                        Surface(
+                            onClick = { showColorModePicker = true },
+                            shape = RoundedCornerShape(12.dp),
+                            color = mc.surface,
+                            border = BorderStroke(
+                                width = if (isNonDefaultColorMode) 1.5.dp else 0.5.dp,
+                                color = if (isNonDefaultColorMode) mc.primaryAccent else mc.surfaceVariant,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Checkbox(
-                                checked = uiState.colorsExact,
-                                onCheckedChange = viewModel::setColorsExact,
-                                colors = CheckboxDefaults.colors(checkedColor = mc.primaryAccent),
-                            )
-                            Text(
-                                stringResource(R.string.advsearch_colors_exact),
-                                style = ty.bodyMedium,
-                                color = mc.textSecondary,
+                            Row(
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.advsearch_colormatch_label),
+                                    style = ty.bodyMedium,
+                                    color = mc.textSecondary,
+                                )
+                                Text(
+                                    text = stringResource(uiState.colorMode.labelRes),
+                                    style = ty.bodyLarge,
+                                    color = if (isNonDefaultColorMode) mc.primaryAccent else mc.textPrimary,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = mc.textDisabled,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+
+                        if (showColorModePicker) {
+                            ColorMatchModePickerSheet(
+                                selectedMode = uiState.colorMode,
+                                onSelectMode = {
+                                    viewModel.setColorMode(it)
+                                    showColorModePicker = false
+                                },
+                                onDismiss = { showColorModePicker = false },
                             )
                         }
                     }
@@ -600,7 +654,9 @@ fun AdvancedSearchSheet(
                 item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_mana),
-                        icon = Icons.Default.FlashOn
+                        icon = Icons.Default.FlashOn,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
                     ) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -628,7 +684,9 @@ fun AdvancedSearchSheet(
                 item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_rarity),
-                        icon = Icons.Default.Diamond
+                        icon = Icons.Default.Diamond,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             FlowRow(
@@ -661,7 +719,9 @@ fun AdvancedSearchSheet(
                 item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_set),
-                        icon = Icons.Default.Layers
+                        icon = Icons.Default.Layers,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
                     ) {
                         var showSetPicker by remember { mutableStateOf(false) }
                         val selectedSets = uiState.selectedSets
@@ -783,6 +843,8 @@ fun AdvancedSearchSheet(
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_stats),
                         icon = Icons.Default.BarChart,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -866,6 +928,8 @@ fun AdvancedSearchSheet(
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_price),
                         icon = Icons.Default.MonetizationOn,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
                     ) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -903,6 +967,8 @@ fun AdvancedSearchSheet(
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_format),
                         icon = Icons.Default.Gavel,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -967,25 +1033,23 @@ fun AdvancedSearchSheet(
                     item {
                         SearchSection(
                             title = stringResource(R.string.advsearch_section_collection_status),
-                            icon = Icons.Default.CollectionsBookmark
+                            icon = Icons.Default.CollectionsBookmark,
+                            titleColor = mc.textPrimary,
+                            iconColor = mc.goldMtg,
                         ) {
-                            Row(
+                            // Single-select SOURCES, not intersecting flags: "In wishlist" lists the
+                            // wishlist itself, so re-tapping the active chip is a no-op rather than
+                            // a "no list selected" state.
+                            FlowRow(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                listOf(
-                                    stringResource(R.string.advsearch_filter_wishlist) to (uiState.filterWishlist == true),
-                                    stringResource(R.string.advsearch_filter_for_trade) to (uiState.filterForTrade == true),
-                                ).forEachIndexed { index, (label, isSelected) ->
+                                CollectionSource.entries.forEach { source ->
                                     MagicFilterChip(
-                                        selected = isSelected,
-                                        onClick = {
-                                            if (index == 0)
-                                                viewModel.setFilterWishlist(if (isSelected) null else true)
-                                            else
-                                                viewModel.setFilterForTrade(if (isSelected) null else true)
-                                        },
-                                        label = label,
+                                        selected = uiState.collectionSource == source,
+                                        onClick = { viewModel.setCollectionSource(source) },
+                                        label = stringResource(source.labelRes),
                                     )
                                 }
                             }
@@ -998,7 +1062,9 @@ fun AdvancedSearchSheet(
                     item {
                         SearchSection(
                             title = stringResource(R.string.advsearch_section_tags),
-                            icon = Icons.Default.LocalOffer
+                            icon = Icons.Default.LocalOffer,
+                            titleColor = mc.textPrimary,
+                            iconColor = mc.goldMtg,
                         ) {
                             var showTagPicker by remember { mutableStateOf(false) }
 
@@ -1074,41 +1140,117 @@ fun AdvancedSearchSheet(
                 }
 
                 // ── Sort ──
-                if (!isCollectionMode) item {
-                    SearchSection(
-                        title = stringResource(R.string.advsearch_section_sort),
-                        icon = Icons.Default.Sort,
-                    ) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                if (isCollectionMode && collectionSortOrder != null) {
+                    // Collection-mode Sort: uses the Collection's own SortOrder enum and
+                    // a separate ASC/DESC toggle, mirroring the CommunityAdvancedSearchSheet pattern.
+                    item {
+                        SearchSection(
+                            title = stringResource(R.string.advsearch_section_sort),
+                            icon = Icons.Default.Sort,
+                            titleColor = mc.textPrimary,
+                            iconColor = mc.goldMtg,
                         ) {
-                            SearchOrder.entries.forEach { order ->
-                                MagicFilterChip(
-                                    selected = uiState.orderBy == order,
-                                    onClick = { viewModel.setOrder(order, uiState.orderDirection) },
-                                    label = stringResource(when(order) {
-                                        SearchOrder.NAME -> R.string.advsearch_sort_name
-                                        SearchOrder.CMC -> R.string.advsearch_sort_cmc
-                                        SearchOrder.PRICE_EUR -> R.string.advsearch_sort_price_eur
-                                        SearchOrder.PRICE_USD -> R.string.advsearch_sort_price_usd
-                                        SearchOrder.RARITY -> R.string.advsearch_sort_rarity
-                                        SearchOrder.RELEASED -> R.string.advsearch_sort_released
-                                        SearchOrder.COLOR -> R.string.advsearch_sort_color
-                                    }),
-                                )
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                CollectionSortOrder.entries.forEach { order ->
+                                    MagicFilterChip(
+                                        selected = collectionSortOrder == order,
+                                        onClick = { onCollectionSortChange?.invoke(order) },
+                                        label = stringResource(when(order) {
+                                            CollectionSortOrder.DATE_ADDED -> R.string.collection_sort_date
+                                            CollectionSortOrder.NAME -> R.string.collection_sort_name
+                                            CollectionSortOrder.PRICE -> R.string.collection_sort_price
+                                            CollectionSortOrder.RARITY -> R.string.collection_sort_rarity
+                                        }),
+                                    )
+                                }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf(
+                                    CollectionSortDirection.ASC to stringResource(R.string.advsearch_dir_asc),
+                                    CollectionSortDirection.DESC to stringResource(R.string.advsearch_dir_desc),
+                                ).forEach { (dir, label) ->
+                                    MagicFilterChip(
+                                        selected = collectionSortDirection == dir,
+                                        onClick = { onCollectionSortDirectionChange?.invoke(dir) },
+                                        label = label,
+                                    )
+                                }
                             }
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf(
-                                SearchDirection.ASC to stringResource(R.string.advsearch_dir_asc),
-                                SearchDirection.DESC to stringResource(R.string.advsearch_dir_desc),
-                            ).forEach { (dir, label) ->
-                                MagicFilterChip(
-                                    selected = uiState.orderDirection == dir,
-                                    onClick = { viewModel.setOrder(uiState.orderBy, dir) },
-                                    label = label,
-                                )
+                    }
+
+                    // ── Group By (collection mode only) ──
+                    item {
+                        SearchSection(
+                            title = stringResource(R.string.collection_grouping_label),
+                            icon = Icons.Default.Layers,
+                            titleColor = mc.textPrimary,
+                            iconColor = mc.goldMtg,
+                        ) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                CollectionGroupingMode.entries.forEach { mode ->
+                                    MagicFilterChip(
+                                        selected = collectionGroupingMode == mode,
+                                        onClick = { onCollectionGroupingChange?.invoke(mode) },
+                                        label = stringResource(when(mode) {
+                                            CollectionGroupingMode.NONE -> R.string.collection_grouping_none
+                                            CollectionGroupingMode.TYPE -> R.string.collection_grouping_type
+                                            CollectionGroupingMode.COLOR -> R.string.collection_grouping_color
+                                            CollectionGroupingMode.CMC -> R.string.collection_sort_cmc
+                                            CollectionGroupingMode.SET -> R.string.collection_grouping_set
+                                            CollectionGroupingMode.RARITY -> R.string.collection_sort_rarity
+                                        }),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else if (!isCollectionMode) {
+                    // Scryfall search mode: uses SearchOrder / SearchDirection from the AdvancedSearchViewModel.
+                    item {
+                        SearchSection(
+                            title = stringResource(R.string.advsearch_section_sort),
+                            icon = Icons.Default.Sort,
+                            titleColor = mc.textPrimary,
+                            iconColor = mc.goldMtg,
+                        ) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                SearchOrder.entries.forEach { order ->
+                                    MagicFilterChip(
+                                        selected = uiState.orderBy == order,
+                                        onClick = { viewModel.setOrder(order, uiState.orderDirection) },
+                                        label = stringResource(when(order) {
+                                            SearchOrder.NAME -> R.string.advsearch_sort_name
+                                            SearchOrder.CMC -> R.string.advsearch_sort_cmc
+                                            SearchOrder.PRICE_EUR -> R.string.advsearch_sort_price_eur
+                                            SearchOrder.PRICE_USD -> R.string.advsearch_sort_price_usd
+                                            SearchOrder.RARITY -> R.string.advsearch_sort_rarity
+                                            SearchOrder.RELEASED -> R.string.advsearch_sort_released
+                                            SearchOrder.COLOR -> R.string.advsearch_sort_color
+                                        }),
+                                    )
+                                }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf(
+                                    SearchDirection.ASC to stringResource(R.string.advsearch_dir_asc),
+                                    SearchDirection.DESC to stringResource(R.string.advsearch_dir_desc),
+                                ).forEach { (dir, label) ->
+                                    MagicFilterChip(
+                                        selected = uiState.orderDirection == dir,
+                                        onClick = { viewModel.setOrder(uiState.orderBy, dir) },
+                                        label = label,
+                                    )
+                                }
                             }
                         }
                     }
@@ -1550,6 +1692,117 @@ fun TagPickerSheet(
                                 style = ty.bodyLarge,
                                 color = mc.textPrimary,
                                 modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Field-row label for the selected color-match mode. */
+@get:StringRes
+private val ColorMatchMode.labelRes: Int
+    get() = when (this) {
+        ColorMatchMode.ANY_OF -> R.string.advsearch_colormatch_any
+        ColorMatchMode.AT_LEAST -> R.string.advsearch_colormatch_all
+        ColorMatchMode.EXACTLY -> R.string.advsearch_colormatch_exactly
+        ColorMatchMode.AT_MOST -> R.string.advsearch_colormatch_at_most
+    }
+
+/** One-line explanation shown under each mode in [ColorMatchModePickerSheet]. */
+@get:StringRes
+private val ColorMatchMode.descriptionRes: Int
+    get() = when (this) {
+        ColorMatchMode.ANY_OF -> R.string.advsearch_colormatch_any_desc
+        ColorMatchMode.AT_LEAST -> R.string.advsearch_colormatch_all_desc
+        ColorMatchMode.EXACTLY -> R.string.advsearch_colormatch_exactly_desc
+        ColorMatchMode.AT_MOST -> R.string.advsearch_colormatch_at_most_desc
+    }
+
+/** Chip label for each collection source. */
+@get:StringRes
+internal val CollectionSource.labelRes: Int
+    get() = when (this) {
+        CollectionSource.COLLECTION -> R.string.advsearch_filter_in_collection
+        CollectionSource.WISHLIST -> R.string.advsearch_filter_wishlist
+        CollectionSource.FOR_TRADE -> R.string.advsearch_filter_for_trade
+    }
+
+/**
+ * Single-select picker for [ColorMatchMode], opened from the Colors section's field row.
+ *
+ * Listed in the order a user reaches for them (the OR default first), not in enum order.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ColorMatchModePickerSheet(
+    selectedMode: ColorMatchMode,
+    onSelectMode: (ColorMatchMode) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val modes = listOf(
+        ColorMatchMode.ANY_OF,
+        ColorMatchMode.AT_LEAST,
+        ColorMatchMode.EXACTLY,
+        ColorMatchMode.AT_MOST,
+    )
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.backgroundSecondary,
+        contentWindowInsets = { WindowInsets(0) },
+        dragHandle = null,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = mc.textPrimary)
+                }
+                Text(
+                    stringResource(R.string.advsearch_colormatch_picker_title),
+                    style = ty.titleLarge,
+                    color = mc.textPrimary,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                items(count = modes.size, key = { i -> modes[i].name }) { index ->
+                    val mode = modes[index]
+                    val isSelected = mode == selectedMode
+                    Surface(
+                        onClick = { onSelectMode(mode) },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSelected) mc.primaryAccent.copy(alpha = 0.1f) else mc.surface,
+                        border = BorderStroke(
+                            width = if (isSelected) 1.5.dp else 0.5.dp,
+                            color = if (isSelected) mc.primaryAccent else mc.surfaceVariant,
+                        ),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                stringResource(mode.labelRes),
+                                style = ty.bodyLarge,
+                                color = if (isSelected) mc.primaryAccent else mc.textPrimary,
+                            )
+                            Text(
+                                stringResource(mode.descriptionRes),
+                                style = ty.bodySmall,
+                                color = mc.textSecondary,
                             )
                         }
                     }

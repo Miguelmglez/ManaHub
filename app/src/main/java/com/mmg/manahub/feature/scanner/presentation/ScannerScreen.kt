@@ -49,8 +49,10 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.CollectionsBookmark
 import androidx.compose.material.icons.rounded.ContentCopy
@@ -77,8 +79,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,18 +90,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -116,14 +119,13 @@ import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardRarity
-import com.mmg.manahub.core.ui.components.MagicLoadingSize
-import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
 import com.mmg.manahub.core.ui.components.LanguageBadge
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCtaButton
-import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicLoadingSize
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.VariantSelectorSheet
@@ -272,6 +274,7 @@ fun ScannerScreen(
                             isFoil = uiState.selectedIsFoil,
                             preferredCurrency = preferredCurrency,
                             onClick = { uiState.lastDetectedCard?.scryfallId?.let { viewModel.onOpenCardDetail(it, fromQueue = false) } },
+                            onRemove = viewModel::onRemoveLastDetectedCard,
                         )
                     }
                 }
@@ -328,6 +331,8 @@ fun ScannerScreen(
             onNavigateToCardDetail = viewModel::onOpenCardDetail,
             onDuplicateCard = viewModel::onDuplicateSessionCard,
             onToggleAutoDeleteOnAdd = viewModel::onToggleAutoDeleteOnAdd,
+            onIncrementQuantity = viewModel::onIncrementSessionCardQuantity,
+            onDecrementQuantity = viewModel::onDecrementSessionCardQuantity,
         )
     }
 
@@ -386,7 +391,7 @@ fun ScannerScreen(
                 },
                 // Pass existing navigation callbacks to ensure features like "Find Community Decks"
                 // or "Open in Deck" still work from within the scanner-scoped overlay.
-                onNavigateToDeck = { id ->
+                onNavigateToDeck ={ id ->
                     viewModel.onCloseCardDetail()
                     onNavigateToDeck(id)
                 },
@@ -1136,6 +1141,7 @@ private fun DetectedCardOverlay(
     isFoil: Boolean,
     preferredCurrency: PreferredCurrency,
     onClick: () -> Unit,
+    onRemove: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -1145,15 +1151,30 @@ private fun DetectedCardOverlay(
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable { onClick() }
                 .padding(12.dp),
             contentAlignment = Alignment.Center
         ) {
             if (card != null) {
+                IconButton(
+                    onClick = onRemove,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 0.dp, end = 0.dp)
+                        .size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        tint = mc.textSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     // W2.11: purely informational — the card is added regardless. languageMismatch
                     // here means "no <selectedLanguage> printing exists, added the English print".
@@ -1337,6 +1358,8 @@ private fun ScanQueueSheet(
     onNavigateToCardDetail: (scryfallId: String, fromQueue: Boolean) -> Unit,
     onDuplicateCard: (ScannedCard) -> Unit,
     onToggleAutoDeleteOnAdd: () -> Unit,
+    onIncrementQuantity: (ScannedCard) -> Unit,
+    onDecrementQuantity: (ScannedCard) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -1371,9 +1394,9 @@ private fun ScanQueueSheet(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Header Row
+                // Header
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onDismiss) {
@@ -1383,17 +1406,11 @@ private fun ScanQueueSheet(
                             tint = mc.textSecondary
                         )
                     }
-                }
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
                     Text(
                         text = stringResource(R.string.scanner_queue_title, session.cards.size),
                         style = ty.titleMedium,
-                        color = mc.textPrimary
+                        color = mc.textPrimary,
+                        modifier = Modifier.weight(1f)
                     )
                     IconButton(onClick = onClearSession) {
                         Icon(Icons.Rounded.Delete, null, tint = mc.lifeNegative)
@@ -1443,6 +1460,8 @@ private fun ScanQueueSheet(
                             onAddToWishlist = { onAddEntryToWishlist(entry) },
                             onClick = { onNavigateToCardDetail(entry.card.scryfallId, true) },
                             onDuplicate = { onDuplicateCard(entry) },
+                            onIncrement = { onIncrementQuantity(entry) },
+                            onDecrement = { onDecrementQuantity(entry) },
                         )
                     }
                 }
@@ -1496,6 +1515,8 @@ private fun QueueCardItem(
     onAddToWishlist: () -> Unit,
     onClick: () -> Unit,
     onDuplicate: () -> Unit,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -1525,9 +1546,11 @@ private fun QueueCardItem(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "${entry.quantity}x ${entry.card.name}",
+                    text = entry.card.name,
                     style = ty.titleMedium.withWeight(FontWeight.Bold).withFontSize(18.sp),
-                    color = mc.textPrimary
+                    color = mc.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 
                 Spacer(Modifier.height(4.dp))
@@ -1552,25 +1575,38 @@ private fun QueueCardItem(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    LanguageBadge(langCode = entry.language)
-                    AttrTag(entry.condition)
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        LanguageBadge(langCode = entry.language)
+                        AttrTag(entry.condition)
 
-                    if (entry.isFoil) {
-                        AttrTag(stringResource(R.string.scanner_foil))
+                        if (entry.isFoil) {
+                            AttrTag(stringResource(R.string.scanner_foil))
+                        }
+
+                        // "Already in collection" badge — any printing/language of the same oracle
+                        // identity (Card Versions & Languages convention: oracleId.ifBlank { name })
+                        if (isInCollection) {
+                            Icon(
+                                imageVector = Icons.Rounded.CollectionsBookmark,
+                                contentDescription = stringResource(R.string.scanner_already_in_collection),
+                                tint = mc.primaryAccent,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
                     }
 
-                    // "Already in collection" badge — any printing/language of the same oracle
-                    // identity (Card Versions & Languages convention: oracleId.ifBlank { name })
-                    if (isInCollection) {
-                        Icon(
-                            imageVector = Icons.Rounded.CollectionsBookmark,
-                            contentDescription = stringResource(R.string.scanner_already_in_collection),
-                            tint = mc.primaryAccent,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
+                    QuantitySelector(
+                        quantity = entry.quantity,
+                        onIncrement = onIncrement,
+                        onDecrement = onDecrement
+                    )
                 }
 
                 Spacer(Modifier.height(8.dp))
@@ -1596,56 +1632,107 @@ private fun QueueCardItem(
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
+            QueueActionButton(
+                icon = Icons.Rounded.Style,
+                label = stringResource(R.string.action_add),
+                tint = mc.primaryAccent,
                 onClick = onAddToCollection,
                 modifier = Modifier.weight(1f)
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Rounded.Style, null, tint = mc.primaryAccent, modifier = Modifier.size(24.dp))
-                    Text(stringResource(R.string.action_add), style = ty.labelSmall, color = mc.primaryAccent)
-                }
-            }
-            IconButton(
+            )
+            QueueActionButton(
+                icon = Icons.Rounded.FavoriteBorder,
+                label = stringResource(R.string.carddetail_add_to_wishlist),
+                tint = mc.secondaryAccent,
                 onClick = onAddToWishlist,
                 modifier = Modifier.weight(1f)
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Rounded.FavoriteBorder, null, tint = mc.secondaryAccent, modifier = Modifier.size(24.dp))
-                    Text(stringResource(R.string.carddetail_add_to_wishlist), style = ty.labelSmall, color = mc.secondaryAccent)
-                }
-            }
-            IconButton(
-                onClick = onEdit,
-                modifier = Modifier.weight(1f)
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Rounded.Edit, null, tint = mc.textSecondary, modifier = Modifier.size(24.dp))
-                    Text(stringResource(R.string.action_edit), style = ty.labelSmall, color = mc.textSecondary)
-                }
-            }
-            IconButton(
-                onClick = onDuplicate,
-                modifier = Modifier.weight(1f)
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Rounded.ContentCopy, null, tint = mc.textSecondary, modifier = Modifier.size(24.dp))
-                    Text(stringResource(R.string.scanner_duplicate_entry), style = ty.labelSmall, color = mc.textSecondary)
-                }
-            }
-            IconButton(
+            )
+            QueueActionButton(
+                icon = Icons.Rounded.Clear,
+                label = stringResource(R.string.action_remove),
+                tint = mc.lifeNegative,
                 onClick = onDelete,
                 modifier = Modifier.weight(1f)
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Rounded.Clear, null, tint = mc.lifeNegative, modifier = Modifier.size(24.dp))
-                    Text(stringResource(R.string.action_remove), style = ty.labelSmall, color = mc.lifeNegative)
-                }
-            }
+            )
+            QueueActionButton(
+                icon = Icons.Rounded.Edit,
+                label = stringResource(R.string.action_edit),
+                tint = mc.textSecondary,
+                onClick = onEdit,
+                modifier = Modifier.weight(1f)
+            )
+            QueueActionButton(
+                icon = Icons.Rounded.ContentCopy,
+                label = stringResource(R.string.scanner_duplicate_entry),
+                tint = mc.textSecondary,
+                onClick = onDuplicate,
+                modifier = Modifier.weight(1f)
+            )
         }
 
         HorizontalDivider(
             modifier = Modifier.padding(top = 8.dp),
             color = mc.textPrimary.withAlpha(0.05f)
+        )
+    }
+}
+
+@Composable
+private fun QuantitySelector(
+    quantity: Int,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    Row(
+        modifier = modifier
+            .background(mc.textPrimary.withAlpha(0.05f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        IconButton(onClick = onDecrement, modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Default.Remove, null, tint = mc.textPrimary, modifier = Modifier.size(16.dp))
+        }
+        Text(
+            text = quantity.toString(),
+            style = ty.titleLarge.withWeight(FontWeight.Bold),
+            color = mc.secondaryAccent,
+            modifier = Modifier.widthIn(min = 20.dp),
+            textAlign = TextAlign.Center
+        )
+        IconButton(onClick = onIncrement, modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Default.Add, null, tint = mc.textPrimary, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun QueueActionButton(
+    icon: ImageVector,
+    label: String,
+    tint: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val ty = MaterialTheme.magicTypography
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
+        Text(
+            text = label,
+            style = ty.labelSmall.withFontSize(9.sp),
+            color = tint,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            softWrap = false
         )
     }
 }

@@ -158,11 +158,20 @@ off suggestion use cases below). New engine, pure `commonMain`,
     for this (2 known small visual deltas from the pre-rework row, flagged not fixed: it now uses
     `imageNormal` instead of `imageArtCrop`, and lost the commander gold-tint on the name — see the
     plan's decisions doc for detail if these turn out to matter).
-  - **`CardSearchSheet` gained a preset entry point** (W5): `initialScryfallQuery`/
-    `initialCollectionTagKeys` params (appended last, defaulted), so the Analysis tab's "Browse"
-    button opens the exact same sheet/`onAdd`/`onRemove` the Build tab uses, pre-filtered, and clears
+  - **`CardSearchSheet` gained a preset entry point** (W5): `initialAdvancedQuery` (structured, W11 —
+    the original `initialScryfallQuery: String?` is long deleted)/`initialCollectionTagKeys` params
+    (appended last, defaulted), so the Analysis tab's "Browse" button opens the exact same
+    sheet/`onAdd`/`onRemove` the Build tab uses, pre-filtered, and clears
     `addCardsQuery`/`scryfallResults` on dismiss the same way the Build tab's own call site already
     does (the two share that mutable VM state — always clear it on close of EITHER entry point).
+    **Both tabs are filtered from that ONE query since 2026-09-07** — `DeckStudioViewModel
+    .applyStructuredSearch` (bound to the now-nullable `onAdvancedSearch`, which also serves
+    `AdvancedSearchSheet`'s SEARCH CARDS CTA) sends the Scryfall fragment to All Cards and runs
+    `AdvancedSearchCardMatcher` (`shared/core-domain/.../core/domain/search/`, `lenient = true`)
+    over the collection; the visible search bar stays name-filter-only in every path. The sheet is
+    rendered only while the destination is `RESUMED`, so a card tap can navigate to `CardDetailScreen`
+    with working transitions. → memory: `project_deck_studio_structured_search_both_tabs`,
+    `feedback_modal_sheet_blocks_nav_transition`
   - Telemetry added: `deck_analysis_section_browse` (section/pillar id + `has_gap`) and
     `deck_analysis_section_card_added` (attributed to a section-driven add via a `sectionBrowseSectionId`
     VM-local flag, sibling of `sectionBrowseQuery`, reset at the same 4 sites). Nothing else was
@@ -222,15 +231,38 @@ off suggestion use cases below). New engine, pure `commonMain`,
     only (same discipline as the Commander golden decks — never assert absolute scores on sparse
     fixtures). SYNERGY subscores recorded for the future P4 retune (A4): Standard AGGRO=57,
     CONTROL=19.
-  - **Future debt (out of Wave 2, hooks left but nothing built):** Modern/Pioneer/Pauper/Legacy/
-    Vintage analysis (each needs its own `SixtyFormatProfile` entry + strategy-availability row +
-    `STUDIO_FORMATS` chip + calibration fixtures, blocked on the app supporting deck creation in
-    those formats first); sideboard analysis beyond the size check (role coverage of the 15,
-    matchup guidance); the SYNERGY (P4) pillar retune; rotation-aware legality refresh UX (respect
-    ADR-005 unless real users hit stale verdicts); Deck Analysis "Detected: X" live preview while
-    manually pinned (still deferred from Wave 1). The category-scoped browse-for-cards sections that
-    replace the deleted Cuts/Adds suggestion engine SHIPPED (Deck Analysis Category Sections rework,
-    W0-W8, 2026-08-21/24 — see the dedicated block below); no longer future debt.
+  - **Wave 3 — Modern/Pioneer/Legacy/Vintage/Pauper analysis SHIPPED (2026-09-06).** Closes the
+    Wave 2 future-debt item above (deck CREATION in these 5 formats was already live via
+    `DeckCreationSheet.kt` — that part of the old debt note was stale; the real gap was purely the
+    archetype/strategy layer). `SixtyFormatProfile` gained 5 new blanket judgment-call entries
+    (documented per-format in its KDoc, live-cross-checked where sources were reachable —
+    mtggoldfish again 403'd automated fetch): MODERN `(0, 0.0)` (already reads as the generic
+    SIXTY/AGGRO baseline), PIONEER `(+1, +0.15)` (half of Standard's shift), LEGACY `(-1, -0.2)`
+    and VINTAGE `(-2, -0.3)` (true duals/fetches/fast-mana → leaner manabases, one full step
+    apart), PAUPER `(+1, -0.1)` (commons-only fixing is weaker despite a low curve).
+    `CuratedStrategyCatalog`'s `COMMANDER_CASUAL_STANDARD` was renamed **`COMMANDER_CASUAL_SIXTY`**
+    and now also covers these 5 formats (all ~15 v1-curated strategies, unchanged list — no
+    per-format metagame curation attempted, a deliberate scope call vs. redoing Wave 2 B1's
+    research 5x); `storm` (bespoke, Commander-excluded by design) extended the same way after a
+    live check confirmed Storm/Reanimator are real, actively-played Pauper archetypes today
+    (contrary to the initial hypothesis that Pauper's card pool was too weak for them). One AGGRO
+    calibration fixture per format added to `DeckAnalysisEngineCalibrationTest.kt` (Modern 85,
+    Pioneer 90, Legacy 84, Vintage 85 — reuses Legacy's core cards, its pool is a Legacy superset
+    with nothing restricted/banned relevant here, Pauper 76 — lowest, thinner creature curve),
+    all inside the existing 65-98 defensible band; matching golden (relative-only) fixtures per
+    format in `DeckAnalysisEngineGoldenTest.kt`; new `ArchetypeSkeletonResolverTest` cases proving
+    each format's deltas actually apply; `CuratedStrategyCatalogTest` extended to round-trip
+    `nearestFor` across all 5 new formats. 46→62 tests, `:app:assembleDebug` green. → memory:
+    `project_deck_analysis_wave3_sixty_formats`
+  - **Future debt (unchanged by Wave 3):** sideboard analysis beyond the size check (role coverage
+    of the 15, matchup guidance); the SYNERGY (P4) pillar retune; rotation-aware legality refresh UX
+    (respect ADR-005 unless real users hit stale verdicts); Deck Analysis "Detected: X" live preview
+    while manually pinned (still deferred from Wave 1); per-format (vs. shared Standard-derived)
+    strategy curation for Modern/Pioneer/Legacy/Vintage/Pauper, if a future pass wants real
+    per-format metagame data instead of the Wave 3 shortcut above. The category-scoped
+    browse-for-cards sections that replace the deleted Cuts/Adds suggestion engine SHIPPED (Deck
+    Analysis Category Sections rework, W0-W8, 2026-08-21/24 — see the dedicated block below); no
+    longer future debt.
 - **Standard specifics (Wave 2 B3):** P5 already dispatched `DeckFormat.STANDARD` to
   `Card.legalityStandard` correctly since Phase 2 — verified, not fixed. New `Finding
   .SideboardOversized(count)` (WARNING) fires when a 60-card constructed deck

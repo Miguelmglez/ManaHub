@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
 import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.ColorMatchMode
 import com.mmg.manahub.core.model.ComparisonOperator
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DetectionRule
@@ -156,17 +157,23 @@ object SectionSearchQuery {
         return AdvancedSearchQuery(criteria = criteria)
     }
 
-    /** [SearchCriterion] mirror of [identityClause] — `null`/non-null under the EXACT same
-     * conditions, same WUBRG-ordered color set. Renders via [SearchCriterion.ColorIdentity]'s bare
-     * (non-`exactly`) mode, which Scryfall's own operator-improvements special-cases to mean
-     * "at most these colors" for identity searches specifically (`id:` ≡ `id<=` for `id`, unlike
-     * `c:`/`c>=` for plain color) — verified live against Scryfall's documented search syntax
-     * before relying on this, not assumed from the `<=` the curated string uses. */
+    /**
+     * [SearchCriterion] mirror of [identityClause] — `null`/non-null under the EXACT same
+     * conditions, same WUBRG-ordered color set, and now the same explicit operator: the clause
+     * builds `id<=`, so the criterion carries [ColorMatchMode.AT_MOST].
+     *
+     * This used to pass `exactly = false` and rely on that meaning "at most" — true of the `id:`
+     * Scryfall renders it as, but the local matcher read the same bare form as a SUPERSET test, so
+     * a Commander deck's Collection tab collapsed to zero while All Cards worked (2026-09-07).
+     */
     private fun identityCriterion(context: SectionQueryContext): SearchCriterion? {
         if (ArchetypeFormat.of(context.format) != ArchetypeFormat.COMMANDER) return null
         val colored = WUBRG_ORDER.filter { it in context.colorIdentity }
         if (colored.isEmpty()) return null
-        return SearchCriterion.ColorIdentity(colors = colored.map { it.symbol }.toSet(), exactly = false)
+        return SearchCriterion.ColorIdentity(
+            colors = colored.map { it.symbol }.toSet(),
+            mode = ColorMatchMode.AT_MOST,
+        )
     }
 
     /** [SearchCriterion] mirror of [legalityClause] — same format→Scryfall-format-name mapping,

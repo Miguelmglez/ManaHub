@@ -9,7 +9,6 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
@@ -44,6 +43,7 @@ import androidx.navigation.navDeepLink
 import com.google.android.play.core.review.ReviewManagerFactory
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.auth.SessionState
@@ -62,9 +62,9 @@ import com.mmg.manahub.feature.addcard.presentation.AddCardScreen
 import com.mmg.manahub.feature.auth.data.repository.AuthRepositoryImpl
 import com.mmg.manahub.feature.auth.presentation.AccountManagementScreen
 import com.mmg.manahub.feature.auth.presentation.ResetPasswordConfirmScreen
-import com.mmg.manahub.feature.auth.presentation.isActiveRecoveryFlow
 import com.mmg.manahub.feature.auth.presentation.UpdateEmailScreen
 import com.mmg.manahub.feature.auth.presentation.UpdatePasswordScreen
+import com.mmg.manahub.feature.auth.presentation.isActiveRecoveryFlow
 import com.mmg.manahub.feature.carddetail.presentation.CardDetailScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionScreen
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckDetailScreen
@@ -94,7 +94,6 @@ import com.mmg.manahub.feature.massiveadd.presentation.MassiveAddCardScreen
 import com.mmg.manahub.feature.news.presentation.NewsScreen
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.manahub.feature.news.presentation.VideoPlayerScreen
-import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.feature.playtest.presentation.hand.PlaytestHandScreen
 import com.mmg.manahub.feature.playtest.presentation.setup.PlaytestSetupScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileScreen
@@ -575,7 +574,9 @@ fun AppNavGraph(
                                 navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
                             },
                             onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.route) },
-                            onNavigateToDeck = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
+                            onNavigateToDeck = { id ->
+                                navController.navigate(Screen.DeckStudio.createRoute(id))
+                            },
                             onNavigateToCommunityDecks = { cardName ->
                                 navController.navigate(Screen.CommunityDecksByCard.createRoute(cardName))
                             }
@@ -593,7 +594,7 @@ fun AppNavGraph(
                             }
                         ),
                         enterTransition = { 
-                            fadeIn(tween(400)) + scaleIn(initialScale = 0.92f, animationSpec = tween(450))
+                            fadeIn(tween(500))
                         },
                         exitTransition = { fadeOut(tween(500)) }
                     ) { backStackEntry ->
@@ -859,12 +860,14 @@ fun AppNavGraph(
             ) {
                 SetDraftDetailScreen(
                     onBack = { navController.popBackStack() },
-                    onCardClick = { id ->
-                        navController.navigate(Screen.CollectionCardDetail.createRoute(id))
+                    onCardClick = { id, key ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(id, key))
                     },
                     onSimulateDraft = { setCode ->
                         navController.navigate(Screen.DraftSimSetup.createRoute(setCode))
                     },
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedVisibilityScope = this@composable
                 )
             }
 

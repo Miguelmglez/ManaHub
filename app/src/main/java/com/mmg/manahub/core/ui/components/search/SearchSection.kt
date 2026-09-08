@@ -47,7 +47,7 @@ fun SearchSection(
         border = BorderStroke(0.5.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
         shadowElevation = if (expanded) 1.dp else 0.dp
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(
                 title = title,
                 expanded = expanded,
@@ -55,12 +55,13 @@ fun SearchSection(
                 icon = icon,
                 titleColor = titleColor,
                 iconColor = iconColor,
+                modifier = Modifier.padding(horizontal = 8.dp)
             )
             AnimatedVisibility(visible = expanded) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp),
+                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     content = content,
                 )

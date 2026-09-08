@@ -43,6 +43,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -85,6 +86,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -94,6 +96,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.CollectionCardGroup
+import com.mmg.manahub.core.model.CollectionSource
 import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionSection
 import com.mmg.manahub.core.model.CollectionViewMode
@@ -181,8 +184,6 @@ fun CollectionScreen(
         onPlaytestClick       = onPlaytestClick,
         onBrowseCommunityDecks = onBrowseCommunityDecks,
         onViewModeToggle      = viewModel::onViewModeToggle,
-        onSortChange          = viewModel::onSortChange,
-        onGroupingChange      = viewModel::onGroupingChange,
         onSearchQueryChange   = viewModel::onSearchQueryChange,
         onClearFilters        = {
             viewModel.clearAdvancedFilters()
@@ -211,6 +212,15 @@ fun CollectionScreen(
                 viewModel.applyAdvancedFilters(advancedQuery)
                 showAdvancedSearch = false
             },
+            // The sheet's ViewModel outlives any single open, so it must be re-seeded from what
+            // is actually filtering the collection right now.
+            appliedQuery = uiState.activeQuery,
+            collectionSortOrder = uiState.sortOrder,
+            collectionSortDirection = uiState.sortDirection,
+            collectionGroupingMode = uiState.groupingMode,
+            onCollectionSortChange = viewModel::onSortChange,
+            onCollectionSortDirectionChange = viewModel::onSortDirectionChange,
+            onCollectionGroupingChange = viewModel::onGroupingChange,
         )
     }
 
@@ -237,8 +247,6 @@ private fun CollectionContent(
     onPlaytestClick:      (String) -> Unit = {},
     onBrowseCommunityDecks: () -> Unit = {},
     onViewModeToggle:     () -> Unit,
-    onSortChange:         (SortOrder) -> Unit,
-    onGroupingChange:     (CollectionGroupingMode) -> Unit,
     onSearchQueryChange:  (String) -> Unit,
     onClearFilters:       () -> Unit,
     onErrorDismissed:     () -> Unit,
@@ -349,8 +357,6 @@ private fun CollectionContent(
                         onClearFilters        = onClearFilters,
                         onShowAdvancedSearch  = onShowAdvancedSearch,
                         onViewModeToggle      = onViewModeToggle,
-                        onSortChange          = onSortChange,
-                        onGroupingChange      = onGroupingChange,
                         gridState             = gridState,
                         listState             = listState,
                         sharedTransitionScope = sharedTransitionScope,
@@ -393,8 +399,6 @@ private fun CardsTabContent(
     onClearFilters:       () -> Unit,
     onShowAdvancedSearch: () -> Unit,
     onViewModeToggle:     () -> Unit,
-    onSortChange:         (SortOrder) -> Unit,
-    onGroupingChange:     (CollectionGroupingMode) -> Unit,
     gridState:            LazyGridState,
     listState:            LazyListState,
     sharedTransitionScope: SharedTransitionScope? = null,
@@ -438,10 +442,39 @@ private fun CardsTabContent(
         // content area swaps to a scoped empty message, keyed off the SAME headerHeightDp offset
         // CardGrid/CardList already use.
         if (uiState.cards.isEmpty()) {
+            // Rows whose card is not cached yet are skipped by the projection, so "empty" would be
+            // a lie while any of them are outstanding — the list is INCOMPLETE, not empty
+            // (ADR-008: ownership data never depends on cache metadata).
+            val isHydrating = uiState.uncachedSourceRows > 0
+            // An empty wishlist / trade list is not a failed search, so it says so in its own words
+            // instead of "no cards match" — but keeps the same clear-filters escape hatch.
+            val isEmptySource = !isHydrating &&
+                uiState.collectionSource != CollectionSource.COLLECTION &&
+                uiState.searchQuery.isBlank() && filterCount == 1
             EmptyState(
-                icon        = Icons.Default.Search,
-                title       = stringResource(R.string.collection_no_results_title),
-                subtitle    = stringResource(R.string.collection_no_results_subtitle),
+                icon        = when {
+                    isHydrating -> Icons.Default.CloudDownload
+                    isEmptySource -> Icons.Default.CollectionsBookmark
+                    else -> Icons.Default.Search
+                },
+                title       = when {
+                    isHydrating -> stringResource(R.string.collection_source_hydrating_title)
+                    !isEmptySource -> stringResource(R.string.collection_no_results_title)
+                    uiState.collectionSource == CollectionSource.WISHLIST ->
+                        stringResource(R.string.collection_wishlist_empty_title)
+                    else -> stringResource(R.string.collection_for_trade_empty_title)
+                },
+                subtitle    = when {
+                    isHydrating -> pluralStringResource(
+                        R.plurals.collection_source_hydrating_subtitle,
+                        uiState.uncachedSourceRows,
+                        uiState.uncachedSourceRows,
+                    )
+                    !isEmptySource -> stringResource(R.string.collection_no_results_subtitle)
+                    uiState.collectionSource == CollectionSource.WISHLIST ->
+                        stringResource(R.string.collection_wishlist_empty_subtitle)
+                    else -> stringResource(R.string.collection_for_trade_empty_subtitle)
+                },
                 actionLabel = stringResource(R.string.collection_no_results_action),
                 onAction    = {
                     // Clears BOTH the plain search text and any advanced-search filters — a
@@ -558,6 +591,34 @@ private fun CardsTabContent(
                 }
             }
 
+            // Same honesty rule as the empty state: a rendered list that silently drops uncached
+            // rows must say the count is still growing, never present itself as complete.
+            AnimatedVisibility(visible = uiState.uncachedSourceRows > 0 && uiState.cards.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudDownload,
+                        contentDescription = null,
+                        tint = mc.textSecondary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = pluralStringResource(
+                            R.plurals.collection_source_hydrating_notice,
+                            uiState.uncachedSourceRows,
+                            uiState.uncachedSourceRows,
+                        ),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textSecondary,
+                    )
+                }
+            }
+
             // Card count + Sort/View controls
             val totalCopies = uiState.cards.sumOf { it.totalQuantity }
             Column(
@@ -586,30 +647,6 @@ private fun CardsTabContent(
                             modifier = Modifier.size(24.dp)
                         )
                     }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
-                ) {
-                    ManaHubBottomSheetSelector(
-                        icon = Icons.AutoMirrored.Filled.Sort,
-                        valueText = stringResource(uiState.sortOrder.displayResId),
-                        items = SortOrder.entries,
-                        selectedItem = uiState.sortOrder,
-                        onSelect = onSortChange,
-                        itemLabel = { stringResource(it.displayResId) },
-                        modifier = Modifier.weight(1f),
-                    )
-                    ManaHubBottomSheetSelector(
-                        icon = Icons.Default.Layers,
-                        valueText = stringResource(uiState.groupingMode.displayResId),
-                        items = CollectionGroupingMode.entries,
-                        selectedItem = uiState.groupingMode,
-                        onSelect = onGroupingChange,
-                        itemLabel = { stringResource(it.displayResId) },
-                        modifier = Modifier.weight(1f),
-                    )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -723,8 +760,7 @@ private fun CardGrid(
                 if (collapsedSections[section.labelToken] != true) {
                     itemsIndexed(
                         section.items,
-                        // Composite key: TAG mode lets one CollectionCardGroup appear in
-                        // multiple sections, so the bare groupKey alone would collide.
+                        // Composite key — sections can overlap, so groupKey alone would collide.
                         key = { _, item -> "${section.labelToken}|${item.groupKey}" },
                     ) { index, item ->
                         val uniqueKey = "${section.labelToken}|${item.groupKey}"
@@ -831,7 +867,7 @@ private fun CardList(
                 if (collapsedSections[section.labelToken] != true) {
                     items(
                         items = section.items,
-                        // Composite key — see CardGrid's identical comment (TAG multi-membership).
+                        // Composite key — sections can overlap, so groupKey alone would collide.
                         key = { "${section.labelToken}|${it.groupKey}" },
                     ) { item ->
                         val uniqueKey = "${section.labelToken}|${item.groupKey}"
@@ -987,11 +1023,7 @@ private fun CollectionGroupHeader(
 }
 
 /**
- * Resolves the localized display label for a group's [labelToken]. Fixed tokens (type buckets,
- * WUBRG colors, "Lands"/"7+"/set codes/rarities) map to `stringResource`s; [CollectionGroupingMode.TAG]
- * resolves the raw [com.mmg.manahub.core.model.CardTag.key] token back to a real [CardTag] found on
- * one of the section's own items and calls its Android-only [label] extension — `shared/core-model`'s
- * pure [groupCollection] cannot do this itself (see `CollectionGrouping.kt`'s KDoc).
+ * Resolves the localized display label for a group's [labelToken].
  */
 @Composable
 private fun collectionGroupLabel(
@@ -1026,26 +1058,7 @@ private fun collectionGroupLabel(
     }
     CollectionGroupingMode.SET -> items.firstOrNull()?.card?.setName?.ifBlank { labelToken.uppercase() } ?: labelToken.uppercase()
     CollectionGroupingMode.RARITY -> labelToken.replaceFirstChar { it.uppercase() }.ifBlank { stringResource(R.string.deckdetail_group_other) }
-    CollectionGroupingMode.TAG -> {
-        if (labelToken == "untagged") {
-            stringResource(R.string.deckbuilder_group_untagged)
-        } else {
-            // Filtered to the same STRATEGY/ARCHETYPE/TRIBAL "identity" categories here too —
-            // defense-in-depth mirroring groupCollection()'s restriction (CollectionGrouping.kt),
-            // so this lookup can never resolve `labelToken` against a same-key, different-category
-            // CardTag (e.g. a TYPE or ROLE tag that happens to share a key).
-            val tag = items.firstNotNullOfOrNull { group ->
-                (group.card.tags + group.card.userTags)
-                    .find {
-                        it.key == labelToken &&
-                            (it.category == TagCategory.STRATEGY ||
-                                it.category == TagCategory.ARCHETYPE ||
-                                it.category == TagCategory.TRIBAL)
-                    }
-            }
-            tag?.label() ?: labelToken.replace('_', ' ').replaceFirstChar { it.uppercase() }
-        }
-    }
+
     CollectionGroupingMode.NONE -> labelToken
 }
 
@@ -1109,24 +1122,4 @@ private fun SyncCollectionBanner(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Display name extensions
-// ─────────────────────────────────────────────────────────────────────────────
 
-val SortOrder.displayResId get() = when (this) {
-    SortOrder.DATE_ADDED -> R.string.collection_sort_date
-    SortOrder.NAME       -> R.string.collection_sort_name
-    SortOrder.PRICE_DESC -> R.string.collection_sort_price_desc
-    SortOrder.PRICE_ASC  -> R.string.collection_sort_price_asc
-    SortOrder.RARITY     -> R.string.collection_sort_rarity
-}
-
-val CollectionGroupingMode.displayResId get() = when (this) {
-    CollectionGroupingMode.NONE   -> R.string.collection_grouping_none
-    CollectionGroupingMode.TYPE   -> R.string.collection_grouping_type
-    CollectionGroupingMode.COLOR  -> R.string.collection_grouping_color
-    CollectionGroupingMode.CMC    -> R.string.collection_sort_cmc
-    CollectionGroupingMode.SET    -> R.string.collection_grouping_set
-    CollectionGroupingMode.RARITY -> R.string.collection_sort_rarity
-    CollectionGroupingMode.TAG    -> R.string.collection_grouping_tag
-}

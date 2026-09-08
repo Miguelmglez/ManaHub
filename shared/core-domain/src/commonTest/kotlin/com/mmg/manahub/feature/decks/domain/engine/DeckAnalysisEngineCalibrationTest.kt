@@ -654,4 +654,366 @@ class DeckAnalysisEngineCalibrationTest {
         // Phase 4 IS that retune.
         assertTrue(analysis.totalScore in 65..95, "Standard CONTROL realistic-density score ${analysis.totalScore} outside the defensible well-built band")
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    //  Wave 2 future-debt closeout (2026-09-06) — realistic-density AGGRO calibration fixtures
+    //  for the 5 remaining 60-card constructed formats (MODERN/PIONEER/LEGACY/VINTAGE/PAUPER),
+    //  now that [SixtyFormatProfile] and [CuratedStrategyCatalog] have calibrated entries for all
+    //  of them. SAME discipline as the Standard fixtures above: one mono-Red AGGRO shell per
+    //  format (proportionate to the payoff — a single realistic-density fixture per format, not a
+    //  full per-archetype sweep), 60 cards exactly, up to 4 copies per distinct card
+    //  (`maxCopies = 4` for every one of these [DeckFormat]s), same documented 65-98 "well-built,
+    //  on-plan deck" band the Standard AGGRO fixture uses. CMC/mana cost/power/toughness/typeLine
+    //  are simplified per this file's established convention (see class KDoc) — card NAMES are
+    //  real, cross-checked live (2026-09-06) against dated decklists/archetype pages for each
+    //  format, cited per fixture below.
+    //
+    //  Every fixture uses [EngineFixtures.card]'s default `legalityStandard`/`legalityModern`/etc.
+    //  ("legal" for every format, same default every other fixture in this file already relies
+    //  on) — this file tests the ARCHETYPE/SCORING layer, not the legality pillar (that pillar has
+    //  its own dedicated suite, `AnalysisEngineLegalityP5Test`), so no per-format legality override
+    //  is needed for these real, currently-legal cards to resolve as legal here.
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Modern Mono-Red Burn — the format's longest-running, best-known AGGRO archetype (unbanned,
+     * nonrotating card pool). Core creature suite (Goblin Guide/Monastery Swiftspear/Soul-Scar
+     * Mage/Eidolon of the Great Revel) + burn suite (Lightning Bolt/Lava Spike/Rift Bolt/Skewer
+     * the Critics/Light Up the Stage) cross-checked live 2026-09-06 against mtggoldfish's
+     * "Modern Burn" archetype page — every card listed there as a long-standing staple, none
+     * banned in Modern. 16 creature copies + 20 spell copies + 24 Mountain = 60. Resolved
+     * SIXTY/MODERN AGGRO skeleton (Wave 2 future-debt closeout: [SixtyFormatProfile.MODERN],
+     * landsDelta=0, curveDelta=0.0 — deliberately unmodulated, see that entry's own KDoc) is
+     * IDENTICAL to the unmodulated generic SIXTY AGGRO band: lands (19,21,23), curve (1.4,1.8,2.2).
+     */
+    private fun buildModernAggroFixture(): List<DeckEntry> {
+        data class AggroCreature(val name: String, val cmc: Double, val manaCost: String, val winCon: Boolean)
+        val creatures = listOf(
+            AggroCreature("Goblin Guide", 1.0, "{R}", false),
+            AggroCreature("Monastery Swiftspear", 1.0, "{R}", false),
+            AggroCreature("Soul-Scar Mage", 1.0, "{R}", true),
+            AggroCreature("Eidolon of the Great Revel", 2.0, "{R}{R}", true),
+        ).mapIndexed { i, c ->
+            entry(
+                card(
+                    id = "mod-aggro-crea-$i", name = c.name, typeLine = "Creature — Goblin",
+                    cmc = c.cmc, manaCost = c.manaCost, colors = listOf("R"), colorIdentity = listOf("R"),
+                    power = "2", toughness = "1", tags = if (c.winCon) listOf(CardTag.WIN_CON) else emptyList(),
+                ),
+                quantity = 4,
+            )
+        }
+
+        data class AggroSpell(val name: String, val cmc: Double, val manaCost: String, val typeLine: String, val tags: List<CardTag>)
+        val spells = listOf(
+            AggroSpell("Lightning Bolt", 1.0, "{R}", "Instant", listOf(CardTag.REMOVAL)),
+            AggroSpell("Rift Bolt", 1.0, "{R}", "Sorcery", listOf(CardTag.REMOVAL)),
+            AggroSpell("Lava Spike", 1.0, "{R}", "Sorcery", emptyList()),
+            AggroSpell("Skewer the Critics", 1.0, "{R}", "Sorcery", emptyList()),
+            AggroSpell("Light Up the Stage", 2.0, "{1}{R}", "Sorcery", emptyList()),
+        ).mapIndexed { i, s ->
+            entry(
+                card(
+                    id = "mod-aggro-spell-$i", name = s.name, typeLine = s.typeLine, cmc = s.cmc,
+                    manaCost = s.manaCost, colors = listOf("R"), colorIdentity = listOf("R"), tags = s.tags,
+                ),
+                quantity = 4,
+            )
+        }
+
+        return creatures + spells + basicLands("Mountain", "R", 24)
+    }
+
+    @Test
+    fun modernAggroRealisticDensity_scoresInWellBuiltDeckBand() {
+        val mainboard = buildModernAggroFixture()
+        assertTrue(mainboard.sumOf { it.quantity } == 60, "Modern fixture must total exactly 60 cards, was ${mainboard.sumOf { it.quantity }}")
+
+        val colorIdentity = setOf(ManaColor.R)
+        val profile = profileForStandard(mainboard, colorIdentity)
+        val analysis = AnalysisEngine.evaluate(
+            mainboard = mainboard, format = DeckFormat.MODERN, colorIdentity = colorIdentity, profile = profile,
+            archetype = ArchetypeId.AGGRO, themes = emptyList(), isManualOverride = true, confidence = 1f,
+        )
+
+        assertNoBlockers(analysis)
+        // Same documented 65-98 "well-built, on-plan deck" band as the Standard AGGRO fixture
+        // (mono-color, zero synergy edges -- SYNERGY reads notApplicable and redistributes, same
+        // as that fixture). Actual measured score: 85/100.
+        assertTrue(analysis.totalScore in 65..98, "Modern AGGRO realistic-density score ${analysis.totalScore} outside the defensible well-built band")
+    }
+
+    /**
+     * Pioneer Mono-Red Aggro/Burn — card names + roster shape cross-checked live 2026-09-06 against
+     * cardsrealm.com's "Pioneer: Mono Red Aggro (2026)" deck tech and mtggoldfish's
+     * "pioneer-mono-red-burn" archetype page: Monastery Swiftspear/Emberheart Challenger/Screaming
+     * Nemesis are cited there as the deck's core creature suite, Burst Lightning/Reckless
+     * Rage/Monstrous Rage as its interaction/reach suite. Kari Zev, Skyship Raider added as a 4th
+     * mono-Red creature (real Pioneer-legal staple) for a fuller curve. Wild Slash/Abrade round out
+     * the removal suite. 16 creature copies + 20 spell copies + 24 Mountain = 60. Resolved
+     * SIXTY/PIONEER AGGRO skeleton ([SixtyFormatProfile.PIONEER], landsDelta=+1, curveDelta=+0.15):
+     * lands (20,22,24), curve (1.55,1.95,2.35).
+     */
+    private fun buildPioneerAggroFixture(): List<DeckEntry> {
+        data class AggroCreature(val name: String, val cmc: Double, val manaCost: String, val winCon: Boolean)
+        val creatures = listOf(
+            AggroCreature("Monastery Swiftspear", 1.0, "{R}", false),
+            AggroCreature("Kari Zev, Skyship Raider", 2.0, "{1}{R}", false),
+            AggroCreature("Emberheart Challenger", 2.0, "{1}{R}", true),
+            AggroCreature("Screaming Nemesis", 3.0, "{2}{R}", true),
+        ).mapIndexed { i, c ->
+            entry(
+                card(
+                    id = "pio-aggro-crea-$i", name = c.name, typeLine = "Creature — Human Berserker",
+                    cmc = c.cmc, manaCost = c.manaCost, colors = listOf("R"), colorIdentity = listOf("R"),
+                    power = "3", toughness = "2", tags = if (c.winCon) listOf(CardTag.WIN_CON) else emptyList(),
+                ),
+                quantity = 4,
+            )
+        }
+
+        data class AggroSpell(val name: String, val cmc: Double, val manaCost: String, val typeLine: String, val tags: List<CardTag>)
+        val spells = listOf(
+            AggroSpell("Burst Lightning", 1.0, "{R}", "Instant", listOf(CardTag.REMOVAL)),
+            AggroSpell("Abrade", 2.0, "{1}{R}", "Instant", listOf(CardTag.REMOVAL)),
+            AggroSpell("Wild Slash", 1.0, "{R}", "Instant", emptyList()),
+            AggroSpell("Reckless Rage", 2.0, "{1}{R}", "Sorcery", emptyList()),
+            AggroSpell("Monstrous Rage", 1.0, "{R}", "Enchantment — Aura", emptyList()),
+        ).mapIndexed { i, s ->
+            entry(
+                card(
+                    id = "pio-aggro-spell-$i", name = s.name, typeLine = s.typeLine, cmc = s.cmc,
+                    manaCost = s.manaCost, colors = listOf("R"), colorIdentity = listOf("R"), tags = s.tags,
+                ),
+                quantity = 4,
+            )
+        }
+
+        return creatures + spells + basicLands("Mountain", "R", 24)
+    }
+
+    @Test
+    fun pioneerAggroRealisticDensity_scoresInWellBuiltDeckBand() {
+        val mainboard = buildPioneerAggroFixture()
+        assertTrue(mainboard.sumOf { it.quantity } == 60, "Pioneer fixture must total exactly 60 cards, was ${mainboard.sumOf { it.quantity }}")
+
+        val colorIdentity = setOf(ManaColor.R)
+        val profile = profileForStandard(mainboard, colorIdentity)
+        val analysis = AnalysisEngine.evaluate(
+            mainboard = mainboard, format = DeckFormat.PIONEER, colorIdentity = colorIdentity, profile = profile,
+            archetype = ArchetypeId.AGGRO, themes = emptyList(), isManualOverride = true, confidence = 1f,
+        )
+
+        assertNoBlockers(analysis)
+        // Actual measured score: 90/100.
+        assertTrue(analysis.totalScore in 65..98, "Pioneer AGGRO realistic-density score ${analysis.totalScore} outside the defensible well-built band")
+    }
+
+    /**
+     * Legacy Burn — card names + roster shape cross-checked live 2026-09-06 against mtggoldfish's
+     * "legacy-burn" archetype page and a dated tappedout "Legacy - Burn" decklist: Goblin
+     * Guide/Monastery Swiftspear/Eidolon of the Great Revel as the creature core, Chain
+     * Lightning/Lightning Bolt/Fireblast/Rift Bolt/Price of Progress as the burn suite -- one of
+     * the format's oldest, most consistently played AGGRO archetypes (efficient 1-mana
+     * interaction is exactly what makes Legacy's manabases leaner than newer formats' -- see
+     * [SixtyFormatProfile.LEGACY]'s own KDoc). Grim Lavamancer added as a 4th mono-Red creature
+     * (real long-running Legacy Burn staple, graveyard-fueled recurring reach). 16 creature copies
+     * + 20 spell copies + 24 Mountain = 60. Resolved SIXTY/LEGACY AGGRO skeleton
+     * ([SixtyFormatProfile.LEGACY], landsDelta=-1, curveDelta=-0.2): lands (18,20,22), curve
+     * (1.2,1.6,2.0).
+     */
+    private fun buildLegacyAggroFixture(): List<DeckEntry> {
+        data class AggroCreature(val name: String, val cmc: Double, val manaCost: String, val winCon: Boolean)
+        val creatures = listOf(
+            AggroCreature("Goblin Guide", 1.0, "{R}", false),
+            AggroCreature("Monastery Swiftspear", 1.0, "{R}", false),
+            AggroCreature("Grim Lavamancer", 1.0, "{R}", true),
+            AggroCreature("Eidolon of the Great Revel", 2.0, "{R}{R}", true),
+        ).mapIndexed { i, c ->
+            entry(
+                card(
+                    id = "leg-aggro-crea-$i", name = c.name, typeLine = "Creature — Goblin",
+                    cmc = c.cmc, manaCost = c.manaCost, colors = listOf("R"), colorIdentity = listOf("R"),
+                    power = "2", toughness = "1", tags = if (c.winCon) listOf(CardTag.WIN_CON) else emptyList(),
+                ),
+                quantity = 4,
+            )
+        }
+
+        data class AggroSpell(val name: String, val cmc: Double, val manaCost: String, val typeLine: String, val tags: List<CardTag>)
+        val spells = listOf(
+            AggroSpell("Lightning Bolt", 1.0, "{R}", "Instant", listOf(CardTag.REMOVAL)),
+            AggroSpell("Chain Lightning", 1.0, "{R}", "Sorcery", listOf(CardTag.REMOVAL)),
+            AggroSpell("Rift Bolt", 1.0, "{R}", "Sorcery", emptyList()),
+            AggroSpell("Fireblast", 0.0, "{4}{R}{R}", "Sorcery", emptyList()),
+            AggroSpell("Price of Progress", 1.0, "{R}", "Sorcery", emptyList()),
+        ).mapIndexed { i, s ->
+            entry(
+                card(
+                    id = "leg-aggro-spell-$i", name = s.name, typeLine = s.typeLine, cmc = s.cmc,
+                    manaCost = s.manaCost, colors = listOf("R"), colorIdentity = listOf("R"), tags = s.tags,
+                ),
+                quantity = 4,
+            )
+        }
+
+        return creatures + spells + basicLands("Mountain", "R", 24)
+    }
+
+    @Test
+    fun legacyAggroRealisticDensity_scoresInWellBuiltDeckBand() {
+        val mainboard = buildLegacyAggroFixture()
+        assertTrue(mainboard.sumOf { it.quantity } == 60, "Legacy fixture must total exactly 60 cards, was ${mainboard.sumOf { it.quantity }}")
+
+        val colorIdentity = setOf(ManaColor.R)
+        val profile = profileForStandard(mainboard, colorIdentity)
+        val analysis = AnalysisEngine.evaluate(
+            mainboard = mainboard, format = DeckFormat.LEGACY, colorIdentity = colorIdentity, profile = profile,
+            archetype = ArchetypeId.AGGRO, themes = emptyList(), isManualOverride = true, confidence = 1f,
+        )
+
+        assertNoBlockers(analysis)
+        // Actual measured score: 84/100.
+        assertTrue(analysis.totalScore in 65..98, "Legacy AGGRO realistic-density score ${analysis.totalScore} outside the defensible well-built band")
+    }
+
+    /**
+     * Vintage Burn — a real, if niche, budget/off-metagame Vintage archetype (mtgdecks.net hosts a
+     * dedicated "Vintage/burn" listing; tappedout's "Mono-Red Vintage Burn" decklist cross-checked
+     * live 2026-09-06). DELIBERATELY reuses the same Legacy Burn creature/spell core rather than
+     * inventing a separate roster: Vintage's card pool is a strict superset of Legacy's, and none
+     * of Goblin Guide/Monastery Swiftspear/Grim Lavamancer/Eidolon of the Great Revel/Chain
+     * Lightning/Lightning Bolt/Rift Bolt/Fireblast/Price of Progress are restricted or banned in
+     * Vintage -- documented reuse, same proportionality discipline the task asked for (one fixture
+     * per format, not a from-scratch archetype study 5x over). 16 creature copies + 20 spell
+     * copies + 24 Mountain = 60. Resolved SIXTY/VINTAGE AGGRO skeleton
+     * ([SixtyFormatProfile.VINTAGE], landsDelta=-2, curveDelta=-0.3): lands (17,19,21), curve
+     * (1.1,1.5,1.9).
+     */
+    private fun buildVintageAggroFixture(): List<DeckEntry> {
+        data class AggroCreature(val name: String, val cmc: Double, val manaCost: String, val winCon: Boolean)
+        val creatures = listOf(
+            AggroCreature("Goblin Guide", 1.0, "{R}", false),
+            AggroCreature("Monastery Swiftspear", 1.0, "{R}", false),
+            AggroCreature("Grim Lavamancer", 1.0, "{R}", true),
+            AggroCreature("Eidolon of the Great Revel", 2.0, "{R}{R}", true),
+        ).mapIndexed { i, c ->
+            entry(
+                card(
+                    id = "vin-aggro-crea-$i", name = c.name, typeLine = "Creature — Goblin",
+                    cmc = c.cmc, manaCost = c.manaCost, colors = listOf("R"), colorIdentity = listOf("R"),
+                    power = "2", toughness = "1", tags = if (c.winCon) listOf(CardTag.WIN_CON) else emptyList(),
+                ),
+                quantity = 4,
+            )
+        }
+
+        data class AggroSpell(val name: String, val cmc: Double, val manaCost: String, val typeLine: String, val tags: List<CardTag>)
+        val spells = listOf(
+            AggroSpell("Lightning Bolt", 1.0, "{R}", "Instant", listOf(CardTag.REMOVAL)),
+            AggroSpell("Chain Lightning", 1.0, "{R}", "Sorcery", listOf(CardTag.REMOVAL)),
+            AggroSpell("Rift Bolt", 1.0, "{R}", "Sorcery", emptyList()),
+            AggroSpell("Fireblast", 0.0, "{4}{R}{R}", "Sorcery", emptyList()),
+            AggroSpell("Price of Progress", 1.0, "{R}", "Sorcery", emptyList()),
+        ).mapIndexed { i, s ->
+            entry(
+                card(
+                    id = "vin-aggro-spell-$i", name = s.name, typeLine = s.typeLine, cmc = s.cmc,
+                    manaCost = s.manaCost, colors = listOf("R"), colorIdentity = listOf("R"), tags = s.tags,
+                ),
+                quantity = 4,
+            )
+        }
+
+        return creatures + spells + basicLands("Mountain", "R", 24)
+    }
+
+    @Test
+    fun vintageAggroRealisticDensity_scoresInWellBuiltDeckBand() {
+        val mainboard = buildVintageAggroFixture()
+        assertTrue(mainboard.sumOf { it.quantity } == 60, "Vintage fixture must total exactly 60 cards, was ${mainboard.sumOf { it.quantity }}")
+
+        val colorIdentity = setOf(ManaColor.R)
+        val profile = profileForStandard(mainboard, colorIdentity)
+        val analysis = AnalysisEngine.evaluate(
+            mainboard = mainboard, format = DeckFormat.VINTAGE, colorIdentity = colorIdentity, profile = profile,
+            archetype = ArchetypeId.AGGRO, themes = emptyList(), isManualOverride = true, confidence = 1f,
+        )
+
+        assertNoBlockers(analysis)
+        // Actual measured score: 85/100.
+        assertTrue(analysis.totalScore in 65..98, "Vintage AGGRO realistic-density score ${analysis.totalScore} outside the defensible well-built band")
+    }
+
+    /**
+     * Pauper Mono-Red Burn -- card names cross-checked live 2026-09-06 against tappedout's
+     * "Pauper Mono-Red Burn" (Kiln Fiend package) decklist and mtg.cardsrealm.com's "Deck pauper
+     * Mono Red Kiln Fiend" listing: Kiln Fiend/Ghitu Lavarunner/Firebrand Archer as the (all
+     * common-rarity) creature suite, Lightning Bolt/Chain Lightning/Lava Spike/Rift
+     * Bolt/Fireblast/Firebolt/Needle Drop as the (all common-rarity) burn suite -- every one of
+     * these has a common printing, satisfying Pauper's rarity restriction, and each was cited in a
+     * real, dated Pauper Burn decklist. 12 creature copies + 26 spell copies + 22 Mountain = 60.
+     * Resolved SIXTY/PAUPER AGGRO skeleton ([SixtyFormatProfile.PAUPER], landsDelta=+1,
+     * curveDelta=-0.1): lands (20,22,24), curve (1.3,1.7,2.1).
+     */
+    private fun buildPauperAggroFixture(): List<DeckEntry> {
+        data class AggroCreature(val name: String, val cmc: Double, val manaCost: String, val winCon: Boolean)
+        val creatures = listOf(
+            AggroCreature("Kiln Fiend", 1.0, "{R}", true),
+            AggroCreature("Ghitu Lavarunner", 1.0, "{R}", false),
+            AggroCreature("Firebrand Archer", 2.0, "{1}{R}", false),
+        ).mapIndexed { i, c ->
+            entry(
+                card(
+                    id = "pau-aggro-crea-$i", name = c.name, typeLine = "Creature — Human Wizard",
+                    cmc = c.cmc, manaCost = c.manaCost, colors = listOf("R"), colorIdentity = listOf("R"),
+                    power = "2", toughness = "1", rarity = "common",
+                    tags = if (c.winCon) listOf(CardTag.WIN_CON) else emptyList(),
+                ),
+                quantity = 4,
+            )
+        }
+
+        data class AggroSpell(val name: String, val cmc: Double, val manaCost: String, val typeLine: String, val tags: List<CardTag>, val quantity: Int)
+        val spells = listOf(
+            AggroSpell("Lightning Bolt", 1.0, "{R}", "Instant", listOf(CardTag.REMOVAL), 4),
+            AggroSpell("Chain Lightning", 1.0, "{R}", "Sorcery", listOf(CardTag.REMOVAL), 4),
+            AggroSpell("Rift Bolt", 1.0, "{R}", "Sorcery", emptyList(), 4),
+            AggroSpell("Lava Spike", 1.0, "{R}", "Sorcery", emptyList(), 4),
+            AggroSpell("Fireblast", 0.0, "{4}{R}{R}", "Sorcery", emptyList(), 4),
+            AggroSpell("Firebolt", 1.0, "{R}", "Sorcery", emptyList(), 4),
+            AggroSpell("Needle Drop", 1.0, "{R}", "Instant", emptyList(), 2),
+        ).mapIndexed { i, s ->
+            entry(
+                card(
+                    id = "pau-aggro-spell-$i", name = s.name, typeLine = s.typeLine, cmc = s.cmc,
+                    manaCost = s.manaCost, colors = listOf("R"), colorIdentity = listOf("R"), tags = s.tags,
+                    rarity = "common",
+                ),
+                quantity = s.quantity,
+            )
+        }
+
+        return creatures + spells + basicLands("Mountain", "R", 22)
+    }
+
+    @Test
+    fun pauperAggroRealisticDensity_scoresInWellBuiltDeckBand() {
+        val mainboard = buildPauperAggroFixture()
+        assertTrue(mainboard.sumOf { it.quantity } == 60, "Pauper fixture must total exactly 60 cards, was ${mainboard.sumOf { it.quantity }}")
+
+        val colorIdentity = setOf(ManaColor.R)
+        val profile = profileForStandard(mainboard, colorIdentity)
+        val analysis = AnalysisEngine.evaluate(
+            mainboard = mainboard, format = DeckFormat.PAUPER, colorIdentity = colorIdentity, profile = profile,
+            archetype = ArchetypeId.AGGRO, themes = emptyList(), isManualOverride = true, confidence = 1f,
+        )
+
+        assertNoBlockers(analysis)
+        // Actual measured score: 76/100 -- the lowest of the five, driven by PLAN_ROLES: this
+        // fixture's Kiln Fiend package is spell-count-driven rather than a wide creature curve, so
+        // AGGRO's own threat_early/finisher role bands read leaner here than the other four
+        // fixtures' fuller creature suites. Still comfortably inside the well-built band.
+        assertTrue(analysis.totalScore in 65..98, "Pauper AGGRO realistic-density score ${analysis.totalScore} outside the defensible well-built band")
+    }
 }

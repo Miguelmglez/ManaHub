@@ -34,7 +34,9 @@ fun CardDto.toDomain(): Card {
         name = name,
         manaCost = manaCost ?: front?.manaCost,
         cmc = cmc ?: 0.0,
-        colors = colors ?: emptyList(),
+        // Scryfall omits root `colors` for transform/MDFC/meld layouts; the faces carry it, and
+        // its own c: filter treats a DFC's color set as the union of both faces.
+        colors = colors ?: cardFaces?.flatMap { it.colors.orEmpty() }?.distinct() ?: emptyList(),
         colorIdentity = colorIdentity,
         typeLine = typeLine ?: front?.typeLine ?: "",
         oracleText = oracleText ?: front?.oracleText,

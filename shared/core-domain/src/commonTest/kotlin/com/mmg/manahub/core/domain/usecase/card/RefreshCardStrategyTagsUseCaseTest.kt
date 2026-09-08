@@ -34,11 +34,15 @@ class RefreshCardStrategyTagsUseCaseTest {
             callCount++
             return result
         }
+        override suspend fun getStrategyTagsBatch(oracleIds: Set<String>): Map<String, CardStrategyTagsResult> =
+            oracleIds.associateWith { result }
         override suspend fun submitStrategyTags(oracleId: String, submission: CardStrategyTagsSubmission) = Unit
     }
 
     private class ThrowingCardStrategyTagsRepository : CardStrategyTagsRepository {
         override suspend fun getStrategyTags(oracleId: String): CardStrategyTagsResult =
+            throw IllegalStateException("offline")
+        override suspend fun getStrategyTagsBatch(oracleIds: Set<String>): Map<String, CardStrategyTagsResult> =
             throw IllegalStateException("offline")
         override suspend fun submitStrategyTags(oracleId: String, submission: CardStrategyTagsSubmission) = Unit
     }

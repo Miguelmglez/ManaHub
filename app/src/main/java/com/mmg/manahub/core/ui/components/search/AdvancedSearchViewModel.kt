@@ -6,6 +6,8 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CollectionSource
+import com.mmg.manahub.core.model.ColorMatchMode
 import com.mmg.manahub.core.model.ComparisonOperator
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.SearchCriterion
@@ -43,7 +45,26 @@ class AdvancedSearchViewModel(
         val cardFunction: Set<String> = emptySet(),
         val cardFunctionMatchAll: Boolean = false,
         val selectedColors: Set<String> = emptySet(),
-        val colorsExact: Boolean = false,
+        /**
+         * How [selectedColors] is compared, chosen by the user in the Color match picker.
+         *
+         * [ColorMatchMode.ANY_OF] is the default because "green or black elves" is what picking two
+         * colors reads as; the previous default demanded a card carry EVERY picked color, which for
+         * 2+ colors matches almost nothing. A seeded mode (Deck Analysis's Commander
+         * [ColorMatchMode.AT_MOST] identity clause) is preserved verbatim by [seedFrom].
+         *
+         * The default is facet-dependent: on IDENTITY the default becomes
+         * [ColorMatchMode.AT_MOST], because a superset test on identity is the semantic inversion
+         * [SearchCriterion.ColorIdentity]'s own KDoc warns about — see [setUseColorIdentity].
+         */
+        val colorMode: ColorMatchMode = ColorMatchMode.ANY_OF,
+        /**
+         * True once the user has picked a mode in the Color match picker. While false,
+         * [setUseColorIdentity] is free to swap in the facet-appropriate default; once true the
+         * pick is never silently overwritten. Reset by [clearAll] and [seedFrom], which both
+         * rebuild [UiState] from scratch.
+         */
+        val colorModeExplicit: Boolean = false,
         val useColorIdentity: Boolean = false,
         val manaCostValue: String = "",
         val manaCostOp: ComparisonOperator = ComparisonOperator.EQUAL,
@@ -74,12 +95,12 @@ class AdvancedSearchViewModel(
         val error: String? = null,
         val hasSearched: Boolean = false,
         // ── Collection-local filters ──────────────────────────────────────────
-        val filterWishlist: Boolean? = null,
-        val filterForTrade: Boolean? = null,
+        /** Which of the user's lists results come from — mutually exclusive, never intersecting. */
+        val collectionSource: CollectionSource = CollectionSource.COLLECTION,
         val filterTags: Set<String> = emptySet(),
     ) {
         val hasAnyCollectionFilter: Boolean
-            get() = filterWishlist != null || filterForTrade != null || filterTags.isNotEmpty()
+            get() = collectionSource != CollectionSource.COLLECTION || filterTags.isNotEmpty()
     }
 
     private val _uiState = MutableStateFlow(UiState())
@@ -107,9 +128,9 @@ class AdvancedSearchViewModel(
             criteria.add(SearchCriterion.CardFunction(s.cardFunction, s.cardFunctionMatchAll))
         if (s.selectedColors.isNotEmpty()) {
             if (s.useColorIdentity)
-                criteria.add(SearchCriterion.ColorIdentity(s.selectedColors, s.colorsExact))
+                criteria.add(SearchCriterion.ColorIdentity(s.selectedColors, s.colorMode))
             else
-                criteria.add(SearchCriterion.Colors(s.selectedColors, s.colorsExact))
+                criteria.add(SearchCriterion.Colors(s.selectedColors, s.colorMode))
         }
         s.manaCostValue.toIntOrNull()?.let {
             criteria.add(SearchCriterion.ManaCost(it, s.manaCostOp))
@@ -132,8 +153,9 @@ class AdvancedSearchViewModel(
             criteria.add(SearchCriterion.Format(s.selectedFormat, s.formatLegal))
         s.oracleTerms?.let { criteria.add(it) }
         s.manaProduction?.let { criteria.add(it) }
-        if (s.filterWishlist == true || s.filterForTrade == true)
-            criteria.add(SearchCriterion.CollectionStatus(s.filterWishlist == true, s.filterForTrade == true))
+        // COLLECTION is the implicit default, so it contributes no criterion (and no filter badge).
+        if (s.collectionSource != CollectionSource.COLLECTION)
+            criteria.add(SearchCriterion.CollectionStatus(s.collectionSource))
         if (s.filterTags.isNotEmpty())
             criteria.add(SearchCriterion.HasTag(s.filterTags.toList()))
 
@@ -207,13 +229,26 @@ class AdvancedSearchViewModel(
         updateBuiltQuery()
     }
 
-    fun setColorsExact(exact: Boolean) {
-        _uiState.update { it.copy(colorsExact = exact) }
+    fun setColorMode(mode: ColorMatchMode) {
+        _uiState.update { it.copy(colorMode = mode, colorModeExplicit = true) }
         updateBuiltQuery()
     }
 
+    /**
+     * Switches the Color/Identity facet and, while the user has not picked a mode themselves,
+     * carries the default that facet actually means: `id>=w or id>=u` would return Jund and 5-color
+     * cards to a user asking "what fits in Azorius", so IDENTITY defaults to
+     * [ColorMatchMode.AT_MOST] and COLOR back to [ColorMatchMode.ANY_OF].
+     */
     fun setUseColorIdentity(use: Boolean) {
-        _uiState.update { it.copy(useColorIdentity = use) }
+        _uiState.update {
+            val mode = when {
+                it.colorModeExplicit -> it.colorMode
+                use -> ColorMatchMode.AT_MOST
+                else -> ColorMatchMode.ANY_OF
+            }
+            it.copy(useColorIdentity = use, colorMode = mode)
+        }
         updateBuiltQuery()
     }
 
@@ -271,13 +306,8 @@ class AdvancedSearchViewModel(
         updateBuiltQuery()
     }
 
-    fun setFilterWishlist(value: Boolean?) {
-        _uiState.update { it.copy(filterWishlist = value) }
-        updateBuiltQuery()
-    }
-
-    fun setFilterForTrade(value: Boolean?) {
-        _uiState.update { it.copy(filterForTrade = value) }
+    fun setCollectionSource(source: CollectionSource) {
+        _uiState.update { it.copy(collectionSource = source) }
         updateBuiltQuery()
     }
 
@@ -295,31 +325,34 @@ class AdvancedSearchViewModel(
         updateBuiltQuery()
     }
 
+    /** [priceCurrency] is a user preference, not a search criterion, so it survives a clear. */
     fun clearAll() {
-        _uiState.value = UiState()
+        _uiState.value = UiState(priceCurrency = _uiState.value.priceCurrency)
         updateBuiltQuery()
     }
 
     /**
-     * Suggestions Tab UI Polish plan (W11/D8): decomposes a pre-built [AdvancedSearchQuery]
-     * (e.g. [com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery.toAdvancedQuery]'s
-     * output) back into this ViewModel's flat [UiState] fields — the inverse of [rebuildQuery] —
-     * so the sheet opens ALREADY SHOWING the translated filters as real, checked UI state, never a
-     * raw string dumped anywhere. Starts from a FRESH [UiState] (preserving only `priceCurrency`,
-     * the one field seeded from user prefs at init, unrelated to any search criterion) rather than
-     * merging onto whatever was there before — a stale filter from a previous, unrelated open must
-     * never leak into a fresh "Browse for X" seed.
+     * Decomposes a pre-built [AdvancedSearchQuery] back into this ViewModel's flat [UiState]
+     * fields — the inverse of [rebuildQuery] — so the sheet opens ALREADY SHOWING the caller's
+     * currently-applied filters as real, checked UI state, never a raw string dumped anywhere.
      *
-     * A handful of [SearchCriterion] subtypes ([SearchCriterion.CardSet], [SearchCriterion.Loyalty],
-     * [SearchCriterion.Language], [SearchCriterion.Artist], [SearchCriterion.FlavorText]) have no
-     * backing [UiState] field today (or, for `CardSet`, would need a set-code→[MagicSet] reverse
-     * lookup this ViewModel doesn't own) and are no-ops here — dead branches in PRACTICE (no
-     * current [SectionSearchQuery][com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery]
-     * translation ever produces them), kept only because [SearchCriterion] is a closed sealed
+     * Called on EVERY open of `AdvancedSearchSheet` with whatever that caller has applied, an
+     * EMPTY query included: this instance is resolved with `koinViewModel()` from a fixed-position
+     * overlay, so one instance serves every open within a navigation destination. Seeding from a
+     * fresh [UiState] each time (preserving only `priceCurrency`, seeded from user prefs at init
+     * and unrelated to any criterion) is what stops a criterion from a previous, unrelated open
+     * staying live and invisibly ANDing itself onto the next search.
+     *
+     * [SearchCriterion.Loyalty], [SearchCriterion.Language], [SearchCriterion.Artist] and
+     * [SearchCriterion.FlavorText] have no backing [UiState] field and are no-ops here — dead
+     * branches in PRACTICE ([rebuildQuery] never emits them, and no
+     * [SectionSearchQuery][com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery]
+     * translation produces them either), kept only because [SearchCriterion] is a closed sealed
      * class and this `when` must stay exhaustive.
      */
     fun seedFrom(query: AdvancedSearchQuery) {
-        var next = UiState(priceCurrency = _uiState.value.priceCurrency)
+        val previous = _uiState.value
+        var next = UiState(priceCurrency = previous.priceCurrency)
         query.criteria.forEach { criterion ->
             next = when (criterion) {
                 is SearchCriterion.Name -> next.copy(nameValue = criterion.value, nameExact = criterion.exact)
@@ -335,17 +368,22 @@ class AdvancedSearchViewModel(
                 )
                 is SearchCriterion.Colors -> next.copy(
                     selectedColors = criterion.colors,
-                    colorsExact = criterion.exactly,
+                    colorMode = criterion.mode,
                     useColorIdentity = false,
                 )
                 is SearchCriterion.ColorIdentity -> next.copy(
                     selectedColors = criterion.colors,
-                    colorsExact = criterion.exactly,
+                    colorMode = criterion.mode,
                     useColorIdentity = true,
                 )
                 is SearchCriterion.ManaCost -> next.copy(manaCostValue = criterion.value.toString(), manaCostOp = criterion.operator)
                 is SearchCriterion.Rarity -> next.copy(selectedRarity = criterion.rarity)
-                is SearchCriterion.CardSet -> next
+                // A MagicSet cannot be rebuilt from its code alone, so the criterion is matched
+                // against the sets already held: rebuildQuery is the only producer of a CardSet
+                // criterion, so whatever it names was picked in this instance and is still there.
+                is SearchCriterion.CardSet -> next.copy(
+                    selectedSets = previous.selectedSets.filter { it.code in criterion.setCodes }.toSet()
+                )
                 is SearchCriterion.Power -> next.copy(powerValue = criterion.value.toString(), powerOp = criterion.operator)
                 is SearchCriterion.Toughness -> next.copy(toughnessValue = criterion.value.toString(), toughnessOp = criterion.operator)
                 is SearchCriterion.Loyalty -> next
@@ -356,13 +394,16 @@ class AdvancedSearchViewModel(
                 is SearchCriterion.FlavorText -> next
                 is SearchCriterion.ManaProduction -> next.copy(manaProduction = criterion)
                 is SearchCriterion.OracleTerms -> next.copy(oracleTerms = criterion)
-                is SearchCriterion.CollectionStatus -> next.copy(
-                    filterWishlist = criterion.wishlist.takeIf { it },
-                    filterForTrade = criterion.forTrade.takeIf { it },
-                )
+                is SearchCriterion.CollectionStatus -> next.copy(collectionSource = criterion.source)
                 is SearchCriterion.HasTag -> next.copy(filterTags = criterion.keys.toSet())
             }
         }
+        // Edge-case QA fix (LOW, 2026-09-06): seedFrom used to only walk query.criteria, silently
+        // dropping AdvancedSearchQuery.orderBy/.direction -- unlike rebuildQuery (the inverse
+        // function), which does write them. Currently harmless (the only live caller,
+        // SectionSearchQuery.toAdvancedQuery, never sets a non-default order) but a latent trap for
+        // a future caller that does; seeding them here keeps seedFrom a true inverse of rebuildQuery.
+        next = next.copy(orderBy = query.orderBy, orderDirection = query.direction)
         _uiState.value = next
         updateBuiltQuery()
     }

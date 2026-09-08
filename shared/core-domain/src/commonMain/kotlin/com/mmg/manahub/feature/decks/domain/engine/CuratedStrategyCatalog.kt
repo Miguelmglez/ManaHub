@@ -94,20 +94,31 @@ data class CuratedStrategy(
 //  exactly as before this wave: [ArchetypeData]'s bands, [ArchetypeSkeletonResolver],
 //  `COLOR_MODULATION`, `LAND_MIX`, the Karsten source tables. [ArchetypeData] is NEVER forked per
 //  [DeckFormat] -- the per-format layer is a THIN modulation on top of the single SIXTY skeleton,
-//  exactly the same layering position color modulation already occupies. Only [DeckFormat.STANDARD]
-//  has a non-default/non-passthrough entry at either extension point in this wave; every other
-//  60-card format (Pioneer/Modern/Legacy/Vintage/Pauper) is documented-but-empty FUTURE DEBT (the
-//  app cannot even create those decks yet -- `STUDIO_FORMATS` in `DeckEditorComponents.kt` has them
-//  commented out) -- do NOT populate them ahead of that work.
+//  exactly the same layering position color modulation already occupies. As of the Wave 2
+//  future-debt closeout (2026-09-06), every 60-card constructed [DeckFormat] (STANDARD, MODERN,
+//  PIONEER, LEGACY, VINTAGE, PAUPER) has a non-default/non-passthrough entry at both extension
+//  points -- `STUDIO_FORMATS` (the old gate this comment used to cite) no longer exists as a
+//  symbol in the codebase; `DeckCreationSheet.kt` already lists all nine [DeckFormat]s and users
+//  could already create decks in every one of these formats before this closeout -- the only real
+//  gap was the picker/inference layer this file (and `SixtyFormatProfile`) now closes.
 //
-//  Adding a future 60-card format (e.g. Modern, once deck creation supports it) must require ONLY:
+//  Adding a future 60-card format required ONLY:
 //    a) a new `SixtyFormatProfile` entry,
 //    b) a new strategy-availability row here (adding that `DeckFormat` to the relevant entries'
 //       `formats` sets -- exactly the mechanism this file builds),
-//    c) uncommenting its `STUDIO_FORMATS` chip,
+//    c) deck creation already supporting the format (it did, for all five -- see below),
 //    d) realistic-density calibration fixtures.
 //  Zero engine-SHAPE changes (no new resolver params beyond the one `deckFormat` param B2 adds, no
 //  forked band tables, no new `ArchetypeFormat` members).
+//
+//  Wave 2 future-debt closeout (2026-09-06): MODERN/PIONEER/LEGACY/VINTAGE/PAUPER now get both
+//  extension points populated (see [SixtyFormatProfile] for (a); [COMMANDER_CASUAL_SIXTY] below
+//  for (b)). (c) had already shipped independently of this file: `DeckCreationSheet.kt` lists all
+//  nine [DeckFormat]s and users could already create decks in these five formats -- the gap this
+//  closeout fixes was purely that [nearestFor] had ZERO curated candidates for any of them (every
+//  one of these formats maps to a non-null [ArchetypeFormat] via [ArchetypeFormat.of], so
+//  [availableIn] was never the unconditional-Draft-style passthrough -- it was filtering the whole
+//  29-entry catalog down to nothing).
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
@@ -138,16 +149,35 @@ object CuratedStrategyCatalog {
     //    the picker's pre-B1 behavior: [ArchetypeFormat.of] returns `null` for Draft, since Draft
     //    has no archetype skeleton at all, so a strategy pin there is inert either way).
 
-    /** Commander + Casual -- the pre-B1 "both formats" baseline, byte-identical in EFFECT to the
-     * old `setOf(ArchetypeFormat.COMMANDER, ArchetypeFormat.SIXTY)` today (Casual is the only
-     * currently-creatable 60-card [DeckFormat] until Standard's [STUDIO_FORMATS] chip is
-     * re-enabled -- Wave 2 B5). Used by every entry NOT curated into the Standard v1 list. */
+    /** Commander + Casual -- entries that are NOT curated for any 60-card constructed format's
+     * picker (Commander-shaped or v1-Standard-excluded themes: Voltron, Group Hug, Aristocrats,
+     * etc.). Gates a strategy OUT of every 60-card constructed format's picker (Standard, Modern,
+     * Pioneer, Legacy, Vintage, Pauper) while remaining a Casual/Commander pick, either because the
+     * underlying theme is structurally Commander-only ([ArchetypeData.THEMES]'s `commanderOnly`
+     * flag) or a deliberate v1 curation choice (not a distinct top-10 archetype in any curated
+     * format's metagame at authoring time). */
     private val COMMANDER_CASUAL: Set<DeckFormat> = setOf(DeckFormat.COMMANDER, DeckFormat.CASUAL)
 
-    /** [COMMANDER_CASUAL] plus Standard -- the Wave 2 B1 Standard v1 curation list (see this
-     * object's KDoc / the plan's Appendix A "Wave 2 Part B curation study" for the full per-entry
-     * rationale + current-meta cross-check). */
-    private val COMMANDER_CASUAL_STANDARD: Set<DeckFormat> = COMMANDER_CASUAL + DeckFormat.STANDARD
+    /** All six 60-card constructed [DeckFormat]s this catalog curates strategies for. */
+    private val ALL_SIXTY_CONSTRUCTED: Set<DeckFormat> = setOf(
+        DeckFormat.STANDARD, DeckFormat.PIONEER, DeckFormat.MODERN,
+        DeckFormat.LEGACY, DeckFormat.VINTAGE, DeckFormat.PAUPER,
+    )
+
+    /** [COMMANDER_CASUAL] plus every 60-card constructed format ([ALL_SIXTY_CONSTRUCTED]) -- the
+     * Wave 2 B1 Standard v1 curation list (see this object's KDoc / the plan's Appendix A "Wave 2
+     * Part B curation study" for the full per-entry rationale + current-meta cross-check), widened
+     * in the Wave 2 future-debt closeout (2026-09-06) to MODERN/PIONEER/LEGACY/VINTAGE/PAUPER too.
+     * These are generic macro archetypes/themes (Aggro/Midrange/Control/Tempo/Big Mana/Tokens/
+     * Spellslinger/Reanimator/Landfall/Lifegain/+1 Counters/Tribal/Artifacts/Vehicles/Equipment) --
+     * real, recognizable shells across every constructed format, not Standard-specific metagame
+     * calls, so the SAME 15-strategy list is reused rather than re-deriving a per-format top-10
+     * from scratch (a live per-format metagame study 5x over would be disproportionate to the
+     * payoff -- see this file's header comment). A light WebSearch sanity check (2026-09-06) found
+     * no entry on this list implausible in any of the five new formats -- see the bespoke `storm`
+     * entry below for the one archetype that WAS specifically checked (and confirmed, not
+     * excluded) per format. */
+    private val COMMANDER_CASUAL_SIXTY: Set<DeckFormat> = COMMANDER_CASUAL + ALL_SIXTY_CONSTRUCTED
 
     /** Commander only -- structurally locked (Group Hug/Group Slug/Clones & Theft,
      * [ArchetypeData.THEMES]'s `commanderOnly` flag) or a deliberate v1 curation choice (Voltron).
@@ -174,7 +204,7 @@ object CuratedStrategyCatalog {
             description = StrategyCatalog.description(ArchetypeId.AGGRO),
             archetypes = setOf(ArchetypeId.AGGRO),
             themes = emptyList(),
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
         CuratedStrategy(
             id = "midrange",
@@ -182,7 +212,7 @@ object CuratedStrategyCatalog {
             description = StrategyCatalog.description(ArchetypeId.MIDRANGE),
             archetypes = setOf(ArchetypeId.MIDRANGE),
             themes = emptyList(),
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
         CuratedStrategy(
             id = "control",
@@ -190,7 +220,7 @@ object CuratedStrategyCatalog {
             description = StrategyCatalog.description(ArchetypeId.CONTROL),
             archetypes = setOf(ArchetypeId.CONTROL),
             themes = emptyList(),
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
         // TEMPO moved to PostureId (spec §2/§3) -- no longer its own macro. Kept as a curated
         // pick via `postures`, matching against the two macros a tempo shell most naturally
@@ -202,7 +232,7 @@ object CuratedStrategyCatalog {
             archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.CONTROL),
             postures = setOf(PostureId.TEMPO),
             themes = emptyList(),
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
         CuratedStrategy(
             id = "combo",
@@ -238,7 +268,7 @@ object CuratedStrategyCatalog {
             archetypes = setOf(ArchetypeId.MIDRANGE, ArchetypeId.CONTROL, ArchetypeId.COMBO),
             postures = setOf(PostureId.RAMP),
             themes = emptyList(),
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
 
         // ── Themed presets (composition = compatible archetypes + theme unless noted) ────────
@@ -250,7 +280,7 @@ object CuratedStrategyCatalog {
             description = StrategyCatalog.description(ThemeId.TOKENS),
             archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE, ArchetypeId.COMBO),
             themes = listOf(ThemeId.TOKENS),
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
         CuratedStrategy(
             id = "aristocrats",
@@ -273,7 +303,7 @@ object CuratedStrategyCatalog {
             themes = listOf(ThemeId.SPELLSLINGER),
             // Confirmed Standard-meta-relevant by the Wave 2 B1 meta check: Izzet Prowess +
             // Izzet Spellementals combined ~17% of the current Standard field (see Appendix A).
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
         // VOLTRON moved to PostureId (spec §4.1) -- no longer a theme. Commander-only in v1 by
         // deliberate curation choice (unchanged from the prior pass's own rationale).
@@ -299,7 +329,7 @@ object CuratedStrategyCatalog {
             // real, independently-tracked top-10 archetypes -- combined ~15% of the field, well
             // above noise. Included per the plan's own escape hatch ("if a ... reanimator shell is
             // genuinely meta right now, include it"). See Appendix A.
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
         // LANDFALL: RAMP moved to PostureId -- widened to MIDRANGE/CONTROL/COMBO (the 3 macros a
         // ramp-flavored theme most naturally overlays), keeping the RAMP posture as an optional
@@ -316,7 +346,7 @@ object CuratedStrategyCatalog {
             // Standard metagame (mtggoldfish-sourced snapshot, 2026-08) shows "Mono Green Landfall"
             // as the #1 tracked archetype at ~13.7% of the field -- clearly meta-real, not a niche
             // brew. Included per the plan's own escape hatch. See Appendix A.
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
         CuratedStrategy(
             id = "lifegain",
@@ -324,7 +354,7 @@ object CuratedStrategyCatalog {
             description = StrategyCatalog.description(ThemeId.LIFEGAIN),
             archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE, ArchetypeId.CONTROL),
             themes = listOf(ThemeId.LIFEGAIN),
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
         CuratedStrategy(
             id = "plus1_counters",
@@ -332,7 +362,7 @@ object CuratedStrategyCatalog {
             description = StrategyCatalog.description(ThemeId.PLUS1_COUNTERS),
             archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE),
             themes = listOf(ThemeId.PLUS1_COUNTERS),
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
         CuratedStrategy(
             id = "tribal",
@@ -341,7 +371,7 @@ object CuratedStrategyCatalog {
             archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE),
             themes = listOf(ThemeId.TRIBAL),
             requiresTribe = true,
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
         CuratedStrategy(
             id = "artifacts",
@@ -349,7 +379,7 @@ object CuratedStrategyCatalog {
             description = StrategyCatalog.description(ThemeId.ARTIFACTS),
             archetypes = setOf(ArchetypeId.MIDRANGE, ArchetypeId.COMBO, ArchetypeId.CONTROL),
             themes = listOf(ThemeId.ARTIFACTS),
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
         CuratedStrategy(
             id = "enchantress",
@@ -447,7 +477,7 @@ object CuratedStrategyCatalog {
             description = StrategyCatalog.description(ThemeId.VEHICLES),
             archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE),
             themes = listOf(ThemeId.VEHICLES),
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
         CuratedStrategy(
             id = "self_mill",
@@ -476,16 +506,25 @@ object CuratedStrategyCatalog {
             description = StrategyCatalog.description(ThemeId.EQUIPMENT),
             archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE),
             themes = listOf(ThemeId.EQUIPMENT),
-            formats = COMMANDER_CASUAL_STANDARD,
+            formats = COMMANDER_CASUAL_SIXTY,
         ),
         // sixtyOnly (spec §4.2) -- Commander is structurally excluded, not a curation choice.
+        // Wave 2 future-debt closeout (2026-09-06): widened to all five new 60-card formats after
+        // a WebSearch sanity check (this is the one archetype the task explicitly flagged as
+        // worth checking, since "Storm" reads as a narrow/dated shell). Storm turned out to be a
+        // real, independently-tracked archetype in every one of them today, not just Standard:
+        // Legacy (ANT / The Epic Storm are format-defining, long-running archetypes), Vintage
+        // (Doomsday/TES, built around Power Nine fast mana), Pioneer (Temur/Gruul "Possibility
+        // Storm", 20+ tracked decks on mtgdecks.net), and even Pauper (Cycling Storm / Gruul Storm,
+        // 500+ tracked decks on mtgdecks.net as of Sept 2026, using Manamorphose/Grapeshot-style
+        // commons-legal payoffs) -- so no format is excluded here.
         CuratedStrategy(
             id = "storm",
             displayName = ThemeId.STORM.displayName,
             description = StrategyCatalog.description(ThemeId.STORM),
             archetypes = setOf(ArchetypeId.COMBO),
             themes = listOf(ThemeId.STORM),
-            formats = setOf(DeckFormat.CASUAL, DeckFormat.STANDARD),
+            formats = setOf(DeckFormat.CASUAL) + ALL_SIXTY_CONSTRUCTED,
         ),
     )
 

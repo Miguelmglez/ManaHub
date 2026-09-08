@@ -9,7 +9,12 @@ package com.mmg.manahub.core.model
 //  search and persistence remain key-based and unambiguous.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-enum class TagCategory { ARCHETYPE, STRATEGY, ROLE, TRIBAL, KEYWORD, TYPE, CUSTOM }
+enum class TagCategory {
+    ARCHETYPE, STRATEGY, ROLE, TRIBAL, KEYWORD, TYPE, CUSTOM;
+
+    val displayLabel: String
+        get() = name.lowercase().replaceFirstChar { it.uppercase() }
+}
 
 data class CardTag(
     val key: String,

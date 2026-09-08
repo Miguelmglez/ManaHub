@@ -15,6 +15,9 @@ val CardCornerRadius         = 12.dp
 /** Smaller MTG card thumbnails in lists or tight layouts. */
 val SmallCardCornerRadius    = 6.dp
 
+/** Very small card thumbnails (e.g. CardRow) where 6dp still cuts too much. */
+val ExtraSmallCardCornerRadius = 4.dp
+
 /** Filter chips, badges, quantity indicators, mana pip containers. */
 val ChipCornerRadius         = 8.dp
 
@@ -29,6 +32,7 @@ val BottomSheetCornerRadius  = 24.dp
 
 val CardShape         = RoundedCornerShape(CardCornerRadius)
 val SmallCardShape    = RoundedCornerShape(SmallCardCornerRadius)
+val ExtraSmallCardShape = RoundedCornerShape(ExtraSmallCardCornerRadius)
 val ChipShape         = RoundedCornerShape(ChipCornerRadius)
 val ButtonShape       = RoundedCornerShape(ButtonCornerRadius)
 val BottomSheetShape  = RoundedCornerShape(

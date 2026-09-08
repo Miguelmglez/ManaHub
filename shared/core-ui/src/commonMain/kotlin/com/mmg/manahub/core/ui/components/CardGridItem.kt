@@ -103,6 +103,7 @@ fun CardGridItem(
                     placeholder = painterResource(Res.drawable.mtg_card_back),
                     error = painterResource(Res.drawable.mtg_card_back),
                     contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
                     modifier = finalImageModifier,
                 )
                 Surface(

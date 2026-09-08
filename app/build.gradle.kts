@@ -54,8 +54,8 @@ android {
         applicationId = "com.mmg.manahub"
         minSdk = 29
         targetSdk = 36
-        versionCode = 23
-        versionName = "2.3"
+        versionCode = 1
+        versionName = "0"
 
         buildConfigField(
             "String",

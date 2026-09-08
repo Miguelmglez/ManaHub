@@ -74,10 +74,7 @@ import org.koin.compose.viewmodel.koinViewModel
  * [CollectionGroupingMode] != [CollectionGroupingMode.NONE] (the [CollectionGroupingMode.NONE]
  * section always exists per [com.mmg.manahub.core.model.groupCollection]'s contract, it just has a
  * blank `labelToken` and is rendered header-less). Items are keyed
- * `"${section.labelToken}|${item.groupKey}"`, never the bare `groupKey` -- required because
- * [CollectionGroupingMode.TAG] can legitimately place the SAME [CollectionCardGroup] in multiple
- * sections (one per [com.mmg.manahub.core.model.TagCategory.STRATEGY] tag it carries); using the
- * bare key would crash on a duplicate Lazy-list key the first time a multi-tagged card was grouped.
+ * `"${section.labelToken}|${item.groupKey}"`, never the bare `groupKey` -- required * sections. Callers must key items by "$labelToken|${item.groupKey}" to avoid collisions.
  */
 @Composable
 fun CollectionScreen(windowSizeClass: ManaWindowSizeClass, onCardClick: (String) -> Unit) {
@@ -228,10 +225,7 @@ private fun CollectionSectionHeader(section: CollectionSection, mode: Collection
 
 /**
  * Resolves a [CollectionSection.labelToken] to a readable display string, per [mode]. A
- * deliberately minimal resolver (no [com.mmg.manahub.core.tagging.TagDictionary] lookup for
- * [CollectionGroupingMode.TAG], unlike Android's `collectionGroupLabel`) -- the app is English-only
- * (CLAUDE.md) so a full localization layer isn't needed, and the raw/lightly-formatted token is
- * already readable for every fixed-vocabulary mode ([CollectionGroupingMode.TYPE]/[RARITY]/[SET]).
+ * deliberately minimal resolver (no * (CLAUDE.md) so a full localization layer isn't needed.
  */
 private fun collectionSectionLabel(section: CollectionSection, mode: CollectionGroupingMode): String {
     val token = section.labelToken
@@ -255,8 +249,7 @@ private fun collectionSectionLabel(section: CollectionSection, mode: CollectionG
             section.items.firstOrNull()?.card?.setName?.ifBlank { token.uppercase() } ?: token.uppercase()
         CollectionGroupingMode.RARITY ->
             token.replaceFirstChar { it.uppercase() }.ifBlank { "Other" }
-        CollectionGroupingMode.TAG ->
-            if (token == "untagged") "Untagged" else token.replace('_', ' ').replaceFirstChar { it.uppercase() }
+
     }
 }
 
@@ -267,7 +260,7 @@ private fun CollectionGroupingMode.toDisplayLabel(): String = when (this) {
     CollectionGroupingMode.CMC -> "Mana value"
     CollectionGroupingMode.SET -> "Set"
     CollectionGroupingMode.RARITY -> "Rarity"
-    CollectionGroupingMode.TAG -> "Tag"
+
 }
 
 /**

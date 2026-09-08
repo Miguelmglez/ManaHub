@@ -1,10 +1,8 @@
 package com.mmg.manahub.core.ui.components
 
 import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -20,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -38,16 +35,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.model.CollectionCardGroup
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.mtg_card_back
+import com.mmg.manahub.core.ui.theme.ExtraSmallCardShape
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
-import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.util.CardConstants
-import com.mmg.manahub.core.model.CollectionCardGroup
+import com.mmg.manahub.core.util.PriceFormatter
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * Convenience overload that renders a [CollectionCardGroup] as a list row.
@@ -143,10 +140,10 @@ fun CardListItem(
             modifier = Modifier.heightIn(min = 72.dp),
             leadingContent = {
                 val imageModifier = Modifier
-                    .size(width = 56.dp, height = 80.dp)
-                    .clip(SmallCardShape)
+                    .size(width = 63.dp, height = 90.dp)
+                    .clip(ExtraSmallCardShape)
                     .background(mc.surfaceVariant)
-                    .border(0.5.dp, mc.surfaceVariant, SmallCardShape)
+                    .border(0.5.dp, mc.surfaceVariant, ExtraSmallCardShape)
 
                 val finalImageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && scryfallId != null) {
                     with(sharedTransitionScope) {
@@ -155,7 +152,7 @@ fun CardListItem(
                                 key = sharedTransitionKey ?: "card-image-$scryfallId"
                             ),
                             animatedVisibilityScope = animatedVisibilityScope,
-                            clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
+                            clipInOverlayDuringTransition = OverlayClip(ExtraSmallCardShape),
                             boundsTransform = { _, _ ->
                                 tween(durationMillis = 500, easing = FastOutSlowInEasing)
                             },
@@ -198,6 +195,16 @@ fun CardListItem(
                         }
                     }
 
+                    if (typeLine != null) {
+                        Text(
+                            text = typeLine,
+                            style = MaterialTheme.magicTypography.bodySmall,
+                            color = mc.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -220,16 +227,6 @@ fun CardListItem(
                                 modifier = Modifier.weight(1f)
                             )
                         }
-                    }
-
-                    if (typeLine != null) {
-                        Text(
-                            text = typeLine,
-                            style = MaterialTheme.magicTypography.bodySmall,
-                            color = mc.textSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
                     }
 
                     Row(

@@ -139,7 +139,7 @@ data class ScannerUiState(
     // Sound
     val isSoundEnabled: Boolean = true,
     // Auto-delete a queue entry once it's individually added to collection/wishlist
-    val isAutoDeleteOnAddEnabled: Boolean = false,
+    val isAutoDeleteOnAddEnabled: Boolean = true,
     // "Already in collection" badge — live identity-key set, see KDoc above
     val ownedCardIdentityKeys: Set<String> = emptySet(),
     // Purely informational since W2.11 (2026-08-24): true when the resolved card is an

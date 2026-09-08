@@ -22,6 +22,7 @@ import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
+import com.mmg.manahub.core.domain.search.AdvancedSearchCardMatcher
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
@@ -170,6 +171,26 @@ data class DeckStudioUiState(
      * [clearAddCardsState] for the two dismiss sites that already call it.
      */
     val activeStructuredSearchFragment: String? = null,
+    /**
+     * Edge-case QA fix (MEDIUM, 2026-09-06): the Collection-tab counterpart of
+     * [activeStructuredSearchFragment] -- the [com.mmg.manahub.core.model.CardTag] key set from
+     * the Analysis tab's "Browse for X" entry point (via [searchCollectionByTags]), kept SEPARATE
+     * from [addCardsQuery] for the exact same reason as the Scryfall fragment. Non-null only while
+     * a tag-filtered Collection-tab session is active; [onAddCardsQueryChange] ANDs it onto every
+     * subsequent keystroke instead of overwriting it (the pre-fix bug: typing after a tag-filtered
+     * Browse-for-X search silently dropped back to a plain name-only filter over the WHOLE
+     * collection). Reset at the same sites [activeStructuredSearchFragment] is.
+     */
+    val activeCollectionTagFilter: Set<String>? = null,
+    /**
+     * The Analysis tab's "Browse for X" structured query, evaluated LOCALLY (leniently) against the
+     * collection so the Collection tab is filtered by the same criteria
+     * [activeStructuredSearchFragment] sends to Scryfall for the All Cards tab. Complements — never
+     * replaces — [activeCollectionTagFilter]: the two operate on different key spaces (structured
+     * search criteria vs. internal `CardTag` keys, see `feature/decks/CLAUDE.md`), and many sections
+     * (curve / mana / legality) have no tag keys at all. Reset at the same sites as the other two.
+     */
+    val activeCollectionQuery: AdvancedSearchQuery? = null,
 
     // ── Commander (Commander format only) ─────────────────────────────────────
     val commanderCard: DeckSlotEntry? = null,
@@ -578,7 +599,17 @@ class DeckStudioViewModel(
                     .filterNot { cardCache.containsKey(it) }
                 if (unresolvedIds.isNotEmpty()) {
                     cardRepository.warmCacheForIds(unresolvedIds)
-                    val resolved = cardRepository.getCardsByIds(unresolvedIds).associateBy { it.scryfallId }
+                    // Collection sync data-loss fix, Phase 4 guard audit: a pending-hydration
+                    // placeholder (SyncManager.ensureCardsExist) carries fabricated cmc=0/empty
+                    // colors -- feeding it into the deck analysis engine as a "real" card would
+                    // skew curve/color/synergy scoring. Excluded here rather than filtered inside
+                    // the (heavily calibrated) engine itself: an excluded id simply stays out of
+                    // cardCache, so resolveCard()/DeckSlotEntry.card fall back to the SAME
+                    // null/"unresolved" path the engine already handles gracefully
+                    // (Finding.UnresolvedCards) for any id Room/Scryfall can't resolve at all.
+                    val resolved = cardRepository.getCardsByIds(unresolvedIds)
+                        .filterNot { it.staleReason == "pending_hydration" }
+                        .associateBy { it.scryfallId }
                     cardCache = cardCache + resolved
                 }
 
@@ -611,7 +642,10 @@ class DeckStudioViewModel(
 
     private suspend fun resolveCard(scryfallId: String): Card? {
         cardCache[scryfallId]?.let { return it }
-        return (cardRepository.getCardById(scryfallId) as? DataResult.Success)?.data
+        val fetched = (cardRepository.getCardById(scryfallId) as? DataResult.Success)?.data
+        // See the batch-resolve path above (observeDeck) for why a pending-hydration placeholder
+        // must not reach the analysis engine as a "real" card.
+        return fetched?.takeUnless { it.staleReason == "pending_hydration" }
     }
 
     private fun rebuildUiState(deck: Deck, allEntries: List<DeckSlotEntry>) {
@@ -816,6 +850,12 @@ class DeckStudioViewModel(
                 archetype = archetype,
                 themes = themes,
                 identity = colorIdentity,
+                // Edge-case QA fix (MEDIUM, 2026-09-06): AnalysisEngine.evaluate() already passes
+                // deckFormat here (Wave 2 B2's SixtyFormatProfile land/curve delta) -- this call
+                // site was the one remaining Wave 2 gap, widened by Wave 3's per-format deltas
+                // (up to a 4-land spread between Vintage and Standard) into a real Build-tab vs.
+                // Analysis-tab disagreement on the same deck's suggested land count.
+                deckFormat = format,
             )
         }
         val mainboardEntries = mainboardNonLands.map { deckCard ->
@@ -922,6 +962,7 @@ class DeckStudioViewModel(
     // ── Tab / UI toggles ──────────────────────────────────────────────────────
 
     fun onSelectTab(tab: DeckStudioTab) {
+        if (tab == DeckStudioTab.SUGGESTIONS && deckFormat == DeckFormat.DRAFT) return
         _uiState.update { it.copy(selectedTab = tab) }
         // Lazily run the first Deck Doctor analysis the first time the user opens
         // Suggestions — never on init (keeps Phase-1 "straight into the editor" fast
@@ -974,8 +1015,22 @@ class DeckStudioViewModel(
 
     // ── Manual mutations (write straight through the repository) ───────────────
 
-    /** Adds one copy of [scryfallId] to the deck (resolving + caching its Card). */
+    /**
+     * Adds one copy of [scryfallId] to the deck (resolving + caching its Card).
+     *
+     * Edge-case QA fix (CRITICAL, 2026-09-06): guards against duplicating the deck's singleton
+     * commander mainboard slot via this generic path — [CardSearchSheet]'s ordinary Add Cards
+     * sheet row now hides its +/- controls for the current commander (see `AddCardSheetRow`'s own
+     * KDoc), but this VM-level check is the defense-in-depth backstop so a future UI regression
+     * can't silently re-open the data-loss hole. [setCommander] is unaffected — it writes through
+     * [DeckRepository.addCardToDeck] directly, bypassing this wrapper entirely. A sideboard copy
+     * of the commander card is a legitimate, separate slot and is never blocked.
+     */
     fun addCardToDeck(scryfallId: String, isSideboard: Boolean = false) {
+        if (!isSideboard && scryfallId == _uiState.value.deck?.commanderCardId) {
+            FirebaseCrashlytics.getInstance().log("deck_studio_commander_mutation_blocked")
+            return
+        }
         invalidateSuggestions()
         viewModelScope.launch {
             // resolveCard hits getCardById, which can throw. Keep it INSIDE the
@@ -1007,8 +1062,19 @@ class DeckStudioViewModel(
         }
     }
 
-    /** Removes one copy of [scryfallId]; deletes the slot when it hits zero. */
+    /**
+     * Removes one copy of [scryfallId]; deletes the slot when it hits zero.
+     *
+     * Edge-case QA fix (CRITICAL, 2026-09-06): mirrors [addCardToDeck]'s guard — blocks removing
+     * the deck's singleton commander mainboard slot through this generic path (the commander's
+     * quantity is always 1, so the pre-fix behavior deleted it outright via the `currentQty <= 1`
+     * branch below). [removeCommander] is unaffected (writes through the repository directly).
+     */
     fun removeCardFromDeck(scryfallId: String, isSideboard: Boolean = false) {
+        if (!isSideboard && scryfallId == _uiState.value.deck?.commanderCardId) {
+            FirebaseCrashlytics.getInstance().log("deck_studio_commander_mutation_blocked")
+            return
+        }
         invalidateSuggestions()
         viewModelScope.launch {
             val currentQty = currentQuantity(scryfallId, isSideboard)
@@ -1271,16 +1337,45 @@ class DeckStudioViewModel(
         }
     }
 
+    /**
+     * The Collection tab's search bar. Delegates to [collectionCardsMatching] so the typed name is
+     * ANDed onto any active structured/tag filter instead of replacing it -- the Scryfall-tab
+     * counterpart of [searchScryfallDirect]'s fragment combining.
+     */
     fun onAddCardsQueryChange(query: String) {
         _uiState.update { it.copy(addCardsQuery = query) }
-        if (query.isBlank()) {
-            showCollectionCards()
-            return
+        publishCollectionResults(collectionCardsMatching(query))
+    }
+
+    /**
+     * [collectionCards] filtered by [DeckStudioUiState.activeCollectionQuery] AND
+     * [DeckStudioUiState.activeCollectionTagFilter] AND [query] (each applied only when set) -- the
+     * shared predicate behind [onAddCardsQueryChange], [searchCollectionByTags] and
+     * [applyStructuredSearch]. With none of the three set this is exactly [collectionCards]
+     * unfiltered (byte-identical to the [showCollectionCards] fallback).
+     *
+     * The structured query is matched in LENIENT mode: a criterion with no local equivalent (a
+     * Scryfall-only `function:` facet) is skipped rather than failing every card, so a
+     * Scryfall-only section never renders a falsely-empty Collection tab.
+     */
+    private fun collectionCardsMatching(query: String): List<Card> {
+        val state = _uiState.value
+        val structuredQuery = state.activeCollectionQuery
+        val activeTagFilter = state.activeCollectionTagFilter
+        return collectionCards.filter { card ->
+            (structuredQuery == null ||
+                AdvancedSearchCardMatcher.matches(card, structuredQuery, lenient = true)) &&
+                (activeTagFilter.isNullOrEmpty() ||
+                    (card.tags + card.userTags).any { it.key in activeTagFilter }) &&
+                (query.isBlank() || card.name.contains(query, ignoreCase = true))
         }
-        val filtered = collectionCards.filter { it.name.contains(query, ignoreCase = true) }
+    }
+
+    /** Republishes [DeckStudioUiState.addCardsResults] from an already-filtered card list. */
+    private fun publishCollectionResults(cards: List<Card>) {
         _uiState.update { s ->
             s.copy(
-                addCardsResults = filtered.map { card ->
+                addCardsResults = cards.map { card ->
                     AddCardRow(card, quantityInMainboard(s.cards + listOfNotNull(s.commanderCard), card.scryfallId), isOwned = true)
                 },
             )
@@ -1288,33 +1383,18 @@ class DeckStudioViewModel(
     }
 
     /**
-     * In-memory filter over [collectionCards] for the Analysis tab's category-browse entry point
-     * (Deck Analysis Category Sections rework, W5) — mirrors [onAddCardsQueryChange]'s shape but
-     * predicates on [CardTag] membership (`card.tags + card.userTags`) instead of a name
-     * substring. [keys] are the [CardTag] keys equivalent to a `CardSection`
-     * (`SectionSearchQuery.collectionTagKeysFor`).
+     * The Analysis tab's category-browse [CardTag] pre-filter for the Collection tab. [keys] are a
+     * `CardSection`'s equivalent tag keys (`SectionSearchQuery.collectionTagKeysFor`) — a DIFFERENT
+     * key space from the structured criteria of [applyStructuredSearch], so the two AND together
+     * rather than replacing each other.
      *
-     * Empty [keys] is a NO-OP that falls back to the full collection, mirroring
-     * [onAddCardsQueryChange]'s own blank-query branch (`showCollectionCards()`) rather than
-     * clearing [DeckStudioUiState.addCardsResults] to empty — a caller that has no tag keys for a
-     * section (e.g. curve/mana/legality sections, which use a structural predicate instead) still
-     * gets a sane Collection tab instead of a dead-looking empty list.
+     * Empty [keys] is a no-op filter (falls back to whatever the structured query and typed name
+     * leave), never an empty result — many sections (curve / mana / legality) have no tag keys at
+     * all and would otherwise render a dead-looking Collection tab.
      */
     fun searchCollectionByTags(keys: Set<String>) {
-        if (keys.isEmpty()) {
-            showCollectionCards()
-            return
-        }
-        val filtered = collectionCards.filter { card ->
-            (card.tags + card.userTags).any { it.key in keys }
-        }
-        _uiState.update { s ->
-            s.copy(
-                addCardsResults = filtered.map { card ->
-                    AddCardRow(card, quantityInMainboard(s.cards + listOfNotNull(s.commanderCard), card.scryfallId), isOwned = true)
-                },
-            )
-        }
+        _uiState.update { it.copy(activeCollectionTagFilter = keys.takeIf { k -> k.isNotEmpty() }) }
+        publishCollectionResults(collectionCardsMatching(_uiState.value.addCardsQuery))
     }
 
     /**
@@ -1393,23 +1473,58 @@ class DeckStudioViewModel(
      * is [CardSearchSheet][com.mmg.manahub.core.ui.components.CardSearchSheet]'s own
      * responsibility (it owns `selectedTab`), not this function's.
      */
-    fun searchScryfallStructured(query: AdvancedSearchQuery) {
+    fun searchScryfallStructured(query: AdvancedSearchQuery) = applyStructuredSearch(query)
+
+    /**
+     * The SINGLE entry point for a structured search — filters BOTH tabs from one
+     * [AdvancedSearchQuery]: the All Cards tab remotely (the query rendered as a Scryfall fragment,
+     * kept out of the visible search bar) and the Collection tab locally
+     * ([AdvancedSearchCardMatcher], lenient).
+     *
+     * Bound to `CardSearchSheet`'s `onAdvancedSearch`, so it serves both the Analysis tab's
+     * "Browse for X" preset and the Advanced Search sheet's own SEARCH CTA.
+     */
+    fun applyStructuredSearch(query: AdvancedSearchQuery) {
         val fragment = (buildScryfallQueryUseCase ?: BuildScryfallQueryUseCase())(query)
-        _uiState.update { it.copy(activeStructuredSearchFragment = fragment.takeIf { f -> f.isNotBlank() }) }
+        _uiState.update {
+            it.copy(
+                activeStructuredSearchFragment = fragment.takeIf { f -> f.isNotBlank() },
+                activeCollectionQuery = query.takeIf { q -> !q.isEmpty() },
+            )
+        }
+        // Clears addCardsQuery, so the collection refresh below sees the same empty name filter.
         searchScryfallDirect("")
+        val collectionMatches = collectionCardsMatching(_uiState.value.addCardsQuery)
+        publishCollectionResults(collectionMatches)
+        // Counts only -- a zero-hit structured search over a non-empty collection is the exact
+        // shape of the 2026-09-07 "Card Advantage returns nothing" report and is otherwise silent.
+        FirebaseCrashlytics.getInstance().apply {
+            setCustomKey("deck_studio_structured_criteria", query.criteria.size)
+            setCustomKey("deck_studio_structured_collection_hits", collectionMatches.size)
+            log("deck_studio_structured_search_applied")
+        }
     }
 
     /**
-     * Clears the Analysis-tab "Browse for X" structured-search fragment (see
-     * [DeckStudioUiState.activeStructuredSearchFragment] / [searchScryfallStructured]). Called
-     * from [DeckStudioScreen] alongside its own UI-local `sectionBrowseSectionId` reset at every
-     * sheet OPEN site that does not already call [clearAddCardsState] (the FAB, `onReplaceCard`)
-     * -- the two DISMISS sites get this for free via [clearAddCardsState] below. Without this, a
-     * later "normal" Build-tab open of the same sheet instance would silently keep combining with
-     * a stale structured filter left over from a previous Analysis-tab visit.
+     * Clears the Analysis-tab "Browse for X" structured-search fragment AND its Collection-tab
+     * counterpart (see [DeckStudioUiState.activeStructuredSearchFragment] /
+     * [searchScryfallStructured] and [DeckStudioUiState.activeCollectionTagFilter] /
+     * [searchCollectionByTags] -- edge-case QA fix, 2026-09-06: the tag filter is reset at every
+     * site this function already covers). Called from [DeckStudioScreen] alongside its own
+     * UI-local `sectionBrowseSectionId` reset at every sheet OPEN site that does not already call
+     * [clearAddCardsState] (the FAB, `onReplaceCard`) -- the two DISMISS sites get this for free
+     * via [clearAddCardsState] below. Without this, a later "normal" Build-tab open of the same
+     * sheet instance would silently keep combining with a stale structured/tag filter left over
+     * from a previous Analysis-tab visit.
      */
     fun clearActiveStructuredSearchFragment() {
-        _uiState.update { it.copy(activeStructuredSearchFragment = null) }
+        _uiState.update {
+            it.copy(
+                activeStructuredSearchFragment = null,
+                activeCollectionTagFilter = null,
+                activeCollectionQuery = null,
+            )
+        }
     }
 
     /** Commander-mode search: shares Scryfall results but is invoked separately. */
@@ -1434,6 +1549,8 @@ class DeckStudioViewModel(
                 // function since both real dismiss sites (handleBack's showAddCardsSheet branch,
                 // CardSearchSheet's own onDismiss) already call it -- see that field's KDoc.
                 activeStructuredSearchFragment = null,
+                activeCollectionTagFilter = null,
+                activeCollectionQuery = null,
             )
         }
     }

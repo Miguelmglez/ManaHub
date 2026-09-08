@@ -9,34 +9,31 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -61,13 +58,13 @@ import coil3.request.crossfade
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
-import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.DeckSlotEntry
+import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.ui.Res
-import com.mmg.manahub.core.ui.components.CardName
-import com.mmg.manahub.core.ui.components.CardTagChip
-import com.mmg.manahub.core.ui.components.ManaCostImages
-import com.mmg.manahub.core.ui.components.OracleText
+import com.mmg.manahub.core.ui.components.CardTagGroup
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
@@ -136,24 +133,23 @@ internal fun CardDetailSheet(
     // The card actually RENDERED (image/name/type-line/oracle-text/tags): null while loading (shows
     // the placeholder below), else the English-preferred [displayCard] or the original as fallback.
     val visualCard = if (isLoadingDetail) null else (displayCard ?: originalCard)
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden },
-    )
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) {
+        it != SheetValue.Hidden
+    }
 
-    var showBackFace by remember { mutableStateOf(false) }
+    var showBackFace by remember { mutableStateOf(value = false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = mc.background,
+        contentWindowInsets = { WindowInsets(0) },
         dragHandle = null,
         tonalElevation = 0.dp,
     ) {
         LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = spacing.xl),
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
+            contentPadding = PaddingValues(bottom = spacing.lg),
         ) {
             item {
                 Row(
@@ -161,22 +157,23 @@ internal fun CardDetailSheet(
                         .fillMaxWidth()
                         .padding(horizontal = spacing.sm, vertical = spacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Start
+                    horizontalArrangement = Arrangement.Start,
                 ) {
                     IconButton(
                         onClick = onDismiss,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Surface(
-                            shape = androidx.compose.foundation.shape.CircleShape,
-                            color = mc.surfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier.fillMaxSize()
+                            shape = CircleShape,
+                            color = mc.surfaceVariant.copy(alpha = 0.2f),
+                            modifier = Modifier.fillMaxSize(),
+                            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.3f))
                         ) {
                             Icon(
                                 Icons.Default.Close,
                                 contentDescription = stringResource(R.string.action_close),
-                                tint = mc.textPrimary,
-                                modifier = Modifier.padding(6.dp)
+                                tint = mc.textSecondary,
+                                modifier = Modifier.padding(8.dp)
                             )
                         }
                     }
@@ -282,76 +279,14 @@ internal fun CardDetailSheet(
                         modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md),
                         verticalArrangement = Arrangement.spacedBy(spacing.xs)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            val displayName = visualCard.printedName?.takeIf { it.isNotBlank() } ?: visualCard.name
-                            CardName(
-                                name = displayName,
-                                showFrontOnly = false,
-                                style = ty.titleLarge,
-                                color = mc.textPrimary,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.weight(1f),
-                            )
 
-                        }
-                        val typeLine = visualCard.printedTypeLine?.takeIf { it.isNotBlank() } ?: visualCard.typeLine
-                        Text(
-                            typeLine,
-                            style = ty.bodyMedium,
-                            color = mc.textSecondary,
-                            fontWeight = FontWeight.Medium
-                        )
-
-                        visualCard.manaCost?.let { cost ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                val costs = cost.split(" // ")
-                                costs.forEachIndexed { index, singleCost ->
-                                    ManaCostImages(manaCost = singleCost, symbolSize = 20.dp)
-                                    if (index < costs.size - 1) {
-                                        Text(
-                                            " // ",
-                                            style = ty.titleMedium,
-                                            color = mc.textSecondary,
-                                            modifier = Modifier.padding(horizontal = spacing.xxs)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        Surface(
-                            color = mc.surfaceVariant.copy(alpha = 0.2f),
-                            shape = MaterialTheme.shapes.medium,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = spacing.sm)
-                        ) {
-                            Column(modifier = Modifier.padding(spacing.md)) {
-                                val oracleDisplayText =
-                                    visualCard.oracleText?.takeIf { it.isNotBlank() } ?: visualCard.printedText
-                                    ?: ""
-                                OracleText(
-                                    text = oracleDisplayText,
-                                    style = ty.bodyMedium,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
 
                         // Tag chips — color-coded by TagCategory (read-only, no onClick).
                         if (tags.isNotEmpty()) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                                verticalArrangement = Arrangement.spacedBy(spacing.xs),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                tags.forEach { tag ->
-                                    CardTagChip(label = tag.label(), category = tag.category)
-                                }
-                            }
+                            CardTagGroup(
+                                tags = tags,
+                                tagLabel = { it.label() }
+                            )
                         }
                     }
                 }
@@ -393,51 +328,39 @@ internal fun CardDetailSheet(
                     isCommanderSelectionContext -> {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg),
-                            verticalArrangement = Arrangement.spacedBy(spacing.sm),
+                            verticalArrangement = Arrangement.spacedBy(spacing.md),
                         ) {
                             if (isCommander) {
                                 CommanderStatusBadge()
-                                OutlinedButton(
+                                MagicCtaButton(
                                     onClick = onRemoveCommander,
-                                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                                    border = BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.6f)),
-                                    shape = ChipShape,
-                                ) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = null,
-                                        tint = mc.lifeNegative,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(Modifier.width(spacing.xs))
-                                    Text(
-                                        text = stringResource(R.string.deckbuilder_remove_commander),
-                                        color = mc.lifeNegative,
-                                        style = ty.bodyMedium,
-                                    )
-                                }
+                                    text = stringResource(R.string.deckbuilder_remove_commander),
+                                    style = MagicCtaStyle.Outlined,
+                                    color = MagicCtaColor.Error,
+                                    icon = {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             } else if (originalCard != null) {
-                                Button(
+                                MagicCtaButton(
                                     onClick = { onChooseAsCommander(originalCard) },
+                                    text = stringResource(R.string.deckbuilder_choose_as_commander),
+                                    color = MagicCtaColor.Gold,
+                                    icon = {
+                                        Icon(
+                                            Icons.Default.Star,
+                                            null,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
                                     modifier = Modifier.fillMaxWidth()
                                         .height(CommanderCtaHeight),
-                                    colors = ButtonDefaults.buttonColors(containerColor = mc.goldMtg),
-                                    shape = ChipShape,
-                                ) {
-                                    Icon(
-                                        Icons.Default.Star,
-                                        null,
-                                        tint = mc.onAccent,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(Modifier.width(spacing.sm))
-                                    Text(
-                                        text = stringResource(R.string.deckbuilder_choose_as_commander),
-                                        style = ty.titleMedium,
-                                        color = mc.onAccent,
-                                        fontWeight = FontWeight.Bold,
-                                    )
-                                }
+                                )
                             }
                         }
                     }
@@ -452,52 +375,73 @@ internal fun CardDetailSheet(
                     // Case 3: regular deck card — +/- quantity counter.
                     else -> {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(spacing.lg),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.sm),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(spacing.md),
                         ) {
-                            Text(
-                                text = stringResource(R.string.deckdetail_in_deck_label),
-                                style = ty.labelMedium,
-                                color = mc.textSecondary,
-                                modifier = Modifier.weight(1f),
-                            )
-                            IconButton(
-                                onClick = onRemove,
-                                enabled = deckCard.quantity > 0,
-                                colors = IconButtonDefaults.iconButtonColors(
-                                    contentColor = mc.primaryAccent,
-                                    disabledContentColor = mc.textDisabled
-                                )
-                            ) {
-                                Icon(
-                                    Icons.Default.Remove,
-                                    contentDescription = stringResource(R.string.action_remove),
-                                )
-                            }
-                            Surface(
-                                shape = ChipShape,
-                                color = mc.primaryAccent.copy(alpha = 0.12f),
-                                border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.3f))
-                            ) {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "${deckCard.quantity}",
-                                    style = ty.titleLarge,
-                                    color = mc.primaryAccent,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    modifier = Modifier.padding(
-                                        horizontal = spacing.lg,
-                                        vertical = spacing.xs
-                                    ),
+                                    text = stringResource(R.string.deckdetail_in_deck_label),
+                                    style = ty.labelMedium,
+                                    color = mc.textSecondary,
+                                )
+                                Text(
+                                    text = "${deckCard.quantity} ${if (deckCard.quantity == 1) "copy" else "copies"}",
+                                    style = ty.titleMedium,
+                                    color = mc.textPrimary,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
-                            IconButton(
-                                onClick = onAdd,
-                                colors = IconButtonDefaults.iconButtonColors(contentColor = mc.primaryAccent)
+                            
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(spacing.xs)
                             ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = stringResource(R.string.action_add)
+                                MagicCtaButton(
+                                    onClick = onRemove,
+                                    enabled = deckCard.quantity > 0,
+                                    style = MagicCtaStyle.Outlined,
+                                    color = MagicCtaColor.Primary,
+                                    icon = {
+                                        Icon(
+                                            Icons.Default.Remove,
+                                            contentDescription = stringResource(R.string.action_remove),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    contentPadding = PaddingValues(spacing.sm),
+                                    modifier = Modifier.size(48.dp)
+                                )
+
+                                Surface(
+                                    shape = ChipShape,
+                                    color = mc.surfaceVariant.copy(alpha = 0.3f),
+                                    border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
+                                    modifier = Modifier.height(48.dp).width(56.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = deckCard.quantity.toString(),
+                                            style = ty.titleLarge,
+                                            color = mc.textPrimary,
+                                            fontWeight = FontWeight.ExtraBold,
+                                        )
+                                    }
+                                }
+
+                                MagicCtaButton(
+                                    onClick = onAdd,
+                                    style = MagicCtaStyle.Filled,
+                                    color = MagicCtaColor.Primary,
+                                    icon = {
+                                        Icon(
+                                            Icons.Default.Add,
+                                            contentDescription = stringResource(R.string.action_add),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    contentPadding = PaddingValues(spacing.sm),
+                                    modifier = Modifier.size(48.dp)
                                 )
                             }
                         }
@@ -508,28 +452,22 @@ internal fun CardDetailSheet(
             // Delete / remove-all — hidden in pure commander-selection context.
             if (!isCommanderSelectionContext) {
                 item {
-                    OutlinedButton(
+                    MagicCtaButton(
                         onClick = onDelete,
+                        text = stringResource(if (isCommander) R.string.deckbuilder_remove_commander else R.string.action_remove_all),
+                        style = MagicCtaStyle.Outlined,
+                        color = MagicCtaColor.Error,
+                        icon = {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = spacing.lg, vertical = spacing.xs)
-                            .height(48.dp),
-                        border = BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.4f)),
-                        shape = ChipShape,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.lifeNegative)
-                    ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(spacing.sm))
-                        Text(
-                            stringResource(if (isCommander) R.string.deckbuilder_remove_commander else R.string.action_remove_all),
-                            style = ty.labelLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                            .padding(horizontal = spacing.lg, vertical = spacing.sm)
+                    )
                 }
             }
         }

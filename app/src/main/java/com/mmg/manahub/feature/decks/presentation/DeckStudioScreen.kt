@@ -74,10 +74,13 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -92,7 +95,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.currentStateAsState
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.FeatureFlags
@@ -170,6 +176,10 @@ import com.mmg.manahub.feature.decks.presentation.components.groupCards
 import com.mmg.manahub.feature.decks.presentation.components.label
 import org.jetbrains.compose.resources.painterResource
 import org.koin.androidx.compose.koinViewModel
+
+// CardSearchSheet's own tab indices for a 2-tab (no Wishlist) sheet.
+private const val ADD_CARDS_TAB_COLLECTION = 0
+private const val ADD_CARDS_TAB_ALL_CARDS = 1
 
 /**
  * The unified "Deck Studio" editor surface (Phase 1).
@@ -252,6 +262,16 @@ fun DeckStudioScreen(
     // contain a card tap that navigates away to a full screen, so none share this failure mode.
     var showAddCardsSheet by rememberSaveable { mutableStateOf(false) }
     var showCommanderSearchSheet by rememberSaveable { mutableStateOf(false) }
+
+    // CardSearchSheet renders in its own window ABOVE the NavHost, so it would stay on top (owning
+    // input and back) while Screen.CollectionCardDetail animates in, killing both the transition and
+    // any way to close the detail screen. Gating on RESUMED unmounts it the instant navigation
+    // starts and remounts it on return; its results live in the VM, which outlives the unmount.
+    val isDestinationResumed = LocalLifecycleOwner.current.lifecycle
+        .currentStateAsState().value.isAtLeast(Lifecycle.State.RESUMED)
+    // Hoisted out of CardSearchSheet so the tab survives that unmount. 0 = Collection, 1 = All
+    // Cards (the sheet's own indices with no Wishlist tab); reset wherever sectionBrowseSectionId is.
+    var addCardsSheetTab by rememberSaveable { mutableIntStateOf(ADD_CARDS_TAB_COLLECTION) }
     // Deck Analysis Category Sections rework (W7/W8 telemetry): non-null only when the Build tab's
     // own add-cards sheet (below) was opened from an Analysis-tab "Browse for <Category>" button —
     // reset to null on every dismiss/FAB-open so a stale preset never leaks into the next,
@@ -343,6 +363,7 @@ fun DeckStudioScreen(
             showAddCardsSheet -> {
                 showAddCardsSheet = false
                 sectionBrowseSectionId = null
+                addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
                 // clearAddCardsState() also resets activeStructuredSearchFragment (W11 bug fix).
                 viewModel.clearAddCardsState()
             }
@@ -417,13 +438,12 @@ fun DeckStudioScreen(
                 ) {
                     FloatingActionButton(
                         onClick = {
-                            viewModel.showCollectionCards()
                             sectionBrowseSectionId = null
-                            // W11 bug fix: not called via clearAddCardsState() here (that would
-                            // also wipe the addCardsResults showCollectionCards() just populated)
-                            // -- a stale fragment from a previous Analysis-tab visit must not leak
-                            // into this normal FAB-opened session.
+                            addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
+                            // Not clearAddCardsState() here: that would also wipe the results
+                            // showCollectionCards() populates below.
                             viewModel.clearActiveStructuredSearchFragment()
+                            viewModel.showCollectionCards()
                             showAddCardsSheet = true
                         },
                         containerColor = mc.primaryAccent,
@@ -437,7 +457,12 @@ fun DeckStudioScreen(
             },
         ) { padding ->
             Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-                // The Suggestions tab is HIDDEN for release behind
+                if (uiState.isLoading || uiState.deck == null) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        MagicLoadingSpinner()
+                    }
+                } else {
+                    // The Suggestions tab is HIDDEN for release behind
                 // DeckFeatureFlags.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED (UI-only; the SUGGESTIONS
                 // branch + SuggestionsTab composable stay compiled). With it disabled, only the
                 // BUILD tab remains — a single-item TabRow looks broken, so it is not rendered.
@@ -449,7 +474,8 @@ fun DeckStudioScreen(
                             onClick = { viewModel.onSelectTab(DeckStudioTab.BUILD) }
                         )
                     )
-                    if (FeatureFlags.Decks.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED) {
+                    val isDraft = uiState.deck?.format?.equals(DeckFormat.DRAFT.name, ignoreCase = true) == true
+                    if (FeatureFlags.Decks.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED && !isDraft) {
                         add(
                             ManaTabItem(
                                 label = stringResource(R.string.deck_studio_tab_suggestions).uppercase(),
@@ -459,7 +485,7 @@ fun DeckStudioScreen(
                         )
                     }
                 }
-                if (tabs.size > 1) {
+                if (!uiState.isLoading && tabs.size > 1) {
                     ManaTabRow(
                         items = tabs,
                         modifier = Modifier.fillMaxWidth()
@@ -489,13 +515,12 @@ fun DeckStudioScreen(
                             },
                             onReviewSurvey = onReviewSurvey,
                             onReplaceCard = { card ->
-                                // Mirror the legacy editor: pre-fill the search with the card
-                                // name and open the add-cards sheet so the user can pick a
-                                // replacement immediately.
-                                viewModel.onAddCardsQueryChange(card.name)
                                 sectionBrowseSectionId = null
-                                // W11 bug fix: see the FAB onClick's identical comment above.
+                                addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
+                                // Clear BEFORE filtering, or the pre-fill still runs through a
+                                // stale Analysis-tab structured/tag filter.
                                 viewModel.clearActiveStructuredSearchFragment()
+                                viewModel.onAddCardsQueryChange(card.name)
                                 showAddCardsSheet = true
                             },
                             onSetGroupingMode = viewModel::setGroupingMode,
@@ -557,21 +582,24 @@ fun DeckStudioScreen(
                                 FirebaseCrashlytics.getInstance().setCustomKey("deck_analysis_section_has_gap", hasGap)
                                 FirebaseCrashlytics.getInstance().log("deck_analysis_section_browse")
                                 viewModel.showCollectionCards()
-                                // Suggestions Tab UI Polish plan (W11/D8, bug-fix pass 2026-08-25):
-                                // structured, not SectionSearchQuery.buildFor's flat string --
-                                // sectionBrowseQuery/sectionBrowseTagKeys above are PURE derived
-                                // vals of (sectionBrowseSectionId, sectionQueryContext), so setting
-                                // the id alone is enough; CardSearchSheet's onAdvancedSearch runs
-                                // the actual filtered search directly (results already filtered,
-                                // search bar left empty) instead of popping AdvancedSearchSheet up
-                                // or dumping raw Scryfall syntax into the plain search bar.
+                                // sectionBrowseQuery/sectionBrowseTagKeys are pure derived vals of
+                                // (sectionBrowseSectionId, sectionQueryContext), so setting the id
+                                // alone is enough; the sheet's onAdvancedSearch then runs the real
+                                // filtered search over both tabs.
                                 sectionBrowseSectionId = section.id
+                                addCardsSheetTab =
+                                    if (SectionSearchQuery.collectionTagKeysFor(section.id).isNotEmpty()) {
+                                        ADD_CARDS_TAB_COLLECTION
+                                    } else {
+                                        ADD_CARDS_TAB_ALL_CARDS
+                                    }
                                 showAddCardsSheet = true
                             },
                         )
                     }
                 }
             }
+        }
         }
 
         MagicToastHost(
@@ -760,7 +788,7 @@ fun DeckStudioScreen(
         )
     }
 
-    if (showAddCardsSheet) {
+    if (showAddCardsSheet && isDestinationResumed) {
         CardSearchSheet(
             query = uiState.addCardsQuery,
             offerResults = emptyList(),
@@ -796,23 +824,27 @@ fun DeckStudioScreen(
             // vals then recompute to null/empty), so this stays a no-op there (see CardSearchSheet's
             // own KDoc on these two params).
             initialAdvancedQuery = sectionBrowseQuery,
+            // What is filtering the two tabs RIGHT NOW -- cleared by every non-Analysis open site,
+            // so the Advanced Search sheet can never re-open holding a filter the user cannot see.
+            appliedAdvancedQuery = uiState.activeCollectionQuery,
             initialCollectionTagKeys = sectionBrowseTagKeys,
-            // W11 bug-fix pass: runs the ACTUAL search against the translated filters directly
-            // (results already filtered, search bar left empty) instead of CardSearchSheet
-            // auto-popping AdvancedSearchSheet up on top of itself.
-            onAdvancedSearch = viewModel::searchScryfallStructured,
+            // One entry point filtering BOTH tabs: Scryfall for All Cards, the local matcher for
+            // Collection. Also serves the Advanced Search sheet's own SEARCH CARDS button.
+            onAdvancedSearch = viewModel::applyStructuredSearch,
             onFilterCollectionByTags = viewModel::searchCollectionByTags,
+            selectedTabIndex = addCardsSheetTab,
+            onSelectedTabChange = { addCardsSheetTab = it },
             onDismiss = {
                 focusManager.clearFocus()
                 showAddCardsSheet = false
                 sectionBrowseSectionId = null
-                // clearAddCardsState() also resets activeStructuredSearchFragment (W11 bug fix).
+                addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
                 viewModel.clearAddCardsState()
             },
         )
     }
 
-    if (showCommanderSearchSheet) {
+    if (showCommanderSearchSheet && isDestinationResumed) {
         CardSearchSheet(
             query = uiState.addCardsQuery,
             offerResults = emptyList(),
@@ -2103,6 +2135,28 @@ private fun DoctorStagedProgressContent(
     }
 }
 
+/**
+ * Edge-case QA fix (MEDIUM, 2026-09-06): [rememberSaveable] Saver for [SuggestionsTab]'s
+ * `collapsedCategorySections` state, which used to be a plain `remember` and did not survive the
+ * real Navigation-Compose round-trip a `CardSectionRow` card tap triggers (see that state's own
+ * KDoc). `SnapshotStateMap<String, Boolean>` has no default Bundle Saver, so this flattens each
+ * entry to a single `$key<sep>$value` string (<sep> = a literal U+0001 control character,
+ * which cannot appear in a section/pillar id) and restores by splitting on the LAST such separator.
+ */
+private val CollapsedCategorySectionsSaver: Saver<SnapshotStateMap<String, Boolean>, List<String>> = Saver(
+    save = { map -> map.map { (key, value) -> "$key\u0001$value" } },
+    restore = { encoded ->
+        mutableStateMapOf<String, Boolean>().apply {
+            encoded.forEach { entry ->
+                val separatorIndex = entry.lastIndexOf('\u0001')
+                if (separatorIndex >= 0) {
+                    this[entry.substring(0, separatorIndex)] = entry.substring(separatorIndex + 1).toBoolean()
+                }
+            }
+        }
+    }
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SuggestionsTab(
@@ -2208,16 +2262,31 @@ private fun SuggestionsTab(
     // Which single pillar tile is expanded (plan §3.4 item 3) -- Plan roles starts expanded by
     // default (plan §3.4 item 4: "always expanded by default"), tapping any tile (including the
     // already-expanded one, to collapse it) reassigns this.
-    var expandedPillar by remember { mutableStateOf<PillarId?>(PillarId.PLAN_ROLES) }
+    //
+    // Edge-case QA fix (MEDIUM, 2026-09-06): `rememberSaveable` (not plain `remember`) for the
+    // exact same reason as `showAddCardsSheet` above -- CardSectionRow's onCardClick navigates to
+    // the real CardDetail screen (real Navigation-Compose nav, not an overlay), disposing and
+    // recreating this composition on the pop and silently resetting the expand state to defaults.
+    // `PillarId?` is a nullable enum, natively Bundle-Saveable (Kotlin enums compile to Java
+    // enums, which implement Serializable) -- no custom Saver needed.
+    var expandedPillar by rememberSaveable { mutableStateOf<PillarId?>(PillarId.PLAN_ROLES) }
     // Deck Analysis Engine v3, Phase 5 (UI) -- the "Archetype signal" card's own collapse state
     // (macro/posture/themes + confidence are always visible; the full 5-way resemblance profile is
     // the part that starts folded, mirroring every other collapsible detail on this tab).
-    var archetypeDetailExpanded by remember { mutableStateOf(false) }
+    //
+    // Edge-case QA fix (MEDIUM, 2026-09-06): `rememberSaveable` -- same nav-round-trip reason as
+    // `expandedPillar` above; `Boolean` is natively Saveable.
+    var archetypeDetailExpanded by rememberSaveable { mutableStateOf(false) }
     // Suggestions Tab UI Polish plan (W1/D2): per-category-section collapse state, keyed by a
     // composite "${pillarId}:${section.id}" string -- mirrors CollectionScreen.kt's
     // CollectionGroupHeader/collapsedSections pattern exactly. A composite key (not just
     // section.id) removes any doubt about a section id colliding across two different pillars.
-    val collapsedCategorySections = remember { mutableStateMapOf<String, Boolean>() }
+    //
+    // Edge-case QA fix (MEDIUM, 2026-09-06): `rememberSaveable` with a small custom [Saver] --
+    // same nav-round-trip reason as `expandedPillar`/`archetypeDetailExpanded` above, but
+    // `SnapshotStateMap<String, Boolean>` has no default Saver, so [CollapsedCategorySectionsSaver]
+    // (file-level, below) flattens it to a `key<sep>value`-encoded `List<String>` and back.
+    val collapsedCategorySections = rememberSaveable(saver = CollapsedCategorySectionsSaver) { mutableStateMapOf() }
     // Deck Engine Unification (D4): the deck's own persisted flag (Deck.strategyLocked), not the
     // orchestrator's own async-loaded DeckDoctorState.strategyLocked -- uiState.deck is always
     // current (observed live), so the "Deck plan" editor gate can never lag one analysis cycle

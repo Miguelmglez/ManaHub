@@ -55,6 +55,7 @@ import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.core.domain.usecase.card.ResolveCardStrategyTagsUseCase
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncWorker
 import com.mmg.manahub.core.gamification.data.sync.QuestRotationWorker
@@ -272,6 +273,11 @@ class ManaHubApp : Application(), KoinComponent {
     // eager-Hilt CardRepositoryImpl gets its OWN CardStrategyTagsRepository instance via a residual
     // SharedDomainUseCaseModule provider (same DAO singleton, see that provider's KDoc for why).
     @Inject lateinit var cardStrategyTagsCacheDao: CardStrategyTagsCacheDao
+
+    // Bulk strategy-tag hydration (2026-09-07): CardTagHydrationWorker resolves this through Koin.
+    // Bridged from Hilt rather than rebuilt Koin-side so the bulk path shares the SAME repository
+    // (and therefore the same cache-write behaviour) as the card-add path.
+    @Inject lateinit var resolveCardStrategyTagsUseCase: ResolveCardStrategyTagsUseCase
 
     // Daily Puzzle feature (Batch B1 foundation). Serves puzzleKoinModule — the Room-owned
     // PuzzleDao bridge, same pattern as cardStrategyTagsCacheDao above.
@@ -496,6 +502,7 @@ class ManaHubApp : Application(), KoinComponent {
                 ),
                 cardStrategyTagsKoinModule(
                     cacheDao = cardStrategyTagsCacheDao,
+                    resolveCardStrategyTags = resolveCardStrategyTagsUseCase,
                 ),
                 puzzleKoinModule(
                     puzzleDao = puzzleDao,

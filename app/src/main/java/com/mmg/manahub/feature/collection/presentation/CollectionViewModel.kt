@@ -14,15 +14,19 @@ import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.search.AdvancedSearchCardMatcher
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CollectionCardGroup
 import com.mmg.manahub.core.model.CollectionGroupingMode
+import com.mmg.manahub.core.model.CollectionSource
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.model.ComparisonOperator
+import com.mmg.manahub.core.model.OpenForTradeEntry
 import com.mmg.manahub.core.model.SearchCriterion
+import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.model.UserCardWithCard
+import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.model.groupByCard
 import com.mmg.manahub.core.model.groupCollection
 import com.mmg.manahub.core.sync.CollectionMergeConflict
@@ -87,9 +91,13 @@ class CollectionViewModel(
     // in-memory lookup against this map so re-filtering/re-sorting never triggers a Room query.
     private var englishSiblingCache: Map<Pair<String, String>, Card> = emptyMap()
 
-    // Live set of scryfall IDs present in the local wishlist table.
-    // Used by the "In Wishlist" advanced-search filter.
-    private val _wishlistCardIds = MutableStateFlow<Set<String>>(emptySet())
+    // The wishlist and open-for-trade tables are the ONLY sources of truth for those two lists:
+    // they are separate tables, not flags on a collection row (`UserCard.isForTrade` is read-only
+    // dead weight — nothing in the app ever writes it true). Held as full entries, not just ids,
+    // because CollectionSource.WISHLIST / FOR_TRADE render them AS the list, not as a filter over
+    // the owned collection (a wishlisted card is by definition usually not owned).
+    private val _wishlistEntries = MutableStateFlow<List<WishlistEntry>>(emptyList())
+    private val _openForTradeEntries = MutableStateFlow<List<OpenForTradeEntry>>(emptyList())
 
     // ViewModel-scoped field (not a local var) so it survives config changes.
     // Reset only on genuine Unauthenticated transitions, never on Loading, so
@@ -123,7 +131,8 @@ class CollectionViewModel(
         _uiState.update { it.copy(selectedTab = initialTab) }
 
         observeCollection()
-        observeWishlistIds()
+        observeWishlist()
+        observeOpenForTrade()
         observeTradeListUnsyncedCounts()
         // Backend & Performance Optimization plan, WS1+WS3 Part B item 7a (2026-07-28): the
         // per-screen-entry price refresh that used to run here was removed — it duplicated
@@ -146,6 +155,10 @@ class CollectionViewModel(
     private companion object {
         /** Matches TradeProposalViewModel's SEARCH_DEBOUNCE_MS — one shared convention. */
         const val SEARCH_DEBOUNCE_MS = 300L
+
+        // Wishlist entries carry these as nullable (a wishlist can want "any printing").
+        const val DEFAULT_CONDITION = "NM"
+        const val DEFAULT_LANGUAGE = "en"
     }
 
     private fun observeUserPreferences() {
@@ -162,10 +175,19 @@ class CollectionViewModel(
         }
     }
 
-    private fun observeWishlistIds() {
+    private fun observeWishlist() {
         viewModelScope.launch {
             getLocalWishlist().distinctUntilChanged().collect { entries ->
-                _wishlistCardIds.value = entries.map { it.cardId }.toSet()
+                _wishlistEntries.value = entries
+                applyFilters()
+            }
+        }
+    }
+
+    private fun observeOpenForTrade() {
+        viewModelScope.launch {
+            openForTradeRepository.observeLocal().distinctUntilChanged().collect { entries ->
+                _openForTradeEntries.value = entries
                 applyFilters()
             }
         }
@@ -484,6 +506,16 @@ class CollectionViewModel(
         }
     }
 
+    fun onSortDirectionChange(dir: SortDirection) {
+        _uiState.update { it.copy(sortDirection = dir) }
+        analyticsHelper.logEvent("collection_sort_direction_changed", mapOf("sort_direction" to dir.name))
+        applyFilters()
+        viewModelScope.launch {
+            gridState.scrollToItem(0)
+            listState.scrollToItem(0)
+        }
+    }
+
     /**
      * Changes the Cards tab "Group by" selection. Updates local state immediately (so the
      * selector and sectioned list reflect the choice without waiting on the DataStore
@@ -555,7 +587,16 @@ class CollectionViewModel(
     }
 
     fun applyAdvancedFilters(query: AdvancedSearchQuery) {
-        _uiState.update { it.copy(activeQuery = if (query.isEmpty()) null else query) }
+        val source = query.criteria.filterIsInstance<SearchCriterion.CollectionStatus>()
+            .firstOrNull()?.source ?: CollectionSource.COLLECTION
+        val sourceChanged = source != _uiState.value.collectionSource
+        _uiState.update {
+            it.copy(
+                activeQuery = if (query.isEmpty()) null else query,
+                collectionSource = source,
+            )
+        }
+        if (sourceChanged) setCollectionSourceTelemetry(source)
         if (!query.isEmpty()) {
             analyticsHelper.logEvent(
                 "collection_advanced_filter_applied", mapOf(
@@ -569,12 +610,57 @@ class CollectionViewModel(
     }
 
     fun clearAdvancedFilters() {
+        setCollectionSource(CollectionSource.COLLECTION)
         _uiState.update { it.copy(activeQuery = null) }
         applyFilters()
     }
 
+    /** Switches which of the user's three lists the Cards tab is showing. */
+    fun setCollectionSource(source: CollectionSource) {
+        if (_uiState.value.collectionSource == source) return
+        _uiState.update {
+            it.copy(
+                collectionSource = source,
+                // Keep activeQuery's CollectionStatus criterion in lockstep with collectionSource
+                // so the two can never disagree — applyAdvancedFilters derives one FROM the other.
+                activeQuery = it.activeQuery.withCollectionSource(source),
+            )
+        }
+        setCollectionSourceTelemetry(source)
+        applyFilters()
+    }
+
+    private fun AdvancedSearchQuery?.withCollectionSource(source: CollectionSource): AdvancedSearchQuery? {
+        val withoutStatus = (this?.criteria ?: emptyList())
+            .filterNot { it is SearchCriterion.CollectionStatus }
+        val criteria = if (source == CollectionSource.COLLECTION) withoutStatus
+            else withoutStatus + SearchCriterion.CollectionStatus(source)
+        return if (criteria.isEmpty()) null else (this ?: AdvancedSearchQuery()).copy(criteria = criteria)
+    }
+
+    private fun setCollectionSourceTelemetry(source: CollectionSource) {
+        analyticsHelper.logEvent("collection_source_changed", mapOf("source" to source.name))
+        val crashlytics = FirebaseCrashlytics.getInstance()
+        crashlytics.setCustomKey("collection_source", source.name)
+        // Recomputed once per source switch, not per applyFilters() pass, so a stale count from a
+        // previous source never lingers after switching back to COLLECTION.
+        crashlytics.setCustomKey("collection_source_uncached_rows", uncachedRowCountFor(source))
+    }
+
+    private fun uncachedRowCountFor(source: CollectionSource): Int = when (source) {
+        CollectionSource.COLLECTION -> 0
+        CollectionSource.WISHLIST -> _wishlistEntries.value.count { it.card == null }
+        CollectionSource.FOR_TRADE -> _openForTradeEntries.value.count { it.card == null }
+    }
+
+    /**
+     * The tag universe offered by the tag picker — derived from the ACTIVE source's rows, not the
+     * owned collection, so filtering the wishlist never offers a tag no wishlist card carries (nor
+     * hides one only a wishlist card does).
+     */
     fun getAllCollectionTags(): Set<com.mmg.manahub.core.model.CardTag> {
-        return _allCards.value.flatMap { it.card.tags + it.card.userTags }
+        return baseListFor(_uiState.value.collectionSource)
+            .flatMap { it.card.tags + it.card.userTags }
             .distinctBy { it.key }
             .toSet()
     }
@@ -583,7 +669,7 @@ class CollectionViewModel(
 
     private fun applyFilters() {
         val state = _uiState.value
-        var result = _allCards.value
+        var result = baseListFor(state.collectionSource)
 
         // Text search
         if (state.searchQuery.isNotBlank()) {
@@ -595,8 +681,14 @@ class CollectionViewModel(
         // Advanced criteria
         state.activeQuery?.let { query ->
             if (!query.isEmpty()) {
+                // Computed once per pass, not per (card, criterion) pair — avoids an O(cards x
+                // criteria x wishlistSize) linear scan on every applyFilters() call.
+                val wishlistIds = _wishlistEntries.value.mapTo(HashSet()) { it.cardId }
+                val forTradeIds = _openForTradeEntries.value.mapTo(HashSet()) { it.scryfallId }
                 result = result.filter { card ->
-                    query.criteria.all { criterion -> matchesCriterion(card, criterion) }
+                    query.criteria.all { criterion ->
+                        matchesCriterion(card, criterion, wishlistIds, forTradeIds)
+                    }
                 }
             }
         }
@@ -607,22 +699,39 @@ class CollectionViewModel(
 
         // Sort
         val sorted = when (state.sortOrder) {
-            SortOrder.NAME -> grouped.sortedBy { it.card.name }
-            SortOrder.PRICE_DESC -> grouped.sortedWith(compareByDescending<CollectionCardGroup> {
-                it.card.priceUsd ?: 0.0
-            }.thenBy { it.card.name })
-
-            SortOrder.PRICE_ASC -> grouped.sortedWith(compareBy<CollectionCardGroup> {
-                it.card.priceUsd ?: 0.0
-            }.thenBy { it.card.name })
-
-            SortOrder.RARITY -> grouped.sortedWith(compareByDescending<CollectionCardGroup> {
-                rarityWeight(
-                    it.card.rarity
-                )
-            }.thenBy { it.card.name })
-
-            SortOrder.DATE_ADDED -> grouped.sortedWith(compareByDescending<CollectionCardGroup> { it.latestAddedAt }.thenBy { it.card.name })
+            SortOrder.NAME -> {
+                if (state.sortDirection == SortDirection.ASC) grouped.sortedBy { it.card.name }
+                else grouped.sortedByDescending { it.card.name }
+            }
+            SortOrder.PRICE -> {
+                if (state.sortDirection == SortDirection.ASC) {
+                    grouped.sortedWith(compareBy<CollectionCardGroup> {
+                        it.card.priceUsd ?: 0.0
+                    }.thenBy { it.card.name })
+                } else {
+                    grouped.sortedWith(compareByDescending<CollectionCardGroup> {
+                        it.card.priceUsd ?: 0.0
+                    }.thenBy { it.card.name })
+                }
+            }
+            SortOrder.RARITY -> {
+                if (state.sortDirection == SortDirection.ASC) {
+                    grouped.sortedWith(compareBy<CollectionCardGroup> {
+                        rarityWeight(it.card.rarity)
+                    }.thenBy { it.card.name })
+                } else {
+                    grouped.sortedWith(compareByDescending<CollectionCardGroup> {
+                        rarityWeight(it.card.rarity)
+                    }.thenBy { it.card.name })
+                }
+            }
+            SortOrder.DATE_ADDED -> {
+                if (state.sortDirection == SortDirection.ASC) {
+                    grouped.sortedWith(compareBy<CollectionCardGroup> { it.latestAddedAt }.thenBy { it.card.name })
+                } else {
+                    grouped.sortedWith(compareByDescending<CollectionCardGroup> { it.latestAddedAt }.thenBy { it.card.name })
+                }
+            }
         }
 
         val sections = if (state.groupingMode == CollectionGroupingMode.NONE) {
@@ -631,169 +740,91 @@ class CollectionViewModel(
             groupCollection(sorted, state.groupingMode)
         }
 
-        _uiState.update { it.copy(cards = sorted, sections = sections) }
-    }
-
-    private fun matchesCriterion(card: UserCardWithCard, criterion: SearchCriterion): Boolean {
-        return when (criterion) {
-            is SearchCriterion.Name ->
-                if (criterion.exact)
-                    card.card.name.equals(criterion.value, ignoreCase = true)
-                else
-                    card.card.name.contains(criterion.value, ignoreCase = true)
-
-            is SearchCriterion.OracleText ->
-                card.card.oracleText?.contains(criterion.value, ignoreCase = true) == true
-
-            is SearchCriterion.CardType -> {
-                val check: (String) -> Boolean = { type ->
-                    card.card.typeLine.contains(type, ignoreCase = true)
-                }
-                if (criterion.matchAll) criterion.types.all(check)
-                else criterion.types.any(check)
-            }
-
-            is SearchCriterion.CardFunction -> {
-                // Deck Analysis — Category Sections plan, W4. Each selected Scryfall function value
-                // maps to its own hand-curated CardTag key set (CardFunctionOption.collectionTagKeys)
-                // — NOT SectionSearchQuery.collectionTagKeysFor(sectionId), which operates on a
-                // different key space (pillar section ids like "role:removal_spot", not raw function
-                // values like "spot-removal"). See CardFunctionOption's KDoc for the full rationale.
-                // A function with no local tag equivalent (emptySet()) matches nothing locally — it
-                // is Scryfall-search-only, same as curve/mana/legality sections in SectionSearchQuery.
-                val cardTagKeys = card.card.tags.map { it.key }.toSet() + card.card.userTags.map { it.key }
-                val check: (String) -> Boolean = { value ->
-                    val tagKeys = com.mmg.manahub.core.model.CardFunctionOption.allFunctions
-                        .find { it.scryfallValue == value }?.collectionTagKeys ?: emptySet()
-                    tagKeys.isNotEmpty() && tagKeys.any { it in cardTagKeys }
-                }
-                if (criterion.matchAll) criterion.functions.all(check)
-                else criterion.functions.any(check)
-            }
-
-            is SearchCriterion.Colors ->
-                if (criterion.exactly)
-                    card.card.colors.map { it.uppercase() }.toSet() ==
-                            criterion.colors.map { it.uppercase() }.toSet()
-                else
-                    criterion.colors.all { c ->
-                        card.card.colors.any { it.equals(c, ignoreCase = true) }
-                    }
-
-            is SearchCriterion.ColorIdentity ->
-                if (criterion.exactly)
-                    card.card.colorIdentity.map { it.uppercase() }.toSet() ==
-                            criterion.colors.map { it.uppercase() }.toSet()
-                else
-                    criterion.colors.all { c ->
-                        card.card.colorIdentity.any { it.equals(c, ignoreCase = true) }
-                    }
-
-            is SearchCriterion.Rarity ->
-                compareRarity(card.card.rarity, criterion.rarity)
-
-            is SearchCriterion.ManaCost ->
-                compareInt(card.card.cmc.toInt(), criterion.value, criterion.operator)
-
-            is SearchCriterion.Price -> {
-                val price =
-                    if (criterion.currency == "eur") card.card.priceEur else card.card.priceUsd
-                price != null && compareDouble(price, criterion.value, criterion.operator)
-            }
-
-            is SearchCriterion.CardSet ->
-                criterion.setCodes.contains(card.card.setCode.lowercase())
-
-            is SearchCriterion.Power -> {
-                val power = card.card.power?.toIntOrNull() ?: return false
-                compareInt(power, criterion.value, criterion.operator)
-            }
-
-            is SearchCriterion.Toughness -> {
-                val toughness = card.card.toughness?.toIntOrNull() ?: return false
-                compareInt(toughness, criterion.value, criterion.operator)
-            }
-
-            is SearchCriterion.Format ->
-                matchesFormat(card.card, criterion.format, criterion.legal)
-
-
-            // ── Collection-local ──────────────────────────────────────────────
-            is SearchCriterion.CollectionStatus -> {
-                val matchesWishlist = criterion.wishlist && _wishlistCardIds.value.contains(card.userCard.scryfallId)
-                val matchesTrade = criterion.forTrade && card.userCard.isForTrade
-                matchesWishlist || matchesTrade
-            }
-
-            is SearchCriterion.HasTag ->
-                criterion.keys.any { key ->
-                    card.card.tags.any { it.key == key } ||
-                            card.card.userTags.any { it.key == key }
-                }
-
-            else -> true
+        _uiState.update {
+            it.copy(
+                cards = sorted,
+                sections = sections,
+                // Recomputed on every pass, not only on a source switch: the wishlist/trade Room
+                // flows emit again as hydration lands, and a stale count would keep the "still
+                // loading" notice up after the last row became renderable.
+                uncachedSourceRows = uncachedRowCountFor(state.collectionSource),
+            )
         }
     }
 
-    private fun matchesFormat(
-        card: Card,
-        formats: List<String>,
-        legal: Boolean,
-    ): Boolean {
-        if (legal) {
-            for (format in formats) {
-                val isLegal = when (format) {
-                    "standard" -> card.legalityStandard == "legal"
-                    "pioneer" -> card.legalityPioneer == "legal"
-                    "modern" -> card.legalityModern == "legal"
-                    "commander" -> card.legalityCommander == "legal"
-                    else -> false
-                }
-                if (isLegal) return true
+    /**
+     * The rows the Cards tab is filtering, chosen by [CollectionSource].
+     *
+     * [CollectionSource.WISHLIST] / [CollectionSource.FOR_TRADE] project their own table's entries
+     * into synthetic [UserCardWithCard] rows so every downstream stage (text search, criteria,
+     * grouping, sorting, sections) runs unchanged. Those rows are READ-ONLY by construction: their
+     * `UserCard.id` is the wishlist/trade entry's id, not a `user_card_collection` row id, so they
+     * must never reach a collection write. Nothing on this screen mutates a row today (the grid and
+     * list expose only `onCardClick`, which navigates by `scryfallId`) — keep it that way, or gate
+     * the new action on `collectionSource == COLLECTION`.
+     *
+     * An entry whose card is not cached locally cannot be rendered and is skipped; the count is
+     * reported rather than silently swallowed.
+     */
+    private fun baseListFor(source: CollectionSource): List<UserCardWithCard> = when (source) {
+        CollectionSource.COLLECTION -> _allCards.value
+        CollectionSource.WISHLIST -> _wishlistEntries.value.projectToRows { entry ->
+            entry.card?.let { card ->
+                UserCardWithCard(
+                    userCard = UserCard(
+                        id = entry.id,
+                        scryfallId = entry.cardId,
+                        quantity = entry.quantity,
+                        isFoil = entry.isFoil,
+                        condition = entry.condition ?: DEFAULT_CONDITION,
+                        language = entry.language ?: DEFAULT_LANGUAGE,
+                        isForTrade = false,
+                        createdAt = entry.createdAt,
+                        updatedAt = entry.createdAt,
+                    ),
+                    card = card,
+                )
             }
-            return false
-        } else {
-            for (format in formats) {
-                val isNotLegal = when (format) {
-                    "standard" -> card.legalityStandard != "legal"
-                    "pioneer" -> card.legalityPioneer != "legal"
-                    "modern" -> card.legalityModern != "legal"
-                    "commander" -> card.legalityCommander != "legal"
-                    else -> false
-                }
-                if (isNotLegal) return true
+        }
+        CollectionSource.FOR_TRADE -> _openForTradeEntries.value.projectToRows { entry ->
+            entry.card?.let { card ->
+                UserCardWithCard(
+                    userCard = UserCard(
+                        id = entry.id,
+                        scryfallId = entry.scryfallId,
+                        quantity = entry.quantity,
+                        isFoil = entry.isFoil,
+                        condition = entry.condition,
+                        language = entry.language,
+                        isForTrade = true,
+                        createdAt = entry.createdAt,
+                        updatedAt = entry.createdAt,
+                    ),
+                    card = card,
+                )
             }
-            return false
         }
     }
 
-    private fun compareRarity(
-        cardRarity: String,
-        targetRarity: List<String>,
-    ): Boolean {
-        return if (targetRarity.isEmpty() ) true
-        else if (targetRarity.contains(cardRarity.lowercase())) true
-        else false
-    }
+    // Uncached-row count is reported via setCollectionSourceTelemetry (on source switch), not here.
+    private fun <T> List<T>.projectToRows(map: (T) -> UserCardWithCard?): List<UserCardWithCard> =
+        mapNotNull(map)
 
-    private fun compareInt(cardVal: Int, target: Int, op: ComparisonOperator): Boolean = when (op) {
-        ComparisonOperator.EQUAL -> cardVal == target
-        ComparisonOperator.LESS -> cardVal < target
-        ComparisonOperator.LESS_OR_EQUAL -> cardVal <= target
-        ComparisonOperator.GREATER -> cardVal > target
-        ComparisonOperator.GREATER_OR_EQUAL -> cardVal >= target
-        ComparisonOperator.NOT_EQUAL -> cardVal != target
-    }
-
-    private fun compareDouble(cardVal: Double, target: Double, op: ComparisonOperator): Boolean =
-        when (op) {
-            ComparisonOperator.EQUAL -> cardVal == target
-            ComparisonOperator.LESS -> cardVal < target
-            ComparisonOperator.LESS_OR_EQUAL -> cardVal <= target
-            ComparisonOperator.GREATER -> cardVal > target
-            ComparisonOperator.GREATER_OR_EQUAL -> cardVal >= target
-            ComparisonOperator.NOT_EQUAL -> cardVal != target
-        }
+    // Strict mode: an unmatchable facet (a CardFunction with no local CardTag mapping) legitimately
+    // means "no local card qualifies" here, unlike Deck Studio's lenient Collection tab.
+    private fun matchesCriterion(
+        card: UserCardWithCard,
+        criterion: SearchCriterion,
+        wishlistIds: Set<String>,
+        forTradeIds: Set<String>,
+    ): Boolean =
+        AdvancedSearchCardMatcher.matchesCriterion(
+            card = card.card,
+            criterion = criterion,
+            isWishlisted = card.userCard.scryfallId in wishlistIds,
+            // Never `userCard.isForTrade`: that column is never written true anywhere in the app.
+            isForTrade = card.userCard.scryfallId in forTradeIds,
+        )
 
     private fun rarityWeight(rarity: String) = when (rarity.lowercase()) {
         "mythic" -> 4

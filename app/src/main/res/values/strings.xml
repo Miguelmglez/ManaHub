@@ -90,6 +90,19 @@
     <string name="collection_no_results_title">No cards match your search</string>
     <string name="collection_no_results_subtitle">Try a different search term or adjust your filters</string>
     <string name="collection_no_results_action">Clear filters</string>
+    <string name="collection_wishlist_empty_title">Your wishlist is empty</string>
+    <string name="collection_wishlist_empty_subtitle">Cards you mark as wanted show up here.</string>
+    <string name="collection_for_trade_empty_title">No cards marked for trade</string>
+    <string name="collection_for_trade_empty_subtitle">Cards you offer for trade show up here.</string>
+    <string name="collection_source_hydrating_title">Still loading this list</string>
+    <plurals name="collection_source_hydrating_subtitle">
+        <item quantity="one">%1$d card has not finished downloading yet. It will appear here on its own.</item>
+        <item quantity="other">%1$d cards have not finished downloading yet. They will appear here on their own.</item>
+    </plurals>
+    <plurals name="collection_source_hydrating_notice">
+        <item quantity="one">%1$d more card is still downloading</item>
+        <item quantity="other">%1$d more cards are still downloading</item>
+    </plurals>
     <string name="collection_stale_banner">Prices may be outdated. Tap to refresh.</string>
     <string name="collection_sort_date">Date added</string>
     <string name="collection_sort_name">Name</string>
@@ -337,7 +350,7 @@
     <string name="scanner_name_zone_label">CARD NAME</string>
     <string name="scanner_queue_search_placeholder">Filter cards</string>
     <string name="scanner_queue_clear">Clear</string>
-    <string name="scanner_queue_add_all">Add to collection</string>
+    <string name="scanner_queue_add_all">Add all to collection</string>
     <string name="scanner_recently_added">Just now</string>
     <string name="scanner_edit_quantity">Quantity</string>
     <string name="scanner_edit_foil_label">Foil</string>
@@ -2109,7 +2122,6 @@
     <string name="advsearch_section_type">Card type</string>
     <string name="advsearch_type_hint">e.g. Legendary Creature Elf</string>
     <string name="advsearch_section_colors">Colors</string>
-    <string name="advsearch_colors_exact">Exactly these colors</string>
     <string name="advsearch_section_mana">Mana value (CMC)</string>
     <string name="advsearch_section_rarity">Rarity</string>
     <string name="advsearch_section_stats">Power / Toughness</string>
@@ -2229,6 +2241,17 @@
     <string name="advsearch_section_collection_status">Collection status</string>
     <string name="advsearch_filter_wishlist">In wishlist</string>
     <string name="advsearch_filter_for_trade">Marked for trade</string>
+    <string name="advsearch_filter_in_collection">In collection</string>
+    <string name="advsearch_colormatch_label">Color match</string>
+    <string name="advsearch_colormatch_any">Any of these colors (OR)</string>
+    <string name="advsearch_colormatch_any_desc">Cards with at least one of the selected colors</string>
+    <string name="advsearch_colormatch_all">All of these colors (AND)</string>
+    <string name="advsearch_colormatch_all_desc">Cards that contain every selected color</string>
+    <string name="advsearch_colormatch_exactly">Exactly these colors</string>
+    <string name="advsearch_colormatch_exactly_desc">Cards whose colors are exactly the selection</string>
+    <string name="advsearch_colormatch_at_most">At most these colors</string>
+    <string name="advsearch_colormatch_at_most_desc">Cards that fit inside the selection (Commander identity)</string>
+    <string name="advsearch_colormatch_picker_title">Color match</string>
     <string name="advsearch_section_tags">Tags</string>
     <string name="advsearch_tags_hint">Any card or user tag</string>
     <string name="advsearch_section_function">Card function</string>
@@ -2365,6 +2388,9 @@
     <string name="draft_mechanic_key_cards">Key Cards</string>
     <string name="draft_archetype_difficulty">Difficulty: %1$s</string>
     <string name="draft_pick_order_rank">Pick #%1$d</string>
+    <string name="draft_cards_to_avoid_label">Cards to Avoid</string>
+    <string name="draft_archetype_win_rate">%1$.1f%% Win Rate</string>
+    <string name="draft_key_commons_by_color">Key Commons by Color</string>
 
     <!-- Draft Simulator -->
     <string name="draft_sim_setup_title">Draft Simulator</string>

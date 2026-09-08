@@ -109,7 +109,7 @@ class DeckViewModel(
 }
 
 sealed interface DeckListEvent {
-    data class NavigateToDeck(val deckId: String) : DeckListEvent
+    data class NavigateToDeck(val deckId: String, val format: String? = null) : DeckListEvent
 }
 
 data class DeckListUiState(

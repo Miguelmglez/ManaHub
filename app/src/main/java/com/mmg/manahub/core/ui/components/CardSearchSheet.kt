@@ -130,36 +130,32 @@ fun CardSearchSheet(
     showWishlistTab: Boolean = false,
     /**
      * Pre-decomposed structured filters — the Analysis tab's "Browse for &lt;Category&gt;" entry
-     * point (Suggestions Tab UI Polish plan, W11/D8). Supersedes the Category Sections rework's
-     * original `initialScryfallQuery: String?` (deleted — it had exactly one call site, this
-     * same one), which used to dump the FULL curated Scryfall query string into the plain search
-     * bar (`"function:spot-removal id<=WUBRG legal:commander"` visible as raw syntax) — the
-     * user's own words: "esto es un error gravísimo." `null` (default) keeps every existing call
-     * site's behavior unchanged.
-     *
-     * W11 bug-fix pass (2026-08-25): this no longer auto-pops [AdvancedSearchSheet] up on open —
-     * an earlier version of this param did, which just relocated the "raw filters visible where
-     * the user didn't ask for them" problem from the search bar to an uninvited sheet. Instead,
-     * [onAdvancedSearch] is invoked once so the caller can run the ACTUAL search against the
-     * translated filters directly (results already filtered, plain search bar left EMPTY); the
-     * user can still open [AdvancedSearchSheet] manually via the Tune icon, at which point it
-     * shows these SAME filters pre-selected (unchanged — still via [AdvancedSearchSheet]'s own
-     * `initialAdvancedQuery` param / `AdvancedSearchViewModel.seedFrom`).
+     * point. Never rendered into the plain search bar: [onAdvancedSearch] is invoked once so the
+     * caller runs the real search against the translated filters (results already filtered, search
+     * bar left EMPTY). The user can still open [AdvancedSearchSheet] via the Tune icon, where these
+     * same filters show pre-selected. `null` (default) is a no-op.
      */
     initialAdvancedQuery: AdvancedSearchQuery? = null,
     /**
-     * Invoked once when [initialAdvancedQuery] is non-empty (W11 bug-fix pass) — the caller runs
-     * the real search against the translated filters (e.g.
-     * `DeckStudioViewModel::searchScryfallStructured`). No-op default keeps every existing call
-     * site (none of which pass [initialAdvancedQuery] today besides the Analysis tab) unaffected.
+     * Structured-search sink: invoked once for a non-empty [initialAdvancedQuery], and again
+     * whenever the user presses SEARCH CARDS inside [AdvancedSearchSheet]. `null` (default) falls
+     * back to the legacy `onScryfallSearch(rawQuery)` route for callers with no structured
+     * handler (Trades), which writes the raw Scryfall string into the visible search bar.
      */
-    onAdvancedSearch: (AdvancedSearchQuery) -> Unit = {},
+    onAdvancedSearch: ((AdvancedSearchQuery) -> Unit)? = null,
+    /**
+     * The structured query the caller currently has APPLIED (e.g. `DeckStudioUiState
+     * .activeCollectionQuery`), forwarded to [AdvancedSearchSheet] so its shared ViewModel is
+     * re-seeded from live state on every open instead of keeping an invisible filter from an
+     * earlier, unrelated open. Falls back to [initialAdvancedQuery] until the preset's own
+     * [onAdvancedSearch] round-trip lands; `null` on both means nothing is filtered.
+     */
+    appliedAdvancedQuery: AdvancedSearchQuery? = null,
     /**
      * [CardTag][com.mmg.manahub.core.model.CardTag] keys used to pre-filter the Collection tab on
-     * open — the local-collection counterpart to [initialScryfallQuery]. Also selects the
-     * Collection tab. Applying the filter is delegated to [onFilterCollectionByTags] (the sheet
-     * has no direct access to the collection); an empty set (default) keeps every existing call
-     * site's behavior unchanged.
+     * open — a different key space from [initialAdvancedQuery]'s criteria, so both can apply.
+     * Applying the filter is delegated to [onFilterCollectionByTags] (the sheet has no direct
+     * access to the collection); an empty set (default) is a no-op.
      */
     initialCollectionTagKeys: Set<String> = emptySet(),
     /**
@@ -167,6 +163,14 @@ fun CardSearchSheet(
      * for the Collection tab (e.g. `DeckStudioViewModel::searchCollectionByTags`). No-op default.
      */
     onFilterCollectionByTags: (Set<String>) -> Unit = {},
+    /**
+     * Hoisted tab selection. Non-null hands tab ownership to the caller, which is what lets the
+     * selected tab survive this sheet being unmounted and remounted (Deck Studio unmounts it while
+     * navigating to CardDetail). `null` (default) keeps the tab in this sheet's own state, and the
+     * preset effects below then pick the opening tab themselves.
+     */
+    selectedTabIndex: Int? = null,
+    onSelectedTabChange: (Int) -> Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -182,30 +186,30 @@ fun CardSearchSheet(
         confirmValueChange = { it != SheetValue.Hidden }
     )
     
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var internalSelectedTab by remember { mutableIntStateOf(0) }
+    val selectedTab = selectedTabIndex ?: internalSelectedTab
+    val setSelectedTab: (Int) -> Unit = { tab ->
+        internalSelectedTab = tab
+        onSelectedTabChange(tab)
+    }
     var showAdvancedSearch by remember { mutableStateOf(false) }
 
-    // Tab indices shift by one when the Wishlist tab (Trades feature) is present. Computed early
-    // (moved up from their original single call site below) so the preset-entry-point effects
-    // below can reference them.
+    // Tab indices shift by one when the Wishlist tab (Trades feature) is present.
     val scryfallTabIndex = if (showWishlistTab) 2 else 1
     val collectionTabIndex = if (showWishlistTab) 1 else 0
 
-    // W11 bug-fix pass — structured preset entry point (Suggestions Tab UI Polish plan): a caller
-    // (the Analysis tab's "Browse for <Category>" button) opens this sheet with results ALREADY
-    // filtered by the translated criteria and the plain search bar left EMPTY, instead of a raw
-    // string in the search bar (the original bug) or an uninvited AdvancedSearchSheet popping up
-    // on top (this param's own earlier, also-wrong behavior). Runs once per distinct preset value;
-    // `null` (every pre-existing call site) is a no-op.
+    // Structured preset entry point: the caller runs the real, already-filtered search; the plain
+    // search bar stays empty. Tab selection is skipped when the caller hoists it — re-asserting a
+    // preset tab on every remount would undo the tab the user picked before navigating away.
     LaunchedEffect(initialAdvancedQuery) {
         if (initialAdvancedQuery != null && !initialAdvancedQuery.isEmpty()) {
-            selectedTab = scryfallTabIndex
-            onAdvancedSearch(initialAdvancedQuery)
+            if (selectedTabIndex == null) setSelectedTab(scryfallTabIndex)
+            onAdvancedSearch?.invoke(initialAdvancedQuery)
         }
     }
     LaunchedEffect(initialCollectionTagKeys) {
         if (initialCollectionTagKeys.isNotEmpty()) {
-            selectedTab = collectionTabIndex
+            if (selectedTabIndex == null) setSelectedTab(collectionTabIndex)
             onFilterCollectionByTags(initialCollectionTagKeys)
         }
     }
@@ -216,39 +220,44 @@ fun CardSearchSheet(
         title
     }
 
-    val forceHideKeyboard = {
-        // 1. Move focus to the sheet container (stealing it from TextField)
-        sheetFocusRequester.requestFocus()
-        
-        // 2. Direct SoftwareKeyboardController call
+    // Focus-free half of the hide, safe to run while this composable is being torn down.
+    val hideKeyboard = {
         keyboardController?.hide()
-        
-        // 3. Native WindowInsets call (Brute force)
         val activity = view.context.findActivity()
         if (activity != null) {
             WindowInsetsControllerCompat(activity.window, view).hide(WindowInsetsCompat.Type.ime())
         }
-        
-        // 4. FocusManager fallback
         focusManager.clearFocus(force = true)
     }
 
+    val forceHideKeyboard = {
+        // Steals focus from the TextField; only valid while the focusable container is attached.
+        sheetFocusRequester.requestFocus()
+        hideKeyboard()
+    }
+
+    // Must NOT request focus here: Deck Studio unmounts this sheet on every navigate-away, and
+    // FocusRequester.requestFocus() throws once its node is detached.
     DisposableEffect(Unit) {
-        onDispose {
-            forceHideKeyboard()
-        }
+        onDispose { hideKeyboard() }
     }
 
     if (showAdvancedSearch) {
         AdvancedSearchSheet(
             onDismiss = { showAdvancedSearch = false },
-            onSearch = { _, rawQuery ->
+            onSearch = { advancedQuery, rawQuery ->
                 showAdvancedSearch = false
-                selectedTab = scryfallTabIndex
-                onScryfallSearch(rawQuery)
+                if (onAdvancedSearch != null) {
+                    // Structured route: the search bar stays clean and BOTH tabs honor the query,
+                    // so the user's current tab is left alone.
+                    onAdvancedSearch(advancedQuery)
+                } else {
+                    setSelectedTab(scryfallTabIndex)
+                    onScryfallSearch(rawQuery)
+                }
                 forceHideKeyboard()
             },
-            initialAdvancedQuery = initialAdvancedQuery,
+            appliedQuery = appliedAdvancedQuery ?: initialAdvancedQuery,
         )
     }
 
@@ -348,7 +357,7 @@ fun CardSearchSheet(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = {
-                            selectedTab = 0
+                            setSelectedTab(0)
                             forceHideKeyboard()
                         },
                         text = {
@@ -362,9 +371,9 @@ fun CardSearchSheet(
                     )
                 }
                 Tab(
-                    selected = selectedTab == (if (showWishlistTab) 1 else 0),
+                    selected = selectedTab == collectionTabIndex,
                     onClick = {
-                        selectedTab = if (showWishlistTab) 1 else 0
+                        setSelectedTab(collectionTabIndex)
                         forceHideKeyboard()
                     },
                     text = {
@@ -377,9 +386,9 @@ fun CardSearchSheet(
                     }
                 )
                 Tab(
-                    selected = selectedTab == (if (showWishlistTab) 2 else 1),
+                    selected = selectedTab == scryfallTabIndex,
                     onClick = {
-                        selectedTab = if (showWishlistTab) 2 else 1
+                        setSelectedTab(scryfallTabIndex)
                         forceHideKeyboard()
                     },
                     text = {
@@ -569,6 +578,18 @@ fun CardSearchSheet(
  *    not expose a name-color override. The gold background tint + border (still applied via the
  *    outer [Surface], unchanged) plus the star icon on the trailing side keep the commander state
  *    visible.
+ *
+ * Edge-case QA fix (CRITICAL, 2026-09-06): a rewrite of this row on top of [CardRow] dropped the
+ * guard that used to keep the commander's own row read-only from this ordinary Add Cards sheet.
+ * [showLiveControls] restores it: the deck's CURRENT commander must never expose live +/-
+ * controls here — tapping "-" would delete the singleton commander slot outright
+ * ([DeckStudioViewModel.removeCardFromDeck]'s `currentQty <= 1` branch), tapping "+" would
+ * duplicate it. It renders read-only (the [Icons.Default.Star] badge below is the only affordance)
+ * whenever [isCurrentCommander] is true outside commander-picker mode. Inside commander-picker
+ * mode ([isCommanderMode]), EVERY row goes control-less too — a card already in the mainboard used
+ * to show a live-looking "-"/quantity pair wired to a no-op [onRemove] (confusing dead UI); picking
+ * a commander is "tap the row" only (`onClick` here navigates to the inline detail sheet with the
+ * "Choose as commander" CTA, C3), never a +/- affordance.
  */
 private fun AddCardSheetRow(
     row: AddCardRow,
@@ -582,6 +603,7 @@ private fun AddCardSheetRow(
 ) {
     val mc = MaterialTheme.magicColors
     val card = row.card
+    val showLiveControls = !isCommanderMode && !isCurrentCommander
 
     Box {
         CardRow(
@@ -591,14 +613,18 @@ private fun AddCardSheetRow(
                 onInteraction()
                 onClick()
             },
-            onRemove = {
-                onInteraction()
-                onRemove()
-            },
-            onAdd = {
-                onInteraction()
-                onAdd()
-            },
+            onRemove = if (showLiveControls) {
+                {
+                    onInteraction()
+                    onRemove()
+                }
+            } else null,
+            onAdd = if (showLiveControls) {
+                {
+                    onInteraction()
+                    onAdd()
+                }
+            } else null,
             quantity = row.quantityInDeck,
             selected = isCurrentCommander,
             extraSupportingContent = {

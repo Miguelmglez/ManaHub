@@ -13,6 +13,11 @@ package com.mmg.manahub.core.model
  * @property keyGameplayNotes General gameplay tips for this format.
  * @property mechanics List of mechanics present in the set.
  * @property archetypes List of two-color archetypes, grouped by tier.
+ * @property keyCommonsByColor Best commons grouped by color label (e.g. "{W} White"), schema v2.
+ *   Has been emitted in the JSON for a long time but was never modelled until now, so v1 guides
+ *   silently carried this data without the app ever showing it. Empty map when unavailable.
+ * @property formatSpeed Overall format speed descriptor (e.g. "Fast", "Slow/Grindy"), schema v2,
+ *   from `set_overview.format_speed`. Empty when unavailable.
  */
 data class SetDraftGuide(
     val setCode: String,
@@ -24,6 +29,8 @@ data class SetDraftGuide(
     val keyGameplayNotes: List<String>,
     val mechanics: List<MechanicGuide>,
     val archetypes: List<ArchetypeGuide>,
+    val keyCommonsByColor: Map<String, List<ArchetypeKeyCard>> = emptyMap(),
+    val formatSpeed: String = "",
 )
 
 /**
@@ -56,6 +63,11 @@ data class MechanicGuide(
  * @property rarity Card rarity string.
  * @property colors List of color identity letters (e.g. ["B"]).
  * @property typeLine Card type line.
+ * @property manaCost Mana cost string (e.g. "{2}{U}{U}"), schema v2. Empty when unavailable.
+ * @property cmc Converted mana cost, schema v2. Null when unavailable.
+ * @property colorIdentity Color identity letters, schema v2. Empty when unavailable.
+ * @property sourceSet Scryfall set code this card was sourced from, schema v2. Empty when unavailable.
+ * @property stats Aggregate 17Lands performance stats, schema v2. Null when unavailable.
  */
 data class MechanicKeyCard(
     val name: String,
@@ -69,6 +81,11 @@ data class MechanicKeyCard(
     val rarity: String = "",
     val colors: List<String> = emptyList(),
     val typeLine: String = "",
+    val manaCost: String = "",
+    val cmc: Double? = null,
+    val colorIdentity: List<String> = emptyList(),
+    val sourceSet: String = "",
+    val stats: DraftCardStats? = null,
 )
 
 /**
@@ -94,6 +111,15 @@ data class MechanicExamples(
  * @property strategy Detailed description of the archetype's game plan.
  * @property difficulty Draft difficulty rating (e.g. "Medium").
  * @property keyCards Key cards for the archetype with full image data.
+ * @property colorLetters Color letters for this archetype (e.g. ["B", "G"]), schema v2. Preferred
+ *   over parsing [colors] when non-empty; callers should fall back to parsing [colors] for v1 guides.
+ * @property signpostCards Signpost/build-around cards for this archetype, schema v2. Empty when
+ *   unavailable.
+ * @property cardsToAvoid Cards that underperform in this archetype, schema v2. Empty when unavailable.
+ * @property archetypeWinRate Aggregate 17Lands win rate for this archetype (0.0-1.0), schema v2.
+ *   Null when unavailable.
+ * @property archetypeGames Sample size backing [archetypeWinRate], schema v2. Null when unavailable.
+ * @property notes Additional freeform notes about this archetype, schema v2. Empty when unavailable.
  */
 data class ArchetypeGuide(
     val colors: String,
@@ -102,10 +128,17 @@ data class ArchetypeGuide(
     val strategy: String,
     val difficulty: String,
     val keyCards: List<ArchetypeKeyCard>,
+    val colorLetters: List<String> = emptyList(),
+    val signpostCards: List<ArchetypeKeyCard> = emptyList(),
+    val cardsToAvoid: List<ArchetypeKeyCard> = emptyList(),
+    val archetypeWinRate: Double? = null,
+    val archetypeGames: Int? = null,
+    val notes: String = "",
 )
 
 /**
- * A key card within an archetype, carrying direct image URLs from the JSON.
+ * A card object within a guide's archetype section (key cards, signpost cards, cards to avoid) or
+ * the guide root's key-commons-by-color map, carrying direct image URLs from the JSON.
  * No Scryfall API call required to display art crops.
  *
  * @property name Card name.
@@ -115,6 +148,13 @@ data class ArchetypeGuide(
  * @property artCropUri Direct CDN URL for the art crop image.
  * @property imageNormalUri Direct CDN URL for the full card image.
  * @property rarity Card rarity string (lowercase).
+ * @property manaCost Mana cost string (e.g. "{2}{U}{U}"), schema v2. Empty when unavailable.
+ * @property cmc Converted mana cost, schema v2. Null when unavailable.
+ * @property colorIdentity Color identity letters, schema v2. Empty when unavailable.
+ * @property sourceSet Scryfall set code this card was sourced from, schema v2. Empty when unavailable.
+ * @property tierRating Tier rating string, schema v2. Empty when unavailable.
+ * @property pickOrderRank Numeric pick-order position, schema v2. 0 when absent.
+ * @property stats Aggregate 17Lands performance stats, schema v2. Null when unavailable.
  */
 data class ArchetypeKeyCard(
     val name: String,
@@ -124,4 +164,11 @@ data class ArchetypeKeyCard(
     val artCropUri: String,
     val imageNormalUri: String,
     val rarity: String,
+    val manaCost: String = "",
+    val cmc: Double? = null,
+    val colorIdentity: List<String> = emptyList(),
+    val sourceSet: String = "",
+    val tierRating: String = "",
+    val pickOrderRank: Int = 0,
+    val stats: DraftCardStats? = null,
 )

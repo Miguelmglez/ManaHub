@@ -4,7 +4,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.CollectionGroupingMode
+import com.mmg.manahub.core.model.CollectionSource
+import com.mmg.manahub.core.model.ColorMatchMode
+import com.mmg.manahub.core.model.OpenForTradeEntry
+import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.model.ComparisonOperator
 import com.mmg.manahub.core.model.SearchCriterion
@@ -19,6 +24,7 @@ import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.collection.presentation.CollectionViewModel
+import com.mmg.manahub.feature.collection.presentation.SortDirection
 import com.mmg.manahub.feature.collection.presentation.SortOrder
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
@@ -152,12 +158,15 @@ class CollectionViewModelTest {
     private fun buildViewModel(
         entries: List<UserCardWithCard> = emptyList(),
         overrideCollection: Boolean = true,
+        wishlist: List<WishlistEntry> = emptyList(),
+        openForTrade: List<OpenForTradeEntry> = emptyList(),
     ): CollectionViewModel {
         if (overrideCollection) every { getCollection() } returns flowOf(entries)
         coEvery { authRepository.getCurrentUser() } returns null
         every { authRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
         every { syncManager.syncState } returns MutableStateFlow(SyncState.IDLE)
-        every { getLocalWishlist() } returns flowOf(emptyList())
+        every { getLocalWishlist() } returns flowOf(wishlist)
+        every { openForTradeRepository.observeLocal() } returns flowOf(openForTrade)
         coEvery { migrateLocalTradeLists(any()) } returns Result.success(0)
 
         return CollectionViewModel(
@@ -402,7 +411,8 @@ class CollectionViewModelTest {
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
 
-        viewModel.onSortChange(SortOrder.PRICE_DESC)
+        viewModel.onSortChange(SortOrder.PRICE)
+        viewModel.onSortDirectionChange(SortDirection.DESC)
         advanceUntilIdle()
 
         val names = viewModel.uiState.value.cards.map { it.card.name }
@@ -419,7 +429,8 @@ class CollectionViewModelTest {
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
 
-        viewModel.onSortChange(SortOrder.PRICE_ASC)
+        viewModel.onSortChange(SortOrder.PRICE)
+        viewModel.onSortDirectionChange(SortDirection.ASC)
         advanceUntilIdle()
 
         assertEquals("Cheap", viewModel.uiState.value.cards.first().card.name)
@@ -547,7 +558,7 @@ class CollectionViewModelTest {
         advanceUntilIdle()
 
         val query = AdvancedSearchQuery(
-            criteria = listOf(SearchCriterion.Colors(setOf("R"), exactly = false))
+            criteria = listOf(SearchCriterion.Colors(setOf("R"), ColorMatchMode.AT_LEAST))
         )
         viewModel.applyAdvancedFilters(query)
         advanceUntilIdle()
@@ -664,24 +675,105 @@ class CollectionViewModelTest {
     }
 
     @Test
-    fun `given CollectionStatus forTrade criterion when applyAdvancedFilters then only trade cards are shown`() = runTest {
-        val entries = listOf(
-            buildEntry(scryfallId = "id-001", name = "For Trade",  isForTrade = true),
-            buildEntry(scryfallId = "id-002", name = "Not Trade",  isForTrade = false),
+    fun `given FOR_TRADE source when applyAdvancedFilters then the open-for-trade list is shown`() = runTest {
+        // The owned collection deliberately holds a DIFFERENT card: FOR_TRADE is a source, not an
+        // intersection, so what the user owns must not narrow it.
+        val entries = listOf(buildEntry(scryfallId = "owned-1", name = "Owned Only"))
+        viewModel = buildViewModel(
+            entries = entries,
+            openForTrade = listOf(buildOpenForTradeEntry(scryfallId = "trade-1", name = "Marked For Trade")),
         )
-        viewModel = buildViewModel(entries)
         advanceUntilIdle()
 
-        // SearchCriterion.IsForTrade was folded into the combined local-only
-        // SearchCriterion.CollectionStatus(wishlist, forTrade) criterion.
-        val query = AdvancedSearchQuery(
-            criteria = listOf(SearchCriterion.CollectionStatus(wishlist = false, forTrade = true))
-        )
-        viewModel.applyAdvancedFilters(query)
+        viewModel.applyAdvancedFilters(collectionSourceQuery(CollectionSource.FOR_TRADE))
         advanceUntilIdle()
 
         assertEquals(1, viewModel.uiState.value.cards.size)
-        assertEquals("For Trade", viewModel.uiState.value.cards.first().card.name)
+        assertEquals("Marked For Trade", viewModel.uiState.value.cards.first().card.name)
+        assertEquals(CollectionSource.FOR_TRADE, viewModel.uiState.value.collectionSource)
+    }
+
+    @Test
+    fun `given FOR_TRADE source then the result does not depend on UserCard isForTrade`() = runTest {
+        // Regression guard: `UserCard.isForTrade` is never written true anywhere in the app, so a
+        // filter reading it returned nothing. The local_open_for_trade table is the only source.
+        val entries = listOf(
+            buildEntry(scryfallId = "id-001", name = "Flagged But Not Listed", isForTrade = true),
+        )
+        viewModel = buildViewModel(entries = entries, openForTrade = emptyList())
+        advanceUntilIdle()
+
+        viewModel.applyAdvancedFilters(collectionSourceQuery(CollectionSource.FOR_TRADE))
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.cards.isEmpty())
+    }
+
+    @Test
+    fun `given WISHLIST source then wishlisted cards are shown even when not owned`() = runTest {
+        viewModel = buildViewModel(
+            entries = listOf(buildEntry(scryfallId = "owned-1", name = "Owned Only")),
+            wishlist = listOf(buildWishlistEntry(cardId = "want-1", name = "Wanted Not Owned")),
+        )
+        advanceUntilIdle()
+
+        viewModel.applyAdvancedFilters(collectionSourceQuery(CollectionSource.WISHLIST))
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.cards.size)
+        assertEquals("Wanted Not Owned", viewModel.uiState.value.cards.first().card.name)
+    }
+
+    @Test
+    fun `given a wishlist entry with no cached card then it is skipped instead of crashing`() = runTest {
+        viewModel = buildViewModel(
+            wishlist = listOf(
+                buildWishlistEntry(cardId = "want-1", name = "Cached"),
+                buildWishlistEntry(cardId = "want-2", name = "Uncached").copy(card = null),
+            ),
+        )
+        advanceUntilIdle()
+
+        viewModel.applyAdvancedFilters(collectionSourceQuery(CollectionSource.WISHLIST))
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.cards.size)
+        assertEquals("Cached", viewModel.uiState.value.cards.first().card.name)
+    }
+
+    @Test
+    fun `given no CollectionStatus criterion then the owned collection stays the source`() = runTest {
+        viewModel = buildViewModel(
+            entries = listOf(buildEntry(scryfallId = "owned-1", name = "Owned Only")),
+            wishlist = listOf(buildWishlistEntry(cardId = "want-1", name = "Wanted Not Owned")),
+        )
+        advanceUntilIdle()
+
+        viewModel.applyAdvancedFilters(
+            AdvancedSearchQuery(criteria = listOf(SearchCriterion.Format(listOf("modern"), legal = true)))
+        )
+        advanceUntilIdle()
+
+        assertEquals(CollectionSource.COLLECTION, viewModel.uiState.value.collectionSource)
+        assertEquals(1, viewModel.uiState.value.cards.size)
+        assertEquals("Owned Only", viewModel.uiState.value.cards.first().card.name)
+    }
+
+    @Test
+    fun `given a non-default source when clearAdvancedFilters then it returns to the collection`() = runTest {
+        viewModel = buildViewModel(
+            entries = listOf(buildEntry(scryfallId = "owned-1", name = "Owned Only")),
+            wishlist = listOf(buildWishlistEntry(cardId = "want-1", name = "Wanted Not Owned")),
+        )
+        advanceUntilIdle()
+        viewModel.applyAdvancedFilters(collectionSourceQuery(CollectionSource.WISHLIST))
+        advanceUntilIdle()
+
+        viewModel.clearAdvancedFilters()
+        advanceUntilIdle()
+
+        assertEquals(CollectionSource.COLLECTION, viewModel.uiState.value.collectionSource)
+        assertEquals("Owned Only", viewModel.uiState.value.cards.first().card.name)
     }
 
     @Test
@@ -731,6 +823,13 @@ class CollectionViewModelTest {
     // ends in `else -> true`, so a missing/short-circuited SearchCriterion.CardFunction branch would
     // silently match every card with zero compile error. These tests fail if that branch is removed
     // or stops actually filtering.
+    //
+    // 2026-09-07: OracleTerms and ManaProduction were BOTH sitting on that fallthrough and are now
+    // really evaluated (see AdvancedSearchCardMatcherTest for their semantics); the two guard tests
+    // at the end of this section pin them from the Collection screen's STRICT side, since that is
+    // where the fallthrough was silently showing the whole collection. The criteria still on
+    // `else -> true` are exactly Loyalty, Language, Artist and FlavorText — no cached field exists
+    // for any of them. If a criterion is ever added to that list, add a guard test here too.
 
     @Test
     fun `given CardFunction criterion when applyAdvancedFilters then only cards with a matching tag pass`() = runTest {
@@ -837,6 +936,73 @@ class CollectionViewModelTest {
         advanceUntilIdle()
 
         assertEquals(0, viewModel.uiState.value.cards.size)
+    }
+
+    @Test
+    fun `given OracleTerms criterion when applyAdvancedFilters then only cards whose oracle text matches pass`() = runTest {
+        // Backs every dictionary-translated role section and every fingerprint: theme section.
+        // Until 2026-09-07 this criterion fell through to `else -> true` and showed the WHOLE
+        // collection on the Collection tab of those sections.
+        val entries = listOf(
+            buildEntry(
+                scryfallId = "id-001", name = "Ashnods Altar", typeLine = "Artifact",
+                oracleText = "Sacrifice a creature: Add {C}{C}.",
+            ),
+            buildEntry(
+                scryfallId = "id-002", name = "Lightning Bolt", typeLine = "Instant",
+                oracleText = "Lightning Bolt deals 3 damage to any target.",
+            ),
+        )
+        viewModel = buildViewModel(entries)
+        advanceUntilIdle()
+
+        val query = AdvancedSearchQuery(
+            criteria = listOf(SearchCriterion.OracleTerms(allOf = listOf("sacrifice a creature")))
+        )
+        viewModel.applyAdvancedFilters(query)
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.cards.size)
+        assertEquals("Ashnods Altar", viewModel.uiState.value.cards.first().card.name)
+    }
+
+    @Test
+    fun `given ManaProduction criterion when applyAdvancedFilters then only matching mana sources pass`() = runTest {
+        // Backs the Mana Base produces:W-G sections and mana_fix. Same `else -> true` history.
+        val dualLand = TestFixtures.buildCard(scryfallId = "id-001", name = "Hinterland Harbor")
+            .copy(typeLine = "Land", producedMana = "UG")
+        val bolt = TestFixtures.buildCard(scryfallId = "id-002", name = "Lightning Bolt")
+            .copy(typeLine = "Instant", producedMana = "")
+        viewModel = buildViewModel(listOf(buildEntryWithCard(dualLand), buildEntryWithCard(bolt)))
+        advanceUntilIdle()
+
+        val query = AdvancedSearchQuery(
+            criteria = listOf(SearchCriterion.ManaProduction(colors = setOf("G"), requireLand = true))
+        )
+        viewModel.applyAdvancedFilters(query)
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.cards.size)
+        assertEquals("Hinterland Harbor", viewModel.uiState.value.cards.first().card.name)
+    }
+
+    @Test
+    fun `given a criterion with no cached field at all when applyAdvancedFilters then it stays a non-constraint`() = runTest {
+        // The remaining `else -> true` set is exactly Loyalty, Language, Artist and FlavorText.
+        // This pins that they are still a deliberate no-op rather than a forgotten branch -- if one
+        // of them gains a cached field, this test should be replaced by a real filtering assertion.
+        val entries = listOf(
+            buildEntry(scryfallId = "id-001", name = "Lightning Bolt"),
+            buildEntry(scryfallId = "id-002", name = "Counterspell"),
+        )
+        viewModel = buildViewModel(entries)
+        advanceUntilIdle()
+
+        val query = AdvancedSearchQuery(criteria = listOf(SearchCriterion.Artist("Christopher Rush")))
+        viewModel.applyAdvancedFilters(query)
+        advanceUntilIdle()
+
+        assertEquals(2, viewModel.uiState.value.cards.size)
     }
 
     @Test
@@ -1159,5 +1325,117 @@ class CollectionViewModelTest {
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value.sections.isEmpty())
     }
-}
 
+    @Test
+    fun `given an applied FOR_TRADE status when setCollectionSource to WISHLIST then exactly one CollectionStatus remains`() = runTest {
+        // The two must never coexist: they are mutually exclusive SOURCES, and an ANDed pair would
+        // filter the wishlist down to whatever is also open for trade — silently, with no UI for it.
+        viewModel = buildViewModel(
+            entries = listOf(buildEntry(scryfallId = "owned-1", name = "Owned Only")),
+            wishlist = listOf(buildWishlistEntry(cardId = "want-1", name = "Wanted Not Owned")),
+            openForTrade = listOf(buildOpenForTradeEntry(scryfallId = "trade-1", name = "Marked For Trade")),
+        )
+        advanceUntilIdle()
+        viewModel.applyAdvancedFilters(collectionSourceQuery(CollectionSource.FOR_TRADE))
+        advanceUntilIdle()
+
+        viewModel.setCollectionSource(CollectionSource.WISHLIST)
+        advanceUntilIdle()
+
+        val statuses = viewModel.uiState.value.activeQuery?.criteria
+            ?.filterIsInstance<SearchCriterion.CollectionStatus>()
+            .orEmpty()
+        assertEquals(1, statuses.size)
+        assertEquals(CollectionSource.WISHLIST, statuses.first().source)
+        assertEquals(CollectionSource.WISHLIST, viewModel.uiState.value.collectionSource)
+        assertEquals(1, viewModel.uiState.value.cards.size)
+        assertEquals("Wanted Not Owned", viewModel.uiState.value.cards.first().card.name)
+    }
+
+    @Test
+    fun `given uncached rows in the active source then the count is reported instead of the list looking empty`() = runTest {
+        // ADR-008 shape: a row whose card is not cached yet cannot be rendered, so "empty" would be
+        // a lie. The screen reads this count to say "still loading" instead.
+        viewModel = buildViewModel(
+            wishlist = listOf(
+                buildWishlistEntry(cardId = "want-1", name = "Uncached A").copy(card = null),
+                buildWishlistEntry(cardId = "want-2", name = "Uncached B").copy(card = null),
+            ),
+        )
+        advanceUntilIdle()
+
+        viewModel.applyAdvancedFilters(collectionSourceQuery(CollectionSource.WISHLIST))
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.cards.isEmpty())
+        assertEquals(2, viewModel.uiState.value.uncachedSourceRows)
+    }
+
+    @Test
+    fun `given the owned collection is the source then no uncached rows are reported`() = runTest {
+        viewModel = buildViewModel(
+            entries = listOf(buildEntry(scryfallId = "owned-1", name = "Owned Only")),
+            wishlist = listOf(buildWishlistEntry(cardId = "want-1", name = "Uncached").copy(card = null)),
+        )
+        advanceUntilIdle()
+
+        assertEquals(0, viewModel.uiState.value.uncachedSourceRows)
+    }
+
+    @Test
+    fun `given a non-default source then the tag picker offers that source's tags, not the owned collection's`() = runTest {
+        viewModel = buildViewModel(
+            entries = listOf(buildEntry(scryfallId = "owned-1", name = "Owned Only", tags = listOf(CardTag.RAMP))),
+            wishlist = listOf(buildWishlistEntry(cardId = "want-1", name = "Wanted", tags = listOf(CardTag.DRAW_ENGINE))),
+        )
+        advanceUntilIdle()
+
+        assertEquals(setOf(CardTag.RAMP), viewModel.getAllCollectionTags())
+
+        viewModel.setCollectionSource(CollectionSource.WISHLIST)
+        advanceUntilIdle()
+
+        assertEquals(setOf(CardTag.DRAW_ENGINE), viewModel.getAllCollectionTags())
+    }
+
+    // ── Collection-source helpers ─────────────────────────
+
+    private fun collectionSourceQuery(source: CollectionSource) = AdvancedSearchQuery(
+        criteria = listOf(SearchCriterion.CollectionStatus(source))
+    )
+
+    private fun buildWishlistEntry(
+        cardId: String,
+        name: String,
+        id: String = "wish-$cardId",
+        tags: List<CardTag> = emptyList(),
+    ) = WishlistEntry(
+        id = id,
+        userId = "user-1",
+        cardId = cardId,
+        quantity = 1,
+        matchAnyVariant = true,
+        isFoil = false,
+        condition = null,
+        language = null,
+        createdAt = 1_000L,
+        card = TestFixtures.buildCard(scryfallId = cardId, name = name, tags = tags),
+    )
+
+    private fun buildOpenForTradeEntry(
+        scryfallId: String,
+        name: String,
+        id: String = "trade-$scryfallId",
+    ) = OpenForTradeEntry(
+        id = id,
+        userId = "user-1",
+        userCardId = "uc-$scryfallId",
+        scryfallId = scryfallId,
+        quantity = 1,
+        isFoil = false,
+        condition = "NM",
+        language = "en",
+        createdAt = 1_000L,
+        card = TestFixtures.buildCard(scryfallId = scryfallId, name = name),
+    )
+}

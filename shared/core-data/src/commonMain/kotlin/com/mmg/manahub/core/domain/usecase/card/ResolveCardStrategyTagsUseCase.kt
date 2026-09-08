@@ -52,11 +52,34 @@ class ResolveCardStrategyTagsUseCase(
         autoThreshold: Float = SuggestTagsUseCase.DEFAULT_AUTO_THRESHOLD,
         suggestThreshold: Float = SuggestTagsUseCase.DEFAULT_SUGGEST_THRESHOLD,
     ): ComputeCardTagsUseCase.Result {
-        if (card.oracleId.isNotBlank()) {
-            val remote = runCatching { cardStrategyTagsRepository.getStrategyTags(card.oracleId) }.getOrNull()
-            if (remote is CardStrategyTagsResult.Found) {
-                return remote.toResolvedResult(existingTagsJson)
-            }
+        val remote = if (card.oracleId.isNotBlank()) {
+            runCatching { cardStrategyTagsRepository.getStrategyTags(card.oracleId) }.getOrNull()
+        } else {
+            null
+        }
+        return resolveWithPrefetched(card, existingTagsJson, remote, autoThreshold, suggestThreshold)
+    }
+
+    /**
+     * Bulk-hydration entry point (2026-09-07): the same resolution as [invoke], but for a
+     * [prefetched] lookup the caller ALREADY performed — via
+     * [CardStrategyTagsRepository.getStrategyTagsBatch], one batched request for a whole page of
+     * cards. Passing the known outcome in is what keeps a bulk pass at ~13 requests instead of
+     * re-asking the repository per card (ADR-005), while the hit/miss semantics — including the
+     * user-confirmed-tag union on a hit — stay literally the same code as the single-card path.
+     *
+     * A null [prefetched] means "not looked up" and is treated exactly like a miss (the on-device
+     * fallback runs); it never triggers a second repository read.
+     */
+    suspend fun resolveWithPrefetched(
+        card: Card,
+        existingTagsJson: String?,
+        prefetched: CardStrategyTagsResult?,
+        autoThreshold: Float = SuggestTagsUseCase.DEFAULT_AUTO_THRESHOLD,
+        suggestThreshold: Float = SuggestTagsUseCase.DEFAULT_SUGGEST_THRESHOLD,
+    ): ComputeCardTagsUseCase.Result {
+        if (prefetched is CardStrategyTagsResult.Found) {
+            return prefetched.toResolvedResult(existingTagsJson)
         }
 
         // Genuine miss (or blank oracleId, which can never have a precomputed row): fall back to

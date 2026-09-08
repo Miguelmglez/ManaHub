@@ -2,8 +2,13 @@ package com.mmg.manahub.core.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -14,17 +19,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import kotlin.math.pow
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -49,7 +59,7 @@ private const val CHIP_MIN_TEXT_CONTRAST = 4.5f
  * here either: reusing a WUBRG pip color for a tag category would misread as a color-identity
  * claim on the card, unrelated to what the tag means.
  */
-private fun TagCategory.accentToken(mc: MagicColors): Color? = when (this) {
+internal fun TagCategory.accentToken(mc: MagicColors): Color? = when (this) {
     TagCategory.ARCHETYPE -> mc.primaryAccent
     TagCategory.STRATEGY  -> mc.secondaryAccent
     TagCategory.ROLE      -> mc.goldMtg
@@ -170,6 +180,100 @@ fun CardTagChip(
                 )
             }
             trailing?.invoke()
+        }
+    }
+}
+
+/**
+ * A layout that groups [tags] by their [TagCategory], rendering each group with a category
+ * header (color-coded to match the chips) and a [FlowRow] of chips.
+ *
+ * This component flows the categories themselves horizontally to save vertical space. If a
+ * category has few tags, the next category will attempt to sit beside it.
+ *
+ * @param tags       The list of tags to display.
+ * @param modifier   Modifier for the root [FlowRow].
+ * @param tagLabel   Lambda to resolve the display label for a tag. This allows the component to
+ *                   stay platform-agnostic while still using Android-specific localization
+ *                   at the call site (e.g. `tag.label()` on Android vs `tag.displayLabel` on Web).
+ * @param onTagClick Optional tap handler for the individual chips.
+ * @param onTagRemove Optional removal handler.
+ * @param removeContentDescription Optional content description for the removal icon.
+ * @param tagTrailing Optional extra trailing content per tag.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun CardTagGroup(
+    tags: List<CardTag>,
+    modifier: Modifier = Modifier,
+    tagLabel: (CardTag) -> String = { it.displayLabel },
+    onTagClick: ((CardTag) -> Unit)? = null,
+    onTagRemove: ((CardTag) -> Unit)? = null,
+    removeContentDescription: @Composable (CardTag) -> String? = { null },
+    tagTrailing: @Composable (CardTag) -> Unit = {},
+) {
+    if (tags.isEmpty()) return
+
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    val groupedTags = remember(tags) {
+        tags.groupBy { it.category }
+            .entries
+            .sortedBy { it.key.ordinal }
+    }
+
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(spacing.lg), // Large gap between categories
+        verticalArrangement = Arrangement.spacedBy(spacing.md)
+    ) {
+        groupedTags.forEach { entry ->
+            val category = entry.key
+            val categoryTags = entry.value
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(spacing.xxs),
+                modifier = Modifier.padding(bottom = 2.dp)
+            ) {
+                // Category Header
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                    modifier = Modifier.padding(bottom = 2.dp)
+                ) {
+                    val accent = category.accentToken(mc) ?: mc.textDisabled
+                    Surface(
+                        modifier = Modifier.size(width = 3.dp, height = 10.dp),
+                        shape = ChipShape,
+                        color = accent
+                    ) {}
+                    Text(
+                        text = category.displayLabel.uppercase(),
+                        style = ty.labelSmall,
+                        color = mc.textSecondary,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(spacing.xs),
+                ) {
+                    categoryTags.forEach { tag ->
+                        CardTagChip(
+                            label = tagLabel(tag),
+                            category = tag.category,
+                            onClick = onTagClick?.let { { it(tag) } },
+                            onRemove = onTagRemove?.let { { it(tag) } },
+                            removeContentDescription = removeContentDescription(tag),
+                            trailing = { tagTrailing(tag) }
+                        )
+                    }
+                }
+            }
         }
     }
 }

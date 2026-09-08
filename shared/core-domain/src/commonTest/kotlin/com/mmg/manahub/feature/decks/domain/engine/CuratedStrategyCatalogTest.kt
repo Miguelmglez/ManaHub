@@ -211,6 +211,63 @@ class CuratedStrategyCatalogTest {
         assertEquals("big_mana", assertNotNull(withPosture).id)
     }
 
+    // ── Wave 2 future-debt closeout (2026-09-06): MODERN/PIONEER/LEGACY/VINTAGE/PAUPER now share
+    //    COMMANDER_CASUAL_SIXTY's widened availability with STANDARD (same set, see
+    //    CuratedStrategyCatalog's COMMANDER_CASUAL_SIXTY KDoc) -- these tests prove nearestFor
+    //    ACTUALLY resolves non-null for a representative sample of archetype/theme/posture
+    //    combinations under each new format (closing the gap this file's own header describes: a
+    //    Modern/Pioneer/Legacy/Vintage/Pauper deck got ZERO curated candidates before this pass). ──
+
+    @Test
+    fun `nearestFor round-trips every STANDARD-available entry under each of the 5 new 60-card formats`() {
+        val newFormats = listOf(DeckFormat.MODERN, DeckFormat.PIONEER, DeckFormat.LEGACY, DeckFormat.VINTAGE, DeckFormat.PAUPER)
+        // Sampled via STANDARD membership: COMMANDER_CASUAL_SIXTY's widened definition means
+        // "available in Standard" and "available in all 5 new formats" are the exact same set today.
+        val sixtyEntries = CuratedStrategyCatalog.ALL.filter { DeckFormat.STANDARD in it.formats }
+        assertTrue(sixtyEntries.size >= 15, "Expected at least the 15 COMMANDER_CASUAL_SIXTY entries (+ storm), found only ${sixtyEntries.size}")
+
+        newFormats.forEach { format ->
+            sixtyEntries.forEach { strategy ->
+                // Sample ONE compatible archetype + this entry's OWN themes/posture -- for every
+                // entry in this list that combination is unique in the catalog (verified when this
+                // test was authored: pure archetypes win ties by declaration order, themed entries
+                // have a theme no sibling entry shares, and posture-carrying entries are
+                // disambiguated by passing their own posture), so the round-trip is a real identity
+                // check, not a coincidental match onto some OTHER entry.
+                val archetype = strategy.archetypes.first()
+                val posture = strategy.postures.firstOrNull()
+                val result = CuratedStrategyCatalog.nearestFor(archetype, strategy.themes, format, posture)
+                assertNotNull(
+                    result,
+                    "nearestFor($archetype, themes=${strategy.themes}, $format, posture=$posture) resolved null " +
+                        "-- entry '${strategy.id}' should be available",
+                )
+                assertEquals(
+                    strategy.id, result.id,
+                    "nearestFor($archetype, themes=${strategy.themes}, $format, posture=$posture) resolved " +
+                        "'${result.id}', expected '${strategy.id}'",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `PRISON has no curated entry and COMBO falls back to big_mana under the 5 new formats too (unchanged scope)`() {
+        val newFormats = listOf(DeckFormat.MODERN, DeckFormat.PIONEER, DeckFormat.LEGACY, DeckFormat.VINTAGE, DeckFormat.PAUPER)
+        newFormats.forEach { format ->
+            // PRISON has no COMMANDER_CASUAL_SIXTY entry at all -- mirrors STANDARD's own
+            // pre-existing exclusion (the "prison" entry stays COMMANDER_CASUAL-only, unchanged by
+            // this task's scope) -- no catalog entry resolves for it in any of the 5 new formats.
+            assertNull(CuratedStrategyCatalog.nearestFor(ArchetypeId.PRISON, emptyList(), format))
+            // The dedicated "combo" entry is COMMANDER_CASUAL-only (also unchanged), but
+            // nearestFor's own fallback chain still resolves COMBO+[] onto "big_mana" (COMBO is one
+            // of its 3 compatible archetypes, and it IS COMMANDER_CASUAL_SIXTY-available) rather
+            // than null -- the exact same fallback STANDARD already exhibits, not a new gap.
+            val comboFallback = assertNotNull(CuratedStrategyCatalog.nearestFor(ArchetypeId.COMBO, emptyList(), format))
+            assertEquals("big_mana", comboFallback.id)
+        }
+    }
+
     @Test
     fun `catalog is non-empty and every entry id is unique (exact count intentionally not pinned)`() {
         // The exact entry count is a moving target across this taxonomy migration (5 pure

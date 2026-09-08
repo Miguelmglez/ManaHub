@@ -52,6 +52,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
@@ -309,6 +310,15 @@ fun PillarTile(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val statusColor = if (pillar.notApplicable) mc.textDisabled else mc.qualityColor(pillar.subscore / 100f)
+    // Edge-case QA fix (HIGH, 2026-09-06): the pillar tile used to render icon + subscore +
+    // Text(pillar.id.label()) -- a rewrite dropped the label text, leaving 4 of 5 tiles
+    // unidentifiable (icon + bare number only) both visually and for screen readers (both Icon
+    // branches below already passed contentDescription = null). Restoring the visible label AND
+    // setting the icon's contentDescription (kept even though the label text is also visible, so
+    // the pillar's identity survives on its own if the visible label is ever compacted away again)
+    // fixes both regressions. `heightIn(min = ...)` (not a fixed `.height()`) lets the tile grow
+    // for a 2-line label / larger font scale instead of clipping it.
+    val pillarLabel = pillar.id.label()
 
     Surface(
         onClick = onClick,
@@ -318,7 +328,7 @@ fun PillarTile(
             width = if (expanded) 2.dp else 1.dp,
             color = if (expanded) statusColor else mc.surfaceVariant.copy(alpha = 0.5f)
         ),
-        modifier = modifier.height(100.dp),
+        modifier = modifier.heightIn(min = 100.dp),
     ) {
         Column(
             modifier = Modifier.padding(MaterialTheme.spacing.sm),
@@ -336,14 +346,14 @@ fun PillarTile(
                 if (icon is ImageVector) {
                     Icon(
                         imageVector = icon,
-                        contentDescription = null,
+                        contentDescription = pillarLabel,
                         tint = statusColor,
                         modifier = Modifier.size(18.dp)
                     )
                 } else if (icon is Int) {
                     Icon(
                         painter = painterResource(id = icon),
-                        contentDescription = null,
+                        contentDescription = pillarLabel,
                         tint = statusColor,
                         modifier = Modifier.size(18.dp)
                     )
@@ -353,6 +363,14 @@ fun PillarTile(
                 text = if (pillar.notApplicable) stringResource(R.string.deck_analysis_pillar_not_applicable_badge) else pillar.subscore.toString(),
                 style = ty.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                 color = statusColor,
+            )
+            Text(
+                text = pillarLabel,
+                style = ty.labelSmall,
+                color = mc.textSecondary,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

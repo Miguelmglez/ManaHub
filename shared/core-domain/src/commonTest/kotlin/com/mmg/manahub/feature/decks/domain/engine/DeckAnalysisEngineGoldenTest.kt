@@ -578,4 +578,72 @@ class DeckAnalysisEngineGoldenTest {
         assertEquals(null, ArchetypeRoleClassifier.classify(plainCard)["counterspell"])
         assertEquals(null, ArchetypeRoleClassifier.classify(plainCard)["protection"])
     }
+
+    // ── Wave 2 future-debt closeout (2026-09-06) — sparse SIXTY golden decks for the 5 remaining
+    //    60-card constructed formats ─────────────────────────────────────────────────────────────
+    //
+    //  SAME sparse-fixture / relative-behavior-only convention as [standardStrategySwitch_
+    //  changesTotalScoreAndPlanRoleCoverage] above (never assert absolute score bands on these --
+    //  the REALISTIC-density absolute-band check for each of these 5 formats already lives in
+    //  [DeckAnalysisEngineCalibrationTest]'s per-format `*AggroRealisticDensity_
+    //  scoresInWellBuiltDeckBand` tests). One shared body proves the same invariant
+    //  [standardStrategySwitch_changesTotalScoreAndPlanRoleCoverage] does -- a strategy switch
+    //  (AGGRO vs. CONTROL) recomputes BOTH `totalScore` and the P3 role-coverage table -- for each
+    //  of [SixtyFormatProfile]'s newly-calibrated entries, proving the profile's per-format deltas
+    //  don't just get applied in isolation ([ArchetypeSkeletonResolverTest]'s job) but also flow
+    //  correctly through the full [AnalysisEngine.evaluate] pipeline for that [DeckFormat].
+
+    /** Shared body for the 5 per-format strategy-switch tests below -- mirrors
+     * [standardStrategySwitch_changesTotalScoreAndPlanRoleCoverage] exactly, parameterized only by
+     * [format] and an [idPrefix] to keep each format's [Card.scryfallId]s distinct. */
+    private fun assertStrategySwitchChangesScoreAndCoverage(format: DeckFormat, idPrefix: String) {
+        val nonland = listOf(
+            entry(card(id = "$idPrefix-swiftspear", name = "Monastery Swiftspear", typeLine = "Creature — Human Monk", cmc = 1.0, colorIdentity = listOf("R"), power = "3", toughness = "2"), quantity = 4),
+            entry(card(id = "$idPrefix-goblin-guide", name = "Goblin Guide", typeLine = "Creature — Goblin Scout", cmc = 1.0, colorIdentity = listOf("R"), power = "2", toughness = "2"), quantity = 4),
+            entry(card(id = "$idPrefix-kari-zev", name = "Kari Zev, Skyship Raider", typeLine = "Legendary Creature — Human Pirate", cmc = 2.0, colorIdentity = listOf("R"), power = "3", toughness = "2"), quantity = 4),
+            entry(card(id = "$idPrefix-lightning-bolt", name = "Lightning Bolt", typeLine = "Instant", cmc = 1.0, colorIdentity = listOf("R"), tags = listOf(CardTag.REMOVAL)), quantity = 4),
+            entry(card(id = "$idPrefix-lightning-strike", name = "Lightning Strike", typeLine = "Instant", cmc = 2.0, colorIdentity = listOf("R"), tags = listOf(CardTag.REMOVAL)), quantity = 4),
+        )
+        val mainboard = withBasicsStandard(nonland, "Mountain", "R")
+        val colorIdentity = setOf(ManaColor.R)
+        val profile = profileForStandard(mainboard, colorIdentity)
+
+        val asAggro = AnalysisEngine.evaluate(
+            mainboard = mainboard, format = format, colorIdentity = colorIdentity, profile = profile,
+            archetype = ArchetypeId.AGGRO, themes = emptyList(), isManualOverride = true, confidence = 1f,
+        )
+        val asControl = AnalysisEngine.evaluate(
+            mainboard = mainboard, format = format, colorIdentity = colorIdentity, profile = profile,
+            archetype = ArchetypeId.CONTROL, themes = emptyList(), isManualOverride = true, confidence = 1f,
+        )
+
+        assertNotEquals(asAggro.totalScore, asControl.totalScore, "$format strategy switch must recompute totalScore, not just warnings")
+        val aggroCoverage = asAggro.pillars.first { it.id == PillarId.PLAN_ROLES }.roleCoverage.associateBy { it.roleKey }
+        val controlCoverage = asControl.pillars.first { it.id == PillarId.PLAN_ROLES }.roleCoverage.associateBy { it.roleKey }
+        assertNotEquals(aggroCoverage, controlCoverage, "$format strategy switch must recompute the P3 role-coverage table, not just warnings")
+        assertNotEquals(
+            asAggro.pillars.first { it.id == PillarId.PLAN_ROLES }.subscore,
+            asControl.pillars.first { it.id == PillarId.PLAN_ROLES }.subscore,
+        )
+    }
+
+    @Test
+    fun modernStrategySwitch_changesTotalScoreAndPlanRoleCoverage() =
+        assertStrategySwitchChangesScoreAndCoverage(DeckFormat.MODERN, "mod-sw")
+
+    @Test
+    fun pioneerStrategySwitch_changesTotalScoreAndPlanRoleCoverage() =
+        assertStrategySwitchChangesScoreAndCoverage(DeckFormat.PIONEER, "pio-sw")
+
+    @Test
+    fun legacyStrategySwitch_changesTotalScoreAndPlanRoleCoverage() =
+        assertStrategySwitchChangesScoreAndCoverage(DeckFormat.LEGACY, "leg-sw")
+
+    @Test
+    fun vintageStrategySwitch_changesTotalScoreAndPlanRoleCoverage() =
+        assertStrategySwitchChangesScoreAndCoverage(DeckFormat.VINTAGE, "vin-sw")
+
+    @Test
+    fun pauperStrategySwitch_changesTotalScoreAndPlanRoleCoverage() =
+        assertStrategySwitchChangesScoreAndCoverage(DeckFormat.PAUPER, "pau-sw")
 }

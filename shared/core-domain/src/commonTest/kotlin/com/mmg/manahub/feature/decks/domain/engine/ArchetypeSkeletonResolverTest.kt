@@ -119,7 +119,12 @@ class ArchetypeSkeletonResolverTest {
     }
 
     @Test
-    fun resolveWithColorIsPassthroughForNullAndNonStandardDeckFormats() {
+    fun resolveWithColorIsPassthroughForNullAndCasualAndModernDeckFormats() {
+        // MODERN swapped in for the old PIONEER example (Wave 2 future-debt closeout, 2026-09-06):
+        // Pioneer now has its own non-zero SixtyFormatProfile entry (see the dedicated test below),
+        // so it no longer demonstrates passthrough behavior. MODERN is the format this pass
+        // deliberately calibrated to (0, 0.0) -- see SixtyFormatProfile.MODERN's KDoc for why --
+        // so it still is a genuine passthrough example, same as CASUAL (which has no entry at all).
         val baseline = ArchetypeSkeletonResolver.resolveWithColor(
             format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.MIDRANGE,
             identity = setOf(ManaColor.G, ManaColor.W), deckFormat = null,
@@ -128,13 +133,97 @@ class ArchetypeSkeletonResolverTest {
             format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.MIDRANGE,
             identity = setOf(ManaColor.G, ManaColor.W), deckFormat = DeckFormat.CASUAL,
         )
-        val pioneer = ArchetypeSkeletonResolver.resolveWithColor(
+        val modern = ArchetypeSkeletonResolver.resolveWithColor(
             format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.MIDRANGE,
-            identity = setOf(ManaColor.G, ManaColor.W), deckFormat = DeckFormat.PIONEER,
+            identity = setOf(ManaColor.G, ManaColor.W), deckFormat = DeckFormat.MODERN,
         )
 
         assertEquals(baseline, casual)
-        assertEquals(baseline, pioneer)
+        assertEquals(baseline, modern)
+    }
+
+    @Test
+    fun resolveWithColorAppliesPioneerLandsAndCurveShift() {
+        val withoutFormat = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = null,
+        )
+        val withPioneer = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = DeckFormat.PIONEER,
+        )
+
+        // SixtyFormatProfile.PIONEER: landsDelta = +1, curveDelta = +0.15.
+        assertEquals(withoutFormat.lands.min + 1, withPioneer.lands.min)
+        assertEquals(withoutFormat.lands.ideal + 1, withPioneer.lands.ideal)
+        assertEquals(withoutFormat.lands.max + 1, withPioneer.lands.max)
+
+        assertEquals(roundTo2ForTest(withoutFormat.curve.min + 0.15), withPioneer.curve.min, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.ideal + 0.15), withPioneer.curve.ideal, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.max + 0.15), withPioneer.curve.max, 0.001)
+    }
+
+    @Test
+    fun resolveWithColorAppliesLegacyLandsAndCurveShift() {
+        val withoutFormat = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = null,
+        )
+        val withLegacy = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = DeckFormat.LEGACY,
+        )
+
+        // SixtyFormatProfile.LEGACY: landsDelta = -1, curveDelta = -0.2.
+        assertEquals(withoutFormat.lands.min - 1, withLegacy.lands.min)
+        assertEquals(withoutFormat.lands.ideal - 1, withLegacy.lands.ideal)
+        assertEquals(withoutFormat.lands.max - 1, withLegacy.lands.max)
+
+        assertEquals(roundTo2ForTest(withoutFormat.curve.min - 0.2), withLegacy.curve.min, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.ideal - 0.2), withLegacy.curve.ideal, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.max - 0.2), withLegacy.curve.max, 0.001)
+    }
+
+    @Test
+    fun resolveWithColorAppliesVintageLandsAndCurveShift() {
+        val withoutFormat = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = null,
+        )
+        val withVintage = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = DeckFormat.VINTAGE,
+        )
+
+        // SixtyFormatProfile.VINTAGE: landsDelta = -2, curveDelta = -0.3.
+        assertEquals(withoutFormat.lands.min - 2, withVintage.lands.min)
+        assertEquals(withoutFormat.lands.ideal - 2, withVintage.lands.ideal)
+        assertEquals(withoutFormat.lands.max - 2, withVintage.lands.max)
+
+        assertEquals(roundTo2ForTest(withoutFormat.curve.min - 0.3), withVintage.curve.min, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.ideal - 0.3), withVintage.curve.ideal, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.max - 0.3), withVintage.curve.max, 0.001)
+    }
+
+    @Test
+    fun resolveWithColorAppliesPauperLandsAndCurveShift() {
+        val withoutFormat = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = null,
+        )
+        val withPauper = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY, archetype = ArchetypeId.AGGRO,
+            identity = setOf(ManaColor.R), deckFormat = DeckFormat.PAUPER,
+        )
+
+        // SixtyFormatProfile.PAUPER: landsDelta = +1, curveDelta = -0.1.
+        assertEquals(withoutFormat.lands.min + 1, withPauper.lands.min)
+        assertEquals(withoutFormat.lands.ideal + 1, withPauper.lands.ideal)
+        assertEquals(withoutFormat.lands.max + 1, withPauper.lands.max)
+
+        assertEquals(roundTo2ForTest(withoutFormat.curve.min - 0.1), withPauper.curve.min, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.ideal - 0.1), withPauper.curve.ideal, 0.001)
+        assertEquals(roundTo2ForTest(withoutFormat.curve.max - 0.1), withPauper.curve.max, 0.001)
     }
 
     @Test

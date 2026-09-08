@@ -217,6 +217,9 @@ fun AddCardScreen(
                         viewModel.onAdvancedQuerySearch(query)
                         showAdvancedSearch = false
                     },
+                    // The sheet's ViewModel outlives any single open, so it must be re-seeded from
+                    // the query actually driving the results right now.
+                    appliedQuery = uiState.activeQuery,
                 )
             }
             if (showLanguageSheet) {

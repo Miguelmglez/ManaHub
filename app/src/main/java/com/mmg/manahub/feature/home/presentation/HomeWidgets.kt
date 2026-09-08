@@ -2693,7 +2693,7 @@ private fun RandomCardWidget(
                 modifier = Modifier
                     .fillMaxWidth(0.62f)
                     .aspectRatio(0.717f) // Keep footprint identical during load/fail/show
-                    .clip(SmallCardShape)
+                    .clip(CardShape)
                     .background(MaterialTheme.magicColors.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {

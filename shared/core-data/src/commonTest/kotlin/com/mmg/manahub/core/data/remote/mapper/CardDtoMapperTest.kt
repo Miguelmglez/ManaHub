@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.data.remote.mapper
 
 import com.mmg.manahub.core.data.remote.dto.CardDto
+import com.mmg.manahub.core.data.remote.dto.CardFaceDto
 import com.mmg.manahub.core.data.remote.dto.LegalitiesDto
 import com.mmg.manahub.core.data.remote.dto.PricesDto
 import kotlin.test.Test
@@ -13,7 +14,13 @@ import kotlin.test.assertEquals
  */
 class CardDtoMapperTest {
 
-    private fun minimalDto(producedMana: List<String>? = null): CardDto = CardDto(
+    private fun minimalDto(
+        producedMana: List<String>? = null,
+        colors: List<String>? = null,
+        cardFaces: List<CardFaceDto>? = null,
+    ): CardDto = CardDto(
+        colors = colors,
+        cardFaces = cardFaces,
         id = "test-id",
         name = "Test Card",
         lang = "en",
@@ -76,5 +83,57 @@ class CardDtoMapperTest {
         // so it is intentionally dropped from the compact subset string.
         val card = minimalDto(producedMana = listOf("C")).toDomain()
         assertEquals("", card.producedMana)
+    }
+
+    // ── Multi-face colors ─────────────────────────────────────────────────────
+    //  Regression (2026-09-08): Scryfall omits the ROOT `colors` key for transform / modal-DFC /
+    //  meld layouts — it lives on `card_faces[].colors`. The mapper defaulted to an empty list, so
+    //  every DFC cached COLORLESS: `Group by → Color` bucketed them under "Colorless", and the new
+    //  colorless "C" picker option matched them locally while Scryfall's `c=c` excluded them.
+
+    private fun face(name: String, colors: List<String>?) = CardFaceDto(name = name, colors = colors)
+
+    @Test
+    fun `an absent root colors key falls back to the union of the card faces`() {
+        val card = minimalDto(
+            colors = null,
+            cardFaces = listOf(face("Delver of Secrets", listOf("U")), face("Insectile Aberration", listOf("U"))),
+        ).toDomain()
+        assertEquals(listOf("U"), card.colors)
+    }
+
+    @Test
+    fun `the face fallback unions distinct colors across faces`() {
+        val card = minimalDto(
+            colors = null,
+            cardFaces = listOf(face("Front", listOf("W")), face("Back", listOf("B", "W"))),
+        ).toDomain()
+        assertEquals(listOf("W", "B"), card.colors)
+    }
+
+    @Test
+    fun `a face with no colors of its own does not break the fallback`() {
+        val card = minimalDto(
+            colors = null,
+            cardFaces = listOf(face("Front", listOf("R")), face("Back", null)),
+        ).toDomain()
+        assertEquals(listOf("R"), card.colors)
+    }
+
+    @Test
+    fun `a present root colors value still wins over the faces`() {
+        // Split cards DO carry the root key; the faces must never override what Scryfall says the
+        // whole card is.
+        val card = minimalDto(
+            colors = listOf("G"),
+            cardFaces = listOf(face("Front", listOf("U")), face("Back", listOf("B"))),
+        ).toDomain()
+        assertEquals(listOf("G"), card.colors)
+    }
+
+    @Test
+    fun `a single-faced card with no colors at all is still colorless`() {
+        val card = minimalDto(colors = null, cardFaces = null).toDomain()
+        assertEquals(emptyList<String>(), card.colors)
     }
 }

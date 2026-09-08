@@ -185,6 +185,7 @@ private fun MagicTypography.toMaterial3Typography() = Typography(
 )
 
 private fun magicMaterial3Shapes() = Shapes(
+    extraSmall = ExtraSmallCardShape,
     small      = ChipShape,
     medium     = CardShape,
     large      = CardShape,

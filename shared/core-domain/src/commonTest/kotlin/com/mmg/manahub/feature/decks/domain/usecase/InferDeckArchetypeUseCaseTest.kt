@@ -219,7 +219,7 @@ class InferDeckArchetypeUseCaseTest {
     fun standardAggroInferenceComposesWithCuratedStrategyCatalog() {
         // End-to-end check: the inferred macro/themes for a Standard-shaped deck feed cleanly into
         // CuratedStrategyCatalog.nearestFor with DeckFormat.STANDARD (the "aggro" pure-archetype
-        // strategy is COMMANDER_CASUAL_STANDARD-available, so this must resolve non-null).
+        // strategy is COMMANDER_CASUAL_SIXTY-available, so this must resolve non-null).
         val mainboard = buildList {
             repeat(4) { add(entry(card(id = "std-aggro2-swiftspear-$it", name = "Monastery Swiftspear", typeLine = "Creature — Human Monk", cmc = 1.0, power = "3"))) }
             repeat(4) { add(entry(card(id = "std-aggro2-kumano-$it", name = "Kumano Faces Kakkazan", typeLine = "Creature — Human Shaman", cmc = 1.0, power = "3"))) }

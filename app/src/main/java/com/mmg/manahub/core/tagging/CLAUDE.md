@@ -13,13 +13,35 @@
   key. `StrategyAnalyzer.analyze()` returns empty on a blank `oracleText` BEFORE evaluating any rule,
   including `typeLineAnyOf`-only ones — a type-line-only detector still needs a non-blank oracle text
   fixture to be exercised in tests.
-- **Collection/Deck Studio show tags from Room only — a one-time startup backfill keeps that Room
-  data populated.** Search-result pages no longer trigger `card_strategy_tags` resolution (only
-  opening Card Detail does); `CardRepository.backfillMissingStrategyTags(40)` runs at startup right
-  after `backfillMissingOracleIds(20)` (same `appScope.launch` block, same order — a blank
-  `oracleId` card can never have a precomputed row) to resolve owned-but-never-resolved cards
-  exactly once. Self-terminating via `CardDao.getScryfallIdsMissingStrategyTags`'s `NOT EXISTS
-  card_strategy_tags_cache` check, never `cards.tags = '[]'`.
+- **Collection/Deck Studio show tags from Room only — a BATCHED background worker keeps that Room
+  data populated.** Search-result pages never trigger `card_strategy_tags` resolution (only opening
+  Card Detail does). `CardTagHydrationWorker` (`core/sync/`) → `HydrateCollectionStrategyTagsUseCase`
+  is the sole bulk path: a ~1000-candidate page per run, grouped by `oracle_id`, resolved by ONE
+  `CardStrategyTagsRepository.getStrategyTagsBatch` call (chunked at 100 ids, hard cap 500 — never
+  near PostgREST's silent `db-max-rows` truncation), persisted through the same
+  `CardDao.updateTagsAndSuggestions` path as every other resolution site. It is enqueued (one-time,
+  unique `card_tag_hydration_one_time`, never periodic) after a successful `CollectionSyncWorker`
+  cycle and by `CardBackfillWorker`'s daily tick — that worker no longer runs the old
+  `backfillMissingStrategyTags(40)` per-card drip, so the two never double-work the same candidates
+  (`backfillMissingOracleIds(20)` still runs there first: a blank `oracleId` card can never have a
+  precomputed row). Candidates come only from `CardDao.getScryfallIdsMissingStrategyTags`, which is
+  self-terminating via its `NOT EXISTS card_strategy_tags_cache` check, never `cards.tags = '[]'`.
+  A batch MISS writes no cache row (the on-device `submitStrategyTags` write-back is what caches
+  those), so the follow-up pass is chained on `Result.retry()` ONLY after a run with ≥1 precomputed
+  hit — the one signal that provably shrank the candidate list. On-device fallback is capped at 60
+  cards per run.
+- **Tags are oracle-wide but stored per `scryfall_id` — a resolution MUST fan out to every cached
+  printing of that `oracle_id`, never just the candidate row.** The candidate query drops a card as
+  soon as ANY row with its `oracle_id` is cached, so a second owned printing was excluded before it
+  was ever written, permanently (8 rows measured on device, 2026-09-07). `applyHits` re-reads all
+  printings via `CardDao.getByOracleIds` and writes each through
+  `ResolveCardStrategyTagsUseCase.resolveWithPrefetched` with that row's OWN `tags` column — never a
+  single `UPDATE ... WHERE oracle_id = ?`, which would clobber a per-printing user-confirmed tag.
+  Writes go through `CardDao.updateTagsAndSuggestionsBatch` in 500-row transactions (one Room
+  invalidation per chunk, not per row). `CardDao.getScryfallIdsWithUnwrittenStrategyTags` is the
+  repair net for rows already stranded (also covers an interrupted run, since the batch caches every
+  `oracle_id` up front); it is the ONE sanctioned `tags = '[]'` predicate — network-free, capped, and
+  it must never drive the retry chain, because it is a stable fixed point, not a shrinking queue.
 - **`TagDictionary.get(key)` is NOT a validity filter — a miss does not mean "unknown/drifted key".**
   The dictionary only holds hand-authored ARCHETYPE/STRATEGY/ROLE/KEYWORD entries; `TypeLineAnalyzer`
   synthesizes `TagCategory.TYPE` tags (card types + creature subtypes — "creature", "artifact", "elf",
@@ -40,7 +62,8 @@
   STRATEGY-only cards rarer) — do not widen `groupCollection()`'s TAG branch
   (`shared/core-model/.../CollectionGrouping.kt`) or `CollectionScreen.kt`'s `collectionGroupLabel()`
   beyond this three-category set.
-- → memory: `project_tagging_engine_v2`, `feedback_tag_dictionary_archetype_audit`,
+- → memory: `project_strategy_tag_bulk_hydration_2026-09-07`, `project_tagging_engine_v2`,
+  `feedback_tag_dictionary_archetype_audit`,
   `project_strategy_tags_backfill_2026-07-22`, `feedback_card_strategy_tags_type_dictionary_miss`,
   `project_card_tag_category_colors_2026-07-23`, `feedback_collection_tag_grouping_identity_categories`
 

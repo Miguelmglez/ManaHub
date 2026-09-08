@@ -1,16 +1,17 @@
 package com.mmg.manahub.core.domain.usecase.search
 
 import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.ColorMatchMode
 import com.mmg.manahub.core.model.SearchCriterion
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Coverage for [BuildScryfallQueryUseCase]'s new `SearchCriterion.CardFunction` branch (Deck
- * Analysis — Category Sections plan, W4). [SearchCriterion] is a sealed class with no `else` branch
- * in [BuildScryfallQueryUseCase.buildPart] — that `when` is itself the compile gate that forced this
- * branch to exist; these tests assert its exact output shape (not just "it compiles").
+ * Coverage for [BuildScryfallQueryUseCase]'s `SearchCriterion.CardFunction` and colour branches.
+ * [SearchCriterion] is a sealed class with no `else` branch in [BuildScryfallQueryUseCase.buildPart]
+ * — that `when` is itself the compile gate that forced those branches to exist; these tests assert
+ * their exact output shape (not just "it compiles").
  */
 class BuildScryfallQueryUseCaseTest {
 
@@ -89,5 +90,84 @@ class BuildScryfallQueryUseCaseTest {
         )
 
         assertEquals("(function:ramp) (t:creature)", useCase(query))
+    }
+
+    // ── Color rendering ───────────────────────────────────────────────────────
+    //  Every case here has a truth-table twin in AdvancedSearchCardMatcherTest; the two must agree
+    //  or the All Cards tab and the Collection tab return different cards for the same query.
+
+    @Test
+    fun `given ANY_OF with two colors when built then an OR group of at-least clauses`() {
+        val query = AdvancedSearchQuery(
+            criteria = listOf(SearchCriterion.Colors(setOf("W", "U"), ColorMatchMode.ANY_OF))
+        )
+
+        assertEquals("(c>=w or c>=u)", useCase(query))
+    }
+
+    @Test
+    fun `given ANY_OF with a single color when built then it collapses to one clause`() {
+        val query = AdvancedSearchQuery(
+            criteria = listOf(SearchCriterion.Colors(setOf("W"), ColorMatchMode.ANY_OF))
+        )
+
+        assertEquals("c>=w", useCase(query))
+    }
+
+    @Test
+    fun `given ANY_OF on color identity when built then the id prefix is used`() {
+        val query = AdvancedSearchQuery(
+            criteria = listOf(SearchCriterion.ColorIdentity(setOf("W", "U"), ColorMatchMode.ANY_OF))
+        )
+
+        assertEquals("(id>=w or id>=u)", useCase(query))
+    }
+
+    @Test
+    fun `given colorless alone when built then it renders the equality clause under every mode`() {
+        // `c>=c` is not meaningful on Scryfall; colorless is only ever an equality test.
+        ColorMatchMode.entries.forEach { mode ->
+            val colors = AdvancedSearchQuery(criteria = listOf(SearchCriterion.Colors(setOf("C"), mode)))
+            assertEquals("c=c", useCase(colors), "colors mode $mode")
+
+            val identity = AdvancedSearchQuery(criteria = listOf(SearchCriterion.ColorIdentity(setOf("C"), mode)))
+            assertEquals("id=c", useCase(identity), "identity mode $mode")
+        }
+    }
+
+    @Test
+    fun `given colorless mixed with a real color when built then only ANY_OF keeps it`() {
+        val any = AdvancedSearchQuery(
+            criteria = listOf(SearchCriterion.Colors(setOf("W", "C"), ColorMatchMode.ANY_OF))
+        )
+        assertEquals("(c>=w or c=c)", useCase(any))
+
+        // A set comparison drops it -- `c>=wc` is not a valid Scryfall color string.
+        val atLeast = AdvancedSearchQuery(
+            criteria = listOf(SearchCriterion.Colors(setOf("W", "C"), ColorMatchMode.AT_LEAST))
+        )
+        assertEquals("c>=w", useCase(atLeast))
+
+        val atMost = AdvancedSearchQuery(
+            criteria = listOf(SearchCriterion.ColorIdentity(setOf("W", "C"), ColorMatchMode.AT_MOST))
+        )
+        assertEquals("id<=w", useCase(atMost))
+    }
+
+    @Test
+    fun `given the non-OR modes when built then each renders its explicit operator`() {
+        val wu = setOf("W", "U")
+        assertEquals("c>=wu", useCase(AdvancedSearchQuery(criteria = listOf(SearchCriterion.Colors(wu, ColorMatchMode.AT_LEAST)))))
+        assertEquals("c=wu", useCase(AdvancedSearchQuery(criteria = listOf(SearchCriterion.Colors(wu, ColorMatchMode.EXACTLY)))))
+        assertEquals("id<=wu", useCase(AdvancedSearchQuery(criteria = listOf(SearchCriterion.ColorIdentity(wu, ColorMatchMode.AT_MOST)))))
+    }
+
+    @Test
+    fun `given an empty color set when built then the criterion contributes nothing`() {
+        val query = AdvancedSearchQuery(
+            criteria = listOf(SearchCriterion.Colors(emptySet(), ColorMatchMode.ANY_OF))
+        )
+
+        assertEquals("", useCase(query))
     }
 }

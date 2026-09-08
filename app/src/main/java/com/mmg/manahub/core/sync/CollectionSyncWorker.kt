@@ -128,7 +128,11 @@ class CollectionSyncWorker(
                 // A successful cycle may have just written pending-hydration placeholders
                 // (SyncManager.ensureCardsExist) -- kick hydration off now instead of waiting for
                 // CardHydrationWorker's hourly tick.
-                CardHydrationWorker.enqueueImmediate(WorkManager.getInstance(applicationContext))
+                val workManager = WorkManager.getInstance(applicationContext)
+                CardHydrationWorker.enqueueImmediate(workManager)
+                // A pull is the only event that introduces cards whose strategy tags this device
+                // has never resolved -- hydrate them in batched passes off the sync's critical path.
+                CardTagHydrationWorker.enqueueImmediate(workManager)
                 Result.success()
             }
         } catch (e: CancellationException) {
