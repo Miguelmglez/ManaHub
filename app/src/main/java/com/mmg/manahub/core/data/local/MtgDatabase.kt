@@ -124,7 +124,7 @@ import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
         CompetitiveMetaCacheEntity::class,
         CompetitiveLimitedRatingsCacheEntity::class,
     ],
-    version = 53,
+    version = 54,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)

@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.data.local.dao
+// COMMENTS_REVIEWED: 2026-09-08
 
 import androidx.room.ColumnInfo
 import androidx.room.Dao
@@ -146,6 +147,7 @@ interface DeckDao {
         UPDATE decks SET
             archetype_override = :archetypeOverride,
             themes_override = :themesOverrideJson,
+            posture_override = :postureOverride,
             updated_at = :updatedAt
         WHERE id = :deckId
     """)
@@ -153,6 +155,7 @@ interface DeckDao {
         deckId: String,
         archetypeOverride: String?,
         themesOverrideJson: String?,
+        postureOverride: String? = null,
         updatedAt: Long = System.currentTimeMillis(),
     )
 

@@ -49,6 +49,10 @@ class DeckAnalysisPipeline(
      * @param themesOverride raw `ThemeId.name` strings from the deck's persisted pin.
      * @param tribeOverride the deck's persisted tribe pin, a SEPARATE column from
      *        [themesOverride] (never folded into that list's JSON).
+     * @param postureOverride the deck's persisted posture pin (Deck Wizard Commander v3 plan,
+     *        E3, D5), forwarded to [EvaluateDeckUseCase] -- a SEPARATE column, same convention as
+     *        [tribeOverride]. Does NOT participate in seed-tag resolution (posture has no seed-tag
+     *        representation), only in [EvaluateDeckUseCase.resolveArchetype]'s pin path.
      * @param weights the (optionally debug-tuned) legacy [ScoreWeights], forwarded to
      *        [EvaluateDeckUseCase]/`DeckScorer.evaluate`.
      * @param scoreWeightOverrides the raw (optionally debug-tuned) v3 pillar weight overrides.
@@ -74,6 +78,7 @@ class DeckAnalysisPipeline(
         // .seedTags's KDoc) can pass it here to skip a redundant re-derivation. `null` (every
         // pre-existing caller) recomputes it internally — byte-identical either way.
         precomputedSeedTags: List<CardTag>? = null,
+        postureOverride: String? = null,
     ): DeckHealth {
         val commanderIdentity = commander?.colorIdentity?.toSet().orEmpty()
         val commanderTags = commander?.let { it.tags + it.userTags }.orEmpty()
@@ -91,6 +96,7 @@ class DeckAnalysisPipeline(
             scoreWeightOverrides = scoreWeightOverrides,
             sideboardCount = sideboardCount,
             emitProgression = emitProgression,
+            postureOverride = postureOverride,
         )
     }
 

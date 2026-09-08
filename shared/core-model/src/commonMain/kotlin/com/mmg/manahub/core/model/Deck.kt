@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.model
+// COMMENTS_REVIEWED: 2026-09-08
 
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -55,6 +56,17 @@ data class Deck(
      * flag in RUN 1. Unlock = explicit user action in Studio, flips this back to false.
      */
     val strategyLocked: Boolean = false,
+    // ── Deck Wizard Commander v3 plan (v53->v54, D5) ────────────────────────
+    // Raw PostureId.name (Ramp/Tempo/Voltron/Toolbox/Group Hug/Group Slug), or null = no posture
+    // pin. A SEPARATE pin slot from archetypeOverride/themesOverride, same convention as
+    // tribeOverride above -- never folded into themesOverride's list, so stale-pin detection there
+    // is never confused by a posture name. LOCAL-ONLY (never synced -- see DeckSyncDto's KDoc,
+    // which documents archetypeOverride/themesOverride/tribeOverride as local-only for the exact
+    // same reason: syncing one pin field alone without its siblings would land a posture on a
+    // second device with no archetype/themes beside it, resolving a different plan than the
+    // origin device). Written via CuratedStrategy.toPin(tribe) (the ONE pin-writing function) and
+    // read by EvaluateDeckUseCase.resolveArchetype's pin path (fixes F3).
+    val postureOverride: String? = null,
 )
 
 /**

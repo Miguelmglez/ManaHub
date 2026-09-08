@@ -159,6 +159,12 @@ class EvaluateDeckUseCase(
         scoreWeightOverrides: ScoreWeightOverrides = ScoreWeightOverrides.NONE,
         sideboardCount: Int = 0,
         emitProgression: Boolean = true,
+        // Deck Wizard Commander v3 plan (Phase 0 / E3, D5, fixes F3) -- raw PostureId.name from
+        // Deck.postureOverride, or null/blank/unrecognized to let the pin/inference paths carry no
+        // posture. Only consulted on the PIN branch of resolveArchetype (a manual archetype/theme
+        // override honors its sibling posture pin); the INFERENCE branch already resolves its own
+        // posture from InferDeckArchetypeUseCase, untouched by this param.
+        postureOverride: String? = null,
     ): DeckHealth = withContext(ioDispatcher) {
         val colorIdentity = deriveColorIdentity(mainboard, commanderIdentity)
 
@@ -201,6 +207,7 @@ class EvaluateDeckUseCase(
             resolveArchetype(
                 mainboard, archetypeFormat, archetypeOverride, themesOverride, commanderTags,
                 commanderColorIdentity = commanderIdentity.mapNotNull(::symbolToColor).toSet(),
+                postureOverride = postureOverride,
             )
         }
 
@@ -286,6 +293,7 @@ class EvaluateDeckUseCase(
         themesOverride: List<String>,
         commanderTags: List<CardTag>,
         commanderColorIdentity: Set<ManaColor>,
+        postureOverride: String? = null,
     ): ArchetypeResolution {
         val pinnedMacro = archetypeOverride?.let { raw -> ArchetypeId.entries.firstOrNull { it.name == raw } }
         val pinnedThemes = themesOverride.mapNotNull { raw -> ThemeId.entries.firstOrNull { it.name == raw } }.take(2)
@@ -296,8 +304,13 @@ class EvaluateDeckUseCase(
             // the bare generic baseline" convention), rather than coercing to a removed enum value.
             // No [ArchetypeResolution.resemblance] here -- a manual pin has no axes-based distance
             // computation to report (resemblance is specifically the INFERENCE path's output).
+            // Deck Wizard Commander v3 plan (E3, fixes F3): the sibling posture pin, parsed the
+            // same defensive way (entries.firstOrNull, never .valueOf()) -- an unrecognized/blank
+            // string resolves to `null` (no posture), never a crash.
+            val pinnedPosture = postureOverride?.let { raw -> PostureId.entries.firstOrNull { it.name == raw } }
             return ArchetypeResolution(
                 macro = pinnedMacro,
+                posture = pinnedPosture,
                 themes = pinnedThemes,
                 isManualOverride = true,
                 confidence = 1f,
@@ -331,9 +344,19 @@ class EvaluateDeckUseCase(
         resolution: ArchetypeResolution,
     ): DeckEvaluation {
         val colorCount = colorIdentity.size
+        // Deck Wizard Commander v3 plan (E3, fixes F3): a MANUAL posture pin is now threaded into
+        // the skeleton resolution -- before this fix, a posture pin was stored on
+        // ArchetypeResolution but never reached the skeleton's own posture-aware role bands, so
+        // e.g. a "Voltron" pin graded identically to a plain macro pick. Gated on
+        // [ArchetypeResolution.isManualOverride] deliberately: the INFERENCE path already resolved
+        // `resolution.posture` before this fix (see [resolveArchetype]'s inferred branch) without
+        // ever reaching the skeleton this way, and this phase's scope is the PIN path only --
+        // widening this to the inference path too is a separate, not-yet-calibrated change (the
+        // golden/corpus suites were calibrated without it) left for a future pass.
         val skeleton: ResolvedArchetypeSkeleton = ArchetypeSkeletonResolver.resolveWithColor(
             format = format,
             archetype = resolution.macro,
+            posture = resolution.posture.takeIf { resolution.isManualOverride },
             themes = resolution.themes,
             identity = colorIdentity,
         )

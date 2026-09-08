@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.domain.repository
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckCardSource
@@ -111,11 +112,19 @@ interface DeckRepository {
      * @param archetypeOverride a raw `ArchetypeId.name` string, or null to clear the macro pin
      *        (the engine goes back to inferring it every analysis).
      * @param themesOverride raw `ThemeId.name` strings (at most 2); empty clears the theme pin.
+     * @param posture Deck Wizard Commander v3 plan (E3, D5) -- a raw `PostureId.name` string, or
+     *        null to clear the posture pin. Appended LAST and defaulted so every existing 3-arg
+     *        call site keeps compiling unchanged; `null` ALSO clears any previously-set posture on
+     *        this write (same "null clears" convention as [archetypeOverride]/[themesOverride]
+     *        and the sibling `tribe` param on [com.mmg.manahub.feature.decks.domain.orchestrator
+     *        .DeckDoctorOrchestrator.setArchetypeOverride] -- correct for a non-postured strategy
+     *        pick or "Auto-detect", same as that precedent documents for tribe).
      */
     suspend fun updateArchetypeOverride(
         deckId: String,
         archetypeOverride: String?,
         themesOverride: List<String>,
+        posture: String? = null,
     )
 
     /**

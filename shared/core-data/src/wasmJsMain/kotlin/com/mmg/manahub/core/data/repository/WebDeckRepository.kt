@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.data.repository
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.mmg.manahub.core.data.remote.decks.DeckCardSyncDto
 import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
@@ -277,6 +278,7 @@ class WebDeckRepository(
         deckId: String,
         archetypeOverride: String?,
         themesOverride: List<String>,
+        posture: String?,
     ): Unit = notSynced("updateArchetypeOverride")
 
     override suspend fun updateTribeOverride(deckId: String, tribeOverride: String?): Unit =

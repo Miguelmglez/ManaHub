@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.data.repository
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -253,12 +254,14 @@ class DeckRepositoryImpl(
         deckId: String,
         archetypeOverride: String?,
         themesOverride: List<String>,
+        posture: String?,
     ) {
         withContext(ioDispatcher) {
             deckDao.updateArchetypeOverride(
                 deckId = deckId,
                 archetypeOverride = archetypeOverride,
                 themesOverrideJson = if (themesOverride.isEmpty()) null else gson.toJson(themesOverride),
+                postureOverride = posture,
                 updatedAt = System.currentTimeMillis(),
             )
         }

@@ -306,6 +306,37 @@ class CuratedStrategyCatalogTest {
         }
     }
 
+    // ── Deck Wizard Commander v3 Phase 0 / E3 (D4/D5): CuratedStrategy.toPin round-trip ──────────
+
+    @Test
+    fun `toPin round-trips every Commander catalog entry back onto itself via nearestFor`() {
+        val commanderEntries = CuratedStrategyCatalog.ALL.filter { it.availableIn(DeckFormat.COMMANDER) }
+        assertTrue(commanderEntries.isNotEmpty())
+        commanderEntries.forEach { strategy ->
+            val tribe = if (strategy.requiresTribe) "Elves" else null
+            val pin = strategy.toPin(tribe)
+            assertEquals(strategy.archetypes.first(), pin.archetype, "Entry '${strategy.id}' toPin.archetype mismatch")
+            assertEquals(strategy.postures.firstOrNull(), pin.posture, "Entry '${strategy.id}' toPin.posture mismatch")
+            assertEquals(strategy.themes, pin.themes, "Entry '${strategy.id}' toPin.themes mismatch")
+            assertEquals(tribe, pin.tribe, "Entry '${strategy.id}' toPin.tribe mismatch")
+
+            val resolved = CuratedStrategyCatalog.nearestFor(pin.archetype, pin.themes, DeckFormat.COMMANDER, pin.posture)
+            assertEquals(
+                strategy.id, assertNotNull(resolved, "toPin round-trip resolved null for '${strategy.id}'").id,
+                "toPin round-trip for '${strategy.id}' resolved a DIFFERENT entry",
+            )
+        }
+    }
+
+    @Test
+    fun `voltron toPin carries its posture, not just its archetype`() {
+        val voltron = assertNotNull(CuratedStrategyCatalog.byId("voltron"))
+        val pin = voltron.toPin()
+        assertEquals(ArchetypeId.AGGRO, pin.archetype)
+        assertEquals(PostureId.VOLTRON, pin.posture)
+        assertTrue(pin.themes.isEmpty())
+    }
+
     @Test
     fun `catalog is non-empty and every entry id is unique (exact count intentionally not pinned)`() {
         // The exact entry count is a moving target across this taxonomy migration (5 pure

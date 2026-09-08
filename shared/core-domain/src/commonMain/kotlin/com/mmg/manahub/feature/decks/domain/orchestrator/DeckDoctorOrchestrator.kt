@@ -15,6 +15,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
 import com.mmg.manahub.feature.decks.domain.engine.PillarId
+import com.mmg.manahub.feature.decks.domain.engine.PostureId
 import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.toAnalysisWeights
@@ -236,6 +237,9 @@ class DeckDoctorOrchestrator(
          * is picked up without a full [loadAnalysis]. */
         var archetypeOverride: String?,
         var themesOverride: List<String>,
+        /** Deck Wizard Commander v3 plan (E3, D5): raw `Deck.postureOverride`, same "re-read on
+         * incremental recompute" convention as [archetypeOverride]/[themesOverride] above. */
+        var postureOverride: String?,
         val commanderTags: List<CardTag>,
         // ── Deck Engine Unification (D4) ────────────────────────────────────────
         /** Mirrors `Deck.strategyLocked` -- re-read on every full [loadAnalysis] (an unlock is
@@ -297,6 +301,7 @@ class DeckDoctorOrchestrator(
             val archetypeOverride = deckWithCards.deck.archetypeOverride
             val themesOverride = deckWithCards.deck.themesOverride
             val tribeOverride = deckWithCards.deck.tribeOverride
+            val postureOverride = deckWithCards.deck.postureOverride
             val strategyLocked = deckWithCards.deck.strategyLocked
 
             val weightOverrides = weightsProvider()
@@ -327,6 +332,7 @@ class DeckDoctorOrchestrator(
                 scoreWeightOverrides = weightOverrides,
                 sideboardCount = sideboardCount,
                 precomputedSeedTags = seedTags,
+                postureOverride = postureOverride,
             )
 
             val collectionCards = collection.map { it.card }
@@ -353,6 +359,7 @@ class DeckDoctorOrchestrator(
                 sideboardCount = sideboardCount,
                 archetypeOverride = archetypeOverride,
                 themesOverride = themesOverride,
+                postureOverride = postureOverride,
                 commanderTags = commanderTags,
                 strategyLocked = strategyLocked,
             )
@@ -510,6 +517,7 @@ class DeckDoctorOrchestrator(
                 weights = weights,
                 archetypeOverride = context.archetypeOverride,
                 themesOverride = context.themesOverride,
+                postureOverride = context.postureOverride,
                 commanderTags = context.commanderTags,
                 // Deck Analysis Engine v3 (spec §8) -- raw overrides, see the sibling call site above.
                 scoreWeightOverrides = weightOverrides,
@@ -631,12 +639,18 @@ class DeckDoctorOrchestrator(
      *        which has no tribe UI, and existing tests) keeps clearing/leaving the tribe pin exactly
      *        as before -- `null` here always clears the tribe column, which is also the CORRECT
      *        behavior for a non-tribal strategy pick or "Auto-detect" ([clearArchetypeOverride]).
+     * @param posture Deck Wizard Commander v3 plan (E3, D5, fixes F3) -- a raw `PostureId.name`,
+     *        written on the SAME [DeckRepository.updateArchetypeOverride] call (unlike [tribe],
+     *        which has its own column write -- posture is meant to travel WITH the archetype/theme
+     *        pin it describes, via [CuratedStrategy.toPin]). Defaults to `null`, same "null clears,
+     *        also correct for a non-postured pick or Auto-detect" convention as [tribe].
      */
     fun setArchetypeOverride(
         deckId: String,
         archetypeId: ArchetypeId?,
         themes: List<ThemeId>,
         tribe: String? = null,
+        posture: PostureId? = null,
     ) {
         scope.launch {
             runCatching {
@@ -644,6 +658,7 @@ class DeckDoctorOrchestrator(
                     deckId = deckId,
                     archetypeOverride = archetypeId?.name,
                     themesOverride = themes.take(2).map { it.name },
+                    posture = posture?.name,
                 )
                 deckRepository.updateTribeOverride(deckId, tribe)
             }.onFailure {

@@ -70,6 +70,7 @@ object HarnessDoctorPipeline {
         // false/emptySet so a non-wizard caller of this pipeline is unaffected.
         strategyLocked: Boolean = false,
         wizardSourcedIds: Set<String> = emptySet(),
+        postureOverride: String? = null,
     ): DoctorResult {
         // Deck Wizard Commander v3 plan (E4, D2): seed inference + pin fold + evaluate now live in
         // the ONE shared DeckAnalysisPipeline (also used by DeckDoctorOrchestrator and, later, the
@@ -83,6 +84,7 @@ object HarnessDoctorPipeline {
             themesOverride = themesOverride,
             tribeOverride = tribeOverride,
             emitProgression = false,
+            postureOverride = postureOverride,
         )
         val protectedIds = setOfNotNull(commander?.scryfallId) + (if (strategyLocked) wizardSourcedIds else emptySet())
         val resolvedSkeleton = resolveArchetypeSkeleton(health)

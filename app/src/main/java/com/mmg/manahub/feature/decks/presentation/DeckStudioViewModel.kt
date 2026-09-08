@@ -41,9 +41,11 @@ import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.LandTargetResolver
 import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.PostureId
 import com.mmg.manahub.feature.decks.domain.engine.SectionQueryContext
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
+import com.mmg.manahub.feature.decks.domain.engine.toPin
 import com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorEvent
 import com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorOrchestrator
 import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
@@ -1699,10 +1701,18 @@ class DeckStudioViewModel(
      * @param tribe Deck Analysis Engine v2 Phase 3 — forwarded to
      *        [DeckDoctorOrchestrator.setArchetypeOverride]'s own `tribe` param (the curated
      *        strategy picker's tribe sub-pick); `null` for every non-tribal strategy.
+     * @param posture Deck Wizard Commander v3 plan (E3, D5) — forwarded to
+     *        [DeckDoctorOrchestrator.setArchetypeOverride]'s own `posture` param; `null` for a
+     *        non-postured strategy or "Auto-detect".
      */
-    fun onSetArchetypeOverride(archetypeId: ArchetypeId?, themes: List<ThemeId>, tribe: String? = null) {
+    fun onSetArchetypeOverride(
+        archetypeId: ArchetypeId?,
+        themes: List<ThemeId>,
+        tribe: String? = null,
+        posture: PostureId? = null,
+    ) {
         if (!::deckId.isInitialized) return
-        deckDoctorOrchestrator.setArchetypeOverride(deckId, archetypeId, themes, tribe)
+        deckDoctorOrchestrator.setArchetypeOverride(deckId, archetypeId, themes, tribe, posture)
     }
 
     /**
@@ -1710,16 +1720,17 @@ class DeckStudioViewModel(
      * ([com.mmg.manahub.feature.decks.presentation.components.CuratedStrategyPickerSheet]) calls
      * directly with the [CuratedStrategy] the player tapped, instead of unpacking its
      * archetype/themes at the call site.
+     *
+     * Deck Wizard Commander v3 plan (D4): builds the pin via [CuratedStrategy.toPin] -- the ONE
+     * function that builds a curated pick's persisted pin, replacing the old inline
+     * `strategy.archetypes.firstOrNull()` (which dropped the entry's posture entirely, F3).
      */
     fun onApplyCuratedStrategy(strategy: CuratedStrategy, tribe: String?) {
         crashReporter.setCustomKey("deck_analysis_strategy_pick_id", strategy.id)
         crashReporter.setCustomKey("deck_analysis_strategy_pick_tribe", tribe ?: "none")
         crashReporter.log("deck_analysis_strategy_pick")
-        // Deck Analysis Engine v3: CuratedStrategy.archetype (singular) widened to .archetypes (a
-        // set, spec §4.2) -- the FIRST declared archetype is the entry's primary/most
-        // representative macro, used as the actual PIN (the persisted override is still a single
-        // ArchetypeId, never a set).
-        onSetArchetypeOverride(strategy.archetypes.firstOrNull(), strategy.themes, tribe)
+        val pin = strategy.toPin(tribe)
+        onSetArchetypeOverride(pin.archetype, pin.themes, pin.tribe, pin.posture)
     }
 
     /** "Auto-detect" — clears the pin and re-infers the archetype/themes from the live deck. */

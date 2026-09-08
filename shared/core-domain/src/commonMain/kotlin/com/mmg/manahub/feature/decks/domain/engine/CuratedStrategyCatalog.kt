@@ -623,3 +623,33 @@ fun CuratedStrategy.availableIn(format: DeckFormat): Boolean {
     val effectiveFormat = if (format == DeckFormat.COMMANDER_CASUAL) DeckFormat.COMMANDER else format
     return effectiveFormat in formats
 }
+
+/**
+ * Deck Wizard Commander v3 plan (D4/D5): a curated strategy pick's persisted pin, in the SAME shape
+ * [Deck.archetypeOverride]/[Deck.themesOverride]/[Deck.tribeOverride]/[Deck.postureOverride]
+ * expect (raw enum-name strings, never the enums themselves -- that model lives below
+ * `:shared:core-domain`). [CuratedStrategy.toPin] is the ONE function that builds this from a
+ * catalog entry -- both Deck Studio's strategy picker and (Phase 1+) the wizard use it, so a
+ * curated pick is written identically everywhere.
+ */
+data class StrategyPin(
+    val archetype: ArchetypeId?,
+    val posture: PostureId?,
+    val themes: List<ThemeId>,
+    val tribe: String?,
+)
+
+/**
+ * Builds this entry's persisted pin (D4: "the pin written is `CuratedStrategy.toPin(tribe)` -- one
+ * function used by Studio and the wizard"). [archetype] is `archetypes.first()` (every catalog
+ * entry declares at least one, enforced by [CuratedStrategyCatalogTest]'s non-empty-formats-style
+ * invariants); [posture] is `postures.firstOrNull()` (today's v1 catalog never declares more than
+ * one posture per entry). [tribe] is the caller's own tribe sub-pick (only meaningful when
+ * [CuratedStrategy.requiresTribe] is true) -- passed through verbatim, not validated here.
+ */
+fun CuratedStrategy.toPin(tribe: String? = null): StrategyPin = StrategyPin(
+    archetype = archetypes.first(),
+    posture = postures.firstOrNull(),
+    themes = themes,
+    tribe = tribe,
+)

@@ -155,6 +155,10 @@ object DatabaseModule {
                 // RESTRICT FK on user_card_collection.scryfall_id -> cards.scryfall_id via the
                 // standard 12-step table recreation.
                 MIGRATION_52_53,
+                // v53 → v54 lives as a top-level `val` in Migration_53_54.kt (same reason).
+                // Deck Wizard Commander v3 plan, Phase 0 / E3: additive decks.posture_override
+                // column (the persisted posture pin, fixes F3).
+                MIGRATION_53_54,
             )
             .build()
 
