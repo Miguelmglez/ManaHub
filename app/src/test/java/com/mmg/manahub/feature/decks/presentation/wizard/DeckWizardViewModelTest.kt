@@ -28,8 +28,11 @@ import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.availableIn
 import com.mmg.manahub.feature.decks.domain.engine.card
+import com.mmg.manahub.feature.decks.domain.engine.StrategyPin
+import com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildStage
+import com.mmg.manahub.feature.decks.domain.template.CommanderBuildOutcome
 import com.mmg.manahub.feature.decks.domain.template.CategorySuggestions
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
 import com.mmg.manahub.feature.decks.domain.template.DeckTemplateArchetypeInfo
@@ -39,6 +42,8 @@ import com.mmg.manahub.feature.decks.domain.template.TemplateBuildProgress
 import com.mmg.manahub.feature.decks.domain.template.TemplateBuildResult
 import com.mmg.manahub.feature.decks.domain.template.TemplateCardSuggestion
 import com.mmg.manahub.feature.decks.domain.template.TemplateSource
+import com.mmg.manahub.feature.decks.domain.template.WizardBuildResult
+import com.mmg.manahub.feature.decks.domain.template.WizardFillStats
 import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import io.mockk.coEvery
@@ -47,6 +52,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.slot
+import io.mockk.spyk
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -99,6 +105,13 @@ class DeckWizardViewModelTest {
     // now exercises `recomputePlanAnalysis()` via `onNextFromStrategy()`, so an unstubbed call would
     // throw. Individual PLAN_SECTIONS tests override this per-case with a real `DeckAnalysis`.
     private val deckAnalysisPipeline = mockk<DeckAnalysisPipeline>()
+    // Deck Wizard Commander v3 plan, Phase 6 -- the Commander build path's own use case. A REAL
+    // spy (not a full mock): a Commander-format `onGenerate()` test stubs the placement engine's
+    // own `invoke()` (its internals are BuildCommanderDeckUseCaseTest's job, not this VM test's),
+    // but leaves `persist()` running for real so this file's write-path assertions
+    // (replaceAllCardsWithSource/updateArchetypeOverride/etc.) still exercise real behavior against
+    // the mocked deckRepository above.
+    private val buildCommanderDeckUseCase = spyk(BuildCommanderDeckUseCase(deckAnalysisPipeline, crashReporter))
 
     private val collectionProfileUseCase = CollectionProfileUseCase(ioDispatcher = dispatcher)
 
@@ -124,6 +137,22 @@ class DeckWizardViewModelTest {
         colorConsistencyWarning = false,
         gamePlan = null,
     )
+
+    /** Deck Wizard Commander v3 plan, Phase 6 -- a minimal, valid [CommanderBuildOutcome] fixture
+     * for stubbing [buildCommanderDeckUseCase] in a Commander-format `onGenerate()` test. [entries]
+     * defaults to just the commander's own qty-1 mainboard slot (mirrors [buildResult]'s
+     * empty-deckCards convention above). */
+    private fun commanderOutcome(entries: List<DeckEntry> = listOf(DeckEntry(card = commander, quantity = 1, isOwned = true, isSideboard = false))) =
+        CommanderBuildOutcome(
+            result = WizardBuildResult(
+                entries = entries,
+                analysis = mockk(relaxed = true),
+                gapSections = emptyList(),
+                fillStats = WizardFillStats(placedByWizard = 0, placedManual = 0, lands = 0),
+            ),
+            plan = mockk(relaxed = true),
+            pin = StrategyPin(archetype = null, posture = null, themes = emptyList(), tribe = null),
+        )
 
     private val suggestionCard = card(id = "sugg-1", name = "Suggested Spell")
 
@@ -158,6 +187,7 @@ class DeckWizardViewModelTest {
         userPreferences = userPreferences,
         cardStrategyTagsRepository = cardStrategyTagsRepository,
         deckAnalysisPipeline = deckAnalysisPipeline,
+        buildCommanderDeckUseCase = buildCommanderDeckUseCase,
     )
 
     @Before
@@ -1211,10 +1241,14 @@ class DeckWizardViewModelTest {
     @Test
     fun `a Commander build writes the commander as a qty-1 mainboard entry, not just Deck-commanderCardId`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
-        val result = buildResult(deckCards = emptyList())
-        coEvery { buildDeckFromTemplateUseCase(any(), any()) } returns flow {
-            emit(TemplateBuildProgress.Complete(result))
-        }
+        // Deck Wizard Commander v3 plan, Phase 6 -- Commander now routes through
+        // buildCommanderDeckUseCase, never buildDeckFromTemplateUseCase; the placement engine
+        // itself is exercised by BuildCommanderDeckUseCaseTest, so this VM test stubs its outcome
+        // and verifies the VM's OWN wiring (persist() is real -- see buildCommanderDeckUseCase's
+        // spyk() construction above -- so the assertions below still exercise the real write path).
+        coEvery {
+            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderOutcome()
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.COMMANDER)
@@ -1244,18 +1278,18 @@ class DeckWizardViewModelTest {
     }
 
     @Test
-    fun `the commander mainboard entry plus BuildDeckFromTemplateUseCase's 99-card reservation totals exactly 100`() = runTest(dispatcher) {
-        // BuildDeckFromTemplateUseCase.mainboardTargetSize reserves targetDeckSize - 1 (99) for
-        // Commander -- this test locks the OTHER half of that contract: writeResultIntoNewDeck adds
-        // exactly ONE more card (the commander), for exactly 100 total.
+    fun `the commander mainboard entry plus BuildCommanderDeckUseCase's placement totals exactly 100`() = runTest(dispatcher) {
+        // Deck Wizard Commander v3 plan, Phase 6: BuildCommanderDeckUseCase itself is responsible
+        // for the 99-non-commander + 1-commander = 100 total (see its own NON_COMMANDER_SLOTS
+        // constant / BuildCommanderDeckUseCaseTest) -- this VM test locks that the WRITE path
+        // forwards every entry the outcome reports, in ONE replaceAllCardsWithSource call.
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         val ninetyNineEntries = (1..99).map { i ->
             DeckEntry(card = card(id = "spell-$i", name = "Spell $i"), quantity = 1, isOwned = true)
         }
-        val result = buildResult(deckCards = ninetyNineEntries)
-        coEvery { buildDeckFromTemplateUseCase(any(), any()) } returns flow {
-            emit(TemplateBuildProgress.Complete(result))
-        }
+        coEvery {
+            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderOutcome(entries = listOf(DeckEntry(card = commander, quantity = 1, isOwned = true, isSideboard = false)) + ninetyNineEntries)
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.COMMANDER)
@@ -1893,15 +1927,17 @@ class DeckWizardViewModelTest {
         assertEquals(WizardEntryFlow.CARDS, state.entryFlow)
 
         // The STALE Casual-taxonomy archetype (picked before backing out) must never reach the
-        // Commander build spec -- Deck Wizard Commander v3 plan Phase 4 now preselects a REAL
+        // Commander build -- Deck Wizard Commander v3 plan Phase 4 now preselects a REAL
         // recommendation for the NEW commander on its own (product default, plan §8), so the
         // no-stale-leak invariant is verified against THAT commander's own top pick, not `null`.
-        var capturedSpec: DeckWizardSpec? = null
+        // Deck Wizard Commander v3 plan, Phase 6: Commander now builds via buildCommanderDeckUseCase
+        // -- capture the strategyPick it actually receives (a StrategyPick.Curated wrapping the
+        // preselected recommendation, never the stale Casual selectedArchetype/strategyProfile).
+        val strategyPickSlot = slot<com.mmg.manahub.feature.decks.domain.engine.StrategyPick>()
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
-        coEvery { buildDeckFromTemplateUseCase(any(), any()) } answers {
-            capturedSpec = firstArg()
-            flow { emit(TemplateBuildProgress.Complete(buildResult())) }
-        }
+        coEvery {
+            buildCommanderDeckUseCase(any(), any(), capture(strategyPickSlot), any(), any(), any(), any(), any(), any())
+        } returns commanderOutcome()
         vm.onNextFromFormat()
         vm.onSelectCommander(commander)
         advanceUntilIdle()
@@ -1913,7 +1949,9 @@ class DeckWizardViewModelTest {
         vm.onGenerate()
         advanceUntilIdle()
 
-        assertEquals(topPickArchetype, capturedSpec?.strategyProfile?.archetype)
+        val capturedPick = strategyPickSlot.captured
+        val capturedArchetype = (capturedPick as? com.mmg.manahub.feature.decks.domain.engine.StrategyPick.Curated)?.strategy?.archetypes?.first()
+        assertEquals(topPickArchetype, capturedArchetype)
     }
 
     @Test

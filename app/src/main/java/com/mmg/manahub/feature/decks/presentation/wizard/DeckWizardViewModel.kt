@@ -43,16 +43,21 @@ import com.mmg.manahub.feature.decks.domain.engine.StrategyProfile
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 import com.mmg.manahub.feature.decks.domain.engine.toPin
+import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
+import com.mmg.manahub.feature.decks.domain.engine.StrategyPick
+import com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
 import com.mmg.manahub.feature.decks.domain.template.CategorySuggestions
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfile
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
 import com.mmg.manahub.feature.decks.domain.template.CollectionTribeSignal
 import com.mmg.manahub.feature.decks.domain.template.DeckWizardSpec
+import com.mmg.manahub.feature.decks.domain.template.ManualAdd
 import com.mmg.manahub.feature.decks.domain.template.OwnedCard
 import com.mmg.manahub.feature.decks.domain.template.TemplateBuildProgress
 import com.mmg.manahub.feature.decks.domain.template.TemplateBuildResult
 import com.mmg.manahub.feature.decks.domain.template.TemplateCardSuggestion
+import com.mmg.manahub.feature.decks.domain.template.WizardBuildResult
 import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.RankOwnedCardsForProfileUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase
@@ -355,6 +360,14 @@ data class DeckWizardUiState(
 
     // ── Result ─────────────────────────────────────────────────────────────────
     val buildResult: TemplateBuildResult? = null,
+    /** Deck Wizard Commander v3 plan, Phase 6 -- the Commander build path's OWN result shape
+     * (D2/D15: the same [com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis] Studio shows),
+     * populated instead of [buildResult] whenever [DeckWizardViewModel.onGenerate] dispatches a
+     * Commander-format spec through [BuildCommanderDeckUseCase]. `null` for every Casual build
+     * (which still populates [buildResult]) and until a Commander build actually completes. The
+     * Result screen's own UI content (6.3/6.4) is NOT wired to render this yet -- tracked as
+     * remaining Phase 6 work. */
+    val commanderBuildResult: WizardBuildResult? = null,
     val createdDeckId: String? = null,
 ) {
     /** Casual + 3-or-more colors: a non-blocking hint, never a hard gate (D9). */
@@ -474,6 +487,11 @@ class DeckWizardViewModel(
     // own non-trivial dependency graph (EvaluateDeckUseCase/InferDeckIdentityUseCase), so there is
     // no cheap fake default the way the pure use cases above get one.
     private val deckAnalysisPipeline: DeckAnalysisPipeline,
+    // Deck Wizard Commander v3 plan, Phase 6 -- the headline gap this run closes: onGenerate now
+    // dispatches Commander/Commander Casual specs here instead of BuildDeckFromTemplateUseCase.
+    // Defaulted from the two deps already required above so no pre-existing test construction site
+    // needs to change unless it wants to inject a fake/spy.
+    private val buildCommanderDeckUseCase: BuildCommanderDeckUseCase = BuildCommanderDeckUseCase(deckAnalysisPipeline, crashReporter),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DeckWizardUiState())
@@ -1854,7 +1872,121 @@ class DeckWizardViewModel(
         _uiState.update {
             it.copy(phase = WizardPhase.GENERATING, buildStage = null, completedStages = emptyList(), buildError = null)
         }
+        // Deck Wizard Commander v3 plan, Phase 6 -- the headline wire: a Commander-shaped format
+        // (D1/D2) now builds through BuildCommanderDeckUseCase (the v3 placement engine, Phase 2)
+        // instead of the legacy BuildDeckFromTemplateUseCase/Motor A pipeline below, which stays the
+        // ONLY build path for Casual (D7's escape hatch -- Casual is explicitly out of this
+        // campaign's scope).
         generateJob = viewModelScope.launch {
+            if (format.isCommanderFormat) {
+                generateCommanderDeck(state, format)
+            } else {
+                generateCasualDeck(state, format)
+            }
+        }
+    }
+
+    /** The Commander/Commander Casual build path (Deck Wizard Commander v3 plan, Phase 6). Builds
+     * via [buildCommanderDeckUseCase] (D1: the SAME objective [com.mmg.manahub.feature.decks.domain
+     * .usecase.DeckAnalysisPipeline] verifies), then persists atomically into [launchedFromDeckId]
+     * when the wizard was launched from an existing draft, or a freshly created deck otherwise
+     * (D12). A cancellation before the write below runs leaves an existing [launchedFromDeckId]
+     * draft completely untouched (nothing has been written to it yet); a fresh deck created by this
+     * function is tracked via [pendingDeckId] so [onCancelGeneration]/[onRetryGeneration] can clean
+     * it up the same way the Casual path already does. */
+    private suspend fun generateCommanderDeck(state: DeckWizardUiState, format: DeckFormat) {
+        val crashlytics = FirebaseCrashlytics.getInstance()
+        crashlytics.log("deck_wizard_generate_started")
+        crashlytics.setCustomKey("deck_wizard_format", format.name)
+        crashlytics.setCustomKey("deck_wizard_seed_count", state.seedCards.size)
+        crashlytics.setCustomKey("deck_wizard_entry_flow", state.entryFlow.name)
+        crashlytics.setCustomKey("deck_wizard_use_community_data", state.useCommunityData)
+
+        val commander = state.selectedCommander
+        if (commander == null) {
+            crashlytics.log("deck_wizard_generate_failed_no_commander")
+            crashReporter.recordException(IllegalStateException("[DeckWizardViewModel] generateCommanderDeck reached REVIEW with no selectedCommander"))
+            _uiState.update { it.copy(buildError = appContext.getString(R.string.deck_wizard_build_error)) }
+            return
+        }
+        val identity = commander.colorIdentity.toManaColorSet()
+        // D4: the STRATEGY step only persists the EXPANDED pin fields
+        // (selectedArchetype/selectedStrategyThemes/selectedTribeKey) plus a display-only catalog id
+        // pointer (selectedCuratedStrategyId) -- re-resolve the StrategyPick the build engine wants
+        // from that id (null id = Custom, D6).
+        val strategyPick: StrategyPick = state.selectedCuratedStrategyId
+            ?.let { id -> CuratedStrategyCatalog.byId(id) }
+            ?.let { strategy -> StrategyPick.Curated(strategy, state.selectedTribeKey) }
+            ?: StrategyPick.Custom
+
+        val ownedCollection = collectionSnapshot
+            .groupBy { it.card.scryfallId }
+            .map { (_, entries) -> OwnedCard(entries.first().card, entries.sumOf { entry -> entry.userCard.quantity }) }
+        // PLAN_SECTIONS' manual adds share DeckWizardUiState.seedCards with Flow A's seed picker --
+        // see onAddSeed/isCommanderManualAddValid, which already gates identity/legality for a
+        // Commander spec before a card can land in this list.
+        val manualAdds = state.seedCards.map { card ->
+            ManualAdd(card = card, isOwned = cardSnapshot.any { it.scryfallId == card.scryfallId })
+        }
+        val communityEnabled = state.useCommunityData && state.communityEngineAvailable
+        val edhrecAggregateNames: Set<String> = if (communityEnabled) {
+            val aggregateResult = runCatching { communityAggregateRepository.getCommanderAggregate(commander.name) }.getOrNull()
+            (aggregateResult as? DataResult.Success)?.data?.cards?.map { it.name }?.toSet() ?: emptySet()
+        } else {
+            emptySet()
+        }
+
+        val outcome = runCatching {
+            buildCommanderDeckUseCase(
+                format = format,
+                commander = commander,
+                strategyPick = strategyPick,
+                identity = identity,
+                ownedCollection = ownedCollection,
+                manualAdds = manualAdds,
+                fillLands = state.fillLands,
+                useCommunityData = communityEnabled,
+                edhrecAggregateNames = edhrecAggregateNames,
+            )
+        }.getOrElse { t ->
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            logFailure("deck_wizard_generate_crashed", t)
+            _uiState.update { it.copy(buildError = appContext.getString(R.string.deck_wizard_build_error)) }
+            return
+        }
+
+        val manualIds = manualAdds.map { it.card.scryfallId }.toSet()
+        val writeOutcome = runCatching {
+            // D12: fill the launched-from draft when one exists, else create a fresh one -- see this
+            // function's own KDoc for the cancellation-safety argument each branch relies on.
+            val deckId = launchedFromDeckId ?: run {
+                val newId = deckRepository.createDeck(name = commander.name, description = "Draft", format = format.name)
+                pendingDeckId = newId
+                newId
+            }
+            val current = deckRepository.observeDeckWithCards(deckId).first()?.deck
+            if (current != null) {
+                deckRepository.updateDeck(current.copy(commanderCardId = commander.scryfallId, coverCardId = commander.scryfallId))
+            }
+            buildCommanderDeckUseCase.persist(deckRepository, deckId, commander, manualIds, outcome)
+            deckId
+        }.getOrElse { t ->
+            logFailure("deck_wizard_write_failed", t)
+            _uiState.update { it.copy(buildError = appContext.getString(R.string.deck_wizard_build_error)) }
+            return
+        }
+
+        crashlytics.log("deck_wizard_generate_succeeded")
+        crashlytics.setCustomKey("deck_wizard_template_source", "COMMANDER_V3_ENGINE")
+        _uiState.update {
+            it.copy(phase = WizardPhase.RESULT, commanderBuildResult = outcome.result, createdDeckId = writeOutcome)
+        }
+    }
+
+    /** The legacy Casual build path (Motor A / [BuildDeckFromTemplateUseCase]) -- byte-identical to
+     * this function's body before Phase 6's Commander dispatch was introduced in [onGenerate]. */
+    private suspend fun generateCasualDeck(state: DeckWizardUiState, format: DeckFormat) {
+        run {
             val crashlytics = FirebaseCrashlytics.getInstance()
             crashlytics.log("deck_wizard_generate_started")
             crashlytics.setCustomKey("deck_wizard_format", format.name)
@@ -1948,14 +2080,14 @@ class DeckWizardViewModel(
             if (result == null) {
                 crashlytics.log("deck_wizard_generate_failed")
                 _uiState.update { it.copy(buildError = failureMessage ?: appContext.getString(R.string.deck_wizard_build_error)) }
-                return@launch
+                return
             }
 
             val writeOutcome = runCatching { writeResultIntoNewDeck(spec, result) }
                 .getOrElse { t ->
                     logFailure("deck_wizard_write_failed", t)
                     _uiState.update { it.copy(buildError = appContext.getString(R.string.deck_wizard_build_error)) }
-                    return@launch
+                    return
                 }
 
             crashlytics.log("deck_wizard_generate_succeeded")

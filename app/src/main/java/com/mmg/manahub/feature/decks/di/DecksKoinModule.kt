@@ -26,6 +26,7 @@ import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUse
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestStrategiesForSeedsUseCase
+import com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
 import com.mmg.manahub.feature.decks.domain.template.DeckTemplateResolver
@@ -131,6 +132,9 @@ fun decksKoinModule(): Module = module {
     // built from the same EvaluateDeckUseCase/InferDeckIdentityUseCase/CrashReporter singletons
     // above, consumed by DeckDoctorOrchestrator today and by the Commander builder in a later phase.
     single { DeckAnalysisPipeline(evaluateDeckUseCase = get(), inferDeckIdentityUseCase = get(), crashReporter = get()) }
+    // Deck Wizard Commander v3 plan (Phase 2/6): the placement engine BuildDeckFromTemplateUseCase's
+    // Commander branch is retiring toward -- consumes the SAME DeckAnalysisPipeline singleton above.
+    single { BuildCommanderDeckUseCase(deckAnalysisPipeline = get(), crashReporter = get()) }
     single { SuggestAddsUseCase(deckScorer = get()) }
     // Deck Analysis Category Sections rework (W0, D3): the old Deck Doctor "Cuts" suggestion tab
     // was deleted, so NOTHING in production resolves `SuggestCutsUseCase` via Koin any more --
@@ -273,6 +277,9 @@ fun decksKoinModule(): Module = module {
             // Deck Wizard Commander v3 plan, Phase 5 (D2) -- the SAME shared DeckAnalysisPipeline
             // singleton DeckDoctorOrchestrator/the harness already resolve, never a second instance.
             deckAnalysisPipeline = get(),
+            // Deck Wizard Commander v3 plan, Phase 6 -- the Commander build path (onGenerate's
+            // format dispatch), replacing BuildDeckFromTemplateUseCase for isCommanderFormat specs.
+            buildCommanderDeckUseCase = get(),
         )
     }
 }
