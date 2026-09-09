@@ -21,7 +21,7 @@ ships — this file survives).
 | Engine used by the wizard | today: legacy Motor A (`DeckScorer.fit`); target: Deck Analysis Engine v3 primitives + `AnalysisEngine.evaluate` verification |
 | Campaign phase | P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 DONE (Run 5); P4 DONE (Run 6); P5 DONE (Run 7) |
 
-Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 DONE 2026-09-09 (Run 4: 3.1 F10 fix + 3.4 search-plumbing; Run 5: 3.2 UI + 3.3 StructuredCardSearch + lockedCriteria + VM wiring + tests + compose-design-reviewer pass — see progress tracker) · P4 DONE 2026-09-09 (Run 6: RecommendCommanderStrategiesUseCase + single-select STRATEGY step UI/VM wiring + DeriveCommanderStrategiesUseCase retirement + tests + compose-design-reviewer pass — see progress tracker) · P5 DONE 2026-09-09 (Run 7: PlanSectionsStepContent replaces MANUAL_ADDS for Commander, DeckAnalysisPipeline-only attribution, selectedPosture F3 gap closed, onAddSeed/onRemoveSeed hardened, ownedAvailabilityBySection, tests + compose-design-reviewer pass — see progress tracker) · P6 — · P7 — · P8 —`
+Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 DONE 2026-09-09 (Run 4: 3.1 F10 fix + 3.4 search-plumbing; Run 5: 3.2 UI + 3.3 StructuredCardSearch + lockedCriteria + VM wiring + tests + compose-design-reviewer pass — see progress tracker) · P4 DONE 2026-09-09 (Run 6: RecommendCommanderStrategiesUseCase + single-select STRATEGY step UI/VM wiring + DeriveCommanderStrategiesUseCase retirement + tests + compose-design-reviewer pass — see progress tracker) · P5 DONE 2026-09-09 (Run 7: PlanSectionsStepContent replaces MANUAL_ADDS for Commander, DeckAnalysisPipeline-only attribution, selectedPosture F3 gap closed, onAddSeed/onRemoveSeed hardened, ownedAvailabilityBySection, tests + compose-design-reviewer pass — see progress tracker) · P6 IN PROGRESS 2026-09-09 (Run 8: the deferred Phase 2 write-atomicity gate item CLOSED; a Phase 6 SLICE landed — nav route args, format preselect, atomic write in writeResultIntoNewDeck, a Run 7 onRemoveSeed fix; the Review/Generating/Result UI, the Studio CTA, and — the headline finding — BuildCommanderDeckUseCase still not wired into DeckWizardViewModel.onGenerate() at all, remain for a follow-up run — see progress tracker Run 8) · P7 — · P8 —`
 
 ---
 
@@ -363,3 +363,20 @@ Things that differ from Commander and are NOT solved by this campaign:
      "nothing selected until the user picks" behavior (a stale-archetype-leak check and the
      GENERIC-escape-hatch check); both were rewritten to select Custom explicitly where the test's
      real intent needed an unpinned state, not loosened.
+- 2026-09-09 — **Phase 2's deferred write-atomicity gate item CLOSED + Phase 6 SLICE landed (Run 8,
+  low reasoning-effort budget — see the progress tracker's Run 8 log for the full breakdown).**
+  `DeckRepository.replaceAllCardsWithSource` is now a genuine single-transaction Room write on
+  Android (`DeckDao.replaceAllCardsWithSource`, `@Transaction`); `writeResultIntoNewDeck` uses it for
+  both Casual and Commander. `Screen.DeckWizard.createRoute` gained `format`/`deckId` args and the VM
+  preselects a passed format, skipping the FORMAT step. The Run 7 `onRemoveSeed` open finding (the
+  Casual-only "clear stale strategy pick" rule wrongly shared with Commander) is fixed. **Headline
+  finding for the next run: `BuildCommanderDeckUseCase` (the whole Phase 2 placement engine) is still
+  never called by `DeckWizardViewModel.onGenerate()`** — every format, Commander included, still
+  builds via the legacy `BuildDeckFromTemplateUseCase`/`TemplateBuildResult` pipeline. Rewiring
+  `onGenerate()` to dispatch Commander through `BuildCommanderDeckUseCase` is a PREREQUISITE for
+  6.2/6.3/6.4 (Review/Generating/Result content), not parallel work — the next run should start
+  there. NOT done this run: the write path targeting an existing launched-from deck, the pop-back-to-
+  Studio nav branch (deliberately reverted rather than shipped half-wired — see the tracker's note
+  1), the Studio wizard CTA + confirmation dialog, all of 6.2/6.3/6.4's UI content, the
+  Result-vs-Studio round-trip test, and the `compose-design-reviewer`/`android-edge-case-tester`
+  passes.
