@@ -995,6 +995,12 @@
     <string name="deck_studio_empty_subtitle">Add cards with the + button, or pick one of the options below.</string>
     <string name="deck_studio_build_from_seed">Build from Seed</string>
     <string name="deck_studio_build_from_seed_desc">Pick a few cards you love and we\'ll build a full deck around them.</string>
+    <!-- Deck Wizard Commander v3 plan (Phase 6, item 4): Studio's own "regenerate this draft
+         through the wizard" entry point, Commander only, gated by the same
+         DECK_BUILDER_V2_ENABLED flag as the rest of the wizard's Studio reachability. -->
+    <string name="deck_studio_rebuild_with_wizard">Rebuild with the Wizard</string>
+    <string name="deck_studio_rebuild_confirm_title">Replace this deck\'s cards?</string>
+    <string name="deck_studio_rebuild_confirm_message">The wizard will replace every card in this deck with a fresh build from your collection. This can\'t be undone.</string>
     <string name="deck_studio_more_options">More options</string>
     <string name="deck_studio_browse_inspirations">Browse Inspirations</string>
     <string name="deck_studio_browse_inspirations_desc">Discover strategies and combos hiding in your own collection.</string>
@@ -1222,6 +1228,10 @@
     <string name="deck_wizard_review_direction_none">Not set</string>
     <string name="deck_wizard_review_colors">Colors</string>
     <string name="deck_wizard_review_seeds">Seed cards</string>
+    <!-- Deck Wizard Commander v3 plan (Phase 6, 6.2) -->
+    <string name="deck_wizard_review_strategy_section">Strategy</string>
+    <string name="deck_wizard_review_manual_adds_count">Manual adds (%1$d)</string>
+    <string name="deck_wizard_commander_expectation_copy">Built only from your collection — any gaps are reported, never filled with weak cards.</string>
     <string name="deck_wizard_fill_lands_title">Fill basic lands automatically</string>
     <string name="deck_wizard_fill_lands_subtitle">Color-weighted from the final mana curve</string>
     <string name="deck_wizard_use_community_data_title">Also use community trends</string>
@@ -1241,6 +1251,12 @@
     <string name="deck_wizard_build_error_title">Something went wrong</string>
     <string name="deck_wizard_build_error">We couldn\'t build the deck. Please try again.</string>
     <string name="deck_wizard_retry">Try again</string>
+    <!-- Deck Wizard Commander v3 plan (Phase 6, 6.3) -->
+    <string name="deck_wizard_commander_stage_resolving_plan">Resolving your plan…</string>
+    <string name="deck_wizard_commander_stage_placing_manual_adds">Placing your manual adds…</string>
+    <string name="deck_wizard_commander_stage_placing_cards">Placing cards from your collection…</string>
+    <string name="deck_wizard_commander_stage_verifying">Verifying and refining…</string>
+    <string name="deck_wizard_commander_stage_writing_deck">Writing your deck…</string>
     <!-- Deck Doctor staged progress (Deck Wizard & Engine Rework plan, Workstream 8.4): mirrors
          the wizard's own "Generating" stage copy above; same visual language, separate strings
          since this is the Suggestions tab's full-analysis pass, not a deck build. -->
@@ -1258,6 +1274,9 @@
     <string name="deck_wizard_source_community">Built from community data</string>
     <string name="deck_wizard_source_synthetic">Built from your deck archetype</string>
     <string name="deck_wizard_open_studio">Open in Deck Studio</string>
+    <!-- Deck Wizard Commander v3 plan (Phase 6, 6.4) -->
+    <string name="deck_wizard_commander_result_fill_summary">%1$d cards placed by the wizard · %2$d kept from your manual adds · %3$d lands</string>
+    <string name="deck_wizard_commander_result_gap_row">%1$s %2$d/%3$d — no more in your collection</string>
     <string name="deck_wizard_suggestion_added">%1$s added</string>
     <string name="deck_wizard_name_suffix_deck">%1$s Deck</string>
     <string name="deck_wizard_name_default">New %1$s Deck</string>

@@ -71,6 +71,11 @@ class BuildCommanderDeckUseCase(
      * @param edhrecAggregateNames D9: card names present in the commander's EDHREC aggregate, or
      *        empty when the community flag is off/unavailable — a bounded prior only (≤ 1.15x),
      *        never a placement source of its own.
+     * @param onStage Deck Wizard Commander v3 plan, Phase 6 (6.3) — fired at each build-loop stage
+     *        boundary so a caller (the wizard VM) can drive a real Generating-step progress UI.
+     *        Defaulted to a no-op so every pre-existing call site/test keeps compiling unchanged.
+     *        Mirrors [BuildDeckFromTemplateUseCase]'s own `TemplateBuildProgress.Stage` emissions,
+     *        but as a plain callback (this use case is a single suspend function, not a `Flow`).
      */
     suspend operator fun invoke(
         format: DeckFormat,
@@ -82,11 +87,13 @@ class BuildCommanderDeckUseCase(
         fillLands: Boolean = true,
         useCommunityData: Boolean = false,
         edhrecAggregateNames: Set<String> = emptySet(),
+        onStage: (CommanderBuildStage) -> Unit = {},
     ): CommanderBuildOutcome {
         require(format.isCommanderFormat) { "BuildCommanderDeckUseCase requires a Commander-shaped format, got $format" }
         val archetypeFormat = ArchetypeFormat.of(format)
             ?: error("BuildCommanderDeckUseCase requires a Commander-shaped format, got $format")
 
+        onStage(CommanderBuildStage.RESOLVING_PLAN)
         val plan = CommanderPlanResolver.resolve(format, commander, strategyPick, identity)
         val pin = when (strategyPick) {
             is StrategyPick.Curated -> strategyPick.strategy.toPin(strategyPick.tribe)
@@ -136,6 +143,7 @@ class BuildCommanderDeckUseCase(
 
         // ── Seed placement state with manual non-land adds (placed FIRST, D7/R5 — never dropped
         //    even off-plan; their contribution still counts toward remaining gain for the loop) ──
+        onStage(CommanderBuildStage.PLACING_MANUAL_ADDS)
         var state = PlacementScorer.PlacementState()
         val placedNonLand = mutableListOf<DeckEntry>()
         manualNonLand.forEach { manual ->
@@ -151,6 +159,7 @@ class BuildCommanderDeckUseCase(
         }
 
         // ── The loop (2.3) ──────────────────────────────────────────────────────────────────────
+        onStage(CommanderBuildStage.PLACING_CARDS)
         val remainingCandidates = candidateCards.toMutableList()
         var iterations = 0
         val iterationCap = candidateCards.size + nonLandTarget + ITERATION_CAP_SLACK
@@ -176,6 +185,7 @@ class BuildCommanderDeckUseCase(
         }
 
         // ── Land fill v2 (2.4) ──────────────────────────────────────────────────────────────────
+        onStage(CommanderBuildStage.FILLING_LANDS)
         val remainingLandSlots = (landTarget - manualLand.sumOf { 1 }).coerceAtLeast(0)
         val landEntries = mutableListOf<DeckEntry>()
         manualLand.forEach { landEntries += DeckEntry(card = it.card, quantity = 1, isOwned = it.isOwned, isSideboard = false) }
@@ -198,6 +208,7 @@ class BuildCommanderDeckUseCase(
         val fullMainboard = listOf(commanderEntry) + placedNonLand + landEntries
 
         // ── Verify + refine (2.5) ───────────────────────────────────────────────────────────────
+        onStage(CommanderBuildStage.VERIFYING_AND_REFINING)
         var health = analyze(fullMainboard, format, commander, pin)
         var analysis = health?.analysis
         if (analysis == null || hasBlocker(analysis)) {
@@ -247,6 +258,7 @@ class BuildCommanderDeckUseCase(
             fillStats = fillStats,
             refinementSwaps = refinementSwaps,
         )
+        onStage(CommanderBuildStage.DONE)
         return CommanderBuildOutcome(result, plan, pin)
     }
 

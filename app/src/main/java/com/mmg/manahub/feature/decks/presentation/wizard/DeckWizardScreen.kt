@@ -77,6 +77,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
+import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import org.jetbrains.compose.resources.painterResource
 import org.koin.androidx.compose.koinViewModel
@@ -261,13 +262,25 @@ fun DeckWizardScreen(
                             onCancel = viewModel::onCancelGeneration,
                             onRetry = viewModel::onRetryGeneration,
                         )
-                        WizardPhase.RESULT -> ResultContent(
-                            uiState = uiState,
-                            onAddSuggestion = viewModel::onAddCommunitySuggestion,
-                            onCardClick = onCardClick,
-                            onOpenDeckStudio = viewModel::onOpenDeckStudio,
-                            onBack = handleBack,
-                        )
+                        WizardPhase.RESULT -> if (uiState.selectedFormat?.isCommanderFormat == true) {
+                            // Deck Wizard Commander v3 plan (Phase 6, 6.4): commanderBuildResult
+                            // carries the SAME DeckAnalysis Studio shows -- never the legacy
+                            // TemplateBuildResult/SuggestionCategory vocabulary below.
+                            CommanderResultContent(
+                                uiState = uiState,
+                                onCardClick = onCardClick,
+                                onOpenDeckStudio = viewModel::onOpenDeckStudio,
+                                onBack = handleBack,
+                            )
+                        } else {
+                            ResultContent(
+                                uiState = uiState,
+                                onAddSuggestion = viewModel::onAddCommunitySuggestion,
+                                onCardClick = onCardClick,
+                                onOpenDeckStudio = viewModel::onOpenDeckStudio,
+                                onBack = handleBack,
+                            )
+                        }
                     }
                 }
             }
@@ -545,6 +558,7 @@ private fun ReviewStepContent(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
+    val isCommander = uiState.selectedFormat?.isCommanderFormat == true
 
     // C1 (design review): the sticky CTA is a real Column sibling, weight(1f) + verticalScroll on
     // the content above it -- no guessed bottom-padding reservation (see FormatStepContent).
@@ -574,9 +588,41 @@ private fun ReviewStepContent(
                 }
             }
 
+            // Deck Wizard Commander v3 plan (Phase 6, 6.2): the STRATEGY step's own pick, resolved
+            // to its display name + description (Custom = the same fallback copy the Strategy step
+            // itself shows) -- byte-identical to the pin generateCommanderDeck re-resolves for the
+            // real build (D4), never a re-derivation.
+            if (isCommander) {
+                val strategy = uiState.selectedCuratedStrategyId?.let { CuratedStrategyCatalog.byId(it) }
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                    ReviewSectionLabel(stringResource(R.string.deck_wizard_review_strategy_section))
+                    Surface(shape = SmallCardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(spacing.md)) {
+                            Text(
+                                text = strategy?.displayName ?: stringResource(R.string.deck_wizard_strategy_custom_title),
+                                style = ty.titleMedium,
+                                color = mc.textPrimary,
+                            )
+                            Text(
+                                text = strategy?.description ?: stringResource(R.string.deck_wizard_strategy_custom_description),
+                                style = ty.bodySmall,
+                                color = mc.textSecondary,
+                                modifier = Modifier.padding(top = spacing.xxs),
+                            )
+                        }
+                    }
+                }
+            }
+
             if (uiState.seedCards.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                    ReviewSectionLabel(stringResource(R.string.deck_wizard_review_seeds))
+                    ReviewSectionLabel(
+                        if (isCommander) {
+                            stringResource(R.string.deck_wizard_review_manual_adds_count, uiState.seedCards.size)
+                        } else {
+                            stringResource(R.string.deck_wizard_review_seeds)
+                        }
+                    )
                     // A nested-scroll horizontal LazyRow inside the outer verticalScroll Column is
                     // safe here (different axis) -- same reasoning as the task's guidance for this
                     // screen; each tile keyed by scryfallId (unique, no duplicate-copy collision
@@ -590,14 +636,18 @@ private fun ReviewStepContent(
             Surface(shape = SmallCardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(spacing.lg), verticalArrangement = Arrangement.spacedBy(spacing.md)) {
                     ReviewRow(stringResource(R.string.deck_wizard_review_format), uiState.selectedFormat?.displayName ?: "—")
-                    ReviewChipRow(
-                        label = stringResource(R.string.deck_wizard_review_direction),
-                        chipText = uiState.selectedCommander?.name
-                            ?: uiState.selectedArchetype?.displayName
-                            ?: uiState.selectedDirectionTheme?.displayName
-                            ?: uiState.selectedTribeLabel
-                            ?: stringResource(R.string.deck_wizard_review_direction_none),
-                    )
+                    // Commander already has its own dedicated Commander/Strategy sections above --
+                    // this generic Direction chip is Casual-only from here on (it used to redundantly
+                    // repeat the commander's name for Commander builds).
+                    if (!isCommander) {
+                        ReviewChipRow(
+                            label = stringResource(R.string.deck_wizard_review_direction),
+                            chipText = uiState.selectedArchetype?.displayName
+                                ?: uiState.selectedDirectionTheme?.displayName
+                                ?: uiState.selectedTribeLabel
+                                ?: stringResource(R.string.deck_wizard_review_direction_none),
+                        )
+                    }
                     ReviewColorsRow(
                         label = stringResource(R.string.deck_wizard_review_colors),
                         colors = uiState.colorIdentity,
@@ -669,7 +719,14 @@ private fun ReviewStepContent(
                 Row(Modifier.padding(spacing.md), verticalAlignment = Alignment.Top) {
                     Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.goldMtg, modifier = Modifier.size(20.dp))
                     Text(
-                        text = stringResource(R.string.deck_wizard_expectation_copy),
+                        // Deck Wizard Commander v3 plan (Phase 6, 6.2): Commander gets its own
+                        // honest expectation copy (D7/D8 -- collection-only, gaps reported not
+                        // filled with weak cards); Casual keeps the original "deeper build" copy.
+                        text = if (isCommander) {
+                            stringResource(R.string.deck_wizard_commander_expectation_copy)
+                        } else {
+                            stringResource(R.string.deck_wizard_expectation_copy)
+                        },
                         style = ty.bodySmall,
                         color = mc.textSecondary,
                         modifier = Modifier.padding(start = spacing.sm),

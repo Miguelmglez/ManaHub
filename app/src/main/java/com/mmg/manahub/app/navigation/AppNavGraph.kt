@@ -739,6 +739,9 @@ fun AppNavGraph(
                     onNavigateToWizard = { archetype, theme, tribe, colors, seeds ->
                         navController.navigate(Screen.DeckWizard.createRoute(archetype, theme, tribe, colors, seeds))
                     },
+                    onNavigateToWizardFromDraft = { deckId, format ->
+                        navController.navigate(Screen.DeckWizard.createRoute(format = format, deckId = deckId))
+                    },
                     onNavigateToMassiveAddCards = {
                         navController.navigate(Screen.CollectionMassiveAddCard.route)
                     },
@@ -757,21 +760,28 @@ fun AppNavGraph(
                     navArgument("format") { type = NavType.StringType; defaultValue = ""; nullable = false },
                     navArgument("deckId") { type = NavType.StringType; defaultValue = ""; nullable = false },
                 ),
-            ) {
+            ) { backStackEntry ->
                 // Deck Wizard Commander v3 plan (Phase 6, D12): the "format"/"deckId" nav args
                 // (Screen.DeckWizard.createRoute) are read by DeckWizardViewModel to preselect the
-                // format and skip the FORMAT step. NOTE -- popping back to the Studio entry that
-                // launched the wizard (instead of navigate+popUpTo pushing a second one) needs
-                // writeResultIntoNewDeck to actually target that existing deckId first; that half of
-                // D12 is NOT wired yet (tracked in the progress doc), so onOpenDeckStudio still always
-                // navigates to a freshly-created deck below.
+                // format and skip the FORMAT step, AND to target the wizard's atomic write at this
+                // SAME existing draft (generateCommanderDeck, Run 9) instead of creating a new one.
+                val launchedFromDeckId = backStackEntry.arguments?.getString("deckId")?.takeIf { it.isNotEmpty() }
                 DeckWizardScreen(
                     onBack = { navController.popBackStack() },
                     onOpenDeckStudio = { deckId ->
-                        // Replace the wizard on the back stack with Deck Studio so system back from
-                        // Studio returns to whatever screen opened the wizard, not back to Result.
-                        navController.navigate(Screen.DeckStudio.createRoute(deckId)) {
-                            popUpTo(Screen.DeckWizard.route) { inclusive = true }
+                        if (launchedFromDeckId != null && launchedFromDeckId == deckId) {
+                            // Item 5 (Phase 6): the wizard filled the SAME draft that launched it --
+                            // pop back to reveal that EXISTING Studio entry (its Room-backed flow
+                            // picks up the new cards reactively) instead of pushing a second Studio
+                            // entry on top of it, which navigate+popUpTo below would do.
+                            navController.popBackStack()
+                        } else {
+                            // Replace the wizard on the back stack with Deck Studio so system back
+                            // from Studio returns to whatever screen opened the wizard, not back to
+                            // Result. Only reached for a FRESH draft (no deckId arg was passed in).
+                            navController.navigate(Screen.DeckStudio.createRoute(deckId)) {
+                                popUpTo(Screen.DeckWizard.route) { inclusive = true }
+                            }
                         }
                     },
                     onCardClick = { id -> navController.navigate(Screen.CollectionCardDetail.createRoute(id)) },

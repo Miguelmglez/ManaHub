@@ -164,8 +164,9 @@ data class WizardBuildResult(
  * `else` branch (one `R.string` per case) — appending cases to the shared enum would force an
  * unrelated Casual-UI change (new strings) for stages the Commander build (Phase 2+) does not use
  * yet, and would blur "which stages can a Casual build actually emit" (Casual keeps
- * [BuildDeckFromTemplateUseCase]/[BuildStage] untouched, D7's escape hatch). Not yet emitted by any
- * build loop or wizard VM (Phase 2/6 wire it) — a pure type addition.
+ * [BuildDeckFromTemplateUseCase]/[BuildStage] untouched, D7's escape hatch). Emitted by
+ * [BuildCommanderDeckUseCase]'s own `onStage` callback (Phase 6, 6.3) and consumed by the wizard
+ * VM's Generating step.
  */
 enum class CommanderBuildStage {
     RESOLVING_PLAN, PLACING_MANUAL_ADDS, PLACING_CARDS, FILLING_LANDS, VERIFYING_AND_REFINING, WRITING_DECK, DONE,

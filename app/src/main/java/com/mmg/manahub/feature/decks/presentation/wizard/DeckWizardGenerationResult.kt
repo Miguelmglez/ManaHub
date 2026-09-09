@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,7 +29,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,14 +52,22 @@ import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.decks.domain.engine.CardSection
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.PillarId
 import com.mmg.manahub.feature.decks.domain.template.BuildStage
 import com.mmg.manahub.feature.decks.domain.template.CategoryFill
+import com.mmg.manahub.feature.decks.domain.template.CommanderBuildStage
 import com.mmg.manahub.feature.decks.domain.template.DeckGap
 import com.mmg.manahub.feature.decks.domain.template.TemplateBuildResult
 import com.mmg.manahub.feature.decks.domain.template.TemplateCardSuggestion
 import com.mmg.manahub.feature.decks.domain.template.TemplateSource
+import com.mmg.manahub.feature.decks.domain.template.WizardBuildResult
+import com.mmg.manahub.feature.decks.presentation.components.FindingsList
+import com.mmg.manahub.feature.decks.presentation.components.HealthScoreRing
+import com.mmg.manahub.feature.decks.presentation.components.PillarTile
 import com.mmg.manahub.feature.decks.presentation.components.SuggestionGrouping
+import com.mmg.manahub.feature.decks.presentation.components.label
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Generating
@@ -95,6 +107,17 @@ internal fun GeneratingContent(
         return
     }
 
+    // Deck Wizard Commander v3 plan, Phase 6 (6.3) -- Commander drives its OWN staged-progress
+    // track (commanderBuildStage/commanderCompletedStages, a separate enum -- see
+    // CommanderBuildStage's own KDoc); Casual keeps the legacy buildStage/completedStages fields,
+    // byte-identical to before this branch was introduced.
+    val isCommander = uiState.selectedFormat?.isCommanderFormat == true
+    val currentStageLabel = if (isCommander) {
+        uiState.commanderBuildStage?.label() ?: stringResource(R.string.deck_wizard_stage_validating)
+    } else {
+        uiState.buildStage?.label() ?: stringResource(R.string.deck_wizard_stage_validating)
+    }
+
     Column(
         modifier = Modifier.fillMaxSize().navigationBarsPadding().padding(spacing.lg),
         verticalArrangement = Arrangement.SpaceBetween,
@@ -107,7 +130,7 @@ internal fun GeneratingContent(
             MagicLoadingSpinner(size = MagicLoadingSize.Medium)
             Spacer(Modifier.height(spacing.lg))
             Text(
-                text = uiState.buildStage?.label() ?: stringResource(R.string.deck_wizard_stage_validating),
+                text = currentStageLabel,
                 style = ty.titleMedium,
                 color = mc.textPrimary,
             )
@@ -117,10 +140,19 @@ internal fun GeneratingContent(
                 verticalArrangement = Arrangement.spacedBy(spacing.xs),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                uiState.completedStages.forEach { stage ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = mc.lifePositive, modifier = Modifier.size(16.dp))
-                        Text(stage.label(), style = ty.labelMedium, color = mc.textSecondary)
+                if (isCommander) {
+                    uiState.commanderCompletedStages.forEach { stage ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = mc.lifePositive, modifier = Modifier.size(16.dp))
+                            Text(stage.label(), style = ty.labelMedium, color = mc.textSecondary)
+                        }
+                    }
+                } else {
+                    uiState.completedStages.forEach { stage ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = mc.lifePositive, modifier = Modifier.size(16.dp))
+                            Text(stage.label(), style = ty.labelMedium, color = mc.textSecondary)
+                        }
                     }
                 }
             }
@@ -148,6 +180,19 @@ private fun BuildStage.label(): String = stringResource(
         BuildStage.TOP_UP_FROM_COLLECTION -> R.string.deck_wizard_stage_top_up_from_collection
         BuildStage.FILLING_LANDS -> R.string.deck_wizard_stage_filling_lands
         BuildStage.DONE -> R.string.deck_wizard_stage_done
+    }
+)
+
+@Composable
+private fun CommanderBuildStage.label(): String = stringResource(
+    when (this) {
+        CommanderBuildStage.RESOLVING_PLAN -> R.string.deck_wizard_commander_stage_resolving_plan
+        CommanderBuildStage.PLACING_MANUAL_ADDS -> R.string.deck_wizard_commander_stage_placing_manual_adds
+        CommanderBuildStage.PLACING_CARDS -> R.string.deck_wizard_commander_stage_placing_cards
+        CommanderBuildStage.FILLING_LANDS -> R.string.deck_wizard_stage_filling_lands
+        CommanderBuildStage.VERIFYING_AND_REFINING -> R.string.deck_wizard_commander_stage_verifying
+        CommanderBuildStage.WRITING_DECK -> R.string.deck_wizard_commander_stage_writing_deck
+        CommanderBuildStage.DONE -> R.string.deck_wizard_stage_done
     }
 )
 
@@ -286,6 +331,168 @@ internal fun ResultContent(
             label = stringResource(R.string.deck_wizard_open_studio),
             enabled = true,
             onClick = onOpenDeckStudio,
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Commander Result — Deck Wizard Commander v3 plan, Phase 6 (6.4).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Renders [DeckWizardUiState.commanderBuildResult] — the SAME [com.mmg.manahub.feature.decks.domain
+ * .engine.DeckAnalysis] object the Deck Studio Analysis tab shows for this deck (D15;
+ * [com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckPersistenceRoundTripTest] proves
+ * the persisted-then-re-analyzed deck is byte-identical to it) — never a wizard-only re-derivation.
+ * Reuses [HealthScoreRing]/[PillarTile]/[FindingsList] verbatim so this screen and Studio's own
+ * Analysis tab read as the same system.
+ */
+@Composable
+internal fun CommanderResultContent(
+    uiState: DeckWizardUiState,
+    onCardClick: (String) -> Unit,
+    onOpenDeckStudio: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    val result = uiState.commanderBuildResult
+
+    if (result == null) {
+        EmptyState(
+            title = stringResource(R.string.deck_wizard_build_error_title),
+            subtitle = stringResource(R.string.deck_wizard_build_error),
+            icon = Icons.Default.AutoAwesome,
+            actionLabel = stringResource(R.string.action_back),
+            onAction = onBack,
+        )
+        return
+    }
+
+    val analysis = result.analysis
+    // Design/edge-case review: keyed on REFERENCE identity, not result's structural equality -- a
+    // cancel-then-identical-retry produces a structurally-equal-but-distinct WizardBuildResult, and
+    // a structural remember() key would then wrongly carry over a stale expandedPillar selection.
+    var expandedPillar by remember(System.identityHashCode(result)) { mutableStateOf<PillarId?>(null) }
+    val expanded = analysis.pillars.firstOrNull { it.id == expandedPillar }
+    val visibleGapSections = remember(result) { result.gapSections.filter { it.min != null } }
+
+    Column(Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = PaddingValues(start = spacing.lg, end = spacing.lg, top = spacing.md, bottom = spacing.md),
+            verticalArrangement = Arrangement.spacedBy(spacing.md),
+        ) {
+            item(key = "commander_score_ring") {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    HealthScoreRing(score = analysis.totalScore)
+                }
+            }
+            item(key = "commander_strategy_chip") {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CommanderResultStrategyChip(displayName = analysis.strategy.displayName)
+                }
+            }
+            item(key = "commander_pillar_row") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    analysis.pillars.forEach { pillar ->
+                        PillarTile(
+                            pillar = pillar,
+                            expanded = expandedPillar == pillar.id,
+                            onClick = { expandedPillar = if (expandedPillar == pillar.id) null else pillar.id },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+            if (expanded != null) {
+                item(key = "commander_pillar_findings_${expanded.id}") {
+                    // Design review: animates the height change when a different pillar is expanded/
+                    // collapsed instead of the findings list popping in/out abruptly.
+                    Box(Modifier.animateContentSize()) {
+                        FindingsList(findings = expanded.findings)
+                    }
+                }
+            }
+            item(key = "commander_fill_summary") {
+                Surface(shape = CardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = stringResource(
+                            R.string.deck_wizard_commander_result_fill_summary,
+                            result.fillStats.placedByWizard,
+                            result.fillStats.placedManual,
+                            result.fillStats.lands,
+                        ),
+                        style = ty.bodySmall,
+                        color = mc.textSecondary,
+                        modifier = Modifier.padding(spacing.md),
+                    )
+                }
+            }
+
+            // D8: the SAME CardSection ids/labels the Studio Analysis tab shows — the wizard never
+            // re-derives its own gap vocabulary. Pre-filtered to sections with a real min band
+            // (design review: CommanderGapSectionRow's own null-min guard would otherwise render as
+            // an invisible zero-height list slot instead of simply not being in the list).
+            if (visibleGapSections.isNotEmpty()) {
+                item(key = "commander_gaps_header") {
+                    Text(stringResource(R.string.deck_wizard_gaps_title), style = ty.labelLarge, color = mc.goldMtg)
+                }
+                items(visibleGapSections, key = { "commander_gap_${it.id}" }) { section ->
+                    CommanderGapSectionRow(section)
+                }
+            }
+
+            if (uiState.seedCards.isNotEmpty()) {
+                item(key = "commander_manual_adds_header") {
+                    Text(stringResource(R.string.deck_wizard_plan_sections_added_title), style = ty.labelLarge, color = mc.lifePositive)
+                }
+                items(uiState.seedCards, key = { "commander_manual_${it.scryfallId}" }) { card ->
+                    WizardOwnedCardRow(card = card, quantity = 1, onClick = { onCardClick(card.scryfallId) })
+                }
+            }
+        }
+
+        WizardStickyButton(
+            label = stringResource(R.string.deck_wizard_open_studio),
+            enabled = true,
+            onClick = onOpenDeckStudio,
+        )
+    }
+}
+
+@Composable
+private fun CommanderResultStrategyChip(displayName: String) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.16f)) {
+        Text(
+            text = displayName,
+            style = ty.labelMedium,
+            color = mc.primaryAccent,
+            modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
+        )
+    }
+}
+
+/** One "{label} {current}/{min} — no more in your collection" row (D8) — the verification
+ * analysis's own gap sections, never a separate wizard vocabulary. */
+@Composable
+private fun CommanderGapSectionRow(section: CardSection) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val min = section.min ?: return
+    Surface(shape = CardShape, color = mc.goldMtg.copy(alpha = 0.12f), modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.deck_wizard_commander_result_gap_row, section.label, section.current, min),
+            style = ty.bodySmall,
+            color = mc.goldMtg,
+            modifier = Modifier.padding(MaterialTheme.spacing.md),
         )
     }
 }

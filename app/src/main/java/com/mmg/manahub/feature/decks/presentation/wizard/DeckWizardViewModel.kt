@@ -356,6 +356,12 @@ data class DeckWizardUiState(
     // ── Generation ─────────────────────────────────────────────────────────────
     val buildStage: com.mmg.manahub.feature.decks.domain.template.BuildStage? = null,
     val completedStages: List<com.mmg.manahub.feature.decks.domain.template.BuildStage> = emptyList(),
+    /** Deck Wizard Commander v3 plan, Phase 6 (6.3) — the Commander build path's OWN staged-progress
+     * track ([com.mmg.manahub.feature.decks.domain.template.CommanderBuildStage], a SEPARATE enum
+     * from [buildStage]'s -- see that enum's own KDoc for why). `null`/empty for every Casual build,
+     * which keeps using [buildStage]/[completedStages] unchanged. */
+    val commanderBuildStage: com.mmg.manahub.feature.decks.domain.template.CommanderBuildStage? = null,
+    val commanderCompletedStages: List<com.mmg.manahub.feature.decks.domain.template.CommanderBuildStage> = emptyList(),
     val buildError: String? = null,
 
     // ── Result ─────────────────────────────────────────────────────────────────
@@ -523,13 +529,20 @@ class DeckWizardViewModel(
     private var pendingDeckId: String? = null
 
     /** Deck Wizard Commander v3 plan (Phase 6, D12): the deckId nav arg (Screen.DeckWizard
-     * .createRoute) when the wizard was launched from an existing Deck Studio draft (Studio's own
-     * wizard CTA, not yet built). NOT YET consumed by [onGenerate]/[writeResultIntoNewDeck] -- the
-     * write path still always creates a brand-new deck regardless of this value; wiring it to write
-     * into THIS existing deck (and to pop back to Studio instead of pushing a second entry) is
-     * tracked as remaining Phase 6 work, not done this run. Read once, at init, and kept only so a
-     * future change has it available without touching SavedStateHandle plumbing again. */
+     * .createRoute) when the wizard was launched from an existing Deck Studio draft (Studio's
+     * "Rebuild with the Wizard" CTA). Consumed by [generateCommanderDeck] (fills THIS deck instead
+     * of creating a new one) and by [onSelectFormat] (a rebuild launch cannot switch away from
+     * Commander). [generateCasualDeck] does NOT honor it -- a rebuild launch is always Commander,
+     * see [onSelectFormat]'s own guard. Read once, at init. */
     private var launchedFromDeckId: String? = null
+
+    /** Edge-case fix (Phase 6 adversarial pass): true while [generateCommanderDeck]'s write step
+     * (`buildCommanderDeckUseCase.persist`, 4 sequential suspend calls) is in flight. [Cancel]
+     * cancelling the coroutine mid-write would leave a rebuild-in-place ([launchedFromDeckId])
+     * target with its cards replaced but a stale archetype/tribe/strategyLocked pin -- there is no
+     * safe rollback for a write already underway, so [onCancelGeneration] becomes a no-op once this
+     * is true, and it is reset the moment the write finishes (success or failure). */
+    private var isWritingCommanderDeck = false
 
     init {
         // Discoveries v2 "Build this" hand-off (D11) — optional, all blank by default. Deck Engine
@@ -633,6 +646,12 @@ class DeckWizardViewModel(
         // restored 60-card formats render "coming soon" and disabled in the UI, but guard here too
         // since this is the actual source of truth (never trust the UI-only disabled state).
         if (!format.isCommanderFormat && format != DeckFormat.CASUAL) return
+        // Edge-case fix (Phase 6 adversarial pass): the wizard was launched to REBUILD a specific
+        // existing Commander draft (launchedFromDeckId, D12) -- back-navigating to FORMAT and
+        // picking Casual would silently abandon that draft (generateCasualDeck never reads
+        // launchedFromDeckId) and create an unrelated new deck instead. A rebuild launch has no
+        // legitimate reason to change format at all.
+        if (launchedFromDeckId != null && !format.isCommanderFormat) return
         // QA fix (RUN 3b): FORMAT is reachable via back-navigation at any point after Direction-step
         // state has already been populated (see resetDirectionScratchState's KDoc) -- an ACTUAL
         // format change wipes every per-flow scratch field and resets the entry chooser to CARDS, so
@@ -1868,9 +1887,17 @@ class DeckWizardViewModel(
         if (state.phase != WizardPhase.REVIEW || state.selectedFormat == null) return
         logStep("generating")
         val format = state.selectedFormat
+        isWritingCommanderDeck = false
 
         _uiState.update {
-            it.copy(phase = WizardPhase.GENERATING, buildStage = null, completedStages = emptyList(), buildError = null)
+            it.copy(
+                phase = WizardPhase.GENERATING,
+                buildStage = null,
+                completedStages = emptyList(),
+                commanderBuildStage = null,
+                commanderCompletedStages = emptyList(),
+                buildError = null,
+            )
         }
         // Deck Wizard Commander v3 plan, Phase 6 -- the headline wire: a Commander-shaped format
         // (D1/D2) now builds through BuildCommanderDeckUseCase (the v3 placement engine, Phase 2)
@@ -1947,6 +1974,14 @@ class DeckWizardViewModel(
                 fillLands = state.fillLands,
                 useCommunityData = communityEnabled,
                 edhrecAggregateNames = edhrecAggregateNames,
+                onStage = { stage ->
+                    _uiState.update { s ->
+                        s.copy(
+                            commanderCompletedStages = s.commanderBuildStage?.let { s.commanderCompletedStages + it } ?: s.commanderCompletedStages,
+                            commanderBuildStage = stage,
+                        )
+                    }
+                },
             )
         }.getOrElse { t ->
             if (t is kotlinx.coroutines.CancellationException) throw t
@@ -1956,6 +1991,15 @@ class DeckWizardViewModel(
         }
 
         val manualIds = manualAdds.map { it.card.scryfallId }.toSet()
+        // Edge-case fix (Phase 6 adversarial pass): once the write actually starts, it MUST run to
+        // completion -- for a rebuild-in-place (launchedFromDeckId != null) this is mutating the
+        // user's own pre-existing draft, and a cancellation landing mid-write (persist() is 4
+        // sequential suspend calls, not one transaction) would leave it with cards replaced but a
+        // stale archetype/tribe/strategyLocked pin. isWritingCommanderDeck gates onCancelGeneration
+        // below so Cancel becomes a no-op once this point is reached, and CancellationException is
+        // explicitly rethrown (never swallowed into a spurious buildError) rather than caught by the
+        // generic getOrElse below, matching the build step's own convention right above this block.
+        isWritingCommanderDeck = true
         val writeOutcome = runCatching {
             // D12: fill the launched-from draft when one exists, else create a fresh one -- see this
             // function's own KDoc for the cancellation-safety argument each branch relies on.
@@ -1971,10 +2015,13 @@ class DeckWizardViewModel(
             buildCommanderDeckUseCase.persist(deckRepository, deckId, commander, manualIds, outcome)
             deckId
         }.getOrElse { t ->
+            isWritingCommanderDeck = false
+            if (t is kotlinx.coroutines.CancellationException) throw t
             logFailure("deck_wizard_write_failed", t)
             _uiState.update { it.copy(buildError = appContext.getString(R.string.deck_wizard_build_error)) }
             return
         }
+        isWritingCommanderDeck = false
 
         crashlytics.log("deck_wizard_generate_succeeded")
         crashlytics.setCustomKey("deck_wizard_template_source", "COMMANDER_V3_ENGINE")
@@ -2194,9 +2241,22 @@ class DeckWizardViewModel(
      * generation never leaves an orphaned draft (the wizard's equivalent of Deck Studio's
      * discard-if-empty contract — simpler here since the wizard ALWAYS starts a fresh deck). */
     fun onCancelGeneration() {
+        // Edge-case fix (Phase 6 adversarial pass): once the write has started there is no safe
+        // rollback (see isWritingCommanderDeck's KDoc) -- ignore Cancel and let the write finish;
+        // it will land on RESULT or a real buildError on its own.
+        if (isWritingCommanderDeck) return
         generateJob?.cancel()
         cleanupPendingDeck()
-        _uiState.update { it.copy(phase = WizardPhase.REVIEW, buildStage = null, completedStages = emptyList(), buildError = null) }
+        _uiState.update {
+            it.copy(
+                phase = WizardPhase.REVIEW,
+                buildStage = null,
+                completedStages = emptyList(),
+                commanderBuildStage = null,
+                commanderCompletedStages = emptyList(),
+                buildError = null,
+            )
+        }
     }
 
     /** Retries generation after a [DeckWizardUiState.buildError] without re-walking the steps.

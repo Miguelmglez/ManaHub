@@ -53,6 +53,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.UploadFile
@@ -221,6 +222,11 @@ fun DeckStudioScreen(
     // [seeds] (plan D7, 4.3): a combo's component card names, hands off to the wizard's Flow A --
     // null/empty for every other entry point (Discoveries v2's "Build this" passes null here too).
     onNavigateToWizard: (archetype: String?, theme: String?, tribe: String?, colors: String?, seeds: List<String>?) -> Unit = { _, _, _, _, _ -> },
+    // Deck Wizard Commander v3 plan (Phase 6, item 4/D12): Studio's own "regenerate this EXISTING
+    // draft through the wizard" entry point -- passes the draft's own format + id so the wizard's
+    // atomic write targets it directly instead of creating a second deck (D12). Unlike
+    // [onNavigateToWizard] above (always a FRESH draft), this always carries a real deckId.
+    onNavigateToWizardFromDraft: (deckId: String, format: String) -> Unit = { _, _ -> },
     // Visual-overhaul pass: non-null only when the hosting nav destination is inside a
     // `SharedTransitionLayout` -- drives the Combos-tab card tiles' shared-element transition
     // into the real CardDetailScreen (mirrors AddCardScreen/CollectionScreen's own optional
@@ -302,6 +308,14 @@ fun DeckStudioScreen(
     var showEditDeckSheet by remember { mutableStateOf(false) }
     var showImportSheet by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    // Deck Wizard Commander v3 plan (Phase 6, item 4, plan §8): a rebuild REPLACES every card in
+    // the draft (D12's atomic write) -- confirm before triggering it on a non-empty deck. An empty
+    // draft (nothing to lose) skips straight to the wizard, matching handleRebuildWithWizard below.
+    var showRebuildConfirm by remember { mutableStateOf(false) }
+    // Edge-case fix (Phase 6 adversarial pass): a rapid double-tap on the menu item (before
+    // showOverflow=false tears down the DropdownMenu) could otherwise fire onNavigateToWizardFromDraft
+    // twice, pushing two DeckWizard destinations for the same deckId.
+    var hasTriggeredRebuild by remember { mutableStateOf(false) }
     // C3: the inline CardDetailSheet target (a scryfallId from a deck-list / commander tap).
     var selectedCardId by remember { mutableStateOf<String?>(null) }
     // True when the detail sheet was opened from the commander-selection flow (shows the
@@ -387,6 +401,23 @@ fun DeckStudioScreen(
         ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
         ?.isCommanderFormat == true
 
+    // Deck Wizard Commander v3 plan (Phase 6, item 4): confirm before a non-empty draft is
+    // replaced (plan §8); an already-empty draft has nothing to lose, so it skips the dialog.
+    val handleRebuildWithWizard: () -> Unit = {
+        if (hasTriggeredRebuild) {
+            // no-op: already navigating (or the confirm dialog is already up) for this composition.
+        } else if (uiState.isEmptyDeck) {
+            val deckId = uiState.deck?.id
+            val format = uiState.deck?.format
+            if (deckId != null && format != null) {
+                hasTriggeredRebuild = true
+                onNavigateToWizardFromDraft(deckId, format)
+            }
+        } else {
+            showRebuildConfirm = true
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         androidx.compose.material3.Scaffold(
             containerColor = mc.background,
@@ -412,6 +443,8 @@ fun DeckStudioScreen(
                     onMassiveAdd = {onNavigateToMassiveAddCards(emptyList())},
                     shareEnabled = !uiState.isEmptyDeck,
                     onDeleteDeck = { showDeleteDialog = true },
+                    isCommanderFormat = isCommanderFormat,
+                    onRebuildWithWizard = handleRebuildWithWizard,
                 )
             },
             bottomBar = {
@@ -764,6 +797,29 @@ fun DeckStudioScreen(
         )
     }
 
+    if (showRebuildConfirm) {
+        MagicAlertDialog(
+            onDismissRequest = { showRebuildConfirm = false },
+            title = stringResource(R.string.deck_studio_rebuild_confirm_title),
+            text = stringResource(R.string.deck_studio_rebuild_confirm_message),
+            confirmLabel = stringResource(R.string.action_confirm),
+            dismissLabel = stringResource(R.string.action_cancel),
+            confirmColor = MagicCtaColor.Error,
+            onConfirm = {
+                showRebuildConfirm = false
+                if (!hasTriggeredRebuild) {
+                    val deckId = uiState.deck?.id
+                    val format = uiState.deck?.format
+                    if (deckId != null && format != null) {
+                        hasTriggeredRebuild = true
+                        onNavigateToWizardFromDraft(deckId, format)
+                    }
+                }
+            },
+            onDismiss = { showRebuildConfirm = false },
+        )
+    }
+
     if (showImportSheet) {
         DeckImportSheet(
             isLoading = uiState.isImporting,
@@ -894,6 +950,11 @@ private fun DeckStudioTopBar(
     shareEnabled: Boolean,
     onMassiveAdd: ()->Unit,
     onDeleteDeck: () -> Unit,
+    // Deck Wizard Commander v3 plan (Phase 6, item 4): Commander-only "regenerate this draft
+    // through the wizard" entry point, gated by the SAME DECK_BUILDER_V2_ENABLED flag as
+    // onBuildFromSeed above (the wizard stays unreachable in production until Phase 8 flips it).
+    isCommanderFormat: Boolean = false,
+    onRebuildWithWizard: () -> Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -985,6 +1046,32 @@ private fun DeckStudioTopBar(
                             onClick = {
                                 showOverflow = false
                                 onBuildFromSeed()
+                            },
+                        )
+                    }
+                    if (FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED && isCommanderFormat) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = stringResource(R.string.deck_studio_rebuild_with_wizard),
+                                    style = ty.bodyMedium,
+                                    color = mc.textPrimary,
+                                )
+                            },
+                            leadingIcon = {
+                                // Design review: a distinct icon from "Build from seed" above
+                                // (AutoAwesome) -- this action replaces every card in the deck
+                                // (confirmed via showRebuildConfirm), a much larger blast radius
+                                // that must read as different at a glance.
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    tint = mc.textSecondary,
+                                )
+                            },
+                            onClick = {
+                                showOverflow = false
+                                onRebuildWithWizard()
                             },
                         )
                     }
