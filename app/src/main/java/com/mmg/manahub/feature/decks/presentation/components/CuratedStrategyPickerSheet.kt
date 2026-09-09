@@ -68,16 +68,19 @@ import com.mmg.manahub.feature.decks.domain.engine.availableIn
 //  strategies", plan §3.2).
 //
 //  Naming note (deviation, documented): this file's `CuratedStrategyPickerSheet` is
-//  DELIBERATELY NOT named `StrategyPickerSheet` — that name is already taken by an UNRELATED,
-//  already-live component (`StrategyPickerSheet.kt`, Deck Wizard & Engine Rework plan WS1.2's
-//  shared 3-axis archetype/theme/tribe picker, still mounted by `DeckWizardCommanderSteps
-//  .StrategyStepContent`). The two pickers solve different problems (this one: pick ONE curated,
-//  pre-validated strategy from a flat list; that one: freely compose archetype + up to 2 themes +
-//  tribe from a restricted candidate set) and must stay separate composables — reusing the name
-//  here would either collide at the same package/file scope or silently shadow the wizard's own
-//  picker. [TribeOption] (declared in `StrategyPickerSheet.kt`) IS reused as-is below: it is a
-//  plain, picker-agnostic (key, label) shape, not specific to that file's 3-axis flow.
+//  DELIBERATELY NOT named `StrategyPickerSheet` — that name belonged to an unrelated 3-axis
+//  archetype/theme/tribe picker (Deck Wizard & Engine Rework plan WS1.2) that was deleted in the
+//  Deck Wizard Commander v3 plan's Phase 8 cleanup after confirming zero remaining callers (0
+//  production call sites; only its own @Preview referenced it). [TribeOption] used to live in
+//  that now-deleted file; it moved here since this is its only surviving consumer group
+//  (`DeckStudioScreen.kt`, `DeckWizardCommanderSteps.kt` also use it) — a plain, picker-agnostic
+//  (key, label) shape, not specific to any one picker's flow.
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/** A tribe candidate for a strategy/plan picker's tribe sub-selection — `key` is a raw
+ * `tribe:<subtype>` string, `label` its display name. Picker-agnostic (key, label) shape shared
+ * by [CuratedStrategyPickerSheet] and the wizard's commander-tribe picker. */
+data class TribeOption(val key: String, val label: String)
 
 /**
  * The Studio "Analysis" tab header chip (plan §3.4 item 2): "Plan: <Strategy> (detected|manual)".

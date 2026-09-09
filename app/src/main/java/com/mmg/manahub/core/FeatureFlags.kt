@@ -16,8 +16,11 @@ object FeatureFlags {
          * on whenever this flag is, no separate engine gate. */
         const val DECK_STUDIO_SUGGESTIONS_TAB_ENABLED = true
 
-        /** Deck Builder v2 wizard + generation + result screens. */
-        const val DECK_BUILDER_V2_ENABLED = false
+        /** Deck Builder v2 wizard + generation + result screens. Deck Wizard Commander v3 plan,
+         * Phase 8: flipped on after the full verify gauntlet passed (harness v2 all 3 segments,
+         * golden/calibration/corpus/skeleton suites byte-identical, persist() atomicity closed) --
+         * see `docs/deck-wizard-state.md` for the durable record. */
+        const val DECK_BUILDER_V2_ENABLED = true
 
         /** Deck Builder v2 Discoveries clustering. */
         const val DISCOVERIES_V2_ENABLED = false
