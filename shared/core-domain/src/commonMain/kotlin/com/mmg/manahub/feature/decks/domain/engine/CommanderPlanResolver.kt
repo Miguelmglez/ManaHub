@@ -118,8 +118,12 @@ object CommanderPlanResolver {
     /** [tribe] is the raw `"tribe:<subtype>"` key ([TribeDeriver.TRIBE_PREFIX]-prefixed, same shape
      * [CuratedStrategy.toPin]/[DeckIdentitySeedTags.tribeSeedTag] expect) — converts it to
      * [SynergyGraph]'s `"TRIBE:<subtype>"` axis form, mirroring `SynergyGraph.build`'s own
-     * `dominantTribeAxis` derivation exactly (`TRIBE_AXIS_PREFIX + key.removePrefix(TRIBE_PREFIX)`). */
-    private fun tribeAxisKey(tribe: String): AxisKey = "TRIBE:${tribe.removePrefix(TribeDeriver.TRIBE_PREFIX)}"
+     * `dominantTribeAxis` derivation exactly (`TRIBE_AXIS_PREFIX + key.removePrefix(TRIBE_PREFIX)`).
+     *
+     * Phase 4 (Deck Wizard Commander v3): promoted from `private` to `internal` — module-visible so
+     * [com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase] can derive
+     * the SAME tribe axis key for a curated Tribal pick's scoring, without a second implementation. */
+    internal fun tribeAxisKey(tribe: String): AxisKey = "TRIBE:${tribe.removePrefix(TribeDeriver.TRIBE_PREFIX)}"
 
     /**
      * [ThemeId] → the [SynergyGraph]'s static [AxisKey] it most directly targets — a DOCUMENTED
@@ -133,8 +137,13 @@ object CommanderPlanResolver {
      * (mana-production is not itself a modeled axis). A theme omitted here still contributes via the
      * commander's own [SynergyGraph.cardAxisProfile] axes and the resolved skeleton's role bands —
      * this table only widens [CommanderPlan.targetAxes] beyond those two sources.
+     *
+     * Phase 4 (Deck Wizard Commander v3): promoted from `private` to `internal` — module-visible so
+     * [com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase] can score a
+     * catalog entry's theme-axis alignment against the commander's own axis profile without a second
+     * hand-written copy of this table (per that use case's own KDoc — see its "signal (a)" note).
      */
-    private val THEME_TARGET_AXES: Map<ThemeId, Set<AxisKey>> = mapOf(
+    internal val THEME_TARGET_AXES: Map<ThemeId, Set<AxisKey>> = mapOf(
         ThemeId.TOKENS to setOf("TOKENS"),
         ThemeId.ARISTOCRATS to setOf("DEATH"),
         ThemeId.SPELLSLINGER to setOf("SPELLS"),
