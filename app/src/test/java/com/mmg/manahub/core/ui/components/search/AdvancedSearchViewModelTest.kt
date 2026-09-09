@@ -229,4 +229,68 @@ class AdvancedSearchViewModelTest {
         assertEquals("usd", vm.uiState.value.priceCurrency)
         assertTrue(vm.uiState.value.currentQuery.criteria.isEmpty())
     }
+
+    // ── Locked criteria (Deck Wizard Commander v3 plan, Phase 3.2/3.4, D14) ────
+
+    @Test
+    fun `a locked criterion is present even with no user interaction`() = runTest(dispatcher) {
+        val vm = createVm()
+        advanceUntilIdle()
+
+        vm.setLockedCriteria(listOf(SearchCriterion.CommanderEligible))
+
+        assertEquals(listOf(SearchCriterion.CommanderEligible), vm.uiState.value.currentQuery.criteria)
+    }
+
+    @Test
+    fun `a locked criterion survives clearAll`() = runTest(dispatcher) {
+        val vm = createVm()
+        advanceUntilIdle()
+        vm.setLockedCriteria(listOf(SearchCriterion.CommanderEligible))
+        vm.setName("Bolt")
+        assertEquals(2, vm.uiState.value.currentQuery.criteria.size)
+
+        vm.clearAll()
+
+        assertEquals(listOf(SearchCriterion.CommanderEligible), vm.uiState.value.currentQuery.criteria)
+    }
+
+    @Test
+    fun `a locked criterion survives re-seeding from an unrelated applied query`() = runTest(dispatcher) {
+        val vm = createVm()
+        advanceUntilIdle()
+        vm.setLockedCriteria(listOf(SearchCriterion.CommanderEligible))
+
+        vm.seedFrom(AdvancedSearchQuery(criteria = listOf(SearchCriterion.Name("Bolt"))))
+
+        assertTrue(vm.uiState.value.currentQuery.criteria.contains(SearchCriterion.CommanderEligible))
+    }
+
+    @Test
+    fun `a locked criterion overrides the same-type criterion the user picks through the form`() =
+        runTest(dispatcher) {
+            // The Format picker has no idea a lock exists -- the merge happens on the way OUT of
+            // the sheet (rebuildQuery), which is what makes the lock structural rather than a
+            // disabled toggle the user could otherwise route around via a different picker state.
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.setLockedCriteria(listOf(SearchCriterion.Format(listOf("commander"), legal = true)))
+
+            vm.updateFormat("standard")
+
+            val formatCriteria = vm.uiState.value.currentQuery.criteria.filterIsInstance<SearchCriterion.Format>()
+            assertEquals(listOf(SearchCriterion.Format(listOf("commander"), legal = true)), formatCriteria)
+        }
+
+    @Test
+    fun `an empty lockedCriteria list is a real, valid value -- no criteria are force-added`() =
+        runTest(dispatcher) {
+            val vm = createVm()
+            advanceUntilIdle()
+
+            vm.setLockedCriteria(emptyList())
+            vm.setName("Bolt")
+
+            assertEquals(listOf(SearchCriterion.Name("Bolt")), vm.uiState.value.currentQuery.criteria)
+        }
 }

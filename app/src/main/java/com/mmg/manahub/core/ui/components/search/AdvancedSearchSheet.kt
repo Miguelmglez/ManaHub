@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.ui.components.search
+// COMMENTS_REVIEWED: 2026-09-09
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocalOffer
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
@@ -92,6 +94,7 @@ import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionSource
 import com.mmg.manahub.core.model.ColorMatchMode
 import com.mmg.manahub.core.model.ComparisonOperator
+import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.SearchDirection
 import com.mmg.manahub.core.model.SearchOrder
 import com.mmg.manahub.core.tagging.label
@@ -124,6 +127,14 @@ fun AdvancedSearchSheet(
      * agreement; the caller therefore owns "what is filtered", and this sheet only edits it.
      */
     appliedQuery: AdvancedSearchQuery? = null,
+    /**
+     * Deck Wizard Commander v3 plan (Phase 3.2/3.4, D14): criteria the CALLER wants non-removable
+     * for this open (e.g. [SearchCriterion.CommanderEligible] +, for a strict Commander build,
+     * [SearchCriterion.Format]). Rendered read-only below (never through a disabled picker toggle)
+     * and force-merged into every [onSearch] result by [AdvancedSearchViewModel.mergeLocked] —
+     * survives `Clear All` too. Empty by default — every existing caller is unaffected.
+     */
+    lockedCriteria: Set<SearchCriterion> = emptySet(),
     // ── Collection-mode sort & group state (only used when isCollectionMode == true) ──
     collectionSortOrder: CollectionSortOrder? = null,
     collectionSortDirection: CollectionSortDirection? = null,
@@ -143,6 +154,7 @@ fun AdvancedSearchSheet(
     // the empty case is what let a filter from an earlier, unrelated open stay live and invisible,
     // silently zeroing the next search (Card Advantage regression, 2026-09-07).
     LaunchedEffect(Unit) {
+        viewModel.setLockedCriteria(lockedCriteria.toList())
         viewModel.seedFrom(appliedQuery ?: AdvancedSearchQuery())
     }
 
@@ -219,6 +231,32 @@ fun AdvancedSearchSheet(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(vertical = 12.dp),
             ) {
+
+                // ── Locked filters (Deck Wizard Commander v3 plan, D14) ──
+                if (uiState.lockedCriteria.isNotEmpty()) {
+                    item {
+                        SearchSection(
+                            title = stringResource(R.string.advsearch_section_locked),
+                            icon = Icons.Default.Lock,
+                            titleColor = mc.textPrimary,
+                            iconColor = mc.goldMtg,
+                        ) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                uiState.lockedCriteria.forEach { criterion ->
+                                    InputChip(
+                                        selected = true,
+                                        enabled = false,
+                                        onClick = {},
+                                        label = { Text(criterion.shortLabel()) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // ── Name ──
                 item {

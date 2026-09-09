@@ -19,9 +19,9 @@ ships — this file survives).
 | Formats reachable in this wave | `COMMANDER`, `COMMANDER_CASUAL` |
 | Formats deferred | `CASUAL`, `STANDARD`, `PIONEER`, `MODERN`, `LEGACY`, `VINTAGE`, `PAUPER` (§7) |
 | Engine used by the wizard | today: legacy Motor A (`DeckScorer.fit`); target: Deck Analysis Engine v3 primitives + `AnalysisEngine.evaluate` verification |
-| Campaign phase | P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 started (F10 fix + search plumbing only) |
+| Campaign phase | P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 DONE (Run 5) |
 
-Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 started 2026-09-09 (3.1 F10 fix + 3.4 search-plumbing prerequisites done; UI/VM/lockedCriteria NOT started, see progress tracker Run 4) · P4 — · P5 — · P6 — · P7 — · P8 —`
+Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 DONE 2026-09-09 (Run 4: 3.1 F10 fix + 3.4 search-plumbing; Run 5: 3.2 UI + 3.3 StructuredCardSearch + lockedCriteria + VM wiring + tests + compose-design-reviewer pass — see progress tracker) · P4 — · P5 — · P6 — · P7 — · P8 —`
 
 ---
 
@@ -314,3 +314,18 @@ Things that differ from Commander and are NOT solved by this campaign:
      builder/matcher wiring) landed. This was a deliberate scope decision (see progress tracker Run
      4 "Why cut"), not a discovery of a blocker — the next session can start directly on 3.2/3.3
      with the plumbing already in place.
+- 2026-09-09 — **Phase 3 DONE (Run 5)**: full detail in the progress tracker's Run 5 log. Headline
+  items future phases should know:
+  1. **F10 was already fully wired in production before this run** — `CollectionProfileUseCase
+     .commanderLimit` defaults to `Int.MAX_VALUE`, and `DeckWizardViewModel`'s call site never
+     passed an explicit value, so the cap was already gone since Run 4's 3.1 commit. Run 4's own
+     note claiming it still needed wiring was overcautious, not wrong about the fix itself.
+  2. **`AdvancedSearchSheet.lockedCriteria` is a REUSABLE mechanism, not commander-specific** — any
+     future caller (a 60-card format's own legality lock, per D14's own "60-card impact" column)
+     can pass `lockedCriteria` and get the same structural non-removability
+     (`AdvancedSearchViewModel.mergeLocked` strips same-subtype UI criteria and re-appends the
+     locked ones on every `rebuildQuery`, survives `clearAll`/`seedFrom`) for free.
+  3. **`StructuredCardSearch` (commonMain) is now the ONE place "one query → Scryfall fragment +
+     local matcher" logic lives** — Deck Studio's Analysis-tab "Browse for X" and the wizard's
+     commander pick step both delegate to it. Phase 5 (Plan sections step) should use it too rather
+     than re-deriving the pairing a third time.

@@ -1183,6 +1183,11 @@
     <string name="deck_wizard_commander_pick_title">Pick your commander</string>
     <string name="deck_wizard_commander_pick_subtitle">Filter by color, then search your collection or beyond.</string>
     <string name="deck_wizard_commander_pick_empty">No commander candidates match this filter yet.</string>
+    <!-- Deck Wizard Commander v3 plan (Phase 3.2) -->
+    <string name="deck_wizard_commanders_in_collection">Available commanders in your collection</string>
+    <string name="deck_wizard_commander_advanced_search">Advanced search</string>
+    <string name="deck_wizard_commander_tab_collection">Collection</string>
+    <string name="deck_wizard_commander_tab_all_cards">All cards</string>
     <string name="deck_wizard_include_outside_collection_title">Include cards outside your collection</string>
     <string name="deck_wizard_include_outside_collection_subtitle">Search Scryfall too, not just what you own</string>
     <string name="deck_wizard_strategy_step_title">Pick a strategy</string>
@@ -2114,6 +2119,7 @@
     <string name="advsearch_clear">Clear all</string>
     <string name="advsearch_search_button">Search cards</string>
     <string name="advsearch_query_preview">Built query</string>
+    <string name="advsearch_section_locked">Locked filters</string>
     <string name="advsearch_section_name">Card name</string>
     <string name="advsearch_name_hint">e.g. Lightning Bolt</string>
     <string name="advsearch_name_exact">Exact name only</string>

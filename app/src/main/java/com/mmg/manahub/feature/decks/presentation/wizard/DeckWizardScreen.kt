@@ -177,11 +177,11 @@ fun DeckWizardScreen(
                         )
                         WizardPhase.COMMANDER_PICK -> CommanderPickStepContent(
                             uiState = uiState,
-                            onToggleColorFilter = viewModel::onToggleCommanderColorFilter,
-                            onToggleIncludeOutsideCollection = viewModel::onToggleIncludeOutsideCollection,
-                            onQueryChange = viewModel::onCommanderQueryChange,
+                            onQueryChange = viewModel::onCommanderNameFilterChange,
                             onSelectCommander = viewModel::onSelectCommander,
                             onClearCommander = viewModel::onClearCommander,
+                            onApplyStructuredSearch = viewModel::applyCommanderStructuredSearch,
+                            onSelectResultTab = viewModel::onSelectCommanderResultTab,
                             onNext = viewModel::onNextFromCommanderPick,
                         )
                         WizardPhase.STRATEGY -> StrategyStepContent(

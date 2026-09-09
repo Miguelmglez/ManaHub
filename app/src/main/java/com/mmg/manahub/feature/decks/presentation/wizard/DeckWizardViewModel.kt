@@ -14,7 +14,9 @@ import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.search.StructuredCardSearch
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
+import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
@@ -82,6 +84,12 @@ enum class WizardPhase { FORMAT, ENTRY, COMMANDER_PICK, STRATEGY, MANUAL_ADDS, D
  * that phase's content composable dispatches on this field rather than adding two more phases.
  */
 enum class WizardEntryFlow { CARDS, COLORS, STRATEGY }
+
+/** Deck Wizard Commander v3 plan (Phase 3.2): the two result tabs COMMANDER_PICK shows once a
+ * structured search ([DeckWizardUiState.commanderStructuredQuery]) is applied via the search bar's
+ * Tune icon. Before any structured search, the step shows the local candidate grid instead and no
+ * tabs render at all. */
+enum class CommanderResultTab { COLLECTION, ALL_CARDS }
 
 /** A rankable color-combination pick for Flow C (strategy-first) — the curated
  * [ColorStrategyAffinity.combosFor] weight blended with how strong the user's OWN collection already
@@ -180,13 +188,29 @@ data class DeckWizardUiState(
      * [selectedCommander]/[commanderQuery]/[commanderSearchResults]/[isSearchingCommander] above --
      * this is the SAME one-commander pick, now reached via its own dedicated step instead of being
      * embedded inside the old Flow-A Direction step (which Commander no longer visits). */
+    /** COMMANDER_PICK's OWN color-identity filter row was DELETED (Deck Wizard Commander v3 plan,
+     * Phase 3.2, D7/R2) -- this field has no remaining UI producer ([onToggleCommanderColorFilter]
+     * is unused dead code kept only because [onCommanderQueryChange]'s Casual-Direction-flow body
+     * still reads it; see that function's KDoc). Always [emptySet] in practice from now on. */
     val commanderColorFilter: Set<ManaColor> = emptySet(),
-    /** D-A -- ONE shared toggle for every wizard card search that can go outside the collection
-     * (COMMANDER_PICK's commander search AND MANUAL_ADDS' card search): default collection-only,
-     * opt-in to a live Scryfall search. A single session-level toggle (not per-step) mirrors the
-     * plan's singular "a toggle" wording and [fillLands]/[useCommunityData]'s own "legitimate across
-     * a step/switch" precedent -- excluded from [resetDirectionScratchState]. */
+    /** D-A -- ONE shared toggle for MANUAL_ADDS' card search (and, unchanged, the Casual Direction
+     * flow's own embedded commander search): default collection-only, opt-in to a live Scryfall
+     * search. Deck Wizard Commander v3 plan (Phase 3.2, D7/R2): COMMANDER_PICK's OWN outside-
+     * collection toggle was DELETED — that step is now collection-only by default, with unowned
+     * commanders reachable only through the structured search's All-cards tab
+     * ([commanderStructuredQuery]/[commanderResultTab] below). This flag stays session-level (not
+     * per-step) -- excluded from [resetDirectionScratchState]. */
     val includeOutsideCollection: Boolean = false,
+    /** Deck Wizard Commander v3 plan (Phase 3.2/3.3/3.4): the structured query applied via
+     * COMMANDER_PICK's search-bar Tune icon ([com.mmg.manahub.core.ui.components.search
+     * .AdvancedSearchSheet], locked to [SearchCriterion.CommanderEligible] +, for a strict
+     * Commander build, `Format(commander, legal)`). `null` while none is active — the step then
+     * shows the local eligible-commander grid ([DeckWizardUiState.collectionProfile]
+     * .commanderCandidates) instead of the two result tabs. */
+    val commanderStructuredQuery: AdvancedSearchQuery? = null,
+    /** Which of [commanderStructuredQuery]'s two result tabs is showing -- meaningless (and
+     * ignored by the UI) while [commanderStructuredQuery] is null. */
+    val commanderResultTab: CommanderResultTab = CommanderResultTab.COLLECTION,
 
     /** STRATEGY step (2.2) -- once a commander is picked, the derived candidate list from
      * [com.mmg.manahub.feature.decks.domain.usecase.DeriveCommanderStrategiesUseCase], rendered
@@ -298,6 +322,8 @@ private fun DeckWizardUiState.resetDirectionScratchState(): DeckWizardUiState = 
     // same rationale as every other field above. [includeOutsideCollection] is deliberately EXCLUDED
     // (session-level, see its own KDoc).
     commanderColorFilter = emptySet(),
+    commanderStructuredQuery = null,
+    commanderResultTab = CommanderResultTab.COLLECTION,
     commanderStrategyCandidates = DerivedCommanderStrategies.EMPTY,
     isLoadingCommanderStrategies = false,
     selectedStrategyThemes = emptyList(),
@@ -563,11 +589,12 @@ class DeckWizardViewModel(
         return "is:commander$identityClause $name"
     }
 
-    /** COMMANDER_PICK's color-identity filter row (2.1) -- multi-select (unlike `StatsScreen`'s
-     * single-select use of the same [com.mmg.manahub.core.ui.components.ManaColorPicker]): "All"
-     * clears the filter entirely, any WUBRG code toggles membership. Re-runs the outside-collection
-     * search (if active) against the new filter — the local-collection candidate list re-filters
-     * itself automatically in the UI layer (a pure function of this same field, no VM push needed). */
+    /** Deck Wizard Commander v3 plan (Phase 3.2, D7/R2): COMMANDER_PICK no longer renders this row
+     * (deleted along with the outside-collection toggle) -- kept only because
+     * [onCommanderQueryChange]'s body still reads [DeckWizardUiState.commanderColorFilter] for the
+     * Casual Direction flow's own (color-filter-less) embedded commander search, where this
+     * function has never been wired either. Effectively dead; not deleted to avoid a needless
+     * ripple into that field's other read site. */
     fun onToggleCommanderColorFilter(code: String) {
         _uiState.update { state ->
             if (code == "All") {
@@ -607,12 +634,15 @@ class DeckWizardViewModel(
     }
 
     fun onSelectCommander(card: Card) {
+        commanderSearchJob?.cancel()
         _uiState.update {
             it.copy(
                 selectedCommander = card,
                 colorIdentity = card.colorIdentity.toManaColorSet(),
                 commanderQuery = "",
                 commanderSearchResults = emptyList(),
+                commanderStructuredQuery = null,
+                commanderResultTab = CommanderResultTab.COLLECTION,
                 availableThemeTags = emptyList(),
                 selectedThemeHint = null,
             )
@@ -633,6 +663,57 @@ class DeckWizardViewModel(
             )
         }
         recomputeSeedStrategySuggestion()
+    }
+
+    /** Deck Wizard Commander v3 plan (Phase 3.2): COMMANDER_PICK's own plain name filter over the
+     * local candidate grid ([commanderPickLocalCandidates]) and, once a structured search is
+     * active, the Collection tab ([commanderPickCollectionTabResults]) -- collection-only, no
+     * network call (D7/R2 deleted this step's outside-collection search; unowned commanders now
+     * arrive ONLY through the Tune icon's All-cards tab, see [applyCommanderStructuredSearch]).
+     * Distinct from [onCommanderQueryChange], which stays the Casual Direction flow's own
+     * outside-collection commander search, unchanged by this campaign. */
+    fun onCommanderNameFilterChange(query: String) {
+        _uiState.update { it.copy(commanderQuery = query) }
+    }
+
+    /**
+     * Deck Wizard Commander v3 plan (Phase 3.2/3.3/3.4): the Tune icon's [com.mmg.manahub.core.ui
+     * .components.search.AdvancedSearchSheet] result for COMMANDER_PICK -- filters BOTH result
+     * tabs from one [AdvancedSearchQuery], mirroring [com.mmg.manahub.feature.decks.presentation
+     * .DeckStudioViewModel.applyStructuredSearch]'s own "one query, two tabs" contract via the
+     * shared [StructuredCardSearch] helper (3.3): the Collection tab is computed locally by the UI
+     * layer ([commanderPickCollectionTabResults], a pure filter of already-loaded
+     * [DeckWizardUiState.ownedCards] -- no VM round-trip needed), while the All-cards tab fires a
+     * real Scryfall search here. The sheet itself force-merges the step's locked criteria
+     * ([commanderLockedCriteria]) into [query] before this is ever called (D14), so this function
+     * never needs to re-add them.
+     */
+    fun applyCommanderStructuredSearch(query: AdvancedSearchQuery) {
+        _uiState.update { it.copy(commanderStructuredQuery = query.takeIf { q -> !q.isEmpty() }) }
+        commanderSearchJob?.cancel()
+        val fragment = StructuredCardSearch.scryfallFragment(query)
+        if (fragment == null) {
+            _uiState.update { it.copy(commanderSearchResults = emptyList(), isSearchingCommander = false) }
+            return
+        }
+        commanderSearchJob = viewModelScope.launch {
+            _uiState.update { it.copy(isSearchingCommander = true) }
+            val results = when (val res = searchCardsUseCase(fragment)) {
+                is DataResult.Success -> res.data.cards
+                is DataResult.Error -> {
+                    crashReporter.log("deck_wizard_commander_structured_search_failed")
+                    emptyList()
+                }
+            }
+            _uiState.update { it.copy(commanderSearchResults = results, isSearchingCommander = false) }
+        }
+    }
+
+    /** Deck Wizard Commander v3 plan (Phase 3.2): switches COMMANDER_PICK's Collection/All-cards
+     * result tab -- a pure UI-state toggle, no re-fetch (the All-cards results are already cached
+     * from [applyCommanderStructuredSearch]). */
+    fun onSelectCommanderResultTab(tab: CommanderResultTab) {
+        _uiState.update { it.copy(commanderResultTab = tab) }
     }
 
     /**

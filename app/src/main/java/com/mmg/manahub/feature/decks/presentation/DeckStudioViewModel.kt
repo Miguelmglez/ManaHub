@@ -24,6 +24,7 @@ import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.search.AdvancedSearchCardMatcher
+import com.mmg.manahub.core.domain.search.StructuredCardSearch
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
@@ -1366,8 +1367,7 @@ class DeckStudioViewModel(
         val structuredQuery = state.activeCollectionQuery
         val activeTagFilter = state.activeCollectionTagFilter
         return collectionCards.filter { card ->
-            (structuredQuery == null ||
-                AdvancedSearchCardMatcher.matches(card, structuredQuery, lenient = true)) &&
+            StructuredCardSearch.matches(card, structuredQuery) &&
                 (activeTagFilter.isNullOrEmpty() ||
                     (card.tags + card.userTags).any { it.key in activeTagFilter }) &&
                 (query.isBlank() || card.name.contains(query, ignoreCase = true))
@@ -1488,10 +1488,10 @@ class DeckStudioViewModel(
      * "Browse for X" preset and the Advanced Search sheet's own SEARCH CTA.
      */
     fun applyStructuredSearch(query: AdvancedSearchQuery) {
-        val fragment = (buildScryfallQueryUseCase ?: BuildScryfallQueryUseCase())(query)
+        val fragment = StructuredCardSearch.scryfallFragment(query, buildScryfallQueryUseCase ?: BuildScryfallQueryUseCase())
         _uiState.update {
             it.copy(
-                activeStructuredSearchFragment = fragment.takeIf { f -> f.isNotBlank() },
+                activeStructuredSearchFragment = fragment,
                 activeCollectionQuery = query.takeIf { q -> !q.isEmpty() },
             )
         }

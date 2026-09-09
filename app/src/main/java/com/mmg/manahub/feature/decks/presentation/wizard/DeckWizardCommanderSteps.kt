@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
+// COMMENTS_REVIEWED: 2026-09-09
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,19 +15,28 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -41,14 +51,20 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
+import com.mmg.manahub.core.domain.search.StructuredCardSearch
+import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckCardSource
+import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DeckSlotEntry
+import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardRow
-import com.mmg.manahub.core.ui.components.ManaColorPicker
+import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
+import com.mmg.manahub.core.ui.components.search.shortLabel
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -71,60 +87,104 @@ import org.jetbrains.compose.resources.painterResource
 //  (2.3, SHARED with a future Casual caller -- Workstream 3).
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ── 2.1 — COMMANDER_PICK ──────────────────────────────────────────────────────
+// ── 2.1 — COMMANDER_PICK (Deck Wizard Commander v3 plan, Phase 3.2) ────────────
 
 /**
- * The new first Commander step: a color-identity filter row ([ManaColorPicker]) + search bar over
- * commander candidates. Candidate pool per D-G: local-collection commanders
- * ([com.mmg.manahub.feature.decks.domain.engine.CommanderEligibility], surfaced via
- * [DeckWizardUiState.collectionProfile]'s existing `commanderCandidates`) by default, OR (behind
- * [DeckWizardUiState.includeOutsideCollection], D-A) a live Scryfall `is:commander` search
- * ([DeckWizardUiState.commanderSearchResults]). Tapping a candidate opens the SHARED
- * [CardDetailSheet] (the one in `presentation/components/`, NOT the legacy private duplicate) in
- * its commander-selection context, mirroring [com.mmg.manahub.feature.decks.presentation
- * .DeckStudioScreen]'s exact "Choose Commander" wiring precedent.
+ * Deck Wizard Commander v3 plan (Phase 3.1, F10): the COMMANDER_PICK grid's default (no structured
+ * search) candidate list -- every collection-eligible commander, uncapped (F10 removed the old
+ * 5-candidate cap), filtered by [DeckWizardUiState.commanderQuery]'s plain name filter. Already
+ * sorted by [com.mmg.manahub.feature.decks.domain.template.OwnedCommanderCandidate.supportScore]
+ * desc then name asc ([com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase]).
+ * A plain (non-`@Composable`) function so it is covered by a JVM unit test rather than a Compose
+ * UI test.
+ */
+internal fun commanderPickLocalCandidates(uiState: DeckWizardUiState): List<Card> {
+    val query = uiState.commanderQuery.trim()
+    return uiState.collectionProfile?.commanderCandidates.orEmpty()
+        .map { it.card }
+        .filter { card -> query.isEmpty() || card.name.contains(query, ignoreCase = true) }
+}
+
+/** Deck Wizard Commander v3 plan (Phase 3.2/3.3): COMMANDER_PICK's Collection-tab results once a
+ * structured search ([DeckWizardUiState.commanderStructuredQuery]) is active -- a lenient local
+ * filter of the already-loaded [DeckWizardUiState.ownedCards] via the SAME [StructuredCardSearch]
+ * helper Deck Studio's own two-tab search uses (3.3), so the two never disagree on what a locked
+ * `is:commander` criterion means locally. */
+internal fun commanderPickCollectionTabResults(uiState: DeckWizardUiState): List<Card> =
+    StructuredCardSearch.collectionMatches(uiState.ownedCards, uiState.commanderStructuredQuery, uiState.commanderQuery)
+
+/**
+ * Deck Wizard Commander v3 plan (Phase 3.2/3.4, D14): the criteria COMMANDER_PICK's own
+ * [AdvancedSearchSheet] open locks non-removable for [format] -- always
+ * [SearchCriterion.CommanderEligible], plus a strict `Format(commander, legal)` lock ONLY for
+ * [DeckFormat.COMMANDER] (Commander Casual is the permissive format and gets no legality lock, per
+ * the campaign's own product rule R2).
+ */
+internal fun commanderLockedCriteria(format: DeckFormat?): List<SearchCriterion> = buildList {
+    add(SearchCriterion.CommanderEligible)
+    if (format == DeckFormat.COMMANDER) {
+        add(SearchCriterion.Format(listOf("commander"), legal = true))
+    }
+}
+
+/**
+ * The first Commander step: a [LazyVerticalGrid] of every eligible owned commander
+ * ([commanderPickLocalCandidates]), a name-filter search bar, and a trailing Tune icon opening the
+ * shared [AdvancedSearchSheet] locked to [commanderLockedCriteria] (D14). Once a structured search
+ * is applied ([DeckWizardUiState.commanderStructuredQuery]), the grid switches to two tabs --
+ * Collection ([commanderPickCollectionTabResults], local, lenient) and All cards
+ * ([DeckWizardUiState.commanderSearchResults], live Scryfall) -- with a chips row summarizing the
+ * active filters (the locked ones among them are, by construction, never removable: nothing in
+ * this step or the sheet can drop them, see [commanderLockedCriteria]'s KDoc). Deck Wizard
+ * Commander v3 plan, Phase 3.2 (D7/R2): the color-identity filter row and the "include cards
+ * outside your collection" toggle were DELETED from this step -- it is collection-only by default,
+ * and an unowned commander is now reachable ONLY through the All-cards tab.
  *
+ * Tapping a candidate opens the SHARED [CardDetailSheet] in its commander-selection context.
  * Once [DeckWizardUiState.selectedCommander] is set, this step shows the picked commander's
- * [CardRow] (commander style) + a "Change commander" affordance instead of the candidate list (same as the
- * old Direction-embedded commander picker's UX).
+ * [CardRow] (commander style) + a "Change commander" affordance instead of the grid.
  */
 @Composable
 internal fun CommanderPickStepContent(
     uiState: DeckWizardUiState,
-    onToggleColorFilter: (String) -> Unit,
-    onToggleIncludeOutsideCollection: () -> Unit,
     onQueryChange: (String) -> Unit,
     onSelectCommander: (Card) -> Unit,
     onClearCommander: () -> Unit,
+    onApplyStructuredSearch: (AdvancedSearchQuery) -> Unit,
+    onSelectResultTab: (CommanderResultTab) -> Unit,
     onNext: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     var inspectionCard by remember { mutableStateOf<Card?>(null) }
+    var showAdvancedSearch by remember { mutableStateOf(false) }
 
-    // Computed OUTSIDE the LazyColumn content block: LazyListScope.() -> Unit is a plain DSL
-    // lambda, not @Composable, so `remember` cannot be called from within it (see
-    // ManualAddsStepContent below for the same established pattern).
     val commander = uiState.selectedCommander
-    val query = uiState.commanderQuery.trim()
-    val filterSymbols = uiState.commanderColorFilter.map { it.symbol }.toSet()
-    val localCandidates = remember(uiState.collectionProfile, filterSymbols, query) {
-        uiState.collectionProfile?.commanderCandidates.orEmpty()
-            .map { it.card }
-            .filter { card -> filterSymbols.isEmpty() || card.colorIdentity.all { it in filterSymbols } }
-            .filter { card -> query.isEmpty() || card.name.contains(query, ignoreCase = true) }
+    val lockedCriteria = remember(uiState.selectedFormat) { commanderLockedCriteria(uiState.selectedFormat) }
+    val hasStructuredSearch = uiState.commanderStructuredQuery != null
+    val localCandidates = remember(uiState.collectionProfile, uiState.commanderQuery) { commanderPickLocalCandidates(uiState) }
+    val collectionTabResults = remember(uiState.ownedCards, uiState.commanderStructuredQuery, uiState.commanderQuery) {
+        commanderPickCollectionTabResults(uiState)
     }
-    val showOutsideResults = uiState.includeOutsideCollection && query.length >= 2
-    val candidatesToShow = if (showOutsideResults) uiState.commanderSearchResults else localCandidates
+    val candidatesToShow = when {
+        !hasStructuredSearch -> localCandidates
+        uiState.commanderResultTab == CommanderResultTab.COLLECTION -> collectionTabResults
+        else -> uiState.commanderSearchResults
+    }
+    val isLoadingAllCardsTab = hasStructuredSearch &&
+        uiState.commanderResultTab == CommanderResultTab.ALL_CARDS &&
+        uiState.isSearchingCommander
 
     Column(Modifier.fillMaxSize()) {
-        LazyColumn(
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 100.dp),
             modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.md),
-            verticalArrangement = Arrangement.spacedBy(spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
-            item(key = "header") {
+            item(key = "header", span = { GridItemSpan(maxLineSpan) }) {
                 Column {
                     Text(stringResource(R.string.deck_wizard_commander_pick_title), style = ty.titleLarge, color = mc.textPrimary)
                     Text(
@@ -137,72 +197,114 @@ internal fun CommanderPickStepContent(
             }
 
             if (commander != null) {
-                item(key = "commander_banner") {
+                item(key = "commander_banner", span = { GridItemSpan(maxLineSpan) }) {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
                         CardRow(
-                    card = commander,
-                    isInCollection = true, // It's a selected commander from a pool/collection
-                    onClick = { /* Detail already visible if needed */ },
-                    onRemove = null,
-                    isCommander = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                            card = commander,
+                            isInCollection = true,
+                            onClick = {},
+                            onRemove = null,
+                            isCommander = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                         Row(
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClick = onClearCommander),
                             verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                         ) {
-                            Text(stringResource(R.string.deck_wizard_change_commander), style = ty.labelMedium, color = mc.textSecondary)
+                            Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(18.dp))
+                            Text(stringResource(R.string.deck_wizard_change_commander), style = ty.labelMedium, color = mc.primaryAccent)
                         }
                     }
                 }
             } else {
-                item(key = "color_filter") {
-                    ManaColorPicker(
-                        selectedColors = uiState.commanderColorFilter.map { it.symbol }.toSet(),
-                        onToggleColor = onToggleColorFilter,
-                        colors = listOf("All", "W", "U", "B", "R", "G"),
+                item(key = "search", span = { GridItemSpan(maxLineSpan) }) {
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                item(key = "outside_toggle") {
-                    OutsideCollectionToggleRow(checked = uiState.includeOutsideCollection, onToggle = onToggleIncludeOutsideCollection)
-                }
-                item(key = "search") {
-                    OutlinedTextField(
-                        value = uiState.commanderQuery,
-                        onValueChange = onQueryChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        placeholder = { Text(stringResource(R.string.deck_wizard_commander_search_hint), style = ty.bodyMedium, color = mc.textDisabled) },
-                        leadingIcon = {
-                            if (uiState.isSearchingCommander) {
-                                MagicLoadingSpinner(size = MagicLoadingSize.XSmall)
-                            } else {
-                                Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary)
-                            }
-                        },
-                        shape = CardShape,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = mc.primaryAccent,
-                            unfocusedBorderColor = mc.surfaceVariant,
-                            focusedTextColor = mc.textPrimary,
-                            unfocusedTextColor = mc.textPrimary,
-                            cursorColor = mc.primaryAccent,
-                        ),
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                    ) {
+                        OutlinedTextField(
+                            value = uiState.commanderQuery,
+                            onValueChange = onQueryChange,
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            placeholder = { Text(stringResource(R.string.deck_wizard_commander_search_hint), style = ty.bodyMedium, color = mc.textDisabled) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary) },
+                            shape = CardShape,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = mc.primaryAccent,
+                                unfocusedBorderColor = mc.surfaceVariant,
+                                focusedTextColor = mc.textPrimary,
+                                unfocusedTextColor = mc.textPrimary,
+                                cursorColor = mc.primaryAccent,
+                            ),
+                        )
+                        IconButton(
+                            onClick = { showAdvancedSearch = true },
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.Tune,
+                                contentDescription = stringResource(R.string.deck_wizard_commander_advanced_search),
+                                tint = if (hasStructuredSearch) mc.goldMtg else mc.textSecondary,
+                            )
+                        }
+                    }
                 }
 
-                if (candidatesToShow.isNotEmpty()) {
-                    item(key = "candidates") {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                            items(candidatesToShow, key = { "cmdcand_${it.scryfallId}" }) { card ->
-                                CommanderCandidateTile(card = card, onClick = { inspectionCard = card })
+                if (hasStructuredSearch) {
+                    val activeCriteria = uiState.commanderStructuredQuery?.criteria.orEmpty()
+                    item(key = "active_filters", span = { GridItemSpan(maxLineSpan) }) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.xs), verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                            activeCriteria.forEach { criterion ->
+                                val isLocked = lockedCriteria.any { it::class == criterion::class }
+                                InputChip(
+                                    selected = true,
+                                    onClick = {},
+                                    label = { Text(criterion.shortLabel()) },
+                                    leadingIcon = if (isLocked) {
+                                        { Icon(Icons.Default.Lock, contentDescription = null, tint = mc.goldMtg, modifier = Modifier.size(16.dp)) }
+                                    } else null,
+                                )
                             }
                         }
                     }
-                } else if (!showOutsideResults) {
-                    item(key = "empty") {
-                        Text(stringResource(R.string.deck_wizard_commander_pick_empty), style = ty.bodySmall, color = mc.textSecondary)
+                    item(key = "tabs", span = { GridItemSpan(maxLineSpan) }) {
+                        TabRow(selectedTabIndex = uiState.commanderResultTab.ordinal, containerColor = mc.surface, contentColor = mc.primaryAccent) {
+                            Tab(
+                                selected = uiState.commanderResultTab == CommanderResultTab.COLLECTION,
+                                onClick = { onSelectResultTab(CommanderResultTab.COLLECTION) },
+                                text = { Text(stringResource(R.string.deck_wizard_commander_tab_collection)) },
+                            )
+                            Tab(
+                                selected = uiState.commanderResultTab == CommanderResultTab.ALL_CARDS,
+                                onClick = { onSelectResultTab(CommanderResultTab.ALL_CARDS) },
+                                text = { Text(stringResource(R.string.deck_wizard_commander_tab_all_cards)) },
+                            )
+                        }
+                    }
+                } else {
+                    item(key = "collection_header", span = { GridItemSpan(maxLineSpan) }) {
+                        Text(stringResource(R.string.deck_wizard_commanders_in_collection), style = ty.titleMedium, color = mc.textPrimary)
+                    }
+                }
+
+                when {
+                    isLoadingAllCardsTab -> item(key = "loading", span = { GridItemSpan(maxLineSpan) }) {
+                        Box(Modifier.fillMaxWidth().padding(vertical = spacing.lg), contentAlignment = Alignment.Center) {
+                            MagicLoadingSpinner(size = MagicLoadingSize.Small)
+                        }
+                    }
+                    candidatesToShow.isEmpty() -> item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
+                        EmptyState(
+                            title = stringResource(R.string.deck_wizard_commander_pick_empty),
+                            icon = Icons.Default.Search,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xl),
+                        )
+                    }
+                    else -> items(candidatesToShow, key = { "cmdcand_${it.scryfallId}" }) { card ->
+                        CommanderCandidateTile(card = card, onClick = { inspectionCard = card })
                     }
                 }
             }
@@ -211,6 +313,18 @@ internal fun CommanderPickStepContent(
             label = stringResource(R.string.deck_wizard_next),
             enabled = uiState.selectedCommander != null,
             onClick = onNext,
+        )
+    }
+
+    if (showAdvancedSearch) {
+        AdvancedSearchSheet(
+            onDismiss = { showAdvancedSearch = false },
+            onSearch = { query, _ ->
+                onApplyStructuredSearch(query)
+                showAdvancedSearch = false
+            },
+            appliedQuery = uiState.commanderStructuredQuery,
+            lockedCriteria = lockedCriteria.toSet(),
         )
     }
 
@@ -235,7 +349,7 @@ internal fun CommanderPickStepContent(
     }
 }
 
-/** A simple, tap-to-open card image tile for the COMMANDER_PICK candidate row -- unlike
+/** A simple, tap-to-open card image grid tile for the COMMANDER_PICK candidate grid -- unlike
  * [WizardCardImageTile] (Direction step's seed/commander tiles), this has ONE action only (tap
  * opens the shared [CardDetailSheet]), so it does not need that tile's separate magnifier badge. */
 @Composable
@@ -243,7 +357,7 @@ private fun CommanderCandidateTile(card: Card, onClick: () -> Unit) {
     val mc = MaterialTheme.magicColors
     Box(
         modifier = Modifier
-            .width(88.dp)
+            .fillMaxWidth()
             .aspectRatio(63f / 88f)
             .clip(CardShape)
             .background(mc.surfaceVariant)

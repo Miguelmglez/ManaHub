@@ -466,6 +466,90 @@ class DeckWizardViewModelTest {
         assertEquals(listOf(commander), vm.uiState.value.commanderSearchResults)
     }
 
+    // ── Deck Wizard Commander v3 plan (Phase 3.2): the two-tab structured search ────────────────
+
+    @Test
+    fun `onCommanderNameFilterChange is a pure local filter -- no Scryfall call`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+
+        vm.onCommanderNameFilterChange("Zada")
+        advanceUntilIdle()
+
+        assertEquals("Zada", vm.uiState.value.commanderQuery)
+        coVerify(exactly = 0) { searchCardsUseCase(any(), any()) }
+    }
+
+    @Test
+    fun `applyCommanderStructuredSearch fetches the All-cards tab via the built fragment`() = runTest(dispatcher) {
+        coEvery { searchCardsUseCase("is:commander", any()) } returns DataResult.Success(
+            com.mmg.manahub.core.model.PaginatedCards(cards = listOf(commander), hasMore = false, totalCards = 1)
+        )
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+
+        vm.applyCommanderStructuredSearch(
+            com.mmg.manahub.core.model.AdvancedSearchQuery(criteria = listOf(com.mmg.manahub.core.model.SearchCriterion.CommanderEligible))
+        )
+        advanceUntilIdle()
+
+        assertNotNull(vm.uiState.value.commanderStructuredQuery)
+        assertEquals(listOf(commander), vm.uiState.value.commanderSearchResults)
+    }
+
+    @Test
+    fun `onSelectCommanderResultTab switches the tab without re-fetching`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        assertEquals(CommanderResultTab.COLLECTION, vm.uiState.value.commanderResultTab)
+
+        vm.onSelectCommanderResultTab(CommanderResultTab.ALL_CARDS)
+
+        assertEquals(CommanderResultTab.ALL_CARDS, vm.uiState.value.commanderResultTab)
+        coVerify(exactly = 0) { searchCardsUseCase(any(), any()) }
+    }
+
+    @Test
+    fun `Commander locks a strict Format legality clause -- Commander Casual does not (R2)`() {
+        assertTrue(
+            commanderLockedCriteria(DeckFormat.COMMANDER)
+                .any { it is com.mmg.manahub.core.model.SearchCriterion.Format }
+        )
+        assertTrue(
+            commanderLockedCriteria(DeckFormat.COMMANDER_CASUAL)
+                .none { it is com.mmg.manahub.core.model.SearchCriterion.Format }
+        )
+    }
+
+    @Test
+    fun `selecting a commander clears any in-flight structured search state`() = runTest(dispatcher) {
+        coEvery { searchCardsUseCase("is:commander", any()) } returns DataResult.Success(
+            com.mmg.manahub.core.model.PaginatedCards(cards = listOf(commander), hasMore = false, totalCards = 1)
+        )
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.applyCommanderStructuredSearch(
+            com.mmg.manahub.core.model.AdvancedSearchQuery(criteria = listOf(com.mmg.manahub.core.model.SearchCriterion.CommanderEligible))
+        )
+        vm.onSelectCommanderResultTab(CommanderResultTab.ALL_CARDS)
+        advanceUntilIdle()
+
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+
+        assertNull(vm.uiState.value.commanderStructuredQuery)
+        assertEquals(CommanderResultTab.COLLECTION, vm.uiState.value.commanderResultTab)
+    }
+
     @Test
     fun `selecting a commander derives STRATEGY candidates from its own card_strategy_tags (source 1)`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
