@@ -180,6 +180,20 @@ sealed class SearchCriterion {
 
     /** Matches cards that have ANY of the given tag keys (in auto-tags OR user-tags). */
     data class HasTag(val keys: List<String>) : SearchCriterion()
+
+    /**
+     * Deck Wizard Commander v3 plan (Phase 3.4, D14): a card that can legally be a Commander
+     * ("Legendary Creature", or any card whose oracle text grants "can be your commander" —
+     * Backgrounds, Planeswalker commanders, etc.). Renders as Scryfall `is:commander`
+     * ([com.mmg.manahub.feature.decks.domain.usecase.search.BuildScryfallQueryUseCase]); evaluated
+     * locally against [com.mmg.manahub.feature.decks.domain.engine.CommanderEligibility
+     * .isCommanderEligible] ([com.mmg.manahub.core.domain.search.AdvancedSearchCardMatcher]) — the
+     * SAME predicate [com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase] uses
+     * for the wizard's owned-commander grid, so "Collection" and "All cards" agree on eligibility.
+     * A singleton object, not a data class: it carries no parameters (unlike [Format], which needs
+     * one for the format list).
+     */
+    data object CommanderEligible : SearchCriterion()
 }
 
 /**

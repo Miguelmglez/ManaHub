@@ -19,9 +19,9 @@ ships — this file survives).
 | Formats reachable in this wave | `COMMANDER`, `COMMANDER_CASUAL` |
 | Formats deferred | `CASUAL`, `STANDARD`, `PIONEER`, `MODERN`, `LEGACY`, `VINTAGE`, `PAUPER` (§7) |
 | Engine used by the wizard | today: legacy Motor A (`DeckScorer.fit`); target: Deck Analysis Engine v3 primitives + `AnalysisEngine.evaluate` verification |
-| Campaign phase | P0 done (incl. 0.5); P1 done (contracts only — P2 placement engine not started) |
+| Campaign phase | P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 started (F10 fix + search plumbing only) |
 
-Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 — · P3 — · P4 — · P5 — · P6 — · P7 — · P8 —`
+Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 started 2026-09-09 (3.1 F10 fix + 3.4 search-plumbing prerequisites done; UI/VM/lockedCriteria NOT started, see progress tracker Run 4) · P4 — · P5 — · P6 — · P7 — · P8 —`
 
 ---
 
@@ -157,7 +157,7 @@ Acceptance bands in force: see plan §5 until P7 replaces them here.
 | F4 | `CuratedStrategy.availableIn(COMMANDER_CASUAL)` is always false → no strategies, chip "Custom" | treat `COMMANDER_CASUAL` as `COMMANDER` | **done P0 (2026-09-08)** |
 | F5 | 27 `== DeckFormat.COMMANDER` checks; Commander Casual mis-sized | `DeckFormat.isCommanderFormat` sweep | **done P0 (2026-09-08)** — ~15 real sites swept; a few were already correct (see progress tracker); `DeckWizardScreen`'s format picker list deliberately left unwidened (dead behind the flag, replaced in Phase 3-6) |
 | F9 | Basic-land pip weights exclude the commander and count Phyrexian pips; owned utility lands unused | D10 | planned P2 |
-| F10 | Owned commander candidates capped at 5 | compute all eligible in the VM | planned P3 |
+| F10 | Owned commander candidates capped at 5 | separate `commanderLimit` param on `CollectionProfileUseCase`, default unbounded | **done P3 (2026-09-09)** — the VM's own call site is NOT yet wired to pass it (that's the pick-step UI/VM work, still pending) |
 | F11 | Analysis entry mirrored in 3 places | D2 | **done P0 (2026-09-08)** — `BuildDeckFromTemplateUseCase.recomputeProfile` confirmed NOT a mirror (Motor A's own `DeckScorer.profile()`), left untouched per the plan's escape hatch |
 | — | `EvaluateDeckUseCase` emits a gamification event on every call | `emitProgression` flag | **done P0 (2026-09-08)** |
 
@@ -260,3 +260,57 @@ Things that differ from Commander and are NOT solved by this campaign:
      `else` branch — adding cases to the shared enum would force an unrelated Casual-UI string change.
      Phase 6 (wizard VM wiring) should keep this split when it wires the Commander build loop's
      progress UI.
+- 2026-09-09 — Phase 2 (Run 3) done, scoped: see the progress tracker's Run 3 log for full detail.
+  Headline items future phases must know:
+  1. **`PlacementScorer`'s D8 filler floor is `roleGain > 0 OR axisGain > 0`** — a theme with no
+     `THEME_TARGET_AXES` entry never zeroes out placement, `roleGain` alone carries it. The map
+     was NOT widened to close the coordinator's mid-run gap concern; see the tracker's note 1 for
+     why forcing new axis citations was rejected.
+  2. **`CommanderPlan.curveTargets` (Phase 1) has no `targetCount`** (built without a
+     `nonLandCount`) — `BuildCommanderDeckUseCase` re-derives its own scaled `CurveTargets` rather
+     than trusting the plan's copy. Any future direct reader of `plan.curveTargets` will hit the
+     same silent `null`.
+  3. **`replaceAllCardsWithSource` is a default-method composition (clearDeck + addCardToDeck
+     loop), NOT a real Room transaction** — D12's cancellation-safety guarantee is UNMET today.
+     Must be hardened before Phase 6 wires this into a real user-facing flow.
+  4. **round_trip_identity, as literally specified, is a structural tautology** (pure-function
+     analyze called twice on identical inputs cannot diverge) — verified true for the NEW path,
+     and argued (not tested) true for the legacy path via `DeckWizardViewModel
+     .writeResultIntoNewDeck`'s direct `result.archetypeOverride`/`themesOverride` write. The real
+     F7 risk is a build-intent-vs-persisted-pin divergence inside `BuildDeckFromTemplateUseCase`/
+     `DeckTemplateResolver.fromCommanderAggregate`, not an analyze-twice divergence — flagged as a
+     concrete follow-up for Phase 7 or a dedicated investigation, not solved this run.
+  5. **Land fill v2 test coverage (mono/2/3/5-colour cases) and the write-atomicity test were NOT
+     written this run** — the biggest scope cut of Run 3. The implementation exists
+     (`BuildCommanderDeckUseCase.fillLandsV2`/`rebalance`) but is exercised only incidentally by
+     the 5 `BuildCommanderDeckUseCaseTest` cases.
+- 2026-09-09 — Run 4 CLOSED the Phase 2 gate and started Phase 3 (full detail: progress tracker's
+  Run 4 log). Two things future phases should know:
+  1. **The MockCollectionRich ground-truth test is GREEN with real margin** — all 4 fixtures'
+     wizard-vs-fixture score deltas are within [-2, +5] against an 8-point tolerance, so the
+     `BuildCommanderDeckUseCase`/`PlacementScorer` pipeline is not merely "passing," it is
+     competitive with hand-authored decklists. The ONE real gap found: a curated pin's
+     `StrategyPin.archetype` (`toPin()`'s `archetypes.first()`) is not a reliable ground truth for
+     "what macro did this build actually resolve to" for entries with multiple listed archetypes
+     (e.g. "aristocrats" = `{AGGRO, MIDRANGE, COMBO}`, pin hard-codes AGGRO) — comparing against it
+     is a tautology for a manually-pinned build. Any future test wanting "did this build get the
+     RIGHT macro" must compare against `AnalysisV3Fixture.expectedMacro` (or another independent
+     ground truth), never a curated pin's own forced field.
+  2. **A genuine, un-diagnosed Custom-macro gap exists for tribal-AGGRO commanders**: Edgar Markov
+     (Vampires) resolves as MIDRANGE under a Custom build, not AGGRO. Left RED per this campaign's
+     explicit "never loosen to pass" instruction. Concrete follow-up for Phase 7: Custom's placement
+     (D6, generic baseline bands + the commander's own axes) has no explicit curve/creature-density
+     bias, so nothing pulls a fast, cheap, tribal-aggressive plan's macro off the generic baseline's
+     MIDRANGE-shaped read. Root cause not yet located in `EvaluateDeckUseCase.resolveArchetype`/the
+     prototype macro resolver.
+  3. **F10 is fixed at the use-case layer, NOT yet wired end-to-end.**
+     `CollectionProfileUseCase.commanderLimit` (new, separately defaulted from `limit`) removes the
+     cap; `DeckWizardViewModel`'s own call site was NOT touched this run (still implicitly uses the
+     old shared-limit shape until the pick-step VM work lands) — the fix is real and tested but
+     inert in production until Phase 3's UI/VM phase wires it.
+  4. **Phase 3's UI half (grid, search bar, `AdvancedSearchSheet.lockedCriteria`,
+     `StructuredCardSearch` extraction, `DeckWizardViewModel` wiring) is UNSTARTED** — only the
+     commonMain search-plumbing prerequisite (`SearchCriterion.CommanderEligible` + its query-
+     builder/matcher wiring) landed. This was a deliberate scope decision (see progress tracker Run
+     4 "Why cut"), not a discovery of a blocker — the next session can start directly on 3.2/3.3
+     with the plumbing already in place.

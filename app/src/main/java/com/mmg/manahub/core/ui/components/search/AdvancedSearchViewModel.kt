@@ -396,6 +396,11 @@ class AdvancedSearchViewModel(
                 is SearchCriterion.OracleTerms -> next.copy(oracleTerms = criterion)
                 is SearchCriterion.CollectionStatus -> next.copy(collectionSource = criterion.source)
                 is SearchCriterion.HasTag -> next.copy(filterTags = criterion.keys.toSet())
+                // Deck Wizard Commander v3 plan (Phase 3.4, D14): no backing UiState field --
+                // CommanderEligible is only ever seeded via a caller's `lockedCriteria`, not this
+                // sheet's own toggleable filters, so it is a no-op here (same convention as Loyalty/
+                // Language/Artist/FlavorText above).
+                SearchCriterion.CommanderEligible -> next
             }
         }
         // Edge-case QA fix (LOW, 2026-09-06): seedFrom used to only walk query.criteria, silently

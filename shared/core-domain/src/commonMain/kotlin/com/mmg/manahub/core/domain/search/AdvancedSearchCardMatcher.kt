@@ -7,6 +7,7 @@ import com.mmg.manahub.core.model.CollectionSource
 import com.mmg.manahub.core.model.ColorMatchMode
 import com.mmg.manahub.core.model.ComparisonOperator
 import com.mmg.manahub.core.model.SearchCriterion
+import com.mmg.manahub.feature.decks.domain.engine.CommanderEligibility
 
 /**
  * Local, in-memory evaluator for an [AdvancedSearchQuery] against a single [Card] — the offline
@@ -133,6 +134,8 @@ object AdvancedSearchCardMatcher {
         is SearchCriterion.OracleTerms -> matchesOracleTerms(card, criterion, lenient)
 
         is SearchCriterion.ManaProduction -> matchesManaProduction(card, criterion, lenient)
+
+        SearchCriterion.CommanderEligible -> CommanderEligibility.isCommanderEligible(card)
 
         // Loyalty, Language, Artist and FlavorText have no locally cached field to evaluate, so
         // they are not a local constraint in either mode. Anything ADDED here silently matches

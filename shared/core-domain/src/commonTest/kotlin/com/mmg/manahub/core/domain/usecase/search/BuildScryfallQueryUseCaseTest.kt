@@ -170,4 +170,10 @@ class BuildScryfallQueryUseCaseTest {
 
         assertEquals("", useCase(query))
     }
+
+    @Test
+    fun `given CommanderEligible when built then renders is-commander`() {
+        val query = AdvancedSearchQuery(criteria = listOf(SearchCriterion.CommanderEligible))
+        assertEquals("is:commander", useCase(query))
+    }
 }

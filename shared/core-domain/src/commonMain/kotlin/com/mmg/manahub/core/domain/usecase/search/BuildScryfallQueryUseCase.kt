@@ -136,6 +136,7 @@ class BuildScryfallQueryUseCase {
             // Collection-local filters have no Scryfall equivalent
             is SearchCriterion.CollectionStatus,
             is SearchCriterion.HasTag -> null
+            SearchCriterion.CommanderEligible -> "is:commander"
         }
     }
 

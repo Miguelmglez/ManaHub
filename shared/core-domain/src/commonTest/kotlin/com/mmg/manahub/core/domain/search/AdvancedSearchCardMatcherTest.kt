@@ -510,4 +510,16 @@ class AdvancedSearchCardMatcherTest {
         assertTrue(AdvancedSearchCardMatcher.matchesCriterion(bolt, SearchCriterion.Colors(emptySet(), ColorMatchMode.AT_MOST)))
         assertTrue(AdvancedSearchCardMatcher.matchesCriterion(bolt, SearchCriterion.ColorIdentity(emptySet(), ColorMatchMode.AT_MOST)))
     }
+
+    @Test
+    fun `CommanderEligible delegates to CommanderEligibility, agreeing with the wizard's own owned-commander grid`() {
+        val legendaryCreature = card(id = "cmd-x", name = "Some Legend", typeLine = "Legendary Creature — Human")
+        val nonLegendary = card(id = "creature-x", name = "Some Creature", typeLine = "Creature — Human")
+        val canBeCommander = card(id = "pw-x", name = "Some Planeswalker", typeLine = "Legendary Planeswalker — Test", oracleText = "Some Planeswalker can be your commander.")
+
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(legendaryCreature, SearchCriterion.CommanderEligible))
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(canBeCommander, SearchCriterion.CommanderEligible))
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(nonLegendary, SearchCriterion.CommanderEligible))
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(bolt, SearchCriterion.CommanderEligible))
+    }
 }
