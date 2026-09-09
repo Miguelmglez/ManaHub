@@ -20,7 +20,7 @@ import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckCardsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckArchetypeUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.DeriveCommanderStrategiesUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.RankOwnedCardsForProfileUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseCase
@@ -177,9 +177,10 @@ fun decksKoinModule(): Module = module {
     // always supplies a real instance; see each class's own KDoc).
     single { SuggestStrategiesForSeedsUseCase() }
     single { RankOwnedCardsForProfileUseCase() }
-    // Deck Wizard & Engine Rework plan, Workstream 2.2 — the STRATEGY step's pure candidate
-    // union/ranking. Pure/dependency-free, same registration convention as the two above.
-    single { DeriveCommanderStrategiesUseCase() }
+    // Deck Wizard Commander v3 plan, Phase 4.1 — the STRATEGY step's ranking use case. Pure/
+    // dependency-free, same registration convention as the two above. Replaces the retired
+    // DeriveCommanderStrategiesUseCase.
+    single { RecommendCommanderStrategiesUseCase() }
     // Deck Engine Unification plan (D1, live-wired in §5 Phase 3.5): build = the Doctor's own Motor A
     // loop, so BuildDeckFromTemplateUseCase shares the SAME SuggestAddsFromCollectionUseCase
     // singleton DeckDoctorOrchestrator uses. Motor B (community) is NOW wired live -- the wizard's
@@ -268,7 +269,7 @@ fun decksKoinModule(): Module = module {
             // Deck Wizard & Engine Rework plan, Workstream 2 -- STRATEGY step's source 1 +
             // derivation ranking.
             cardStrategyTagsRepository = get(),
-            deriveCommanderStrategiesUseCase = get(),
+            recommendCommanderStrategiesUseCase = get(),
         )
     }
 }

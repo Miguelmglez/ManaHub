@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
 // COMMENTS_REVIEWED: 2026-09-09
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +22,12 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -58,11 +64,14 @@ import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.SearchCriterion
+import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardRow
+import com.mmg.manahub.core.ui.components.CardTagChip
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.components.MagicSelectionItem
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
 import com.mmg.manahub.core.ui.components.search.shortLabel
 import com.mmg.manahub.core.ui.mtg_card_back
@@ -70,15 +79,14 @@ import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
+import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
-import com.mmg.manahub.feature.decks.domain.engine.StrategyPickerSelection
-import com.mmg.manahub.feature.decks.domain.engine.ThemeId
+import com.mmg.manahub.feature.decks.domain.usecase.StrategyRecommendation
 import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
-import com.mmg.manahub.feature.decks.presentation.components.StrategyPickerSheet
 import com.mmg.manahub.feature.decks.presentation.components.TribeOption
+import com.mmg.manahub.feature.decks.presentation.components.TribePickerSection
 import org.jetbrains.compose.resources.painterResource
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -404,66 +412,240 @@ internal fun OutsideCollectionToggleRow(checked: Boolean, onToggle: () -> Unit) 
     }
 }
 
-// ── 2.2 — STRATEGY ────────────────────────────────────────────────────────────
+// ── 2.2 — STRATEGY (Deck Wizard Commander v3 plan, Phase 4.2) ──────────────────
+
+/** Sentinel id for the UI-level "Custom" row -- never a [CuratedStrategy.id] (the catalog never
+ * mints an id equal to this), so it can share a single-select `selectedId` slot with real catalog
+ * ids without ambiguity. */
+internal const val CUSTOM_STRATEGY_ID = "__custom__"
+
+/** Deck Wizard Commander v3 plan (Phase 4, D4): the STRATEGY step's own top-N split of
+ * [DeckWizardUiState.commanderStrategyRecommendations] -- the first [STRATEGY_RECOMMENDED_COUNT]
+ * are "Recommended", the rest "Other plans" (collapsed by default, plan §8's "yes" default). A
+ * plain (non-`@Composable`) function so it is unit-testable without a Compose UI test. */
+internal fun strategyRecommendedSplit(recommendations: List<StrategyRecommendation>): Pair<List<StrategyRecommendation>, List<StrategyRecommendation>> =
+    recommendations.take(STRATEGY_RECOMMENDED_COUNT) to recommendations.drop(STRATEGY_RECOMMENDED_COUNT)
+
+private const val STRATEGY_RECOMMENDED_COUNT = 6
 
 /**
- * Once a commander is picked, derive its supported strategies ([DeckWizardUiState
- * .commanderStrategyCandidates]) and render them through the SHARED [StrategyPickerSheet]
- * (Workstream 1.2), restricted to exactly those candidates -- the picker itself always additionally
- * offers [ArchetypeId.GENERIC] ("Balanced") as the Commander-only escape hatch (D-B/plan 2.2).
+ * The single-select STRATEGY list (D4): [DeckWizardUiState.commanderStrategyRecommendations] split
+ * into "Recommended" (top 6) and collapsed "Other plans", plus "Custom" always offered last. The
+ * #1 recommendation is preselected by the ViewModel the moment the list loads
+ * ([DeckWizardViewModel.recommendCommanderStrategies]) and Next is ALWAYS enabled (plan §4/§8
+ * defaults) -- this step never blocks progress the way the old picker's tribe-required gate could.
+ *
+ * A [CuratedStrategy.requiresTribe] entry the recommender could not resolve a concrete tribe for
+ * opens the shared [TribePickerSection] tribe sub-picker (same component Deck Studio's own
+ * [CuratedStrategyPickerSheet] uses) instead of applying with no tribe.
  */
 @Composable
 internal fun StrategyStepContent(
     uiState: DeckWizardUiState,
-    onSelectArchetype: (ArchetypeId?) -> Unit,
-    onToggleTheme: (ThemeId) -> Unit,
-    onSelectTribe: (String?) -> Unit,
+    onSelectStrategy: (CuratedStrategy) -> Unit,
+    onSelectCustom: () -> Unit,
+    onRequestTribe: (CuratedStrategy) -> Unit,
+    onPickTribe: (String) -> Unit,
+    onCancelTribePick: () -> Unit,
     onNext: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    val candidates = uiState.commanderStrategyCandidates
-    val selection = StrategyPickerSelection(
-        archetype = uiState.selectedArchetype,
-        themes = uiState.selectedStrategyThemes,
-        tribe = uiState.selectedTribeKey,
-    )
-    val availableTribes = remember(candidates.tribes) {
-        candidates.tribes.map { TribeOption(key = it.key, label = it.label) }
+    var otherPlansExpanded by remember { mutableStateOf(false) }
+    val (recommended, other) = remember(uiState.commanderStrategyRecommendations) {
+        strategyRecommendedSplit(uiState.commanderStrategyRecommendations)
+    }
+    val commanderName = uiState.selectedCommander?.name.orEmpty()
+    val pendingTribeStrategy = uiState.pendingTribeStrategy
+    val tribeOptions = remember(uiState.commanderTribePickerCandidates) {
+        uiState.commanderTribePickerCandidates.map { TribeOption(key = it.tribeKey, label = it.displayLabel) }
     }
 
     Column(Modifier.fillMaxSize()) {
-        Column(Modifier.padding(horizontal = spacing.lg, vertical = spacing.md)) {
-            Text(stringResource(R.string.deck_wizard_strategy_step_title), style = ty.titleLarge, color = mc.textPrimary)
-            Text(
-                stringResource(R.string.deck_wizard_strategy_step_subtitle),
-                style = ty.bodyMedium,
-                color = mc.textSecondary,
-                modifier = Modifier.padding(top = spacing.xxs),
-            )
-        }
-        if (uiState.isLoadingCommanderStrategies) {
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                MagicLoadingSpinner()
+        if (pendingTribeStrategy != null) {
+            Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.md)) {
+                TribePickerSection(
+                    strategy = pendingTribeStrategy,
+                    availableTribes = tribeOptions,
+                    onSelectTribe = onPickTribe,
+                    onCancel = onCancelTribePick,
+                )
             }
         } else {
-            StrategyPickerSheet(
-                selection = selection,
-                availableTribes = availableTribes,
-                onSelectArchetype = onSelectArchetype,
-                onToggleTheme = onToggleTheme,
-                onSelectTribe = onSelectTribe,
-                modifier = Modifier.weight(1f),
-                availableArchetypes = candidates.archetypes.toSet(),
-                availableThemes = candidates.themes.toSet(),
-            )
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.md),
+                verticalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                item(key = "header") {
+                    Column {
+                        Text(
+                            stringResource(R.string.deck_wizard_strategy_step_title_for, commanderName),
+                            style = ty.titleLarge,
+                            color = mc.textPrimary,
+                        )
+                        Text(
+                            stringResource(R.string.deck_wizard_strategy_step_subtitle),
+                            style = ty.bodyMedium,
+                            color = mc.textSecondary,
+                            modifier = Modifier.padding(top = spacing.xxs),
+                        )
+                    }
+                }
+
+                if (uiState.isLoadingCommanderStrategies) {
+                    item(key = "loading") {
+                        Box(Modifier.fillMaxWidth().padding(vertical = spacing.xl), contentAlignment = Alignment.Center) {
+                            MagicLoadingSpinner()
+                        }
+                    }
+                } else {
+                    if (recommended.isNotEmpty()) {
+                        item(key = "recommended_header") {
+                            StrategySectionHeader(stringResource(R.string.deck_wizard_strategy_recommended_header, commanderName))
+                        }
+                        items(recommended, key = { "rec_${it.strategy.id}" }) { recommendation ->
+                            StrategyRecommendationRow(
+                                recommendation = recommendation,
+                                isSelected = uiState.selectedCuratedStrategyId == recommendation.strategy.id,
+                                onClick = {
+                                    if (recommendation.strategy.requiresTribe && recommendation.tribe == null) {
+                                        onRequestTribe(recommendation.strategy)
+                                    } else {
+                                        onSelectStrategy(recommendation.strategy)
+                                    }
+                                },
+                            )
+                        }
+                    }
+                    if (other.isNotEmpty()) {
+                        item(key = "other_plans_toggle") {
+                            OtherPlansToggle(
+                                expanded = otherPlansExpanded,
+                                onToggle = { otherPlansExpanded = !otherPlansExpanded },
+                            )
+                        }
+                        if (otherPlansExpanded) {
+                            items(other, key = { "other_${it.strategy.id}" }) { recommendation ->
+                                StrategyRecommendationRow(
+                                    recommendation = recommendation,
+                                    isSelected = uiState.selectedCuratedStrategyId == recommendation.strategy.id,
+                                    onClick = {
+                                        if (recommendation.strategy.requiresTribe && recommendation.tribe == null) {
+                                            onRequestTribe(recommendation.strategy)
+                                        } else {
+                                            onSelectStrategy(recommendation.strategy)
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    item(key = "custom_header") {
+                        StrategySectionHeader(stringResource(R.string.deck_wizard_strategy_custom_header))
+                    }
+                    item(key = "custom") {
+                        MagicSelectionItem(
+                            title = stringResource(R.string.deck_wizard_strategy_custom_title),
+                            description = stringResource(R.string.deck_wizard_strategy_custom_description),
+                            isSelected = uiState.selectedCuratedStrategyId == null,
+                            accentColor = mc.goldMtg,
+                            icon = {
+                                Box(
+                                    modifier = Modifier.size(40.dp).clip(CircleShape).background(mc.goldMtg.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.goldMtg)
+                                }
+                            },
+                            onClick = onSelectCustom,
+                        )
+                    }
+                }
+            }
         }
         WizardStickyButton(
             label = stringResource(R.string.deck_wizard_next),
             enabled = true,
             onClick = onNext,
         )
+    }
+}
+
+@Composable
+private fun StrategySectionHeader(title: String) {
+    Text(
+        text = title.uppercase(),
+        style = MaterialTheme.magicTypography.labelMedium,
+        color = MaterialTheme.magicColors.primaryAccent,
+        modifier = Modifier.padding(top = MaterialTheme.spacing.sm, bottom = MaterialTheme.spacing.xxs),
+    )
+}
+
+@Composable
+private fun OtherPlansToggle(expanded: Boolean, onToggle: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(onClick = onToggle),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+    ) {
+        Icon(
+            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            contentDescription = null,
+            tint = mc.textSecondary,
+        )
+        Text(
+            text = stringResource(if (expanded) R.string.deck_wizard_strategy_other_plans_collapse else R.string.deck_wizard_strategy_other_plans_expand),
+            style = ty.labelLarge,
+            color = mc.textSecondary,
+        )
+    }
+}
+
+/**
+ * One STRATEGY row (D4): mirrors [MagicSelectionItem]'s Surface/border/selected treatment (that
+ * shared component has no slot for a reason-chip row, so this is a sibling built on the same
+ * tokens/shape rather than a literal clone of its markup -- see the Phase 4 report for this
+ * judgment call) plus up to 2 [RecommendationReason] chips via [CardTagChip] (never a raw
+ * `Surface`/`InputChip`, per CLAUDE.md's tag-chip rule).
+ */
+@Composable
+private fun StrategyRecommendationRow(recommendation: StrategyRecommendation, isSelected: Boolean, onClick: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    val accent = mc.primaryAccent
+
+    Surface(
+        onClick = onClick,
+        shape = CardShape,
+        color = mc.backgroundSecondary,
+        border = BorderStroke(width = if (isSelected) 1.5.dp else 1.dp, color = if (isSelected) accent else mc.surfaceVariant),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(spacing.md), verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                Text(recommendation.strategy.displayName, style = ty.titleMedium, color = mc.textPrimary, modifier = Modifier.weight(1f))
+                if (isSelected) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+                }
+            }
+            Text(recommendation.strategy.description, style = ty.bodySmall, color = mc.textSecondary)
+            if (recommendation.reasons.isNotEmpty()) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.xs), verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                    recommendation.reasons.forEach { reason ->
+                        CardTagChip(label = reason.label, category = TagCategory.STRATEGY)
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -1192,6 +1192,14 @@
     <string name="deck_wizard_include_outside_collection_subtitle">Search Scryfall too, not just what you own</string>
     <string name="deck_wizard_strategy_step_title">Pick a strategy</string>
     <string name="deck_wizard_strategy_step_subtitle">These are the game plans your commander supports best.</string>
+    <!-- Deck Wizard Commander v3 plan (Phase 4.2) -->
+    <string name="deck_wizard_strategy_step_title_for">Pick a strategy for %1$s</string>
+    <string name="deck_wizard_strategy_recommended_header">Recommended for %1$s</string>
+    <string name="deck_wizard_strategy_other_plans_expand">Other plans</string>
+    <string name="deck_wizard_strategy_other_plans_collapse">Hide other plans</string>
+    <string name="deck_wizard_strategy_custom_header">Custom</string>
+    <string name="deck_wizard_strategy_custom_title">Custom</string>
+    <string name="deck_wizard_strategy_custom_description">The engine will detect the plan from what you build.</string>
     <string name="deck_wizard_manual_adds_title">Add specific cards (optional)</string>
     <string name="deck_wizard_manual_adds_subtitle">We\'ll fill everything else automatically — this step is fully skippable.</string>
     <string name="deck_wizard_manual_adds_role_progress">%1$d / %2$d</string>

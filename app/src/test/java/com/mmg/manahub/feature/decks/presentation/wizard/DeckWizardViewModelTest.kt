@@ -22,11 +22,12 @@ import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
+import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
+import com.mmg.manahub.feature.decks.domain.engine.availableIn
 import com.mmg.manahub.feature.decks.domain.engine.card
-import com.mmg.manahub.feature.decks.domain.usecase.DeriveCommanderStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildStage
 import com.mmg.manahub.feature.decks.domain.template.CategorySuggestions
@@ -389,13 +390,13 @@ class DeckWizardViewModelTest {
     }
 
     @Test
-    fun `STRATEGY step advances with no pick at all -- Commander's GENERIC Balanced escape hatch (D-B), and resolves NO skeleton`() = runTest(dispatcher) {
-        // Fix 5 (edge-case audit, 2026-07-28): a GENERIC ("Balanced") pick with no themes must
-        // mirror BuildDeckFromTemplateUseCase.resolveArchetypeSkeleton's own gate -- the REAL build
-        // never resolves an archetype-flavored skeleton for this case (Motor A scores with zero
-        // theme bonus), so this UI-only preview must not show one either. Before this fix, this
-        // test asserted the OPPOSITE (a non-null skeleton) as the intended behavior -- that was
-        // itself the bug: a misleading MANUAL_ADDS role chip the real build never actually applied.
+    fun `STRATEGY step Custom pick advances with no pick at all (D6) and resolves NO skeleton`() = runTest(dispatcher) {
+        // Deck Wizard Commander v3 plan (Phase 4): the #1 recommendation is now PRESELECTED on
+        // arrival (plan §8 default) -- this test explicitly switches to Custom (D6, "no pin") to
+        // exercise the "GENERIC/no theme" gate BuildDeckFromTemplateUseCase.resolveArchetypeSkeleton
+        // also honors -- the real build never resolves an archetype-flavored skeleton for an unpinned
+        // deck (Motor A scores with zero theme bonus), so this UI-only preview must not show one
+        // either.
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         val vm = viewModel()
         advanceUntilIdle()
@@ -405,15 +406,32 @@ class DeckWizardViewModelTest {
         advanceUntilIdle()
         vm.onNextFromCommanderPick()
 
+        vm.onSelectCustomStrategy()
         assertNull(vm.uiState.value.selectedArchetype)
+        assertNull(vm.uiState.value.selectedCuratedStrategyId)
         vm.onNextFromStrategy()
 
         assertEquals(WizardPhase.MANUAL_ADDS, vm.uiState.value.phase)
-        assertNull("a GENERIC pick with no themes must resolve NO skeleton, matching the real build's own gate", vm.uiState.value.manualAddsSkeleton)
+        assertNull("a Custom pick with no themes must resolve NO skeleton, matching the real build's own gate", vm.uiState.value.manualAddsSkeleton)
     }
 
     @Test
-    fun `onSelectStrategyArchetype and onToggleStrategyTheme update the STRATEGY step's own selection`() = runTest(dispatcher) {
+    fun `selecting a commander preselects the #1 STRATEGY recommendation (plan default)`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+
+        val recommendations = vm.uiState.value.commanderStrategyRecommendations
+        assertTrue(recommendations.isNotEmpty())
+        assertEquals(recommendations.first().strategy.id, vm.uiState.value.selectedCuratedStrategyId)
+    }
+
+    @Test
+    fun `onSelectCommanderStrategy and onSelectCustomStrategy update the STRATEGY step's own selection`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         val vm = viewModel()
         advanceUntilIdle()
@@ -423,22 +441,59 @@ class DeckWizardViewModelTest {
         advanceUntilIdle()
         vm.onNextFromCommanderPick()
 
-        vm.onSelectStrategyArchetype(ArchetypeId.AGGRO)
-        assertEquals(ArchetypeId.AGGRO, vm.uiState.value.selectedArchetype)
-
-        vm.onToggleStrategyTheme(ThemeId.TOKENS)
+        val tokensStrategy = CuratedStrategyCatalog.byId("tokens")!!
+        vm.onSelectCommanderStrategy(tokensStrategy)
+        assertEquals("tokens", vm.uiState.value.selectedCuratedStrategyId)
         assertEquals(listOf(ThemeId.TOKENS), vm.uiState.value.selectedStrategyThemes)
-
-        // Toggling the same theme again removes it (StrategyPickerLogic.toggleTheme contract).
-        vm.onToggleStrategyTheme(ThemeId.TOKENS)
-        assertTrue(vm.uiState.value.selectedStrategyThemes.isEmpty())
 
         // Casual's own single-theme slot (selectedDirectionTheme) is untouched -- the two flows use
         // SEPARATE fields for the theme axis (see DeckWizardUiState.selectedStrategyThemes' KDoc).
         assertNull(vm.uiState.value.selectedDirectionTheme)
 
-        vm.onSelectStrategyArchetype(null)
+        vm.onSelectCustomStrategy()
         assertNull(vm.uiState.value.selectedArchetype)
+        assertNull(vm.uiState.value.selectedCuratedStrategyId)
+    }
+
+    @Test
+    fun `a requiresTribe strategy with no derivable tribe opens the sub-picker instead of applying`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+
+        val tribalStrategy = CuratedStrategyCatalog.byId("tribal")!!
+        vm.onSelectCommanderStrategy(tribalStrategy)
+        advanceUntilIdle()
+
+        assertEquals(tribalStrategy, vm.uiState.value.pendingTribeStrategy)
+
+        vm.onPickTribeForStrategy("tribe:elf")
+        assertNull(vm.uiState.value.pendingTribeStrategy)
+        assertEquals("tribal", vm.uiState.value.selectedCuratedStrategyId)
+        assertEquals("tribe:elf", vm.uiState.value.selectedTribeKey)
+    }
+
+    @Test
+    fun `cancelling the tribe sub-picker leaves the previous selection untouched`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        val previousSelection = vm.uiState.value.selectedCuratedStrategyId
+
+        vm.onRequestTribeForStrategy(CuratedStrategyCatalog.byId("tribal")!!)
+        advanceUntilIdle()
+        vm.onCancelTribePickForStrategy()
+
+        assertNull(vm.uiState.value.pendingTribeStrategy)
+        assertEquals(previousSelection, vm.uiState.value.selectedCuratedStrategyId)
     }
 
     @Test
@@ -551,7 +606,7 @@ class DeckWizardViewModelTest {
     }
 
     @Test
-    fun `selecting a commander derives STRATEGY candidates from its own card_strategy_tags (source 1)`() = runTest(dispatcher) {
+    fun `selecting a commander computes STRATEGY recommendations informed by its own card_strategy_tags (source 1)`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery { cardStrategyTagsRepository.getStrategyTags(any()) } returns CardStrategyTagsResult.Found(
             tags = listOf(CardTag.TRIBAL),
@@ -565,8 +620,9 @@ class DeckWizardViewModelTest {
         vm.onSelectCommander(commander)
         advanceUntilIdle()
 
-        val candidates = vm.uiState.value.commanderStrategyCandidates
-        assertTrue(candidates.tribes.any { it.key == "tribe:elf" })
+        val recommendations = vm.uiState.value.commanderStrategyRecommendations
+        assertTrue(recommendations.isNotEmpty())
+        assertTrue(recommendations.all { it.strategy.availableIn(DeckFormat.COMMANDER) })
     }
 
     @Test
@@ -1581,7 +1637,10 @@ class DeckWizardViewModelTest {
         assertTrue(state.suggestedSeedCards.isEmpty())
         assertEquals(WizardEntryFlow.CARDS, state.entryFlow)
 
-        // The stale archetype must never reach the build spec.
+        // The STALE Casual-taxonomy archetype (picked before backing out) must never reach the
+        // Commander build spec -- Deck Wizard Commander v3 plan Phase 4 now preselects a REAL
+        // recommendation for the NEW commander on its own (product default, plan §8), so the
+        // no-stale-leak invariant is verified against THAT commander's own top pick, not `null`.
         var capturedSpec: DeckWizardSpec? = null
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery { buildDeckFromTemplateUseCase(any(), any()) } answers {
@@ -1591,6 +1650,7 @@ class DeckWizardViewModelTest {
         vm.onNextFromFormat()
         vm.onSelectCommander(commander)
         advanceUntilIdle()
+        val topPickArchetype = vm.uiState.value.commanderStrategyRecommendations.firstOrNull()?.strategy?.archetypes?.first()
         // Deck Wizard & Engine Rework plan, Workstream 2 -- the new Commander step sequence.
         vm.onNextFromCommanderPick()
         vm.onNextFromStrategy()
@@ -1598,7 +1658,7 @@ class DeckWizardViewModelTest {
         vm.onGenerate()
         advanceUntilIdle()
 
-        assertNull(capturedSpec?.strategyProfile?.archetype)
+        assertEquals(topPickArchetype, capturedSpec?.strategyProfile?.archetype)
     }
 
     @Test

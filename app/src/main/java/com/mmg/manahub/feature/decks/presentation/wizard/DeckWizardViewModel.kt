@@ -27,26 +27,27 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
 import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyAffinity
 import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyEntry
+import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
-import com.mmg.manahub.feature.decks.domain.engine.StrategyPickerLogic
-import com.mmg.manahub.feature.decks.domain.engine.StrategyPickerSelection
 import com.mmg.manahub.feature.decks.domain.engine.StrategyProfile
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
+import com.mmg.manahub.feature.decks.domain.engine.toPin
 import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
 import com.mmg.manahub.feature.decks.domain.template.CategorySuggestions
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfile
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
 import com.mmg.manahub.feature.decks.domain.template.CollectionTribeSignal
 import com.mmg.manahub.feature.decks.domain.template.DeckWizardSpec
+import com.mmg.manahub.feature.decks.domain.template.OwnedCard
 import com.mmg.manahub.feature.decks.domain.template.TemplateBuildProgress
 import com.mmg.manahub.feature.decks.domain.template.TemplateBuildResult
 import com.mmg.manahub.feature.decks.domain.template.TemplateCardSuggestion
-import com.mmg.manahub.feature.decks.domain.usecase.DerivedCommanderStrategies
-import com.mmg.manahub.feature.decks.domain.usecase.DeriveCommanderStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.RankOwnedCardsForProfileUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.StrategyRecommendation
 import com.mmg.manahub.feature.decks.domain.usecase.SeedStrategyCandidate
 import com.mmg.manahub.feature.decks.domain.usecase.SeedStrategySuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestStrategiesForSeedsUseCase
@@ -212,22 +213,40 @@ data class DeckWizardUiState(
      * ignored by the UI) while [commanderStructuredQuery] is null. */
     val commanderResultTab: CommanderResultTab = CommanderResultTab.COLLECTION,
 
-    /** STRATEGY step (2.2) -- once a commander is picked, the derived candidate list from
-     * [com.mmg.manahub.feature.decks.domain.usecase.DeriveCommanderStrategiesUseCase], rendered
-     * through the shared `StrategyPickerSheet` restricted to exactly these entries (the picker
-     * itself always additionally offers the GENERIC "Balanced" escape hatch, D-B/plan 2.2). */
-    val commanderStrategyCandidates: DerivedCommanderStrategies = DerivedCommanderStrategies.EMPTY,
+    /** STRATEGY step (Deck Wizard Commander v3 plan, Phase 4) -- the ranked recommendation list
+     * from [RecommendCommanderStrategiesUseCase], sorted best-first; the UI takes the first
+     * [STRATEGY_RECOMMENDED_COUNT] as "Recommended" and the rest as collapsed "Other plans"
+     * (Custom is a UI-level sentinel, always offered separately -- see
+     * [DeckWizardCommanderSteps.CUSTOM_STRATEGY_ID]). Replaces the old `DeriveCommanderStrategiesUseCase`
+     * candidate-union list + the 3-axis `StrategyPickerSheet` this step used to mount. */
+    val commanderStrategyRecommendations: List<StrategyRecommendation> = emptyList(),
     val isLoadingCommanderStrategies: Boolean = false,
+    /** The currently-selected catalog entry's id, or `null` for Custom (D6) -- drives the STRATEGY
+     * step's single-select highlight. Distinct from [selectedArchetype]/[selectedStrategyThemes]/
+     * [selectedTribeKey], which stay the ACTUAL pin fields the rest of the wizard (skeleton preview,
+     * build) reads -- this id is a display-only pointer back into
+     * [commanderStrategyRecommendations], since a (archetype, themes) pair alone cannot always be
+     * mapped back to exactly one catalog id. */
+    val selectedCuratedStrategyId: String? = null,
+    /** The STRATEGY step's own tribe sub-picker (shown when the user taps a `requiresTribe` entry
+     * with no tribe the recommender could derive on its own) -- the entry awaiting a tribe pick, or
+     * `null` when the sub-picker is closed. */
+    val pendingTribeStrategy: CuratedStrategy? = null,
+    /** [pendingTribeStrategy]'s own candidate list -- the collection's dominant tribes within the
+     * selected commander's identity (reuses [CollectionProfileUseCase.dominantTribes] over an
+     * identity-filtered slice of [ownedCards], per the plan's "reuse whatever the app already
+     * computes for dominant tribes in identity" instruction -- no new dominant-tribe computation). */
+    val commanderTribePickerCandidates: List<CollectionTribeSignal> = emptyList(),
     /** The STRATEGY step's OWN theme pick(s) -- up to [com.mmg.manahub.feature.decks.domain.engine
-     * .StrategyCatalog.MAX_THEMES], mirroring [StrategyPickerSelection.themes]. Kept SEPARATE from
-     * [selectedDirectionTheme] (Casual's existing single-theme Direction/Identity slot) deliberately:
-     * unifying them would force [selectedDirectionTheme] to become a `List<ThemeId>` and ripple
-     * through every Casual Direction/Identity call site this workstream must leave byte-identical
-     * (see [DeckWizardViewModel.onGenerate]'s Commander branch for where this feeds the build spec).
+     * .StrategyCatalog.MAX_THEMES]. Kept SEPARATE from [selectedDirectionTheme] (Casual's existing
+     * single-theme Direction/Identity slot) deliberately: unifying them would force
+     * [selectedDirectionTheme] to become a `List<ThemeId>` and ripple through every Casual
+     * Direction/Identity call site this workstream must leave byte-identical (see
+     * [DeckWizardViewModel.onGenerate]'s Commander branch for where this feeds the build spec).
      * [selectedArchetype]/[selectedTribeKey]/[selectedTribeLabel] ARE shared with Casual's existing
      * one-slot fields (both flows use the SAME "one Direction/Strategy pick" contract) -- only the
      * theme axis needed its own field, since it is the only axis where the two flows' cardinality
-     * differs (Casual: 1 theme; Commander STRATEGY: up to 2, matching the shared picker). */
+     * differs (Casual: 1 theme; Commander STRATEGY: up to 2). */
     val selectedStrategyThemes: List<ThemeId> = emptyList(),
 
     /** MANUAL_ADDS step (2.3, SHARED -- WS3 mounts this same composable/state shape for the Casual
@@ -324,8 +343,11 @@ private fun DeckWizardUiState.resetDirectionScratchState(): DeckWizardUiState = 
     commanderColorFilter = emptySet(),
     commanderStructuredQuery = null,
     commanderResultTab = CommanderResultTab.COLLECTION,
-    commanderStrategyCandidates = DerivedCommanderStrategies.EMPTY,
+    commanderStrategyRecommendations = emptyList(),
     isLoadingCommanderStrategies = false,
+    selectedCuratedStrategyId = null,
+    pendingTribeStrategy = null,
+    commanderTribePickerCandidates = emptyList(),
     selectedStrategyThemes = emptyList(),
     manualAddsSkeleton = null,
     manualAddsRoleFilter = null,
@@ -365,7 +387,8 @@ class DeckWizardViewModel(
     // (`card_strategy_tags` payload). Required (like every other repository above), appended last
     // for the same positional-arg-free-call-site reason as the pure use cases below.
     private val cardStrategyTagsRepository: CardStrategyTagsRepository,
-    private val deriveCommanderStrategiesUseCase: DeriveCommanderStrategiesUseCase = DeriveCommanderStrategiesUseCase(),
+    // Deck Wizard Commander v3 plan, Phase 4.1 -- replaces the retired DeriveCommanderStrategiesUseCase.
+    private val recommendCommanderStrategiesUseCase: RecommendCommanderStrategiesUseCase = RecommendCommanderStrategiesUseCase(),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DeckWizardUiState())
@@ -649,7 +672,7 @@ class DeckWizardViewModel(
         }
         loadThemeTags(card)
         recomputeSeedStrategySuggestion()
-        deriveCommanderStrategies(card)
+        recommendCommanderStrategies(card)
     }
 
     fun onClearCommander() {
@@ -659,7 +682,10 @@ class DeckWizardViewModel(
                 colorIdentity = emptySet(),
                 availableThemeTags = emptyList(),
                 selectedThemeHint = null,
-                commanderStrategyCandidates = DerivedCommanderStrategies.EMPTY,
+                commanderStrategyRecommendations = emptyList(),
+                selectedCuratedStrategyId = null,
+                pendingTribeStrategy = null,
+                commanderTribePickerCandidates = emptyList(),
             )
         }
         recomputeSeedStrategySuggestion()
@@ -717,41 +743,42 @@ class DeckWizardViewModel(
     }
 
     /**
-     * Deck Wizard & Engine Rework plan, Workstream 2.2 — derives the STRATEGY step's short,
-     * commander-specific candidate list. Three ranked sources (see
-     * [com.mmg.manahub.feature.decks.domain.usecase.DeriveCommanderStrategiesUseCase]'s own KDoc for
-     * the full rationale, including the documented adaptation of source 1 to the repository's ACTUAL
-     * read shape): the commander's own `card_strategy_tags` row (source 1), the EDHREC per-commander
-     * aggregate's theme tags (source 2, the SAME fetch [loadThemeTags] already makes — issued again
-     * here rather than shared with that function's result, since [loadThemeTags] feeds the now
-     * Commander-unreachable Identity-step theme picker and keeping the two call sites independent
-     * avoids coupling an old, soon-superseded consumer to a new one), and a fallback (source 3, only
-     * when 1+2 are both empty) over the commander `Card`'s own already-persisted tags plus its
-     * [TribeDeriver] payoff/subtype tribes. Best-effort throughout — ANY failure degrades to fewer
-     * candidates, never blocks the step (mirrors [loadThemeTags]'s own "degraded, never dead"
-     * precedent); the STRATEGY step's picker always still offers the GENERIC "Balanced" escape hatch
-     * regardless of how many (if any) real candidates were derived.
+     * Deck Wizard Commander v3 plan, Phase 4.1 — ranks [com.mmg.manahub.feature.decks.domain.engine
+     * .CuratedStrategyCatalog.ALL] for [commander] via [RecommendCommanderStrategiesUseCase]:
+     * the commander's own `card_strategy_tags` row, the EDHREC per-commander aggregate's theme tags
+     * (the SAME fetch [loadThemeTags] already makes — issued again here rather than shared with that
+     * function's result, since [loadThemeTags] feeds the now Commander-unreachable Identity-step
+     * theme picker and keeping the two call sites independent avoids coupling an old,
+     * soon-superseded consumer to a new one), [ColorStrategyAffinity], and owned-role coverage over
+     * [cardSnapshot]. Best-effort throughout — ANY failure degrades the corresponding signal to zero
+     * contribution, never blocks the step (the use case itself never throws). Preselects the #1
+     * recommendation on arrival (product default, plan §8) via [selectCommanderStrategy].
      */
-    private fun deriveCommanderStrategies(commander: Card) {
+    private fun recommendCommanderStrategies(commander: Card) {
         commanderStrategyJob?.cancel()
         commanderStrategyJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoadingCommanderStrategies = true) }
+            val format = _uiState.value.selectedFormat ?: DeckFormat.COMMANDER
             val source1 = runCatching { cardStrategyTagsRepository.getStrategyTags(commander.oracleId) }
                 .onFailure { crashReporter.log("deck_wizard_commander_strategy_tags_fetch_failed") }
                 .getOrNull() as? CardStrategyTagsResult.Found
-            val source2ThemeNames = runCatching {
+            val edhrecThemeNames = runCatching {
                 val result = communityAggregateRepository.getCommanderAggregate(commander.name)
                 (result as? DataResult.Success)?.data?.themeTags?.map { it.name }.orEmpty()
             }.getOrDefault(emptyList())
 
-            val derived = deriveCommanderStrategiesUseCase(
+            val recommendations = recommendCommanderStrategiesUseCase(
+                format = format,
+                commander = commander,
+                identity = commander.colorIdentity.toManaColorSet(),
+                ownedCollection = cardSnapshot.map { OwnedCard(it, 1) },
                 ownTags = source1?.tags.orEmpty(),
                 ownTribes = source1?.tribes.orEmpty(),
-                edhrecThemeNames = source2ThemeNames,
-                fallbackTags = commander.tags + commander.userTags,
-                fallbackTribeKeys = TribeDeriver.tribeKeys(commander),
+                edhrecThemeNames = edhrecThemeNames,
             )
-            _uiState.update { it.copy(commanderStrategyCandidates = derived, isLoadingCommanderStrategies = false) }
+            _uiState.update { it.copy(commanderStrategyRecommendations = recommendations, isLoadingCommanderStrategies = false) }
+            val topPick = recommendations.firstOrNull()
+            if (topPick != null) selectCommanderStrategy(topPick.strategy, topPick.tribe) else selectCommanderStrategy(null, null)
         }
     }
 
@@ -770,33 +797,65 @@ class DeckWizardViewModel(
         _uiState.update { it.copy(phase = WizardPhase.STRATEGY) }
     }
 
-    // ── STRATEGY step (Deck Wizard & Engine Rework plan, Workstream 2.2) ─────────
+    // ── STRATEGY step (Deck Wizard Commander v3 plan, Phase 4.2) ─────────────────
 
-    /** Wraps [StrategyPickerLogic] against this VM's existing one-slot archetype/tribe fields plus
-     * the STRATEGY-step-only [DeckWizardUiState.selectedStrategyThemes] — see that field's KDoc for
-     * why themes get a dedicated field while archetype/tribe are shared with Casual. */
-    private fun currentStrategyPickerSelection(state: DeckWizardUiState = _uiState.value): StrategyPickerSelection =
-        StrategyPickerSelection(archetype = state.selectedArchetype, themes = state.selectedStrategyThemes, tribe = state.selectedTribeKey)
-
-    private fun applyStrategyPickerSelection(selection: StrategyPickerSelection) {
+    /** Writes [strategy]/[tribe]'s pin into the shared archetype/themes/tribe fields (D4:
+     * `CuratedStrategy.toPin`, the SAME function Deck Studio's own strategy picker uses) plus the
+     * STRATEGY step's own [DeckWizardUiState.selectedCuratedStrategyId] display pointer.
+     * `strategy == null` is Custom (D6): every pin field clears. */
+    private fun selectCommanderStrategy(strategy: CuratedStrategy?, tribe: String?) {
+        val pin = strategy?.toPin(tribe)
         _uiState.update {
             it.copy(
-                selectedArchetype = selection.archetype,
-                selectedStrategyThemes = selection.themes,
-                selectedTribeKey = selection.tribe,
-                selectedTribeLabel = selection.tribe?.let { key -> key.removePrefix("tribe:").replaceFirstChar(Char::uppercase) },
+                selectedCuratedStrategyId = strategy?.id,
+                selectedArchetype = pin?.archetype,
+                selectedStrategyThemes = pin?.themes.orEmpty(),
+                selectedTribeKey = pin?.tribe,
+                selectedTribeLabel = pin?.tribe?.let { key -> key.removePrefix("tribe:").replaceFirstChar(Char::uppercase) },
             )
         }
     }
 
-    fun onSelectStrategyArchetype(archetype: ArchetypeId?) =
-        applyStrategyPickerSelection(StrategyPickerLogic.selectArchetype(currentStrategyPickerSelection(), archetype))
+    /** Selects a "Recommended"/"Other plans" row. A [CuratedStrategy.requiresTribe] entry the
+     * recommender could already resolve a concrete tribe for (its own
+     * [StrategyRecommendation.tribe]) applies immediately; one it could NOT resolve opens the tribe
+     * sub-picker instead ([onRequestTribeForStrategy]) rather than applying with a `null` tribe. */
+    fun onSelectCommanderStrategy(strategy: CuratedStrategy) {
+        val recommendation = _uiState.value.commanderStrategyRecommendations.firstOrNull { it.strategy.id == strategy.id }
+        val tribe = recommendation?.tribe
+        if (strategy.requiresTribe && tribe == null) {
+            onRequestTribeForStrategy(strategy)
+        } else {
+            selectCommanderStrategy(strategy, tribe)
+        }
+    }
 
-    fun onToggleStrategyTheme(theme: ThemeId) =
-        applyStrategyPickerSelection(StrategyPickerLogic.toggleTheme(currentStrategyPickerSelection(), theme))
+    /** D6: Custom is always separately offered, regardless of what the recommender returned. */
+    fun onSelectCustomStrategy() = selectCommanderStrategy(null, null)
 
-    fun onSelectStrategyTribe(tribe: String?) =
-        applyStrategyPickerSelection(StrategyPickerLogic.selectTribe(currentStrategyPickerSelection(), tribe))
+    /** Opens the tribe sub-picker for [strategy], seeded with the collection's dominant tribes
+     * within the selected commander's identity — reuses [CollectionProfileUseCase.dominantTribes]
+     * over an identity-filtered slice of [cardSnapshot] (no new dominant-tribe computation). */
+    fun onRequestTribeForStrategy(strategy: CuratedStrategy) {
+        val identitySymbols = _uiState.value.colorIdentity.map { it.symbol }.toSet()
+        viewModelScope.launch {
+            val identityCards = cardSnapshot.filter { card -> identitySymbols.containsAll(card.colorIdentity) }
+            val profile = collectionProfileUseCase(identityCards, limit = TRIBE_PICKER_CANDIDATE_LIMIT)
+            _uiState.update {
+                it.copy(pendingTribeStrategy = strategy, commanderTribePickerCandidates = profile.dominantTribes)
+            }
+        }
+    }
+
+    fun onCancelTribePickForStrategy() {
+        _uiState.update { it.copy(pendingTribeStrategy = null, commanderTribePickerCandidates = emptyList()) }
+    }
+
+    fun onPickTribeForStrategy(tribeKey: String) {
+        val strategy = _uiState.value.pendingTribeStrategy ?: return
+        selectCommanderStrategy(strategy, tribeKey)
+        _uiState.update { it.copy(pendingTribeStrategy = null, commanderTribePickerCandidates = emptyList()) }
+    }
 
     /**
      * STRATEGY's "Next" (2.4) — ALWAYS enabled (no gate): an untouched pick already means GENERIC
@@ -1766,6 +1825,7 @@ class DeckWizardViewModel(
         const val SEARCH_MIN_LENGTH = 2
         const val SEARCH_DEBOUNCE_MS = 400L
         const val MAX_SEED_CARDS = 8
+        const val TRIBE_PICKER_CANDIDATE_LIMIT = 8
     }
 }
 

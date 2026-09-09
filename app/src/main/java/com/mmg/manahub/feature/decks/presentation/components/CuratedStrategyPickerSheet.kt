@@ -411,9 +411,12 @@ private fun PickerSectionHeader(title: String) {
 
 /** The inline "now pick a tribe for <Strategy>" step shown after tapping a `requiresTribe`
  * strategy (plan §3.4 item 1's "tribe sub-picker shown when the selected entry has
- * `requiresTribe=true`") — replaces the flat list until a tribe is chosen or the user backs out. */
+ * `requiresTribe=true`") — replaces the flat list until a tribe is chosen or the user backs out.
+ * Internal (not `private`) since Deck Wizard Commander v3 plan Phase 4.2 reuses it verbatim from
+ * `DeckWizardCommanderSteps.kt`'s new STRATEGY step (a different package, same `:app` module —
+ * `internal` is module-visible, per CLAUDE.md's "reuse, don't clone" instruction). */
 @Composable
-private fun TribePickerSection(
+internal fun TribePickerSection(
     strategy: CuratedStrategy,
     availableTribes: List<TribeOption>,
     onSelectTribe: (String) -> Unit,

@@ -186,9 +186,11 @@ fun DeckWizardScreen(
                         )
                         WizardPhase.STRATEGY -> StrategyStepContent(
                             uiState = uiState,
-                            onSelectArchetype = viewModel::onSelectStrategyArchetype,
-                            onToggleTheme = viewModel::onToggleStrategyTheme,
-                            onSelectTribe = viewModel::onSelectStrategyTribe,
+                            onSelectStrategy = viewModel::onSelectCommanderStrategy,
+                            onSelectCustom = viewModel::onSelectCustomStrategy,
+                            onRequestTribe = viewModel::onRequestTribeForStrategy,
+                            onPickTribe = viewModel::onPickTribeForStrategy,
+                            onCancelTribePick = viewModel::onCancelTribePickForStrategy,
                             onNext = viewModel::onNextFromStrategy,
                         )
                         WizardPhase.MANUAL_ADDS -> ManualAddsStepContent(
