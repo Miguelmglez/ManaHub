@@ -35,6 +35,7 @@ import org.junit.Test
  *  - GROUP 4: addCardToDeck — card entity construction, deck updatedAt bump
  *  - GROUP 5: removeCardFromDeck — DAO delegation, deck updatedAt bump
  *  - GROUP 6: clearDeck   — DAO delegation, deck updatedAt bump
+ *  - GROUP 6b: replaceAllCardsWithSource — single-transaction DAO delegation (D12 atomicity)
  *  - GROUP 7: observeAllDeckSummaries — groupBy, cardCount, colorIdentity, sorting
  *  - GROUP 8: moveCardQuantity — provenance merge on a board-move (edge-case audit Fix 3)
  */
@@ -309,6 +310,41 @@ class DeckRepositoryImplTest {
         repository.clearDeck(DECK_ID)
 
         assertTrue("updatedAt must be bumped", captured.captured.updatedAt > 100L)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 6b — replaceAllCardsWithSource (Deck Wizard Commander v3, D12 atomicity)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given slots when replaceAllCardsWithSource then deckDao single-transaction method is called exactly once`() = runTest {
+        val entitiesSlot = slot<List<DeckCardEntity>>()
+        every { deckDao.replaceAllCardsWithSource(DECK_ID, capture(entitiesSlot), any()) } returns Unit
+
+        repository.replaceAllCardsWithSource(
+            DECK_ID,
+            listOf(
+                com.mmg.manahub.core.domain.repository.CardSlotWrite("wizard-card-1", 1, source = DeckCardSource.WIZARD),
+                com.mmg.manahub.core.domain.repository.CardSlotWrite("user-card-1", 1, source = DeckCardSource.USER),
+            ),
+        )
+
+        verify(exactly = 1) { deckDao.replaceAllCardsWithSource(DECK_ID, any(), any()) }
+        assertEquals(setOf("wizard-card-1", "user-card-1"), entitiesSlot.captured.map { it.scryfallId }.toSet())
+        assertEquals("WIZARD", entitiesSlot.captured.first { it.scryfallId == "wizard-card-1" }.source)
+    }
+
+    @Test
+    fun `given slots when replaceAllCardsWithSource then the old non-atomic clearDeck plus addCardToDeck composition is never used`() = runTest {
+        every { deckDao.replaceAllCardsWithSource(any(), any(), any()) } returns Unit
+
+        repository.replaceAllCardsWithSource(
+            DECK_ID,
+            listOf(com.mmg.manahub.core.domain.repository.CardSlotWrite("card-1", 1)),
+        )
+
+        verify(exactly = 0) { deckDao.clearDeckCards(any()) }
+        verify(exactly = 0) { deckDao.upsertDeckCard(any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════

@@ -13,6 +13,7 @@ import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckSlot
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DeckWithCards
+import com.mmg.manahub.core.domain.repository.CardSlotWrite
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
@@ -284,6 +285,27 @@ class DeckRepositoryImpl(
                 locked = locked,
                 updatedAt = System.currentTimeMillis(),
             )
+        }
+    }
+
+    /**
+     * Deck Wizard Commander v3 plan (Phase 6, D12): overrides the commonMain default (non-atomic
+     * clearDeck + addCardToDeck loop) with a genuine single-transaction Room write via
+     * [DeckDao.replaceAllCardsWithSource] -- a cancelled or failed build leaves the draft exactly as
+     * it was, never empty-then-partial.
+     */
+    override suspend fun replaceAllCardsWithSource(deckId: String, slots: List<CardSlotWrite>) {
+        withContext(ioDispatcher) {
+            val entities = slots.map { slot ->
+                DeckCardEntity(
+                    deckId = deckId,
+                    scryfallId = slot.scryfallId,
+                    quantity = slot.quantity,
+                    isSideboard = slot.isSideboard,
+                    source = slot.source.name,
+                )
+            }
+            deckDao.replaceAllCardsWithSource(deckId, entities)
         }
     }
 

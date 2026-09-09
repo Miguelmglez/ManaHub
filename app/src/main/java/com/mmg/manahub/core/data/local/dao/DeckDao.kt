@@ -236,6 +236,28 @@ interface DeckDao {
         if (cards.isNotEmpty()) upsertDeckCards(cards)
     }
 
+    /**
+     * Deck Wizard Commander v3 plan (Phase 6, D12): atomically replaces all card slots for a deck
+     * with per-slot provenance ([DeckCardEntity.source]) AND bumps `updated_at` in the SAME SQLite
+     * transaction as the clear+insert. Unlike [DeckRepository.replaceAllCardsWithSource]'s commonMain
+     * default (clearDeck then addCardToDeck per slot -- NOT atomic, still the portable fallback for
+     * `WebDeckRepository`), a mid-list write failure here (e.g. a FK violation on `deck_id`) rolls
+     * BOTH the clear and every prior insert back, leaving the draft in its pre-call state -- the real
+     * D12 cancellation-safety guarantee. See [DeckDaoReplaceAllCardsWithSourceTransactionTest] for
+     * the instrumented Room proof.
+     */
+    @Transaction
+    fun replaceAllCardsWithSource(deckId: String, cards: List<DeckCardEntity>, updatedAt: Long = System.currentTimeMillis()) {
+        clearDeckCards(deckId)
+        if (cards.isNotEmpty()) upsertDeckCards(cards)
+        touchDeckUpdatedAt(deckId, updatedAt)
+    }
+
+    // No-op (0 rows affected) if the deck does not exist -- callers that already validated the
+    // deckId (every production call site) never hit that branch.
+    @Query("UPDATE decks SET updated_at = :updatedAt WHERE id = :deckId")
+    fun touchDeckUpdatedAt(deckId: String, updatedAt: Long)
+
     // ── Stats / other features ─────────────────────────────────────────────────
 
     @Query("""

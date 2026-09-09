@@ -54,24 +54,27 @@ private class FakeAtomicityDeckRepository : DeckRepository {
 }
 
 /**
- * Deck Wizard Commander v3 plan, Phase 2 gate item D — write-path test for
- * [DeckRepository.replaceAllCardsWithSource] "at whatever level is testable today" (the campaign
- * instruction, since Run 3 documented this default method as NOT a real Room transaction — see
- * `docs/deck-wizard-state.md`'s Phase 2 changelog note 4 / the progress tracker's Run 3 note 4).
+ * Deck Wizard Commander v3 plan, Phase 6 (D12) — write-path test for
+ * [DeckRepository.replaceAllCardsWithSource]'s commonMain DEFAULT method ONLY.
  *
- * This suite proves BOTH halves honestly: the happy path replaces atomically-in-EFFECT (old
- * contents gone, new contents present, in one logical call), and the failure path proves the
- * documented gap is real -- a mid-loop exception leaves the deck EMPTY (clearDeck already ran) with
- * only the slots placed before the failure, not the pre-call state. This is exactly D12's
- * cancellation-safety guarantee being UNMET, captured as a running regression test rather than a
- * prose claim -- when Phase 6 replaces this with a real `@Transaction` DAO override, the failure-path
- * assertions in this file are expected to FLIP (the deck should show its OLD contents unchanged, not
- * an empty/partial board), which is the intended signal that the hardening landed.
+ * **Which layer this covers:** the default method is a portable, best-effort fallback (clearDeck
+ * then addCardToDeck per slot) kept for any [DeckRepository] implementer that has no real
+ * transactional primitive to build on -- today that is `WebDeckRepository` (wasmJs has no Room). It
+ * is intentionally, permanently NOT atomic; this suite documents that honestly (the failure-path
+ * test below still shows the mid-loop-failure gap) rather than pretending otherwise.
+ *
+ * D12's actual cancellation-safety guarantee ("a cancelled or failed build leaves the draft exactly
+ * as it was") is met on Android by `DeckRepositoryImpl`'s OWN override, which delegates to a genuine
+ * `@Transaction` Room DAO method (`DeckDao.replaceAllCardsWithSource`) instead of this default. That
+ * override is proven at two levels: `DeckRepositoryImplTest` (GROUP 6b, mockk) proves the Android
+ * repository never falls back to this composition, and
+ * `DeckDaoReplaceAllCardsWithSourceTransactionTest` (androidTest, in-memory Room) proves the real
+ * SQLite rollback with a genuine FK-violation failure.
  */
 class DeckRepositoryReplaceAllCardsWithSourceTest {
 
     @Test
-    fun `happy path -- replaces the full mainboard in one logical call`() = runTest {
+    fun `default method happy path -- replaces the full mainboard in one logical call`() = runTest {
         val repo = FakeAtomicityDeckRepository()
         repo.mainboard += CardSlotWrite("old-card-1", 1)
         repo.mainboard += CardSlotWrite("old-card-2", 1)
@@ -91,7 +94,7 @@ class DeckRepositoryReplaceAllCardsWithSourceTest {
     }
 
     @Test
-    fun `failure path -- a mid-loop exception leaves the deck EMPTY, not unchanged (D12 UNMET, documented not fixed)`() = runTest {
+    fun `default method failure path -- a mid-loop exception leaves the deck EMPTY, not unchanged (permanent fallback-path limitation, not exercised on Android)`() = runTest {
         val repo = FakeAtomicityDeckRepository()
         repo.mainboard += CardSlotWrite("pre-existing-card", 1)
         repo.failOnScryfallId = "card-3"

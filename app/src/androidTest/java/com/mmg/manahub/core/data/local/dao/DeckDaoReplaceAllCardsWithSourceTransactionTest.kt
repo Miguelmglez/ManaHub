@@ -1,0 +1,115 @@
+package com.mmg.manahub.core.data.local.dao
+
+import android.content.Context
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.mmg.manahub.core.data.local.MtgDatabase
+import com.mmg.manahub.core.data.local.entity.DeckCardEntity
+import com.mmg.manahub.core.data.local.entity.DeckEntity
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+
+/**
+ * Instrumented Room proof for the Deck Wizard Commander v3 plan (Phase 6, D12): a real SQLite
+ * transaction failure inside [DeckDao.replaceAllCardsWithSource] rolls back the ENTIRE method body
+ * (the clear, every prior insert in the loop, and the `updated_at` bump), leaving the deck's card
+ * list exactly as it was before the call -- the guarantee `DeckRepository.replaceAllCardsWithSource`'s
+ * commonMain default method (clearDeck + addCardToDeck loop, still used by `WebDeckRepository`)
+ * cannot provide, and which `DeckRepositoryReplaceAllCardsWithSourceTest` (commonTest) documents as
+ * UNMET for that default path.
+ *
+ * The mid-transaction failure is a genuine FK violation (`deck_cards.deck_id -> decks.id`), not a
+ * simulated throw: the last entity in the write list references a deck id that does not exist, so
+ * Room's own FK enforcement aborts the transaction exactly like a real Room write error would.
+ *
+ * Requires a connected device or emulator (`./gradlew connectedAndroidTest`). Uses an in-memory
+ * [MtgDatabase] so tests are hermetic and do not touch the real on-device database file.
+ */
+@RunWith(AndroidJUnit4::class)
+class DeckDaoReplaceAllCardsWithSourceTransactionTest {
+
+    private lateinit var db: MtgDatabase
+    private lateinit var deckDao: DeckDao
+
+    @Before
+    fun createDatabase() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        db = Room.inMemoryDatabaseBuilder(context, MtgDatabase::class.java).build()
+        deckDao = db.deckDao()
+    }
+
+    @After
+    fun closeDatabase() {
+        db.close()
+    }
+
+    private fun makeDeck(id: String, updatedAt: Long) = DeckEntity(
+        id = id,
+        userId = null,
+        name = "Test Deck",
+        format = "commander",
+        updatedAt = updatedAt,
+        createdAt = updatedAt,
+    )
+
+    @Test
+    fun happyPath_replaceAllCardsWithSource_replacesCardsAndBumpsUpdatedAt() {
+        val deckId = "deck-1"
+        deckDao.upsertDeck(makeDeck(deckId, updatedAt = 100L))
+        deckDao.upsertDeckCard(DeckCardEntity(deckId = deckId, scryfallId = "old-card", quantity = 1))
+
+        deckDao.replaceAllCardsWithSource(
+            deckId,
+            listOf(
+                DeckCardEntity(deckId = deckId, scryfallId = "new-card-1", quantity = 1, source = "WIZARD"),
+                DeckCardEntity(deckId = deckId, scryfallId = "new-card-2", quantity = 1, source = "USER"),
+            ),
+            updatedAt = 200L,
+        )
+
+        val cards = deckDao.getDeckCards(deckId)
+        assertEquals(setOf("new-card-1", "new-card-2"), cards.map { it.scryfallId }.toSet())
+        assertEquals(200L, deckDao.getDeckById(deckId)?.updatedAt)
+    }
+
+    @Test
+    fun failurePath_midTransactionFkViolation_rollsBackEverything_deckLeftUntouched() {
+        val deckId = "deck-1"
+        deckDao.upsertDeck(makeDeck(deckId, updatedAt = 100L))
+        deckDao.upsertDeckCard(DeckCardEntity(deckId = deckId, scryfallId = "pre-existing-card", quantity = 1))
+
+        var threw = false
+        try {
+            deckDao.replaceAllCardsWithSource(
+                deckId,
+                listOf(
+                    DeckCardEntity(deckId = deckId, scryfallId = "card-1", quantity = 1),
+                    DeckCardEntity(deckId = deckId, scryfallId = "card-2", quantity = 1),
+                    // FK violation: no deck with this id exists -- aborts the transaction.
+                    DeckCardEntity(deckId = "no-such-deck", scryfallId = "card-3", quantity = 1),
+                ),
+                updatedAt = 200L,
+            )
+        } catch (e: Exception) {
+            threw = true
+        }
+
+        assertTrue("the FK violation must surface as a thrown exception", threw)
+        val cards = deckDao.getDeckCards(deckId)
+        assertEquals(
+            "the pre-existing card must survive -- the clear + all prior inserts rolled back with the failing one",
+            setOf("pre-existing-card"),
+            cards.map { it.scryfallId }.toSet(),
+        )
+        assertEquals(
+            "updated_at must NOT be bumped -- the whole transaction, including the touch, rolled back",
+            100L,
+            deckDao.getDeckById(deckId)?.updatedAt,
+        )
+    }
+}
