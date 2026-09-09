@@ -537,12 +537,14 @@ class DeckWizardViewModel(
      * see [onSelectFormat]'s own guard. Read once, at init. */
     private var launchedFromDeckId: String? = null
 
-    /** Edge-case fix (Phase 6 adversarial pass): true while [generateCommanderDeck]'s write step
-     * (`buildCommanderDeckUseCase.persist`, 4 sequential suspend calls) is in flight. [Cancel]
-     * cancelling the coroutine mid-write would leave a rebuild-in-place ([launchedFromDeckId])
-     * target with its cards replaced but a stale archetype/tribe/strategyLocked pin -- there is no
-     * safe rollback for a write already underway, so [onCancelGeneration] becomes a no-op once this
-     * is true, and it is reset the moment the write finishes (success or failure). */
+    /** Edge-case fix (Phase 6 adversarial pass), kept as defense-in-depth after Phase 8 JOB 2 made
+     * `buildCommanderDeckUseCase.persist` a single Room `@Transaction`
+     * ([com.mmg.manahub.core.data.local.dao.DeckDao.persistCommanderBuild]): true while that write
+     * is in flight. The DB itself can no longer land half-written (a cancelled/failed transaction
+     * rolls back atomically), but a coroutine cancellation racing the `withContext(ioDispatcher)`
+     * call could still leave THIS ViewModel's own in-memory state (`_uiState`, `generateJob`)
+     * inconsistent with what actually got committed -- [onCancelGeneration] stays a no-op once this
+     * is true, reset the moment the write finishes (success or failure). */
     private var isWritingCommanderDeck = false
 
     init {
@@ -1994,12 +1996,12 @@ class DeckWizardViewModel(
         val manualIds = manualAdds.map { it.card.scryfallId }.toSet()
         // Edge-case fix (Phase 6 adversarial pass): once the write actually starts, it MUST run to
         // completion -- for a rebuild-in-place (launchedFromDeckId != null) this is mutating the
-        // user's own pre-existing draft, and a cancellation landing mid-write (persist() is 4
-        // sequential suspend calls, not one transaction) would leave it with cards replaced but a
-        // stale archetype/tribe/strategyLocked pin. isWritingCommanderDeck gates onCancelGeneration
-        // below so Cancel becomes a no-op once this point is reached, and CancellationException is
-        // explicitly rethrown (never swallowed into a spurious buildError) rather than caught by the
-        // generic getOrElse below, matching the build step's own convention right above this block.
+        // user's own pre-existing draft. persist() is now ONE Room transaction (Phase 8 JOB 2), so
+        // the DB itself cannot land half-written; isWritingCommanderDeck stays as defense-in-depth
+        // for this ViewModel's OWN state (see its KDoc) and gates onCancelGeneration below so Cancel
+        // becomes a no-op once this point is reached. CancellationException is explicitly rethrown
+        // (never swallowed into a spurious buildError) rather than caught by the generic getOrElse
+        // below, matching the build step's own convention right above this block.
         isWritingCommanderDeck = true
         val writeOutcome = runCatching {
             // D12: fill the launched-from draft when one exists, else create a fresh one -- see this

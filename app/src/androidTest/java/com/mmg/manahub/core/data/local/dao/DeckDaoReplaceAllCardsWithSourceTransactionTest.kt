@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.mmg.manahub.core.data.local.MtgDatabase
 import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.entity.DeckEntity
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -111,5 +112,73 @@ class DeckDaoReplaceAllCardsWithSourceTransactionTest {
             100L,
             deckDao.getDeckById(deckId)?.updatedAt,
         )
+    }
+
+    // ── Phase 8, JOB 2: persistCommanderBuild spans cards + pin in ONE transaction ─────────────────
+
+    @Test
+    fun happyPath_persistCommanderBuild_writesCardsAndPinTogether() = runBlocking {
+        val deckId = "deck-pcb-1"
+        deckDao.upsertDeck(makeDeck(deckId, updatedAt = 100L))
+
+        deckDao.persistCommanderBuild(
+            deckId = deckId,
+            cards = listOf(DeckCardEntity(deckId = deckId, scryfallId = "commander-1", quantity = 1, source = "WIZARD")),
+            archetypeOverride = "AGGRO",
+            themesOverrideJson = null,
+            postureOverride = null,
+            tribeOverride = "tribe:Goblin",
+            strategyLocked = true,
+            updatedAt = 200L,
+        )
+
+        val cards = deckDao.getDeckCards(deckId)
+        assertEquals(setOf("commander-1"), cards.map { it.scryfallId }.toSet())
+        val deck = deckDao.getDeckById(deckId)
+        assertEquals("AGGRO", deck?.archetypeOverride)
+        assertEquals("tribe:Goblin", deck?.tribeOverride)
+        assertEquals(true, deck?.strategyLocked)
+        assertEquals(200L, deck?.updatedAt)
+    }
+
+    @Test
+    fun failurePath_persistCommanderBuild_midTransactionFkViolation_rollsBackCardsAndPinTogether() = runBlocking {
+        val deckId = "deck-pcb-2"
+        deckDao.upsertDeck(makeDeck(deckId, updatedAt = 100L))
+        deckDao.upsertDeckCard(DeckCardEntity(deckId = deckId, scryfallId = "pre-existing-card", quantity = 1))
+
+        var threw = false
+        try {
+            deckDao.persistCommanderBuild(
+                deckId = deckId,
+                cards = listOf(
+                    DeckCardEntity(deckId = deckId, scryfallId = "commander-1", quantity = 1, source = "WIZARD"),
+                    // FK violation: no deck with this id exists -- aborts the whole transaction,
+                    // including the pin/tribe/strategyLocked writes below it in the method body.
+                    DeckCardEntity(deckId = "no-such-deck", scryfallId = "commander-2", quantity = 1),
+                ),
+                archetypeOverride = "AGGRO",
+                themesOverrideJson = null,
+                postureOverride = null,
+                tribeOverride = "tribe:Goblin",
+                strategyLocked = true,
+                updatedAt = 200L,
+            )
+        } catch (e: Exception) {
+            threw = true
+        }
+
+        assertTrue("the FK violation must surface as a thrown exception", threw)
+        val cards = deckDao.getDeckCards(deckId)
+        assertEquals(
+            "the pre-existing card must survive -- cards AND pin roll back together, never cards-only",
+            setOf("pre-existing-card"),
+            cards.map { it.scryfallId }.toSet(),
+        )
+        val deck = deckDao.getDeckById(deckId)
+        assertEquals("a rolled-back write must NOT leave a stale archetype pin", null, deck?.archetypeOverride)
+        assertEquals("a rolled-back write must NOT leave a stale tribe pin", null, deck?.tribeOverride)
+        assertEquals("a rolled-back write must NOT leave a stale strategyLocked flag", false, deck?.strategyLocked)
+        assertEquals(100L, deck?.updatedAt)
     }
 }

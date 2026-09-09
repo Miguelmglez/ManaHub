@@ -309,6 +309,43 @@ class DeckRepositoryImpl(
         }
     }
 
+    /**
+     * Deck Wizard Commander v3 plan (Phase 8, JOB 2): overrides the commonMain default (4 separate
+     * suspend calls) with a genuine single-transaction Room write via [DeckDao.persistCommanderBuild]
+     * -- see that method's KDoc for the data-corruption gap this closes.
+     */
+    override suspend fun persistCommanderBuild(
+        deckId: String,
+        slots: List<CardSlotWrite>,
+        archetypeOverride: String?,
+        themesOverride: List<String>,
+        posture: String?,
+        tribeOverride: String?,
+        strategyLocked: Boolean,
+    ) {
+        withContext(ioDispatcher) {
+            val entities = slots.map { slot ->
+                DeckCardEntity(
+                    deckId = deckId,
+                    scryfallId = slot.scryfallId,
+                    quantity = slot.quantity,
+                    isSideboard = slot.isSideboard,
+                    source = slot.source.name,
+                )
+            }
+            deckDao.persistCommanderBuild(
+                deckId = deckId,
+                cards = entities,
+                archetypeOverride = archetypeOverride,
+                themesOverrideJson = if (themesOverride.isEmpty()) null else gson.toJson(themesOverride),
+                postureOverride = posture,
+                tribeOverride = tribeOverride,
+                strategyLocked = strategyLocked,
+                updatedAt = System.currentTimeMillis(),
+            )
+        }
+    }
+
     override suspend fun replaceAllCards(deckId: String, slots: List<Triple<String, Int, Boolean>>) {
         withContext(ioDispatcher) {
             val entities = slots.map { (scryfallId, quantity, isSideboard) ->

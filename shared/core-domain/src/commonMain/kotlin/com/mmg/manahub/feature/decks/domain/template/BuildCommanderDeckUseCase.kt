@@ -265,15 +265,15 @@ class BuildCommanderDeckUseCase(
     // ── Write path (2.6, D12/D13) ──────────────────────────────────────────────────────────────
 
     /**
-     * Persists [outcome]'s cards + pin into [deckId] — [DeckRepository.replaceAllCardsWithSource]
-     * (see that function's own KDoc for its best-effort-atomicity caveat) plus the archetype/
-     * theme/posture/tribe pin and [DeckCardSource] provenance (D13): the commander and every
-     * engine-placed card are [DeckCardSource.WIZARD]; a card whose id is in [manualIds] is
-     * [DeckCardSource.USER]. Deck NAME and `commanderCardId`/`coverCardId` are deliberately NOT
-     * written here — those need the deck's current [com.mmg.manahub.core.model.Deck] row (via
-     * `DeckRepository.updateDeck`), which this use case is never handed (only a [deckId] string);
-     * Phase 6's wizard VM already holds that row (Studio's draft) and should call `updateDeck`
-     * itself alongside this method, in the same build-completion step.
+     * Persists [outcome]'s cards + pin into [deckId] in ONE atomic write —
+     * [DeckRepository.persistCommanderBuild] (Phase 8, JOB 2 — closed the 4-separate-calls gap this
+     * function used to have; see that method's KDoc) plus [DeckCardSource] provenance (D13): the
+     * commander and every engine-placed card are [DeckCardSource.WIZARD]; a card whose id is in
+     * [manualIds] is [DeckCardSource.USER]. Deck NAME and `commanderCardId`/`coverCardId` are
+     * deliberately NOT written here — those need the deck's current [com.mmg.manahub.core.model.Deck]
+     * row (via `DeckRepository.updateDeck`), which this use case is never handed (only a [deckId]
+     * string); Phase 6's wizard VM already holds that row (Studio's draft) and should call
+     * `updateDeck` itself alongside this method, in the same build-completion step.
      */
     suspend fun persist(
         deckRepository: DeckRepository,
@@ -290,15 +290,15 @@ class BuildCommanderDeckUseCase(
             }
             CardSlotWrite(entry.card.scryfallId, entry.quantity, isSideboard = false, source = source)
         }
-        deckRepository.replaceAllCardsWithSource(deckId, slots)
-        deckRepository.updateArchetypeOverride(
+        deckRepository.persistCommanderBuild(
             deckId = deckId,
+            slots = slots,
             archetypeOverride = outcome.pin.archetype?.name,
             themesOverride = outcome.pin.themes.map { it.name },
             posture = outcome.pin.posture?.name,
+            tribeOverride = outcome.pin.tribe,
+            strategyLocked = outcome.pin.archetype != null || outcome.pin.themes.isNotEmpty(),
         )
-        deckRepository.updateTribeOverride(deckId, outcome.pin.tribe)
-        deckRepository.updateStrategyLocked(deckId, locked = outcome.pin.archetype != null || outcome.pin.themes.isNotEmpty())
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────────────────────────

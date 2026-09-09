@@ -258,6 +258,34 @@ interface DeckDao {
     @Query("UPDATE decks SET updated_at = :updatedAt WHERE id = :deckId")
     fun touchDeckUpdatedAt(deckId: String, updatedAt: Long)
 
+    /**
+     * Deck Wizard Commander v3 plan (Phase 8, JOB 2): ONE Room transaction spanning the entire
+     * Commander-build persist -- card replacement + archetype/theme/posture pin + tribe pin +
+     * strategy-locked flag, previously 4 separate suspend repository calls (see
+     * [com.mmg.manahub.core.domain.repository.DeckRepository.persistCommanderBuild]'s KDoc for the
+     * data-corruption gap this closes). A `suspend` default method annotated `@Transaction` runs
+     * every call inside it -- blocking [clearDeckCards]/[upsertDeckCards] AND the other `suspend`
+     * DAO methods below -- on Room's single transaction thread, so a failure/cancellation partway
+     * through rolls EVERYTHING back, leaving the deck exactly as it was before this call.
+     */
+    @Transaction
+    suspend fun persistCommanderBuild(
+        deckId: String,
+        cards: List<DeckCardEntity>,
+        archetypeOverride: String?,
+        themesOverrideJson: String?,
+        postureOverride: String?,
+        tribeOverride: String?,
+        strategyLocked: Boolean,
+        updatedAt: Long = System.currentTimeMillis(),
+    ) {
+        clearDeckCards(deckId)
+        if (cards.isNotEmpty()) upsertDeckCards(cards)
+        updateArchetypeOverride(deckId, archetypeOverride, themesOverrideJson, postureOverride, updatedAt)
+        updateTribeOverride(deckId, tribeOverride, updatedAt)
+        updateStrategyLocked(deckId, strategyLocked, updatedAt)
+    }
+
     // ── Stats / other features ─────────────────────────────────────────────────
 
     @Query("""

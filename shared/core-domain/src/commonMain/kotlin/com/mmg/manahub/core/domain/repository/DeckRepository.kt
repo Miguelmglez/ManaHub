@@ -177,4 +177,34 @@ interface DeckRepository {
      * [Deck.updatedAt].
      */
     suspend fun updateStrategyLocked(deckId: String, locked: Boolean)
+
+    /**
+     * Deck Wizard Commander v3 plan (Phase 8, JOB 2): the ONE atomic write for a Commander build's
+     * whole persist step -- card replacement + archetype/theme/posture pin + tribe pin + the
+     * strategy-locked flag. Before this, [com.mmg.manahub.feature.decks.domain.template
+     * .BuildCommanderDeckUseCase.persist] issued 4 SEPARATE suspend calls
+     * ([replaceAllCardsWithSource] + [updateArchetypeOverride] + [updateTribeOverride] +
+     * [updateStrategyLocked]); a cancellation or failure between any two of them could leave a
+     * deck with NEW cards but a STALE pin (mitigated, not fixed, by a cancel-blocking guard in
+     * `DeckWizardViewModel` -- see that guard's own KDoc for why it stays as defense-in-depth).
+     *
+     * DEFAULT implementation (best-effort, NOT one transaction): the same 4 calls this replaces,
+     * in the same order -- kept additive so `WebDeckRepository` compiles unchanged until it gets
+     * a real transactional web store. Android's `DeckRepositoryImpl` overrides this with a genuine
+     * single Room `@Transaction` ([com.mmg.manahub.core.data.local.dao.DeckDao.persistCommanderBuild]).
+     */
+    suspend fun persistCommanderBuild(
+        deckId: String,
+        slots: List<CardSlotWrite>,
+        archetypeOverride: String?,
+        themesOverride: List<String>,
+        posture: String?,
+        tribeOverride: String?,
+        strategyLocked: Boolean,
+    ) {
+        replaceAllCardsWithSource(deckId, slots)
+        updateArchetypeOverride(deckId, archetypeOverride, themesOverride, posture)
+        updateTribeOverride(deckId, tribeOverride)
+        updateStrategyLocked(deckId, strategyLocked)
+    }
 }

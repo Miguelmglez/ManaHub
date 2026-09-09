@@ -1266,13 +1266,18 @@ class DeckWizardViewModelTest {
         assertEquals(WizardPhase.RESULT, vm.uiState.value.phase)
         // BUG-1: DeckStudioViewModel.rebuildUiState resolves the commander from the deck's ENTRIES
         // (allEntries.find { it.scryfallId == commanderId }), not from Deck.commanderCardId alone --
-        // without this write the commander was invisible in the built deck. Since the D12 atomicity
-        // fix, the commander's qty-1 entry is the FIRST slot in the one replaceAllCardsWithSource
-        // call, not a separate addCardToDeck call.
+        // without this write the commander was invisible in the built deck. Since the Phase 8 JOB 2
+        // atomicity fix, the commander's qty-1 entry is the FIRST slot in the one
+        // persistCommanderBuild call, not a separate addCardToDeck call.
         coVerify {
-            deckRepository.replaceAllCardsWithSource(
-                "wizard-deck-1",
-                listOf(com.mmg.manahub.core.domain.repository.CardSlotWrite("cmd-1", 1, false, DeckCardSource.WIZARD)),
+            deckRepository.persistCommanderBuild(
+                deckId = "wizard-deck-1",
+                slots = listOf(com.mmg.manahub.core.domain.repository.CardSlotWrite("cmd-1", 1, false, DeckCardSource.WIZARD)),
+                archetypeOverride = any(),
+                themesOverride = any(),
+                posture = any(),
+                tribeOverride = any(),
+                strategyLocked = any(),
             )
         }
     }
@@ -1303,10 +1308,10 @@ class DeckWizardViewModelTest {
         vm.onGenerate()
         advanceUntilIdle()
 
-        // 99 deckCards slots + 1 commander slot = 100 total, all in ONE replaceAllCardsWithSource
-        // call (D12 atomicity fix).
+        // 99 deckCards slots + 1 commander slot = 100 total, all in ONE persistCommanderBuild
+        // call (Phase 8 JOB 2 atomicity fix).
         val slotsSlot = slot<List<com.mmg.manahub.core.domain.repository.CardSlotWrite>>()
-        coVerify { deckRepository.replaceAllCardsWithSource("wizard-deck-1", capture(slotsSlot)) }
+        coVerify { deckRepository.persistCommanderBuild(deckId = "wizard-deck-1", slots = capture(slotsSlot), archetypeOverride = any(), themesOverride = any(), posture = any(), tribeOverride = any(), strategyLocked = any()) }
         assertEquals(100, slotsSlot.captured.size)
     }
 
