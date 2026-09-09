@@ -19,9 +19,9 @@ ships — this file survives).
 | Formats reachable in this wave | `COMMANDER`, `COMMANDER_CASUAL` |
 | Formats deferred | `CASUAL`, `STANDARD`, `PIONEER`, `MODERN`, `LEGACY`, `VINTAGE`, `PAUPER` (§7) |
 | Engine used by the wizard | today: legacy Motor A (`DeckScorer.fit`); target: Deck Analysis Engine v3 primitives + `AnalysisEngine.evaluate` verification |
-| Campaign phase | P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 DONE (Run 5) |
+| Campaign phase | P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 DONE (Run 5); P4 DONE (Run 6) |
 
-Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 DONE 2026-09-09 (Run 4: 3.1 F10 fix + 3.4 search-plumbing; Run 5: 3.2 UI + 3.3 StructuredCardSearch + lockedCriteria + VM wiring + tests + compose-design-reviewer pass — see progress tracker) · P4 — · P5 — · P6 — · P7 — · P8 —`
+Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 DONE 2026-09-09 (Run 4: 3.1 F10 fix + 3.4 search-plumbing; Run 5: 3.2 UI + 3.3 StructuredCardSearch + lockedCriteria + VM wiring + tests + compose-design-reviewer pass — see progress tracker) · P4 DONE 2026-09-09 (Run 6: RecommendCommanderStrategiesUseCase + single-select STRATEGY step UI/VM wiring + DeriveCommanderStrategiesUseCase retirement + tests + compose-design-reviewer pass — see progress tracker) · P5 — · P6 — · P7 — · P8 —`
 
 ---
 
@@ -212,12 +212,12 @@ Things that differ from Commander and are NOT solved by this campaign:
 | Commander builder (target) | `shared/core-domain/.../feature/decks/domain/template/BuildCommanderDeckUseCase.kt`, `engine/CommanderPlanResolver.kt`, `engine/PlacementScorer.kt`, `engine/CurveTargets.kt` |
 | Shared analysis entry (target) | `shared/core-domain/.../feature/decks/domain/usecase/DeckAnalysisPipeline.kt` |
 | Analysis engine | `shared/core-domain/.../feature/decks/domain/engine/` (`AnalysisEngine.kt`, `ArchetypeSkeletonResolver.kt`, `ArchetypeRoleClassifier.kt`, `SynergyGraph.kt`, `CuratedStrategyCatalog.kt`, `SectionSearchQuery.kt`, `LandTargetResolver.kt`, `ManaBaseAnalyzer.kt`) |
-| Strategy recommendation (target) | `.../domain/usecase/RecommendCommanderStrategiesUseCase.kt` |
+| Strategy recommendation | `.../domain/usecase/RecommendCommanderStrategiesUseCase.kt` (Phase 4, done) |
 | Search | `shared/core-model/.../AdvancedSearchQuery.kt`, `shared/core-domain/.../core/domain/search/AdvancedSearchCardMatcher.kt`, `.../usecase/search/BuildScryfallQueryUseCase.kt`, `app/.../core/ui/components/search/AdvancedSearchSheet.kt`, `app/.../core/ui/components/CardSearchSheet.kt` |
 | Section UI | `app/.../feature/decks/presentation/components/CardSectionComponents.kt`, `CuratedStrategyPickerSheet.kt`, `HealthComponents.kt` |
 | Persistence | `shared/core-model/.../Deck.kt`, `DeckRepository`, Room migrations `Migration_x_y.kt`, Supabase `decks` + `batch_upsert_decks` |
 | Harness | `app/src/test/java/com/mmg/manahub/feature/decks/harness/`; fixtures in gitignored `testdata/wizard-harness/` (real user data — never commit) |
-| Legacy (Casual-only after this campaign) | `template/BuildDeckFromTemplateUseCase.kt`, `template/DeckTemplateResolver.kt`, `template/SuggestionCategoryResolver.kt`, `template/MainboardTrimmer.kt`, `usecase/SuggestAddsFromCollectionUseCase.kt` (Motor A), `engine/DeckScorer.kt`, `components/StrategyPickerSheet.kt` |
+| Legacy (Casual-only after this campaign) | `template/BuildDeckFromTemplateUseCase.kt`, `template/DeckTemplateResolver.kt`, `template/SuggestionCategoryResolver.kt`, `template/MainboardTrimmer.kt`, `usecase/SuggestAddsFromCollectionUseCase.kt` (Motor A), `engine/DeckScorer.kt`, `components/StrategyPickerSheet.kt` (Phase 4, Run 6: confirmed ZERO remaining callers, Casual included — not deleted, per this campaign's own "don't touch it" scope; a future cleanup pass should find it a real caller or delete it) |
 
 ---
 
@@ -329,3 +329,37 @@ Things that differ from Commander and are NOT solved by this campaign:
      local matcher" logic lives** — Deck Studio's Analysis-tab "Browse for X" and the wizard's
      commander pick step both delegate to it. Phase 5 (Plan sections step) should use it too rather
      than re-deriving the pairing a third time.
+- 2026-09-09 — **Phase 4 DONE (Run 6)**: full detail in the progress tracker's Run 6 log. Headline
+  items future phases should know:
+  1. **`RecommendCommanderStrategiesUseCase` (new, commonMain) replaces
+     `DeriveCommanderStrategiesUseCase`** (deleted) as the STRATEGY step's ranking source — reuses
+     `CommanderPlanResolver`'s `THEME_TARGET_AXES`/`tribeAxisKey` (promoted `internal`) for its
+     PRIMARY commander-axis/role signal, plus `card_strategy_tags`, EDHREC theme names,
+     `ColorStrategyAffinity`, and an owned-role-band-coverage signal computed once per call over the
+     owned pool (NOT a public extraction of `BuildCommanderDeckUseCase`'s own candidate-pool
+     internals — those carry pip/curve/power machinery this use case has no use for; see the
+     tracker's own note on why that specific reuse was rejected).
+  2. **A real `TribeDeriver` false-positive was found and worked around, not fixed upstream.**
+     `payoffTribeKeys`'s generic `"<word> you control"` regex manufactures a spurious tribe from
+     non-tribal oracle text (Urza's "for each artifact you control" → a fake "artifact" tribe) —
+     the recommender only trusts a tribe that is BOTH a subtype AND a named payoff (the
+     intersection), never payoff-only. `TribeDeriver` itself was NOT touched (out of this run's
+     scope) — any other caller of `payoffTribeKeys` alone should be aware this false-positive class
+     exists.
+  3. **Two fixture commanders (Urza, Brago) classify to an EMPTY role/axis map** under
+     `ArchetypeRoleClassifier`/`SynergyGraph` — their hand-authored fixture oracle text is too
+     minimal to trip any matcher, so the PRIMARY signal contributes zero for them specifically (a
+     real Scryfall card's fuller oracle text would very likely not have this gap). Their own
+     recommendation tests simulate the `card_strategy_tags` signal instead. Worth revisiting if
+     Phase 7 calibration finds similarly-thin-oracle-text commanders under-recommended in
+     production.
+  4. **The old 3-axis `StrategyPickerSheet` component now has ZERO remaining callers** (its only
+     call site, the old `StrategyStepContent`, was replaced this run) — left untouched per this
+     run's explicit instruction, but the file map's "Casual-only" framing for it (§9) was already
+     stale before this run (no live Casual flow ever called it either). A future pass should find it
+     a real caller or delete it.
+  5. **The #1 recommendation is preselected on every commander pick (product default, plan §8)** —
+     this changed two pre-existing `DeckWizardViewModelTest` assertions that encoded the OLD
+     "nothing selected until the user picks" behavior (a stale-archetype-leak check and the
+     GENERIC-escape-hatch check); both were rewritten to select Custom explicitly where the test's
+     real intent needed an unpinned state, not loosened.
