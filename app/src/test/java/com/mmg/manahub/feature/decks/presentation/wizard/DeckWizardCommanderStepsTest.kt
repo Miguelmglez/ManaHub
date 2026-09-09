@@ -1,13 +1,18 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
 
 import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.SearchCriterion
+import com.mmg.manahub.core.model.TagCategory
+import com.mmg.manahub.feature.decks.domain.engine.CardSection
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.card
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfile
 import com.mmg.manahub.feature.decks.domain.template.OwnedCommanderCandidate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -123,5 +128,96 @@ class DeckWizardCommanderStepsTest {
         val locked = commanderLockedCriteria(null)
 
         assertEquals(listOf(SearchCriterion.CommanderEligible), locked)
+    }
+
+    // ── computeOwnedAvailabilityBySection (Deck Wizard Commander v3 plan, Phase 5, 5.1) ─────────
+    // Every classification signal below is the REAL engine (ArchetypeRoleClassifier/PlacementScorer/
+    // TribeDeriver/BasicLandCalculator) -- no mocking, per the campaign's own "attribution comes only
+    // from the engine" rule.
+
+    @Test
+    fun `a role-tagged owned card counts toward its own role section, excluded ids don't count`() {
+        val rampCard = card(id = "ramp-1", name = "Ramp Spell", colorIdentity = listOf("G"), tags = listOf(CardTag("ramp", TagCategory.ROLE)))
+        val excludedCopy = card(id = "ramp-2", name = "Already Added", colorIdentity = listOf("G"), tags = listOf(CardTag("ramp", TagCategory.ROLE)))
+        val sections = listOf(CardSection(id = "role:ramp", label = "Ramp", current = 0, min = 8, ideal = 10, max = 14))
+
+        val availability = computeOwnedAvailabilityBySection(
+            sections = sections,
+            ownedCards = listOf(rampCard, excludedCopy),
+            excludeIds = setOf(excludedCopy.scryfallId),
+            identity = setOf(ManaColor.G),
+            format = DeckFormat.COMMANDER,
+        )
+
+        assertEquals(1, availability["role:ramp"])
+    }
+
+    @Test
+    fun `a card whose colors sit outside the identity is never counted (identity rejection)`() {
+        val offColor = card(id = "off-1", name = "Off Color", colorIdentity = listOf("U"), tags = listOf(CardTag("ramp", TagCategory.ROLE)))
+        val sections = listOf(CardSection(id = "role:ramp", label = "Ramp", current = 0, min = 8, ideal = 10, max = 14))
+
+        val availability = computeOwnedAvailabilityBySection(
+            sections = sections,
+            ownedCards = listOf(offColor),
+            excludeIds = emptySet(),
+            identity = setOf(ManaColor.G),
+            format = DeckFormat.COMMANDER,
+        )
+
+        assertTrue(availability.isEmpty())
+    }
+
+    @Test
+    fun `a card banned in strict Commander is never counted, even if identity-legal`() {
+        val banned = card(id = "banned-1", name = "Banned Ramp", colorIdentity = listOf("G"), tags = listOf(CardTag("ramp", TagCategory.ROLE)), legalityCommander = "banned")
+        val sections = listOf(CardSection(id = "role:ramp", label = "Ramp", current = 0, min = 8, ideal = 10, max = 14))
+
+        val availability = computeOwnedAvailabilityBySection(
+            sections = sections,
+            ownedCards = listOf(banned),
+            excludeIds = emptySet(),
+            identity = setOf(ManaColor.G),
+            format = DeckFormat.COMMANDER,
+        )
+
+        assertTrue(availability.isEmpty())
+    }
+
+    @Test
+    fun `a section id with no matching signal (offplan) is absent from the map, never zero`() {
+        val plainCard = card(id = "plain-1", name = "Plain Card", colorIdentity = listOf("G"))
+        val sections = listOf(CardSection(id = "offplan", label = "Off-plan", current = 0))
+
+        val availability = computeOwnedAvailabilityBySection(
+            sections = sections,
+            ownedCards = listOf(plainCard),
+            excludeIds = emptySet(),
+            identity = setOf(ManaColor.G),
+            format = DeckFormat.COMMANDER,
+        )
+
+        assertNull(availability["offplan"])
+        assertTrue(availability.isEmpty())
+    }
+
+    @Test
+    fun `a card can match multiple sections at once (role + curve bucket)`() {
+        val multiCard = card(id = "multi-1", name = "Multi Match", colorIdentity = listOf("G"), cmc = 2.0, tags = listOf(CardTag("ramp", TagCategory.ROLE)))
+        val sections = listOf(
+            CardSection(id = "role:ramp", label = "Ramp", current = 0, min = 8, ideal = 10, max = 14),
+            CardSection(id = "mv:2", label = "2 Cost", current = 0),
+        )
+
+        val availability = computeOwnedAvailabilityBySection(
+            sections = sections,
+            ownedCards = listOf(multiCard),
+            excludeIds = emptySet(),
+            identity = setOf(ManaColor.G),
+            format = DeckFormat.COMMANDER,
+        )
+
+        assertEquals(1, availability["role:ramp"])
+        assertEquals(1, availability["mv:2"])
     }
 }

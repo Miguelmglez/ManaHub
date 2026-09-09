@@ -19,9 +19,9 @@ ships — this file survives).
 | Formats reachable in this wave | `COMMANDER`, `COMMANDER_CASUAL` |
 | Formats deferred | `CASUAL`, `STANDARD`, `PIONEER`, `MODERN`, `LEGACY`, `VINTAGE`, `PAUPER` (§7) |
 | Engine used by the wizard | today: legacy Motor A (`DeckScorer.fit`); target: Deck Analysis Engine v3 primitives + `AnalysisEngine.evaluate` verification |
-| Campaign phase | P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 DONE (Run 5); P4 DONE (Run 6) |
+| Campaign phase | P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 DONE (Run 5); P4 DONE (Run 6); P5 DONE (Run 7) |
 
-Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 DONE 2026-09-09 (Run 4: 3.1 F10 fix + 3.4 search-plumbing; Run 5: 3.2 UI + 3.3 StructuredCardSearch + lockedCriteria + VM wiring + tests + compose-design-reviewer pass — see progress tracker) · P4 DONE 2026-09-09 (Run 6: RecommendCommanderStrategiesUseCase + single-select STRATEGY step UI/VM wiring + DeriveCommanderStrategiesUseCase retirement + tests + compose-design-reviewer pass — see progress tracker) · P5 — · P6 — · P7 — · P8 —`
+Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 DONE 2026-09-09 (Run 4: 3.1 F10 fix + 3.4 search-plumbing; Run 5: 3.2 UI + 3.3 StructuredCardSearch + lockedCriteria + VM wiring + tests + compose-design-reviewer pass — see progress tracker) · P4 DONE 2026-09-09 (Run 6: RecommendCommanderStrategiesUseCase + single-select STRATEGY step UI/VM wiring + DeriveCommanderStrategiesUseCase retirement + tests + compose-design-reviewer pass — see progress tracker) · P5 DONE 2026-09-09 (Run 7: PlanSectionsStepContent replaces MANUAL_ADDS for Commander, DeckAnalysisPipeline-only attribution, selectedPosture F3 gap closed, onAddSeed/onRemoveSeed hardened, ownedAvailabilityBySection, tests + compose-design-reviewer pass — see progress tracker) · P6 — · P7 — · P8 —`
 
 ---
 

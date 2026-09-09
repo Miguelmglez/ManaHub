@@ -16,6 +16,7 @@ import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.search.StructuredCardSearch
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
+import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
@@ -24,12 +25,18 @@ import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
+import com.mmg.manahub.feature.decks.domain.engine.CardSection
 import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyAffinity
 import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyEntry
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
+import com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis
+import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.PlacementScorer
+import com.mmg.manahub.feature.decks.domain.engine.PostureId
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.StrategyProfile
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
@@ -45,6 +52,7 @@ import com.mmg.manahub.feature.decks.domain.template.OwnedCard
 import com.mmg.manahub.feature.decks.domain.template.TemplateBuildProgress
 import com.mmg.manahub.feature.decks.domain.template.TemplateBuildResult
 import com.mmg.manahub.feature.decks.domain.template.TemplateCardSuggestion
+import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.RankOwnedCardsForProfileUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.StrategyRecommendation
@@ -248,10 +256,70 @@ data class DeckWizardUiState(
      * theme axis needed its own field, since it is the only axis where the two flows' cardinality
      * differs (Casual: 1 theme; Commander STRATEGY: up to 2). */
     val selectedStrategyThemes: List<ThemeId> = emptyList(),
+    /** Deck Wizard Commander v3 plan (Phase 0 F3 gap, closed in Phase 5): [CuratedStrategy.toPin]'s
+     * posture, previously computed by [selectCommanderStrategy] and immediately discarded -- there
+     * was no field to store it in. Mirrors [selectedArchetype]/[selectedStrategyThemes]/
+     * [selectedTribeKey]'s "one Strategy pick" contract; forwarded to
+     * [com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline.analyze]'s
+     * `postureOverride` so [planAnalysis] scores the SAME plan the engine will score at generation
+     * time (once Phase 6 wires generation). */
+    val selectedPosture: PostureId? = null,
+
+    /** PLAN_SECTIONS step (Deck Wizard Commander v3 plan, Phase 5, R4 -- Commander only; Casual
+     * still mounts [manualAddsSkeleton]/[MANUAL_ADDS]). The ONLY analysis engine call this step
+     * ever makes -- attribution comes from here, never a wizard-side classifier (see the
+     * campaign's own D2/§2 "no third vocabulary" rule). `null` while no build has been analyzed
+     * yet (before the first recompute lands) or the pipeline degraded (see
+     * [DeckWizardViewModel.recomputePlanAnalysis]'s KDoc). */
+    val planAnalysis: DeckAnalysis? = null,
+    /** True while a debounced [planAnalysis] recompute is in flight. Only meaningful together with
+     * [planAnalysis] == null (the loading-vs-error distinction the UI needs) -- a `true` with a
+     * non-null [planAnalysis] just means a newer recompute is already running, the UI keeps
+     * showing the last-good result. */
+    val isAnalyzingPlan: Boolean = false,
+    /** [CardSection.id] -> count of owned, identity-legal, format-legal candidates (excluding the
+     * commander and any card already in [seedCards], deduped by name) that the SAME classification
+     * signal used to BUILD that section's own id would credit -- the "N in your collection" hint.
+     * Absent key (not zero) for a section with no sensible availability signal (`offplan`/
+     * `standalone`/`interaction`/`legal`/`illegal`) -- see
+     * [DeckWizardViewModel.computeOwnedAvailabilityBySection]'s KDoc for exactly how each section id
+     * shape is matched. This is a CHEAP REPRODUCTION of the same signals [ArchetypeRoleClassifier]/
+     * [PlacementScorer]/[TribeDeriver] already expose -- never a re-exposure of
+     * [com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase]'s own private
+     * candidate-pool machinery (same precedent as Phase 4's `ownedRoleCounts`, see the progress
+     * tracker's Run 6 log). */
+    val ownedAvailabilityBySection: Map<String, Int> = emptyMap(),
+    /** PLAN_SECTIONS' "Browse for &lt;Category&gt;" sheet -- mirrors [manualAddsQuery]/
+     * [manualAddsSearchResults]'s shape but as its OWN state (a different tab/context from
+     * [manualAddsQuery], which stays Casual/MANUAL_ADDS-only): the plain search-bar text. */
+    val planSectionsQuery: String = "",
+    /** The structured query currently APPLIED via the browse sheet's Advanced Search sheet (Tune
+     * icon or a section's own "Browse for X" preset) -- `null` means nothing is filtering the two
+     * result tabs beyond [planSectionsQuery]'s plain name filter. */
+    val planSectionsStructuredQuery: AdvancedSearchQuery? = null,
+    /** [com.mmg.manahub.core.model.CardTag] keys applied via [planSectionsStructuredQuery]'s
+     * accompanying collection-tag preset (`SectionSearchQuery.collectionTagKeysFor`) -- a DIFFERENT
+     * key space from the structured criteria above, ANDed together (mirrors
+     * `DeckStudioUiState.activeCollectionTagFilter`'s own contract). */
+    val planSectionsTagFilter: Set<String> = emptySet(),
+    /** Collection tab results -- local, lenient [StructuredCardSearch.collectionMatches] over
+     * [ownedCards], filtered by [planSectionsStructuredQuery] + [planSectionsTagFilter] +
+     * [planSectionsQuery]'s plain name filter. */
+    val planSectionsCollectionResults: List<Card> = emptyList(),
+    /** All-cards tab results -- a real Scryfall search combining [planSectionsQuery] +
+     * [planSectionsStructuredQuery]'s Scryfall fragment (mirrors
+     * [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.searchScryfallDirect]'s own
+     * combination rule). */
+    val planSectionsScryfallResults: List<Card> = emptyList(),
+    val isSearchingPlanSectionsScryfall: Boolean = false,
 
     /** MANUAL_ADDS step (2.3, SHARED -- WS3 mounts this same composable/state shape for the Casual
-     * flows). Resolved once on entering the step, from the picked archetype/themes + [colorIdentity]
-     * 's size ([DeckWizardViewModel.onNextFromStrategy]). */
+     * flows; Commander formats now mount [DeckWizardCommanderSteps.PlanSectionsStepContent] on this
+     * SAME [WizardPhase.MANUAL_ADDS] phase instead, see [DeckWizardScreen]'s phase dispatch --
+     * [manualAddsSkeleton]/[manualAddsRoleFilter] below stay Casual-only from Phase 5 onward, still
+     * computed for Commander too since [DeckWizardViewModel.onNextFromStrategy] is shared, but never
+     * read by the Commander UI). Resolved once on entering the step, from the picked archetype/
+     * themes + [colorIdentity]'s size ([DeckWizardViewModel.onNextFromStrategy]). */
     val manualAddsSkeleton: ResolvedArchetypeSkeleton? = null,
     /** Single-select role-key filter chip (tap toggles) -- narrows the search list to cards
      * [com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier.classify] scores > 0 for
@@ -349,6 +417,16 @@ private fun DeckWizardUiState.resetDirectionScratchState(): DeckWizardUiState = 
     pendingTribeStrategy = null,
     commanderTribePickerCandidates = emptyList(),
     selectedStrategyThemes = emptyList(),
+    selectedPosture = null,
+    planAnalysis = null,
+    isAnalyzingPlan = false,
+    ownedAvailabilityBySection = emptyMap(),
+    planSectionsQuery = "",
+    planSectionsStructuredQuery = null,
+    planSectionsTagFilter = emptySet(),
+    planSectionsCollectionResults = emptyList(),
+    planSectionsScryfallResults = emptyList(),
+    isSearchingPlanSectionsScryfall = false,
     manualAddsSkeleton = null,
     manualAddsRoleFilter = null,
     manualAddsQuery = "",
@@ -389,6 +467,12 @@ class DeckWizardViewModel(
     private val cardStrategyTagsRepository: CardStrategyTagsRepository,
     // Deck Wizard Commander v3 plan, Phase 4.1 -- replaces the retired DeriveCommanderStrategiesUseCase.
     private val recommendCommanderStrategiesUseCase: RecommendCommanderStrategiesUseCase = RecommendCommanderStrategiesUseCase(),
+    // Deck Wizard Commander v3 plan, Phase 5 (D2) -- the SINGLE analysis entry point PLAN_SECTIONS
+    // scores against; the SAME shared singleton DeckDoctorOrchestrator/the harness use (never a
+    // second instance). Required (no default, like every other repository param above): it has its
+    // own non-trivial dependency graph (EvaluateDeckUseCase/InferDeckIdentityUseCase), so there is
+    // no cheap fake default the way the pure use cases above get one.
+    private val deckAnalysisPipeline: DeckAnalysisPipeline,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DeckWizardUiState())
@@ -412,6 +496,8 @@ class DeckWizardViewModel(
     private var generateJob: Job? = null
     private var commanderStrategyJob: Job? = null
     private var manualAddsSearchJob: Job? = null
+    private var planAnalysisJob: Job? = null
+    private var planSectionsSearchJob: Job? = null
 
     /** Set only once [onGenerate] has actually created the deck row -- lets [onCancelGeneration]
      * clean up a partial build instead of orphaning an empty draft. */
@@ -495,6 +581,8 @@ class DeckWizardViewModel(
         themeTagsJob?.cancel()
         commanderStrategyJob?.cancel()
         manualAddsSearchJob?.cancel()
+        planAnalysisJob?.cancel()
+        planSectionsSearchJob?.cancel()
     }
 
     // ── Step 1 — Format ───────────────────────────────────────────────────────
@@ -812,6 +900,10 @@ class DeckWizardViewModel(
                 selectedStrategyThemes = pin?.themes.orEmpty(),
                 selectedTribeKey = pin?.tribe,
                 selectedTribeLabel = pin?.tribe?.let { key -> key.removePrefix("tribe:").replaceFirstChar(Char::uppercase) },
+                // Phase 5 fix (F3 gap, closed): `pin.posture` used to be computed here and dropped
+                // on the floor -- there was no field to store it in, so PLAN_SECTIONS' analysis
+                // could never reflect a Voltron/Ramp/Tempo/Toolbox/Group Hug posture pick.
+                selectedPosture = pin?.posture,
             )
         }
     }
@@ -890,6 +982,152 @@ class DeckWizardViewModel(
         }
         logStep("manual_adds")
         _uiState.update { it.copy(phase = WizardPhase.MANUAL_ADDS, manualAddsSkeleton = skeleton) }
+        // Deck Wizard Commander v3 plan (Phase 5, 5.1) -- PLAN_SECTIONS needs a real DeckAnalysis
+        // the moment it's entered (commander + no manual adds yet is still a real, analyzable plan).
+        recomputePlanAnalysis()
+    }
+
+    // ── PLAN_SECTIONS step (Deck Wizard Commander v3 plan, Phase 5, R4 -- Commander only) ─────────
+
+    /**
+     * The ONLY analysis call this step makes -- debounced (so a burst of manual add/remove taps
+     * doesn't fire one [com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline.analyze]
+     * per tap) and off the main thread by construction (a `suspend` call inside [viewModelScope],
+     * same idiom every other async VM function in this file already uses -- this codebase has no
+     * separate injected-dispatcher convention for ViewModels, see
+     * `feedback_koin_named_dispatcher_pattern`'s scope: that pattern is for Koin-provided
+     * repositories/use cases, not ViewModel-internal coroutine launches).
+     *
+     * [mainboard] mirrors EXACTLY what [com.mmg.manahub.feature.decks.domain.template
+     * .BuildCommanderDeckUseCase] itself passes to `analyze` for a REAL build (verified against its
+     * `fullMainboard` construction, Phase 2/2.5): the commander as its own [DeckEntry] first, then
+     * every [DeckWizardUiState.seedCards] manual add -- so [DeckWizardUiState.planAnalysis] is
+     * exactly the object the real build's own verify pass will produce once Phase 6 wires
+     * generation, never an approximation.
+     *
+     * `emitProgression = false` (same reason [com.mmg.manahub.feature.decks.domain.template
+     * .BuildCommanderDeckUseCase] passes it): this fires on every manual-add change, and must never
+     * spam the Deck Doctor exploration quest.
+     *
+     * A thrown exception (the pipeline's own internal `runCatching` around its v3 half can still let
+     * a seed-inference or pin-fold exception through -- see [DeckAnalysisPipeline]'s own KDoc, which
+     * does not claim full exception-safety) degrades to `planAnalysis = null` -- the step's empty/
+     * error state, never a VM crash.
+     */
+    private fun recomputePlanAnalysis() {
+        planAnalysisJob?.cancel()
+        planAnalysisJob = viewModelScope.launch {
+            delay(PLAN_ANALYSIS_DEBOUNCE_MS)
+            _uiState.update { it.copy(isAnalyzingPlan = true) }
+            val state = _uiState.value
+            val commander = state.selectedCommander
+            val format = state.selectedFormat ?: DeckFormat.COMMANDER
+            val mainboard = buildList {
+                commander?.let { add(DeckEntry(card = it, quantity = 1, isOwned = true, isSideboard = false)) }
+                state.seedCards.forEach { card ->
+                    add(DeckEntry(card = card, quantity = 1, isOwned = cardSnapshot.any { owned -> owned.scryfallId == card.scryfallId }, isSideboard = false))
+                }
+            }
+            val analysis = runCatching {
+                deckAnalysisPipeline.analyze(
+                    mainboard = mainboard,
+                    format = format,
+                    commander = commander,
+                    archetypeOverride = state.selectedArchetype?.name,
+                    themesOverride = state.selectedStrategyThemes.map { it.name },
+                    tribeOverride = state.selectedTribeKey,
+                    postureOverride = state.selectedPosture?.name,
+                    emitProgression = false,
+                ).analysis
+            }.onFailure { t -> logFailure("deck_wizard_plan_analysis_failed", t) }.getOrNull()
+            val excludeIds = (listOfNotNull(commander?.scryfallId) + state.seedCards.map { it.scryfallId }).toSet()
+            val availability = analysis?.let {
+                computeOwnedAvailabilityBySection(it.pillars.flatMap { pillar -> pillar.sections }, cardSnapshot, excludeIds, state.colorIdentity, format)
+            }.orEmpty()
+            _uiState.update { it.copy(planAnalysis = analysis, isAnalyzingPlan = false, ownedAvailabilityBySection = availability) }
+        }
+    }
+
+    /** PLAN_SECTIONS' "Browse for &lt;Category&gt;" sheet -- plain search-bar text, updates the
+     * Collection tab only (mirrors [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
+     * .onAddCardsQueryChange]'s own split between a live local re-filter and a separate, explicit
+     * Scryfall fetch trigger, [searchPlanSectionsScryfall]). */
+    fun onPlanSectionsQueryChange(query: String) {
+        _uiState.update { it.copy(planSectionsQuery = query) }
+        publishPlanSectionsCollectionResults()
+    }
+
+    /** The Tune icon's [com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet] result, OR a
+     * section's own "Browse for X" preset (Phase 5, 5.2) -- filters BOTH result tabs from one
+     * [AdvancedSearchQuery] via the shared [StructuredCardSearch] helper (Phase 3.3), same "one
+     * applyStructuredSearch -> Scryfall + local matcher" contract [applyCommanderStructuredSearch]/
+     * [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.applyStructuredSearch] already
+     * use. */
+    fun applyPlanSectionsStructuredSearch(query: AdvancedSearchQuery) {
+        _uiState.update { it.copy(planSectionsStructuredQuery = query.takeIf { q -> !q.isEmpty() }) }
+        publishPlanSectionsCollectionResults()
+        searchPlanSectionsScryfall(_uiState.value.planSectionsQuery)
+    }
+
+    /** The Analysis-tab-style category [com.mmg.manahub.core.model.CardTag] pre-filter for the
+     * Collection tab ([com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery
+     * .collectionTagKeysFor]) -- a DIFFERENT key space from [applyPlanSectionsStructuredSearch]'s
+     * criteria, ANDed together (mirrors `DeckStudioViewModel.searchCollectionByTags`). Empty [keys]
+     * is a no-op filter, never a falsely-empty tab (many sections have no tag-key equivalent). */
+    fun searchPlanSectionsCollectionByTags(keys: Set<String>) {
+        _uiState.update { it.copy(planSectionsTagFilter = keys) }
+        publishPlanSectionsCollectionResults()
+    }
+
+    private fun publishPlanSectionsCollectionResults() {
+        val state = _uiState.value
+        val matches = state.ownedCards.filter { card ->
+            StructuredCardSearch.matches(card, state.planSectionsStructuredQuery) &&
+                (state.planSectionsTagFilter.isEmpty() || (card.tags + card.userTags).any { it.key in state.planSectionsTagFilter }) &&
+                (state.planSectionsQuery.isBlank() || card.name.contains(state.planSectionsQuery, ignoreCase = true))
+        }
+        _uiState.update { it.copy(planSectionsCollectionResults = matches) }
+    }
+
+    /** The All-cards tab's real Scryfall search -- [query] (typed free text) combined with
+     * [DeckWizardUiState.planSectionsStructuredQuery]'s own Scryfall fragment, same combination
+     * rule as [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.searchScryfallDirect]. */
+    fun searchPlanSectionsScryfall(query: String) {
+        _uiState.update { it.copy(planSectionsQuery = query) }
+        val fragment = _uiState.value.planSectionsStructuredQuery?.let { StructuredCardSearch.scryfallFragment(it) }
+        val effectiveQuery = listOfNotNull(query.takeIf { it.isNotBlank() }, fragment).joinToString(" ")
+        planSectionsSearchJob?.cancel()
+        if (effectiveQuery.isBlank()) {
+            _uiState.update { it.copy(planSectionsScryfallResults = emptyList(), isSearchingPlanSectionsScryfall = false) }
+            return
+        }
+        planSectionsSearchJob = viewModelScope.launch {
+            _uiState.update { it.copy(isSearchingPlanSectionsScryfall = true) }
+            val results = when (val res = searchCardsUseCase(effectiveQuery)) {
+                is DataResult.Success -> res.data.cards
+                is DataResult.Error -> {
+                    crashReporter.log("deck_wizard_plan_sections_search_failed")
+                    emptyList()
+                }
+            }
+            _uiState.update { it.copy(planSectionsScryfallResults = results, isSearchingPlanSectionsScryfall = false) }
+        }
+    }
+
+    /** Resets every PLAN_SECTIONS browse-sheet field -- called on the sheet's `onDismiss`, mirrors
+     * [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.clearActiveStructuredSearchFragment]. */
+    fun clearPlanSectionsSearchState() {
+        planSectionsSearchJob?.cancel()
+        _uiState.update {
+            it.copy(
+                planSectionsQuery = "",
+                planSectionsStructuredQuery = null,
+                planSectionsTagFilter = emptySet(),
+                planSectionsCollectionResults = emptyList(),
+                planSectionsScryfallResults = emptyList(),
+                isSearchingPlanSectionsScryfall = false,
+            )
+        }
     }
 
     // ── MANUAL_ADDS step (Deck Wizard & Engine Rework plan, Workstream 2.3 — SHARED, WS3 reuses) ──
@@ -989,15 +1227,50 @@ class DeckWizardViewModel(
         }
     }
 
+    /**
+     * Deck Wizard Commander v3 plan (Phase 5, 5.1/R5) -- for a Commander format, a manual add is
+     * ALWAYS kept (D7), but must still be identity-legal and format-legal (a color-identity/legality
+     * violation is not "off-plan", it's a rules violation the wizard must never write) and deduped
+     * BY NAME (not just [Card.scryfallId] -- two different printings of the same card would
+     * otherwise both slip into [DeckWizardUiState.seedCards], violating the singleton rule
+     * `feature/decks/CLAUDE.md`'s Phase 4 construction-validation block documents; basics are
+     * exempt, same rule [BasicLandCalculator.isBasicLand] already encodes elsewhere in this engine).
+     * Casual's own [onAddSeed] behavior (scryfallId-only dedupe, no identity/legality gate) stays
+     * byte-identical -- this whole block is gated on [DeckFormat.isCommanderFormat].
+     */
     fun onAddSeed(card: Card) {
-        val current = _uiState.value.seedCards
-        if (current.any { it.scryfallId == card.scryfallId } || current.size >= MAX_SEED_CARDS) return
+        val state = _uiState.value
+        val isCommander = state.selectedFormat?.isCommanderFormat == true
+        if (isCommander && !isCommanderManualAddValid(card, state)) {
+            viewModelScope.launch {
+                _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_manual_add_rejected)))
+            }
+            return
+        }
+        val current = state.seedCards
+        val isDuplicateByName = isCommander &&
+            !BasicLandCalculator.isBasicLand(card) &&
+            current.any { it.name.equals(card.name, ignoreCase = false) }
+        if (current.any { it.scryfallId == card.scryfallId } || isDuplicateByName || current.size >= MAX_SEED_CARDS) return
         _uiState.update { it.copy(seedCards = current + card) }
         recomputeSeedLockedColors()
         recomputeSeedStrategySuggestion()
+        if (isCommander) recomputePlanAnalysis()
+    }
+
+    /** Color identity ⊆ [DeckWizardUiState.colorIdentity] + format legality
+     * ([DeckFormat.COMMANDER] requires `legal`, [DeckFormat.COMMANDER_CASUAL] only excludes
+     * `banned`) -- the SAME rule [com.mmg.manahub.feature.decks.domain.template
+     * .BuildCommanderDeckUseCase.isLegalForCommanderFormat] applies to engine-placed candidates, so
+     * a manual add can never be a card the build itself would refuse to place for a rules reason. */
+    private fun isCommanderManualAddValid(card: Card, state: DeckWizardUiState): Boolean {
+        val identitySymbols = state.colorIdentity.map { it.symbol }.toSet()
+        if (!card.colorIdentity.all { it in identitySymbols }) return false
+        return if (state.selectedFormat == DeckFormat.COMMANDER) card.legalityCommander == "legal" else card.legalityCommander != "banned"
     }
 
     fun onRemoveSeed(card: Card) {
+        val isCommander = _uiState.value.selectedFormat?.isCommanderFormat == true
         _uiState.update { state ->
             val remaining = state.seedCards.filterNot { s -> s.scryfallId == card.scryfallId }
             if (remaining.isEmpty()) {
@@ -1023,6 +1296,7 @@ class DeckWizardViewModel(
         }
         recomputeSeedLockedColors()
         recomputeSeedStrategySuggestion()
+        if (isCommander) recomputePlanAnalysis()
     }
 
     /**
@@ -1826,7 +2100,75 @@ class DeckWizardViewModel(
         const val SEARCH_DEBOUNCE_MS = 400L
         const val MAX_SEED_CARDS = 8
         const val TRIBE_PICKER_CANDIDATE_LIMIT = 8
+        const val PLAN_ANALYSIS_DEBOUNCE_MS = 300L
     }
+}
+
+/**
+ * Deck Wizard Commander v3 plan (Phase 5, 5.1) — a cheap, self-contained reproduction of "which
+ * [CardSection]s would this owned candidate count toward", NOT a re-exposure of
+ * [com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase]'s own private
+ * candidate-pool machinery (that carries pip/curve/power scoring this hint has no use for — same
+ * precedent as Phase 4's `RecommendCommanderStrategiesUseCase` rejecting that same shortcut for its
+ * own owned-role-coverage signal, see the progress tracker's Run 6 log).
+ *
+ * [sections] is every [com.mmg.manahub.feature.decks.domain.engine.PillarResult.sections] for the
+ * CURRENT [DeckAnalysis] (PLAN_ROLES/MANA_BASE/
+ * CURVE/SYNERGY combined — LEGALITY's `legal`/`illegal` never match anything below). [ownedCards]
+ * is the full collection snapshot; [excludeIds] removes the commander and every already-manually-
+ * added card (no point telling the user "1 in your collection" for a card they already added).
+ * [identity]/[format] gate legality the SAME way [DeckWizardViewModel.isCommanderManualAddValid]
+ * does for a real add, so this hint never counts a card the user could not actually add.
+ *
+ * A candidate can match MULTIPLE section ids (e.g. a 2-mana token generator counts toward
+ * `role:token_generator`, `mv:2`, and `fingerprint:tokens` all at once) — every match increments
+ * its own counter independently, mirroring how [CardSection.contributions] already lets one real
+ * card appear in more than one section. A section id with no matching signal below (`offplan`/
+ * `standalone`/`interaction`/`legal`/`illegal`, or a `role:*`/`fingerprint:*` id this candidate pool
+ * genuinely has zero owned support for) is simply ABSENT from the result map, never present at 0.
+ */
+internal fun computeOwnedAvailabilityBySection(
+    sections: List<CardSection>,
+    ownedCards: List<Card>,
+    excludeIds: Set<String>,
+    identity: Set<ManaColor>,
+    format: DeckFormat,
+): Map<String, Int> {
+    val sectionIds = sections.map { it.id }.toSet()
+    val identitySymbols = identity.map { it.symbol }.toSet()
+    val candidates = ownedCards
+        .asSequence()
+        .filter { it.scryfallId !in excludeIds }
+        .filter { card -> card.colorIdentity.all { it in identitySymbols } }
+        .filter { card -> if (format == DeckFormat.COMMANDER) card.legalityCommander == "legal" else card.legalityCommander != "banned" }
+        .distinctBy { it.name }
+
+    val counts = mutableMapOf<String, Int>()
+    candidates.forEach { card ->
+        val matched = mutableSetOf<String>()
+        ArchetypeRoleClassifier.classify(card).forEach { (role, confidence) ->
+            if (confidence > 0f) {
+                val id = "role:$role"
+                if (id in sectionIds) matched += id
+            }
+        }
+        val mvId = PlacementScorer.mvBucketId(card)
+        if (mvId in sectionIds) matched += mvId
+        if (BasicLandCalculator.isLand(card)) {
+            ManaColor.entries.forEach { color ->
+                val id = "produces:${color.symbol}"
+                if (id in sectionIds && card.producedMana.contains(color.symbol.first())) matched += id
+            }
+        }
+        val tagKeys = (card.tags + card.userTags).map { it.key }.toSet() + TribeDeriver.tribeKeys(card)
+        tagKeys.forEach { key ->
+            if (key in sectionIds) matched += key
+            val fingerprintId = "fingerprint:$key"
+            if (fingerprintId in sectionIds) matched += fingerprintId
+        }
+        matched.forEach { id -> counts[id] = (counts[id] ?: 0) + 1 }
+    }
+    return counts
 }
 
 private fun List<String>.toManaColorSet(): Set<ManaColor> =

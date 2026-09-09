@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.components
+// COMMENTS_REVIEWED: 2026-09-09
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -217,8 +218,14 @@ fun CardSectionRow(
     expanded: Boolean,
     onToggleExpanded: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Deck Wizard Commander v3 plan (Phase 5, 5.2) — a muted "N in your collection" hint rendered
+     * under the header, for the wizard's Plan Sections step only. `null` (default, every
+     * pre-existing caller incl. Deck Studio's own Analysis tab) omits the line entirely — this is
+     * a purely additive param, zero behavior change for any caller that doesn't pass it. */
+    ownedAvailabilityHint: Int? = null,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
 
     Surface(
@@ -238,6 +245,14 @@ fun CardSectionRow(
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 CardSectionHeader(section = section, expanded = expanded, onToggle = onToggleExpanded)
+                if (ownedAvailabilityHint != null) {
+                    Text(
+                        text = stringResource(R.string.deck_wizard_plan_sections_owned_hint, ownedAvailabilityHint),
+                        style = ty.labelSmall,
+                        color = mc.textSecondary,
+                        modifier = Modifier.padding(start = spacing.sm, bottom = spacing.xxs),
+                    )
+                }
 
                 if (expanded) {
                     Spacer(Modifier.height(spacing.sm))

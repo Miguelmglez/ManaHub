@@ -39,11 +39,14 @@ import com.mmg.manahub.feature.decks.domain.template.TemplateBuildProgress
 import com.mmg.manahub.feature.decks.domain.template.TemplateBuildResult
 import com.mmg.manahub.feature.decks.domain.template.TemplateCardSuggestion
 import com.mmg.manahub.feature.decks.domain.template.TemplateSource
+import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
+import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.slot
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -58,6 +61,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -90,6 +94,11 @@ class DeckWizardViewModelTest {
     private val cardStrategyTagsRepository = mockk<CardStrategyTagsRepository>()
     private val crashReporter = mockk<CrashReporter>(relaxed = true)
     private val appContext = mockk<Context>()
+    // Deck Wizard Commander v3 plan, Phase 5 -- stubbed to a real DeckHealth (analysis defaults
+    // null) rather than left relaxed: `analyze` is `suspend` and every Commander STRATEGY-step test
+    // now exercises `recomputePlanAnalysis()` via `onNextFromStrategy()`, so an unstubbed call would
+    // throw. Individual PLAN_SECTIONS tests override this per-case with a real `DeckAnalysis`.
+    private val deckAnalysisPipeline = mockk<DeckAnalysisPipeline>()
 
     private val collectionProfileUseCase = CollectionProfileUseCase(ioDispatcher = dispatcher)
 
@@ -148,6 +157,7 @@ class DeckWizardViewModelTest {
         // precedent) unless a test needs to isolate a specific ranking/coherence outcome.
         userPreferences = userPreferences,
         cardStrategyTagsRepository = cardStrategyTagsRepository,
+        deckAnalysisPipeline = deckAnalysisPipeline,
     )
 
     @Before
@@ -158,6 +168,11 @@ class DeckWizardViewModelTest {
         every { appContext.getString(any()) } returns "TPL"
         every { userCardRepository.observeCollection() } returns flowOf(emptyList())
         coEvery { deckRepository.createDeck(any(), any(), any()) } returns "wizard-deck-1"
+        // Default: no analysis available (degrades PLAN_SECTIONS to its error state) -- tests that
+        // need a real DeckAnalysis re-stub this call with their own fixture.
+        coEvery {
+            deckAnalysisPipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns DeckHealth(evaluation = mockk(relaxed = true), profile = mockk(relaxed = true))
         // A relaxed mock's default Flow-returning stub never emits, which would hang
         // writeResultIntoNewDeck's `observeDeckWithCards(deckId).first()` forever for a Commander
         // build -- explicit stub so .first() resolves immediately (no existing deck to update).
@@ -456,6 +471,26 @@ class DeckWizardViewModelTest {
     }
 
     @Test
+    fun `Phase 5 F3 gap -- picking a posture-bearing strategy (Voltron) now persists selectedPosture`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+
+        val voltronStrategy = CuratedStrategyCatalog.byId("voltron")!!
+        vm.onSelectCommanderStrategy(voltronStrategy)
+
+        assertEquals(com.mmg.manahub.feature.decks.domain.engine.PostureId.VOLTRON, vm.uiState.value.selectedPosture)
+
+        // Custom clears every pin field, posture included.
+        vm.onSelectCustomStrategy()
+        assertNull(vm.uiState.value.selectedPosture)
+    }
+
+    @Test
     fun `a requiresTribe strategy with no derivable tribe opens the sub-picker instead of applying`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         val vm = viewModel()
@@ -494,6 +529,121 @@ class DeckWizardViewModelTest {
 
         assertNull(vm.uiState.value.pendingTribeStrategy)
         assertEquals(previousSelection, vm.uiState.value.selectedCuratedStrategyId)
+    }
+
+    // ── PLAN_SECTIONS step (Deck Wizard Commander v3 plan, Phase 5) ────────────────────────────
+
+    @Test
+    fun `PLAN_SECTIONS -- entering the step (onNextFromStrategy) recomputes planAnalysis`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+
+        assertNull(vm.uiState.value.planAnalysis)
+        vm.onNextFromStrategy()
+        advanceUntilIdle()
+
+        assertNotNull(vm.uiState.value.planAnalysis)
+        coVerify(atLeast = 1) {
+            deckAnalysisPipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(false), any(), any())
+        }
+    }
+
+    @Test
+    fun `PLAN_SECTIONS -- a manual add outside the commander's color identity is rejected with a toast, never added`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander) // identity = {G}
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        advanceUntilIdle()
+
+        val offColorCard = card(id = "off-1", name = "Off Color Card", colorIdentity = listOf("U"))
+
+        vm.events.test {
+            vm.onAddSeed(offColorCard)
+            val event = awaitItem()
+            assertTrue(event is DeckWizardEvent.ShowToast)
+        }
+        assertTrue(vm.uiState.value.seedCards.none { it.scryfallId == offColorCard.scryfallId })
+    }
+
+    @Test
+    fun `PLAN_SECTIONS -- a manual add banned in strict Commander is rejected`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        advanceUntilIdle()
+
+        val bannedCard = card(id = "banned-1", name = "Banned Card", colorIdentity = listOf("G"), legalityCommander = "banned")
+        vm.onAddSeed(bannedCard)
+
+        assertTrue(vm.uiState.value.seedCards.none { it.scryfallId == bannedCard.scryfallId })
+    }
+
+    @Test
+    fun `PLAN_SECTIONS -- two different printings of the same card name are deduped, basics exempt`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        advanceUntilIdle()
+
+        val printingA = card(id = "dup-a", name = "Sol Ring", colorIdentity = emptyList())
+        val printingB = card(id = "dup-b", name = "Sol Ring", colorIdentity = emptyList())
+        vm.onAddSeed(printingA)
+        vm.onAddSeed(printingB)
+        assertEquals(1, vm.uiState.value.seedCards.size)
+
+        val forestA = card(id = "forest-a", name = "Forest", typeLine = "Basic Land — Forest", colorIdentity = emptyList())
+        val forestB = card(id = "forest-b", name = "Forest", typeLine = "Basic Land — Forest", colorIdentity = emptyList())
+        vm.onAddSeed(forestA)
+        vm.onAddSeed(forestB)
+        assertEquals(3, vm.uiState.value.seedCards.size)
+    }
+
+    @Test
+    fun `PLAN_SECTIONS -- an unowned manual add is still kept, flagged isOwned = false in the analyzed mainboard`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        advanceUntilIdle()
+
+        val unownedCard = card(id = "unowned-1", name = "Unowned Card", colorIdentity = listOf("G"))
+        vm.onAddSeed(unownedCard)
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.seedCards.any { it.scryfallId == unownedCard.scryfallId })
+        val mainboardSlot = slot<List<DeckEntry>>()
+        coVerify { deckAnalysisPipeline.analyze(capture(mainboardSlot), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
+        val entry = mainboardSlot.captured.first { it.card.scryfallId == unownedCard.scryfallId }
+        assertFalse(entry.isOwned)
     }
 
     @Test

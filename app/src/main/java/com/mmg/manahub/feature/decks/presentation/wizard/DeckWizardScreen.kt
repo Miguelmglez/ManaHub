@@ -193,15 +193,34 @@ fun DeckWizardScreen(
                             onCancelTribePick = viewModel::onCancelTribePickForStrategy,
                             onNext = viewModel::onNextFromStrategy,
                         )
-                        WizardPhase.MANUAL_ADDS -> ManualAddsStepContent(
-                            uiState = uiState,
-                            onQueryChange = viewModel::onManualAddsQueryChange,
-                            onToggleIncludeOutsideCollection = viewModel::onToggleIncludeOutsideCollection,
-                            onSelectRoleFilter = viewModel::onSelectManualAddsRoleFilter,
-                            onAddSeed = viewModel::onAddSeed,
-                            onRemoveSeed = viewModel::onRemoveSeed,
-                            onNext = viewModel::onNextFromManualAdds,
-                        )
+                        WizardPhase.MANUAL_ADDS -> if (uiState.selectedFormat?.isCommanderFormat == true) {
+                            // Deck Wizard Commander v3 plan (Phase 5, R4): Commander mounts the
+                            // engine-attributed Plan Sections step on this SAME phase instead of the
+                            // old skeleton-guided free search -- Casual keeps ManualAddsStepContent
+                            // below, byte-identical.
+                            PlanSectionsStepContent(
+                                uiState = uiState,
+                                onQueryChange = viewModel::onPlanSectionsQueryChange,
+                                onApplyStructuredSearch = viewModel::applyPlanSectionsStructuredSearch,
+                                onFilterByTags = viewModel::searchPlanSectionsCollectionByTags,
+                                onScryfallSearch = viewModel::searchPlanSectionsScryfall,
+                                onAddCard = viewModel::onAddSeed,
+                                onRemoveCard = viewModel::onRemoveSeed,
+                                onClearSearchState = viewModel::clearPlanSectionsSearchState,
+                                onCardClick = onCardClick,
+                                onNext = viewModel::onNextFromManualAdds,
+                            )
+                        } else {
+                            ManualAddsStepContent(
+                                uiState = uiState,
+                                onQueryChange = viewModel::onManualAddsQueryChange,
+                                onToggleIncludeOutsideCollection = viewModel::onToggleIncludeOutsideCollection,
+                                onSelectRoleFilter = viewModel::onSelectManualAddsRoleFilter,
+                                onAddSeed = viewModel::onAddSeed,
+                                onRemoveSeed = viewModel::onRemoveSeed,
+                                onNext = viewModel::onNextFromManualAdds,
+                            )
+                        }
                         WizardPhase.DIRECTION -> DirectionStepContent(
                             uiState = uiState,
                             onSelectDirectionTag = viewModel::onSelectDirectionTag,

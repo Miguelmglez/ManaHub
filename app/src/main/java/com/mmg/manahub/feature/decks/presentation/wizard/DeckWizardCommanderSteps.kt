@@ -48,9 +48,13 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,9 +64,13 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.search.StructuredCardSearch
+import com.mmg.manahub.core.model.AddCardRow
 import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckCardSource
@@ -72,8 +80,10 @@ import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardRow
+import com.mmg.manahub.core.ui.components.CardSearchSheet
 import com.mmg.manahub.core.ui.components.CardTagChip
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicSelectionItem
@@ -85,13 +95,20 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
+import com.mmg.manahub.feature.decks.domain.engine.CardSection
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
+import com.mmg.manahub.feature.decks.domain.engine.PillarId
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
+import com.mmg.manahub.feature.decks.domain.engine.SectionQueryContext
+import com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery
+import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 import com.mmg.manahub.feature.decks.domain.usecase.StrategyRecommendation
 import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
+import com.mmg.manahub.feature.decks.presentation.components.CardSectionRow
 import com.mmg.manahub.feature.decks.presentation.components.TribeOption
 import com.mmg.manahub.feature.decks.presentation.components.TribePickerSection
+import com.mmg.manahub.feature.decks.presentation.components.label
 import org.jetbrains.compose.resources.painterResource
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -662,6 +679,237 @@ private fun StrategyRecommendationRow(recommendation: StrategyRecommendation, is
                 }
             }
         }
+    }
+}
+
+// ── PLAN_SECTIONS (Deck Wizard Commander v3 plan, Phase 5, R4) — Commander-only replacement for
+//    MANUAL_ADDS on the SAME WizardPhase.MANUAL_ADDS phase; Casual keeps ManualAddsStepContent
+//    below untouched. ────────────────────────────────────────────────────────────────────────────
+
+/** Pillar display order for the PLAN_SECTIONS step (plan 5.2) -- LEGALITY is never shown here (it
+ * carries no section a manual add can meaningfully target: `legal`/`illegal` have no Browse action
+ * per [SectionSearchQuery.fragmentFor]'s own "no sensible add-more action" rule). */
+private val PLAN_SECTIONS_PILLAR_ORDER = listOf(PillarId.PLAN_ROLES, PillarId.MANA_BASE, PillarId.CURVE, PillarId.SYNERGY)
+
+/** The SYNERGY residual buckets (Deck Analysis Engine v3, Phase 4, spec §7) -- the manual adds the
+ * engine could not attribute to the plan. Relabeled "Kept — outside the plan" here (R5/D7: the
+ * wizard never auto-drops a manual add for being off-plan) rather than their normal
+ * [CardSection.label]. */
+private val KEPT_OUTSIDE_PLAN_IDS = setOf("interaction", "standalone", "offplan")
+
+/** Same [SnapshotStateMap] + flattened-`List<String>` [Saver] shape as `DeckStudioScreen.kt`'s
+ * `CollapsedCategorySectionsSaver` -- duplicated locally (not promoted to a shared file) per this
+ * codebase's own "small per-file duplicate over cross-file coupling for one extra call site"
+ * convention (see [FormatCard]'s KDoc for the same judgment call made elsewhere in this file). */
+private const val PLAN_SECTIONS_SAVER_DELIMITER = "|||"
+
+private val CollapsedPlanSectionsSaver: Saver<SnapshotStateMap<String, Boolean>, List<String>> = Saver(
+    save = { map -> map.map { (key, value) -> "$key$PLAN_SECTIONS_SAVER_DELIMITER$value" } },
+    restore = { encoded ->
+        mutableStateMapOf<String, Boolean>().apply {
+            encoded.forEach { entry ->
+                val separatorIndex = entry.lastIndexOf(PLAN_SECTIONS_SAVER_DELIMITER)
+                if (separatorIndex >= 0) {
+                    val keyPart = entry.substring(0, separatorIndex)
+                    val valuePart = entry.substring(separatorIndex + PLAN_SECTIONS_SAVER_DELIMITER.length)
+                    this[keyPart] = valuePart.toBoolean()
+                }
+            }
+        }
+    },
+)
+
+/**
+ * Deck Wizard Commander v3 plan, Phase 5 (R4) — replaces [ManualAddsStepContent] for Commander
+ * formats only. Renders [DeckWizardUiState.planAnalysis]'s pillars/sections via the SAME
+ * [CardSectionRow] the Deck Studio Analysis tab uses -- card→section attribution comes ONLY from
+ * [com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline.analyze] (wired by
+ * [DeckWizardViewModel.recomputePlanAnalysis]); this composable has ZERO scoring/classification/
+ * query logic of its own (the campaign's own D2 rule -- see `docs/deck-wizard-state.md` §2).
+ *
+ * Fully skippable, same as the old MANUAL_ADDS step -- Next is always enabled, even while
+ * [DeckWizardUiState.planAnalysis] is still loading or degraded to `null`.
+ */
+@Composable
+internal fun PlanSectionsStepContent(
+    uiState: DeckWizardUiState,
+    onQueryChange: (String) -> Unit,
+    onApplyStructuredSearch: (AdvancedSearchQuery) -> Unit,
+    onFilterByTags: (Set<String>) -> Unit,
+    onScryfallSearch: (String) -> Unit,
+    onAddCard: (Card) -> Unit,
+    onRemoveCard: (Card) -> Unit,
+    onClearSearchState: () -> Unit,
+    onCardClick: (String) -> Unit,
+    onNext: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    val expandedSections = rememberSaveable(saver = CollapsedPlanSectionsSaver) { mutableStateMapOf() }
+    var browseSectionId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showSearchSheet by rememberSaveable { mutableStateOf(false) }
+    // Same RESUMED gate as Deck Studio's own add-cards sheet (feedback_modal_sheet_blocks_nav_
+    // transition): a card tap inside CardSearchSheet forwards to the full CardDetailScreen via
+    // [onCardClick], and the sheet must unmount the instant that navigation starts.
+    val isDestinationResumed = LocalLifecycleOwner.current.lifecycle.currentStateAsState().value.isAtLeast(Lifecycle.State.RESUMED)
+
+    val format = uiState.selectedFormat ?: DeckFormat.COMMANDER
+    val dominantTribe = uiState.selectedTribeKey?.removePrefix(TribeDeriver.TRIBE_PREFIX)
+    val queryContext = remember(uiState.colorIdentity, format, dominantTribe) {
+        SectionQueryContext(colorIdentity = uiState.colorIdentity, format = format, dominantTribe = dominantTribe)
+    }
+    val browseQuery = remember(browseSectionId, queryContext) {
+        browseSectionId?.let { SectionSearchQuery.toAdvancedQuery(it, queryContext) }
+    }
+    val browseTagKeys = remember(browseSectionId) {
+        browseSectionId?.let { SectionSearchQuery.collectionTagKeysFor(it) }.orEmpty()
+    }
+
+    fun resolveCard(scryfallId: String): Card? =
+        uiState.selectedCommander?.takeIf { it.scryfallId == scryfallId }
+            ?: uiState.seedCards.firstOrNull { it.scryfallId == scryfallId }
+
+    val analysis = uiState.planAnalysis
+    val pillars = remember(analysis) {
+        PLAN_SECTIONS_PILLAR_ORDER.mapNotNull { id -> analysis?.pillars?.firstOrNull { it.id == id } }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        when {
+            analysis == null && uiState.isAnalyzingPlan -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                MagicLoadingSpinner()
+            }
+            analysis == null -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                InlineErrorState(message = stringResource(R.string.deck_wizard_plan_sections_error))
+            }
+            else -> LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.md),
+                verticalArrangement = Arrangement.spacedBy(spacing.md),
+            ) {
+                item(key = "header") {
+                    Column {
+                        Text(stringResource(R.string.deck_wizard_plan_sections_title), style = ty.titleLarge, color = mc.textPrimary)
+                        Text(
+                            stringResource(R.string.deck_wizard_plan_sections_subtitle),
+                            style = ty.bodyMedium,
+                            color = mc.textSecondary,
+                            modifier = Modifier.padding(top = spacing.xxs),
+                        )
+                    }
+                }
+                pillars.forEach { pillar ->
+                    item(key = "pillar_${pillar.id.name}") {
+                        Text(
+                            text = pillar.id.label().uppercase(),
+                            style = ty.labelMedium,
+                            color = mc.primaryAccent,
+                            modifier = Modifier.padding(top = spacing.sm, bottom = spacing.xxs),
+                        )
+                    }
+                    items(pillar.sections, key = { "${pillar.id.name}:${it.id}" }) { section ->
+                        val sectionKey = "${pillar.id.name}:${section.id}"
+                        // Defaults to EXPANDED (matches DeckStudioScreen's Analysis tab convention,
+                        // where collapsedCategorySections gates on `!= true`) -- this step's whole
+                        // purpose is to surface each category's Browse action, so hiding everything
+                        // behind a tap on first load would bury the primary action of the screen.
+                        val expanded = expandedSections[sectionKey] ?: true
+                        val renderedSection = if (section.id in KEPT_OUTSIDE_PLAN_IDS) {
+                            section.copy(label = stringResource(R.string.deck_wizard_plan_sections_kept_outside_plan))
+                        } else {
+                            section
+                        }
+                        val browseFragment = SectionSearchQuery.fragmentFor(section.id, queryContext)
+                        CardSectionRow(
+                            section = renderedSection,
+                            resolveCard = ::resolveCard,
+                            onCardClick = onCardClick,
+                            onBrowse = if (browseFragment == null) null else {
+                                {
+                                    browseSectionId = section.id
+                                    showSearchSheet = true
+                                }
+                            },
+                            expanded = expanded,
+                            onToggleExpanded = { expandedSections[sectionKey] = !expanded },
+                            ownedAvailabilityHint = uiState.ownedAvailabilityBySection[section.id],
+                        )
+                    }
+                }
+                if (uiState.seedCards.isNotEmpty()) {
+                    item(key = "manual_adds_header") {
+                        // Same labelMedium/primaryAccent/uppercase treatment as the pillar headers
+                        // above (see StrategySectionHeader for the shared convention this file uses
+                        // for every such sub-header) -- this is one more section in the same list,
+                        // not a bigger heading, so it must not outrank the pillar headers it sits
+                        // below.
+                        Text(
+                            text = stringResource(R.string.deck_wizard_plan_sections_added_title).uppercase(),
+                            style = ty.labelMedium,
+                            color = mc.primaryAccent,
+                            modifier = Modifier.padding(top = spacing.sm, bottom = spacing.xxs),
+                        )
+                    }
+                    items(uiState.seedCards, key = { "planadded_${it.scryfallId}" }) { card ->
+                        // Tappable, unlike the dead onClick={} elsewhere in this file's legacy
+                        // ManualAddsStepContent -- this step already threads onCardClick through for
+                        // the search sheet, so wire the same navigation here instead of rendering a
+                        // clickable Surface (CardRow uses Surface(onClick=...), real ripple) that does
+                        // nothing on tap.
+                        CardRow(
+                            card = card,
+                            isInCollection = true,
+                            onClick = { onCardClick(card.scryfallId) },
+                            onRemove = { onRemoveCard(card) },
+                        )
+                    }
+                }
+            }
+        }
+        WizardStickyButton(
+            label = stringResource(R.string.deck_wizard_next),
+            enabled = true,
+            onClick = onNext,
+        )
+    }
+
+    if (showSearchSheet && isDestinationResumed) {
+        val existingIds = remember(uiState.selectedCommander, uiState.seedCards) {
+            (listOfNotNull(uiState.selectedCommander?.scryfallId) + uiState.seedCards.map { it.scryfallId }).toSet()
+        }
+        val ownedIds = remember(uiState.ownedCards) { uiState.ownedCards.map { it.scryfallId }.toSet() }
+        fun toRow(card: Card) = AddCardRow(
+            card = card,
+            quantityInDeck = if (card.scryfallId in existingIds) 1 else 0,
+            isOwned = card.scryfallId in ownedIds,
+        )
+        CardSearchSheet(
+            query = uiState.planSectionsQuery,
+            offerResults = emptyList(),
+            addCardsResults = uiState.planSectionsCollectionResults.map(::toRow),
+            scryfallResults = uiState.planSectionsScryfallResults.map(::toRow),
+            isSearchingCards = false,
+            isSearchingScryfall = uiState.isSearchingPlanSectionsScryfall,
+            offerTabLabel = stringResource(R.string.stats_tab_collection),
+            allCardsTabLabel = stringResource(R.string.deckdetail_tab_scryfall),
+            onQueryChange = onQueryChange,
+            onScryfallSearch = onScryfallSearch,
+            onAdd = { row -> onAddCard(row.card) },
+            onRemove = { row -> onRemoveCard(row.card) },
+            onCardClick = onCardClick,
+            initialAdvancedQuery = browseQuery,
+            appliedAdvancedQuery = uiState.planSectionsStructuredQuery,
+            initialCollectionTagKeys = browseTagKeys,
+            onAdvancedSearch = onApplyStructuredSearch,
+            onFilterCollectionByTags = onFilterByTags,
+            onDismiss = {
+                showSearchSheet = false
+                browseSectionId = null
+                onClearSearchState()
+            },
+        )
     }
 }
 

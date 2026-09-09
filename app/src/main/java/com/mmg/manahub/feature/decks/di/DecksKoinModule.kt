@@ -270,6 +270,9 @@ fun decksKoinModule(): Module = module {
             // derivation ranking.
             cardStrategyTagsRepository = get(),
             recommendCommanderStrategiesUseCase = get(),
+            // Deck Wizard Commander v3 plan, Phase 5 (D2) -- the SAME shared DeckAnalysisPipeline
+            // singleton DeckDoctorOrchestrator/the harness already resolve, never a second instance.
+            deckAnalysisPipeline = get(),
         )
     }
 }

@@ -1206,6 +1206,14 @@
     <string name="deck_wizard_manual_adds_search_hint">Search cards…</string>
     <string name="deck_wizard_manual_adds_empty">No cards match this search yet.</string>
     <string name="deck_wizard_manual_adds_added_title">Added</string>
+    <!-- Plan sections step (Commander only, replaces Manual adds — Deck Wizard Commander v3 plan, Phase 5) -->
+    <string name="deck_wizard_plan_sections_title">Fill in your plan</string>
+    <string name="deck_wizard_plan_sections_subtitle">We\'ll build the rest from your collection — add specific cards here, or skip this step entirely.</string>
+    <string name="deck_wizard_plan_sections_error">We couldn\'t analyze your plan right now. You can still continue.</string>
+    <string name="deck_wizard_plan_sections_kept_outside_plan">Kept — outside the plan</string>
+    <string name="deck_wizard_plan_sections_owned_hint">%1$d in your collection</string>
+    <string name="deck_wizard_plan_sections_added_title">Your manual adds</string>
+    <string name="deck_wizard_manual_add_rejected">That card doesn\'t fit this deck\'s color identity or format legality.</string>
     <!-- Step 4 — Review -->
     <string name="deck_wizard_review_title">Review &amp; generate</string>
     <string name="deck_wizard_review_commander_section">Commander</string>
