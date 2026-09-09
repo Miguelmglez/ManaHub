@@ -19,9 +19,9 @@ ships — this file survives).
 | Formats reachable in this wave | `COMMANDER`, `COMMANDER_CASUAL` |
 | Formats deferred | `CASUAL`, `STANDARD`, `PIONEER`, `MODERN`, `LEGACY`, `VINTAGE`, `PAUPER` (§7) |
 | Engine used by the wizard | today: legacy Motor A (`DeckScorer.fit`); target: Deck Analysis Engine v3 primitives + `AnalysisEngine.evaluate` verification |
-| Campaign phase | P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 DONE (Run 5); P4 DONE (Run 6); P5 DONE (Run 7) |
+| Campaign phase | P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 DONE (Run 5); P4 DONE (Run 6); P5 DONE (Run 7); P6 DONE (Runs 8-10) |
 
-Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 DONE 2026-09-09 (Run 4: 3.1 F10 fix + 3.4 search-plumbing; Run 5: 3.2 UI + 3.3 StructuredCardSearch + lockedCriteria + VM wiring + tests + compose-design-reviewer pass — see progress tracker) · P4 DONE 2026-09-09 (Run 6: RecommendCommanderStrategiesUseCase + single-select STRATEGY step UI/VM wiring + DeriveCommanderStrategiesUseCase retirement + tests + compose-design-reviewer pass — see progress tracker) · P5 DONE 2026-09-09 (Run 7: PlanSectionsStepContent replaces MANUAL_ADDS for Commander, DeckAnalysisPipeline-only attribution, selectedPosture F3 gap closed, onAddSeed/onRemoveSeed hardened, ownedAvailabilityBySection, tests + compose-design-reviewer pass — see progress tracker) · P6 IN PROGRESS 2026-09-09 (Run 8: the deferred Phase 2 write-atomicity gate item CLOSED; a Phase 6 SLICE landed — nav route args, format preselect, atomic write in writeResultIntoNewDeck, a Run 7 onRemoveSeed fix; the Review/Generating/Result UI, the Studio CTA, and — the headline finding — BuildCommanderDeckUseCase still not wired into DeckWizardViewModel.onGenerate() at all, remain for a follow-up run — see progress tracker Run 8) · P7 — · P8 —`
+Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 DONE 2026-09-09 (Run 4: 3.1 F10 fix + 3.4 search-plumbing; Run 5: 3.2 UI + 3.3 StructuredCardSearch + lockedCriteria + VM wiring + tests + compose-design-reviewer pass — see progress tracker) · P4 DONE 2026-09-09 (Run 6: RecommendCommanderStrategiesUseCase + single-select STRATEGY step UI/VM wiring + DeriveCommanderStrategiesUseCase retirement + tests + compose-design-reviewer pass — see progress tracker) · P5 DONE 2026-09-09 (Run 7: PlanSectionsStepContent replaces MANUAL_ADDS for Commander, DeckAnalysisPipeline-only attribution, selectedPosture F3 gap closed, onAddSeed/onRemoveSeed hardened, ownedAvailabilityBySection, tests + compose-design-reviewer pass — see progress tracker) · P6 DONE 2026-09-09 (Run 8: write-atomicity + nav-arg plumbing; Run 9: BuildCommanderDeckUseCase wired into onGenerate, D12/D13 write path, persistence round-trip proof; Run 10: Result/Generating/Review UI for Commander, Studio "Rebuild with the Wizard" CTA + confirm dialog, pop-back nav, item 8 verified by code trace, compose-design-reviewer + android-edge-case-tester passes with fixes applied — see progress tracker Run 10; one flagged-not-fully-closed item: persist()'s 4-call write is not yet one Room transaction, mitigated via a cancel-blocking guard, low real risk while DECK_BUILDER_V2_ENABLED stays false) · P7 — · P8 —`
 
 ---
 
@@ -160,6 +160,7 @@ Acceptance bands in force: see plan §5 until P7 replaces them here.
 | F10 | Owned commander candidates capped at 5 | separate `commanderLimit` param on `CollectionProfileUseCase`, default unbounded | **done P3 (2026-09-09)** — the VM's own call site is NOT yet wired to pass it (that's the pick-step UI/VM work, still pending) |
 | F11 | Analysis entry mirrored in 3 places | D2 | **done P0 (2026-09-08)** — `BuildDeckFromTemplateUseCase.recomputeProfile` confirmed NOT a mirror (Motor A's own `DeckScorer.profile()`), left untouched per the plan's escape hatch |
 | — | `EvaluateDeckUseCase` emits a gamification event on every call | `emitProgression` flag | **done P0 (2026-09-08)** |
+| — | `BuildCommanderDeckUseCase.persist()` is 4 sequential non-transactional writes -- a cancellation mid-write (reachable via Studio's "Rebuild with the Wizard" CTA, D12 rebuild-in-place) can leave an existing draft with cards replaced but a stale pin | mitigated: `isWritingCommanderDeck` blocks cancellation once the write starts (Run 10); real fix is one Room `@Transaction` | **mitigated, not closed** — low risk while `DECK_BUILDER_V2_ENABLED=false`; close before Phase 8 flips it |
 
 Known engine debt deliberately NOT touched by this campaign (see ADR-007 "Known debt"): SYNERGY P4
 calibration, PRISON never resolving, 60-card CONTROL inevitability ceiling, `DRAFT` has no skeleton,
@@ -380,3 +381,27 @@ Things that differ from Commander and are NOT solved by this campaign:
   1), the Studio wizard CTA + confirmation dialog, all of 6.2/6.3/6.4's UI content, the
   Result-vs-Studio round-trip test, and the `compose-design-reviewer`/`android-edge-case-tester`
   passes.
+- 2026-09-09 — **Phase 6 headline wire (Run 9)**: `BuildCommanderDeckUseCase` is now actually called
+  by `DeckWizardViewModel.onGenerate()` for Commander formats (`generateCommanderDeck`, D12/D13
+  write path), and a new `BuildCommanderDeckPersistenceRoundTripTest` proves the build's own
+  `DeckAnalysis` survives a real persist-then-re-analyze round trip byte-for-byte. The Result/
+  Generating/Review UI content, the Studio CTA, and the pop-back nav branch were still NOT done —
+  `commanderBuildResult` was populated in state with no screen rendering it yet.
+- 2026-09-09 — **Phase 6 DONE (Run 10)**: full detail in the progress tracker's Run 10 log. Headline
+  items future phases should know:
+  1. **`BuildCommanderDeckUseCase.persist()` is still 4 sequential, non-transactional writes** —
+     the adversarial pass flagged this as a real data-corruption risk for the NEW "Rebuild with the
+     Wizard" (rebuild-in-place) path specifically, since that path mutates a real pre-existing
+     draft rather than an orphan-safe fresh deck. Mitigated this run with a cancel-blocking guard
+     (`isWritingCommanderDeck`) so a cancellation can no longer land mid-write, but the write itself
+     is still not one Room `@Transaction` — a genuine follow-up before `DECK_BUILDER_V2_ENABLED`
+     ever flips (the CTA is unreachable in production today, so real-world risk is currently zero).
+  2. **Item 8 (posture pin -> Studio chip) needed no new code** — Phase 0/E3 already wired
+     `postureOverride` through the ONE shared `DeckAnalysisPipeline.analyze` both the wizard and
+     `DeckDoctorOrchestrator` call; this run's contribution was confirming that chain end to end,
+     not fixing a gap. No `DeckDoctorOrchestrator`-level test proves it directly yet (only the
+     lower-level `DeckAnalysisPipeline` round trip does) — a reasonable Phase 7 addition if
+     stronger proof is wanted.
+  3. **`CommanderBuildStage` progress is real, not simulated** — `BuildCommanderDeckUseCase` gained
+     an `onStage` callback (defaulted, zero call-site breakage beyond a mock-matcher arg count) that
+     fires at the SAME stage boundaries the placement loop already passes through.
