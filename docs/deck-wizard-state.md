@@ -5,7 +5,7 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-08 (plan authored, implementation not started).
+**Last updated:** 2026-09-09 (Phase 7 done — Run 11: harness v2, calibration, telemetry).
 **Owning plan:** `docs/plans/deck-wizard-commander-plan.md` (gitignored; deleted when the campaign
 ships — this file survives).
 
@@ -18,10 +18,17 @@ ships — this file survives).
 | Feature flag `FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED` | `false` (D16 — stays off until Phase 8) |
 | Formats reachable in this wave | `COMMANDER`, `COMMANDER_CASUAL` |
 | Formats deferred | `CASUAL`, `STANDARD`, `PIONEER`, `MODERN`, `LEGACY`, `VINTAGE`, `PAUPER` (§7) |
-| Engine used by the wizard | today: legacy Motor A (`DeckScorer.fit`); target: Deck Analysis Engine v3 primitives + `AnalysisEngine.evaluate` verification |
-| Campaign phase | P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 DONE (Run 5); P4 DONE (Run 6); P5 DONE (Run 7); P6 DONE (Runs 8-10) |
+| Engine used by the wizard | Commander/Commander Casual: `BuildCommanderDeckUseCase` (`PlacementScorer` + `DeckAnalysisPipeline` verify/refine), wired into production since Run 9. Casual: still legacy Motor A (`DeckScorer.fit`), unchanged (non-goal). |
+| Campaign phase | P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 DONE (Run 5); P4 DONE (Run 6); P5 DONE (Run 7); P6 DONE (Runs 8-10); P7 DONE (Run 11 — harness v2 green, calibration verdict NO CHANGE, telemetry added) |
 
-Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 DONE 2026-09-09 (Run 4: 3.1 F10 fix + 3.4 search-plumbing; Run 5: 3.2 UI + 3.3 StructuredCardSearch + lockedCriteria + VM wiring + tests + compose-design-reviewer pass — see progress tracker) · P4 DONE 2026-09-09 (Run 6: RecommendCommanderStrategiesUseCase + single-select STRATEGY step UI/VM wiring + DeriveCommanderStrategiesUseCase retirement + tests + compose-design-reviewer pass — see progress tracker) · P5 DONE 2026-09-09 (Run 7: PlanSectionsStepContent replaces MANUAL_ADDS for Commander, DeckAnalysisPipeline-only attribution, selectedPosture F3 gap closed, onAddSeed/onRemoveSeed hardened, ownedAvailabilityBySection, tests + compose-design-reviewer pass — see progress tracker) · P6 DONE 2026-09-09 (Run 8: write-atomicity + nav-arg plumbing; Run 9: BuildCommanderDeckUseCase wired into onGenerate, D12/D13 write path, persistence round-trip proof; Run 10: Result/Generating/Review UI for Commander, Studio "Rebuild with the Wizard" CTA + confirm dialog, pop-back nav, item 8 verified by code trace, compose-design-reviewer + android-edge-case-tester passes with fixes applied — see progress tracker Run 10; one flagged-not-fully-closed item: persist()'s 4-call write is not yet one Room transaction, mitigated via a cancel-blocking guard, low real risk while DECK_BUILDER_V2_ENABLED stays false) · P7 — · P8 —`
+Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 DONE 2026-09-09 (Run 4: 3.1 F10 fix + 3.4 search-plumbing; Run 5: 3.2 UI + 3.3 StructuredCardSearch + lockedCriteria + VM wiring + tests + compose-design-reviewer pass — see progress tracker) · P4 DONE 2026-09-09 (Run 6: RecommendCommanderStrategiesUseCase + single-select STRATEGY step UI/VM wiring + DeriveCommanderStrategiesUseCase retirement + tests + compose-design-reviewer pass — see progress tracker) · P5 DONE 2026-09-09 (Run 7: PlanSectionsStepContent replaces MANUAL_ADDS for Commander, DeckAnalysisPipeline-only attribution, selectedPosture F3 gap closed, onAddSeed/onRemoveSeed hardened, ownedAvailabilityBySection, tests + compose-design-reviewer pass — see progress tracker) · P6 DONE 2026-09-09 (Run 8: write-atomicity + nav-arg plumbing; Run 9: BuildCommanderDeckUseCase wired into onGenerate, D12/D13 write path, persistence round-trip proof; Run 10: Result/Generating/Review UI for Commander, Studio "Rebuild with the Wizard" CTA + confirm dialog, pop-back nav, item 8 verified by code trace, compose-design-reviewer + android-edge-case-tester passes with fixes applied — see progress tracker Run 10; one flagged-not-fully-closed item: persist()'s 4-call write is not yet one Room transaction, mitigated via a cancel-blocking guard, low real risk while DECK_BUILDER_V2_ENABLED stays false) · P7 DONE 2026-09-09 (Run 11: harness v2
+real-collection segment 180/180 HARD-pass + MockCollectionRich/Thin segments green (1 diagnosed
+exclusion each, logged not masked); calibration verdict NO CHANGE to PlacementScorer's initial
+weights (evidence, not a default); Edgar Markov MIDRANGE-vs-AGGRO gap diagnosed to
+CommanderPlanResolver's Custom branch, principled fix identified but deferred (would need to rewrite
+a stable, deliberately-tested D6 contract — see progress tracker Run 11 §7.2 for the concrete next
+step); 8 new telemetry keys added, 0 stale keys needed removal (already unreachable for Commander by
+Phase 6's dispatch split) — see progress tracker Run 11) · P8 —`
 
 ---
 
@@ -161,6 +168,8 @@ Acceptance bands in force: see plan §5 until P7 replaces them here.
 | F11 | Analysis entry mirrored in 3 places | D2 | **done P0 (2026-09-08)** — `BuildDeckFromTemplateUseCase.recomputeProfile` confirmed NOT a mirror (Motor A's own `DeckScorer.profile()`), left untouched per the plan's escape hatch |
 | — | `EvaluateDeckUseCase` emits a gamification event on every call | `emitProgression` flag | **done P0 (2026-09-08)** |
 | — | `BuildCommanderDeckUseCase.persist()` is 4 sequential non-transactional writes -- a cancellation mid-write (reachable via Studio's "Rebuild with the Wizard" CTA, D12 rebuild-in-place) can leave an existing draft with cards replaced but a stale pin | mitigated: `isWritingCommanderDeck` blocks cancellation once the write starts (Run 10); real fix is one Room `@Transaction` | **mitigated, not closed** — low risk while `DECK_BUILDER_V2_ENABLED=false`; close before Phase 8 flips it |
+| F17 | Colorless-identity commander (e.g. "Page, Loose Leaf") builds a `DeckTooSmall` BLOCKER — `BasicLandCalculator`/`BasicLandDistribution` has no colourless "Wastes" slot at all, so Stage B of `fillLandsV2` allocates zero basics for an empty identity | none this campaign — needs a `BasicLandDistribution` model + Room-schema change, cross-cutting and out of Phase 7's scope | **open, diagnosed P7 (Run 11, harness v2)** — 1/91 real-collection commanders affected; excluded from the harness's HARD gate with a logged, documented carve-out, never silently masked |
+| F18 | `CommanderPlanResolver.resolve`'s `StrategyPick.Custom` branch always targets the archetype-null generic BELL-shaped baseline skeleton regardless of the commander's own aggression signal, so a fast/cheap/tribal-aggressive Custom build (Edgar Markov) reads MIDRANGE post-build instead of AGGRO | none this campaign — principled fix identified (a bounded build-time archetype hint, tag-then-color, mirroring `InferDeckArchetypeUseCase.commanderMacroPrior`) but deferred: it requires deliberately rewriting `CommanderPlanResolverTest`'s existing "Custom always resolves archetype==null" assertion, a conscious change to D6's stable, explicitly-tested contract, not a side-effect-free bug fix | **open, diagnosed P7 (Run 11)** — root cause confirmed by reading the code (Run 4 only hypothesized it); concrete next step recorded in the progress tracker Run 11 §7.2 |
 
 Known engine debt deliberately NOT touched by this campaign (see ADR-007 "Known debt"): SYNERGY P4
 calibration, PRISON never resolving, 60-card CONTROL inevitability ceiling, `DRAFT` has no skeleton,
@@ -201,7 +210,14 @@ Things that differ from Commander and are NOT solved by this campaign:
 - User confirmation (non-blocking, defaults in force): preselect the top recommended strategy (yes);
   show Commander-only catalog entries the commander does not signal under "Other plans" (yes).
 - Device runtime check of the build loop on a mid-range phone (plan P6).
-- Decide, after P7, whether `CandidatePoolGenerator` has any caller left; delete if not.
+- `CandidatePoolGenerator` (checked P7): still has a live caller — `BuildDeckFromTemplateUseCase`'s
+  Scryfall backstop fill, which only Casual builds ever reach now that Commander dispatches to
+  `BuildCommanderDeckUseCase`. Not dead code; do not delete without first retiring Casual's own
+  build path (60-card wave, §7).
+- F17 (colorless commander land fill) and F18 (Custom macro bias) — see §6, both diagnosed P7 with
+  a concrete next step, neither fixed.
+- `BuildCommanderDeckUseCase.persist()`'s non-transactional 4-write sequence (§6, unchanged since
+  Run 10) — still the one real blocker before `DECK_BUILDER_V2_ENABLED` can safely flip (Phase 8).
 
 ---
 
@@ -405,3 +421,32 @@ Things that differ from Commander and are NOT solved by this campaign:
   3. **`CommanderBuildStage` progress is real, not simulated** — `BuildCommanderDeckUseCase` gained
      an `onStage` callback (defaulted, zero call-site breakage beyond a mock-matcher arg count) that
      fires at the SAME stage boundaries the placement loop already passes through.
+- 2026-09-09 — **Phase 7 DONE (Run 11)**: full detail in the progress tracker's Run 11 log. Headline
+  items future phases (especially the 60-card wave, §7) should know:
+  1. **The new engine measurably beats the legacy one on the SAME real collection, without any
+     calibration.** Real-collection score distribution moved from 40/82/85/88/91 (legacy Motor A,
+     P0 baseline) to 78/85/88/91/96 (`BuildCommanderDeckUseCase`, 180 builds) — the long tail is
+     gone (min 40->78) and every percentile improved. 0 BLOCKER across all 180 in-scope builds
+     (vs. 3% before).
+  2. **`PlacementScorer`'s initial weights need no retune** — verdict is evidence-backed (real
+     collection reads well inside/above the healthy band without fitting; `MockCollectionRich`
+     reconstruction beats 3 of 4 hand-authored fixtures), not an unexamined default. Do not
+     re-litigate this without new evidence the current numbers don't already cover.
+  3. **Two genuine, narrow defects were found by harness v2 and left OPEN, not force-fixed** — F17
+     (colorless commanders get zero land fill, a `BasicLandCalculator` gap) and F18 (Custom builds
+     never bias toward the commander's own aggression signal, so a fast tribal-aggro commander like
+     Edgar Markov reads MIDRANGE post-build). Both have a concrete next step recorded (§6, progress
+     tracker Run 11 §7.2) — F18 in particular needs a CONSCIOUS decision to touch D6's stable
+     "Custom == null archetype" contract, not a quick patch.
+  4. **The legacy `WizardQualityMatrixTest`/`HarnessMetricsCalculator`/`HarnessDoctorPipeline`
+     stack was NOT deleted**, despite the plan's literal 7.1 text — it is the only automated
+     coverage the Casual wizard path (still Motor A, non-goal) has. The new Commander-only harness
+     v2 (`WizardCommanderHarnessV2Test` in `app/src/test`, `WizardHarnessMock{Rich,Thin}
+     SegmentTest` in `shared/core-domain` commonTest) is ADDITIVE. A future cleanup (60-card wave or
+     Phase 8) should rename the legacy class to make its now-Casual-only scope explicit.
+  5. **Telemetry additions were smaller than the plan implied** — of the "remove stale keys" list,
+     EVERY item was already structurally unreachable from the Commander path (Phase 6's
+     `generateCommanderDeck`/`generateCasualDeck` split already isolated them), and one
+     (`deck_wizard_include_outside_collection`) never existed as a literal telemetry key to begin
+     with (only as a UI-state/string-resource name). Only the 8 ADD items + the already-existing
+     `deck_wizard_blocker_after_build` (Phase 2) needed real work.
