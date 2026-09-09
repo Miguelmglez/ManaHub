@@ -36,6 +36,7 @@ import com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.PillarId
 import com.mmg.manahub.feature.decks.domain.engine.PlacementScorer
 import com.mmg.manahub.feature.decks.domain.engine.PostureId
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
@@ -2025,9 +2026,83 @@ class DeckWizardViewModel(
 
         crashlytics.log("deck_wizard_generate_succeeded")
         crashlytics.setCustomKey("deck_wizard_template_source", "COMMANDER_V3_ENGINE")
+        logCommanderBuildTelemetry(state, strategyPick, ownedCollection.size, outcome.result)
         _uiState.update {
             it.copy(phase = WizardPhase.RESULT, commanderBuildResult = outcome.result, createdDeckId = writeOutcome)
         }
+    }
+
+    /**
+     * Deck Wizard Commander v3 plan, Phase 7.3 -- self-evaluation telemetry for a completed
+     * Commander build (D15: "production quality must be observable"). `deck_wizard_blocker_after_
+     * build` is NOT logged here -- [buildCommanderDeckUseCase] itself already records it as a
+     * non-fatal the instant a BLOCKER survives verify+refine (see that class's own
+     * `deck_wizard_blocker_after_build` log line), so this function only covers the ADDITIONAL
+     * TRACKED buckets the harness's own TRACKED metrics mirror (score/pillar/gap/offplan/pool-size/
+     * strategy-source/refinement-swaps). All values are ints/enum names/small buckets -- no PII.
+     */
+    private fun logCommanderBuildTelemetry(
+        state: DeckWizardUiState,
+        strategyPick: StrategyPick,
+        poolSize: Int,
+        result: WizardBuildResult,
+    ) {
+        val crashlytics = FirebaseCrashlytics.getInstance()
+        val analysis = result.analysis
+        crashlytics.setCustomKey("deck_wizard_self_score_bucket", scoreBucket(analysis.totalScore))
+        val weakestPillar = analysis.pillars.filterNot { it.notApplicable }.minByOrNull { it.subscore }?.id ?: PillarId.PLAN_ROLES
+        crashlytics.setCustomKey("deck_wizard_weakest_pillar", weakestPillar.name)
+        crashlytics.setCustomKey("deck_wizard_gap_count_bucket", countBucket(result.gapSections.size))
+
+        val nonLand = result.entries.filterNot { BasicLandCalculator.isLand(it.card) }
+        val wizardPlacedNonLand = nonLand.filterNot { it.card.scryfallId == state.selectedCommander?.scryfallId }
+        val offplanIds = analysis.pillars.flatMap { it.sections }.filter { it.id == "offplan" }
+            .flatMap { section -> section.contributions.map { it.scryfallId } }.toSet()
+        val wizardCopies = wizardPlacedNonLand.sumOf { it.quantity }
+        val offplanCopies = wizardPlacedNonLand.filter { it.card.scryfallId in offplanIds }.sumOf { it.quantity }
+        val offplanShare = if (wizardCopies > 0) offplanCopies.toFloat() / wizardCopies else 0f
+        crashlytics.setCustomKey("deck_wizard_offplan_share_bucket", offplanShareBucket(offplanShare))
+
+        crashlytics.setCustomKey("deck_wizard_manual_adds_count", result.fillStats.placedManual)
+        crashlytics.setCustomKey("deck_wizard_pool_size_bucket", poolSizeBucket(poolSize))
+
+        val topRecommendationId = state.commanderStrategyRecommendations.firstOrNull()?.strategy?.id
+        val strategySource = when (strategyPick) {
+            StrategyPick.Custom -> "custom"
+            is StrategyPick.Curated -> if (strategyPick.strategy.id == topRecommendationId) "recommended" else "other"
+        }
+        crashlytics.setCustomKey("deck_wizard_strategy_source", strategySource)
+        crashlytics.setCustomKey("deck_wizard_refinement_swaps", result.refinementSwaps)
+    }
+
+    private fun scoreBucket(score: Int): String = when {
+        score < 40 -> "0-39"
+        score < 60 -> "40-59"
+        score < 80 -> "60-79"
+        else -> "80-100"
+    }
+
+    private fun countBucket(count: Int): String = when {
+        count <= 0 -> "0"
+        count <= 2 -> "1-2"
+        count <= 5 -> "3-5"
+        else -> "6+"
+    }
+
+    private fun offplanShareBucket(share: Float): String = when {
+        share <= 0f -> "0%"
+        share <= 0.10f -> "1-10%"
+        share <= 0.25f -> "11-25%"
+        share <= 0.50f -> "26-50%"
+        else -> "51%+"
+    }
+
+    private fun poolSizeBucket(size: Int): String = when {
+        size < 20 -> "<20"
+        size < 50 -> "20-49"
+        size < 100 -> "50-99"
+        size < 250 -> "100-249"
+        else -> "250+"
     }
 
     /** The legacy Casual build path (Motor A / [BuildDeckFromTemplateUseCase]) -- byte-identical to

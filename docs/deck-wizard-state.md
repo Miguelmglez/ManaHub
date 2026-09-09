@@ -120,14 +120,14 @@ byte-identical during wizard work.
 
 | Metric | Before (P0 baseline) | After (P7) |
 |---|---|---|
-| Real collection: cards / unique / eligible commanders | 1344 / 1309 / 93 (P0.2) | — |
-| Real-collection Commander builds: score distribution (min/p25/median/p75/max) | 40 / 82 / 85 / 88 / 91 (legacy Motor A build, scored by `DeckAnalysisPipeline`, 99 builds) | — |
-| Share of builds with 0 BLOCKER | 97.0% (3/99 had ≥1 BLOCKER) | — |
-| Median off-plan share (wizard-placed) | 0.0 (min 0.0, max 0.136) | — |
-| Gap sections (`current < min`) | avg 3.17 sections/build, avg 12.96 total missing count | — |
-| MockCollectionRich reconstruction delta vs fixture score | n/a | — |
-| Final `PlacementScorer` weights | n/a | roles · axes · curve · power · community |
-| Runtime per build (JVM, real collection) | min 40 ms / median 99 ms / max 332 ms (build + analyze) | — |
+| Real collection: cards / unique / eligible commanders | 1344 / 1309 / 93 (P0.2) | 1344 / 1309 / 90 legal-and-non-colorless (a few dropped by the harness's own `isLegal` filter, matching P0's own methodology, plus 1 colorless "Page, Loose Leaf" edge case excluded and diagnosed, §6) |
+| Real-collection Commander builds: score distribution (min/p25/median/p75/max) | 40 / 82 / 85 / 88 / 91 (legacy Motor A build, scored by `DeckAnalysisPipeline`, 99 builds) | **78 / 85 / 88 / 91 / 96** (NEW `BuildCommanderDeckUseCase` engine, 180 builds = 90 commanders x {top recommendation, Custom}) |
+| Share of builds with 0 BLOCKER | 97.0% (3/99 had ≥1 BLOCKER) | **100% of the 180 in-scope builds** (0 BLOCKER); the 1 excluded colorless commander is a diagnosed pre-existing `BasicLandCalculator` gap, not a scored build |
+| Median off-plan share (wizard-placed) | 0.0 (min 0.0, max 0.136) | 0/180 builds exceed the 15% `offplan_share` HARD ceiling (exact per-build shares not separately archived this run — every build passed the ceiling check) |
+| Gap sections (`current < min`) | avg 3.17 sections/build, avg 12.96 total missing count | not re-measured as an average this run (harness v2 tracks `gap_section_count`/`gaps_total` per spec in the JSON report, `testdata/wizard-harness/reports/`, gitignored) — all 180 builds satisfied `size_or_gaps` (declared gaps + entries reach the 100-card target) |
+| MockCollectionRich reconstruction delta vs fixture score | n/a | Edgar -2, Meren +1, Karlov +4, Urza +5 (tolerance >= -8; 3 of 4 beat their own hand-authored fixture) |
+| Final `PlacementScorer` weights | n/a | **NO CHANGE** — `roles 0.45 · axes 0.30 · curve 0.10 · power 0.10 · community <=1.15` (initial weights), confirmed sufficient by the numbers on this row (never fitted to the real collection, ADR-007 §4 — see progress tracker Run 11 §7.2 for the full evidence) |
+| Runtime per build (JVM, real collection) | min 40 ms / median 99 ms / max 332 ms (build + analyze) | min 50 ms / median 107 ms / max 231 ms (build + analyze, `BuildCommanderDeckUseCase`) |
 
 **P0.5 baseline reproduction:** `./gradlew :app:testDebugUnitTest --tests
 "com.mmg.manahub.feature.decks.harness.P0BaselineTest"` (requires `testdata/wizard-harness/`
