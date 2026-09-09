@@ -58,10 +58,11 @@ Build and manage decks backed by your collection and real-time Scryfall data.
 - Import / export in Moxfield / MTGO text format
 - Format validation (Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Commander, Casual)
 - Card detail with double-faced support; quick add/remove from search or your collection
-- **Deck creation wizard**: guided multi-step builder (Commander & Casual) that matches your
-  collection against community deck templates (EDHREC/Archidekt data), with staged generation
-  progress, per-category fill report, and community picks grouped by role (Removal, Ramp, …)
-  clearly separated from cards you own
+- **Deck creation wizard**: guided multi-step builder for Commander & Commander Casual, built by the
+  SAME scoring/analysis engine that grades the deck afterward — pick a curated strategy (or go
+  Custom), fill remaining plan sections from your collection, and get a staged build with a
+  transparent gap report (no silent placeholder cards). Casual keeps a separate, community-template-
+  matched build path.
 - **Collection discoveries**: synergy clusters detected in your own collection (strategies and
   tribes), each with a one-tap "Build this" handoff into the wizard
 

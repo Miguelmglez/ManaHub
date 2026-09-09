@@ -279,20 +279,35 @@ off suggestion use cases below). New engine, pure `commonMain`,
   call budget / ADR-005 above) — per ADR-005 this pillar deliberately does NOT add a new on-demand
   refresh path to compensate. Sideboard role-coverage/matchup analysis remains FUTURE DEBT.
 
-**Deck Builder v2 wizard (`Screen.DeckWizard`) and Discoveries v2 (`DiscoverSynergiesV2UseCase`,
-identity-only clustering) are the SOLE "Build from seed" / "Browse inspirations" entry points** —
-gated by `DeckFeatureFlags.DECK_BUILDER_V2_ENABLED`/`DISCOVERIES_V2_ENABLED` (currently `true`).
-Their LEGACY siblings (`DECK_STUDIO_BUILD_FROM_SEED_ENABLED`/`DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED`,
-and the `SeedsContent`/`BuildDeckFromSeedsUseCase`/`DeckMagicEngine.discoverSynergies` content they
-gated) went through a hide-then-retire cycle: hidden 2026-07-17 when v2 landed, both entry points
-temporarily hidden end-to-end 2026-07-21 (all four flags briefly `false`), then the legacy code was
-DELETED OUTRIGHT (not just re-hidden) in the Deck Wizard & Engine Rework plan, Workstream 7.2
-(2026-07-28) after a parity audit confirmed the current wizard fully supersedes it — see
-`docs/plans/deck-wizard-rework-plan.md` §WS7 and `feature_deck_wizard_rework_ws7_retirement` memory.
-`docs/hidden-features/deck-studio-build-from-seed.md`/`-inspirations.md` were deleted alongside it;
-only `docs/hidden-features/deck-studio-suggestions.md` remains (still-real hide/show toggle, no
-legacy sibling to retire). → memory: `project_deck_builder_v2` (consolidated; per-run detail in
-`.claude/agent-memory/android-kotlin-architect/`), `project_deck_studio_temporary_hide_2026-07-21`
+### Deck Wizard (`Screen.DeckWizard`, `presentation/wizard/`)
+
+**The durable record is `docs/deck-wizard-state.md`** (architecture contract, D1-D16 decisions,
+engine defects F1-F18, the 60-card wave's inheritance notes) — read it before touching any wizard
+code. `FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED` is `true` (Deck Wizard Commander v3 plan, Phase 8,
+2026-09-09). Only the must-know invariants live here:
+
+- **Commander/Commander Casual build through `BuildCommanderDeckUseCase`** (`shared/core-domain/
+  .../feature/decks/domain/template/`, `PlacementScorer` + `DeckAnalysisPipeline` verify/refine) —
+  the SAME analysis objective the Studio Analysis tab runs (`RoleKey`/`AxisKey`/`CardSection.id`/
+  `CuratedStrategy.id` vocabulary only; no wizard-only scoring/classification logic). **Casual still
+  builds through the legacy `BuildDeckFromTemplateUseCase`/Motor A/`DeckTemplateResolver`/
+  `MainboardTrimmer`/`CandidatePoolGenerator` pipeline** — non-goal for this campaign, do not
+  pre-emptively port it; see the state doc §7 for the 60-card wave's plan to do so.
+  `CandidatePoolGenerator` stays alive solely for Casual's Scryfall backstop — do not delete without
+  first retiring Casual's own build path.
+  → memory: `project_deck_wizard_commander_v3_plan`
+- **Persistence is ONE atomic write** — `BuildCommanderDeckUseCase.persist()` calls
+  `DeckRepository.persistCommanderBuild` (cards + archetype/theme/posture/tribe pin +
+  `strategyLocked`, all in a single Room `@Transaction` on Android via
+  `DeckDao.persistCommanderBuild`; the commonMain default is a best-effort 4-call fallback for
+  `WebDeckRepository`). `DeckWizardViewModel.isWritingCommanderDeck` stays as defense-in-depth for
+  the ViewModel's own in-memory state, not because the DB write can land half-written.
+- **Collection-only, D7** — no Scryfall backstop for Commander; manual adds (owned or not) are
+  always kept. A thin real collection can legitimately fail to reach 100 cards for a
+  narrow-legality commander (e.g. a colourless one) — that is an honest gap, never force-filled.
+- **Never `.valueOf()` on a persisted enum string**; calibration is normative (fixtures are a
+  regression harness, never a training set); the golden/corpus/calibration/skeleton-differentiation
+  analysis suites must stay byte-identical across wizard-only changes.
 
 **The SINGLE deck create + edit surface.** Both new decks AND existing decks route here: DeckList FAB +
 empty-state, Collection/Stats/Home/CardDetail deck-open, and Home → "Build deck" all navigate to

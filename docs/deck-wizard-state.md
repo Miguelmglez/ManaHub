@@ -5,9 +5,10 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-09 (Phase 7 done — Run 11: harness v2, calibration, telemetry).
-**Owning plan:** `docs/plans/deck-wizard-commander-plan.md` (gitignored; deleted when the campaign
-ships — this file survives).
+**Last updated:** 2026-09-09 (Phase 8 CLOSED — Run 12: F17 fixed, persist() atomicity closed,
+cleanup, flag flipped, campaign done).
+**Owning plan:** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the AI-planning-doc rule
+now that the campaign has shipped; this file is the durable record that survives.
 
 ---
 
@@ -15,11 +16,11 @@ ships — this file survives).
 
 | Item | State |
 |---|---|
-| Feature flag `FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED` | `false` (D16 — stays off until Phase 8) |
+| Feature flag `FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED` | **`true`** (flipped Run 12, Phase 8 — full verify gauntlet green first) |
 | Formats reachable in this wave | `COMMANDER`, `COMMANDER_CASUAL` |
 | Formats deferred | `CASUAL`, `STANDARD`, `PIONEER`, `MODERN`, `LEGACY`, `VINTAGE`, `PAUPER` (§7) |
-| Engine used by the wizard | Commander/Commander Casual: `BuildCommanderDeckUseCase` (`PlacementScorer` + `DeckAnalysisPipeline` verify/refine), wired into production since Run 9. Casual: still legacy Motor A (`DeckScorer.fit`), unchanged (non-goal). |
-| Campaign phase | P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 DONE (Run 5); P4 DONE (Run 6); P5 DONE (Run 7); P6 DONE (Runs 8-10); P7 DONE (Run 11 — harness v2 green, calibration verdict NO CHANGE, telemetry added) |
+| Engine used by the wizard | Commander/Commander Casual: `BuildCommanderDeckUseCase` (`PlacementScorer` + `DeckAnalysisPipeline` verify/refine), wired into production since Run 9, LIVE since Run 12. Casual: still legacy Motor A (`DeckScorer.fit`), unchanged (non-goal). |
+| Campaign phase | **CLOSED** — P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 DONE (Run 5); P4 DONE (Run 6); P5 DONE (Run 7); P6 DONE (Runs 8-10); P7 DONE (Run 11 — harness v2 green, calibration verdict NO CHANGE, telemetry added); P8 DONE (Run 12 — F17 fixed, persist() atomicity closed, cleanup, flag flip) |
 
 Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 DONE 2026-09-09 (Run 4: 3.1 F10 fix + 3.4 search-plumbing; Run 5: 3.2 UI + 3.3 StructuredCardSearch + lockedCriteria + VM wiring + tests + compose-design-reviewer pass — see progress tracker) · P4 DONE 2026-09-09 (Run 6: RecommendCommanderStrategiesUseCase + single-select STRATEGY step UI/VM wiring + DeriveCommanderStrategiesUseCase retirement + tests + compose-design-reviewer pass — see progress tracker) · P5 DONE 2026-09-09 (Run 7: PlanSectionsStepContent replaces MANUAL_ADDS for Commander, DeckAnalysisPipeline-only attribution, selectedPosture F3 gap closed, onAddSeed/onRemoveSeed hardened, ownedAvailabilityBySection, tests + compose-design-reviewer pass — see progress tracker) · P6 DONE 2026-09-09 (Run 8: write-atomicity + nav-arg plumbing; Run 9: BuildCommanderDeckUseCase wired into onGenerate, D12/D13 write path, persistence round-trip proof; Run 10: Result/Generating/Review UI for Commander, Studio "Rebuild with the Wizard" CTA + confirm dialog, pop-back nav, item 8 verified by code trace, compose-design-reviewer + android-edge-case-tester passes with fixes applied — see progress tracker Run 10; one flagged-not-fully-closed item: persist()'s 4-call write is not yet one Room transaction, mitigated via a cancel-blocking guard, low real risk while DECK_BUILDER_V2_ENABLED stays false) · P7 DONE 2026-09-09 (Run 11: harness v2
 real-collection segment 180/180 HARD-pass + MockCollectionRich/Thin segments green (1 diagnosed
@@ -28,7 +29,19 @@ weights (evidence, not a default); Edgar Markov MIDRANGE-vs-AGGRO gap diagnosed 
 CommanderPlanResolver's Custom branch, principled fix identified but deferred (would need to rewrite
 a stable, deliberately-tested D6 contract — see progress tracker Run 11 §7.2 for the concrete next
 step); 8 new telemetry keys added, 0 stale keys needed removal (already unreachable for Commander by
-Phase 6's dispatch split) — see progress tracker Run 11) · P8 —`
+Phase 6's dispatch split) — see progress tracker Run 11) · P8 DONE 2026-09-09 (Run 12: F17 fixed —
+`BasicLandDistribution.wastes` + `BasicLandCalculator.allocate`'s colourless-identity branch +
+`BuildCommanderDeckUseCase.materializeBasics`/`nameToColor`, coloured behaviour byte-identical,
+harness's colourless-commander exclusion re-diagnosed to a real collection-sparsity DeckTooSmall
+(59 owned colourless nonland cards, not the land-fill bug) and correctly re-excluded with an
+accurate comment; `persist()` closed to ONE Room `@Transaction`
+(`DeckRepository.persistCommanderBuild` / `DeckDao.persistCommanderBuild`), `isWritingCommanderDeck`
+kept as VM-state defense-in-depth only; cleanup deleted the zero-caller 3-axis `StrategyPickerSheet`
++ `StrategyPickerState` (every other candidate had real live callers, left untouched, see the
+changelog entry below); `DECK_BUILDER_V2_ENABLED` flipped `true` after the full verify gauntlet
+(harness v2 all 3 segments, golden/calibration/corpus/skeleton-differentiation suites
+byte-identical, `:app:assembleDebug`, `:shared:core-domain:compileKotlinWasmJs`) — see the
+changelog for the full breakdown)`
 
 ---
 
@@ -167,8 +180,8 @@ Acceptance bands in force: see plan §5 until P7 replaces them here.
 | F10 | Owned commander candidates capped at 5 | separate `commanderLimit` param on `CollectionProfileUseCase`, default unbounded | **done P3 (2026-09-09)** — the VM's own call site is NOT yet wired to pass it (that's the pick-step UI/VM work, still pending) |
 | F11 | Analysis entry mirrored in 3 places | D2 | **done P0 (2026-09-08)** — `BuildDeckFromTemplateUseCase.recomputeProfile` confirmed NOT a mirror (Motor A's own `DeckScorer.profile()`), left untouched per the plan's escape hatch |
 | — | `EvaluateDeckUseCase` emits a gamification event on every call | `emitProgression` flag | **done P0 (2026-09-08)** |
-| — | `BuildCommanderDeckUseCase.persist()` is 4 sequential non-transactional writes -- a cancellation mid-write (reachable via Studio's "Rebuild with the Wizard" CTA, D12 rebuild-in-place) can leave an existing draft with cards replaced but a stale pin | mitigated: `isWritingCommanderDeck` blocks cancellation once the write starts (Run 10); real fix is one Room `@Transaction` | **mitigated, not closed** — low risk while `DECK_BUILDER_V2_ENABLED=false`; close before Phase 8 flips it |
-| F17 | Colorless-identity commander (e.g. "Page, Loose Leaf") builds a `DeckTooSmall` BLOCKER — `BasicLandCalculator`/`BasicLandDistribution` has no colourless "Wastes" slot at all, so Stage B of `fillLandsV2` allocates zero basics for an empty identity | none this campaign — needs a `BasicLandDistribution` model + Room-schema change, cross-cutting and out of Phase 7's scope | **open, diagnosed P7 (Run 11, harness v2)** — 1/91 real-collection commanders affected; excluded from the harness's HARD gate with a logged, documented carve-out, never silently masked |
+| — | `BuildCommanderDeckUseCase.persist()` is 4 sequential non-transactional writes -- a cancellation mid-write (reachable via Studio's "Rebuild with the Wizard" CTA, D12 rebuild-in-place) can leave an existing draft with cards replaced but a stale pin | `DeckRepository.persistCommanderBuild` (new) is ONE Room `@Transaction` via `DeckDao.persistCommanderBuild` on Android; commonMain default keeps the 4-call fallback for `WebDeckRepository` | **closed P8 (Run 12)** — instrumented Room tests (happy path + genuine FK-violation rollback) added mirroring the existing `replaceAllCardsWithSource` proof; `isWritingCommanderDeck` kept as defense-in-depth for the ViewModel's own in-memory state, not because the DB can land half-written any more |
+| F17 | Colorless-identity commander (e.g. "Page, Loose Leaf") builds a `DeckTooSmall` BLOCKER — `BasicLandCalculator`/`BasicLandDistribution` has no colourless "Wastes" slot at all, so Stage B of `fillLandsV2` allocates zero basics for an empty identity | `BasicLandDistribution.wastes` (new field, folded into `total`/`toMap()`'s `"C"` key) + `BasicLandCalculator.allocate` returns an all-Wastes distribution when `commanderIdentity` is explicitly empty (distinct from `null` = no constraint) + `BuildCommanderDeckUseCase.materializeBasics`/`nameToColor` place Wastes like any other basic. Coloured-identity behaviour byte-identical (verified by the full pre-existing `LandFillV2Test` suite + a new colourless-identity case). | **CLOSED P8 (Run 12)** — land fill itself is fixed (`land_target`/`mana_sources` harness metrics green for "Page, Loose Leaf"). The harness's colourless-commander exclusion STAYS, re-diagnosed to a DIFFERENT, genuine cause: this real collection owns only 59 colourless nonland cards total, well under Commander's ~62-card nonland target once lands are correctly filled — a real MTG color-identity constraint (colourless commander ⇒ colourless cards + Wastes only) colliding with real collection sparsity, not an engine defect, and unfixable without a Scryfall backstop D7 forbids. → memory: `feedback_colourless_commander_deck_size_vs_land_fill`. |
 | F18 | `CommanderPlanResolver.resolve`'s `StrategyPick.Custom` branch always targets the archetype-null generic BELL-shaped baseline skeleton regardless of the commander's own aggression signal, so a fast/cheap/tribal-aggressive Custom build (Edgar Markov) reads MIDRANGE post-build instead of AGGRO | none this campaign — principled fix identified (a bounded build-time archetype hint, tag-then-color, mirroring `InferDeckArchetypeUseCase.commanderMacroPrior`) but deferred: it requires deliberately rewriting `CommanderPlanResolverTest`'s existing "Custom always resolves archetype==null" assertion, a conscious change to D6's stable, explicitly-tested contract, not a side-effect-free bug fix | **open, diagnosed P7 (Run 11)** — root cause confirmed by reading the code (Run 4 only hypothesized it); concrete next step recorded in the progress tracker Run 11 §7.2 |
 
 Known engine debt deliberately NOT touched by this campaign (see ADR-007 "Known debt"): SYNERGY P4
@@ -210,14 +223,19 @@ Things that differ from Commander and are NOT solved by this campaign:
 - User confirmation (non-blocking, defaults in force): preselect the top recommended strategy (yes);
   show Commander-only catalog entries the commander does not signal under "Other plans" (yes).
 - Device runtime check of the build loop on a mid-range phone (plan P6).
-- `CandidatePoolGenerator` (checked P7): still has a live caller — `BuildDeckFromTemplateUseCase`'s
-  Scryfall backstop fill, which only Casual builds ever reach now that Commander dispatches to
-  `BuildCommanderDeckUseCase`. Not dead code; do not delete without first retiring Casual's own
-  build path (60-card wave, §7).
-- F17 (colorless commander land fill) and F18 (Custom macro bias) — see §6, both diagnosed P7 with
-  a concrete next step, neither fixed.
-- `BuildCommanderDeckUseCase.persist()`'s non-transactional 4-write sequence (§6, unchanged since
-  Run 10) — still the one real blocker before `DECK_BUILDER_V2_ENABLED` can safely flip (Phase 8).
+- `CandidatePoolGenerator` (checked P7, re-confirmed P8): still has a live caller —
+  `BuildDeckFromTemplateUseCase`'s Scryfall backstop fill, which only Casual builds ever reach now
+  that Commander dispatches to `BuildCommanderDeckUseCase`. Not dead code; do not delete without
+  first retiring Casual's own build path (60-card wave, §7).
+- **F17 CLOSED P8** (land fill fixed; see §6 for the re-diagnosed residual real-collection-sparsity
+  case, which is not this defect and not fixable within this campaign's D7 scope).
+- **F18 still OPEN** — Custom builds never bias toward a commander's own aggression signal (Edgar
+  Markov resolves MIDRANGE not AGGRO). A principled fix exists but needs a CONSCIOUS ADR-level
+  decision to rewrite `CommanderPlanResolverTest`'s stable "Custom always resolves archetype==null"
+  (D6) assertion — not shipped this campaign. Next session: write the ADR, decide whether D6's
+  contract changes, then implement.
+- **`persist()` atomicity CLOSED P8** — `DeckRepository.persistCommanderBuild` / `DeckDao
+  .persistCommanderBuild` is one real Room `@Transaction`. No open item here any more.
 
 ---
 
@@ -234,7 +252,7 @@ Things that differ from Commander and are NOT solved by this campaign:
 | Section UI | `app/.../feature/decks/presentation/components/CardSectionComponents.kt`, `CuratedStrategyPickerSheet.kt`, `HealthComponents.kt` |
 | Persistence | `shared/core-model/.../Deck.kt`, `DeckRepository`, Room migrations `Migration_x_y.kt`, Supabase `decks` + `batch_upsert_decks` |
 | Harness | `app/src/test/java/com/mmg/manahub/feature/decks/harness/`; fixtures in gitignored `testdata/wizard-harness/` (real user data — never commit) |
-| Legacy (Casual-only after this campaign) | `template/BuildDeckFromTemplateUseCase.kt`, `template/DeckTemplateResolver.kt`, `template/SuggestionCategoryResolver.kt`, `template/MainboardTrimmer.kt`, `usecase/SuggestAddsFromCollectionUseCase.kt` (Motor A), `engine/DeckScorer.kt`, `components/StrategyPickerSheet.kt` (Phase 4, Run 6: confirmed ZERO remaining callers, Casual included — not deleted, per this campaign's own "don't touch it" scope; a future cleanup pass should find it a real caller or delete it) |
+| Legacy (Casual-only after this campaign) | `template/BuildDeckFromTemplateUseCase.kt`, `template/DeckTemplateResolver.kt`, `template/SuggestionCategoryResolver.kt`, `template/MainboardTrimmer.kt`, `usecase/SuggestAddsFromCollectionUseCase.kt` (Motor A), `engine/DeckScorer.kt` — all confirmed to still have real Casual callers (Phase 8, Run 12), left untouched. `components/StrategyPickerSheet.kt` was DELETED in Phase 8 (Run 12) after confirming zero remaining callers; `TribeOption` moved to `CuratedStrategyPickerSheet.kt`. |
 
 ---
 
@@ -450,3 +468,48 @@ Things that differ from Commander and are NOT solved by this campaign:
      (`deck_wizard_include_outside_collection`) never existed as a literal telemetry key to begin
      with (only as a UI-state/string-resource name). Only the 8 ADD items + the already-existing
      `deck_wizard_blocker_after_build` (Phase 2) needed real work.
+- 2026-09-09 — **Phase 8 CLOSED (Run 12) — campaign done.** Full detail in the (now-deleted) plan's
+  final run; headline items future work must know:
+  1. **F17 is fixed, not merely narrowed.** `BasicLandDistribution` gained a `wastes` field;
+     `BasicLandCalculator.allocate` returns an all-Wastes distribution when `commanderIdentity` is
+     an EXPLICITLY EMPTY set (distinct from `null` = no constraint, which keeps its pre-existing
+     empty-distribution behaviour); `BuildCommanderDeckUseCase.materializeBasics`/`nameToColor`
+     place Wastes exactly like any other basic. Coloured-identity behaviour is byte-identical
+     (proven by the full pre-existing `LandFillV2Test` suite passing unchanged plus a new
+     colourless-identity test). **The harness's colourless-commander exclusion was NOT removed** —
+     re-diagnosing it after the fix found a DIFFERENT, genuine cause: this real collection owns only
+     59 colourless nonland cards total (confirmed by direct inspection, not assumed), well under
+     Commander's ~62-card nonland target once lands are correctly filled — a real MTG
+     color-identity constraint (a colourless commander deck can only run colourless cards +
+     Wastes), not an engine defect, and not fixable within D7's collection-only scope. Any future
+     session that sees this exclusion should not assume it means F17 regressed.
+  2. **`persist()` is now genuinely one Room transaction, not a mitigation.**
+     `DeckRepository.persistCommanderBuild` (new interface method, default 4-call fallback for
+     `WebDeckRepository`) is overridden on Android by `DeckDao.persistCommanderBuild`, a `suspend
+     fun` DEFAULT method annotated `@Transaction` that calls the existing blocking
+     (`clearDeckCards`/`upsertDeckCards`) AND suspend (`updateArchetypeOverride`/
+     `updateTribeOverride`/`updateStrategyLocked`) abstract DAO methods directly — Room supports
+     mixing suspend-ness inside one suspend `@Transaction` default method without `runBlocking`.
+     `isWritingCommanderDeck` was kept (not removed) as defense-in-depth for the ViewModel's OWN
+     in-memory state, since a coroutine cancellation can still race `withContext(ioDispatcher)`
+     even though the DB itself can no longer land half-written.
+  3. **Cleanup found far less genuinely-dead code than the plan assumed.** Grepping for callers
+     before deleting anything found that `DeckTemplateResolver`'s Commander branch,
+     `runScryfallBackstopLoop`, `MainboardTrimmer`, `ManualAddsStepContent
+     .buildRoleSections`/`OutsideCollectionToggleRow`, `includeOutsideCollection`, and
+     `CandidatePoolGenerator` ALL have real, live callers — Casual's own build path (explicitly
+     out of scope, "Casual-only code stays") or existing test coverage
+     (`DeckTemplateResolverTest`, `P0BaselineTest`). None of it was touched. The ONE genuine
+     zero-caller deletion was the old 3-axis `StrategyPickerSheet.kt` + its commonMain backing
+     `StrategyPickerState.kt`/test (superseded by `CuratedStrategyPickerSheet` since Phase 3;
+     only their own `@Preview` referenced them). `TribeOption` — a plain (key, label) shape that
+     data class also happened to define — moved to `CuratedStrategyPickerSheet.kt`, its real
+     surviving consumer group.
+  4. **`DECK_BUILDER_V2_ENABLED` is `true` in production as of this run**, gated on the FULL verify
+     gauntlet passing first: harness v2 (real-collection 90/90 + both mock segments),
+     `DeckAnalysisEngineGoldenTest`/`DeckAnalysisEngineCalibrationTest`/`DeckAnalysisV3CorpusTest`/
+     `SkeletonDifferentiationTest` byte-identical (0 failures each), `:app:assembleDebug`,
+     `:shared:core-domain:compileKotlinWasmJs`. The only red tests anywhere in the affected surface
+     are the 4 pre-existing ones documented at the top of this campaign (3 `SectionSearchQueryTest`
+     + 1 `DeckWizardViewModelTest` taxonomy-toggle case) — confirmed still red at the pre-campaign
+     base commit, not a regression.
