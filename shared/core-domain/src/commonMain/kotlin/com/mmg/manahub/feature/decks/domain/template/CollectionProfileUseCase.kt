@@ -57,7 +57,22 @@ class CollectionProfileUseCase(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
 
-    suspend operator fun invoke(collection: List<Card>, limit: Int = DEFAULT_LIMIT): CollectionProfile =
+    /**
+     * @param limit caps [CollectionProfile.dominantStrategies]/[CollectionProfile.dominantTribes]
+     *        (small tappable-suggestion lists on the wizard's Direction step — a real cap, unrelated
+     *        to F10 below).
+     * @param commanderLimit Deck Wizard Commander v3 plan (Phase 3.1, F10): [CollectionProfile
+     *        .commanderCandidates] gets its OWN, separately-defaulted cap — unbounded by default —
+     *        instead of silently sharing [limit]'s small default. The R2 commander pick step shows
+     *        EVERY eligible owned commander (93 on the real collection, not the old 5-row
+     *        `LazyRow`); a caller that genuinely wants a short list (a "suggested commanders" widget,
+     *        say) can still pass a small value explicitly.
+     */
+    suspend operator fun invoke(
+        collection: List<Card>,
+        limit: Int = DEFAULT_LIMIT,
+        commanderLimit: Int = Int.MAX_VALUE,
+    ): CollectionProfile =
         withContext(ioDispatcher) {
             // Dedupe by NAME, not scryfallId: two different printings of the same card (a regular
             // + a foil/promo copy, see project_card_versions_languages memory) are ONE real card to
@@ -71,7 +86,7 @@ class CollectionProfileUseCase(
                 colorShares = colorShares(distinct),
                 dominantStrategies = dominantStrategies(distinct, limit),
                 dominantTribes = dominantTribes(distinct, limit),
-                commanderCandidates = commanderCandidates(distinct, limit),
+                commanderCandidates = commanderCandidates(distinct, commanderLimit),
             )
         }
 
