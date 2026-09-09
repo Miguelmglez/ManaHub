@@ -9,6 +9,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.domain.repository.CardSlotWrite
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
@@ -503,6 +504,15 @@ class DeckWizardViewModel(
      * clean up a partial build instead of orphaning an empty draft. */
     private var pendingDeckId: String? = null
 
+    /** Deck Wizard Commander v3 plan (Phase 6, D12): the deckId nav arg (Screen.DeckWizard
+     * .createRoute) when the wizard was launched from an existing Deck Studio draft (Studio's own
+     * wizard CTA, not yet built). NOT YET consumed by [onGenerate]/[writeResultIntoNewDeck] -- the
+     * write path still always creates a brand-new deck regardless of this value; wiring it to write
+     * into THIS existing deck (and to pop back to Studio instead of pushing a second entry) is
+     * tracked as remaining Phase 6 work, not done this run. Read once, at init, and kept only so a
+     * future change has it available without touching SavedStateHandle plumbing again. */
+    private var launchedFromDeckId: String? = null
+
     init {
         // Discoveries v2 "Build this" hand-off (D11) — optional, all blank by default. Deck Engine
         // Unification (D2): nav args carry the unified taxonomy directly (raw ArchetypeId/ThemeId
@@ -534,6 +544,19 @@ class DeckWizardViewModel(
         }
         if (seedsArg.isNotEmpty()) {
             _uiState.update { it.copy(entryFlow = WizardEntryFlow.CARDS) }
+        }
+
+        // Deck Wizard Commander v3 plan (Phase 6, D12/6.1): a "format" arg (Deck Studio's own
+        // wizard CTA, not yet built) preselects the format and skips the FORMAT step entirely --
+        // FormatStepContent stays the fallback for every other entry point above, which never pass
+        // this arg. Reuses onSelectFormat/onNextFromFormat rather than duplicating their phase
+        // transition logic.
+        val formatArg = savedStateHandle.get<String?>("format")?.takeIf { it.isNotEmpty() }
+            ?.let { name -> DeckFormat.entries.firstOrNull { it.name == name } }
+        launchedFromDeckId = savedStateHandle.get<String?>("deckId")?.takeIf { it.isNotEmpty() }
+        if (formatArg != null) {
+            onSelectFormat(formatArg)
+            onNextFromFormat()
         }
 
         viewModelScope.launch {
@@ -1273,7 +1296,7 @@ class DeckWizardViewModel(
         val isCommander = _uiState.value.selectedFormat?.isCommanderFormat == true
         _uiState.update { state ->
             val remaining = state.seedCards.filterNot { s -> s.scryfallId == card.scryfallId }
-            if (remaining.isEmpty()) {
+            if (remaining.isEmpty() && !isCommander) {
                 // Fix 6 (edge-case audit, 2026-07-28): removing the LAST seed must also clear any
                 // strategy pick that was justified by it -- otherwise the visible strategy-candidate
                 // list recomputes to empty (recomputeSeedStrategySuggestion below, nothing left to
@@ -1283,6 +1306,11 @@ class DeckWizardViewModel(
                 // recomputeSeedLockedColors' own contract is additive-only ("removing a seed unlocks
                 // its color, but the color itself stays picked until manually deselected"); only the
                 // ARCHETYPE/THEME/TRIBE pick is unjustified by an empty seed list, not the colors.
+                //
+                // Deck Wizard Commander v3 plan (Phase 6, Run 7 follow-up finding): this rule is
+                // CASUAL-ONLY (`!isCommander` above). For Commander, the strategy pick is an explicit
+                // user choice made on its OWN step (STRATEGY), never inferred from manual adds --
+                // removing the last Plan Sections manual add must never silently clear it.
                 state.copy(
                     seedCards = remaining,
                     selectedArchetype = null,
@@ -1970,13 +1998,23 @@ class DeckWizardViewModel(
                     created.copy(commanderCardId = commander.scryfallId, coverCardId = commander.scryfallId)
                 )
             }
-            // BUG-1 fix: insert the commander as a qty-1 mainboard entry — see this method's KDoc.
-            deckRepository.addCardToDeck(deckId, commander.scryfallId, 1, false, DeckCardSource.WIZARD)
         }
 
-        result.deckCards.forEach { entry ->
-            deckRepository.addCardToDeck(deckId, entry.card.scryfallId, entry.quantity, entry.isSideboard, DeckCardSource.WIZARD)
+        // Deck Wizard Commander v3 plan (Phase 6, D12): ONE atomic write for the commander (BUG-1's
+        // qty-1 mainboard row, still folded in here) plus every result.deckCards entry, instead of
+        // the old clearDeck-free per-card addCardToDeck loop -- this is a freshly-created empty deck
+        // so there is nothing to preserve on a mid-write failure, but the write itself is now a
+        // single Room transaction rather than N independent ones (see DeckRepositoryImpl
+        // .replaceAllCardsWithSource's KDoc).
+        val slots = buildList {
+            if (spec.format.isCommanderFormat && commander != null) {
+                add(CardSlotWrite(commander.scryfallId, 1, false, DeckCardSource.WIZARD))
+            }
+            result.deckCards.forEach { entry ->
+                add(CardSlotWrite(entry.card.scryfallId, entry.quantity, entry.isSideboard, DeckCardSource.WIZARD))
+            }
         }
+        deckRepository.replaceAllCardsWithSource(deckId, slots)
         deckRepository.updateArchetypeOverride(deckId, result.archetypeOverride, result.themesOverride)
         deckRepository.updateTribeOverride(deckId, spec.strategyProfile.tribe)
         deckRepository.updateStrategyLocked(deckId, true)

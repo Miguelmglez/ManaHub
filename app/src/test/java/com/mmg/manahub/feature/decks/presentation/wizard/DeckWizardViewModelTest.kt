@@ -536,6 +536,26 @@ class DeckWizardViewModelTest {
     @Test
     fun `PLAN_SECTIONS -- entering the step (onNextFromStrategy) recomputes planAnalysis`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        // The shared setUp() default stub returns DeckHealth(analysis = null) on purpose (the
+        // "degraded" case) -- this test needs a REAL non-null DeckAnalysis to prove the field
+        // actually gets populated, so it re-stubs with one for this test only.
+        val realAnalysis = com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis(
+            totalScore = 80,
+            pillars = emptyList(),
+            strategy = com.mmg.manahub.feature.decks.domain.engine.ResolvedStrategyInfo(
+                curatedStrategyId = null,
+                displayName = "Custom",
+                archetype = null,
+                themes = emptyList(),
+                isManualOverride = false,
+                confidence = 0f,
+            ),
+            limiter = com.mmg.manahub.feature.decks.domain.engine.ScoreLimiter.None,
+        )
+        coEvery {
+            deckAnalysisPipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns DeckHealth(evaluation = mockk(relaxed = true), profile = mockk(relaxed = true), analysis = realAnalysis)
+
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.COMMANDER)
@@ -548,7 +568,7 @@ class DeckWizardViewModelTest {
         vm.onNextFromStrategy()
         advanceUntilIdle()
 
-        assertNotNull(vm.uiState.value.planAnalysis)
+        assertEquals(realAnalysis, vm.uiState.value.planAnalysis)
         coVerify(atLeast = 1) {
             deckAnalysisPipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(false), any(), any())
         }
@@ -625,6 +645,19 @@ class DeckWizardViewModelTest {
     @Test
     fun `PLAN_SECTIONS -- an unowned manual add is still kept, flagged isOwned = false in the analyzed mainboard`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        // recomputePlanAnalysis fires more than once in this scenario (step entry + the manual
+        // add) -- a single mockk `slot` only ever keeps the LAST invocation's argument and mockk
+        // refuses to `coVerify { capture(slot) }` against more than one matching call, so every
+        // mainboard this mock is called with is recorded into a list instead (the error message's
+        // own recommended pattern).
+        val capturedMainboards = mutableListOf<List<DeckEntry>>()
+        coEvery {
+            deckAnalysisPipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } coAnswers {
+            capturedMainboards += firstArg<List<DeckEntry>>()
+            DeckHealth(evaluation = mockk(relaxed = true), profile = mockk(relaxed = true))
+        }
+
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.COMMANDER)
@@ -640,9 +673,7 @@ class DeckWizardViewModelTest {
         advanceUntilIdle()
 
         assertTrue(vm.uiState.value.seedCards.any { it.scryfallId == unownedCard.scryfallId })
-        val mainboardSlot = slot<List<DeckEntry>>()
-        coVerify { deckAnalysisPipeline.analyze(capture(mainboardSlot), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
-        val entry = mainboardSlot.captured.first { it.card.scryfallId == unownedCard.scryfallId }
+        val entry = capturedMainboards.last().first { it.card.scryfallId == unownedCard.scryfallId }
         assertFalse(entry.isOwned)
     }
 
@@ -1019,6 +1050,35 @@ class DeckWizardViewModelTest {
         assertEquals(setOf(ManaColor.B, ManaColor.R), state.colorIdentity)
     }
 
+    // ── Deck Wizard Commander v3 plan (Phase 6, D12/6.1): format/deckId nav args ─
+
+    @Test
+    fun `a format nav arg preselects the format and skips the FORMAT step, landing on COMMANDER_PICK for Commander`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        val state = vm.uiState.value
+        assertEquals(DeckFormat.COMMANDER, state.selectedFormat)
+        assertEquals(WizardPhase.COMMANDER_PICK, state.phase)
+    }
+
+    @Test
+    fun `a format nav arg for CASUAL preselects the format and lands on ENTRY`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "CASUAL"))
+        advanceUntilIdle()
+        val state = vm.uiState.value
+        assertEquals(DeckFormat.CASUAL, state.selectedFormat)
+        assertEquals(WizardPhase.ENTRY, state.phase)
+    }
+
+    @Test
+    fun `no format nav arg leaves the wizard on the FORMAT step as before`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        val state = vm.uiState.value
+        assertEquals(null, state.selectedFormat)
+        assertEquals(WizardPhase.FORMAT, state.phase)
+    }
+
     // ── Combo "Use as seed" hand-off (Deck Engine Unification plan D7, 4.3) ──
 
     @Test
@@ -1134,7 +1194,12 @@ class DeckWizardViewModelTest {
         assertEquals(WizardPhase.RESULT, state.phase)
         assertEquals("wizard-deck-1", state.createdDeckId)
         assertEquals(result, state.buildResult)
-        coVerify { deckRepository.addCardToDeck("wizard-deck-1", "spell-1", 2, false, DeckCardSource.WIZARD) }
+        coVerify {
+            deckRepository.replaceAllCardsWithSource(
+                "wizard-deck-1",
+                listOf(com.mmg.manahub.core.domain.repository.CardSlotWrite("spell-1", 2, false, DeckCardSource.WIZARD)),
+            )
+        }
         coVerify { deckRepository.updateArchetypeOverride("wizard-deck-1", null, emptyList()) }
         // D4: every wizard build pins strategyLocked=true and writes the (here absent) tribe pin.
         coVerify { deckRepository.updateTribeOverride("wizard-deck-1", null) }
@@ -1167,8 +1232,15 @@ class DeckWizardViewModelTest {
         assertEquals(WizardPhase.RESULT, vm.uiState.value.phase)
         // BUG-1: DeckStudioViewModel.rebuildUiState resolves the commander from the deck's ENTRIES
         // (allEntries.find { it.scryfallId == commanderId }), not from Deck.commanderCardId alone --
-        // without this write the commander was invisible in the built deck.
-        coVerify { deckRepository.addCardToDeck("wizard-deck-1", "cmd-1", 1, false, DeckCardSource.WIZARD) }
+        // without this write the commander was invisible in the built deck. Since the D12 atomicity
+        // fix, the commander's qty-1 entry is the FIRST slot in the one replaceAllCardsWithSource
+        // call, not a separate addCardToDeck call.
+        coVerify {
+            deckRepository.replaceAllCardsWithSource(
+                "wizard-deck-1",
+                listOf(com.mmg.manahub.core.domain.repository.CardSlotWrite("cmd-1", 1, false, DeckCardSource.WIZARD)),
+            )
+        }
     }
 
     @Test
@@ -1197,8 +1269,11 @@ class DeckWizardViewModelTest {
         vm.onGenerate()
         advanceUntilIdle()
 
-        // 99 deckCards writes + 1 commander write = 100 total addCardToDeck calls for this build.
-        coVerify(exactly = 100) { deckRepository.addCardToDeck("wizard-deck-1", any(), any(), any(), any()) }
+        // 99 deckCards slots + 1 commander slot = 100 total, all in ONE replaceAllCardsWithSource
+        // call (D12 atomicity fix).
+        val slotsSlot = slot<List<com.mmg.manahub.core.domain.repository.CardSlotWrite>>()
+        coVerify { deckRepository.replaceAllCardsWithSource("wizard-deck-1", capture(slotsSlot)) }
+        assertEquals(100, slotsSlot.captured.size)
     }
 
     @Test
@@ -1289,14 +1364,14 @@ class DeckWizardViewModelTest {
 
     @Test
     fun `retrying after a partial-write failure deletes the orphaned deck before the next generate`() = runTest(dispatcher) {
-        // The build succeeds, but the per-card write inside writeResultIntoNewDeck throws AFTER
+        // The build succeeds, but the atomic write inside writeResultIntoNewDeck throws AFTER
         // createDeck() already ran -- pendingDeckId is set to the dangling row.
         val entry = DeckEntry(card = card(id = "spell-1", name = "Forest Spell"), quantity = 1, isOwned = true)
         val result = buildResult(deckCards = listOf(entry))
         coEvery { buildDeckFromTemplateUseCase(any(), any()) } returns flow {
             emit(TemplateBuildProgress.Complete(result))
         }
-        coEvery { deckRepository.addCardToDeck(any(), any(), any(), any(), any()) } throws RuntimeException("write boom")
+        coEvery { deckRepository.replaceAllCardsWithSource(any(), any()) } throws RuntimeException("write boom")
 
         val vm = viewModel()
         advanceUntilIdle()
@@ -1334,9 +1409,9 @@ class DeckWizardViewModelTest {
         coEvery { buildDeckFromTemplateUseCase(any(), any()) } returns flow {
             emit(TemplateBuildProgress.Complete(result))
         }
-        // addCardToDeck suspends forever -- lets the test cancel mid-write, AFTER the deck row was
-        // already created (pendingDeckId set), verifying the orphan-cleanup delete fires.
-        coEvery { deckRepository.addCardToDeck(any(), any(), any(), any(), any()) } coAnswers { awaitCancellation() }
+        // replaceAllCardsWithSource suspends forever -- lets the test cancel mid-write, AFTER the
+        // deck row was already created (pendingDeckId set), verifying the orphan-cleanup delete fires.
+        coEvery { deckRepository.replaceAllCardsWithSource(any(), any()) } coAnswers { awaitCancellation() }
 
         val vm = viewModel()
         advanceUntilIdle()
@@ -1558,6 +1633,36 @@ class DeckWizardViewModelTest {
             "onNextFromDirection must NOT advance past DIRECTION on a cleared/stale strategy pick",
             WizardPhase.DIRECTION, vm.uiState.value.phase,
         )
+    }
+
+    @Test
+    fun `Commander -- removing the LAST manual add does NOT clear the strategy pick (Run 7 follow-up finding)`() = runTest(dispatcher) {
+        // Fix 6's Casual rule above is deliberately NOT applied to Commander: the strategy pick is
+        // an explicit user choice made on its own STRATEGY step, never inferred from manual adds --
+        // removing every Plan Sections manual add must leave it untouched.
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander) // identity = {G}
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        val tokensStrategy = CuratedStrategyCatalog.byId("tokens")!!
+        vm.onSelectCommanderStrategy(tokensStrategy)
+        vm.onNextFromStrategy()
+        advanceUntilIdle()
+
+        val onlyManualAdd = card(id = "manual-1", name = "Manual Add", colorIdentity = listOf("G"))
+        vm.onAddSeed(onlyManualAdd)
+        assertEquals(listOf(onlyManualAdd), vm.uiState.value.seedCards)
+
+        vm.onRemoveSeed(onlyManualAdd)
+
+        assertTrue(vm.uiState.value.seedCards.isEmpty())
+        assertEquals("tokens", vm.uiState.value.selectedCuratedStrategyId)
+        assertEquals(ArchetypeId.AGGRO, vm.uiState.value.selectedArchetype)
+        assertEquals(listOf(ThemeId.TOKENS), vm.uiState.value.selectedStrategyThemes)
     }
 
     @Test

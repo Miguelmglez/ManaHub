@@ -85,7 +85,9 @@ sealed class Screen(val route: String) {
      * [com.mmg.manahub.feature.decks.domain.engine.ManaColor] symbol string (e.g. "WU"). All blank
      * by default (a plain "Build from seed" entry point passes none).
      */
-    object DeckWizard : Screen("deck/wizard?archetype={archetype}&theme={theme}&tribe={tribe}&colors={colors}&seeds={seeds}") {
+    object DeckWizard : Screen(
+        "deck/wizard?archetype={archetype}&theme={theme}&tribe={tribe}&colors={colors}&seeds={seeds}&format={format}&deckId={deckId}"
+    ) {
         const val baseRoute = "deck/wizard"
 
         /**
@@ -96,6 +98,14 @@ sealed class Screen(val route: String) {
          *   init for the matching `split("|")`. When present, forces the wizard's Flow A
          *   (cards-first) entry, mirroring how [archetype]/[theme]/[tribe]/[colors] force Flow
          *   B/C's picks.
+         * @param format Deck Wizard Commander v3 plan (Phase 6, D12) — a raw
+         *   [com.mmg.manahub.core.model.DeckFormat] enum name. When present, the wizard skips its
+         *   own FORMAT step (`FormatStepContent` is kept only as the fallback for the no-arg entry
+         *   points above). Deck Studio's wizard CTA always passes this.
+         * @param deckId Deck Wizard Commander v3 plan (Phase 6, D12) — the id of the draft the
+         *   wizard was launched FROM. When present, the wizard's atomic write targets this deck
+         *   (never creates a new one) and, on finish, pops back to the Studio destination that
+         *   launched it instead of creating a second Studio back-stack entry.
          */
         fun createRoute(
             archetype: String? = null,
@@ -103,6 +113,8 @@ sealed class Screen(val route: String) {
             tribe: String? = null,
             colors: String? = null,
             seeds: List<String>? = null,
+            format: String? = null,
+            deckId: String? = null,
         ): String {
             val params = mutableListOf<String>()
             if (!archetype.isNullOrEmpty()) params += "archetype=${Uri.encode(archetype)}"
@@ -110,6 +122,8 @@ sealed class Screen(val route: String) {
             if (!tribe.isNullOrEmpty()) params += "tribe=${Uri.encode(tribe)}"
             if (!colors.isNullOrEmpty()) params += "colors=${Uri.encode(colors)}"
             if (!seeds.isNullOrEmpty()) params += "seeds=${Uri.encode(seeds.joinToString("|"))}"
+            if (!format.isNullOrEmpty()) params += "format=${Uri.encode(format)}"
+            if (!deckId.isNullOrEmpty()) params += "deckId=${Uri.encode(deckId)}"
             return if (params.isEmpty()) baseRoute else "$baseRoute?${params.joinToString("&")}"
         }
     }

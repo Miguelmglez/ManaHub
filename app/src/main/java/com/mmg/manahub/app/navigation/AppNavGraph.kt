@@ -754,8 +754,17 @@ fun AppNavGraph(
                     navArgument("tribe") { type = NavType.StringType; defaultValue = ""; nullable = false },
                     navArgument("colors") { type = NavType.StringType; defaultValue = ""; nullable = false },
                     navArgument("seeds") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                    navArgument("format") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                    navArgument("deckId") { type = NavType.StringType; defaultValue = ""; nullable = false },
                 ),
             ) {
+                // Deck Wizard Commander v3 plan (Phase 6, D12): the "format"/"deckId" nav args
+                // (Screen.DeckWizard.createRoute) are read by DeckWizardViewModel to preselect the
+                // format and skip the FORMAT step. NOTE -- popping back to the Studio entry that
+                // launched the wizard (instead of navigate+popUpTo pushing a second one) needs
+                // writeResultIntoNewDeck to actually target that existing deckId first; that half of
+                // D12 is NOT wired yet (tracked in the progress doc), so onOpenDeckStudio still always
+                // navigates to a freshly-created deck below.
                 DeckWizardScreen(
                     onBack = { navController.popBackStack() },
                     onOpenDeckStudio = { deckId ->
