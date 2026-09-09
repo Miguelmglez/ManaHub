@@ -55,15 +55,14 @@ object CommanderMatrixV2 {
         val owned = ownedPool(fixtures)
         val candidates = fixtures.commanderCandidates
             .filter { HarnessMetricsCalculator.isLegal(it, DeckFormat.COMMANDER) }
-            // A purely colorless commander (e.g. "Page, Loose Leaf", color_identity = []) hits a
-            // PRE-EXISTING, out-of-campaign-scope engine gap: BasicLandDistribution/LAND_FOR_COLOR
-            // (core/domain/usecase/decks/BasicLandCalculator.kt) has no colourless "Wastes" slot at
-            // all -- BuildCommanderDeckUseCase.fillLandsV2's Stage B allocates ZERO basics for an
-            // empty identity, so the build reports a real BLOCKER (DeckTooSmall) that is a genuine,
-            // discovered defect in the SHARED land-basics model, not something Phase 7's placement/
-            // calibration work touches or can fix without a cross-cutting BasicLandDistribution/
-            // Room-schema change. Excluded here with this note; recorded as engine debt in the state
-            // doc rather than silently masked or force-passed. 1 of 93 real-collection commanders.
+            // F17 IS fixed: a purely colorless commander (e.g. "Page, Loose Leaf") now gets a proper
+            // Wastes fill (BasicLandCalculator.allocate + BuildCommanderDeckUseCase.materializeBasics)
+            // -- land_target/mana_sources are green. What remains excluded here is a DIFFERENT,
+            // genuine limitation, not an engine defect: real MTG color-identity rules mean a
+            // colourless commander deck can ONLY contain colourless cards (+ Wastes) -- this real
+            // collection owns only 59 such nonland cards total, well under the ~62-card nonland
+            // target, so DeckTooSmall (a real BLOCKER) is unavoidable without a Scryfall backstop,
+            // which D7 forbids by design. Confirmed by direct collection inspection, not assumed.
             .filterNot { it.colorIdentity.isEmpty() }
             .distinctBy { it.name }
             .sortedBy { it.name }

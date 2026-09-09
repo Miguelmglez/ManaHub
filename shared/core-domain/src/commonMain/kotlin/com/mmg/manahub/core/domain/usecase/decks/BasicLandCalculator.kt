@@ -100,10 +100,17 @@ object BasicLandCalculator {
 
         val totalWeight = colorWeights.values.sum()
 
-        // If no weights (e.g. all colorless or all cards filtered out), 
-        // we fallback to equal distribution if we have a commander identity, 
+        // If no weights (e.g. all colorless or all cards filtered out),
+        // we fallback to equal distribution if we have a commander identity,
         // or return empty if no weights at all and no identity.
         if (totalWeight == 0) {
+            // F17: a commander with a TRULY colourless identity (color_identity == []) has no WUBRG
+            // colour to distribute basics across at all -- every basic slot becomes Wastes. Distinct
+            // from `commanderIdentity == null` (no commander constraint, e.g. a 60-card build),
+            // which keeps its pre-existing empty-distribution behaviour untouched.
+            if (commanderIdentity != null && commanderIdentity.isEmpty()) {
+                return BasicLandDistribution(wastes = basicSlotsAvailable)
+            }
             return if (commanderIdentity != null && commanderIdentity.isNotEmpty()) {
                 val allowedColors = commanderIdentity.filter { it in LAND_FOR_COLOR.keys }
                 if (allowedColors.isEmpty()) return BasicLandDistribution()

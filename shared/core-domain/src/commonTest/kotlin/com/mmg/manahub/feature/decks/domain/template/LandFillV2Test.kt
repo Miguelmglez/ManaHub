@@ -216,4 +216,23 @@ class LandFillV2Test {
         val islands = outcome.result.entries.filter { it.card.name == "Island" }.sumOf { it.quantity }
         assertEquals(0, kotlin.math.abs(plains - islands).let { if (it <= 1) 0 else it }, "Phyrexian-only pips must not skew the basic split beyond a rounding remainder, got $plains Plains / $islands Islands")
     }
+
+    // ── F17: a truly colourless identity must fill with Wastes, never zero basics ────────────────
+    @Test
+    fun `colourless identity fills every basic slot with Wastes`() = runTest {
+        val useCase = newUseCase()
+        val commander = card(id = "cmd-colourless", name = "Page, Loose Leaf", typeLine = "Legendary Creature", cmc = 2.0, colors = emptyList(), colorIdentity = emptyList(), manaCost = "{2}")
+        val owned = listOf(
+            OwnedCard(commander, 1),
+            OwnedCard(card(id = "basic-wastes", name = "Wastes", typeLine = "Basic Land", cmc = 0.0, colors = emptyList(), colorIdentity = emptyList(), producedMana = "C"), quantity = 40),
+        )
+
+        val outcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, emptySet(), owned)
+
+        // Only the commander + Wastes are owned in this fixture (no nonland candidates), so the
+        // build is deliberately thin -- DeckTooSmall is expected here and orthogonal to F17. The
+        // fix under test is that basic-land fill no longer allocates ZERO for a colourless identity.
+        val wastes = outcome.result.entries.filter { it.card.name == "Wastes" }.sumOf { it.quantity }
+        assertTrue(wastes > 0, "a colourless commander with owned Wastes must fill basics with Wastes, got $wastes")
+    }
 }

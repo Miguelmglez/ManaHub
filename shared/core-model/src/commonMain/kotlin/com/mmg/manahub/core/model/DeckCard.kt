@@ -14,8 +14,10 @@ data class BasicLandDistribution(
     val swamps: Int = 0,
     val mountains: Int = 0,
     val forests: Int = 0,
+    // F17 fix (Deck Wizard Commander v3): Wastes for a colourless commander identity.
+    val wastes: Int = 0,
 ) {
-    val total: Int get() = plains + islands + swamps + mountains + forests
+    val total: Int get() = plains + islands + swamps + mountains + forests + wastes
 
     fun toMap(): Map<String, Int> = mapOf(
         "W" to plains,
@@ -23,5 +25,6 @@ data class BasicLandDistribution(
         "B" to swamps,
         "R" to mountains,
         "G" to forests,
+        "C" to wastes,
     ).filter { it.value > 0 }
 }

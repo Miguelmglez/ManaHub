@@ -492,6 +492,7 @@ class BuildCommanderDeckUseCase(
         "Swamp" -> ManaColor.B
         "Mountain" -> ManaColor.R
         "Forest" -> ManaColor.G
+        "Wastes" -> ManaColor.C
         else -> ManaColor.C
     }
 
@@ -502,6 +503,7 @@ class BuildCommanderDeckUseCase(
             "Swamp" to distribution.swamps,
             "Mountain" to distribution.mountains,
             "Forest" to distribution.forests,
+            "Wastes" to distribution.wastes,
         )
 
     /** Stage C (D10): moves up to [KARSTEN_REBALANCE_CAP] basic-land copies from the
