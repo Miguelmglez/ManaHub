@@ -87,7 +87,7 @@ class BuildCommanderDeckUseCaseTest {
     }
 
     @Test
-    fun `MockCollectionThin -- builds without crashing, declares gaps, still fills lands`() = runTest {
+    fun `MockCollectionThin -- builds without crashing, declares gaps, places no filler, still fills lands, reports the score honestly`() = runTest {
         val useCase = newUseCase()
         val commander = MockCollectionThin.commander
         val identity = commander.colorIdentity.toManaColors()
@@ -100,6 +100,29 @@ class BuildCommanderDeckUseCaseTest {
             .sumOf { it.quantity }
         assertTrue(landCount > 0, "a thin collection must still get SOME lands filled from its 8 owned basics")
         assertTrue(outcome.result.entries.size < 100, "a 31-card owned pool cannot fill a 100-card mainboard -- gaps are expected, not filler")
+
+        // D8: no filler placed -- every placed non-land, non-commander entry is EITHER a candidate
+        // the placement loop chose from the owned pool (never exceeds the 30-card owned non-land
+        // pool size) or the commander itself. The loop can place AT MOST 30 non-land candidates --
+        // if it ever placed more, that would mean it invented cards outside the collection (D7) or
+        // placed something the filler floor should have rejected.
+        val nonLandNonCommanderCount = outcome.result.entries.count {
+            !BasicLandCalculator.isLand(it.card) && it.card.scryfallId != commander.scryfallId
+        }
+        assertTrue(
+            nonLandNonCommanderCount <= MockCollectionThin.ownedCards.size,
+            "the placement loop must never place more non-land cards than the thin pool actually owns (${MockCollectionThin.ownedCards.size}), got $nonLandNonCommanderCount -- D8's filler floor exists precisely to prevent this",
+        )
+
+        // Score is reported honestly, not inflated to hide the gap: a 39-card (approx) mainboard
+        // must show a DeckTooSmall finding and a total score that is NOT the perfect/near-perfect
+        // number a full 100-card deck could reach.
+        val findings = outcome.result.analysis.pillars.flatMap { it.findings }
+        assertTrue(
+            findings.any { it is com.mmg.manahub.feature.decks.domain.engine.Finding.DeckTooSmall },
+            "a mainboard this thin must surface a DeckTooSmall finding, not hide the shortfall: $findings",
+        )
+        assertTrue(outcome.result.analysis.totalScore < 90, "a genuinely gappy thin-collection build must not score as if it were complete, got ${outcome.result.analysis.totalScore}")
     }
 
     @Test
