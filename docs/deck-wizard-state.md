@@ -5,8 +5,8 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-10 (v4 campaign, Run 2 — W2 done; see `docs/plans/deck-wizard-commander-v4-progress.md`
-for the full per-item log, gitignored).
+**Last updated:** 2026-09-10 (v4 campaign, Run 3 — W3 + W4.1/W4.4 done; see
+`docs/plans/deck-wizard-commander-v4-progress.md` for the full per-item log, gitignored).
 **Owning plan (v3, shipped):** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the
 AI-planning-doc rule now that the campaign has shipped; this file is the durable record that
 survives. **v4 (active):** `docs/plans/deck-wizard-commander-v4-plan.md` (gitignored).
@@ -57,7 +57,30 @@ Two commits: `c6fa39fe` (W2.1/W2.2/W2.3 implementation) + `28693576` (compose-de
   `pre-push-security-gate` PASS before each commit; golden/corpus/calibration/skeleton suites
   untouched (no `shared/` scoring code touched this run).
 
-Remaining v4 workstreams (W3-W8) are NOT started.
+## v4 — Run 3 (2026-09-10): W3 (strategy step) + W4.1/W4.4 (visual half of plan sections)
+
+Two commits: `40adaccc` (W3 engine — `RecommendCommanderStrategiesUseCase.splitRecommended`) +
+`57a6d61f` (W3 UI + W4.1 category nav + W4.4 ring/label fix + design-review fixes).
+- **W3 (G4/E3, R4):** Recommended is now score-threshold-gated (absolute noise floor `1.0`,
+  calibrated from the real fixture score distribution — a zero-signal commander tops out at `0.9`
+  from color affinity alone; relative top-of-range fraction `0.2`) plus a hard cap of 5, replacing
+  the old `take(6)` cosmetic split. "Other plans" renamed "Partial fit". A commander with no real
+  signal now yields a SHORT (possibly empty) Recommended list instead of 5 padded color-affinity
+  ties — verified empty for a from-scratch Urza (no owned collection, no tags, no EDHREC).
+- **W4.1 (G5/R5):** the plan step's category navigation reuses the Analysis tab's own `PillarTile`
+  single-select row verbatim — one overview row, one active category's sections below, replacing
+  the old always-all-expanded flat list.
+- **W4.4 (G8b/E2):** the section ring now shows the SAME metric as its label (progress toward
+  ideal, clamped at 1.0, never shrinking); over-ideal reads as an explicit `goldMtg` tone, an
+  anti-role over max stays an immediate `lifeNegative` alert — both render a FULL ring now, never a
+  shrinking one. Math extracted to a plain, unit-tested `sectionRingState()`.
+- W4.2 (Browse coverage for every `role:*` section, the 3 long-red `SectionSearchQueryTest` cases),
+  W4.2b (G14 Collection/Scryfall parity audit) and W4.3 (Browse loading state) are the SEPARATE
+  "search half of W4" — not started, not this run's scope.
+- Full detail (threshold derivation, actual per-fixture Recommended lists, design-review findings +
+  fixes): `docs/plans/deck-wizard-commander-v4-progress.md` Run 3 (gitignored).
+
+Remaining v4 workstreams (W4.2/W4.2b/W4.3, W5-W8) are NOT started.
 
 ## v4 — Run 1 (2026-09-10): W0 + W1
 
