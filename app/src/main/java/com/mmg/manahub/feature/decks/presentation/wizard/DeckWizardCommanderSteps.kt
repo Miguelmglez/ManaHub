@@ -48,6 +48,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
@@ -63,6 +65,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -686,11 +689,19 @@ private fun PartialFitToggle(expanded: Boolean, subtitle: String?, onToggle: () 
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
+    // Task 0 / P2 (design review): relying on the label text alone ("Partial fit" <-> "Hide
+    // partial fit") to convey expand/collapse state gives TalkBack no distinct state signal --
+    // stateDescription makes the expanded/collapsed state an explicit, announced fact.
+    val stateDescription = stringResource(
+        if (expanded) R.string.deck_wizard_strategy_partial_fit_state_expanded
+        else R.string.deck_wizard_strategy_partial_fit_state_collapsed,
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .clickable(onClick = onToggle, role = Role.Button)
+            .semantics { this.stateDescription = stateDescription }
             .padding(vertical = spacing.xxs),
     ) {
         Row(
@@ -844,6 +855,12 @@ internal fun PlanSectionsStepContent(
     var selectedPillarId by rememberSaveable { mutableStateOf<PillarId?>(PLAN_SECTIONS_PILLAR_ORDER.firstOrNull()) }
     var browseSectionId by rememberSaveable { mutableStateOf<String?>(null) }
     var showSearchSheet by rememberSaveable { mutableStateOf(false) }
+    // Deck Wizard v4, W4.3 (G7): "Browse for X" must ALWAYS open on the Collection tab. Hoisted
+    // (rather than left to CardSearchSheet's own un-hoisted default) because that default switches
+    // to All Cards whenever a non-blank structured query exists -- true for almost every section
+    // since W4.2's fragment-coverage fix -- regardless of whether a collection-tag preset also
+    // fires; hoisting lets this call site pin the opening tab unconditionally.
+    var browseSheetTab by rememberSaveable { mutableIntStateOf(0) }
     // Same RESUMED gate as Deck Studio's own add-cards sheet (feedback_modal_sheet_blocks_nav_
     // transition): a card tap inside CardSearchSheet forwards to the full CardDetailScreen via
     // [onCardClick], and the sheet must unmount the instant that navigation starts.
@@ -896,7 +913,7 @@ internal fun PlanSectionsStepContent(
                 }
                 item(key = "pillar_row") {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().selectableGroup(),
                         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                     ) {
                         pillars.forEach { pillar ->
@@ -944,6 +961,7 @@ internal fun PlanSectionsStepContent(
                             onBrowse = if (browseFragment == null) null else {
                                 {
                                     browseSectionId = section.id
+                                    browseSheetTab = 0 // Collection tab, always (G7).
                                     showSearchSheet = true
                                 }
                             },
@@ -1019,6 +1037,8 @@ internal fun PlanSectionsStepContent(
             initialCollectionTagKeys = browseTagKeys,
             onAdvancedSearch = onApplyStructuredSearch,
             onFilterCollectionByTags = onFilterByTags,
+            selectedTabIndex = browseSheetTab,
+            onSelectedTabChange = { browseSheetTab = it },
             onDismiss = {
                 showSearchSheet = false
                 browseSectionId = null

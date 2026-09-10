@@ -217,17 +217,19 @@ fun CardSectionHeader(
     } else {
         stringResource(R.string.deck_analysis_section_progress_format, realCount, ideal)
     }
-    // compose-design-reviewer P1 finding: the ring's own contentDescription used to just repeat
-    // valueText (the sighted Text label right next to it) -- a screen-reader user got "10 / 8"
-    // announced twice with no way to tell HEALTHY / OVER_LIMIT / ALERT apart, exactly the ambiguity
-    // this whole fix exists to resolve for sighted users via color.
+    // Deck Wizard v4, Task 0 / P1 (independent design-review re-audit): SectionHeader's row is
+    // `.clickable(...)`, which MERGES descendant semantics into one TalkBack announcement --
+    // valueText's own Text is already inside that merge, so a ring description that repeats it
+    // (the previous fix's "$valueText, $toneLabel") is announced TWICE ("Ramp, 22 / 8, 22 / 8, over
+    // your max"). The ring's own description must carry ONLY the tone -- never text already
+    // rendered on screen (and already merged in).
     val toneLabel = when (ringState.tone) {
         SectionRingTone.RAMP -> stringResource(R.string.deck_analysis_ring_tone_building)
         SectionRingTone.HEALTHY -> stringResource(R.string.deck_analysis_ring_tone_healthy)
         SectionRingTone.OVER_LIMIT -> stringResource(R.string.deck_analysis_ring_tone_over_ideal)
         SectionRingTone.ALERT -> stringResource(R.string.deck_analysis_ring_tone_over_max)
     }
-    val ringContentDescription = "$valueText, $toneLabel"
+    val ringContentDescription = toneLabel
 
     SectionHeader(
         title = section.label,

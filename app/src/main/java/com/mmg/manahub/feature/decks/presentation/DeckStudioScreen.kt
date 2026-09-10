@@ -622,12 +622,12 @@ fun DeckStudioScreen(
                                 // alone is enough; the sheet's onAdvancedSearch then runs the real
                                 // filtered search over both tabs.
                                 sectionBrowseSectionId = section.id
-                                addCardsSheetTab =
-                                    if (SectionSearchQuery.collectionTagKeysFor(section.id).isNotEmpty()) {
-                                        ADD_CARDS_TAB_COLLECTION
-                                    } else {
-                                        ADD_CARDS_TAB_ALL_CARDS
-                                    }
+                                // Deck Wizard v4, W4.3 (G7): "Browse for X" must ALWAYS open on the
+                                // Collection tab -- the collection comes first, regardless of
+                                // whether this section happens to have a CardTag equivalent (the
+                                // structured predicate alone, per W4.2b, already renders real
+                                // Collection results for every section with a fragment).
+                                addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
                                 showAddCardsSheet = true
                             },
                         )

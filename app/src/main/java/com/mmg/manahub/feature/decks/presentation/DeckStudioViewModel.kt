@@ -1352,25 +1352,39 @@ class DeckStudioViewModel(
     }
 
     /**
-     * [collectionCards] filtered by [DeckStudioUiState.activeCollectionQuery] AND
-     * [DeckStudioUiState.activeCollectionTagFilter] AND [query] (each applied only when set) -- the
-     * shared predicate behind [onAddCardsQueryChange], [searchCollectionByTags] and
+     * [collectionCards] filtered by [DeckStudioUiState.activeCollectionQuery] UNIONed with
+     * [DeckStudioUiState.activeCollectionTagFilter], ANDed with [query] (each applied only when
+     * set) -- the shared predicate behind [onAddCardsQueryChange], [searchCollectionByTags] and
      * [applyStructuredSearch]. With none of the three set this is exactly [collectionCards]
      * unfiltered (byte-identical to the [showCollectionCards] fallback).
      *
      * The structured query is matched in LENIENT mode: a criterion with no local equivalent (a
      * Scryfall-only `function:` facet) is skipped rather than failing every card, so a
      * Scryfall-only section never renders a falsely-empty Collection tab.
+     *
+     * Deck Wizard v4, W4.2b (G14): when a real structured query IS active, the tag filter used to
+     * be a SECOND mandatory AND gate on top of it, so a card the tagging engine never got around to
+     * tagging was invisible here even though it genuinely satisfies the section's own oracle/type
+     * predicate (the reported "Graveyard enabler" bug). It is now a UNION in that case -- a card
+     * passes if EITHER the persisted tag is present OR the structured predicate matches directly.
+     * With NO structured query active (a bare tag-only filter, e.g. Trades' own tag search), the
+     * tag filter is still the sole gate, exactly as before -- a `null` query trivially "matches"
+     * everything in [StructuredCardSearch.matches]'s contract, so ORing it in unconditionally would
+     * turn an empty structured query into "show the whole collection" and defeat the tag filter.
      */
     private fun collectionCardsMatching(query: String): List<Card> {
         val state = _uiState.value
         val structuredQuery = state.activeCollectionQuery
         val activeTagFilter = state.activeCollectionTagFilter
         return collectionCards.filter { card ->
-            StructuredCardSearch.matches(card, structuredQuery) &&
-                (activeTagFilter.isNullOrEmpty() ||
-                    (card.tags + card.userTags).any { it.key in activeTagFilter }) &&
-                (query.isBlank() || card.name.contains(query, ignoreCase = true))
+            val tagMatch = !activeTagFilter.isNullOrEmpty() &&
+                (card.tags + card.userTags).any { it.key in activeTagFilter }
+            val sectionMatch = if (structuredQuery == null || structuredQuery.isEmpty()) {
+                activeTagFilter.isNullOrEmpty() || tagMatch
+            } else {
+                StructuredCardSearch.matches(card, structuredQuery) || tagMatch
+            }
+            sectionMatch && (query.isBlank() || card.name.contains(query, ignoreCase = true))
         }
     }
 

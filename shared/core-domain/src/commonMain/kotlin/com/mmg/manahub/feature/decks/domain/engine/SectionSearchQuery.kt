@@ -383,6 +383,9 @@ object SectionSearchQuery {
         "blink_effect" to "function:blink",
         "group_effect" to "function:group-hug",
         "stax_piece" to "function:tax",
+        // Deck Wizard v4, W4.2 (G6): 5 RoleKeys ArchetypeData grew after this table was written had
+        // no fragment mapping at all -- no "Browse" button, the exact defect the user hit on Anthem.
+        "anthem" to "function:anthem",
     )
 
     // ── Plan roles -- structural, constant (W3 table 2, minus tribe_members which needs
@@ -395,6 +398,8 @@ object SectionSearchQuery {
         "finisher" to "t:creature mv>=5 pow>=4",
         "planeswalker" to "t:planeswalker",
         "vehicle" to "t:vehicle",
+        // W4.2 (G6): pure type-line fact, same shape as planeswalker/vehicle above.
+        "equipment" to "t:equipment",
     )
 
     // ── Plan roles -- translated from TagDictionary DetectionRules (W3 table 3, 10 rows) ──────
@@ -454,14 +459,31 @@ object SectionSearchQuery {
             "creatures you control of the chosen type", "other creatures you control of the chosen type",
             "that share a creature type with", "choose a creature type",
         ))),
+        // Deck Wizard v4, W4.2 (G6): 3 more RoleKeys with no function: tag, added to ArchetypeData
+        // after the W3 table was written -- verified no equivalent exists in CardFunctionOption.
+        // TagDictionary.kt:744-746
+        "treasure_source" to listOf(DetectionRule(anyOf = listOf(
+            "treasure token", "gold token", "powerstone token",
+        ))),
+        // TagDictionary.kt:766-770
+        "mill_opponent" to listOf(DetectionRule(anyOf = listOf(
+            "target player mills", "each opponent mills", "that player mills",
+        ))),
+        // TagDictionary.kt:771-777 -- disambiguated from mill_opponent by excluding its phrasing.
+        "mill_self" to listOf(DetectionRule(
+            allOf = listOf("mill"),
+            noneOf = listOf("target player", "each opponent", "that player", "target opponent"),
+        )),
     )
 
     private val DICTIONARY_TRANSLATED_FRAGMENTS: Map<RoleKey, String> =
         DICTIONARY_TRANSLATED_RULES.mapValues { (_, rules) -> translate(rules) }
 
-    /** Merged lookup for every constant (context-free) role fragment: 20 direct + 6 structural
-     * (excluding `tribe_members`, handled separately) + 10 dictionary-translated = 36 entries,
-     * covering every [RoleKey] [ArchetypeData] references except `tribe_members`. Shared by both
+    /** Merged lookup for every constant (context-free) role fragment: 21 direct + 7 structural
+     * (excluding `tribe_members`, handled separately) + 13 dictionary-translated = 41 entries,
+     * covering every [RoleKey] [ArchetypeData] references except `tribe_members` (W4.2, G6: added
+     * `anthem`/`equipment`/`treasure_source`/`mill_opponent`/`mill_self`, the 5 keys that grew onto
+     * `ArchetypeData` after this table was first written and had no fragment at all). Shared by both
      * `role:<key>` and `fingerprint:<key>` ids (plan: "same TagDictionary translation as the
      * roles, reuse your translator"). Widened `private` -> `internal` (W11) so
      * `SectionSearchQueryTest`'s full-coverage test can enumerate `.keys` as the single
@@ -554,6 +576,7 @@ object SectionSearchQuery {
         )
         put("planeswalker", listOf(SearchCriterion.CardType(setOf("planeswalker"))))
         put("vehicle", listOf(SearchCriterion.CardType(setOf("vehicle"))))
+        put("equipment", listOf(SearchCriterion.CardType(setOf("equipment"))))
         // Re-verified real tags (see this property's own KDoc above).
         put("sac_outlet", listOf(SearchCriterion.CardFunction(setOf("sacrifice-outlet"))))
         put("clone_theft_effect", listOf(SearchCriterion.CardFunction(setOf("theft"))))

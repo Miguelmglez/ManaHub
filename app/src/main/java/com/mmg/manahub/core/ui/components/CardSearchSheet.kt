@@ -512,12 +512,18 @@ fun CardSearchSheet(
                         selectedTab == collectionTabIndex -> isSearchingCards
                         else -> isSearchingScryfall
                     }
-                    if (!isSearching) {
-                        item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
+                    // Deck Wizard v4, W4.3 (G7): a search in flight used to render NOTHING here --
+                    // reading as "no results" (a lie) until the leading-icon spinner in the text
+                    // field, easy to miss, finished. Loading/empty/content are now each their own
+                    // distinguishable state in the results area itself.
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSearching) {
+                                MagicLoadingSpinner()
+                            } else {
                                 Text(
                                     text = if (selectedTab == scryfallTabIndex && query.isBlank())
                                         stringResource(R.string.deckbuilder_add_cards_search_hint)

@@ -1217,6 +1217,8 @@
     <string name="deck_wizard_strategy_partial_fit_expand">Partial fit</string>
     <string name="deck_wizard_strategy_partial_fit_collapse">Hide partial fit</string>
     <string name="deck_wizard_strategy_partial_fit_subtitle">These can work, but %1$s doesn\'t push you toward them.</string>
+    <string name="deck_wizard_strategy_partial_fit_state_expanded">Expanded</string>
+    <string name="deck_wizard_strategy_partial_fit_state_collapsed">Collapsed</string>
     <string name="deck_wizard_strategy_custom_header">Custom</string>
     <string name="deck_wizard_strategy_custom_title">Custom</string>
     <string name="deck_wizard_strategy_custom_description">The engine will detect the plan from what you build.</string>

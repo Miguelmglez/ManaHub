@@ -1660,10 +1660,13 @@ class DeckStudioViewModelTest {
         }
 
     @Test
-    fun `collectionCardsMatching ANDs the structured query, the tag filter and the typed name`() =
+    fun `collectionCardsMatching unions the structured query with the tag filter, both ANDed with the typed name`() =
         runTest(dispatcher) {
-            // Arrange — one card fails each of the three constraints in turn, so only a card
-            // satisfying all three may survive.
+            // Deck Wizard v4, W4.2b (G14): rewritten from the old "ANDs all three" assertion, which
+            // encoded the exact bug this workstream fixes -- an untagged card the tagging engine
+            // never got to (but that genuinely satisfies the section's own structured predicate)
+            // used to be invisible on the Collection tab. `untaggedInstant` is that card: it matches
+            // the CardType(Instant) structured query but carries no REMOVAL tag.
             val untaggedInstant = card(
                 id = "beast-trick-1",
                 name = "Beast Trick",
@@ -1682,16 +1685,44 @@ class DeckStudioViewModelTest {
             val vm = createVm()
             advanceUntilIdle()
 
-            // Act — structured query drops elfCard (a Creature), the tag filter drops
-            // untaggedInstant, the typed name drops removalCard ("Naturalize").
+            // Act — structured query (Instant) drops elfCard (a Creature); the tag filter (REMOVAL)
+            // no longer needs to ALSO match for untaggedInstant to survive; the typed name "Beast"
+            // narrows to the two cards whose name contains it.
             vm.applyStructuredSearch(AdvancedSearchQuery(criteria = listOf(SearchCriterion.CardType(setOf("Instant")))))
             advanceUntilIdle()
             vm.searchCollectionByTags(setOf(CardTag.REMOVAL.key))
             vm.onAddCardsQueryChange("Beast")
 
-            // Assert
+            // Assert — beastWithinCard passes via EITHER gate (Instant AND REMOVAL); untaggedInstant
+            // now also surfaces via the structured predicate alone (the G14 fix), even though it was
+            // never tagged REMOVAL.
             assertEquals(
-                setOf(beastWithinCard.scryfallId),
+                setOf(beastWithinCard.scryfallId, untaggedInstant.scryfallId),
+                vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet(),
+            )
+        }
+
+    @Test
+    fun `collectionCardsMatching keeps the tag filter as the sole gate when no structured query is active`() =
+        runTest(dispatcher) {
+            // Deck Wizard v4, W4.2b (G14): a bare tag-only filter (searchCollectionByTags with no
+            // accompanying applyStructuredSearch -- Trades' own tag search, or a section whose id
+            // never carried a structured query) must NOT degrade to "matches everything" just
+            // because StructuredCardSearch.matches(card, null) trivially returns true.
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
+            every { userCardRepository.observeCollection() } returns flowOf(
+                listOf(userCardWith(elfCard), userCardWith(removalCard))
+            )
+            coEvery { cardRepository.getCardById(any()) } answers {
+                DataResult.Success(listOf(elfCard, removalCard).first { it.scryfallId == firstArg() })
+            }
+            val vm = createVm()
+            advanceUntilIdle()
+
+            vm.searchCollectionByTags(setOf(CardTag.REMOVAL.key))
+
+            assertEquals(
+                setOf(removalCard.scryfallId),
                 vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet(),
             )
         }

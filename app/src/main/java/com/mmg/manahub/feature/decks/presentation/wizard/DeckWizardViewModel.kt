@@ -1174,19 +1174,39 @@ class DeckWizardViewModel(
     /** The Analysis-tab-style category [com.mmg.manahub.core.model.CardTag] pre-filter for the
      * Collection tab ([com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery
      * .collectionTagKeysFor]) -- a DIFFERENT key space from [applyPlanSectionsStructuredSearch]'s
-     * criteria, ANDed together (mirrors `DeckStudioViewModel.searchCollectionByTags`). Empty [keys]
-     * is a no-op filter, never a falsely-empty tab (many sections have no tag-key equivalent). */
+     * criteria, UNIONed with it (mirrors `DeckStudioViewModel.searchCollectionByTags` -- Deck Wizard
+     * v4 W4.2b/G14). Empty [keys] is a no-op filter, never a falsely-empty tab (many sections have
+     * no tag-key equivalent). */
     fun searchPlanSectionsCollectionByTags(keys: Set<String>) {
         _uiState.update { it.copy(planSectionsTagFilter = keys) }
         publishPlanSectionsCollectionResults()
     }
 
+    /**
+     * Deck Wizard v4, W4.2b (G14): the persisted [DeckWizardUiState.planSectionsTagFilter] used to
+     * be ANDed onto the structured predicate, so a card the tagging engine never got around to
+     * tagging was invisible here even though it genuinely matches the section's own oracle/type
+     * predicate (the reported "Graveyard enabler" bug -- Collection empty, All Cards full for the
+     * SAME cards). When a real structured query IS active, the tag is now a UNION on top of it,
+     * never a second mandatory gate -- a card passes if EITHER already carries the tag OR satisfies
+     * the predicate [StructuredCardSearch.matches] evaluates directly (oracle text / type line /
+     * mana production, all real `Card` fields, no tagging-engine dependency). With NO structured
+     * query active, the tag filter alone still gates (mirrors `DeckStudioViewModel
+     * .collectionCardsMatching`'s own contract) -- a null query trivially matches everything, so
+     * ORing it in unconditionally would defeat a bare tag-only filter.
+     */
     private fun publishPlanSectionsCollectionResults() {
         val state = _uiState.value
+        val tagFilter = state.planSectionsTagFilter
+        val structuredQuery = state.planSectionsStructuredQuery
         val matches = state.ownedCards.filter { card ->
-            StructuredCardSearch.matches(card, state.planSectionsStructuredQuery) &&
-                (state.planSectionsTagFilter.isEmpty() || (card.tags + card.userTags).any { it.key in state.planSectionsTagFilter }) &&
-                (state.planSectionsQuery.isBlank() || card.name.contains(state.planSectionsQuery, ignoreCase = true))
+            val tagMatch = tagFilter.isNotEmpty() && (card.tags + card.userTags).any { it.key in tagFilter }
+            val sectionMatch = if (structuredQuery == null || structuredQuery.isEmpty()) {
+                tagFilter.isEmpty() || tagMatch
+            } else {
+                StructuredCardSearch.matches(card, structuredQuery) || tagMatch
+            }
+            sectionMatch && (state.planSectionsQuery.isBlank() || card.name.contains(state.planSectionsQuery, ignoreCase = true))
         }
         _uiState.update { it.copy(planSectionsCollectionResults = matches) }
     }
