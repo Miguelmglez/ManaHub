@@ -5,11 +5,59 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-10 (v4 campaign, Run 1 — W0+W1 done; see `docs/plans/deck-wizard-commander-v4-progress.md`
+**Last updated:** 2026-09-10 (v4 campaign, Run 2 — W2 done; see `docs/plans/deck-wizard-commander-v4-progress.md`
 for the full per-item log, gitignored).
 **Owning plan (v3, shipped):** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the
 AI-planning-doc rule now that the campaign has shipped; this file is the durable record that
 survives. **v4 (active):** `docs/plans/deck-wizard-commander-v4-plan.md` (gitignored).
+
+## v4 — Run 2 (2026-09-10): W2 (Commander pick step)
+
+Closes G2/G3 (R2/R3) — the COMMANDER_PICK step, now the wizard's FIRST screen (Run 1 removed FORMAT).
+Two commits: `c6fa39fe` (W2.1/W2.2/W2.3 implementation) + `28693576` (compose-design-reviewer fixes).
+- **W2.1 (G2/R2) — no tabs.** Deleted the Collection/All-cards `TabRow` and `CommanderResultTab`
+  entirely. Idle (`commanderPickIsIdle`: blank query AND zero non-locked filter criteria) shows the
+  owned commander-eligible grid (`commanderPickLocalCandidates`, unchanged); any search text or
+  user-added advanced-search filter routes to a live Scryfall search
+  (`triggerCommanderPickSearch` → `StructuredCardSearch.scryfallFragment` → `searchCardsUseCase`,
+  already `ScryfallRequestQueue`-wrapped at the data-source layer), debounced at the SAME
+  `SEARCH_DEBOUNCE_MS` (400ms) used elsewhere in this VM. `commanderLockedCriteria` (commander
+  eligibility + Commander-format legality) stays structurally non-removable — a structured query
+  containing ONLY the locked criteria (sheet opened, Search tapped, nothing added) still reads as
+  idle, by design. Scryfall results are marked owned/not via the same ownership-matching logic the
+  old Collection tab used. A distinct `commanderSearchError` state (new) now renders `InlineErrorState`
+  on a failed search, ranked loading > error > empty so a failure never reads as "no results" (G7).
+- **W2.2 (R2) — filters mirror `CollectionScreen`.** Active-filter count line + `MagicCtaButton(Ghost,
+  Error)` "clear filters" + `BadgedBox`/`Tune` icon with the active (non-locked) filter count as a
+  badge, replacing the old per-criterion `InputChip` row. One shared `commanderActiveFilterCount`
+  helper feeds both the badge and the idle check (W2.1) — never computed two different ways.
+- **W2.3 (G3/R3) — selected commander mirrors `CardDetailSheet`.** Extracted `CardFlipPortrait`
+  (`presentation/components/CardDetailSheet.kt`) — the large-image + DFC-flip block, previously
+  private/inline in `CardDetailSheet`'s `ModalBottomSheet` — into a standalone `internal` composable
+  both `CardDetailSheet` and the wizard's inline selected-commander view call. Below the image:
+  `CardTagGroup`, then "Change commander" (`onClearCommander`); "Continue" is owned solely by the
+  existing `WizardStickyButton` (a design-review pass caught and fixed a duplicate inline "Next"
+  button that shipped in the first commit — see below).
+- **compose-design-reviewer pass (2nd commit):** 1 P0 (duplicate "Next" CTA when a commander was
+  selected — fixed, `WizardStickyButton` is now the ONLY "Next" for this step, matching every sibling
+  step), 3 P1 (idle-empty-collection dead-end message added; the new `commanderSearchError` field
+  above came FROM this finding, not W2.1's original design; Tune icon's active tint unified to
+  `primaryAccent`, was inconsistently `goldMtg`), 3 P2 (shared `CardPortraitFrame` helper to stop the
+  loading-placeholder frame drifting from `CardFlipPortrait`'s; the flip hint chip is now itself
+  tappable, not just the image; `CommanderCtaHeight` 52dp→48dp, back on the touch-target minimum and
+  the 8dp grid). One P2 finding (spinner replaces prior results on every keystroke) was left as-is —
+  confirmed the debounce is the same 400ms used everywhere else in this VM, not a short window.
+- **Tests:** rewrote the old "name filter is a pure local filter, no Scryfall call" test (now FALSE
+  by design — a non-blank query must fetch) into idle/search/filter-transition coverage; deleted the
+  tab-switch tests along with `CommanderResultTab`; added owned-marking-on-Scryfall-results and
+  search-error-sets/clears coverage. 111 `DeckWizardCommanderStepsTest`+`DeckWizardViewModelTest`
+  cases, 1 failure — the same pre-existing Casual taxonomy-toggle case documented since Run 1,
+  confirmed unchanged via `git stash` before/after.
+- **Gate:** `:app:assembleDebug` and `:shared:core-domain:compileKotlinWasmJs` green both commits;
+  `pre-push-security-gate` PASS before each commit; golden/corpus/calibration/skeleton suites
+  untouched (no `shared/` scoring code touched this run).
+
+Remaining v4 workstreams (W3-W8) are NOT started.
 
 ## v4 — Run 1 (2026-09-10): W0 + W1
 
