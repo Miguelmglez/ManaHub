@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -69,6 +70,60 @@ import com.mmg.manahub.feature.decks.domain.engine.CardSection
  * Base pillar uses for its per-color "produces:X" sections — kept in sync with that file's own
  * `CardSection(id = "produces:${color.symbol}", ...)` construction. */
 private const val PRODUCES_SECTION_PREFIX = "produces:"
+
+/** The visual treatment a [CardSectionHeader]'s ring/color should use (Deck Wizard v4 plan, W4.4/
+ * E2) -- kept separate from an actual `Color` so [sectionRingState] stays a plain, Compose-free,
+ * unit-testable function; [CardSectionHeader] alone maps a tone onto theme tokens. */
+internal enum class SectionRingTone {
+    /** Below ideal (or, for an anti-role, below max) -- the continuous good→mid→low ramp applies. */
+    RAMP,
+    /** At or within the healthy band -- full ring, [com.mmg.manahub.core.ui.theme.MagicColors.lifePositive]. */
+    HEALTHY,
+    /** Over ideal but not a safety concern (e.g. Ramp at 22 with an ideal of 8/max of 12) -- full
+     * ring, an explicit [com.mmg.manahub.core.ui.theme.MagicColors.goldMtg] over-limit treatment,
+     * never the plain healthy green (E2: "communicated by colour and an explicit over-limit
+     * treatment"). */
+    OVER_LIMIT,
+    /** An anti-role over its max -- immediate alert
+     * ([com.mmg.manahub.core.ui.theme.MagicColors.lifeNegative]), never a point on the continuous
+     * ramp (same rule [FindingRow] applies to `Finding.AntiRoleOverMax`). */
+    ALERT,
+}
+
+internal data class SectionRingState(val progress: Float, val tone: SectionRingTone)
+
+/**
+ * Deck Wizard v4 plan, W4.4/G8b/E2 -- the ring and the label MUST show the same metric: progress
+ * toward ideal, clamped at 1.0. The pre-v4 code computed a "quality" ramp that used `max / current`
+ * once a section went over its band -- for Ramp at 22 with max 12 that produced a HALF-FILLED amber
+ * ring next to a label reading "22/8", i.e. two different metrics in one control. [progress] here
+ * is `realCount / ideal` (or, for an anti-role, `realCount / max`) clamped at `[0,1]` -- it only
+ * ever fills UP, never empties back out as more cards are added; going over the band is expressed
+ * entirely through [SectionRingState.tone], never by shrinking the ring.
+ *
+ * A section with no band ([CardSection.min]/[CardSection.ideal]/[CardSection.max] not all non-null)
+ * has no ring at all -- callers must check that before calling this (mirrors [CardSectionHeader]'s
+ * own `hasBand` gate).
+ */
+internal fun sectionRingState(section: CardSection): SectionRingState {
+    val ideal = section.ideal ?: 0
+    val max = section.max ?: 0
+    val realCount = section.realCount
+    return if (section.isAntiRole) {
+        val progress = if (max <= 0) (if (realCount > 0) 1f else 0f) else (realCount.toFloat() / max).coerceIn(0f, 1f)
+        val tone = if (realCount > max) SectionRingTone.ALERT else SectionRingTone.HEALTHY
+        SectionRingState(progress, tone)
+    } else {
+        val progress = if (ideal <= 0) 1f else (realCount.toFloat() / ideal).coerceIn(0f, 1f)
+        val tone = when {
+            ideal <= 0 -> SectionRingTone.HEALTHY
+            realCount < ideal -> SectionRingTone.RAMP
+            realCount <= max -> SectionRingTone.HEALTHY
+            else -> SectionRingTone.OVER_LIMIT
+        }
+        SectionRingState(progress, tone)
+    }
+}
 
 /**
  * One section's header row: [CardSection.label], its `current`/`ideal` (or `current`/max N for an
@@ -137,33 +192,42 @@ fun CardSectionHeader(
         return
     }
 
-    // Same [0,1] quality shape RoleCoverageEntryRow's own `quality` local used (and this file's
-    // old linear-bar version before the W8 ring swap) — both must agree on what "healthy" looks
-    // like for the SAME underlying band.
-    val min = section.min ?: 0
-    val ideal = section.ideal ?: 0
+    // Deck Wizard v4 plan, W4.4/G8b/E2 -- the ring and the label MUST show the same metric: progress
+    // toward ideal, clamped at 1.0. The pre-v4 `quality` local (still mirrored in
+    // RoleCoverageEntryRow, which uses a dynamically-rescaled linear bar rather than a ring and so
+    // isn't affected the same way) computed `max / current` once a section went over its band --
+    // for Ramp at 22 with max 12 that put a HALF-FILLED amber ring next to a label reading "22/8",
+    // i.e. two different metrics in one control. The math itself lives in [sectionRingState] (a
+    // plain function, unit-tested without Compose) so this composable only maps its result onto
+    // theme colors.
+    val ringState = sectionRingState(section)
+    val ringColor = when (ringState.tone) {
+        SectionRingTone.RAMP -> mc.qualityColor(ringState.progress)
+        SectionRingTone.HEALTHY -> mc.qualityColor(1f)
+        SectionRingTone.OVER_LIMIT -> mc.goldMtg
+        SectionRingTone.ALERT -> mc.lifeNegative
+    }
     val max = section.max ?: 0
-    val quality = if (section.isAntiRole) {
-        if (section.current <= max) 1f else (max.toFloat() / section.current).coerceIn(0f, 1f)
-    } else when {
-        ideal <= 0 -> 1f
-        section.current <= ideal -> (section.current.toFloat() / ideal).coerceIn(0f, 1f)
-        section.current <= max -> 1f
-        else -> (max.toFloat() / section.current).coerceIn(0f, 1f)
-    }
-    // See RoleCoverageEntryRow's own comment for why an over-max anti-role bypasses the continuous
-    // ramp entirely (a mid-ramp gold reads as mild caution, but this must read as an immediate alert
-    // — same rule FindingRow applies to Finding.AntiRoleOverMax).
-    val ringColor = if (section.isAntiRole && section.current > max) mc.lifeNegative else mc.qualityColor(quality)
+    val ideal = section.ideal ?: 0
+    val realCount = section.realCount
 
-    // W0.3/E1: the DISPLAYED count is always the real, user-verifiable count -- quality/ringColor
-    // above still consume section.current (the weighted value the score uses) untouched; only the
-    // label text changes here.
+    // W0.3/E1: the DISPLAYED count is always the real, user-verifiable count.
     val valueText = if (section.isAntiRole) {
-        stringResource(R.string.deck_analysis_role_anti_max_format, section.realCount, max)
+        stringResource(R.string.deck_analysis_role_anti_max_format, realCount, max)
     } else {
-        stringResource(R.string.deck_analysis_section_progress_format, section.realCount, ideal)
+        stringResource(R.string.deck_analysis_section_progress_format, realCount, ideal)
     }
+    // compose-design-reviewer P1 finding: the ring's own contentDescription used to just repeat
+    // valueText (the sighted Text label right next to it) -- a screen-reader user got "10 / 8"
+    // announced twice with no way to tell HEALTHY / OVER_LIMIT / ALERT apart, exactly the ambiguity
+    // this whole fix exists to resolve for sighted users via color.
+    val toneLabel = when (ringState.tone) {
+        SectionRingTone.RAMP -> stringResource(R.string.deck_analysis_ring_tone_building)
+        SectionRingTone.HEALTHY -> stringResource(R.string.deck_analysis_ring_tone_healthy)
+        SectionRingTone.OVER_LIMIT -> stringResource(R.string.deck_analysis_ring_tone_over_ideal)
+        SectionRingTone.ALERT -> stringResource(R.string.deck_analysis_ring_tone_over_max)
+    }
+    val ringContentDescription = "$valueText, $toneLabel"
 
     SectionHeader(
         title = section.label,
@@ -182,7 +246,19 @@ fun CardSectionHeader(
                     color = ringColor,
                     fontWeight = FontWeight.Bold,
                 )
-                MiniProgressRing(value = quality, color = ringColor, contentDescription = valueText)
+                // compose-design-reviewer P1 finding: OVER_LIMIT (goldMtg) and ALERT (lifeNegative)
+                // sit close in hue on some themes -- an extra glyph on ALERT only means the two
+                // states never rely on hue alone to be told apart, same discipline FindingRow
+                // already applies to Finding.AntiRoleOverMax.
+                if (ringState.tone == SectionRingTone.ALERT) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = ringColor,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+                MiniProgressRing(value = ringState.progress, color = ringColor, contentDescription = ringContentDescription)
             }
         },
         modifier = modifier,

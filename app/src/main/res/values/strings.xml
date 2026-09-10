@@ -838,6 +838,13 @@
          role-coverage-bar list; every pillar (not just Plan roles) renders sections now. -->
     <string name="deck_analysis_section_progress_format">%1$d / %2$d</string>
     <string name="deck_analysis_section_browse">Browse for %1$s</string>
+    <!-- Deck Wizard v4 plan (W4.4/E2): tone-aware ring content description, appended to the plain
+         "N / ideal" text so a screen-reader user gets the same RAMP/HEALTHY/OVER_LIMIT/ALERT signal
+         a sighted user gets from color alone. -->
+    <string name="deck_analysis_ring_tone_building">building up</string>
+    <string name="deck_analysis_ring_tone_healthy">healthy</string>
+    <string name="deck_analysis_ring_tone_over_ideal">over your ideal, not a problem</string>
+    <string name="deck_analysis_ring_tone_over_max">over your max, this needs attention</string>
     <!-- Suggestions Tab UI Polish plan (W3, 2026-08-25): placeholder shown in a CardSectionRow
          whose section.contributions is empty — every section now renders a consistent visual
          anchor instead of the LazyRow simply being absent. -->
@@ -1206,8 +1213,10 @@
     <!-- Deck Wizard Commander v3 plan (Phase 4.2) -->
     <string name="deck_wizard_strategy_step_title_for">Pick a strategy for %1$s</string>
     <string name="deck_wizard_strategy_recommended_header">Recommended for %1$s</string>
-    <string name="deck_wizard_strategy_other_plans_expand">Other plans</string>
-    <string name="deck_wizard_strategy_other_plans_collapse">Hide other plans</string>
+    <string name="deck_wizard_strategy_recommended_empty">%1$s doesn\'t clearly push toward one of these plans — try Partial fit below, or go Custom.</string>
+    <string name="deck_wizard_strategy_partial_fit_expand">Partial fit</string>
+    <string name="deck_wizard_strategy_partial_fit_collapse">Hide partial fit</string>
+    <string name="deck_wizard_strategy_partial_fit_subtitle">These can work, but %1$s doesn\'t push you toward them.</string>
     <string name="deck_wizard_strategy_custom_header">Custom</string>
     <string name="deck_wizard_strategy_custom_title">Custom</string>
     <string name="deck_wizard_strategy_custom_description">The engine will detect the plan from what you build.</string>

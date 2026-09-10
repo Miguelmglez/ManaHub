@@ -59,6 +59,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -105,10 +107,12 @@ import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.SectionQueryContext
 import com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
+import com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.StrategyRecommendation
 import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
 import com.mmg.manahub.feature.decks.presentation.components.CardFlipPortrait
 import com.mmg.manahub.feature.decks.presentation.components.CardSectionRow
+import com.mmg.manahub.feature.decks.presentation.components.PillarTile
 import com.mmg.manahub.feature.decks.presentation.components.TribeOption
 import com.mmg.manahub.feature.decks.presentation.components.TribePickerSection
 import com.mmg.manahub.feature.decks.presentation.components.label
@@ -486,21 +490,22 @@ internal fun OutsideCollectionToggleRow(checked: Boolean, onToggle: () -> Unit) 
  * ids without ambiguity. */
 internal const val CUSTOM_STRATEGY_ID = "__custom__"
 
-/** Deck Wizard Commander v3 plan (Phase 4, D4): the STRATEGY step's own top-N split of
- * [DeckWizardUiState.commanderStrategyRecommendations] -- the first [STRATEGY_RECOMMENDED_COUNT]
- * are "Recommended", the rest "Other plans" (collapsed by default, plan §8's "yes" default). A
- * plain (non-`@Composable`) function so it is unit-testable without a Compose UI test. */
+/** Deck Wizard Commander v4 plan (W3, E3): the STRATEGY step's own split of
+ * [DeckWizardUiState.commanderStrategyRecommendations] into "Recommended" (score-threshold + hard
+ * cap of 5) and collapsed "Partial fit" (the rest of the format's catalog, collapsed by default) --
+ * delegates entirely to [RecommendCommanderStrategiesUseCase.splitRecommended], the use case's own
+ * threshold/cap logic (never a UI-local `take(N)`). A plain (non-`@Composable`) function so it stays
+ * unit-testable without a Compose UI test. */
 internal fun strategyRecommendedSplit(recommendations: List<StrategyRecommendation>): Pair<List<StrategyRecommendation>, List<StrategyRecommendation>> =
-    recommendations.take(STRATEGY_RECOMMENDED_COUNT) to recommendations.drop(STRATEGY_RECOMMENDED_COUNT)
-
-private const val STRATEGY_RECOMMENDED_COUNT = 6
+    RecommendCommanderStrategiesUseCase().splitRecommended(recommendations)
 
 /**
  * The single-select STRATEGY list (D4): [DeckWizardUiState.commanderStrategyRecommendations] split
- * into "Recommended" (top 6) and collapsed "Other plans", plus "Custom" always offered last. The
- * #1 recommendation is preselected by the ViewModel the moment the list loads
- * ([DeckWizardViewModel.recommendCommanderStrategies]) and Next is ALWAYS enabled (plan §4/§8
- * defaults) -- this step never blocks progress the way the old picker's tribe-required gate could.
+ * into "Recommended" (score-threshold + hard cap of 5, E3) and collapsed "Partial fit", plus
+ * "Custom" always offered last. The #1 recommendation is preselected by the ViewModel the moment
+ * the list loads ([DeckWizardViewModel.recommendCommanderStrategies]) and Next is ALWAYS enabled
+ * (plan §4/§8 defaults) -- this step never blocks progress the way the old picker's tribe-required
+ * gate could.
  *
  * A [CuratedStrategy.requiresTribe] entry the recommender could not resolve a concrete tribe for
  * opens the shared [TribePickerSection] tribe sub-picker (same component Deck Studio's own
@@ -574,10 +579,16 @@ internal fun StrategyStepContent(
                         }
                     }
                 } else {
+                    // compose-design-reviewer P2 findings: the header now renders unconditionally
+                    // (previously it was skipped along with the whole branch when Recommended was
+                    // empty, so the "why empty" text dropped in with none of the section chrome
+                    // every other block in this list uses); the empty-explanation text no longer
+                    // requires `other` to be non-empty either (a theoretical fully-empty catalog
+                    // would otherwise explain nothing).
+                    item(key = "recommended_header") {
+                        StrategySectionHeader(stringResource(R.string.deck_wizard_strategy_recommended_header, commanderName))
+                    }
                     if (recommended.isNotEmpty()) {
-                        item(key = "recommended_header") {
-                            StrategySectionHeader(stringResource(R.string.deck_wizard_strategy_recommended_header, commanderName))
-                        }
                         items(recommended, key = { "rec_${it.strategy.id}" }) { recommendation ->
                             StrategyRecommendationRow(
                                 recommendation = recommendation,
@@ -591,11 +602,21 @@ internal fun StrategyStepContent(
                                 },
                             )
                         }
+                    } else {
+                        item(key = "recommended_empty") {
+                            Text(
+                                text = stringResource(R.string.deck_wizard_strategy_recommended_empty, commanderName),
+                                style = ty.bodyMedium,
+                                color = mc.textSecondary,
+                                modifier = Modifier.padding(vertical = spacing.sm),
+                            )
+                        }
                     }
                     if (other.isNotEmpty()) {
-                        item(key = "other_plans_toggle") {
-                            OtherPlansToggle(
+                        item(key = "partial_fit_toggle") {
+                            PartialFitToggle(
                                 expanded = otherPlansExpanded,
+                                subtitle = if (!otherPlansExpanded) stringResource(R.string.deck_wizard_strategy_partial_fit_subtitle, commanderName) else null,
                                 onToggle = { otherPlansExpanded = !otherPlansExpanded },
                             )
                         }
@@ -656,29 +677,45 @@ private fun StrategySectionHeader(title: String) {
     )
 }
 
+/** Deck Wizard Commander v4 plan, W3/E3: renamed from "Other plans" -- users found the old label
+ * and its equal visual weight with Recommended read as false confidence. [subtitle] (shown only
+ * while collapsed) frames the group honestly: these can work, the commander just doesn't push
+ * toward them. */
 @Composable
-private fun OtherPlansToggle(expanded: Boolean, onToggle: () -> Unit) {
+private fun PartialFitToggle(expanded: Boolean, subtitle: String?, onToggle: () -> Unit) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .clickable(onClick = onToggle),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+            .clickable(onClick = onToggle, role = Role.Button)
+            .padding(vertical = spacing.xxs),
     ) {
-        Icon(
-            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-            contentDescription = null,
-            tint = mc.textSecondary,
-        )
-        Text(
-            text = stringResource(if (expanded) R.string.deck_wizard_strategy_other_plans_collapse else R.string.deck_wizard_strategy_other_plans_expand),
-            style = ty.labelLarge,
-            color = mc.textSecondary,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+        ) {
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = null,
+                tint = mc.textSecondary,
+            )
+            Text(
+                text = stringResource(if (expanded) R.string.deck_wizard_strategy_partial_fit_collapse else R.string.deck_wizard_strategy_partial_fit_expand),
+                style = ty.labelLarge,
+                color = mc.textSecondary,
+            )
+        }
+        if (subtitle != null) {
+            Text(
+                text = subtitle,
+                style = ty.bodySmall,
+                color = mc.textDisabled,
+                modifier = Modifier.padding(start = spacing.xxl, top = spacing.xxs),
+            )
+        }
     }
 }
 
@@ -772,6 +809,12 @@ private val CollapsedPlanSectionsSaver: Saver<SnapshotStateMap<String, Boolean>,
  * [DeckWizardViewModel.recomputePlanAnalysis]); this composable has ZERO scoring/classification/
  * query logic of its own (the campaign's own D2 rule -- see `docs/deck-wizard-state.md` §2).
  *
+ * **Category navigation (v4 plan, W4.1/G5/R5):** reuses the Analysis tab's own single-select
+ * [PillarTile] row verbatim (`DeckStudioScreen.kt`'s `expandedPillar`/`PillarTile` pattern) --
+ * every pillar's icon/subscore/label renders at once (the overview), and tapping a tile switches
+ * which pillar's [CardSectionRow] list renders below, replacing the old always-all-expanded,
+ * every-pillar-stacked-into-one-list layout this step used to render.
+ *
  * Fully skippable, same as the old MANUAL_ADDS step -- Next is always enabled, even while
  * [DeckWizardUiState.planAnalysis] is still loading or degraded to `null`.
  */
@@ -793,6 +836,12 @@ internal fun PlanSectionsStepContent(
     val spacing = MaterialTheme.spacing
 
     val expandedSections = rememberSaveable(saver = CollapsedPlanSectionsSaver) { mutableStateMapOf() }
+    // Deck Wizard v4 plan, W4.1/G5/R5 -- category navigation reused verbatim from the Analysis
+    // tab's own PillarTile row (DeckStudioScreen.kt's `expandedPillar`): a single-select tile per
+    // pillar gives the at-a-glance overview (icon/subscore/label per category, all visible at once)
+    // and the step now shows only the SELECTED pillar's sections below, instead of every pillar's
+    // sections stacked into one long undifferentiated list.
+    var selectedPillarId by rememberSaveable { mutableStateOf<PillarId?>(PLAN_SECTIONS_PILLAR_ORDER.firstOrNull()) }
     var browseSectionId by rememberSaveable { mutableStateOf<String?>(null) }
     var showSearchSheet by rememberSaveable { mutableStateOf(false) }
     // Same RESUMED gate as Deck Studio's own add-cards sheet (feedback_modal_sheet_blocks_nav_
@@ -845,17 +894,38 @@ internal fun PlanSectionsStepContent(
                         )
                     }
                 }
-                pillars.forEach { pillar ->
-                    item(key = "pillar_${pillar.id.name}") {
+                item(key = "pillar_row") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                    ) {
+                        pillars.forEach { pillar ->
+                            val isSelected = selectedPillarId == pillar.id
+                            PillarTile(
+                                pillar = pillar,
+                                expanded = isSelected,
+                                onClick = { selectedPillarId = pillar.id },
+                                // compose-design-reviewer P1 finding: PillarTile has no built-in
+                                // `selected` semantics (it's a repurposed "expanded" boolean, color
+                                // only) -- wrap it here since this call site promotes it to a
+                                // single-select TAB row, this campaign's primary step navigation.
+                                modifier = Modifier.weight(1f).semantics { selected = isSelected; role = Role.Tab },
+                            )
+                        }
+                    }
+                }
+                val selectedPillar = pillars.firstOrNull { it.id == selectedPillarId } ?: pillars.firstOrNull()
+                if (selectedPillar != null) {
+                    item(key = "pillar_${selectedPillar.id.name}_header") {
                         Text(
-                            text = pillar.id.label().uppercase(),
+                            text = selectedPillar.id.label().uppercase(),
                             style = ty.labelMedium,
                             color = mc.primaryAccent,
                             modifier = Modifier.padding(top = spacing.sm, bottom = spacing.xxs),
                         )
                     }
-                    items(pillar.sections, key = { "${pillar.id.name}:${it.id}" }) { section ->
-                        val sectionKey = "${pillar.id.name}:${section.id}"
+                    items(selectedPillar.sections, key = { "${selectedPillar.id.name}:${it.id}" }) { section ->
+                        val sectionKey = "${selectedPillar.id.name}:${section.id}"
                         // Defaults to EXPANDED (matches DeckStudioScreen's Analysis tab convention,
                         // where collapsedCategorySections gates on `!= true`) -- this step's whole
                         // purpose is to surface each category's Browse action, so hiding everything
