@@ -55,9 +55,6 @@ class BuildCommanderDeckUseCase(
      * @param ownedCollection the caller's full owned pool (commander + basics + everything else) —
      *        this class does its own filtering (legality, identity, dedupe); pass the raw owned set.
      * @param manualAdds D7/R5: the ONLY unowned cards that can enter the build; always kept.
-     * @param edhrecAggregateNames D9: card names present in the commander's EDHREC aggregate, or
-     *        empty when the community flag is off/unavailable — a bounded prior only (≤ 1.15x),
-     *        never a placement source of its own.
      * @param onStage Deck Wizard Commander v3 plan, Phase 6 (6.3) — fired at each build-loop stage
      *        boundary so a caller (the wizard VM) can drive a real Generating-step progress UI.
      *        Defaulted to a no-op so every pre-existing call site/test keeps compiling unchanged.
@@ -72,8 +69,6 @@ class BuildCommanderDeckUseCase(
         ownedCollection: List<OwnedCard>,
         manualAdds: List<ManualAdd> = emptyList(),
         fillLands: Boolean = true,
-        useCommunityData: Boolean = false,
-        edhrecAggregateNames: Set<String> = emptySet(),
         onStage: (CommanderBuildStage) -> Unit = {},
     ): CommanderBuildOutcome {
         require(format.isCommanderFormat) { "BuildCommanderDeckUseCase requires a Commander-shaped format, got $format" }
@@ -124,7 +119,6 @@ class BuildCommanderDeckUseCase(
                 axisProfile = SynergyGraph.cardAxisProfile(card, archetypeFormat, dominantTribeAxis, dominantTribeKey),
                 mvBucketId = PlacementScorer.mvBucketId(card),
                 powerNormalized = powerResolver.powerOf(card).normalized,
-                edhrecAggregatePresent = card.name in edhrecAggregateNames,
             )
         }
 
@@ -157,7 +151,7 @@ class BuildCommanderDeckUseCase(
             remainingCandidates.forEach { card ->
                 val profile = candidateProfiles.getValue(card)
                 val pip = PlacementScorer.pipFactor(card, colorCount, manaBaseAnalyzer, emptyMap(), 0)
-                val gain = PlacementScorer.marginalGain(profile, state, plan, curveTargets, axisIdeals, pip, useCommunityData) ?: return@forEach
+                val gain = PlacementScorer.marginalGain(profile, state, plan, curveTargets, axisIdeals, pip) ?: return@forEach
                 if (best == null || gain > bestGain ||
                     (gain == bestGain && (card.name < best!!.name || (card.name == best!!.name && card.scryfallId < best!!.scryfallId)))
                 ) {

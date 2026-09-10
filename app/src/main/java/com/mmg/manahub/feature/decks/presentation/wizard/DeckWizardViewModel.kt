@@ -1991,7 +1991,6 @@ class DeckWizardViewModel(
         crashlytics.setCustomKey("deck_wizard_format", format.name)
         crashlytics.setCustomKey("deck_wizard_seed_count", state.seedCards.size)
         crashlytics.setCustomKey("deck_wizard_entry_flow", state.entryFlow.name)
-        crashlytics.setCustomKey("deck_wizard_use_community_data", state.useCommunityData)
 
         val commander = state.selectedCommander
         if (commander == null) {
@@ -2026,13 +2025,6 @@ class DeckWizardViewModel(
         val manualAdds = state.seedCards.map { card ->
             ManualAdd(card = card, isOwned = cardSnapshot.any { it.scryfallId == card.scryfallId })
         }
-        val communityEnabled = state.useCommunityData && state.communityEngineAvailable
-        val edhrecAggregateNames: Set<String> = if (communityEnabled) {
-            val aggregateResult = runCatching { communityAggregateRepository.getCommanderAggregate(commander.name) }.getOrNull()
-            (aggregateResult as? DataResult.Success)?.data?.cards?.map { it.name }?.toSet() ?: emptySet()
-        } else {
-            emptySet()
-        }
 
         val outcome = runCatching {
             buildCommanderDeckUseCase(
@@ -2043,8 +2035,6 @@ class DeckWizardViewModel(
                 ownedCollection = ownedCollection,
                 manualAdds = manualAdds,
                 fillLands = state.fillLands,
-                useCommunityData = communityEnabled,
-                edhrecAggregateNames = edhrecAggregateNames,
                 onStage = { stage ->
                     _uiState.update { s ->
                         s.copy(

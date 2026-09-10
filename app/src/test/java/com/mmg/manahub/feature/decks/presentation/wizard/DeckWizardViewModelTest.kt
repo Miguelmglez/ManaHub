@@ -1369,7 +1369,7 @@ class DeckWizardViewModelTest {
         // and verifies the VM's OWN wiring (persist() is real -- see buildCommanderDeckUseCase's
         // spyk() construction above -- so the assertions below still exercise the real write path).
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any())
         } returns commanderOutcome()
         val vm = viewModel()
         advanceUntilIdle()
@@ -1415,7 +1415,7 @@ class DeckWizardViewModelTest {
             DeckEntry(card = card(id = "spell-$i", name = "Spell $i"), quantity = 1, isOwned = true)
         }
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any())
         } returns commanderOutcome(entries = listOf(DeckEntry(card = commander, quantity = 1, isOwned = true, isSideboard = false)) + ninetyNineEntries)
         val vm = viewModel()
         advanceUntilIdle()
@@ -1448,7 +1448,7 @@ class DeckWizardViewModelTest {
         coEvery { cardRepository.searchCardByName("Forest") } returns DataResult.Success(forest)
         val ownedCollectionSlot = slot<List<OwnedCard>>()
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), capture(ownedCollectionSlot), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), any(), any(), capture(ownedCollectionSlot), any(), any(), any())
         } returns commanderOutcome()
         val vm = viewModel()
         advanceUntilIdle()
@@ -2094,7 +2094,7 @@ class DeckWizardViewModelTest {
         val strategyPickSlot = slot<com.mmg.manahub.feature.decks.domain.engine.StrategyPick>()
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), capture(strategyPickSlot), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), capture(strategyPickSlot), any(), any(), any(), any(), any())
         } returns commanderOutcome()
         vm.onNextFromFormat()
         vm.onSelectCommander(commander)

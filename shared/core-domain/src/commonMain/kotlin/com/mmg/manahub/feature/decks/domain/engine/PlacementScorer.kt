@@ -32,7 +32,6 @@ object PlacementScorer {
     const val AXIS_WEIGHT = 0.30f
     const val CURVE_WEIGHT = 0.10f
     const val POWER_WEIGHT = 0.10f
-    const val COMMUNITY_MULTIPLIER_CAP = 1.15f
 
     /** Credit while a role sits between [RoleTarget.ideal] and [RoleTarget.max] -- not zero (still
      * a legal, wanted card) but far below the steep pre-ideal slope, so the loop naturally prefers
@@ -56,7 +55,6 @@ object PlacementScorer {
         val axisProfile: SynergyGraph.CardAxisProfile,
         val mvBucketId: String,
         val powerNormalized: Float,
-        val edhrecAggregatePresent: Boolean = false,
     )
 
     /** Running placement counters the loop updates incrementally after every placement (plan 2.3). */
@@ -78,7 +76,6 @@ object PlacementScorer {
         curveTargets: List<CurveTargets.CurveBucketTarget>,
         axisIdeals: Map<AxisKey, SynergyGraph.AxisIdeal>,
         pipFactor: Float,
-        useCommunityData: Boolean,
     ): Float? {
         // Hard filter (plan 2.2): a card matching one of the skeleton's anti-roles is never placed
         // by the engine, regardless of how well it scores elsewhere.
@@ -97,8 +94,7 @@ object PlacementScorer {
         val powerPrior = candidate.powerNormalized.coerceIn(0f, 1f)
 
         val weighted = roleGain * ROLE_WEIGHT + axisGain * AXIS_WEIGHT + curveGain * CURVE_WEIGHT + powerPrior * POWER_WEIGHT
-        val communityMultiplier = if (useCommunityData && candidate.edhrecAggregatePresent) COMMUNITY_MULTIPLIER_CAP else 1f
-        return weighted * pipFactor.coerceIn(0f, 1f) * communityMultiplier
+        return weighted * pipFactor.coerceIn(0f, 1f)
     }
 
     /**

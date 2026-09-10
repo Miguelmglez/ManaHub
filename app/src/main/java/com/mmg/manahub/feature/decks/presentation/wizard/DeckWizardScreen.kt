@@ -682,11 +682,13 @@ private fun ReviewStepContent(
                 }
             }
 
-            // Deck Engine Unification plan (§5 Phase 3.5) — the shared source step. Hidden entirely
+            // Deck Engine Unification plan (§5 Phase 3.5) — the shared source step, Casual-only
+            // since W5.1 (G9): community decklists are unvalidated, so Commander's review step never
+            // shows this toggle (its whole placement-prior plumbing was deleted). Hidden entirely
             // when the global community-engine flag is off (never a disabled-but-visible toggle for
             // a capability the user can't actually use — mirrors the Coming Soon format cards'
             // "never advertise something inert" convention).
-            if (uiState.communityEngineAvailable) {
+            if (!isCommander && uiState.communityEngineAvailable) {
                 Surface(
                     onClick = onToggleUseCommunityData,
                     shape = SmallCardShape,

@@ -68,13 +68,13 @@ class PlacementScorerTest {
         val atMax = PlacementScorer.PlacementState(roleCounts = mapOf("ramp" to 12))
 
         val gainUnderIdeal = PlacementScorer.marginalGain(
-            underIdeal, PlacementScorer.PlacementState(), myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f, useCommunityData = false,
+            underIdeal, PlacementScorer.PlacementState(), myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f,
         )
         val gainAtIdealPlateau = PlacementScorer.marginalGain(
-            underIdeal, atIdeal, myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f, useCommunityData = false,
+            underIdeal, atIdeal, myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f,
         )
         val gainAtMax = PlacementScorer.marginalGain(
-            underIdeal, atMax, myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f, useCommunityData = false,
+            underIdeal, atMax, myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f,
         )
 
         assertTrue((gainUnderIdeal ?: 0f) > (gainAtIdealPlateau ?: 0f), "gain below ideal must exceed the plateau credit")
@@ -89,7 +89,7 @@ class PlacementScorerTest {
         )
         val candidate = profile(roleConfidence = mapOf("ramp" to 1f))
         val gain = PlacementScorer.marginalGain(
-            candidate, PlacementScorer.PlacementState(), myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f, useCommunityData = false,
+            candidate, PlacementScorer.PlacementState(), myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f,
         )
         assertNull(gain, "a role in the skeleton's antiRoles must never be placed by the engine")
     }
@@ -104,10 +104,10 @@ class PlacementScorerTest {
         val someProducers = PlacementScorer.PlacementState(axisProducerCounts = mapOf("TOKENS" to 5))
 
         val gainNoProducers = PlacementScorer.marginalGain(
-            payoffCandidate, noProducers, myPlan, myPlan.curveTargets, ideals, pipFactor = 1f, useCommunityData = false,
+            payoffCandidate, noProducers, myPlan, myPlan.curveTargets, ideals, pipFactor = 1f,
         )
         val gainWithProducers = PlacementScorer.marginalGain(
-            payoffCandidate, someProducers, myPlan, myPlan.curveTargets, ideals, pipFactor = 1f, useCommunityData = false,
+            payoffCandidate, someProducers, myPlan, myPlan.curveTargets, ideals, pipFactor = 1f,
         )
 
         assertNull(gainNoProducers, "a payoff with zero producers on its own axis clears no role/axis gain -> filler floor")
@@ -122,10 +122,10 @@ class PlacementScorerTest {
 
         val stateWithFullBucket = PlacementScorer.PlacementState(curveBucketCounts = mapOf("mv:1" to 9_999))
         val gainDeficit = PlacementScorer.marginalGain(
-            deficitBucketCandidate, PlacementScorer.PlacementState(), myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f, useCommunityData = false,
+            deficitBucketCandidate, PlacementScorer.PlacementState(), myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f,
         )
         val gainFullBucket = PlacementScorer.marginalGain(
-            fullBucketCandidate, stateWithFullBucket, myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f, useCommunityData = false,
+            fullBucketCandidate, stateWithFullBucket, myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f,
         )
         assertTrue((gainDeficit ?: 0f) > (gainFullBucket ?: 0f), "an already-saturated MV bucket must contribute zero curveGain")
     }
@@ -135,7 +135,7 @@ class PlacementScorerTest {
         val myPlan = plan(roleTargets = emptyMap())
         val filler = profile() // no roles, no axis edges at all
         val gain = PlacementScorer.marginalGain(
-            filler, PlacementScorer.PlacementState(), myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f, useCommunityData = false,
+            filler, PlacementScorer.PlacementState(), myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f,
         )
         assertNull(gain, "D8: a candidate with zero role gain and zero axis gain is never placed")
     }
