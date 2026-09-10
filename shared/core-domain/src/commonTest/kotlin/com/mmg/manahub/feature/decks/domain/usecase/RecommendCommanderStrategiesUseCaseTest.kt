@@ -126,6 +126,83 @@ class RecommendCommanderStrategiesUseCaseTest {
         assertTrue(commanderResult == casualResult)
     }
 
+    // Deck Wizard Commander v4 plan, W3/E3 -- splitRecommended (score threshold + hard cap of 5).
+
+    @Test
+    fun `splitRecommended -- Karlov -- lifegain stays in Recommended`() {
+        val commander = fixture03Karlov().mainboard.first { it.card.name == "Karlov of the Ghost Council" }.card
+        val owned = ownedFrom(MockCollectionRich.ownedCards, MockCollectionRich.ownedBasics)
+        val result = useCase(DeckFormat.COMMANDER, commander, commander.colorIdentity.toManaColors(), owned)
+        val (recommended, _) = useCase.splitRecommended(result)
+        assertTrue(recommended.size <= 5, "Recommended must never exceed 5, got ${recommended.size}")
+        assertTrue(recommended.any { it.strategy.id == "lifegain" }, "expected 'lifegain' in Recommended, got ${recommended.map { it.strategy.id }}")
+    }
+
+    @Test
+    fun `splitRecommended -- Meren -- aristocrats stays in Recommended`() {
+        val commander = fixture02Meren().mainboard.first { it.card.name == "Meren of Clan Nel Toth" }.card
+        val owned = ownedFrom(MockCollectionRich.ownedCards, MockCollectionRich.ownedBasics)
+        val result = useCase(DeckFormat.COMMANDER, commander, commander.colorIdentity.toManaColors(), owned)
+        val (recommended, _) = useCase.splitRecommended(result)
+        assertTrue(recommended.size <= 5)
+        assertTrue(recommended.any { it.strategy.id == "aristocrats" }, "expected 'aristocrats' in Recommended, got ${recommended.map { it.strategy.id }}")
+    }
+
+    @Test
+    fun `splitRecommended -- Edgar -- tribal stays in Recommended`() {
+        val commander = fixture01EdgarMarkov().mainboard.first { it.card.scryfallId == "cmd-edgar-markov" }.card
+        val owned = ownedFrom(MockCollectionRich.ownedCards, MockCollectionRich.ownedBasics)
+        val result = useCase(DeckFormat.COMMANDER, commander, commander.colorIdentity.toManaColors(), owned)
+        val (recommended, _) = useCase.splitRecommended(result)
+        assertTrue(recommended.size <= 5)
+        assertTrue(recommended.any { it.strategy.id == "tribal" }, "expected 'tribal' in Recommended, got ${recommended.map { it.strategy.id }}")
+    }
+
+    @Test
+    fun `splitRecommended -- Urza with artifacts tag -- artifacts stays in Recommended`() {
+        val commander = fixture05Urza().mainboard.first { it.card.name == "Urza, Lord High Artificer" }.card
+        val owned = ownedFrom(MockCollectionRich.ownedCards, MockCollectionRich.ownedBasics)
+        val ownTags = listOf(CardTag("artifacts_matter", TagCategory.STRATEGY))
+        val result = useCase(DeckFormat.COMMANDER, commander, commander.colorIdentity.toManaColors(), owned, ownTags = ownTags)
+        val (recommended, _) = useCase.splitRecommended(result)
+        assertTrue(recommended.size <= 5)
+        assertTrue(recommended.any { it.strategy.id == "artifacts" }, "expected 'artifacts' in Recommended, got ${recommended.map { it.strategy.id }}")
+    }
+
+    @Test
+    fun `splitRecommended -- Brago with blink tag -- blink stays in Recommended`() {
+        val commander = fixture07Brago().mainboard.first { it.card.name == "Brago, King Eternal" }.card
+        val ownTags = listOf(CardTag.BLINK)
+        val result = useCase(DeckFormat.COMMANDER, commander, commander.colorIdentity.toManaColors(), ownTags = ownTags)
+        val (recommended, _) = useCase.splitRecommended(result)
+        assertTrue(recommended.size <= 5)
+        assertTrue(recommended.any { it.strategy.id == "blink" }, "expected 'blink' in Recommended, got ${recommended.map { it.strategy.id }}")
+    }
+
+    @Test
+    fun `splitRecommended -- a commander with no owned collection, tags or EDHREC data yields a short Recommended list, never padded to 5`() {
+        // Urza's own fixture-authored oracle text trips zero ArchetypeRoleClassifier/SynergyGraph
+        // matchers (documented above) -- with no owned collection and no card_strategy_tags either,
+        // every candidate's score comes from ColorStrategyAffinity alone (a generic color-pair prior,
+        // never real commander-specific signal). This is the exact "no strong signal" case E3 exists
+        // to stop padding to 5.
+        val commander = fixture05Urza().mainboard.first { it.card.name == "Urza, Lord High Artificer" }.card
+        val result = useCase(DeckFormat.COMMANDER, commander, commander.colorIdentity.toManaColors())
+        val (recommended, partialFit) = useCase.splitRecommended(result)
+        assertTrue(recommended.size < 5, "expected a SHORT Recommended list for a no-signal commander, got ${recommended.size}: ${recommended.map { it.strategy.id }}")
+        assertTrue(partialFit.size == result.size - recommended.size)
+    }
+
+    @Test
+    fun `splitRecommended -- partial fit carries every entry Recommended does not`() {
+        val commander = fixture03Karlov().mainboard.first { it.card.name == "Karlov of the Ghost Council" }.card
+        val owned = ownedFrom(MockCollectionRich.ownedCards, MockCollectionRich.ownedBasics)
+        val result = useCase(DeckFormat.COMMANDER, commander, commander.colorIdentity.toManaColors(), owned)
+        val (recommended, partialFit) = useCase.splitRecommended(result)
+        assertTrue((recommended + partialFit).size == result.size)
+        assertTrue(recommended.map { it.strategy.id }.toSet().intersect(partialFit.map { it.strategy.id }.toSet()).isEmpty())
+    }
+
     @Test
     fun `unresolved tribal entries never occupy the top 3`() {
         // A colorless-flavored commander with no tribe signal at all -- "tribal" should still be

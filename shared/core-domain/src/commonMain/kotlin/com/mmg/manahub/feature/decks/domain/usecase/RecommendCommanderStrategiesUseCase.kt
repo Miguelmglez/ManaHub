@@ -32,7 +32,7 @@ import com.mmg.manahub.feature.decks.domain.template.OwnedCard
 //  a single-select over CuratedStrategyCatalog.ALL, D4). This class ranks the catalog itself.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** One catalog entry the STRATEGY step's "Recommended" / "Other plans" list can show, ranked by
+/** One catalog entry the STRATEGY step's "Recommended" / "Partial fit" list can show, ranked by
  * [score] (higher first). [tribe] is the concrete `"tribe:<subtype>"` key this recommendation would
  * pin ([CuratedStrategy.requiresTribe] entries only) — `null` when either the entry needs no tribe,
  * or [CuratedStrategy.requiresTribe] is true but no tribe could be derived from the commander (that
@@ -174,6 +174,55 @@ class RecommendCommanderStrategiesUseCase {
             ).map { it.recommendation }
     }
 
+    /**
+     * Deck Wizard Commander v4 plan, W3/E3 — splits an [invoke] result into "Recommended" (first
+     * pair element) and "Partial fit" (second): a commander genuinely supports a handful of plans,
+     * not the whole catalog, so this is a real cut, not a `take(6)` cosmetic split.
+     *
+     * A candidate is Recommended only when it clears BOTH gates below (a hard cap of
+     * [RECOMMENDED_CAP] applies after):
+     * 1. **[ABSOLUTE_MIN_SCORE]** — excludes candidates whose score is pure generic noise (no
+     *    commander-specific axis/role/tag/EDHREC/owned-coverage signal at all, only
+     *    [colorAffinityScore]'s color-pair prior). Calibrated from the real corpus, not guessed:
+     *    over the 7 fixture commanders in `RecommendCommanderStrategiesUseCaseTest`, a commander
+     *    with literally zero non-color signal (Urza with no owned collection, no `card_strategy_tags`,
+     *    no EDHREC data) tops out at 0.9 (`COLOR_WEIGHT * colorAffinityScore` alone) — every fixture
+     *    with ANY real signal clears 1.0 by a wide margin (Omnath's weakest real match is 1.5). This
+     *    is what makes a "no strong signal" commander yield an EMPTY Recommended list (§ below)
+     *    instead of 5 color-affinity ties dressed up as recommendations.
+     * 2. **Relative-spread threshold** — `topScore - RELATIVE_SPREAD_FRACTION * (topScore - bottomScore)`.
+     *    Keeps only the top slice of THIS commander's own score range, so a landslide winner (Edgar
+     *    Markov: tribal at 9.18 vs. everything else under 3.8) yields a short, high-confidence list
+     *    instead of padding to 5 with plans the commander doesn't actually push toward, while a
+     *    genuinely close race (Karlov: aristocrats 3.78 / lifegain 3.78, both real Orzhov plans)
+     *    keeps both. `RELATIVE_SPREAD_FRACTION = 0.2` was chosen by checking it against every fixture:
+     *    tight enough to cut Karlov's third-place `tokens` (3.48, a real but weaker fit) while loose
+     *    enough to keep Meren's `lifegain` (3.225) alongside its `aristocrats` top pick (3.477).
+     *
+     * [CuratedStrategy.requiresTribe] entries the recommender could not resolve a concrete tribe for
+     * (the same `unresolved` set [invoke] already pushes to the very end) are never eligible for
+     * Recommended — re-derived here from the public [StrategyRecommendation.tribe]/
+     * [CuratedStrategy.requiresTribe] fields rather than threading a private flag through the return
+     * type. An empty Recommended list is a valid, INTENTIONAL result (a commander with no real
+     * signal) — callers must not treat it as an error or fall back to padding it themselves; "Custom"
+     * stays separately offered by the caller in every case (D6, unchanged).
+     */
+    fun splitRecommended(recommendations: List<StrategyRecommendation>): Pair<List<StrategyRecommendation>, List<StrategyRecommendation>> {
+        val resolvable = recommendations.filter { !(it.strategy.requiresTribe && it.tribe == null) }
+        if (resolvable.isEmpty()) return emptyList<StrategyRecommendation>() to recommendations
+
+        val top = resolvable.first().score
+        val bottom = resolvable.last().score
+        val relativeThreshold = top - RELATIVE_SPREAD_FRACTION * (top - bottom)
+
+        val recommended = resolvable
+            .filter { it.score >= ABSOLUTE_MIN_SCORE && it.score >= relativeThreshold }
+            .take(RECOMMENDED_CAP)
+        val recommendedIds = recommended.map { it.strategy.id }.toSet()
+        val partialFit = recommendations.filter { it.strategy.id !in recommendedIds }
+        return recommended to partialFit
+    }
+
     private data class ScoredEntry(val recommendation: StrategyRecommendation, val unresolved: Boolean)
 
     private fun axisAlignmentScore(entryAxes: Set<String>, commanderAxes: Set<String>): Double {
@@ -289,5 +338,17 @@ class RecommendCommanderStrategiesUseCase {
         const val EDHREC_WEIGHT = 1.0
         const val COLOR_WEIGHT = 1.0
         const val OWNED_WEIGHT = 3.0
+
+        /** Hard cap on the "Recommended" group (E3) regardless of how many candidates clear the
+         * score gates in [splitRecommended]. */
+        const val RECOMMENDED_CAP = 5
+
+        /** See [splitRecommended]'s KDoc — the calibrated noise floor a commander with zero real
+         * signal cannot clear. */
+        const val ABSOLUTE_MIN_SCORE = 1.0
+
+        /** See [splitRecommended]'s KDoc — fraction of a commander's own top-to-bottom score range
+         * that still counts as "the same tier" as the top pick. */
+        const val RELATIVE_SPREAD_FRACTION = 0.2
     }
 }

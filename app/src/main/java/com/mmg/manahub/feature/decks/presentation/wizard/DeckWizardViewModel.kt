@@ -227,11 +227,12 @@ data class DeckWizardUiState(
     val commanderStructuredQuery: AdvancedSearchQuery? = null,
 
     /** STRATEGY step (Deck Wizard Commander v3 plan, Phase 4) -- the ranked recommendation list
-     * from [RecommendCommanderStrategiesUseCase], sorted best-first; the UI takes the first
-     * [STRATEGY_RECOMMENDED_COUNT] as "Recommended" and the rest as collapsed "Other plans"
-     * (Custom is a UI-level sentinel, always offered separately -- see
-     * [DeckWizardCommanderSteps.CUSTOM_STRATEGY_ID]). Replaces the old `DeriveCommanderStrategiesUseCase`
-     * candidate-union list + the 3-axis `StrategyPickerSheet` this step used to mount. */
+     * from [RecommendCommanderStrategiesUseCase], sorted best-first; the UI splits it via
+     * [RecommendCommanderStrategiesUseCase.splitRecommended] (v4 W3/E3: score threshold + hard cap
+     * of 5) into "Recommended" and collapsed "Partial fit" (Custom is a UI-level sentinel, always
+     * offered separately -- see [DeckWizardCommanderSteps.CUSTOM_STRATEGY_ID]). Replaces the old
+     * `DeriveCommanderStrategiesUseCase` candidate-union list + the 3-axis `StrategyPickerSheet`
+     * this step used to mount. */
     val commanderStrategyRecommendations: List<StrategyRecommendation> = emptyList(),
     val isLoadingCommanderStrategies: Boolean = false,
     /** The currently-selected catalog entry's id, or `null` for Custom (D6) -- drives the STRATEGY
@@ -1009,7 +1010,7 @@ class DeckWizardViewModel(
         }
     }
 
-    /** Selects a "Recommended"/"Other plans" row. A [CuratedStrategy.requiresTribe] entry the
+    /** Selects a "Recommended"/"Partial fit" row. A [CuratedStrategy.requiresTribe] entry the
      * recommender could already resolve a concrete tribe for (its own
      * [StrategyRecommendation.tribe]) applies immediately; one it could NOT resolve opens the tribe
      * sub-picker instead ([onRequestTribeForStrategy]) rather than applying with a `null` tribe. */
