@@ -141,6 +141,11 @@ data class DeckWizardUiState(
     val commanderQuery: String = "",
     val commanderSearchResults: List<Card> = emptyList(),
     val isSearchingCommander: Boolean = false,
+    /** Deck Wizard Commander v4 plan, Run 2 W2 review (P1.2): true when [triggerCommanderPickSearch]'s
+     * Scryfall call failed -- lets COMMANDER_PICK render [com.mmg.manahub.core.ui.components
+     * .InlineErrorState] instead of silently falling through to the "no results" empty state. Cleared
+     * at the start of every new search attempt. */
+    val commanderSearchError: Boolean = false,
     /** Flow A (cards-first, plan §5 3.2) — recomputed from [seedCards] (+ [selectedCommander]) on
      * every seed add/remove. `null` while no seed is picked yet (nothing to rank). */
     val seedStrategySuggestion: SeedStrategySuggestion? = null,
@@ -399,6 +404,7 @@ private fun DeckWizardUiState.resetDirectionScratchState(): DeckWizardUiState = 
     commanderQuery = "",
     commanderSearchResults = emptyList(),
     isSearchingCommander = false,
+    commanderSearchError = false,
     seedStrategySuggestion = null,
     colorAffinityEntries = emptyList(),
     selectedColorAffinityEntry = null,
@@ -796,6 +802,7 @@ class DeckWizardViewModel(
                 it.copy(
                     commanderSearchResults = emptyList(),
                     isSearchingCommander = false,
+                    commanderSearchError = false,
                     manualAddsSearchResults = emptyList(),
                     isSearchingManualAdds = false,
                     seedSearchResults = emptyList(),
@@ -813,6 +820,7 @@ class DeckWizardViewModel(
                 colorIdentity = card.colorIdentity.toManaColorSet(),
                 commanderQuery = "",
                 commanderSearchResults = emptyList(),
+                commanderSearchError = false,
                 commanderStructuredQuery = null,
                 availableThemeTags = emptyList(),
                 selectedThemeHint = null,
@@ -900,21 +908,22 @@ class DeckWizardViewModel(
         val lockedCriteria = commanderLockedCriteria(state.selectedFormat)
         val effectiveQuery = buildCommanderSearchQuery(state, lockedCriteria)
         if (effectiveQuery == null) {
-            _uiState.update { it.copy(commanderSearchResults = emptyList(), isSearchingCommander = false) }
+            _uiState.update { it.copy(commanderSearchResults = emptyList(), isSearchingCommander = false, commanderSearchError = false) }
             return
         }
         val fragment = StructuredCardSearch.scryfallFragment(effectiveQuery)
         if (fragment == null) {
-            _uiState.update { it.copy(commanderSearchResults = emptyList(), isSearchingCommander = false) }
+            _uiState.update { it.copy(commanderSearchResults = emptyList(), isSearchingCommander = false, commanderSearchError = false) }
             return
         }
         commanderSearchJob = viewModelScope.launch {
             if (debounce) delay(SEARCH_DEBOUNCE_MS)
-            _uiState.update { it.copy(isSearchingCommander = true) }
+            _uiState.update { it.copy(isSearchingCommander = true, commanderSearchError = false) }
             val results = when (val res = searchCardsUseCase(fragment)) {
                 is DataResult.Success -> res.data.cards
                 is DataResult.Error -> {
                     crashReporter.log("deck_wizard_commander_structured_search_failed")
+                    _uiState.update { it.copy(commanderSearchError = true) }
                     emptyList()
                 }
             }

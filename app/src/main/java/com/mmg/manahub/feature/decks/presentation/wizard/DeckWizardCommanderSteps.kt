@@ -194,7 +194,9 @@ internal fun buildCommanderSearchQuery(uiState: DeckWizardUiState, lockedCriteri
  *
  * Tapping a candidate opens the SHARED [CardDetailSheet] in its commander-selection context.
  * Once [DeckWizardUiState.selectedCommander] is set, this step shows the picked commander's large
- * flip portrait + tags + Change/Continue CTAs (W2.3, G3) instead of the grid.
+ * flip portrait + tags + a "Change commander" CTA (W2.3, G3) instead of the grid -- "Next" is owned
+ * solely by the sticky [WizardStickyButton] below, same as every sibling step (Deck Wizard Commander
+ * v4 plan, Run 2 W2 review, P0: a duplicate inline "Next" here used to render alongside it).
  */
 @Composable
 internal fun CommanderPickStepContent(
@@ -243,13 +245,6 @@ internal fun CommanderPickStepContent(
                     style = MagicCtaStyle.Outlined,
                     color = MagicCtaColor.Neutral,
                     icon = { Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                MagicCtaButton(
-                    onClick = onNext,
-                    text = stringResource(R.string.deck_wizard_next),
-                    style = MagicCtaStyle.Filled,
-                    color = MagicCtaColor.Primary,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -309,7 +304,7 @@ internal fun CommanderPickStepContent(
                                 Icon(
                                     Icons.Default.Tune,
                                     contentDescription = stringResource(R.string.deck_wizard_commander_advanced_search),
-                                    tint = if (filterCount > 0) mc.goldMtg else mc.textSecondary,
+                                    tint = if (filterCount > 0) mc.primaryAccent else mc.textSecondary,
                                 )
                             }
                         }
@@ -344,15 +339,22 @@ internal fun CommanderPickStepContent(
 
                 when {
                     // Never render an empty state while a search is in flight -- that reads as
-                    // "no results", which may be a lie (campaign G7).
+                    // "no results", which may be a lie (campaign G7). Error takes priority over
+                    // empty (P1.2) but loading still wins over both.
                     !isIdle && uiState.isSearchingCommander -> item(key = "loading", span = { GridItemSpan(maxLineSpan) }) {
                         Box(Modifier.fillMaxWidth().padding(vertical = spacing.lg), contentAlignment = Alignment.Center) {
                             MagicLoadingSpinner(size = MagicLoadingSize.Small)
                         }
                     }
+                    !isIdle && uiState.commanderSearchError -> item(key = "error", span = { GridItemSpan(maxLineSpan) }) {
+                        InlineErrorState(
+                            message = stringResource(R.string.deck_wizard_commander_search_error),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = spacing.lg),
+                        )
+                    }
                     candidatesToShow.isEmpty() -> item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
                         EmptyState(
-                            title = stringResource(R.string.deck_wizard_commander_pick_empty),
+                            title = stringResource(if (isIdle) R.string.deck_wizard_commander_pick_idle_empty else R.string.deck_wizard_commander_pick_empty),
                             icon = Icons.Default.Search,
                             actionLabel = if (!isIdle) stringResource(R.string.deck_wizard_commander_clear_filters) else null,
                             onAction = if (!isIdle) onClearSearchAndFilters else null,

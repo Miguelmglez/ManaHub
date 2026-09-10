@@ -814,6 +814,30 @@ class DeckWizardViewModelTest {
     }
 
     @Test
+    fun `triggerCommanderPickSearch sets commanderSearchError on failure and clears it on the next successful search`() = runTest(dispatcher) {
+        coEvery { searchCardsUseCase(any(), any()) } returns DataResult.Error("Scryfall down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+
+        vm.onCommanderNameFilterChange("Zada")
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.commanderSearchError)
+        assertTrue(vm.uiState.value.commanderSearchResults.isEmpty())
+
+        coEvery { searchCardsUseCase(any(), any()) } returns DataResult.Success(
+            com.mmg.manahub.core.model.PaginatedCards(cards = listOf(commander), hasMore = false, totalCards = 1)
+        )
+        vm.onCommanderNameFilterChange("Zada Rovni")
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.commanderSearchError)
+        assertEquals(listOf(commander), vm.uiState.value.commanderSearchResults)
+    }
+
+    @Test
     fun `onClearCommanderFilters drops the structured query but keeps the search text`() = runTest(dispatcher) {
         coEvery { searchCardsUseCase(any(), any()) } returns DataResult.Success(
             com.mmg.manahub.core.model.PaginatedCards(cards = listOf(commander), hasMore = false, totalCards = 1)

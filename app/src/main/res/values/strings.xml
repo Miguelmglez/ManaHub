@@ -1192,6 +1192,9 @@
     <!-- Deck Wizard Commander v3 plan (Phase 3.2) -->
     <string name="deck_wizard_commanders_in_collection">Available commanders in your collection</string>
     <string name="deck_wizard_commander_advanced_search">Advanced search</string>
+    <!-- Deck Wizard Commander v4 plan, Run 2 W2 review (P1.1/P1.2) -->
+    <string name="deck_wizard_commander_pick_idle_empty">No eligible commanders in your collection yet. Try searching Scryfall by name above.</string>
+    <string name="deck_wizard_commander_search_error">Something went wrong searching for commanders. Try again.</string>
     <!-- Deck Wizard Commander v4 plan (W2.1/W2.2) -->
     <string name="deck_wizard_commander_active_filters">%1$d active filter(s)</string>
     <string name="deck_wizard_commander_clear_filters">Clear filters</string>

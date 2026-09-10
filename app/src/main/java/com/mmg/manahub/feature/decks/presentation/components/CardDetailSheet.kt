@@ -69,6 +69,7 @@ import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -210,16 +211,7 @@ internal fun CardDetailSheet(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth(0.8f)
-                                .aspectRatio(0.716f)
-                                .clip(CardShape),
-                            shape = CardShape,
-                            shadowElevation = 8.dp,
-                            tonalElevation = 4.dp,
-                            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f))
-                        ) {
+                        CardPortraitFrame(mc = mc) {
                             Image(
                                 painter = painterResource(Res.drawable.mtg_card_back),
                                 contentDescription = null,
@@ -385,6 +377,26 @@ internal fun CardDetailSheet(
 }
 
 /**
+ * The card-portrait frame (aspect ratio, shape, elevation, border) shared by [CardFlipPortrait]'s
+ * real image and [CardDetailSheet]'s loading placeholder -- hoisted (Deck Wizard Commander v4 plan,
+ * Run 2 W2 review, P2.1) so the two can't silently drift apart on a future tweak.
+ */
+@Composable
+private fun CardPortraitFrame(mc: MagicColors, content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth(0.8f)
+            .aspectRatio(0.716f)
+            .clip(CardShape),
+        shape = CardShape,
+        shadowElevation = 8.dp,
+        tonalElevation = 4.dp,
+        border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
+        content = content,
+    )
+}
+
+/**
  * The large card image + DFC flip block, extracted from [CardDetailSheet] (Deck Wizard Commander v4
  * plan, W2.3/G3) so the wizard's own selected-commander view can render the SAME composition
  * without reaching into this file's private internals. Takes just the [Card] to render -- no
@@ -409,16 +421,7 @@ internal fun CardFlipPortrait(card: Card, modifier: Modifier = Modifier) {
             label = "CardFlip",
         )
 
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.8f)
-                .aspectRatio(0.716f)
-                .clip(CardShape),
-            shape = CardShape,
-            shadowElevation = 8.dp,
-            tonalElevation = 4.dp,
-            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f))
-        ) {
+        CardPortraitFrame(mc = mc) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -471,6 +474,7 @@ internal fun CardFlipPortrait(card: Card, modifier: Modifier = Modifier) {
 
         if (hasBackFace) {
             Surface(
+                onClick = { showBackFace = !showBackFace },
                 shape = ChipShape,
                 color = mc.primaryAccent.copy(alpha = 0.1f),
                 modifier = Modifier.padding(top = spacing.xs)
@@ -524,5 +528,6 @@ private fun CommanderStatusBadge() {
     }
 }
 
-/** Height of the golden "Choose as commander" CTA button. */
-private val CommanderCtaHeight = 52.dp
+/** Height of the golden "Choose as commander" CTA button -- 48dp, the app's touch-target minimum
+ * and on the 8dp spacing grid (Deck Wizard Commander v4 plan, Run 2 W2 review, P2.3: was 52dp). */
+private val CommanderCtaHeight = 48.dp
