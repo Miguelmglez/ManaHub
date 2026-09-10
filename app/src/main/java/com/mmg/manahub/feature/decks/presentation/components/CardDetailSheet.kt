@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.components
+// COMMENTS_REVIEWED: 2026-09-10
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -137,8 +138,6 @@ internal fun CardDetailSheet(
         it != SheetValue.Hidden
     }
 
-    var showBackFace by remember { mutableStateOf(value = false) }
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -182,96 +181,7 @@ internal fun CardDetailSheet(
 
             if (visualCard != null) {
                 item {
-                    val hasBackFace = !visualCard.imageBackNormal.isNullOrBlank()
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(spacing.sm),
-                    ) {
-                        val rotation by animateFloatAsState(
-                            targetValue = if (showBackFace) -180f else 0f,
-                            animationSpec = tween(durationMillis = 500),
-                            label = "CardFlip",
-                        )
-
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth(0.8f)
-                                .aspectRatio(0.716f)
-                                .clip(CardShape),
-                            shape = CardShape,
-                            shadowElevation = 8.dp,
-                            tonalElevation = 4.dp,
-                            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f))
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer {
-                                        rotationY = rotation
-                                        cameraDistance = 12f * density
-                                    }
-                                    .then(
-                                        if (hasBackFace) Modifier.clickable {
-                                            showBackFace = !showBackFace
-                                        } else Modifier
-                                    ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(visualCard.imageNormal ?: visualCard.imageArtCrop)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = visualCard.name,
-                                    placeholder = painterResource(Res.drawable.mtg_card_back),
-                                    error = painterResource(Res.drawable.mtg_card_back),
-                                    fallback = painterResource(Res.drawable.mtg_card_back),
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .graphicsLayer { alpha = if (rotation >= -90f) 1f else 0f },
-                                )
-                                if (hasBackFace) {
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current)
-                                            .data(visualCard.imageBackNormal)
-                                            .crossfade(true)
-                                            .build(),
-                                        contentDescription = visualCard.name,
-                                        placeholder = painterResource(Res.drawable.mtg_card_back),
-                                        error = painterResource(Res.drawable.mtg_card_back),
-                                        fallback = painterResource(Res.drawable.mtg_card_back),
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .graphicsLayer {
-                                                rotationY = 180f
-                                                alpha = if (rotation < -90f) 1f else 0f
-                                            },
-                                    )
-                                }
-                            }
-                        }
-
-                        if (hasBackFace) {
-                            Surface(
-                                shape = ChipShape,
-                                color = mc.primaryAccent.copy(alpha = 0.1f),
-                                modifier = Modifier.padding(top = spacing.xs)
-                            ) {
-                                Text(
-                                    text = stringResource(if (showBackFace) R.string.carddetail_flip_see_front else R.string.carddetail_flip_see_back),
-                                    style = ty.labelSmall,
-                                    color = mc.primaryAccent,
-                                    modifier = Modifier.padding(
-                                        horizontal = spacing.md,
-                                        vertical = spacing.xxs
-                                    )
-                                )
-                            }
-                        }
-                    }
+                    CardFlipPortrait(card = visualCard)
                 }
 
                 item {
@@ -469,6 +379,111 @@ internal fun CardDetailSheet(
                             .padding(horizontal = spacing.lg, vertical = spacing.sm)
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * The large card image + DFC flip block, extracted from [CardDetailSheet] (Deck Wizard Commander v4
+ * plan, W2.3/G3) so the wizard's own selected-commander view can render the SAME composition
+ * without reaching into this file's private internals. Takes just the [Card] to render -- no
+ * sheet/dismiss/action-area coupling.
+ */
+@Composable
+internal fun CardFlipPortrait(card: Card, modifier: Modifier = Modifier) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    val hasBackFace = !card.imageBackNormal.isNullOrBlank()
+    var showBackFace by remember { mutableStateOf(value = false) }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(spacing.sm),
+    ) {
+        val rotation by animateFloatAsState(
+            targetValue = if (showBackFace) -180f else 0f,
+            animationSpec = tween(durationMillis = 500),
+            label = "CardFlip",
+        )
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.8f)
+                .aspectRatio(0.716f)
+                .clip(CardShape),
+            shape = CardShape,
+            shadowElevation = 8.dp,
+            tonalElevation = 4.dp,
+            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        rotationY = rotation
+                        cameraDistance = 12f * density
+                    }
+                    .then(
+                        if (hasBackFace) Modifier.clickable {
+                            showBackFace = !showBackFace
+                        } else Modifier
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(card.imageNormal ?: card.imageArtCrop)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = card.name,
+                    placeholder = painterResource(Res.drawable.mtg_card_back),
+                    error = painterResource(Res.drawable.mtg_card_back),
+                    fallback = painterResource(Res.drawable.mtg_card_back),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = if (rotation >= -90f) 1f else 0f },
+                )
+                if (hasBackFace) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(card.imageBackNormal)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = card.name,
+                        placeholder = painterResource(Res.drawable.mtg_card_back),
+                        error = painterResource(Res.drawable.mtg_card_back),
+                        fallback = painterResource(Res.drawable.mtg_card_back),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                rotationY = 180f
+                                alpha = if (rotation < -90f) 1f else 0f
+                            },
+                    )
+                }
+            }
+        }
+
+        if (hasBackFace) {
+            Surface(
+                shape = ChipShape,
+                color = mc.primaryAccent.copy(alpha = 0.1f),
+                modifier = Modifier.padding(top = spacing.xs)
+            ) {
+                Text(
+                    text = stringResource(if (showBackFace) R.string.carddetail_flip_see_front else R.string.carddetail_flip_see_back),
+                    style = ty.labelSmall,
+                    color = mc.primaryAccent,
+                    modifier = Modifier.padding(
+                        horizontal = spacing.md,
+                        vertical = spacing.xxs
+                    )
+                )
             }
         }
     }

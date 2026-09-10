@@ -181,7 +181,8 @@ fun DeckWizardScreen(
                             onSelectCommander = viewModel::onSelectCommander,
                             onClearCommander = viewModel::onClearCommander,
                             onApplyStructuredSearch = viewModel::applyCommanderStructuredSearch,
-                            onSelectResultTab = viewModel::onSelectCommanderResultTab,
+                            onClearFilters = viewModel::onClearCommanderFilters,
+                            onClearSearchAndFilters = viewModel::onClearCommanderSearchAndFilters,
                             onNext = viewModel::onNextFromCommanderPick,
                         )
                         WizardPhase.STRATEGY -> StrategyStepContent(

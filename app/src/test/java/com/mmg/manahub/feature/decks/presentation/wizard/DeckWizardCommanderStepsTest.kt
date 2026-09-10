@@ -82,25 +82,68 @@ class DeckWizardCommanderStepsTest {
         assertTrue(commanderPickLocalCandidates(DeckWizardUiState()).isEmpty())
     }
 
-    // ── commanderPickCollectionTabResults ───────────────────────────────────────
+    // ── commanderPickIsIdle / commanderActiveFilterCount / buildCommanderSearchQuery (W2.1, G2/R2) ──
 
     @Test
-    fun `the Collection tab filters ownedCards by the active structured query`() {
-        val eligible = card(id = "e1", name = "Eligible One", typeLine = "Legendary Creature — Test")
-        val notEligible = card(id = "n1", name = "Not Eligible", typeLine = "Sorcery")
-        val state = DeckWizardUiState(
-            ownedCards = listOf(eligible, notEligible),
-            commanderStructuredQuery = AdvancedSearchQuery(criteria = listOf(SearchCriterion.CommanderEligible)),
-        )
+    fun `idle -- no query text and no active filter`() {
+        val locked = commanderLockedCriteria(DeckFormat.COMMANDER)
+        val state = DeckWizardUiState(commanderQuery = "", commanderStructuredQuery = null)
 
-        assertEquals(listOf(eligible), commanderPickCollectionTabResults(state))
+        assertTrue(commanderPickIsIdle(state, locked))
+        assertNull(buildCommanderSearchQuery(state, locked))
     }
 
     @Test
-    fun `no structured query -- the Collection-tab helper matches everything (unused in that mode)`() {
-        val a = card(id = "a", name = "A")
-        val b = card(id = "b", name = "B")
-        assertEquals(listOf(a, b), commanderPickCollectionTabResults(DeckWizardUiState(ownedCards = listOf(a, b))))
+    fun `a structured query containing ONLY the locked criteria still counts as idle`() {
+        val locked = commanderLockedCriteria(DeckFormat.COMMANDER)
+        val state = DeckWizardUiState(commanderStructuredQuery = AdvancedSearchQuery(criteria = locked))
+
+        assertEquals(0, commanderActiveFilterCount(state.commanderStructuredQuery, locked))
+        assertTrue(commanderPickIsIdle(state, locked))
+    }
+
+    @Test
+    fun `non-blank query text ends idle and builds a query carrying a Name criterion`() {
+        val locked = commanderLockedCriteria(DeckFormat.COMMANDER)
+        val state = DeckWizardUiState(commanderQuery = "Zada")
+
+        assertFalse(commanderPickIsIdle(state, locked))
+        val built = buildCommanderSearchQuery(state, locked)
+        assertEquals(SearchCriterion.Name("Zada"), built?.criteria?.last())
+        assertTrue(locked.all { l -> built!!.criteria.any { it::class == l::class } })
+    }
+
+    @Test
+    fun `a user-added filter beyond the locked set ends idle`() {
+        val locked = commanderLockedCriteria(DeckFormat.COMMANDER)
+        val userCriterion = SearchCriterion.ColorIdentity(setOf("G"))
+        val state = DeckWizardUiState(commanderStructuredQuery = AdvancedSearchQuery(criteria = locked + userCriterion))
+
+        assertEquals(1, commanderActiveFilterCount(state.commanderStructuredQuery, locked))
+        assertFalse(commanderPickIsIdle(state, locked))
+        val built = buildCommanderSearchQuery(state, locked)
+        assertTrue(built!!.criteria.contains(userCriterion))
+    }
+
+    @Test
+    fun `locked criteria survive a clear-and-repeat-search cycle -- never droppable`() {
+        val locked = commanderLockedCriteria(DeckFormat.COMMANDER)
+        val state = DeckWizardUiState(commanderQuery = "Meren", commanderStructuredQuery = null)
+
+        val built = buildCommanderSearchQuery(state, locked)!!
+
+        assertTrue(locked.all { l -> built.criteria.any { it::class == l::class } })
+    }
+
+    // ── commanderOwnedIds (W2.1, G2 -- Scryfall results still show ownership) ────
+
+    @Test
+    fun `commanderOwnedIds matches Scryfall results by scryfallId`() {
+        val owned = card(id = "owned-1", name = "Owned Commander")
+        val ownedIds = commanderOwnedIds(listOf(owned))
+
+        assertTrue("owned-1" in ownedIds)
+        assertFalse("unowned-1" in ownedIds)
     }
 
     // ── commanderLockedCriteria (D14, Casual has no legality lock) ──────────────

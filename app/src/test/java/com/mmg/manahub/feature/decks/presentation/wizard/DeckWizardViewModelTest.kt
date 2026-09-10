@@ -747,22 +747,54 @@ class DeckWizardViewModelTest {
     // ── Deck Wizard Commander v3 plan (Phase 3.2): the two-tab structured search ────────────────
 
     @Test
-    fun `onCommanderNameFilterChange is a pure local filter -- no Scryfall call`() = runTest(dispatcher) {
+    fun `onCommanderNameFilterChange -- idle to search to idle-again`() = runTest(dispatcher) {
+        coEvery { searchCardsUseCase(any(), any()) } returns DataResult.Success(
+            com.mmg.manahub.core.model.PaginatedCards(cards = listOf(commander), hasMore = false, totalCards = 1)
+        )
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.COMMANDER)
         vm.onNextFromFormat()
 
-        vm.onCommanderNameFilterChange("Zada")
-        advanceUntilIdle()
+        // Idle: no query text, no filter -- no Scryfall call.
+        assertTrue(vm.uiState.value.commanderQuery.isBlank())
+        coVerify(exactly = 0) { searchCardsUseCase(any(), any()) }
 
+        // Non-blank query text crosses into search -- debounced, then a real Scryfall call.
+        vm.onCommanderNameFilterChange("Zada")
         assertEquals("Zada", vm.uiState.value.commanderQuery)
         coVerify(exactly = 0) { searchCardsUseCase(any(), any()) }
+        advanceUntilIdle()
+        coVerify(exactly = 1) { searchCardsUseCase(any(), any()) }
+        assertEquals(listOf(commander), vm.uiState.value.commanderSearchResults)
+
+        // Clearing the query text back to blank returns to idle -- stale results are cleared, not shown.
+        vm.onCommanderNameFilterChange("")
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.commanderSearchResults.isEmpty())
     }
 
     @Test
-    fun `applyCommanderStructuredSearch fetches the All-cards tab via the built fragment`() = runTest(dispatcher) {
-        coEvery { searchCardsUseCase("is:commander", any()) } returns DataResult.Success(
+    fun `applyCommanderStructuredSearch with ONLY the locked criteria stays idle -- no Scryfall call`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+
+        // Opening the sheet and hitting Search with nothing else picked -- the sheet force-merges
+        // the locked criteria in, so this is exactly what a no-op Search tap looks like.
+        vm.applyCommanderStructuredSearch(
+            com.mmg.manahub.core.model.AdvancedSearchQuery(criteria = commanderLockedCriteria(DeckFormat.COMMANDER))
+        )
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { searchCardsUseCase(any(), any()) }
+        assertTrue(vm.uiState.value.commanderSearchResults.isEmpty())
+    }
+
+    @Test
+    fun `applyCommanderStructuredSearch with a real added criterion fetches results immediately (no debounce)`() = runTest(dispatcher) {
+        coEvery { searchCardsUseCase("is:commander id<=g", any()) } returns DataResult.Success(
             com.mmg.manahub.core.model.PaginatedCards(cards = listOf(commander), hasMore = false, totalCards = 1)
         )
         val vm = viewModel()
@@ -771,7 +803,9 @@ class DeckWizardViewModelTest {
         vm.onNextFromFormat()
 
         vm.applyCommanderStructuredSearch(
-            com.mmg.manahub.core.model.AdvancedSearchQuery(criteria = listOf(com.mmg.manahub.core.model.SearchCriterion.CommanderEligible))
+            com.mmg.manahub.core.model.AdvancedSearchQuery(
+                criteria = listOf(com.mmg.manahub.core.model.SearchCriterion.CommanderEligible, com.mmg.manahub.core.model.SearchCriterion.ColorIdentity(setOf("G"))),
+            )
         )
         advanceUntilIdle()
 
@@ -780,17 +814,70 @@ class DeckWizardViewModelTest {
     }
 
     @Test
-    fun `onSelectCommanderResultTab switches the tab without re-fetching`() = runTest(dispatcher) {
+    fun `onClearCommanderFilters drops the structured query but keeps the search text`() = runTest(dispatcher) {
+        coEvery { searchCardsUseCase(any(), any()) } returns DataResult.Success(
+            com.mmg.manahub.core.model.PaginatedCards(cards = listOf(commander), hasMore = false, totalCards = 1)
+        )
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.COMMANDER)
         vm.onNextFromFormat()
-        assertEquals(CommanderResultTab.COLLECTION, vm.uiState.value.commanderResultTab)
+        vm.onCommanderNameFilterChange("Zada")
+        advanceUntilIdle()
+        vm.applyCommanderStructuredSearch(
+            com.mmg.manahub.core.model.AdvancedSearchQuery(
+                criteria = commanderLockedCriteria(DeckFormat.COMMANDER) + com.mmg.manahub.core.model.SearchCriterion.ColorIdentity(setOf("G")),
+            )
+        )
+        advanceUntilIdle()
 
-        vm.onSelectCommanderResultTab(CommanderResultTab.ALL_CARDS)
+        vm.onClearCommanderFilters()
+        advanceUntilIdle()
 
-        assertEquals(CommanderResultTab.ALL_CARDS, vm.uiState.value.commanderResultTab)
-        coVerify(exactly = 0) { searchCardsUseCase(any(), any()) }
+        assertNull(vm.uiState.value.commanderStructuredQuery)
+        assertEquals("Zada", vm.uiState.value.commanderQuery)
+    }
+
+    @Test
+    fun `onClearCommanderSearchAndFilters clears both and returns to the idle owned grid`() = runTest(dispatcher) {
+        coEvery { searchCardsUseCase(any(), any()) } returns DataResult.Success(
+            com.mmg.manahub.core.model.PaginatedCards(cards = listOf(commander), hasMore = false, totalCards = 1)
+        )
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onCommanderNameFilterChange("Zada")
+        advanceUntilIdle()
+
+        vm.onClearCommanderSearchAndFilters()
+        advanceUntilIdle()
+
+        assertNull(vm.uiState.value.commanderStructuredQuery)
+        assertTrue(vm.uiState.value.commanderQuery.isBlank())
+        assertTrue(vm.uiState.value.commanderSearchResults.isEmpty())
+    }
+
+    @Test
+    fun `locked criteria survive a clear-and-repeat-search cycle, never droppable by the user`() = runTest(dispatcher) {
+        val capturedFragments = mutableListOf<String>()
+        coEvery { searchCardsUseCase(any(), any()) } answers {
+            capturedFragments += firstArg<String>()
+            DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(cards = emptyList(), hasMore = false, totalCards = 0))
+        }
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+
+        vm.onCommanderNameFilterChange("Meren")
+        advanceUntilIdle()
+        vm.onClearCommanderSearchAndFilters()
+        advanceUntilIdle()
+        vm.onCommanderNameFilterChange("Karlov")
+        advanceUntilIdle()
+
+        assertTrue(capturedFragments.all { it.contains("is:commander") })
     }
 
     @Test
@@ -818,14 +905,13 @@ class DeckWizardViewModelTest {
         vm.applyCommanderStructuredSearch(
             com.mmg.manahub.core.model.AdvancedSearchQuery(criteria = listOf(com.mmg.manahub.core.model.SearchCriterion.CommanderEligible))
         )
-        vm.onSelectCommanderResultTab(CommanderResultTab.ALL_CARDS)
         advanceUntilIdle()
 
         vm.onSelectCommander(commander)
         advanceUntilIdle()
 
         assertNull(vm.uiState.value.commanderStructuredQuery)
-        assertEquals(CommanderResultTab.COLLECTION, vm.uiState.value.commanderResultTab)
+        assertTrue(vm.uiState.value.commanderSearchResults.isEmpty())
     }
 
     @Test

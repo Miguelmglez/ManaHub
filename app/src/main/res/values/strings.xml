@@ -1192,8 +1192,10 @@
     <!-- Deck Wizard Commander v3 plan (Phase 3.2) -->
     <string name="deck_wizard_commanders_in_collection">Available commanders in your collection</string>
     <string name="deck_wizard_commander_advanced_search">Advanced search</string>
-    <string name="deck_wizard_commander_tab_collection">Collection</string>
-    <string name="deck_wizard_commander_tab_all_cards">All cards</string>
+    <!-- Deck Wizard Commander v4 plan (W2.1/W2.2) -->
+    <string name="deck_wizard_commander_active_filters">%1$d active filter(s)</string>
+    <string name="deck_wizard_commander_clear_filters">Clear filters</string>
+    <string name="deck_wizard_commander_owned_badge">In your collection</string>
     <string name="deck_wizard_include_outside_collection_title">Include cards outside your collection</string>
     <string name="deck_wizard_include_outside_collection_subtitle">Search Scryfall too, not just what you own</string>
     <string name="deck_wizard_strategy_step_title">Pick a strategy</string>
