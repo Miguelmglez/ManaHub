@@ -84,17 +84,16 @@ import org.koin.androidx.compose.koinViewModel
 
 /**
  * Steps shown by [WizardStepIndicator]; GENERATING/RESULT replace the whole body instead.
- * Deck Engine Unification plan (§5 Phase 3.1) / Deck Wizard & Engine Rework plan (Workstream 2/3) —
- * this is COMPUTED, not a fixed list: Commander runs `FORMAT → COMMANDER_PICK → STRATEGY →
- * MANUAL_ADDS → REVIEW` (see [WizardPhase]'s KDoc); every Casual flow (A/B/C) now runs the SAME
- * shape as of Workstream 3 -- `FORMAT → ENTRY → DIRECTION → MANUAL_ADDS → REVIEW`
- * ([WizardPhase.IDENTITY] is unreachable dead code for every flow now, see
- * [DeckWizardViewModel.onNextFromDirection]'s KDoc) -- so this no longer branches on [uiState]'s
- * entry flow at all; kept as a function (not a `val`) for parity with the Commander branch above it.
+ * Deck Wizard v4 (W1.1/G1/R1): Commander's format is chosen at deck creation and arrives via nav
+ * arg (`Screen.DeckWizard.createRoute`), so FORMAT is no longer a Commander step at all --
+ * `COMMANDER_PICK → STRATEGY → MANUAL_ADDS → REVIEW`. Every Casual flow (A/B/C) still runs
+ * `FORMAT → ENTRY → DIRECTION → MANUAL_ADDS → REVIEW` -- `FormatStepContent` survives only for
+ * those entry points that still arrive without the arg ([WizardPhase.IDENTITY] stays unreachable
+ * dead code for every flow, see [DeckWizardViewModel.onNextFromDirection]'s KDoc).
  */
 private fun stepPhasesFor(uiState: DeckWizardUiState): List<WizardPhase> {
     if (uiState.selectedFormat?.isCommanderFormat == true) {
-        return listOf(WizardPhase.FORMAT, WizardPhase.COMMANDER_PICK, WizardPhase.STRATEGY, WizardPhase.MANUAL_ADDS, WizardPhase.REVIEW)
+        return listOf(WizardPhase.COMMANDER_PICK, WizardPhase.STRATEGY, WizardPhase.MANUAL_ADDS, WizardPhase.REVIEW)
     }
     return listOf(WizardPhase.FORMAT, WizardPhase.ENTRY, WizardPhase.DIRECTION, WizardPhase.MANUAL_ADDS, WizardPhase.REVIEW)
 }

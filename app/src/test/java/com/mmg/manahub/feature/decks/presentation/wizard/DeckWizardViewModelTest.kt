@@ -6,6 +6,7 @@ import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
@@ -37,6 +38,7 @@ import com.mmg.manahub.feature.decks.domain.template.CategorySuggestions
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
 import com.mmg.manahub.feature.decks.domain.template.DeckTemplateArchetypeInfo
 import com.mmg.manahub.feature.decks.domain.template.DeckWizardSpec
+import com.mmg.manahub.feature.decks.domain.template.OwnedCard
 import com.mmg.manahub.feature.decks.domain.template.SuggestionCategory
 import com.mmg.manahub.feature.decks.domain.template.TemplateBuildProgress
 import com.mmg.manahub.feature.decks.domain.template.TemplateBuildResult
@@ -112,6 +114,10 @@ class DeckWizardViewModelTest {
     // (replaceAllCardsWithSource/updateArchetypeOverride/etc.) still exercise real behavior against
     // the mocked deckRepository above.
     private val buildCommanderDeckUseCase = spyk(BuildCommanderDeckUseCase(deckAnalysisPipeline, crashReporter))
+    // Deck Wizard v4, W0.2 -- relaxed: no existing test exercises the basic-land pre-warm path
+    // directly, and an unstubbed call is swallowed by ensureBasicsAvailable's own runCatching, so
+    // this only needs to exist, never to be configured.
+    private val cardRepository = mockk<CardRepository>(relaxed = true)
 
     private val collectionProfileUseCase = CollectionProfileUseCase(ioDispatcher = dispatcher)
 
@@ -188,6 +194,7 @@ class DeckWizardViewModelTest {
         cardStrategyTagsRepository = cardStrategyTagsRepository,
         deckAnalysisPipeline = deckAnalysisPipeline,
         buildCommanderDeckUseCase = buildCommanderDeckUseCase,
+        cardRepository = cardRepository,
     )
 
     @Before
@@ -298,7 +305,7 @@ class DeckWizardViewModelTest {
     }
 
     @Test
-    fun `back from DIRECTION returns to ENTRY for Casual, but FORMAT for Commander`() = runTest(dispatcher) {
+    fun `back from DIRECTION returns to ENTRY for Casual, but exits the wizard for Commander (W1_1)`() = runTest(dispatcher) {
         val casual = viewModel()
         advanceUntilIdle()
         casual.onSelectFormat(DeckFormat.CASUAL)
@@ -307,12 +314,15 @@ class DeckWizardViewModelTest {
         casual.onBackPressed()
         assertEquals(WizardPhase.ENTRY, casual.uiState.value.phase)
 
+        // W1.1 (G1/R1): onNextFromFormat() lands Commander directly on COMMANDER_PICK (never
+        // DIRECTION), and that step's own back action now exits the wizard -- no FORMAT step left.
         val commander = viewModel()
         advanceUntilIdle()
         commander.onSelectFormat(DeckFormat.COMMANDER)
         commander.onNextFromFormat()
-        commander.onBackPressed()
-        assertEquals(WizardPhase.FORMAT, commander.uiState.value.phase)
+        assertEquals(WizardPhase.COMMANDER_PICK, commander.uiState.value.phase)
+        assertTrue(commander.onBackPressed())
+        assertEquals(WizardPhase.COMMANDER_PICK, commander.uiState.value.phase)
     }
 
     @Test
@@ -430,8 +440,10 @@ class DeckWizardViewModelTest {
         assertEquals(WizardPhase.STRATEGY, vm.uiState.value.phase)
         vm.onBackPressed()
         assertEquals(WizardPhase.COMMANDER_PICK, vm.uiState.value.phase)
-        vm.onBackPressed()
-        assertEquals(WizardPhase.FORMAT, vm.uiState.value.phase)
+        // W1.1 (G1/R1): COMMANDER_PICK is now the first Commander step -- its own back action exits
+        // the wizard (no FORMAT step left to route to) instead of mutating phase.
+        assertTrue(vm.onBackPressed())
+        assertEquals(WizardPhase.COMMANDER_PICK, vm.uiState.value.phase)
     }
 
     @Test
@@ -1316,6 +1328,37 @@ class DeckWizardViewModelTest {
     }
 
     @Test
+    fun `W0_2 -- the 94-card bug -- a basic the user owns zero copies of is pre-warmed before a Commander build`() = runTest(dispatcher) {
+        // G10 reproduction: a mono-Green commander whose real collection contains ZERO "Forest"
+        // rows (the default empty collectionSnapshot from setUp()) used to leave materializeBasics
+        // unable to find a Forest Card object, silently dropping every basic land fill would have
+        // allocated to Green -- landing short of the 100-card target. The fix pre-warms it here.
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val forest = card(id = "forest-real", name = "Forest", typeLine = "Basic Land — Forest", cmc = 0.0, colors = emptyList(), colorIdentity = listOf("G"))
+        coEvery { cardRepository.searchCardByName("Forest") } returns DataResult.Success(forest)
+        val ownedCollectionSlot = slot<List<OwnedCard>>()
+        coEvery {
+            buildCommanderDeckUseCase(any(), any(), any(), any(), capture(ownedCollectionSlot), any(), any(), any(), any(), any())
+        } returns commanderOutcome()
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        vm.onNextFromManualAdds()
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        assertTrue(
+            "a Commander build must pre-warm a real Forest Card object even though the collection owns zero, got ${ownedCollectionSlot.captured.map { it.card.name }}",
+            ownedCollectionSlot.captured.any { it.card.name == "Forest" },
+        )
+    }
+
+    @Test
     fun `calling onGenerate twice in immediate succession only launches one build`() = runTest(dispatcher) {
         coEvery { buildDeckFromTemplateUseCase(any(), any()) } returns flow { awaitCancellation() }
         val vm = viewModel()
@@ -1970,8 +2013,10 @@ class DeckWizardViewModelTest {
         advanceUntilIdle()
         assertEquals(commander, vm.uiState.value.selectedCommander)
 
-        vm.onBackPressed()
-        assertEquals(WizardPhase.FORMAT, vm.uiState.value.phase)
+        // W1.1 (G1/R1): onBackPressed() from COMMANDER_PICK now exits the wizard instead of
+        // routing to FORMAT (that step no longer exists in the Commander flow) -- this test's real
+        // subject is onSelectFormat's own stale-commander-clearing guard, so it exercises that
+        // directly rather than simulating a back-navigation path that is no longer reachable.
         vm.onSelectFormat(DeckFormat.CASUAL)
 
         val state = vm.uiState.value

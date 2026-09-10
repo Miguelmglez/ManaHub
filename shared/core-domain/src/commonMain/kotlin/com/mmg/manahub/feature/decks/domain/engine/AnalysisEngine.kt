@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.engine
+// COMMENTS_REVIEWED: 2026-09-10
 
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckFormat
@@ -857,7 +858,7 @@ object AnalysisEngine {
         }
 
         mainboard.map { it.card }.distinctBy { it.scryfallId }
-            .filterNot { isLegal(it, format) }
+            .filterNot { isLegalForFormat(it, format) }
             .forEach { findings += Finding.IllegalCard(it.name) }
 
         // Wave 2 / B3: 60-card constructed only (DeckFormat.isSixtyCardConstructed — Standard,
@@ -881,7 +882,7 @@ object AnalysisEngine {
         // Category Sections rework (W1) -- legal/illegal split, grouped by scryfallId so a card
         // that (abnormally) appears as more than one DeckEntry still counts its full quantity once.
         // Always shown, even at 0 -- "Illegal 0" is itself useful confirmation.
-        val entriesByLegality = mainboard.groupBy { isLegal(it.card, format) }
+        val entriesByLegality = mainboard.groupBy { isLegalForFormat(it.card, format) }
         fun legalitySection(legal: Boolean, id: String, label: String): CardSection {
             val entries = entriesByLegality[legal].orEmpty()
             return CardSection(
@@ -897,24 +898,6 @@ object AnalysisEngine {
         )
 
         return PillarResult(id = PillarId.LEGALITY, subscore = subscore, findings = shown, sections = sections)
-    }
-
-    /** Mirrors [DeckScorer]'s private `isLegal` verbatim ("restricted" counts as legal; CASUAL/
-     * DRAFT are permissive). */
-    private fun isLegal(card: Card, format: DeckFormat): Boolean {
-        fun ok(s: String) = s.equals("legal", true) || s.equals("restricted", true)
-        return when (format) {
-            DeckFormat.STANDARD -> ok(card.legalityStandard)
-            DeckFormat.PIONEER -> ok(card.legalityPioneer)
-            DeckFormat.MODERN -> ok(card.legalityModern)
-            DeckFormat.LEGACY -> ok(card.legalityLegacy)
-            DeckFormat.VINTAGE -> ok(card.legalityVintage)
-            DeckFormat.PAUPER -> ok(card.legalityPauper)
-            DeckFormat.COMMANDER -> ok(card.legalityCommander)
-            DeckFormat.COMMANDER_CASUAL -> true
-            DeckFormat.CASUAL -> true
-            DeckFormat.DRAFT -> true
-        }
     }
 
     // ── Composition ─────────────────────────────────────────────────────────────────────────

@@ -138,6 +138,67 @@ class BuildCommanderDeckUseCaseTest {
     }
 
     @Test
+    fun `W0_1 -- a Commander-banned owned card is structurally excluded from the COMMANDER candidate pool`() = runTest {
+        val useCase = newUseCase()
+        val commander = MockCollectionThin.commander
+        val identity = commander.colorIdentity.toManaColors()
+        val bannedOwned = com.mmg.manahub.feature.decks.domain.engine.card(
+            id = "banned-owned-1",
+            name = "Banned Owned Candidate",
+            typeLine = "Creature — Vampire",
+            cmc = 2.0,
+            colors = identity.map { it.symbol },
+            colorIdentity = identity.map { it.symbol },
+            legalityCommander = "banned",
+        )
+        val owned = ownedFrom(MockCollectionThin.ownedCards, MockCollectionThin.ownedBasics) +
+            OwnedCard(bannedOwned, 1)
+
+        val commanderOutcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, identity, owned)
+        assertTrue(
+            commanderOutcome.result.entries.none { it.card.scryfallId == bannedOwned.scryfallId },
+            "a banned owned card must never enter a COMMANDER build's candidate pool",
+        )
+    }
+
+    @Test
+    fun `W0_1 -- builder and analysis agree on the same legality verdict per format`() = runTest {
+        val commander = MockCollectionThin.commander
+        val bannedCard = com.mmg.manahub.feature.decks.domain.engine.card(
+            id = "banned-analysis-1",
+            name = "Banned Analysis Candidate",
+            typeLine = "Sorcery",
+            cmc = 2.0,
+            colors = emptyList(),
+            colorIdentity = emptyList(),
+            legalityCommander = "banned",
+        )
+        val mainboard = listOf(com.mmg.manahub.feature.decks.domain.engine.DeckEntry(bannedCard, 1, isOwned = true))
+        val pipeline = DeckAnalysisPipeline(
+            EvaluateDeckUseCase(DeckScorer(RoleClassifier(), NeutralPowerResolver), ProgressionEventBus()),
+            InferDeckIdentityUseCase(),
+            TestCrashReporter,
+        )
+
+        val commanderHealth = pipeline.analyze(
+            mainboard = mainboard, format = DeckFormat.COMMANDER, commander = commander,
+            archetypeOverride = null, themesOverride = emptyList(), emitProgression = false,
+        )
+        val casualHealth = pipeline.analyze(
+            mainboard = mainboard, format = DeckFormat.COMMANDER_CASUAL, commander = commander,
+            archetypeOverride = null, themesOverride = emptyList(), emitProgression = false,
+        )
+
+        val commanderIllegal = commanderHealth.analysis?.pillars.orEmpty().flatMap { it.findings }
+            .any { it is com.mmg.manahub.feature.decks.domain.engine.Finding.IllegalCard }
+        val casualIllegal = casualHealth.analysis?.pillars.orEmpty().flatMap { it.findings }
+            .any { it is com.mmg.manahub.feature.decks.domain.engine.Finding.IllegalCard }
+
+        assertTrue(commanderIllegal, "AnalysisEngine must flag a banned card as illegal for COMMANDER (matches the builder's own exclusion)")
+        assertTrue(!casualIllegal, "AnalysisEngine must NOT flag a banned card as illegal for COMMANDER_CASUAL (R7)")
+    }
+
+    @Test
     fun `round-trip identity -- the returned analysis matches re-analyzing the assembled mainboard`() = runTest {
         val useCase = newUseCase()
         val commander = MockCollectionRich.targetFixtures.first().mainboard

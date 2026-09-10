@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.engine
+// COMMENTS_REVIEWED: 2026-09-10
 
 import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.ColorMatchMode
@@ -177,8 +178,8 @@ object SectionSearchQuery {
     }
 
     /** [SearchCriterion] mirror of [legalityClause] — same format→Scryfall-format-name mapping,
-     * `null` for the same 2 formats. [SearchCriterion.Format]'s `f:<x>` rendering is a confirmed
-     * live alias of `legal:<x>` (both return identical result sets on Scryfall). */
+     * same null cases. [SearchCriterion.Format]'s `f:<x>` rendering is a confirmed live alias of
+     * `legal:<x>` (both return identical result sets on Scryfall). */
     private fun legalityCriterion(format: DeckFormat): SearchCriterion? {
         val scryfallFormat = when (format) {
             DeckFormat.STANDARD -> "standard"
@@ -187,8 +188,8 @@ object SectionSearchQuery {
             DeckFormat.LEGACY -> "legacy"
             DeckFormat.VINTAGE -> "vintage"
             DeckFormat.PAUPER -> "pauper"
-            DeckFormat.COMMANDER, DeckFormat.COMMANDER_CASUAL -> "commander"
-            DeckFormat.CASUAL, DeckFormat.DRAFT -> null
+            DeckFormat.COMMANDER -> "commander"
+            DeckFormat.COMMANDER_CASUAL, DeckFormat.CASUAL, DeckFormat.DRAFT -> null
         } ?: return null
         return SearchCriterion.Format(format = listOf(scryfallFormat), legal = true)
     }
@@ -311,13 +312,8 @@ object SectionSearchQuery {
         return "id<=" + colored.joinToString("") { it.symbol }
     }
 
-    /**
-     * `legal:<format>` for every format with a live Scryfall legality list. [DeckFormat
-     * .COMMANDER_CASUAL] maps to the SAME `legal:commander` pool as [DeckFormat.COMMANDER] --
-     * "Casual" here is this app's own relaxed deck-BUILDING rules (no format legality difference
-     * from Scryfall's point of view). [DeckFormat.CASUAL]/[DeckFormat.DRAFT] have no Scryfall
-     * legality list to filter by and are omitted, per the plan.
-     */
+    /** `legal:<format>` for every format [isLegalForFormat] enforces (R7: Commander only among the
+     * Commander-family formats; every other permissive format is omitted here too). */
     private fun legalityClause(format: DeckFormat): String? = when (format) {
         DeckFormat.STANDARD -> "legal:standard"
         DeckFormat.PIONEER -> "legal:pioneer"
@@ -325,8 +321,8 @@ object SectionSearchQuery {
         DeckFormat.LEGACY -> "legal:legacy"
         DeckFormat.VINTAGE -> "legal:vintage"
         DeckFormat.PAUPER -> "legal:pauper"
-        DeckFormat.COMMANDER, DeckFormat.COMMANDER_CASUAL -> "legal:commander"
-        DeckFormat.CASUAL, DeckFormat.DRAFT -> null
+        DeckFormat.COMMANDER -> "legal:commander"
+        DeckFormat.COMMANDER_CASUAL, DeckFormat.CASUAL, DeckFormat.DRAFT -> null
     }
 
     // ── Curve ────────────────────────────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.CardSlotWrite
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
@@ -499,6 +500,12 @@ class DeckWizardViewModel(
     // Defaulted from the two deps already required above so no pre-existing test construction site
     // needs to change unless it wants to inject a fake/spy.
     private val buildCommanderDeckUseCase: BuildCommanderDeckUseCase = BuildCommanderDeckUseCase(deckAnalysisPipeline, crashReporter),
+    // Deck Wizard v4, W0.2 (G10/E10) -- lets generateCommanderDeck pre-warm real, cached basic-land
+    // Card objects the same way DeckStudioViewModel.applyLandSuggestions already does, so
+    // BuildCommanderDeckUseCase.materializeBasics never silently drops a colour the user's real
+    // collection happens to own zero copies of. Appended last, required (no default: CardRepository
+    // has no cheap fake, matches every other repository param above).
+    private val cardRepository: CardRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DeckWizardUiState())
@@ -1847,8 +1854,10 @@ class DeckWizardViewModel(
         return when (state.phase) {
             WizardPhase.FORMAT -> true
             WizardPhase.ENTRY -> { _uiState.update { it.copy(phase = WizardPhase.FORMAT) }; false }
-            // Deck Wizard & Engine Rework plan, Workstream 2 -- the new Commander-only sequence.
-            WizardPhase.COMMANDER_PICK -> { _uiState.update { it.copy(phase = WizardPhase.FORMAT) }; false }
+            // W1.1 (G1/R1): FORMAT is no longer a Commander step -- the deck's format is chosen at
+            // creation and arrives by nav arg, so COMMANDER_PICK is now the FIRST Commander step and
+            // its own back action exits the wizard instead of routing to a step that no longer exists.
+            WizardPhase.COMMANDER_PICK -> true
             WizardPhase.STRATEGY -> { _uiState.update { it.copy(phase = WizardPhase.COMMANDER_PICK) }; false }
             // Workstream 3 -- MANUAL_ADDS is now shared by BOTH Commander (from STRATEGY) and every
             // Casual flow (from DIRECTION, see onNextFromDirection). Format-aware back target.
@@ -1949,9 +1958,16 @@ class DeckWizardViewModel(
             ?.let { strategy -> StrategyPick.Curated(strategy, state.selectedTribeKey) }
             ?: StrategyPick.Custom
 
-        val ownedCollection = collectionSnapshot
+        var ownedCollection = collectionSnapshot
             .groupBy { it.card.scryfallId }
             .map { (_, entries) -> OwnedCard(entries.first().card, entries.sumOf { entry -> entry.userCard.quantity }) }
+        // W0.2 (G10/E10): a real collection can legitimately own ZERO copies of some basic land
+        // type -- materializeBasics can only place a basic it finds a Card object for in
+        // ownedCollection, so without this a whole colour's worth of basics silently drops (the
+        // 94-card bug). Mirrors DeckStudioViewModel.applyLandSuggestions' own fetch-if-missing.
+        if (state.fillLands) {
+            ownedCollection = ensureBasicsAvailable(ownedCollection, identity)
+        }
         // PLAN_SECTIONS' manual adds share DeckWizardUiState.seedCards with Flow A's seed picker --
         // see onAddSeed/isCommanderManualAddValid, which already gates identity/legality for a
         // Commander spec before a card can land in this list.
@@ -2032,6 +2048,31 @@ class DeckWizardViewModel(
         _uiState.update {
             it.copy(phase = WizardPhase.RESULT, commanderBuildResult = outcome.result, createdDeckId = writeOutcome)
         }
+    }
+
+    /**
+     * W0.2 (G10/E10): synthesizes [OwnedCard] entries for whichever WUBRG basics (or Wastes, for a
+     * colourless identity) [ownedCollection] has zero Card object for, fetched via [cardRepository]
+     * exactly as [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
+     * .applyLandSuggestions] already does for the same reason -- basics are a commodity Studio
+     * treats as always-obtainable regardless of the collection's real owned quantity. A fetch
+     * failure (offline, unstubbed test double) is swallowed: the caller then simply sees the SAME
+     * gap it would have seen before this fix, never a crash.
+     */
+    private suspend fun ensureBasicsAvailable(ownedCollection: List<OwnedCard>, identity: Set<ManaColor>): List<OwnedCard> {
+        val neededNames = if (identity.isEmpty()) {
+            setOf("Wastes")
+        } else {
+            identity.mapNotNull { color -> BasicLandCalculator.LAND_FOR_COLOR[color.symbol] }.toSet()
+        }
+        val missingNames = neededNames.filterNot { name -> ownedCollection.any { it.card.name == name } }
+        if (missingNames.isEmpty()) return ownedCollection
+        val fetched = missingNames.mapNotNull { name ->
+            runCatching { cardRepository.searchCardByName(name) }.getOrNull()
+                .let { it as? DataResult.Success }?.data
+                ?.let { card -> OwnedCard(card, BASIC_LAND_SYNTHETIC_QUANTITY) }
+        }
+        return ownedCollection + fetched
     }
 
     /**
@@ -2408,6 +2449,9 @@ class DeckWizardViewModel(
         const val MAX_SEED_CARDS = 8
         const val TRIBE_PICKER_CANDIDATE_LIMIT = 8
         const val PLAN_ANALYSIS_DEBOUNCE_MS = 300L
+        /** W0.2: a generous synthetic owned quantity for a fetched-not-owned basic land -- basics
+         * are effectively unlimited, this only needs to exceed any realistic land-fill target. */
+        const val BASIC_LAND_SYNTHETIC_QUANTITY = 40
     }
 }
 

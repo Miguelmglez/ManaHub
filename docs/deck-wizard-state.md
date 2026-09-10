@@ -5,10 +5,36 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-09 (Phase 8 CLOSED — Run 12: F17 fixed, persist() atomicity closed,
-cleanup, flag flipped, campaign done).
-**Owning plan:** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the AI-planning-doc rule
-now that the campaign has shipped; this file is the durable record that survives.
+**Last updated:** 2026-09-10 (v4 campaign, Run 1 — W0+W1 done; see `docs/plans/deck-wizard-commander-v4-progress.md`
+for the full per-item log, gitignored).
+**Owning plan (v3, shipped):** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the
+AI-planning-doc rule now that the campaign has shipped; this file is the durable record that
+survives. **v4 (active):** `docs/plans/deck-wizard-commander-v4-plan.md` (gitignored).
+
+## v4 — Run 1 (2026-09-10): W0 + W1
+
+Fixes 14 user-reported defects from hands-on testing of the v3 wizard (G1-G14). Run 1 closed:
+- **W0.1 (G13/E9/R7):** ONE `isLegalForFormat(card, format)` predicate
+  (`shared/core-domain/.../engine/DeckLegality.kt`), replacing `AnalysisEngine`'s private `isLegal`
+  and `BuildCommanderDeckUseCase.isLegalForCommanderFormat`. `SectionSearchQuery`'s legality clause
+  now also drops `legal:commander` for `COMMANDER_CASUAL` (was wrongly enforcing it before).
+- **W0.2 (G10/E10):** the 94-card bug's real cause — `materializeBasics` can't place a basic land the
+  user owns zero copies of (its `Card` object doesn't exist in `ownedCollection`). Fixed via
+  `DeckWizardViewModel.ensureBasicsAvailable` pre-warming missing basics through `CardRepository
+  .searchCardByName`, mirroring `DeckStudioViewModel.applyLandSuggestions`'s own fetch-if-missing
+  pattern. `DeckWizardViewModel` gained a new required `cardRepository` constructor param.
+- **W0.3 (G8a/E1):** `CardSection.realCount` (computed, `Σ contributions.quantity`) is now what every
+  UI consumer renders; `current` (confidence-weighted) stays score-only, never displayed.
+- **W0.4 (F18):** traced the principled fix and confirmed it requires touching
+  `CommanderPlanResolverTest`'s D6 assertion — escalated per the campaign brief rather than forced.
+  See the progress tracker for the exact trade-off and recommendation. **Still RED, unchanged.**
+- **W1 (G1/R1):** Commander's wizard steps are now `COMMANDER_PICK → STRATEGY → MANUAL_ADDS → REVIEW`
+  (FORMAT removed from the indicator; `onBackPressed` from COMMANDER_PICK exits the wizard). R11
+  (finish → Build tab) already held with zero code change (`DeckStudioUiState.selectedTab` defaults
+  to BUILD) for the primary fresh-draft path; the "Rebuild with the Wizard" pop-back-to-existing-entry
+  path has a known, unfixed residual gap — see the progress tracker.
+
+Remaining v4 workstreams (W2-W8) are NOT started.
 
 ---
 

@@ -122,7 +122,10 @@ off suggestion use cases below). New engine, pure `commonMain`,
     `contributions.sumOf { it.quantity }`** — role counts are `round(Σ quantity × confidence)`, so a
     partially-confident card contributes a fraction; `current` is what the SCORE uses, the
     `contributions` list (sorted confidence-descending) is what produced it. **Never reconcile one
-    from the other** — this is a documented-on-purpose mismatch, not a bug to "fix". Sections render
+    from the other** — the mismatch is real and permanent, but since Deck Wizard v4 (W0.3/E1) it is
+    purely INTERNAL: `CardSection.realCount` (`Σ contributions.quantity`, no rounding/weighting) is
+    the ONE number every UI consumer renders (wizard sections + Analysis tab sections); `current`
+    never reaches the screen any more, only the score. Sections render
     UNFILTERED, including 0/N gaps (the old `filter { it.current > 0 }` was deleted — a gap is exactly
     what the user needs to see; this also exposed and fixed a pre-existing bug where
     `tribe_members` had a band but no `RoleSpec`, so it was permanently absent from `roleCounts` on

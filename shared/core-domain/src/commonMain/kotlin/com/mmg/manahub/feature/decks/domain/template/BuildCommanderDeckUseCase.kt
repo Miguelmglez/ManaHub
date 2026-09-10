@@ -19,6 +19,7 @@ import com.mmg.manahub.feature.decks.domain.engine.CurveTargets
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.EdhrecPowerResolver
 import com.mmg.manahub.feature.decks.domain.engine.LandTargetResolver
+import com.mmg.manahub.feature.decks.domain.engine.isLegalForFormat
 import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.PlacementScorer
@@ -28,21 +29,7 @@ import com.mmg.manahub.feature.decks.domain.engine.SynergyGraph
 import com.mmg.manahub.feature.decks.domain.engine.toPin
 import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  BuildCommanderDeckUseCase — Deck Wizard Commander v3 plan, Phase 2 (the placement engine).
-//
-//  D1: builds AGAINST the analysis objective. Zero calls into DeckScorer/Motor A anywhere in this
-//  file (no `DeckScorer`, `SuggestAddsFromCollectionUseCase`, `DeckTemplateResolver`,
-//  `runScryfallBackstopLoop`, `MainboardTrimmer` imports) -- 2.7's retirement is satisfied
-//  STRUCTURALLY for this new path (see the plan report's own note on why the OLD
-//  `BuildDeckFromTemplateUseCase` Commander branches are not deleted THIS phase: nothing calls this
-//  class yet, so deleting the old path now would strand it with no replacement wired -- that wiring
-//  is Phase 6's job, per D7's own escape hatch language).
-//
-//  D7/R5: collection-only by construction -- this class has no Scryfall/CardRepository dependency
-//  at all, so it CANNOT query outside the collection even accidentally; [DeckWizardSpec
-//  .includeOutsideCollection] is never read here.
-// ═══════════════════════════════════════════════════════════════════════════════
+// Builds against the analysis objective (D1); collection-only by construction, no Scryfall/CardRepository dependency (D7/R5).
 
 /** One card the wizard's candidate pool may consider, decoupled from whatever collection type a
  * caller's own data layer uses (`UserCardWithCard`, [com.mmg.manahub.feature.decks.domain.engine
@@ -124,7 +111,7 @@ class BuildCommanderDeckUseCase(
             .filter { it.scryfallId != commander.scryfallId }
             .filter { it.scryfallId !in manualIds }
             .filterNot { BasicLandCalculator.isLand(it) }
-            .filter { isLegalForCommanderFormat(it, format) }
+            .filter { isLegalForFormat(it, format) }
             .filter { identitySymbols.containsAll(it.colorIdentity) }
             .distinctBy { it.name }
             .sortedBy { it.scryfallId } // deterministic base order before any scoring
@@ -316,9 +303,6 @@ class BuildCommanderDeckUseCase(
         curve[profile.mvBucketId] = (curve[profile.mvBucketId] ?: 0) + 1
         return PlacementScorer.PlacementState(roleCounts, producers, payoffs, curve)
     }
-
-    private fun isLegalForCommanderFormat(card: Card, format: DeckFormat): Boolean =
-        if (format == DeckFormat.COMMANDER) card.legalityCommander == "legal" else card.legalityCommander != "banned"
 
     private suspend fun analyze(
         mainboard: List<DeckEntry>,

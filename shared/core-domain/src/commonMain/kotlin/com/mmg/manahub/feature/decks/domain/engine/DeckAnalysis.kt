@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.engine
+// COMMENTS_REVIEWED: 2026-09-10
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  DeckAnalysis — Deck Analysis Engine v2 plan (docs/plans/deck-analysis-engine-v2-plan.md),
@@ -65,8 +66,10 @@ data class CardContribution(
  *
  * [current] is NOT `contributions.sumOf { it.quantity }` — role counts are
  * `round(Σ quantity × confidence)` (see [ArchetypeRoleClassifier.deckRoleCounts]), so a
- * partially-confident card contributes a fraction. [current] is what the score uses; the list is
- * what produced it. Never reconcile one from the other.
+ * partially-confident card contributes a fraction. [current] is what the score uses; [realCount]
+ * (Deck Wizard v4, W0.3/E1) is the literal number of cards on screen — every UI consumer renders
+ * [realCount], never [current]. The mismatch is real and permanent (never reconcile one from the
+ * other); it is simply no longer user-visible.
  */
 data class CardSection(
     /** "role:removal_spot" | "mv:3" | "mv:7plus" | "produces:B" | "fingerprint:tokens" |
@@ -84,7 +87,11 @@ data class CardSection(
     val max: Int? = null,
     val isAntiRole: Boolean = false,
     val contributions: List<CardContribution> = emptyList(),
-)
+) {
+    /** W0.3/E1: the real, user-verifiable card count -- `Σ contributions.quantity`, never rounded
+     * or confidence-weighted. Display-only; the score keeps consuming [current] untouched. */
+    val realCount: Int get() = contributions.sumOf { it.quantity }
+}
 
 /**
  * A single, severity-tagged, structured analysis finding — Engine v2's unified replacement for the

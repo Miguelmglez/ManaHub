@@ -280,6 +280,8 @@ fun decksKoinModule(): Module = module {
             // Deck Wizard Commander v3 plan, Phase 6 -- the Commander build path (onGenerate's
             // format dispatch), replacing BuildDeckFromTemplateUseCase for isCommanderFormat specs.
             buildCommanderDeckUseCase = get(),
+            // Deck Wizard v4, W0.2 -- pre-warms real basic-land Card objects before a Commander build.
+            cardRepository = get(),
         )
     }
 }

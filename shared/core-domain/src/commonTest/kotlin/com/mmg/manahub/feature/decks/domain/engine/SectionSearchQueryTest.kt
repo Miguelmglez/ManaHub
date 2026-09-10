@@ -264,12 +264,15 @@ class SectionSearchQueryTest {
     }
 
     @Test
-    fun buildFor_commanderCasual_alsoGetsIdentityAndCommanderLegality() {
+    fun buildFor_commanderCasual_getsIdentityButNoLegalityClause() {
+        // Deck Wizard v4, W0.1 (G13/E9/R7): legality is ignored entirely for Casual formats, so
+        // Commander Casual keeps the identity bound but drops `legal:commander` -- the same rule
+        // isLegalForFormat now enforces at the predicate level.
         val context = ctx(colors = setOf(ManaColor.U), format = DeckFormat.COMMANDER_CASUAL)
         val built = SectionSearchQuery.buildFor("role:removal_spot", context)
         assertNotNull(built)
         assertTrue(built.contains("id<=U"))
-        assertTrue(built.contains("legal:commander"))
+        assertFalse(built.contains("legal:commander"), "Commander Casual must not filter by legality (R7), got: $built")
     }
 
     @Test

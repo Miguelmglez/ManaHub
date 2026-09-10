@@ -489,7 +489,7 @@ private fun CommanderGapSectionRow(section: CardSection) {
     val min = section.min ?: return
     Surface(shape = CardShape, color = mc.goldMtg.copy(alpha = 0.12f), modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = stringResource(R.string.deck_wizard_commander_result_gap_row, section.label, section.current, min),
+            text = stringResource(R.string.deck_wizard_commander_result_gap_row, section.label, section.realCount, min),
             style = ty.bodySmall,
             color = mc.goldMtg,
             modifier = Modifier.padding(MaterialTheme.spacing.md),

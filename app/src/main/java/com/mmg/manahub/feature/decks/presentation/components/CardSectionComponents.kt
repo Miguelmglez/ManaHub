@@ -125,7 +125,7 @@ fun CardSectionHeader(
             leading = leading,
             trailing = {
                 Text(
-                    text = section.current.toString(),
+                    text = section.realCount.toString(),
                     style = ty.labelLarge,
                     color = mc.textPrimary,
                     fontWeight = FontWeight.Bold,
@@ -156,10 +156,13 @@ fun CardSectionHeader(
     // — same rule FindingRow applies to Finding.AntiRoleOverMax).
     val ringColor = if (section.isAntiRole && section.current > max) mc.lifeNegative else mc.qualityColor(quality)
 
+    // W0.3/E1: the DISPLAYED count is always the real, user-verifiable count -- quality/ringColor
+    // above still consume section.current (the weighted value the score uses) untouched; only the
+    // label text changes here.
     val valueText = if (section.isAntiRole) {
-        stringResource(R.string.deck_analysis_role_anti_max_format, section.current, max)
+        stringResource(R.string.deck_analysis_role_anti_max_format, section.realCount, max)
     } else {
-        stringResource(R.string.deck_analysis_section_progress_format, section.current, ideal)
+        stringResource(R.string.deck_analysis_section_progress_format, section.realCount, ideal)
     }
 
     SectionHeader(
