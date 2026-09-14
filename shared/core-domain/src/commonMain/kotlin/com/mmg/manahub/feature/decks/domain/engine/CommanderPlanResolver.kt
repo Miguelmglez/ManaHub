@@ -84,11 +84,24 @@ object CommanderPlanResolver {
             StrategyPick.Custom -> StrategyPin(archetype = null, posture = null, themes = emptyList(), tribe = null)
         }
 
+        // F18 (E12, W6 Task 1): a Custom pick's INTERNAL build target may lean toward what the
+        // commander actually does (e.g. Edgar Markov -> AGGRO), via the tag-tier of the SAME
+        // CommanderArchetypeBias the Analysis engine already applies post-build (color-identity
+        // tier deliberately excluded here -- see CommanderArchetypeBias.commanderTagArchetype's own
+        // KDoc for why). This is a build hint ONLY — `pin` above (what gets PERSISTED as the deck's
+        // StrategyPin) stays Custom with `archetype = null` regardless of what this bias resolves
+        // to. A Curated pick already carries a real archetype from its own catalog entry, so the
+        // bias only ever applies here.
+        val buildArchetype = when (pick) {
+            is StrategyPick.Curated -> pin.archetype
+            StrategyPick.Custom -> CommanderArchetypeBias.commanderTagArchetype(commander.tags + commander.userTags)
+        }
+
         // SAME call shape as AnalysisEngine.evaluate's own resolveWithColor invocation — see this
-        // function's KDoc.
+        // function's KDoc (archetype excepted, per the F18 build-hint above).
         val skeleton = ArchetypeSkeletonResolver.resolveWithColor(
             format = archetypeFormat,
-            archetype = pin.archetype,
+            archetype = buildArchetype,
             posture = pin.posture,
             themes = pin.themes,
             identity = identity,

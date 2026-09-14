@@ -93,7 +93,11 @@ class CommanderPlanResolverTest {
     }
 
     @Test
-    fun `Custom resolves to the non-null generic baseline skeleton, never a null plan`() {
+    fun `Custom with no commander tag signal resolves the generic baseline skeleton, never a null plan`() {
+        // testCommander() carries no tags -- CommanderArchetypeBias.commanderTagArchetype returns
+        // null (F18's build hint deliberately has NO color-identity tier, see its own KDoc), so the
+        // F18 build hint is byte-for-byte inert for every identity and Custom keeps its pre-F18
+        // generic-baseline behavior (F2), regardless of how many colors the commander is in.
         commanderFormats.forEach { format ->
             identities.forEach { identity ->
                 val plan = CommanderPlanResolver.resolve(
@@ -102,13 +106,42 @@ class CommanderPlanResolverTest {
                     pick = StrategyPick.Custom,
                     identity = identity,
                 )
-                assertNull(plan.skeleton.archetype, "Custom must resolve the generic baseline (archetype == null)")
+                assertNull(plan.skeleton.archetype, "no commander tag signal must resolve the generic baseline (archetype == null)")
                 assertNotNull(plan.skeleton, "F2: Custom must never resolve to a null/absent skeleton")
                 val expected = analysisEngineSkeleton(format, null, null, emptyList(), identity)
                 assertEquals(expected, plan.skeleton)
             }
         }
     }
+
+    @Test
+    fun `F18 -- Custom biases the internal skeleton toward the commander's own tag-derived archetype`() {
+        // E12 -- a Custom build MAY aim internally at what the commander actually does. A
+        // real Edgar-Markov-shaped commander (Vampire tribal lord, AGGRO-tagged) must resolve
+        // AGGRO, not the generic baseline and never MIDRANGE.
+        val identity = setOf(ManaColor.B, ManaColor.R)
+        val edgarLike = card(
+            id = "cmd-edgar-like",
+            name = "Test Vampire Lord",
+            typeLine = "Legendary Creature — Vampire Knight",
+            cmc = 4.0,
+            colors = listOf("B", "R"),
+            colorIdentity = listOf("B", "R"),
+            tags = listOf(com.mmg.manahub.core.model.CardTag.AGGRO),
+        )
+        commanderFormats.forEach { format ->
+            val plan = CommanderPlanResolver.resolve(
+                format = format,
+                commander = edgarLike,
+                pick = StrategyPick.Custom,
+                identity = identity,
+            )
+            assertEquals(ArchetypeId.AGGRO, plan.skeleton.archetype, "F18: Edgar-shaped Custom must resolve AGGRO")
+            val expected = analysisEngineSkeleton(format, ArchetypeId.AGGRO, null, emptyList(), identity)
+            assertEquals(expected, plan.skeleton)
+        }
+    }
+
 
     @Test
     fun `toPin round-trips through persisted raw strings back to the same catalog id via nearestFor`() {

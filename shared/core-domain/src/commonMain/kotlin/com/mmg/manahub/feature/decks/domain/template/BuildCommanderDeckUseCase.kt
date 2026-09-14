@@ -103,6 +103,21 @@ class BuildCommanderDeckUseCase(
         val axisIdeals = SynergyGraph.axisIdeals(archetypeFormat, nonLandCount = nonLandTarget)
         val colorCount = identity.count { it != ManaColor.C }
 
+        // W6 Task 2 (G11d): an ESTIMATED manabase for pipFactor's shortage penalty, fed throughout
+        // the WHOLE non-land loop -- an even split of the deck's own land target across its
+        // identity colours. No real land base exists yet at this point (lands are filled AFTER
+        // non-land placement, D10), so this is deliberately a rough forecast, not the actual
+        // eventual pip-weighted distribution (that would require Stage B's own BasicLandCalculator
+        // pass, which needs the FINISHED mainboard's pip distribution -- a chicken-and-egg the
+        // estimate sidesteps). It replaces the previous permanently-inert emptyMap()/0, making the
+        // shortage term a real, live discriminator instead of a structural no-op (G11 finding d).
+        val estimatedSourcesByColor: Map<ManaColor, Int> = if (colorCount > 0) {
+            val perColor = landTarget / colorCount
+            identity.filter { it != ManaColor.C }.associateWith { perColor }
+        } else {
+            emptyMap()
+        }
+
         // ── Candidate pool (2.1) ────────────────────────────────────────────────────────────────
         val identitySymbols = identity.map { it.symbol }.toSet()
         val manualIds = manualAdds.map { it.card.scryfallId }.toSet()
@@ -157,7 +172,7 @@ class BuildCommanderDeckUseCase(
             var bestGain = 0f
             remainingCandidates.forEach { card ->
                 val profile = candidateProfiles.getValue(card)
-                val pip = PlacementScorer.pipFactor(card, colorCount, manaBaseAnalyzer, emptyMap(), 0)
+                val pip = PlacementScorer.pipFactor(card, colorCount, manaBaseAnalyzer, estimatedSourcesByColor, landTarget)
                 val gain = PlacementScorer.marginalGain(profile, state, plan, curveTargets, axisIdeals, pip) ?: return@forEach
                 if (best == null || gain > bestGain ||
                     (gain == bestGain && (card.name < best!!.name || (card.name == best!!.name && card.scryfallId < best!!.scryfallId)))

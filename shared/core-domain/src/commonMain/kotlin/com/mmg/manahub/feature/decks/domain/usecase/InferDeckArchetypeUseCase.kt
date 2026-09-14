@@ -6,7 +6,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeData
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
-import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyAffinity
+import com.mmg.manahub.feature.decks.domain.engine.CommanderArchetypeBias
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.DeckSynergyGraph
@@ -148,7 +148,7 @@ class InferDeckArchetypeUseCase {
         // real caller already only supplies these for Commander decks, but a format deck has no
         // commander concept at all, so this is a structural invariant, not a caller convention).
         val macroPrior = if (format == ArchetypeFormat.COMMANDER) {
-            commanderMacroPrior(commanderTags, commanderColorIdentity)
+            CommanderArchetypeBias.commanderMacroPrior(commanderTags, commanderColorIdentity)
         } else {
             null
         }
@@ -161,7 +161,7 @@ class InferDeckArchetypeUseCase {
         val best = ranked[0]
         val runnerUp = ranked.getOrNull(1)
         val margin = best.value - (runnerUp?.value ?: 0f)
-        val isAmbiguous = margin < MACRO_AMBIGUITY_MARGIN
+        val isAmbiguous = margin < CommanderArchetypeBias.MACRO_AMBIGUITY_MARGIN
 
         val macro = if (isAmbiguous) null else best.key
         val runnerUpMacro = if (isAmbiguous) runnerUp?.key else null
@@ -191,51 +191,10 @@ class InferDeckArchetypeUseCase {
     }
 
     // ── Commander prior (macro) ─────────────────────────────────────────────────────────────
-
-    /** One resolved commander-prior candidate: the [archetype] it nudges toward and how strong
-     * that nudge is. See [commanderMacroPrior]'s own KDoc. */
-    private data class MacroPrior(val archetype: ArchetypeId, val bonus: Float)
-
-    /**
-     * Resolves the commander into a BOUNDED bias over exactly one macro's score, or `null` when
-     * the commander carries no usable signal at all. Two tiers, tag-based STRICTLY preferred over
-     * color-based (spec brief: "colour identity is a weak signal... use it as a tiebreak, not a
-     * driver"):
-     *
-     * 1. **Tag-based** ([commanderTags], the commander card's own resolved tags — A.6 "commander
-     *    tags" classifier signal, already threaded through every call site, previously unread).
-     *    Reuses [DeckIdentitySeedTags.archetypeForTag] verbatim — the SAME reverse map the
-     *    wizard's Direction-step chip taps already use — rather than authoring a second
-     *    tag→archetype vocabulary parallel to [ArchetypeRoleClassifier]'s `RoleKey` table (a
-     *    standing plan anti-pattern this workstream was explicitly told to avoid). Bonus =
-     *    [MACRO_AMBIGUITY_MARGIN] itself, not a new invented constant: the prior is capped at
-     *    EXACTLY the model's own definition of "a decisive margin," so it can turn a genuinely
-     *    close/ambiguous call (deck-only gap <= [MACRO_AMBIGUITY_MARGIN]) into a confident one,
-     *    but can never manufacture a win over a candidate the deck's OWN composition already
-     *    separated by more than that — i.e. it can bias, but by construction cannot override a
-     *    clear compositional read. Verified by hand against the calibration corpus (see this
-     *    phase's memory file): a confidently-WRONG deck-only resolution (e.g. fixture 9 Rhys,
-     *    deck-only margin .139) is pulled down to honest ambiguity by the correct-macro tag, but
-     *    is NOT flipped outright to the (correct) tag-suggested macro — the deck's own card
-     *    composition still dominates the outcome, exactly the "bias, never override" contract.
-     * 2. **Color-based** ([commanderColorIdentity], used ONLY when step 1 found nothing). Reuses
-     *    [ColorStrategyAffinity.forColors] verbatim (the existing color-pie/EDH-convention table,
-     *    D9/WS1.4) rather than inventing a second color→archetype heuristic — the brief's own
-     *    warning that "mono-red is not automatically aggro" is exactly what that curated table
-     *    already encodes (mono-red's own best entry is AGGRO at weight 0.9, not a hardcoded
-     *    certainty). Bonus is deliberately much smaller (roughly a third of the tag-based bonus) —
-     *    color identity alone is the weakest signal available (a 2-5 color identity often has no
-     *    single dominant archetype lean at all), so it should nudge, not decide. Verified by hand:
-     *    at this magnitude it does not change ANY corpus fixture's displayed macro (see the gate
-     *    report) — it only ever narrows an already-ambiguous margin.
-     */
-    private fun commanderMacroPrior(commanderTags: List<CardTag>, commanderColorIdentity: Set<ManaColor>): MacroPrior? {
-        val tagArchetype = commanderTags.firstNotNullOfOrNull { DeckIdentitySeedTags.archetypeForTag(it) }
-        if (tagArchetype != null) return MacroPrior(tagArchetype, MACRO_AMBIGUITY_MARGIN)
-        if (commanderColorIdentity.isEmpty()) return null
-        val colorArchetype = ColorStrategyAffinity.forColors(commanderColorIdentity).firstOrNull()?.archetype ?: return null
-        return MacroPrior(colorArchetype, MACRO_PRIOR_COLOR_BONUS)
-    }
+    // W6 Task 1 (E12, 2026-09-14): [MacroPrior]/`commanderMacroPrior` moved to the shared
+    // [CommanderArchetypeBias] object so [CommanderPlanResolver]'s Custom build path can reuse
+    // the SAME bias this class applies post-build, instead of a second hand-written copy. See
+    // that object's own KDoc for the two-tier tag/color mechanics.
 
     /** Reverse-maps [commanderTags] onto [ThemeId]s via [DeckIdentitySeedTags.themeForTag] (same
      * anti-duplicate-vocabulary discipline as [commanderMacroPrior]). Returns every match, not
@@ -621,19 +580,6 @@ class InferDeckArchetypeUseCase {
     }
 
     private companion object {
-        /** Spec §2.1: "confidence < MACRO_AMBIGUITY_MARGIN (start at 0.08) surfaces as Custom or a
-         * hybrid label." Reused verbatim (not a fresh literal) as the TAG-based commander-prior
-         * bonus in [commanderMacroPrior] -- see that function's own KDoc for why capping the prior
-         * at exactly this value is what makes it bias rather than override. */
-        const val MACRO_AMBIGUITY_MARGIN = 0.08f
-
-        /** Color-identity commander-prior bonus (see [commanderMacroPrior]'s KDoc) -- deliberately
-         * much smaller than [MACRO_AMBIGUITY_MARGIN] (roughly a third of it) since color identity
-         * alone is the weakest signal this workstream uses: a tiebreak, never a driver. Judgment
-         * call, verified by hand against the calibration corpus to never flip a displayed macro on
-         * its own (see the phase gate report) -- only ever narrows an already-ambiguous margin. */
-        const val MACRO_PRIOR_COLOR_BONUS = 0.03f
-
         /** Commander theme-prior nudge (see [detectThemes]'s own commander-prior step). Smaller
          * than either macro bonus above -- themes are a ranked top-2 cut, not a binary argmax, so
          * a smaller nudge is enough to matter on a genuine near-tie between two ALREADY-live

@@ -16,6 +16,12 @@ fun fixture01EdgarMarkov(): AnalysisV3Fixture {
         typeLine = "Legendary Creature — Vampire Knight", cmc = 6.0,
         colorIdentity = listOf("R", "W", "B"), power = "4", toughness = "4",
         oracleText = "Eminence — Whenever you cast a Vampire spell, if Edgar Markov is on the battlefield or in the command zone, create a 1/1 black Vampire creature token with lifelink. Other Vampires you control get +1/+1. Whenever Edgar Markov attacks, create X 1/1 black Vampire creature tokens with lifelink, where X is the number of Vampires you control.",
+        // W6 Task 1 (F18/E12): a real production Edgar Markov carries an AGGRO-classified tag from
+        // the tagging engine (fast wide-attacking Vampire tribal aggro is its defining identity, per
+        // this fixture's own header) -- this fixture predates that classifier signal, added here so
+        // MockCollectionRichReconstructionTest's Custom-build acceptance case (a real ground-truth
+        // check, not a synthetic one) exercises the SAME tag-based bias production would apply.
+        tags = listOf(CardTag.AGGRO),
     )
     val nonland = listOf(
         entry(commander),

@@ -126,14 +126,20 @@ class BuildCommanderDeckUseCaseTest {
     }
 
     @Test
-    fun `Custom strategy pick resolves the non-null generic baseline (F2 stays dead)`() = runTest {
+    fun `Custom strategy pick always resolves a real, non-empty skeleton (F2 stays dead)`() = runTest {
+        // MockCollectionThin.commander is fixture01EdgarMarkov's Edgar Markov, which since F18/E12
+        // (W6 Task 1) carries an AGGRO tag -- Custom's build hint therefore biases toward AGGRO
+        // bands rather than the generic baseline for THIS specific commander (see
+        // CommanderPlanResolverTest for the isolated no-tag-signal case). F2's own guarantee is
+        // narrower than "archetype == null": Custom must never resolve to an absent/empty skeleton,
+        // regardless of which archetype (or none) the build hint lands on.
         val useCase = newUseCase()
         val commander = MockCollectionThin.commander
         val identity = commander.colorIdentity.toManaColors()
         val owned = ownedFrom(MockCollectionThin.ownedCards, MockCollectionThin.ownedBasics)
 
         val outcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, identity, owned)
-        assertEquals(null, outcome.plan.skeleton.archetype, "Custom resolves the generic baseline, archetype == null")
+        assertEquals(com.mmg.manahub.feature.decks.domain.engine.ArchetypeId.AGGRO, outcome.plan.skeleton.archetype, "F18: Edgar Markov's Custom build hint resolves AGGRO")
         assertTrue(outcome.result.analysis.pillars.isNotEmpty(), "Custom must still target real bands, not zero targets (F2)")
     }
 

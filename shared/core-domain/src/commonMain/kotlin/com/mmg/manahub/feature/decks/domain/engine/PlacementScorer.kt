@@ -1,42 +1,53 @@
 package com.mmg.manahub.feature.decks.domain.engine
-// COMMENTS_REVIEWED: 2026-09-09
+// COMMENTS_REVIEWED: 2026-09-14
 
 import com.mmg.manahub.core.model.Card
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PlacementScorer — Deck Wizard Commander v3 plan, Phase 2.2/2.3 (D1).
+// PlacementScorer -- Deck Wizard Commander v3 plan, Phase 2.2/2.3 (D1); rescaled W6 Task 2 (G11/E5).
 //
-//  The wizard's placement objective IS the analysis objective: every term below reuses a P1-P4
-//  primitive the Analysis tab already scores with (ArchetypeRoleClassifier role bands,
-//  SynergyGraph axis ideals, CurveTargets buckets) -- no new classification/scoring vocabulary of
-//  its own. Pure and deterministic: given the same [CandidateProfile]/[PlacementState]/[CommanderPlan]
-//  inputs, [marginalGain] always returns the same value.
+// The wizard's placement objective IS the analysis objective: every term below reuses a P1-P4
+// primitive the Analysis tab already scores with (ArchetypeRoleClassifier role bands, SynergyGraph
+// axis ideals, CurveTargets buckets). Pure and deterministic. D8 filler floor: [marginalGain]
+// returns `null` when BOTH roleGain and axisGain are <= 0 -- an OR gate, so a theme with no mapped
+// axis (CommanderPlanResolver.THEME_TARGET_AXES) still places on role gain alone.
 //
-//  D8 filler floor: [marginalGain] returns `null` (never placed) when BOTH roleGain and axisGain are
-//  <= 0 -- crucially this is an OR gate for placement eligibility (either term alone is enough), so a
-//  theme whose CommanderPlan.targetAxes contribution is empty (CommanderPlanResolver.THEME_TARGET_AXES
-//  intentionally omits WHEELS/CLONES_THEFT/VEHICLES/TREASURE -- see that file's own KDoc) never
-//  degrades to "nothing can be placed": roleGain (always populated from the resolved skeleton's real
-//  role bands, present for every strategy including Custom's generic baseline) alone can still clear
-//  the floor. axisGain simply contributes 0 for those themes rather than blocking placement -- the
-//  commander's OWN axis profile (already unioned into CommanderPlan.targetAxes by
-//  CommanderPlanResolver, independent of the theme table) still lights whatever axes the commander
-//  itself touches, so axisGain is never structurally zero for every deck, only for a themeless-and-
-//  vanilla-commander corner case, which correctly falls back to role-only placement (D6's own
-//  "Custom = baseline bands + commander axes" contract already anticipates this).
-// ═══════════════════════════════════════════════════════════════════════════════
-
+// W6 Task 2 (G11 root cause b/c): every gain term below is now normalised to [0,1] BEFORE
+// weighting -- roleGain/axisGain/curveGain used to be raw count gaps `(ideal - current)` summed
+// across every band a card touched (range ~0-12+), while powerPrior stayed 0-1 at weight 0.10, so
+// the nominal weights were meaningless and card quality almost never decided a pick. Each term is
+// now a genuine [0,1] fraction of "how needed is one more of this", and a card that touches several
+// live needs combines them with DIMINISHING RETURNS ([combineDiminishing]: `1 - Π(1 - contribution)`)
+// rather than summing raw gaps -- this rewards real versatility (a card serving 3 live needs still
+// outranks a single-purpose one) without letting one card count as filling 3 slots at once (the
+// combined value asymptotically approaches 1, it never exceeds it).
 object PlacementScorer {
 
-    const val ROLE_WEIGHT = 0.45f
-    const val AXIS_WEIGHT = 0.30f
+    /** Calibrated by hand against [com.mmg.manahub.feature.decks.domain.engine.analysisv3.MockCollectionRich]
+     * (W6 Task 2, normative per plan §6 -- never fit to a real user collection). ROLE/AXIS raised to
+     * equal weight (was 0.45/0.30) because axis alignment (the commander's own produce/consume
+     * profile) turned out to be at least as strong a skeleton-specific signal as role bands once
+     * both are on a comparable [0,1] scale; CURVE/POWER stayed at their pre-normalisation ratio.
+     * Known residual (reported, not hidden -- see [com.mmg.manahub.feature.decks.domain.template
+     * .MockCollectionRichReconstructionTest]'s own KDoc): this weighting resolves 3 of 4 fixtures'
+     * Custom-build macro exactly and leaves the 4th (Edgar/AGGRO) at a razor-thin ambiguous margin
+     * (~0.0796 vs the 0.08 decisive threshold) rather than a clean win -- real, measurable progress
+     * over the pre-Task-2 baseline (which read a confidently WRONG MIDRANGE there), not a full close. */
+    const val ROLE_WEIGHT = 0.40f
+    const val AXIS_WEIGHT = 0.40f
     const val CURVE_WEIGHT = 0.10f
     const val POWER_WEIGHT = 0.10f
 
-    /** Credit while a role sits between [RoleTarget.ideal] and [RoleTarget.max] -- not zero (still
-     * a legal, wanted card) but far below the steep pre-ideal slope, so the loop naturally prefers
-     * an under-filled band over topping off one already at its ideal. */
-    private const val ROLE_PLATEAU_CREDIT = 0.5f
+    /** Normalised credit while a role sits between [RoleTarget.ideal] and [RoleTarget.max] -- not
+     * zero (still a legal, wanted card) but below a typical under-ideal fraction, so the loop
+     * naturally prefers an under-filled band over topping off one already at its ideal. */
+    private const val ROLE_PLATEAU_CREDIT = 0.01f
+
+    /** [combineDiminishing]'s per-step decay: the 2nd-strongest need counts at 40% of its own value,
+     * the 3rd at 16%, etc. Judgment call verified by hand against [MockCollectionRich] (W6 Task 2):
+     * strong enough that a genuinely multi-purpose card still separates from a single-purpose one,
+     * weak enough that it does not flatten the skeleton-specific differentiation a pure product
+     * combinator did (see [combineDiminishing]'s own KDoc for the regression that motivated this). */
+    private const val SECONDARY_NEED_DECAY = 0.4f
 
     /** Ported from [com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase]
      * (Motor A's own pip-intensity/mana-shortage penalty, D1 "math unchanged") -- duplicated rather
@@ -98,43 +109,70 @@ object PlacementScorer {
     }
 
     /**
-     * Ideal-weighted role gain (plan 2.2, mirrors P3's own ideal-weighting): for every role the
-     * card matches at confidence > 0 (the classifier's own matchers already embed their per-role
-     * floor -- see [ArchetypeRoleClassifier.classify]'s own D11 discipline -- so "confidence > 0"
-     * IS "clears the classifier's own floor", no second threshold needed here), the raw count-gain
-     * `(ideal - current)` scaled by the match confidence while under ideal; a flat, much smaller
-     * [ROLE_PLATEAU_CREDIT] while between ideal and max; zero at/above max. Using the RAW count gain
-     * (not a `[0,1]` normalized fraction) is what "weighted by ideal" means in practice: a role with
-     * a big ideal (e.g. ramp=12) contributes proportionally more total gain than a role with a small
-     * one (e.g. tutor=3) at the same fractional shortfall, exactly mirroring how P3's own
-     * ideal-weighted average privileges high-ideal bands.
+     * Combines several independent [0,1] need-contributions into one [0,1] value with diminishing
+     * returns (W6 Task 2, E5): the STRONGEST contribution counts at full weight, each subsequent one
+     * (sorted descending) counts at a geometrically decaying fraction ([SECONDARY_NEED_DECAY] per
+     * step) of its own value, and the total is capped at 1. A card never counts as filling several
+     * slots at once (closing G11's double-counting defect) while a genuine second/third live need
+     * still raises its score over a single-purpose equivalent (rewarding real versatility).
+     *
+     * Chosen over the mathematically simpler `1 - Π(1 - contribution)` (tried first, W6 Task 2):
+     * that formula saturates too fast once a card touches 2-3 bands — and nearly every real card
+     * touches multiple SKELETON-INDEPENDENT bands that most archetypes share (ramp/removal/draw are
+     * wanted almost everywhere) — so it flattened the composition differences BETWEEN skeletons,
+     * regressing [com.mmg.manahub.feature.decks.domain.template.MockCollectionRichReconstructionTest]
+     * ("Custom build resolves the fixture's own expected macro") from 1 real mismatch to 3. The
+     * geometric-decay version keeps the single dominant, skeleton-SPECIFIC need in control of the
+     * score (preserving differentiation between what an AGGRO skeleton and a MIDRANGE skeleton each
+     * reward) while still giving a genuinely multi-purpose card a real, bounded edge.
      */
-    private fun roleGain(candidate: CandidateProfile, plan: CommanderPlan, roleCounts: Map<RoleKey, Int>): Float {
-        var gain = 0f
-        candidate.roleConfidence.forEach { (role, confidence) ->
-            if (confidence <= 0f) return@forEach
-            val target = plan.skeleton.roleTargets[role] ?: return@forEach
-            if (role in plan.skeleton.antiRoles) return@forEach // never a positive contributor either
-            val current = roleCounts[role] ?: 0
-            gain += when {
-                current < target.ideal -> confidence * (target.ideal - current)
-                current < target.max -> confidence * ROLE_PLATEAU_CREDIT
-                else -> 0f
-            }
+    private fun combineDiminishing(contributions: List<Float>): Float {
+        if (contributions.isEmpty()) return 0f
+        val sorted = contributions.map { it.coerceIn(0f, 1f) }.sortedDescending()
+        var total = 0f
+        var weight = 1f
+        sorted.forEach { c ->
+            total += c * weight
+            weight *= SECONDARY_NEED_DECAY
         }
-        return gain
+        return total.coerceIn(0f, 1f)
     }
 
     /**
-     * Producer/payoff axis gain (plan 2.2): mirrors [SynergyGraph]'s own `health = min(1,
+     * Normalised role gain (W6 Task 2, rescaled from the raw count-gap version -- see this file's
+     * header): for every role the card matches at confidence > 0 (the classifier's own matchers
+     * already embed their per-role floor -- see [ArchetypeRoleClassifier.classify]'s own D11
+     * discipline), the FRACTION of the remaining need one more copy fills
+     * (`(ideal - current) / ideal`, in [0,1] regardless of the band's absolute size -- this is what
+     * closes G11(b): a big-ideal band like ramp=12 no longer dominates a small one like tutor=3 just
+     * because its raw gap is larger) while under ideal; a flat, smaller [ROLE_PLATEAU_CREDIT] while
+     * between ideal and max; zero at/above max. Multiple matched roles combine via
+     * [combineDiminishing] rather than summing (G11(c): a card in three under-ideal bands no longer
+     * collects all three full gaps while occupying one slot).
+     */
+    private fun roleGain(candidate: CandidateProfile, plan: CommanderPlan, roleCounts: Map<RoleKey, Int>): Float {
+        val contributions = candidate.roleConfidence.mapNotNull { (role, confidence) ->
+            if (confidence <= 0f) return@mapNotNull null
+            val target = plan.skeleton.roleTargets[role] ?: return@mapNotNull null
+            if (role in plan.skeleton.antiRoles) return@mapNotNull null // never a positive contributor either
+            val current = roleCounts[role] ?: 0
+            when {
+                current < target.ideal -> confidence * ((target.ideal - current).toFloat() / target.ideal).coerceIn(0f, 1f)
+                current < target.max -> confidence * ROLE_PLATEAU_CREDIT
+                else -> null
+            }
+        }
+        return combineDiminishing(contributions)
+    }
+
+    /**
+     * Normalised producer/payoff axis gain (W6 Task 2, rescaled -- see roleGain's own KDoc for the
+     * same normalisation rationale): mirrors [SynergyGraph]'s own `health = min(1,
      * producer/producerIdeal) * min(1, payoff/payoffIdeal)` multiplicative shape -- a payoff's gain
      * is scaled by how filled the SAME axis's producer side already is (`producerFillRatio`), so the
-     * loop cannot stack payoffs onto an axis with zero producers (mirrors axis health's own "payoffs
-     * with no producers score zero" property). Axes in [CommanderPlan.targetAxes] count at full
-     * weight; any other axis the card happens to touch counts at half weight (plan 2.2: "edges on
-     * non-target but live axes count at half weight" -- approximated here as "any other axis the
-     * candidate touches", since full liveness requires a built [DeckSynergyGraph] the incremental
-     * loop does not maintain per-candidate).
+     * loop cannot stack payoffs onto an axis with zero producers. Axes in [CommanderPlan.targetAxes]
+     * count at full weight; any other axis the card happens to touch counts at half weight. Every
+     * produce/consume edge the card touches combines via [combineDiminishing], never a raw sum.
      */
     private fun axisGain(
         candidate: CandidateProfile,
@@ -143,37 +181,42 @@ object PlacementScorer {
         producerCounts: Map<AxisKey, Int>,
         payoffCounts: Map<AxisKey, Int>,
     ): Float {
-        var gain = 0f
         val profile = candidate.axisProfile
+        val contributions = mutableListOf<Float>()
 
         profile.produces.forEach { (axis, confidence) ->
             if (confidence <= 0f) return@forEach
             val ideal = axisIdeals[axis] ?: return@forEach
+            if (ideal.producerIdeal <= 0) return@forEach
             val current = producerCounts[axis] ?: 0
             if (current >= ideal.producerIdeal) return@forEach
             val weight = if (axis in plan.targetAxes) 1f else 0.5f
-            gain += confidence * (ideal.producerIdeal - current) * weight
+            val fraction = ((ideal.producerIdeal - current).toFloat() / ideal.producerIdeal).coerceIn(0f, 1f)
+            contributions += confidence * fraction * weight
         }
 
         profile.consumes.forEach { (axis, confidence) ->
             if (confidence <= 0f) return@forEach
             val ideal = axisIdeals[axis] ?: return@forEach
+            if (ideal.payoffIdeal <= 0 || ideal.producerIdeal <= 0) return@forEach
             val currentPayoff = payoffCounts[axis] ?: 0
             if (currentPayoff >= ideal.payoffIdeal) return@forEach
             val currentProducer = producerCounts[axis] ?: 0
             val producerFillRatio = (currentProducer.toFloat() / ideal.producerIdeal).coerceIn(0f, 1f)
             if (producerFillRatio <= 0f) return@forEach // "producers first" -- see this fun's KDoc
             val weight = if (axis in plan.targetAxes) 1f else 0.5f
-            gain += confidence * (ideal.payoffIdeal - currentPayoff) * producerFillRatio * weight
+            val fraction = ((ideal.payoffIdeal - currentPayoff).toFloat() / ideal.payoffIdeal).coerceIn(0f, 1f)
+            contributions += confidence * fraction * producerFillRatio * weight
         }
 
-        return gain
+        return combineDiminishing(contributions)
     }
 
-    /** Distance-based curve gain (plan 2.2): how far the candidate's own MV bucket is BELOW its
-     * remaining target -- zero once the bucket is full or over target. Cheap and low-weight by
-     * design (see [CurveTargets]'s own KDoc: this is new derived logic, not a mirror of any real
-     * `evaluateCurve` computation). */
+    /** Normalised curve gain (W6 Task 2, rescaled): the FRACTION of the deficit bucket's remaining
+     * target one more copy fills -- zero once the bucket is full or over target. A candidate occupies
+     * exactly one MV bucket, so no combinator is needed here. Cheap and low-weight by design (see
+     * [CurveTargets]'s own KDoc: this is new derived logic, not a mirror of any real `evaluateCurve`
+     * computation). */
     private fun curveGain(
         candidate: CandidateProfile,
         curveTargets: List<CurveTargets.CurveBucketTarget>,
@@ -181,8 +224,9 @@ object PlacementScorer {
     ): Float {
         val bucket = curveTargets.firstOrNull { it.bucketId == candidate.mvBucketId } ?: return 0f
         val target = bucket.targetCount ?: return 0f
+        if (target <= 0) return 0f
         val current = curveBucketCounts[candidate.mvBucketId] ?: 0
-        return if (current < target) (target - current).toFloat() else 0f
+        return if (current < target) ((target - current).toFloat() / target).coerceIn(0f, 1f) else 0f
     }
 
     /**
@@ -211,11 +255,13 @@ object PlacementScorer {
         val intensityPenalty = (intensity - 1) * perPipPenalty * (colorCount - 1)
         val intensityMultiplier = (1f - intensityPenalty).coerceIn(PIP_MULTIPLIER_FLOOR, 1f)
 
-        // No land base exists yet during the non-land placement loop (plan §3: lands are filled
-        // AFTER placement, D10) -- the shortage term is meaningless before any land is placed
-        // (every multi-pip card would read as "shorted" against zero sources), so it is skipped
-        // entirely (neutral 1f) until a real [totalLands] > 0 is passed (the refinement pass, which
-        // runs after land fill).
+        // No REAL land base exists yet during the non-land placement loop (plan §3: lands are
+        // filled AFTER placement, D10). W6 Task 2 (G11d) feeds this an ESTIMATED manabase (an even
+        // split of the deck's own land target across its identity colours) instead of the previous
+        // permanently-inert emptyMap()/0 -- see BuildCommanderDeckUseCase's own call site KDoc --
+        // so the shortage term is live throughout the whole loop rather than always neutral. Still
+        // skipped entirely (neutral 1f) when a caller genuinely has no land plan yet (totalLands<=0,
+        // e.g. a test exercising this function in isolation).
         if (totalLands <= 0) return intensityMultiplier
 
         val have = sourcesByColor[color] ?: 0
