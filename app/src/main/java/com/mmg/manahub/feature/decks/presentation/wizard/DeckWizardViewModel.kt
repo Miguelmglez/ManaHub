@@ -2075,6 +2075,7 @@ class DeckWizardViewModel(
                         )
                     }
                 },
+                deckId = launchedFromDeckId.orEmpty(), // seeds placement tie-breaks (E4)
             )
         }.getOrElse { t ->
             if (t is kotlinx.coroutines.CancellationException) throw t

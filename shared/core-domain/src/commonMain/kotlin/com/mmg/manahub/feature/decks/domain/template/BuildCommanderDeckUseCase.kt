@@ -66,6 +66,13 @@ class BuildCommanderDeckUseCase(
      *        Defaulted to a no-op so every pre-existing call site/test keeps compiling unchanged.
      *        Mirrors [BuildDeckFromTemplateUseCase]'s own `TemplateBuildProgress.Stage` emissions,
      *        but as a plain callback (this use case is a single suspend function, not a `Flow`).
+     * @param deckId W6 Task 3 (E4) — seeds every near-tie break (non-land placement, land Stage A
+     *        orderings) via [stableSeed] instead of alphabetical card name/id. Rebuilding the SAME
+     *        deck is therefore byte-identical (same [deckId] -> same seed -> same tie order); two
+     *        different decks with the same commander and strategy diverge. Defaulted to `""` so
+     *        every pre-existing call site/test keeps compiling unchanged (an empty deckId still
+     *        seeds deterministically, it just is not tied to any real deck) — every wizard launch
+     *        route requires a real `deckId` nav argument (R13), so production always supplies one.
      */
     suspend operator fun invoke(
         format: DeckFormat,
@@ -77,6 +84,7 @@ class BuildCommanderDeckUseCase(
         fillLands: Boolean = true,
         includeNonBasicLands: Boolean = false,
         onStage: (CommanderBuildStage) -> Unit = {},
+        deckId: String = "",
     ): CommanderBuildOutcome {
         require(format.isCommanderFormat) { "BuildCommanderDeckUseCase requires a Commander-shaped format, got $format" }
         val archetypeFormat = ArchetypeFormat.of(format)
@@ -103,14 +111,7 @@ class BuildCommanderDeckUseCase(
         val axisIdeals = SynergyGraph.axisIdeals(archetypeFormat, nonLandCount = nonLandTarget)
         val colorCount = identity.count { it != ManaColor.C }
 
-        // W6 Task 2 (G11d): an ESTIMATED manabase for pipFactor's shortage penalty, fed throughout
-        // the WHOLE non-land loop -- an even split of the deck's own land target across its
-        // identity colours. No real land base exists yet at this point (lands are filled AFTER
-        // non-land placement, D10), so this is deliberately a rough forecast, not the actual
-        // eventual pip-weighted distribution (that would require Stage B's own BasicLandCalculator
-        // pass, which needs the FINISHED mainboard's pip distribution -- a chicken-and-egg the
-        // estimate sidesteps). It replaces the previous permanently-inert emptyMap()/0, making the
-        // shortage term a real, live discriminator instead of a structural no-op (G11 finding d).
+        // G11d: an estimated manabase (even split of landTarget across identity colours) so pipFactor's shortage term is live, not permanently inert.
         val estimatedSourcesByColor: Map<ManaColor, Int> = if (colorCount > 0) {
             val perColor = landTarget / colorCount
             identity.filter { it != ManaColor.C }.associateWith { perColor }
@@ -175,7 +176,7 @@ class BuildCommanderDeckUseCase(
                 val pip = PlacementScorer.pipFactor(card, colorCount, manaBaseAnalyzer, estimatedSourcesByColor, landTarget)
                 val gain = PlacementScorer.marginalGain(profile, state, plan, curveTargets, axisIdeals, pip) ?: return@forEach
                 if (best == null || gain > bestGain ||
-                    (gain == bestGain && (card.name < best!!.name || (card.name == best!!.name && card.scryfallId < best!!.scryfallId)))
+                    (gain == bestGain && stableSeed(deckId, card.scryfallId) < stableSeed(deckId, best!!.scryfallId))
                 ) {
                     best = card
                     bestGain = gain
@@ -205,6 +206,7 @@ class BuildCommanderDeckUseCase(
                 usedNames = (manualNonLand.map { it.card.name } + manualLand.map { it.card.name } + placedNonLand.map { it.card.name }).toMutableSet(),
                 archetypeFormat = archetypeFormat,
                 includeNonBasicLands = includeNonBasicLands,
+                deckId = deckId,
             )
         }
 
@@ -307,6 +309,20 @@ class BuildCommanderDeckUseCase(
 
     // ── Helpers ─────────────────────────────────────────────────────────────────────────────────
 
+    /** W6 Task 3 (E4): a stable, platform-independent hash of `deckId:cardId` (plain FNV-1a over
+     * Unicode code points -- deliberately NOT `String.hashCode()`, to stay independent of any
+     * stdlib hashing guarantee across the JVM/wasmJs targets) used to break near-ties without
+     * alphabetical bias. Same [deckId] always orders the same two cards the same way (rebuilding a
+     * deck is byte-identical); two different [deckId]s order them differently (variety). */
+    private fun stableSeed(deckId: String, cardId: String): Long {
+        var hash = 1469598103934665603L
+        for (c in "$deckId:$cardId") {
+            hash = hash xor c.code.toLong()
+            hash *= 1099511628211L
+        }
+        return hash
+    }
+
     private fun fold(state: PlacementScorer.PlacementState, profile: PlacementScorer.CandidateProfile): PlacementScorer.PlacementState {
         val roleCounts = state.roleCounts.toMutableMap()
         profile.roleConfidence.forEach { (role, confidence) ->
@@ -404,6 +420,7 @@ class BuildCommanderDeckUseCase(
         usedNames: MutableSet<String>,
         archetypeFormat: ArchetypeFormat,
         includeNonBasicLands: Boolean,
+        deckId: String,
     ): List<DeckEntry> {
         val identitySymbols = identity.map { it.symbol }.toSet()
         val placed = mutableListOf<DeckEntry>()
@@ -431,7 +448,7 @@ class BuildCommanderDeckUseCase(
                 .sortedWith(
                     compareByDescending<Pair<Card, Set<ManaColor>>> { (_, colors) ->
                         colors.sumOf { c -> (intensity[c] ?: 0).let { need -> (need - (sources[c] ?: 0)).coerceAtLeast(0) } }
-                    }.thenBy { it.first.name }.thenBy { it.first.scryfallId }
+                    }.thenBy { stableSeed(deckId, it.first.scryfallId) }
                 )
 
             var remaining = nonBasicCap
@@ -450,7 +467,7 @@ class BuildCommanderDeckUseCase(
             val utilityLands = ownedNonBasics
                 .filter { it !in colorProducers.map { pair -> pair.first } }
                 .filter { ArchetypeRoleClassifier.classify(it).isNotEmpty() }
-                .sortedWith(compareBy<Card> { it.name }.thenBy { it.scryfallId })
+                .sortedWith(compareBy { stableSeed(deckId, it.scryfallId) })
             for (card in utilityLands) {
                 if (remaining <= 0) break
                 if (card.name in usedNames) continue

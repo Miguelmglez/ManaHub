@@ -4,7 +4,9 @@ package com.mmg.manahub.feature.decks.domain.template
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.availableIn
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
@@ -50,6 +52,8 @@ class BuildCommanderDeckUseCaseTest {
     private fun ownedFrom(vararg pools: List<com.mmg.manahub.feature.decks.domain.engine.analysisv3.MockCollectionCard>): List<OwnedCard> =
         pools.flatMap { pool -> pool.map { OwnedCard(it.card, it.quantity) } }
 
+    private fun roleTagFor(key: String): CardTag = CardTag(key, TagCategory.ROLE)
+
     @Test
     fun `determinism -- two builds of the same spec are byte-identical`() = runTest {
         val useCase = newUseCase()
@@ -63,6 +67,41 @@ class BuildCommanderDeckUseCaseTest {
         val secondIds = second.result.entries.map { it.card.scryfallId to it.quantity }.sortedBy { it.first }
         assertEquals(firstIds, secondIds, "two builds of the identical spec must place identical cards")
         assertEquals(first.result.analysis.totalScore, second.result.analysis.totalScore)
+    }
+
+    @Test
+    fun `W6 Task 3 -- same deckId rebuilds byte-identical, different deckIds diverge`() = runTest {
+        // A real scarcity scenario is required to exercise the tie-break at all: MockCollectionRich
+        // is curated to almost exactly reconstruct its own target deck (no real excess candidates),
+        // so every candidate gets placed regardless of order and the SET never differs. Here 90
+        // synthetic filler creatures all carry the SAME role tag, CMC and (null-rank) power, so their
+        // marginalGain genuinely ties -- with more of them than the ~63 available non-land slots,
+        // WHICH 63 make the cut is decided purely by the tie-break.
+        val useCase = newUseCase()
+        val commander = card(id = "cmd-vanilla", name = "Vanilla Commander", typeLine = "Legendary Creature — Human", cmc = 3.0, colors = listOf("G"), colorIdentity = listOf("G"))
+        val fillers = (1..90).map { i ->
+            OwnedCard(
+                card(id = "filler-$i", name = "Filler Creature $i", typeLine = "Creature — Bear", cmc = 2.0, colors = listOf("G"), colorIdentity = listOf("G"), tags = listOf(roleTagFor("ramp"))),
+                1,
+            )
+        }
+        val basics = MockCollectionRich.ownedBasics.filter { it.card.colorIdentity.contains("G") || it.card.name == "Forest" }
+        val owned = fillers + basics.map { OwnedCard(it.card, it.quantity) }
+        val identity = setOf(ManaColor.G)
+
+        suspend fun build(deckId: String) = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, identity, owned, deckId = deckId)
+        fun nonLandIds(outcome: CommanderBuildOutcome) = outcome.result.entries
+            .filterNot { BasicLandCalculator.isLand(it.card) }
+            .map { it.card.scryfallId }
+            .sorted()
+
+        val sameA = build("deck-A")
+        val sameB = build("deck-A")
+        assertEquals(nonLandIds(sameA), nonLandIds(sameB), "the SAME deckId rebuilt must place identical cards (E4)")
+
+        val deckA = build("deck-A")
+        val deckB = build("deck-B")
+        assertTrue(nonLandIds(deckA) != nonLandIds(deckB), "two DIFFERENT deckIds with the same commander/strategy must diverge (E4) -- got identical placements: ${nonLandIds(deckA)}")
     }
 
     @Test

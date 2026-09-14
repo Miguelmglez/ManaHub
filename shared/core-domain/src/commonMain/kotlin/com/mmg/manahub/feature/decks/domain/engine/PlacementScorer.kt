@@ -3,23 +3,17 @@ package com.mmg.manahub.feature.decks.domain.engine
 
 import com.mmg.manahub.core.model.Card
 
-// PlacementScorer -- Deck Wizard Commander v3 plan, Phase 2.2/2.3 (D1); rescaled W6 Task 2 (G11/E5).
-//
-// The wizard's placement objective IS the analysis objective: every term below reuses a P1-P4
-// primitive the Analysis tab already scores with (ArchetypeRoleClassifier role bands, SynergyGraph
-// axis ideals, CurveTargets buckets). Pure and deterministic. D8 filler floor: [marginalGain]
-// returns `null` when BOTH roleGain and axisGain are <= 0 -- an OR gate, so a theme with no mapped
-// axis (CommanderPlanResolver.THEME_TARGET_AXES) still places on role gain alone.
-//
-// W6 Task 2 (G11 root cause b/c): every gain term below is now normalised to [0,1] BEFORE
-// weighting -- roleGain/axisGain/curveGain used to be raw count gaps `(ideal - current)` summed
-// across every band a card touched (range ~0-12+), while powerPrior stayed 0-1 at weight 0.10, so
-// the nominal weights were meaningless and card quality almost never decided a pick. Each term is
-// now a genuine [0,1] fraction of "how needed is one more of this", and a card that touches several
-// live needs combines them with DIMINISHING RETURNS ([combineDiminishing]: `1 - Π(1 - contribution)`)
-// rather than summing raw gaps -- this rewards real versatility (a card serving 3 live needs still
-// outranks a single-purpose one) without letting one card count as filling 3 slots at once (the
-// combined value asymptotically approaches 1, it never exceeds it).
+/**
+ * The wizard's placement objective IS the analysis objective (Deck Wizard Commander v3 plan, Phase
+ * 2.2/2.3, D1) -- reuses the P1-P4 primitives the Analysis tab already scores with. Pure and
+ * deterministic; D8 filler floor: [marginalGain] returns `null` when both roleGain and axisGain are
+ * `<= 0` (an OR gate, so a theme with no mapped axis still places on role gain alone).
+ *
+ * Rescaled W6 Task 2 (G11/E5): every gain term is normalised to `[0,1]` before weighting (was a raw,
+ * unbounded count-gap, drowning out `powerPrior`'s real `[0,1]` signal), and a card touching several
+ * live needs combines them with diminishing returns ([combineDiminishing]) instead of summing raw
+ * gaps -- rewarding real versatility without one card counting as filling several slots at once.
+ */
 object PlacementScorer {
 
     /** Calibrated by hand against [com.mmg.manahub.feature.decks.domain.engine.analysisv3.MockCollectionRich]

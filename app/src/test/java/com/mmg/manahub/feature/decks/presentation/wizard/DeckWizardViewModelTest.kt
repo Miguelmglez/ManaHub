@@ -1382,7 +1382,7 @@ class DeckWizardViewModelTest {
         // and verifies the VM's OWN wiring (persist() is real -- see buildCommanderDeckUseCase's
         // spyk() construction above -- so the assertions below still exercise the real write path).
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         } returns commanderOutcome()
         val vm = viewModel()
         advanceUntilIdle()
@@ -1428,7 +1428,7 @@ class DeckWizardViewModelTest {
             DeckEntry(card = card(id = "spell-$i", name = "Spell $i"), quantity = 1, isOwned = true)
         }
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         } returns commanderOutcome(entries = listOf(DeckEntry(card = commander, quantity = 1, isOwned = true, isSideboard = false)) + ninetyNineEntries)
         val vm = viewModel()
         advanceUntilIdle()
@@ -1461,7 +1461,7 @@ class DeckWizardViewModelTest {
         coEvery { cardRepository.searchCardByName("Forest") } returns DataResult.Success(forest)
         val ownedCollectionSlot = slot<List<OwnedCard>>()
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), capture(ownedCollectionSlot), any(), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), any(), any(), capture(ownedCollectionSlot), any(), any(), any(), any(), any())
         } returns commanderOutcome()
         val vm = viewModel()
         advanceUntilIdle()
@@ -1492,7 +1492,7 @@ class DeckWizardViewModelTest {
         val ownedCollectionSlot = slot<List<OwnedCard>>()
         val includeNonBasicLandsSlot = slot<Boolean>()
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), capture(ownedCollectionSlot), any(), any(), capture(includeNonBasicLandsSlot), any())
+            buildCommanderDeckUseCase(any(), any(), any(), any(), capture(ownedCollectionSlot), any(), any(), capture(includeNonBasicLandsSlot), any(), any())
         } returns commanderOutcome()
         val vm = viewModel()
         advanceUntilIdle()
@@ -1532,7 +1532,7 @@ class DeckWizardViewModelTest {
     fun `R15 -- an unconfirmed launch into a non-empty deck refuses to persist, deck untouched`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         } returns commanderOutcome()
         every { deckRepository.observeDeckWithCards("existing-deck-1") } returns flowOf(nonEmptyDeckWithCards("existing-deck-1"))
 
@@ -1563,7 +1563,7 @@ class DeckWizardViewModelTest {
     fun `R15 -- a confirmed launch into a non-empty deck persists normally`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         } returns commanderOutcome()
         every { deckRepository.observeDeckWithCards("existing-deck-1") } returns flowOf(nonEmptyDeckWithCards("existing-deck-1"))
 
@@ -1588,7 +1588,7 @@ class DeckWizardViewModelTest {
     fun `R15 -- an unconfirmed launch into an EMPTY existing deck persists normally, nothing to lose`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         } returns commanderOutcome()
         every { deckRepository.observeDeckWithCards("existing-deck-2") } returns flowOf(emptyDeckWithCards("existing-deck-2"))
 
@@ -2234,7 +2234,7 @@ class DeckWizardViewModelTest {
         val strategyPickSlot = slot<com.mmg.manahub.feature.decks.domain.engine.StrategyPick>()
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), capture(strategyPickSlot), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), capture(strategyPickSlot), any(), any(), any(), any(), any(), any(), any())
         } returns commanderOutcome()
         vm.onNextFromFormat()
         vm.onSelectCommander(commander)
