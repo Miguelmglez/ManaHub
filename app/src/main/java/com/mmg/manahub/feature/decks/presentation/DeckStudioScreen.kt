@@ -311,14 +311,16 @@ fun DeckStudioScreen(
     var showEditDeckSheet by remember { mutableStateOf(false) }
     var showImportSheet by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    // Deck Wizard Commander v3 plan (Phase 6, item 4, plan §8): a rebuild REPLACES every card in
-    // the draft (D12's atomic write) -- confirm before triggering it on a non-empty deck. An empty
-    // draft (nothing to lose) skips straight to the wizard, matching handleRebuildWithWizard below.
-    var showRebuildConfirm by remember { mutableStateOf(false) }
+    // Deck Wizard Commander v3 plan (Phase 6, item 4, plan §8), extended R14-bugfix run: BOTH
+    // "Rebuild with the Wizard" and "Build from seed" replace every card in the draft (D12's atomic
+    // write) -- confirm before triggering either on a non-empty deck. An empty draft (nothing to
+    // lose) skips straight to the wizard. [pendingWizardConfirm] tracks which entry point is
+    // awaiting confirmation so one dialog serves both.
+    var pendingWizardConfirm by remember { mutableStateOf<WizardEntryPoint?>(null) }
     // Edge-case fix (Phase 6 adversarial pass): a rapid double-tap on the menu item (before
     // showOverflow=false tears down the DropdownMenu) could otherwise fire onNavigateToWizardFromDraft
     // twice, pushing two DeckWizard destinations for the same deckId.
-    var hasTriggeredRebuild by remember { mutableStateOf(false) }
+    var hasTriggeredWizardNav by remember { mutableStateOf(false) }
     // C3: the inline CardDetailSheet target (a scryfallId from a deck-list / commander tap).
     var selectedCardId by remember { mutableStateOf<String?>(null) }
     // True when the detail sheet was opened from the commander-selection flow (shows the
@@ -402,28 +404,37 @@ fun DeckStudioScreen(
     // Deck Wizard v4 (Task 2, R14): "Build from seed" is gated to isCommanderFormat at its render
     // site (DeckStudioTopBar below) -- this guard is defense-in-depth, mirroring the codebase's
     // "never trust the UI-only disabled state" precedent (onSelectFormat/onToggleUseCommunityData).
+    // R14-bugfix run: a non-empty deck must confirm before "Build from seed" replaces its cards,
+    // the same as "Rebuild with the Wizard" -- see [resolveWizardNavDecision].
     val handleBuildFromSeed: () -> Unit = {
-        val deckId = uiState.deck?.id
-        val format = uiState.deck?.format
-        if (deckId != null && format != null && isCommanderFormat) {
-            onNavigateToWizard(deckId, format, null, null, null, null, null)
+        when (resolveWizardNavDecision(isCommanderFormat, uiState.isEmptyDeck, hasTriggeredWizardNav)) {
+            WizardNavDecision.NAVIGATE_NOW -> {
+                val deckId = uiState.deck?.id
+                val format = uiState.deck?.format
+                if (deckId != null && format != null) {
+                    hasTriggeredWizardNav = true
+                    onNavigateToWizard(deckId, format, null, null, null, null, null)
+                }
+            }
+            WizardNavDecision.REQUIRE_CONFIRM -> pendingWizardConfirm = WizardEntryPoint.BUILD_FROM_SEED
+            WizardNavDecision.NO_OP -> Unit
         }
     }
 
     // Deck Wizard Commander v3 plan (Phase 6, item 4): confirm before a non-empty draft is
     // replaced (plan §8); an already-empty draft has nothing to lose, so it skips the dialog.
     val handleRebuildWithWizard: () -> Unit = {
-        if (hasTriggeredRebuild) {
-            // no-op: already navigating (or the confirm dialog is already up) for this composition.
-        } else if (uiState.isEmptyDeck) {
-            val deckId = uiState.deck?.id
-            val format = uiState.deck?.format
-            if (deckId != null && format != null) {
-                hasTriggeredRebuild = true
-                onNavigateToWizardFromDraft(deckId, format)
+        when (resolveWizardNavDecision(isCommanderFormat, uiState.isEmptyDeck, hasTriggeredWizardNav)) {
+            WizardNavDecision.NAVIGATE_NOW -> {
+                val deckId = uiState.deck?.id
+                val format = uiState.deck?.format
+                if (deckId != null && format != null) {
+                    hasTriggeredWizardNav = true
+                    onNavigateToWizardFromDraft(deckId, format)
+                }
             }
-        } else {
-            showRebuildConfirm = true
+            WizardNavDecision.REQUIRE_CONFIRM -> pendingWizardConfirm = WizardEntryPoint.REBUILD
+            WizardNavDecision.NO_OP -> Unit
         }
     }
 
@@ -816,26 +827,32 @@ fun DeckStudioScreen(
         )
     }
 
-    if (showRebuildConfirm) {
+    if (pendingWizardConfirm != null) {
+        val confirmedEntryPoint = pendingWizardConfirm
         MagicAlertDialog(
-            onDismissRequest = { showRebuildConfirm = false },
+            onDismissRequest = { pendingWizardConfirm = null },
             title = stringResource(R.string.deck_studio_rebuild_confirm_title),
             text = stringResource(R.string.deck_studio_rebuild_confirm_message),
             confirmLabel = stringResource(R.string.action_confirm),
             dismissLabel = stringResource(R.string.action_cancel),
             confirmColor = MagicCtaColor.Error,
             onConfirm = {
-                showRebuildConfirm = false
-                if (!hasTriggeredRebuild) {
+                pendingWizardConfirm = null
+                if (!hasTriggeredWizardNav) {
                     val deckId = uiState.deck?.id
                     val format = uiState.deck?.format
                     if (deckId != null && format != null) {
-                        hasTriggeredRebuild = true
-                        onNavigateToWizardFromDraft(deckId, format)
+                        hasTriggeredWizardNav = true
+                        when (confirmedEntryPoint) {
+                            WizardEntryPoint.REBUILD -> onNavigateToWizardFromDraft(deckId, format)
+                            WizardEntryPoint.BUILD_FROM_SEED ->
+                                onNavigateToWizard(deckId, format, null, null, null, null, null)
+                            null -> Unit
+                        }
                     }
                 }
             },
-            onDismiss = { showRebuildConfirm = false },
+            onDismiss = { pendingWizardConfirm = null },
         )
     }
 
@@ -1084,7 +1101,7 @@ private fun DeckStudioTopBar(
                             leadingIcon = {
                                 // Design review: a distinct icon from "Build from seed" above
                                 // (AutoAwesome) -- this action replaces every card in the deck
-                                // (confirmed via showRebuildConfirm), a much larger blast radius
+                                // (confirmed via pendingWizardConfirm), a much larger blast radius
                                 // that must read as different at a glance.
                                 Icon(
                                     Icons.Default.Refresh,
@@ -1252,6 +1269,7 @@ private fun BuildTab(
             }
         } else if (uiState.isEmptyDeck) {
             EmptyDeckState(
+                isCommanderFormat = isCommanderFormat,
                 onBuildFromSeed = onBuildFromSeed,
                 onBrowseInspirations = onBrowseInspirations,
                 onImportDeck = onImportDeck,
@@ -1543,6 +1561,61 @@ private fun BuildTab(
 /** Standard large primary/secondary action button height. */
 private val LargeButtonHeight = 52.dp
 
+/** Which wizard entry point is awaiting (or triggering) a replace-confirmation. */
+internal enum class WizardEntryPoint { BUILD_FROM_SEED, REBUILD }
+
+/** The outcome of [resolveWizardNavDecision]: what a wizard-entry callback should do next. */
+internal enum class WizardNavDecision { NAVIGATE_NOW, REQUIRE_CONFIRM, NO_OP }
+
+/**
+ * R14-bugfix run: both "Build from seed" and "Rebuild with the Wizard" replace every card in the
+ * draft via [com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase]'s atomic
+ * write -- a non-empty deck must confirm before either fires. Before this fix, "Build from seed"
+ * navigated unconditionally once [isCommanderFormat] was true, silently overwriting a non-empty
+ * Commander deck with no confirmation (introduced when R13 started passing a real deckId/format
+ * into "Build from seed"'s nav call). Pure, Compose-free so both call sites share one code path.
+ */
+internal fun resolveWizardNavDecision(
+    isCommanderFormat: Boolean,
+    isEmptyDeck: Boolean,
+    hasTriggeredWizardNav: Boolean,
+): WizardNavDecision = when {
+    hasTriggeredWizardNav -> WizardNavDecision.NO_OP
+    !isCommanderFormat -> WizardNavDecision.NO_OP
+    isEmptyDeck -> WizardNavDecision.NAVIGATE_NOW
+    else -> WizardNavDecision.REQUIRE_CONFIRM
+}
+
+/** Which [EmptyStateOptionCard]s [EmptyDeckState] renders, and which one is primary. */
+internal data class EmptyDeckStateOptions(
+    val showSeed: Boolean,
+    val seedIsPrimary: Boolean,
+    val showInspirations: Boolean,
+    val inspirationsIsPrimary: Boolean,
+    val importIsPrimary: Boolean,
+)
+
+/**
+ * R14: "Build from seed" opens the Commander-only Deck Wizard, so it must never appear (nor claim
+ * the primary slot) on a deck whose format the wizard doesn't support -- gate its visibility on
+ * [isCommanderFormat], not just [seedEnabled]. Exactly one card is primary in every combination:
+ * seed (when available) always wins, else inspirations (when enabled), else import.
+ */
+internal fun resolveEmptyDeckStateOptions(
+    seedEnabled: Boolean,
+    isCommanderFormat: Boolean,
+    inspirationsEnabled: Boolean,
+): EmptyDeckStateOptions {
+    val seedAvailable = seedEnabled && isCommanderFormat
+    return EmptyDeckStateOptions(
+        showSeed = seedAvailable,
+        seedIsPrimary = true,
+        showInspirations = inspirationsEnabled,
+        inspirationsIsPrimary = !seedAvailable,
+        importIsPrimary = !seedAvailable && !inspirationsEnabled,
+    )
+}
+
 /**
  * The empty-deck landing panel (visual-overhaul pass): a hero header followed by up to three
  * richly-illustrated option cards -- "Build from seed", "Browse inspirations", "Import deck list"
@@ -1552,6 +1625,7 @@ private val LargeButtonHeight = 52.dp
  */
 @Composable
 private fun EmptyDeckState(
+    isCommanderFormat: Boolean,
     onBuildFromSeed: () -> Unit,
     onBrowseInspirations: () -> Unit,
     onImportDeck: () -> Unit,
@@ -1566,9 +1640,11 @@ private fun EmptyDeckState(
     // add-cards affordance). Unchanged from the previous layout. Each flag's legacy sibling
     // (DECK_STUDIO_BUILD_FROM_SEED_ENABLED / DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED) was RETIRED
     // in the Deck Wizard & Engine Rework plan, WS7.2 (2026-07-28).
-    val seedEnabled = FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED
-    val inspirationsEnabled = FeatureFlags.Decks.DISCOVERIES_V2_ENABLED
-    val importIsPrimary = !seedEnabled && !inspirationsEnabled
+    val options = resolveEmptyDeckStateOptions(
+        seedEnabled = FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED,
+        isCommanderFormat = isCommanderFormat,
+        inspirationsEnabled = FeatureFlags.Decks.DISCOVERIES_V2_ENABLED,
+    )
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -1610,7 +1686,7 @@ private fun EmptyDeckState(
             }
         }
 
-        if (seedEnabled) {
+        if (options.showSeed) {
             item(key = "empty_option_seed") {
                 EmptyStateOptionCard(
                     icon = Icons.Default.AutoAwesome,
@@ -1619,12 +1695,12 @@ private fun EmptyDeckState(
                     description = stringResource(R.string.deck_studio_build_from_seed_desc),
                     ctaLabel = stringResource(R.string.deck_studio_build_from_seed),
                     ctaColor = MagicCtaColor.Gold,
-                    isPrimary = true,
+                    isPrimary = options.seedIsPrimary,
                     onClick = onBuildFromSeed,
                 )
             }
         }
-        if (inspirationsEnabled) {
+        if (options.showInspirations) {
             item(key = "empty_option_inspirations") {
                 EmptyStateOptionCard(
                     icon = Icons.Default.Explore,
@@ -1633,7 +1709,7 @@ private fun EmptyDeckState(
                     description = stringResource(R.string.deck_studio_browse_inspirations_desc),
                     ctaLabel = stringResource(R.string.deck_studio_browse_inspirations),
                     ctaColor = MagicCtaColor.Primary,
-                    isPrimary = !seedEnabled,
+                    isPrimary = options.inspirationsIsPrimary,
                     onClick = onBrowseInspirations,
                 )
             }
@@ -1646,7 +1722,7 @@ private fun EmptyDeckState(
                 description = stringResource(R.string.deck_studio_import_deck_desc),
                 ctaLabel = stringResource(R.string.deck_studio_import_deck),
                 ctaColor = MagicCtaColor.Accent,
-                isPrimary = importIsPrimary,
+                isPrimary = options.importIsPrimary,
                 onClick = onImportDeck,
             )
         }
