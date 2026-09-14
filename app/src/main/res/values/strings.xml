@@ -1272,6 +1272,9 @@
     <string name="deck_wizard_build_error_title">Something went wrong</string>
     <string name="deck_wizard_build_error">We couldn\'t build the deck. Please try again.</string>
     <string name="deck_wizard_retry">Try again</string>
+    <!-- Deck Wizard v4 (R15) structural guard: shown when the launched deck gained cards while the
+         wizard was open and the launch was never confirmed. The write is refused, deck untouched. -->
+    <string name="deck_wizard_replace_not_confirmed">This deck already has cards, so nothing was changed. Go back and confirm to replace it.</string>
     <!-- Deck Wizard Commander v3 plan (Phase 6, 6.3) -->
     <string name="deck_wizard_commander_stage_resolving_plan">Resolving your plan…</string>
     <string name="deck_wizard_commander_stage_placing_manual_adds">Placing your manual adds…</string>

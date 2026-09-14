@@ -224,7 +224,10 @@ fun DeckStudioScreen(
     // Deck Wizard v4 (R13): [deckId]/[format] are now REQUIRED leading args -- the wizard never has
     // its own format step, so every call site here always supplies the CURRENTLY open draft's own
     // id/format (this screen only ever operates on a loaded deck when these fire).
-    onNavigateToWizard: (deckId: String, format: String, archetype: String?, theme: String?, tribe: String?, colors: String?, seeds: List<String>?) -> Unit = { _, _, _, _, _, _, _ -> },
+    // Deck Wizard v4 (R15): [replaceConfirmed] is a REQUIRED trailing arg -- the compiler forces
+    // every call site to decide whether the user already confirmed replacing this deck's cards;
+    // DeckWizardViewModel re-checks the deck's real card count at persist time regardless.
+    onNavigateToWizard: (deckId: String, format: String, archetype: String?, theme: String?, tribe: String?, colors: String?, seeds: List<String>?, replaceConfirmed: Boolean) -> Unit = { _, _, _, _, _, _, _, _ -> },
     // Deck Wizard Commander v3 plan (Phase 6, item 4/D12): Studio's own "regenerate this EXISTING
     // draft through the wizard" entry point -- passes the draft's own format + id so the wizard's
     // atomic write targets it directly instead of creating a second deck (D12). Unlike
@@ -311,12 +314,12 @@ fun DeckStudioScreen(
     var showEditDeckSheet by remember { mutableStateOf(false) }
     var showImportSheet by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    // Deck Wizard Commander v3 plan (Phase 6, item 4, plan §8), extended R14-bugfix run: BOTH
-    // "Rebuild with the Wizard" and "Build from seed" replace every card in the draft (D12's atomic
-    // write) -- confirm before triggering either on a non-empty deck. An empty draft (nothing to
-    // lose) skips straight to the wizard. [pendingWizardConfirm] tracks which entry point is
-    // awaiting confirmation so one dialog serves both.
-    var pendingWizardConfirm by remember { mutableStateOf<WizardEntryPoint?>(null) }
+    // Deck Wizard v4 (R15): "Build from seed" is rendered ONLY on the empty-deck state card
+    // (nothing to lose, per resolveWizardNavDecision below it never confirms); "Rebuild with the
+    // Wizard" is rendered ONLY in the overflow menu on a non-empty deck, so it ALWAYS confirms
+    // before replacing every card (D12's atomic write). One boolean is enough now that only one
+    // entry point ever reaches the dialog.
+    var showRebuildConfirm by remember { mutableStateOf(false) }
     // Edge-case fix (Phase 6 adversarial pass): a rapid double-tap on the menu item (before
     // showOverflow=false tears down the DropdownMenu) could otherwise fire onNavigateToWizardFromDraft
     // twice, pushing two DeckWizard destinations for the same deckId.
@@ -401,39 +404,35 @@ fun DeckStudioScreen(
     val isCommanderFormat = uiState.deck?.format
         ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
         ?.isCommanderFormat == true
-    // Deck Wizard v4 (Task 2, R14): "Build from seed" is gated to isCommanderFormat at its render
-    // site (DeckStudioTopBar below) -- this guard is defense-in-depth, mirroring the codebase's
-    // "never trust the UI-only disabled state" precedent (onSelectFormat/onToggleUseCommunityData).
-    // R14-bugfix run: a non-empty deck must confirm before "Build from seed" replaces its cards,
-    // the same as "Rebuild with the Wizard" -- see [resolveWizardNavDecision].
+    // Deck Wizard v4 (R15): "Build from seed" is gated to isCommanderFormat at its render site
+    // (the empty-deck state card, its ONLY render site now that the overflow duplicate is gone)
+    // -- this guard is defense-in-depth, mirroring the codebase's "never trust the UI-only disabled
+    // state" precedent (onSelectFormat/onToggleUseCommunityData). It never confirms: it is only
+    // ever reachable while the deck is empty, so there is nothing to lose (see
+    // [resolveWizardNavDecision]'s KDoc). replaceConfirmed=false is safe here for the same reason --
+    // [DeckWizardViewModel] still re-checks the deck's real card count at persist time.
     val handleBuildFromSeed: () -> Unit = {
-        when (resolveWizardNavDecision(isCommanderFormat, uiState.isEmptyDeck, hasTriggeredWizardNav)) {
+        when (resolveWizardNavDecision(WizardEntryPoint.BUILD_FROM_SEED, isCommanderFormat, hasTriggeredWizardNav)) {
             WizardNavDecision.NAVIGATE_NOW -> {
                 val deckId = uiState.deck?.id
                 val format = uiState.deck?.format
                 if (deckId != null && format != null) {
                     hasTriggeredWizardNav = true
-                    onNavigateToWizard(deckId, format, null, null, null, null, null)
+                    onNavigateToWizard(deckId, format, null, null, null, null, null, false)
                 }
             }
-            WizardNavDecision.REQUIRE_CONFIRM -> pendingWizardConfirm = WizardEntryPoint.BUILD_FROM_SEED
+            WizardNavDecision.REQUIRE_CONFIRM -> Unit // unreachable for this entry point (R15)
             WizardNavDecision.NO_OP -> Unit
         }
     }
 
-    // Deck Wizard Commander v3 plan (Phase 6, item 4): confirm before a non-empty draft is
-    // replaced (plan §8); an already-empty draft has nothing to lose, so it skips the dialog.
+    // Deck Wizard v4 (R15): "Rebuild with the Wizard" is rendered ONLY when the deck already has
+    // cards (its overflow-menu render gate below), so it ALWAYS confirms before firing -- there is
+    // no more empty-deck skip branch to consider.
     val handleRebuildWithWizard: () -> Unit = {
-        when (resolveWizardNavDecision(isCommanderFormat, uiState.isEmptyDeck, hasTriggeredWizardNav)) {
-            WizardNavDecision.NAVIGATE_NOW -> {
-                val deckId = uiState.deck?.id
-                val format = uiState.deck?.format
-                if (deckId != null && format != null) {
-                    hasTriggeredWizardNav = true
-                    onNavigateToWizardFromDraft(deckId, format)
-                }
-            }
-            WizardNavDecision.REQUIRE_CONFIRM -> pendingWizardConfirm = WizardEntryPoint.REBUILD
+        when (resolveWizardNavDecision(WizardEntryPoint.REBUILD, isCommanderFormat, hasTriggeredWizardNav)) {
+            WizardNavDecision.REQUIRE_CONFIRM -> showRebuildConfirm = true
+            WizardNavDecision.NAVIGATE_NOW -> Unit // unreachable for this entry point (R15)
             WizardNavDecision.NO_OP -> Unit
         }
     }
@@ -447,7 +446,6 @@ fun DeckStudioScreen(
                     title = uiState.deck?.name ?: stringResource(R.string.deck_studio_title),
                     format = uiState.deck?.format,
                     onBack = handleBack,
-                    onBuildFromSeed = handleBuildFromSeed,
                     onBrowseInspirations = { viewModel.openInspirations() },
                     onEdit = { showEditDeckSheet = true },
                     onShare = {
@@ -464,6 +462,8 @@ fun DeckStudioScreen(
                     shareEnabled = !uiState.isEmptyDeck,
                     onDeleteDeck = { showDeleteDialog = true },
                     isCommanderFormat = isCommanderFormat,
+                    // R15: "Rebuild with the Wizard" only renders for a non-empty deck.
+                    isEmptyDeck = uiState.isEmptyDeck,
                     onRebuildWithWizard = handleRebuildWithWizard,
                 )
             },
@@ -746,6 +746,10 @@ fun DeckStudioScreen(
                     val format = uiState.deck?.format
                     if (deckId != null && format != null) {
                         viewModel.closeInspirations()
+                        // R15 structural guard: this hand-off never confirmed a replace before
+                        // either -- replaceConfirmed=false lets DeckWizardViewModel's persist-time
+                        // re-check refuse safely if the draft has gained cards since this screen
+                        // loaded, instead of silently overwriting them.
                         onNavigateToWizard(
                             deckId,
                             format,
@@ -754,6 +758,7 @@ fun DeckStudioScreen(
                             discovery.tribe,
                             discovery.dominantColors.joinToString("") { it.symbol },
                             null,
+                            false,
                         )
                     }
                 },
@@ -772,7 +777,8 @@ fun DeckStudioScreen(
                     val format = uiState.deck?.format
                     if (deckId != null && format != null) {
                         viewModel.closeInspirations()
-                        onNavigateToWizard(deckId, format, null, null, null, null, cardNames)
+                        // R15 structural guard: see the onBuildThis comment just above.
+                        onNavigateToWizard(deckId, format, null, null, null, null, cardNames, false)
                     }
                 },
                 // Combos tab only -- Strategies-tab card taps open the inline zoom overlay
@@ -827,32 +833,26 @@ fun DeckStudioScreen(
         )
     }
 
-    if (pendingWizardConfirm != null) {
-        val confirmedEntryPoint = pendingWizardConfirm
+    if (showRebuildConfirm) {
         MagicAlertDialog(
-            onDismissRequest = { pendingWizardConfirm = null },
+            onDismissRequest = { showRebuildConfirm = false },
             title = stringResource(R.string.deck_studio_rebuild_confirm_title),
             text = stringResource(R.string.deck_studio_rebuild_confirm_message),
             confirmLabel = stringResource(R.string.action_confirm),
             dismissLabel = stringResource(R.string.action_cancel),
             confirmColor = MagicCtaColor.Error,
             onConfirm = {
-                pendingWizardConfirm = null
+                showRebuildConfirm = false
                 if (!hasTriggeredWizardNav) {
                     val deckId = uiState.deck?.id
                     val format = uiState.deck?.format
                     if (deckId != null && format != null) {
                         hasTriggeredWizardNav = true
-                        when (confirmedEntryPoint) {
-                            WizardEntryPoint.REBUILD -> onNavigateToWizardFromDraft(deckId, format)
-                            WizardEntryPoint.BUILD_FROM_SEED ->
-                                onNavigateToWizard(deckId, format, null, null, null, null, null)
-                            null -> Unit
-                        }
+                        onNavigateToWizardFromDraft(deckId, format)
                     }
                 }
             },
-            onDismiss = { pendingWizardConfirm = null },
+            onDismiss = { showRebuildConfirm = false },
         )
     }
 
@@ -979,7 +979,6 @@ private fun DeckStudioTopBar(
     title: String,
     format: String?,
     onBack: () -> Unit,
-    onBuildFromSeed: () -> Unit,
     onBrowseInspirations: () -> Unit,
     onEdit: () -> Unit,
     onShare: () -> Unit,
@@ -987,9 +986,13 @@ private fun DeckStudioTopBar(
     onMassiveAdd: ()->Unit,
     onDeleteDeck: () -> Unit,
     // Deck Wizard Commander v3 plan (Phase 6, item 4): Commander-only "regenerate this draft
-    // through the wizard" entry point, gated by the SAME DECK_BUILDER_V2_ENABLED flag as
-    // onBuildFromSeed above (the wizard stays unreachable in production until Phase 8 flips it).
+    // through the wizard" entry point, gated by the SAME DECK_BUILDER_V2_ENABLED flag the empty-deck
+    // state card's "Build from seed" option uses.
     isCommanderFormat: Boolean = false,
+    // Deck Wizard v4 (R15): "Rebuild with the Wizard" only renders here when the deck already has
+    // cards -- an empty deck's ONLY wizard entry point is the empty-deck state card's own "Build
+    // from seed" option (never this overflow menu, see the deleted item below).
+    isEmptyDeck: Boolean = false,
     onRebuildWithWizard: () -> Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
@@ -1061,35 +1064,13 @@ private fun DeckStudioTopBar(
                             onEdit()
                         },
                     )
-                    // Deck Builder v2 (plan D10/§3.7): visible when the v2 wizard is enabled. The
-                    // legacy seed-sheet sibling flag was RETIRED in WS7.2 (2026-07-28).
-                    // Deck Wizard v4 (Task 2, R14): also gated on isCommanderFormat -- the wizard is
-                    // only ready for Commander/Commander Casual after this campaign; every 60-card
-                    // format stays hidden until its own wave ships (see isCommanderFormat's own
-                    // computation above, the ONE place this decision lives).
-                    if (FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED && isCommanderFormat) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = stringResource(R.string.deck_studio_build_from_seed),
-                                    style = ty.bodyMedium,
-                                    color = mc.textPrimary,
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = mc.textSecondary,
-                                )
-                            },
-                            onClick = {
-                                showOverflow = false
-                                onBuildFromSeed()
-                            },
-                        )
-                    }
-                    if (FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED && isCommanderFormat) {
+                    // Deck Wizard v4 (R15): "Build from seed" was REMOVED from this overflow menu --
+                    // it now renders ONLY on the empty-deck state card (EmptyDeckState below),
+                    // never here, so the two entry points can no longer both appear on the same
+                    // empty Commander deck. Gated on DECK_BUILDER_V2_ENABLED && isCommanderFormat &&
+                    // !isEmptyDeck: a deck that still has cards is the ONLY case this item exists
+                    // for, since an empty one already offers the wizard on its state card.
+                    if (FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED && isCommanderFormat && !isEmptyDeck) {
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -1099,10 +1080,6 @@ private fun DeckStudioTopBar(
                                 )
                             },
                             leadingIcon = {
-                                // Design review: a distinct icon from "Build from seed" above
-                                // (AutoAwesome) -- this action replaces every card in the deck
-                                // (confirmed via pendingWizardConfirm), a much larger blast radius
-                                // that must read as different at a glance.
                                 Icon(
                                     Icons.Default.Refresh,
                                     contentDescription = null,
@@ -1561,28 +1538,29 @@ private fun BuildTab(
 /** Standard large primary/secondary action button height. */
 private val LargeButtonHeight = 52.dp
 
-/** Which wizard entry point is awaiting (or triggering) a replace-confirmation. */
+/** Which wizard entry point [resolveWizardNavDecision] is being asked about. */
 internal enum class WizardEntryPoint { BUILD_FROM_SEED, REBUILD }
 
 /** The outcome of [resolveWizardNavDecision]: what a wizard-entry callback should do next. */
 internal enum class WizardNavDecision { NAVIGATE_NOW, REQUIRE_CONFIRM, NO_OP }
 
 /**
- * R14-bugfix run: both "Build from seed" and "Rebuild with the Wizard" replace every card in the
- * draft via [com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase]'s atomic
- * write -- a non-empty deck must confirm before either fires. Before this fix, "Build from seed"
- * navigated unconditionally once [isCommanderFormat] was true, silently overwriting a non-empty
- * Commander deck with no confirmation (introduced when R13 started passing a real deckId/format
- * into "Build from seed"'s nav call). Pure, Compose-free so both call sites share one code path.
+ * R15 (2026-09-14, user decision): the two wizard entry points now have disjoint render
+ * conditions, so each has exactly one rule instead of sharing an `isEmptyDeck` branch --
+ * [WizardEntryPoint.BUILD_FROM_SEED] is rendered ONLY on the empty-deck state card (nothing to
+ * lose) and never confirms; [WizardEntryPoint.REBUILD] is rendered ONLY in the overflow menu on a
+ * non-empty deck and always confirms. Kept as one function (not two) so both entry points read
+ * their rule from the same place. `hasTriggeredWizardNav`/`isCommanderFormat` still gate both, as
+ * defense-in-depth against a caller that renders either item outside its intended condition.
  */
 internal fun resolveWizardNavDecision(
+    entryPoint: WizardEntryPoint,
     isCommanderFormat: Boolean,
-    isEmptyDeck: Boolean,
     hasTriggeredWizardNav: Boolean,
 ): WizardNavDecision = when {
     hasTriggeredWizardNav -> WizardNavDecision.NO_OP
     !isCommanderFormat -> WizardNavDecision.NO_OP
-    isEmptyDeck -> WizardNavDecision.NAVIGATE_NOW
+    entryPoint == WizardEntryPoint.BUILD_FROM_SEED -> WizardNavDecision.NAVIGATE_NOW
     else -> WizardNavDecision.REQUIRE_CONFIRM
 }
 

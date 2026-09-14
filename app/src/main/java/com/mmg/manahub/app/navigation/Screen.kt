@@ -89,7 +89,7 @@ sealed class Screen(val route: String) {
      * INTO an existing Deck Studio draft, never creates a fresh one of its own anymore.
      */
     object DeckWizard : Screen(
-        "deck/wizard?archetype={archetype}&theme={theme}&tribe={tribe}&colors={colors}&seeds={seeds}&format={format}&deckId={deckId}"
+        "deck/wizard?archetype={archetype}&theme={theme}&tribe={tribe}&colors={colors}&seeds={seeds}&format={format}&deckId={deckId}&replaceConfirmed={replaceConfirmed}"
     ) {
         const val baseRoute = "deck/wizard"
 
@@ -111,6 +111,11 @@ sealed class Screen(val route: String) {
          *   targets an existing draft created by Deck Studio). The wizard's atomic write targets
          *   this deck (never creates a new one) and, on finish, pops back to the Studio destination
          *   that launched it instead of creating a second Studio back-stack entry.
+         * @param replaceConfirmed Deck Wizard v4 (R15) — REQUIRED, no default: every caller must
+         *   explicitly decide whether the user already confirmed replacing [deckId]'s existing
+         *   cards. `false` is only safe when [deckId] is empty; [DeckWizardViewModel] re-checks the
+         *   deck's card count at persist time and refuses an unconfirmed write into a non-empty
+         *   deck regardless of which entry point reached this route.
          */
         fun createRoute(
             format: String,
@@ -120,8 +125,13 @@ sealed class Screen(val route: String) {
             tribe: String? = null,
             colors: String? = null,
             seeds: List<String>? = null,
+            replaceConfirmed: Boolean,
         ): String {
-            val params = mutableListOf("format=${Uri.encode(format)}", "deckId=${Uri.encode(deckId)}")
+            val params = mutableListOf(
+                "format=${Uri.encode(format)}",
+                "deckId=${Uri.encode(deckId)}",
+                "replaceConfirmed=$replaceConfirmed",
+            )
             if (!archetype.isNullOrEmpty()) params += "archetype=${Uri.encode(archetype)}"
             if (!theme.isNullOrEmpty()) params += "theme=${Uri.encode(theme)}"
             if (!tribe.isNullOrEmpty()) params += "tribe=${Uri.encode(tribe)}"

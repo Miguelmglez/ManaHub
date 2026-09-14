@@ -737,16 +737,23 @@ fun AppNavGraph(
                     onNavigateToCommunityDeckDetail = { archidektId ->
                         navController.navigate(Screen.CommunityDeckDetail.createRoute(archidektId))
                     },
-                    onNavigateToWizard = { deckId, format, archetype, theme, tribe, colors, seeds ->
+                    onNavigateToWizard = { deckId, format, archetype, theme, tribe, colors, seeds, replaceConfirmed ->
                         navController.navigate(
                             Screen.DeckWizard.createRoute(
                                 format = format, deckId = deckId,
                                 archetype = archetype, theme = theme, tribe = tribe, colors = colors, seeds = seeds,
+                                replaceConfirmed = replaceConfirmed,
                             )
                         )
                     },
+                    // R15: onNavigateToWizardFromDraft is ONLY reached from Deck Studio's "Rebuild
+                    // with the Wizard" confirm dialog (see DeckStudioScreen.kt) -- always confirmed
+                    // by construction, so replaceConfirmed is hardcoded true here rather than
+                    // widening this callback's own signature for a single caller.
                     onNavigateToWizardFromDraft = { deckId, format ->
-                        navController.navigate(Screen.DeckWizard.createRoute(format = format, deckId = deckId))
+                        navController.navigate(
+                            Screen.DeckWizard.createRoute(format = format, deckId = deckId, replaceConfirmed = true)
+                        )
                     },
                     onNavigateToMassiveAddCards = {
                         navController.navigate(Screen.CollectionMultiAddCard.route)
@@ -765,6 +772,7 @@ fun AppNavGraph(
                     navArgument("seeds") { type = NavType.StringType; defaultValue = ""; nullable = false },
                     navArgument("format") { type = NavType.StringType; defaultValue = ""; nullable = false },
                     navArgument("deckId") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                    navArgument("replaceConfirmed") { type = NavType.BoolType; defaultValue = false },
                 ),
             ) { backStackEntry ->
                 // Deck Wizard v4 (R13): "format"/"deckId" are now REQUIRED nav args (Screen

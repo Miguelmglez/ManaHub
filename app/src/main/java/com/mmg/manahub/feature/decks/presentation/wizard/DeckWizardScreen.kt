@@ -62,7 +62,6 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardRow
 import com.mmg.manahub.core.ui.components.MagicToastHost
-import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.mtg_card_back
@@ -125,7 +124,7 @@ fun DeckWizardScreen(
     androidx.compose.runtime.LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                is DeckWizardEvent.ShowToast -> toastState.show(event.message, MagicToastType.INFO)
+                is DeckWizardEvent.ShowToast -> toastState.show(event.message, event.type)
                 is DeckWizardEvent.OpenDeckStudio -> onOpenDeckStudio(event.deckId)
             }
         }

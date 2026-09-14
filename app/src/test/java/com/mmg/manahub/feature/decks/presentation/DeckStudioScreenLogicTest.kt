@@ -5,9 +5,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Deck Wizard v4, Run 7 (R14 correction + data-loss bugfix): pure decision functions extracted
- * from [DeckStudioScreen]'s empty-state and wizard-entry-point logic, so both are testable without
- * a Compose harness.
+ * Deck Wizard v4: pure decision functions extracted from [DeckStudioScreen]'s empty-state and
+ * wizard-entry-point logic, so both are testable without a Compose harness.
+ * Run 7 (R14 correction + data-loss bugfix) introduced [resolveWizardNavDecision] with a shared
+ * `isEmptyDeck` branch for both entry points; Run 8 (R15, 2026-09-14) gave each entry point its
+ * own disjoint render condition (Build from seed: empty-deck state card only; Rebuild: overflow
+ * menu on a non-empty deck only), so the `isEmptyDeck`-branching tests below were REWRITTEN to
+ * assert the new per-entry-point rule instead of deleted -- see each test's own note.
  */
 class DeckStudioScreenLogicTest {
 
@@ -84,41 +88,51 @@ class DeckStudioScreenLogicTest {
         }
     }
 
-    // -- resolveWizardNavDecision -------------------------------------------------------------
+    // -- resolveWizardNavDecision (R15: rewritten for the per-entry-point signature) -----------
 
+    // R15 rewrite of "commander format, empty deck -- navigates immediately": Build from seed is
+    // now unconditionally NAVIGATE_NOW for a commander format (it is only ever rendered on the
+    // empty-deck state card, so there is no isEmptyDeck param left to vary).
     @Test
-    fun `commander format, empty deck -- navigates immediately`() {
+    fun `commander format, build-from-seed entry point -- navigates immediately, never confirms`() {
         assertEquals(
             WizardNavDecision.NAVIGATE_NOW,
-            resolveWizardNavDecision(isCommanderFormat = true, isEmptyDeck = true, hasTriggeredWizardNav = false),
+            resolveWizardNavDecision(WizardEntryPoint.BUILD_FROM_SEED, isCommanderFormat = true, hasTriggeredWizardNav = false),
         )
     }
 
+    // R15 rewrite of "commander format, non-empty deck -- requires confirmation": Rebuild is now
+    // unconditionally REQUIRE_CONFIRM for a commander format (it is only ever rendered on a
+    // non-empty deck, so there is no isEmptyDeck skip branch left either).
     @Test
-    fun `commander format, non-empty deck -- requires confirmation`() {
+    fun `commander format, rebuild entry point -- always requires confirmation`() {
         assertEquals(
             WizardNavDecision.REQUIRE_CONFIRM,
-            resolveWizardNavDecision(isCommanderFormat = true, isEmptyDeck = false, hasTriggeredWizardNav = false),
+            resolveWizardNavDecision(WizardEntryPoint.REBUILD, isCommanderFormat = true, hasTriggeredWizardNav = false),
         )
     }
 
     @Test
-    fun `non-commander format -- always a no-op regardless of deck contents`() {
+    fun `non-commander format -- always a no-op regardless of entry point`() {
         assertEquals(
             WizardNavDecision.NO_OP,
-            resolveWizardNavDecision(isCommanderFormat = false, isEmptyDeck = true, hasTriggeredWizardNav = false),
+            resolveWizardNavDecision(WizardEntryPoint.BUILD_FROM_SEED, isCommanderFormat = false, hasTriggeredWizardNav = false),
         )
         assertEquals(
             WizardNavDecision.NO_OP,
-            resolveWizardNavDecision(isCommanderFormat = false, isEmptyDeck = false, hasTriggeredWizardNav = false),
+            resolveWizardNavDecision(WizardEntryPoint.REBUILD, isCommanderFormat = false, hasTriggeredWizardNav = false),
         )
     }
 
     @Test
-    fun `already-triggered nav -- no-op even for a commander empty deck`() {
+    fun `already-triggered nav -- no-op for both entry points even on a commander format`() {
         assertEquals(
             WizardNavDecision.NO_OP,
-            resolveWizardNavDecision(isCommanderFormat = true, isEmptyDeck = true, hasTriggeredWizardNav = true),
+            resolveWizardNavDecision(WizardEntryPoint.BUILD_FROM_SEED, isCommanderFormat = true, hasTriggeredWizardNav = true),
+        )
+        assertEquals(
+            WizardNavDecision.NO_OP,
+            resolveWizardNavDecision(WizardEntryPoint.REBUILD, isCommanderFormat = true, hasTriggeredWizardNav = true),
         )
     }
 }

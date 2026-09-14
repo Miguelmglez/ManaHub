@@ -25,6 +25,7 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
@@ -112,7 +113,10 @@ data class ColorComboSuggestion(val colors: Set<ManaColor>, val score: Float)
 /** One-shot side effects, delivered via a buffered [Channel] (never a nullable [MutableStateFlow]
  * — see the project-wide "one-shot events" convention documented on every other feature VM). */
 sealed interface DeckWizardEvent {
-    data class ShowToast(val message: String) : DeckWizardEvent
+    // R15 structural guard: [type] defaults to INFO (every pre-existing call site is an unchanged
+    // "you're missing a required pick" nudge); the persist-time replace refusal is the one caller
+    // that passes ERROR.
+    data class ShowToast(val message: String, val type: MagicToastType = MagicToastType.INFO) : DeckWizardEvent
 
     /** The Result screen's "Open in Deck Studio" CTA — the caller navigates + pops the wizard. */
     data class OpenDeckStudio(val deckId: String) : DeckWizardEvent
@@ -557,6 +561,14 @@ class DeckWizardViewModel(
      * see [onSelectFormat]'s own guard. Read once, at init. */
     private var launchedFromDeckId: String? = null
 
+    /** Deck Wizard v4 (R15) structural guard: the `replaceConfirmed` nav arg (Screen.DeckWizard
+     * .createRoute) -- true only when the caller already showed a replace-confirmation dialog for
+     * [launchedFromDeckId] (Deck Studio's "Rebuild with the Wizard" confirm path). Read once, at
+     * init; re-checked against the deck's REAL card count at persist time in
+     * [generateCommanderDeck], not trusted as a launch-time snapshot, since the deck can gain cards
+     * while the wizard is open. */
+    private var replaceConfirmed: Boolean = false
+
     /** Edge-case fix (Phase 6 adversarial pass), kept as defense-in-depth after Phase 8 JOB 2 made
      * `buildCommanderDeckUseCase.persist` a single Room `@Transaction`
      * ([com.mmg.manahub.core.data.local.dao.DeckDao.persistCommanderBuild]): true while that write
@@ -580,6 +592,7 @@ class DeckWizardViewModel(
         val requestedFormat = savedStateHandle.get<String?>("format")?.takeIf { it.isNotEmpty() }
             ?.let { name -> DeckFormat.entries.firstOrNull { it.name == name } }
         launchedFromDeckId = savedStateHandle.get<String?>("deckId")?.takeIf { it.isNotEmpty() }
+        replaceConfirmed = savedStateHandle.get<Boolean>("replaceConfirmed") ?: false
         val resolvedFormat = requestedFormat?.takeIf { it.isCommanderFormat || it == DeckFormat.CASUAL }
             ?: DeckFormat.CASUAL.also {
                 if (requestedFormat != null) crashReporter.log("deck_wizard_unsupported_format_fallback_casual")
@@ -2071,6 +2084,34 @@ class DeckWizardViewModel(
         }
 
         val manualIds = manualAdds.map { it.card.scryfallId }.toSet()
+
+        // R15 structural guard: re-read the launched deck's REAL card count right before the write
+        // (not the launch-time snapshot -- the deck can gain cards while the wizard is open, e.g.
+        // a manual add from another tab, or the user backgrounding and returning). Every wizard
+        // entry point can reach this function, confirmed or not (Discoveries/combo hand-offs never
+        // showed a confirm dialog at all) -- this is the ONE place a silent replace is refused,
+        // independent of which UI path forgot to ask. A fresh deck (launchedFromDeckId == null) is
+        // never at risk here (BuildCommanderDeckUseCase.persist only just created it below).
+        if (launchedFromDeckId != null && !replaceConfirmed) {
+            val existing = deckRepository.observeDeckWithCards(launchedFromDeckId!!).first()
+            // Same "has anything to lose" definition DeckStudioViewModel.isEmptyDeck uses: a
+            // commander pick alone counts, even with zero mainboard cards.
+            val hasCardsToLose = existing != null &&
+                (existing.mainboard.sumOf { it.quantity } > 0 || existing.deck.commanderCardId != null)
+            if (hasCardsToLose) {
+                crashReporter.recordException(
+                    IllegalStateException("[DeckWizardViewModel] refused an unconfirmed wizard write into a non-empty deck")
+                )
+                _events.send(
+                    DeckWizardEvent.ShowToast(
+                        appContext.getString(R.string.deck_wizard_replace_not_confirmed),
+                        MagicToastType.ERROR,
+                    )
+                )
+                return
+            }
+        }
+
         // Edge-case fix (Phase 6 adversarial pass): once the write actually starts, it MUST run to
         // completion -- for a rebuild-in-place (launchedFromDeckId != null) this is mutating the
         // user's own pre-existing draft. persist() is now ONE Room transaction (Phase 8 JOB 2), so

@@ -1514,6 +1514,101 @@ class DeckWizardViewModelTest {
         )
     }
 
+    // ── R15 structural guard: an unconfirmed launch never silently replaces a non-empty deck ──
+
+    private fun nonEmptyDeckWithCards(deckId: String, commanderId: String? = "cmd-1") = DeckWithCards(
+        deck = com.mmg.manahub.core.model.Deck(id = deckId, name = "Existing Deck", format = "commander", commanderCardId = commanderId),
+        mainboard = listOf(com.mmg.manahub.core.model.DeckSlot(scryfallId = "spell-1", quantity = 1)),
+        sideboard = emptyList(),
+    )
+
+    private fun emptyDeckWithCards(deckId: String) = DeckWithCards(
+        deck = com.mmg.manahub.core.model.Deck(id = deckId, name = "Existing Deck", format = "commander", commanderCardId = null),
+        mainboard = emptyList(),
+        sideboard = emptyList(),
+    )
+
+    @Test
+    fun `R15 -- an unconfirmed launch into a non-empty deck refuses to persist, deck untouched`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderOutcome()
+        every { deckRepository.observeDeckWithCards("existing-deck-1") } returns flowOf(nonEmptyDeckWithCards("existing-deck-1"))
+
+        val vm = viewModel(mapOf("deckId" to "existing-deck-1", "replaceConfirmed" to false))
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        vm.onNextFromManualAdds()
+
+        vm.events.test {
+            vm.onGenerate()
+            advanceUntilIdle()
+            val event = awaitItem()
+            assertTrue(event is DeckWizardEvent.ShowToast)
+            assertEquals(com.mmg.manahub.core.ui.components.MagicToastType.ERROR, (event as DeckWizardEvent.ShowToast).type)
+        }
+        assertEquals(WizardPhase.GENERATING, vm.uiState.value.phase)
+        assertNull(vm.uiState.value.createdDeckId)
+        coVerify(exactly = 0) { deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any()) }
+        coVerify { crashReporter.recordException(any()) }
+    }
+
+    @Test
+    fun `R15 -- a confirmed launch into a non-empty deck persists normally`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderOutcome()
+        every { deckRepository.observeDeckWithCards("existing-deck-1") } returns flowOf(nonEmptyDeckWithCards("existing-deck-1"))
+
+        val vm = viewModel(mapOf("deckId" to "existing-deck-1", "replaceConfirmed" to true))
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        vm.onNextFromManualAdds()
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        assertEquals(WizardPhase.RESULT, vm.uiState.value.phase)
+        assertEquals("existing-deck-1", vm.uiState.value.createdDeckId)
+        coVerify { deckRepository.persistCommanderBuild(deckId = "existing-deck-1", slots = any(), archetypeOverride = any(), themesOverride = any(), posture = any(), tribeOverride = any(), strategyLocked = any()) }
+    }
+
+    @Test
+    fun `R15 -- an unconfirmed launch into an EMPTY existing deck persists normally, nothing to lose`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderOutcome()
+        every { deckRepository.observeDeckWithCards("existing-deck-2") } returns flowOf(emptyDeckWithCards("existing-deck-2"))
+
+        val vm = viewModel(mapOf("deckId" to "existing-deck-2", "replaceConfirmed" to false))
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        vm.onNextFromManualAdds()
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        assertEquals(WizardPhase.RESULT, vm.uiState.value.phase)
+        assertEquals("existing-deck-2", vm.uiState.value.createdDeckId)
+        coVerify { deckRepository.persistCommanderBuild(deckId = "existing-deck-2", slots = any(), archetypeOverride = any(), themesOverride = any(), posture = any(), tribeOverride = any(), strategyLocked = any()) }
+    }
+
     @Test
     fun `calling onGenerate twice in immediate succession only launches one build`() = runTest(dispatcher) {
         coEvery { buildDeckFromTemplateUseCase(any(), any()) } returns flow { awaitCancellation() }
