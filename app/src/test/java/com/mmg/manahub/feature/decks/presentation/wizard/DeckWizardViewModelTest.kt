@@ -2364,10 +2364,15 @@ class DeckWizardViewModelTest {
         vm.onSelectColorCombo(combo)
         assertEquals(combo.colors, vm.uiState.value.colorIdentity)
 
-        // User changes their mind without ever picking a new combo for RAMP.
-        vm.onSelectTaxonomyArchetype(ArchetypeId.AGGRO)
+        // User changes their mind to a DIFFERENT archetype without ever picking a new combo.
+        // (Was `ArchetypeId.AGGRO` twice pre-2026-09-14 -- a stale artifact of the taxonomy
+        // migration that removed `ArchetypeId.RAMP`: re-selecting the SAME archetype is a
+        // deselect/toggle-off by design (see onSelectTaxonomyArchetype), not a switch, so the
+        // test was silently asserting its own toggle-off path instead of the switch path its
+        // name and comment describe.)
+        vm.onSelectTaxonomyArchetype(ArchetypeId.CONTROL)
 
-        assertEquals(ArchetypeId.AGGRO, vm.uiState.value.selectedArchetype)
+        assertEquals(ArchetypeId.CONTROL, vm.uiState.value.selectedArchetype)
         assertTrue(vm.uiState.value.colorIdentity.isEmpty())
     }
 
