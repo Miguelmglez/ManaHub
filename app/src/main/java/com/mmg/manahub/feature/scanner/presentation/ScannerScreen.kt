@@ -46,35 +46,21 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.rounded.Clear
-import androidx.compose.material.icons.rounded.CollectionsBookmark
-import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FlashOff
 import androidx.compose.material.icons.rounded.FlashOn
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -89,18 +75,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -115,15 +98,15 @@ import com.google.accompanist.permissions.shouldShowRationale
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardSelectionEntry
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.AddCardSheet
+import com.mmg.manahub.core.ui.components.CardQueueSheet
 import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
-import com.mmg.manahub.core.ui.components.LanguageBadge
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCtaButton
-import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
@@ -157,13 +140,6 @@ import java.util.concurrent.Executors
  * [CameraPreview]'s KDoc.
  */
 private const val CAMERA_STOP_DEBOUNCE_MS = 250L
-
-private fun Color.withAlpha(alpha: Float): Color = this.copy(alpha = alpha)
-
-private fun TextStyle.withFontSize(size: TextUnit): TextStyle = this.copy(fontSize = size)
-private fun TextStyle.withWeight(weight: FontWeight): TextStyle = this.copy(fontWeight = weight)
-private fun TextStyle.withColor(color: Color): TextStyle = this.copy(color = color)
-private fun TextStyle.withLetterSpacing(spacing: TextUnit): TextStyle = this.copy(letterSpacing = spacing)
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Root screen — entry point from navigation
@@ -233,7 +209,7 @@ fun ScannerScreen(
 
                 TopScannerControls(
                     onBack = onBack,
-                    queueCount = uiState.scanSession.cards.sumOf { it.quantity },
+                    queueCount = uiState.scanSession.entries.sumOf { it.quantity },
                     isFlashOn = uiState.isFlashOn,
                     hasFlash = uiState.hasFlash,
                     isSoundEnabled = uiState.isSoundEnabled,
@@ -293,14 +269,12 @@ fun ScannerScreen(
 
             cameraPermission.status.shouldShowRationale -> {
                 CameraPermissionRequest(
-                    isPermanentlyDenied = false,
                     onRequest = { cameraPermission.launchPermissionRequest() },
                 )
             }
 
             else -> {
                 CameraPermissionRequest(
-                    isPermanentlyDenied = true,
                     onRequest = { cameraPermission.launchPermissionRequest() },
                 )
             }
@@ -311,25 +285,26 @@ fun ScannerScreen(
 
     // Queue bottom sheet
     if (uiState.showQueueSheet) {
-        ScanQueueSheet(
+        CardQueueSheet(
             session = uiState.scanSession,
-            multiSelectedIds = uiState.multiSelectedIds,
             preferredCurrency = preferredCurrency,
             ownedCardIdentityKeys = uiState.ownedCardIdentityKeys,
             isAutoDeleteOnAddEnabled = uiState.isAutoDeleteOnAddEnabled,
+            isCommitting = uiState.isCommittingQueue,
+            toastMessage = uiState.toastMessage,
+            toastType = uiState.toastType,
+            onToastDismissed = viewModel::onToastDismissed,
             listState = queueListState,
             onDismiss = viewModel::onCloseQueue,
-            onRemoveCard = viewModel::onRemoveSessionCard,
-            onEditCard = viewModel::onEditScannedCard,
-            onToggleSelect = viewModel::onToggleMultiSelect,
-            onDeleteSelected = viewModel::onDeleteSelected,
+            onRemoveEntry = viewModel::onRemoveSessionCard,
+            onEditEntry = viewModel::onEditScannedCard,
             onClearSession = viewModel::onClearSession,
             onAddAllToCollection = viewModel::onAddAllToCollection,
             onAddAllToWishlist = viewModel::onAddAllToWishlist,
             onAddEntryToCollection = viewModel::onAddEntryToCollection,
             onAddEntryToWishlist = viewModel::onAddEntryToWishlist,
-            onNavigateToCardDetail = viewModel::onOpenCardDetail,
-            onDuplicateCard = viewModel::onDuplicateSessionCard,
+            onNavigateToCardDetail = { id -> viewModel.onOpenCardDetail(id, true) },
+            onDuplicateEntry = viewModel::onDuplicateSessionCard,
             onToggleAutoDeleteOnAdd = viewModel::onToggleAutoDeleteOnAdd,
             onIncrementQuantity = viewModel::onIncrementSessionCardQuantity,
             onDecrementQuantity = viewModel::onDecrementSessionCardQuantity,
@@ -341,8 +316,6 @@ fun ScannerScreen(
         val editingCard = uiState.editingCard!!
         EditScannedCardSheet(
             scannedCard = editingCard,
-            availablePrints = uiState.availablePrints,
-            isLoadingPrints = uiState.isLoadingPrints,
             onDismiss = viewModel::onCloseEditSheet,
             onConfirm = viewModel::onUpdateScannedCard,
             onOpenVariantSelector = { viewModel.onOpenVariantSelector(editingCard) },
@@ -768,9 +741,10 @@ private fun NameZoneIndicator(modifier: Modifier = Modifier) {
             val bracketH    = 14.dp.toPx()
 
             // Top border line
-            drawLine(accentColor.withAlpha(0.55f), androidx.compose.ui.geometry.Offset(left, top), androidx.compose.ui.geometry.Offset(right, top), stroke)
+            drawLine(accentColor.copy(alpha = 0.55f),
+                Offset(left, top), androidx.compose.ui.geometry.Offset(right, top), stroke)
             // Bottom border line
-            drawLine(accentColor.withAlpha(0.55f), androidx.compose.ui.geometry.Offset(left, bottom), androidx.compose.ui.geometry.Offset(right, bottom), stroke)
+            drawLine(accentColor.copy(alpha = 0.55f), androidx.compose.ui.geometry.Offset(left, bottom), androidx.compose.ui.geometry.Offset(right, bottom), stroke)
 
             // Left bracket — top arm and bottom arm
             drawLine(accentColor, androidx.compose.ui.geometry.Offset(left, top), androidx.compose.ui.geometry.Offset(left, top + bracketH), strokeBold)
@@ -779,23 +753,13 @@ private fun NameZoneIndicator(modifier: Modifier = Modifier) {
             // Right bracket — top arm and bottom arm
             drawLine(accentColor, androidx.compose.ui.geometry.Offset(right, top), androidx.compose.ui.geometry.Offset(right, top + bracketH), strokeBold)
             drawLine(accentColor, androidx.compose.ui.geometry.Offset(right, bottom), androidx.compose.ui.geometry.Offset(right, bottom - bracketH), strokeBold)
-
-            /*// Centre scan line (dashed)
-            val mid = (top + bottom) / 2f
-            drawLine(
-                color       = accentColor.withAlpha(0.18f),
-                start       = androidx.compose.ui.geometry.Offset(left + 28.dp.toPx(), mid),
-                end         = androidx.compose.ui.geometry.Offset(right - 28.dp.toPx(), mid),
-                strokeWidth = stroke * 0.6f,
-                pathEffect  = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
-            )*/
         }
 
         // Label — "CARD NAME" aligned to zone left edge, just above the top line
         Text(
             text = stringResource(R.string.scanner_name_zone_label),
-            style = ty.labelSmall.withFontSize(9.sp).withLetterSpacing(1.5.sp).withWeight(FontWeight.Bold),
-            color = accentColor.withAlpha(0.75f),
+            style = ty.labelSmall.copy(fontSize = 9.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold),
+            color = accentColor.copy(alpha = 0.75f),
             modifier = Modifier
                 .padding(top = zoneTop - 18.dp, start = zoneLeftStart + 2.dp),
         )
@@ -878,8 +842,8 @@ private fun TopScannerControls(
             onClick = onBack,
             modifier = Modifier
                 .size(40.dp)
-                .background(mc.background.withAlpha(0.6f), CircleShape)
-                .border(1.dp, mc.textPrimary.withAlpha(0.12f), CircleShape)
+                .background(mc.background.copy(alpha = 0.6f), CircleShape)
+                .border(1.dp, mc.textPrimary.copy(alpha = 0.12f), CircleShape)
         ) {
             Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = mc.textPrimary)
         }
@@ -891,10 +855,10 @@ private fun TopScannerControls(
                 modifier = Modifier
                     .size(40.dp)
                     .background(
-                        if (isRecognitionPausedByUser) mc.goldMtg.withAlpha(0.9f) else mc.background.withAlpha(0.6f),
+                        if (isRecognitionPausedByUser) mc.goldMtg.copy(alpha = 0.9f) else mc.background.copy(alpha = 0.6f),
                         CircleShape
                     )
-                    .border(1.dp, mc.textPrimary.withAlpha(0.12f), CircleShape)
+                    .border(1.dp, mc.textPrimary.copy(alpha = 0.12f), CircleShape)
             ) {
                 Icon(
                     imageVector = if (isRecognitionPausedByUser) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
@@ -909,8 +873,8 @@ private fun TopScannerControls(
                     onClick = onOpenQueue,
                     modifier = Modifier
                         .size(40.dp)
-                        .background(mc.background.withAlpha(0.6f), CircleShape)
-                        .border(1.dp, mc.textPrimary.withAlpha(0.12f), CircleShape)
+                        .background(mc.background.copy(alpha = 0.6f), CircleShape)
+                        .border(1.dp, mc.textPrimary.copy(alpha = 0.12f), CircleShape)
                 ) {
                     Icon(Icons.Rounded.Style, contentDescription = null, tint = mc.textPrimary)
                 }
@@ -928,7 +892,7 @@ private fun TopScannerControls(
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 4.dp)) {
                             Text(
                                 text = if (queueCount > 99) "+99" else queueCount.toString(),
-                                style = ty.labelSmall.withFontSize(10.sp).withLetterSpacing(0.sp),
+                                style = ty.labelSmall.copy(fontSize = 10.sp, letterSpacing = 0.sp),
                                 color = mc.background,
                                 fontWeight = FontWeight.Bold
                             )
@@ -942,8 +906,8 @@ private fun TopScannerControls(
                 onClick = { showLanguageSelector = true },
                 modifier = Modifier
                     .size(40.dp)
-                    .background(mc.background.withAlpha(0.6f), CircleShape)
-                    .border(1.dp, mc.textPrimary.withAlpha(0.12f), CircleShape)
+                    .background(mc.background.copy(alpha = 0.6f), CircleShape)
+                    .border(1.dp, mc.textPrimary.copy(alpha = 0.12f), CircleShape)
             ) {
                 Text(text = CardConstants.getFlag(selectedLanguage), style = ty.titleLarge)
             }
@@ -959,10 +923,10 @@ private fun TopScannerControls(
                     modifier = Modifier
                         .size(40.dp)
                         .background(
-                            if (isSettingsExpanded) mc.primaryAccent.withAlpha(0.9f) else mc.background.withAlpha(0.6f),
+                            if (isSettingsExpanded) mc.primaryAccent.copy(alpha = 0.9f) else mc.background.copy(alpha = 0.6f),
                             CircleShape
                         )
-                        .border(1.dp, mc.textPrimary.withAlpha(0.12f), CircleShape)
+                        .border(1.dp, mc.textPrimary.copy(alpha = 0.12f), CircleShape)
                         .zIndex(1f) // Keep gear on top during animation
                 ) {
                     Icon(
@@ -984,10 +948,10 @@ private fun TopScannerControls(
                             modifier = Modifier
                                 .size(40.dp)
                                 .background(
-                                    if (isSoundEnabled) mc.goldMtg.withAlpha(0.9f) else mc.background.withAlpha(0.6f),
+                                    if (isSoundEnabled) mc.goldMtg.copy(alpha = 0.9f) else mc.background.copy(alpha = 0.6f),
                                     CircleShape
                                 )
-                                .border(1.dp, mc.textPrimary.withAlpha(0.12f), CircleShape)
+                                .border(1.dp, mc.textPrimary.copy(alpha = 0.12f), CircleShape)
                         ) {
                             Icon(
                                 imageVector = if (isSoundEnabled) Icons.AutoMirrored.Rounded.VolumeUp else Icons.AutoMirrored.Rounded.VolumeOff,
@@ -1003,10 +967,10 @@ private fun TopScannerControls(
                                 modifier = Modifier
                                     .size(40.dp)
                                     .background(
-                                        if (isFlashOn) mc.goldMtg.withAlpha(0.9f) else mc.background.withAlpha(0.6f),
+                                        if (isFlashOn) mc.goldMtg.copy(alpha = 0.9f) else mc.background.copy(alpha = 0.6f),
                                         CircleShape
                                     )
-                                    .border(1.dp, mc.textPrimary.withAlpha(0.12f), CircleShape)
+                                    .border(1.dp, mc.textPrimary.copy(alpha = 0.12f), CircleShape)
                             ) {
                                 Icon(
                                     imageVector = if (isFlashOn) Icons.Rounded.FlashOn else Icons.Rounded.FlashOff,
@@ -1098,7 +1062,7 @@ private fun LanguageSelectorSheet(
                             .heightIn(min = 48.dp)
                             .clickable { onSelectLanguage(code) }
                             .then(
-                                if (isSelected) Modifier.background(mc.primaryAccent.withAlpha(0.08f))
+                                if (isSelected) Modifier.background(mc.primaryAccent.copy(alpha = 0.08f))
                                 else Modifier
                             )
                             .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -1147,7 +1111,7 @@ private fun DetectedCardOverlay(
     val ty = MaterialTheme.magicTypography
 
     Surface(
-        color = mc.background.withAlpha(0.85f),
+        color = mc.background.copy(alpha = 0.85f),
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -1180,7 +1144,7 @@ private fun DetectedCardOverlay(
                     // here means "no <selectedLanguage> printing exists, added the English print".
                     if (languageMismatch) {
                         Surface(
-                            color = mc.goldMtg.withAlpha(0.15f),
+                            color = mc.goldMtg.copy(alpha = 0.15f),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
@@ -1241,7 +1205,7 @@ private fun DetectedCardOverlay(
                                     if (isFoil) card.priceEurFoil else card.priceEur,
                                     preferredCurrency,
                                 ),
-                                style = ty.labelSmall.withLetterSpacing(0.sp),
+                                style = ty.labelSmall.copy(letterSpacing = 0.sp),
                                 color = mc.primaryAccent
                             )
                         }
@@ -1249,7 +1213,7 @@ private fun DetectedCardOverlay(
 
                     // Attribute Pill (Normal, Set, Lang, Qty)
                     Surface(
-                        color = mc.textPrimary.withAlpha(0.1f),
+                        color = mc.textPrimary.copy(alpha = 0.1f),
                         shape = CircleShape,
                         modifier = Modifier.fillMaxWidth().height(32.dp)
                     ) {
@@ -1275,7 +1239,7 @@ private fun DetectedCardOverlay(
                                     color = mc.textPrimary
                                 )
                             }
-                            Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(mc.textPrimary.withAlpha(0.2f)))
+                            Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(mc.textPrimary.copy(alpha = 0.2f)))
                             Text(
                                 text = card.lang.uppercase(),
                                 style = ty.labelSmall,
@@ -1318,7 +1282,7 @@ private fun RateLimitedBadge(remainingSeconds: Int, modifier: Modifier = Modifie
     val ty = MaterialTheme.magicTypography
 
     Surface(
-        color = mc.lifeNegative.withAlpha(0.15f),
+        color = mc.lifeNegative.copy(alpha = 0.15f),
         shape = RoundedCornerShape(12.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
@@ -1332,426 +1296,17 @@ private fun RateLimitedBadge(remainingSeconds: Int, modifier: Modifier = Modifie
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Scan Queue Sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ScanQueueSheet(
-    session: ScanSession,
-    multiSelectedIds: Set<String>,
-    preferredCurrency: PreferredCurrency,
-    ownedCardIdentityKeys: Set<String>,
-    isAutoDeleteOnAddEnabled: Boolean,
-    listState: androidx.compose.foundation.lazy.LazyListState,
-    onDismiss: () -> Unit,
-    onRemoveCard: (ScannedCard) -> Unit,
-    onEditCard: (ScannedCard) -> Unit,
-    onToggleSelect: (ScannedCard) -> Unit,
-    onDeleteSelected: () -> Unit,
-    onClearSession: () -> Unit,
-    onAddAllToCollection: () -> Unit,
-    onAddAllToWishlist: () -> Unit,
-    onAddEntryToCollection: (ScannedCard) -> Unit,
-    onAddEntryToWishlist: (ScannedCard) -> Unit,
-    onNavigateToCardDetail: (scryfallId: String, fromQueue: Boolean) -> Unit,
-    onDuplicateCard: (ScannedCard) -> Unit,
-    onToggleAutoDeleteOnAdd: () -> Unit,
-    onIncrementQuantity: (ScannedCard) -> Unit,
-    onDecrementQuantity: (ScannedCard) -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden }
+private fun AmbiguityDropdown(cardName: String, onConfirm: () -> Unit, onSkip: () -> Unit) {
+    MagicAlertDialog(
+        onDismissRequest = onSkip,
+        title = stringResource(R.string.scanner_ambiguous_match),
+        text = cardName,
+        confirmLabel = stringResource(R.string.scanner_confirm),
+        onConfirm = onConfirm,
+        dismissLabel = stringResource(R.string.scanner_skip),
+        onDismiss = onSkip,
     )
-    var searchQuery by remember { mutableStateOf("") }
-
-    val filtered = remember(session.cards, searchQuery) {
-        if (searchQuery.isBlank()) session.cards
-        else session.cards.filter { it.card.name.contains(searchQuery, ignoreCase = true) }
-    }
-
-    // Local toast state for actions inside the sheet
-    val sheetToastState = rememberMagicToastState()
-    val viewModel: ScannerViewModel = hiltViewModel()
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    LaunchedEffect(uiState.toastMessage) {
-        uiState.toastMessage?.let {
-            sheetToastState.show(it, uiState.toastType)
-            viewModel.onToastDismissed()
-        }
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = mc.background,
-        dragHandle = null,
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = stringResource(R.string.action_cancel),
-                            tint = mc.textSecondary
-                        )
-                    }
-                    Text(
-                        text = stringResource(R.string.scanner_queue_title, session.cards.size),
-                        style = ty.titleMedium,
-                        color = mc.textPrimary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = onClearSession) {
-                        Icon(Icons.Rounded.Delete, null, tint = mc.lifeNegative)
-                    }
-                }
-
-                // Sticky "Auto-delete on add" switch — stays visible above the scrollable list
-                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                    SettingsToggleRow(
-                        title = stringResource(R.string.scanner_queue_auto_delete_title),
-                        subtitle = stringResource(R.string.scanner_queue_auto_delete_desc),
-                        checked = isAutoDeleteOnAddEnabled,
-                        onCheckedChange = { onToggleAutoDeleteOnAdd() },
-                    )
-                }
-
-                // Search Bar
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    placeholder = { Text(stringResource(R.string.scanner_queue_search_placeholder), style = ty.bodyMedium, color = mc.textDisabled) },
-                    leadingIcon = { Icon(Icons.Rounded.Search, null, tint = mc.textDisabled) },
-                    shape = CircleShape,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = mc.textPrimary.withAlpha(0.05f),
-                        focusedContainerColor = mc.textPrimary.withAlpha(0.05f),
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedBorderColor = Color.Transparent,
-                        focusedTextColor = mc.textPrimary,
-                        unfocusedTextColor = mc.textPrimary
-                    )
-                )
-
-                Spacer(Modifier.height(16.dp))
-
-                // Card List
-                LazyColumn(modifier = Modifier.weight(1f), state = listState) {
-                    items(filtered, key = { it.id }) { entry ->
-                        QueueCardItem(
-                            entry = entry,
-                            preferredCurrency = preferredCurrency,
-                            isInCollection = entry.card.oracleId.ifBlank { entry.card.name } in ownedCardIdentityKeys,
-                            onEdit = { onEditCard(entry) },
-                            onDelete = { onRemoveCard(entry) },
-                            onAddToCollection = { onAddEntryToCollection(entry) },
-                            onAddToWishlist = { onAddEntryToWishlist(entry) },
-                            onClick = { onNavigateToCardDetail(entry.card.scryfallId, true) },
-                            onDuplicate = { onDuplicateCard(entry) },
-                            onIncrement = { onIncrementQuantity(entry) },
-                            onDecrement = { onDecrementQuantity(entry) },
-                        )
-                    }
-                }
-
-                // Bulk Actions Footer
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(mc.backgroundSecondary)
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    MagicCtaButton(
-                        onClick = onAddAllToCollection,
-                        text = stringResource(R.string.scanner_queue_add_all),
-                        icon = @Composable { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, null, modifier = Modifier.size(18.dp)) },
-                        enabled = !uiState.isCommittingQueue,
-                        isLoading = uiState.isCommittingQueue,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    MagicCtaButton(
-                        onClick = onAddAllToWishlist,
-                        text = stringResource(R.string.scanner_queue_add_all_wishlist),
-                        icon = @Composable { Icon(Icons.Rounded.FavoriteBorder, null, modifier = Modifier.size(18.dp)) },
-                        style = MagicCtaStyle.Outlined,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
-            // MagicToastHost for this sheet, positioned above the footer
-            MagicToastHost(
-                state = sheetToastState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 140.dp) // Adjusted to be above the bulk action buttons
-            )
-        }
-    }
-}
-
-@Composable
-private fun QueueCardItem(
-    entry: ScannedCard,
-    preferredCurrency: PreferredCurrency,
-    isInCollection: Boolean,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onAddToCollection: () -> Unit,
-    onAddToWishlist: () -> Unit,
-    onClick: () -> Unit,
-    onDuplicate: () -> Unit,
-    onIncrement: () -> Unit,
-    onDecrement: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 12.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Larger top-aligned image
-            AsyncImage(
-                model = entry.card.imageArtCrop ?: entry.card.imageNormal,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(8.dp))
-            )
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = entry.card.name,
-                    style = ty.titleMedium.withWeight(FontWeight.Bold).withFontSize(18.sp),
-                    color = mc.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                
-                Spacer(Modifier.height(4.dp))
-                
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    SetSymbol(
-                        setCode = entry.card.setCode,
-                        rarity = CardRarity.fromString(entry.card.rarity),
-                        size = 16.dp,
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "${entry.card.setName} #${entry.card.collectorNumber}",
-                        style = ty.labelMedium,
-                        color = mc.secondaryAccent,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        LanguageBadge(langCode = entry.language)
-                        AttrTag(entry.condition)
-
-                        if (entry.isFoil) {
-                            AttrTag(stringResource(R.string.scanner_foil))
-                        }
-
-                        // "Already in collection" badge — any printing/language of the same oracle
-                        // identity (Card Versions & Languages convention: oracleId.ifBlank { name })
-                        if (isInCollection) {
-                            Icon(
-                                imageVector = Icons.Rounded.CollectionsBookmark,
-                                contentDescription = stringResource(R.string.scanner_already_in_collection),
-                                tint = mc.primaryAccent,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
-                    }
-
-                    QuantitySelector(
-                        quantity = entry.quantity,
-                        onIncrement = onIncrement,
-                        onDecrement = onDecrement
-                    )
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                Text(
-                    text = PriceFormatter.formatFromScryfall(
-                        if (entry.isFoil) entry.card.priceUsdFoil else entry.card.priceUsd,
-                        if (entry.isFoil) entry.card.priceEurFoil else entry.card.priceEur,
-                        preferredCurrency,
-                    ),
-                    style = ty.labelLarge.withWeight(FontWeight.Bold).withColor(mc.goldMtg),
-                )
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        // Full-width action row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            QueueActionButton(
-                icon = Icons.Rounded.Style,
-                label = stringResource(R.string.action_add),
-                tint = mc.primaryAccent,
-                onClick = onAddToCollection,
-                modifier = Modifier.weight(1f)
-            )
-            QueueActionButton(
-                icon = Icons.Rounded.FavoriteBorder,
-                label = stringResource(R.string.carddetail_add_to_wishlist),
-                tint = mc.secondaryAccent,
-                onClick = onAddToWishlist,
-                modifier = Modifier.weight(1f)
-            )
-            QueueActionButton(
-                icon = Icons.Rounded.Clear,
-                label = stringResource(R.string.action_remove),
-                tint = mc.lifeNegative,
-                onClick = onDelete,
-                modifier = Modifier.weight(1f)
-            )
-            QueueActionButton(
-                icon = Icons.Rounded.Edit,
-                label = stringResource(R.string.action_edit),
-                tint = mc.textSecondary,
-                onClick = onEdit,
-                modifier = Modifier.weight(1f)
-            )
-            QueueActionButton(
-                icon = Icons.Rounded.ContentCopy,
-                label = stringResource(R.string.scanner_duplicate_entry),
-                tint = mc.textSecondary,
-                onClick = onDuplicate,
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        HorizontalDivider(
-            modifier = Modifier.padding(top = 8.dp),
-            color = mc.textPrimary.withAlpha(0.05f)
-        )
-    }
-}
-
-@Composable
-private fun QuantitySelector(
-    quantity: Int,
-    onIncrement: () -> Unit,
-    onDecrement: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    Row(
-        modifier = modifier
-            .background(mc.textPrimary.withAlpha(0.05f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 4.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        IconButton(onClick = onDecrement, modifier = Modifier.size(28.dp)) {
-            Icon(Icons.Default.Remove, null, tint = mc.textPrimary, modifier = Modifier.size(16.dp))
-        }
-        Text(
-            text = quantity.toString(),
-            style = ty.titleLarge.withWeight(FontWeight.Bold),
-            color = mc.secondaryAccent,
-            modifier = Modifier.widthIn(min = 20.dp),
-            textAlign = TextAlign.Center
-        )
-        IconButton(onClick = onIncrement, modifier = Modifier.size(28.dp)) {
-            Icon(Icons.Default.Add, null, tint = mc.textPrimary, modifier = Modifier.size(16.dp))
-        }
-    }
-}
-
-@Composable
-private fun QueueActionButton(
-    icon: ImageVector,
-    label: String,
-    tint: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val ty = MaterialTheme.magicTypography
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp, horizontal = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
-        Text(
-            text = label,
-            style = ty.labelSmall.withFontSize(9.sp),
-            color = tint,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            softWrap = false
-        )
-    }
-}
-
-@Composable
-private fun AttrTag(text: String) {
-    val mc = MaterialTheme.magicColors
-    Surface(
-        color = mc.textPrimary.withAlpha(0.1f),
-        shape = RoundedCornerShape(4.dp),
-        modifier = Modifier.padding(vertical = 2.dp)
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.magicTypography.labelSmall.withFontSize(10.sp).withLetterSpacing(0.sp),
-            color = mc.textPrimary,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-        )
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1760,11 +1315,9 @@ private fun AttrTag(text: String) {
 
 @Composable
 private fun EditScannedCardSheet(
-    scannedCard: ScannedCard,
-    availablePrints: List<Card>,
-    isLoadingPrints: Boolean,
+    scannedCard: CardSelectionEntry,
     onDismiss: () -> Unit,
-    onConfirm: (ScannedCard) -> Unit,
+    onConfirm: (CardSelectionEntry) -> Unit,
     onOpenVariantSelector: () -> Unit,
 ) {
     AddCardSheet(
@@ -1787,30 +1340,13 @@ private fun EditScannedCardSheet(
         setCode = scannedCard.card.setCode,
         setName = scannedCard.card.setName,
         rarity = scannedCard.card.rarity,
-        // Variant selection moved into the Edit sheet (item 7, 2026-07-17 UX pass) — replaces the
-        // old standalone "Variants" queue action. VariantSelectorSheet renders on top of this
-        // still-open sheet (same stacking pattern as CardDetailScreen's sheet-scoped variant flow).
         onOpenVariantSelector = onOpenVariantSelector,
-        // Reserves the card-art footprint immediately with the card-back art so switching between
-        // scanned entries never causes a visible layout jump while Coil loads the real image.
         cardImagePlaceholder = painterResource(Res.drawable.mtg_card_back),
     )
 }
 
 @Composable
-private fun SettingsToggleRow(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    val mc = MaterialTheme.magicColors
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.magicTypography.bodyMedium, color = mc.textPrimary)
-            Text(text = subtitle, style = MaterialTheme.magicTypography.bodySmall, color = mc.textSecondary)
-        }
-        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-@Composable
-private fun CameraPermissionRequest(isPermanentlyDenied: Boolean, onRequest: () -> Unit) {
+private fun CameraPermissionRequest(onRequest: () -> Unit) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     Box(modifier = Modifier.fillMaxSize().background(mc.background), contentAlignment = Alignment.Center) {
@@ -1822,17 +1358,4 @@ private fun CameraPermissionRequest(isPermanentlyDenied: Boolean, onRequest: () 
             )
         }
     }
-}
-
-@Composable
-private fun AmbiguityDropdown(cardName: String, onConfirm: () -> Unit, onSkip: () -> Unit) {
-    MagicAlertDialog(
-        onDismissRequest = onSkip,
-        title = stringResource(R.string.scanner_ambiguous_match),
-        text = cardName,
-        confirmLabel = stringResource(R.string.scanner_confirm),
-        onConfirm = onConfirm,
-        dismissLabel = stringResource(R.string.scanner_skip),
-        onDismiss = onSkip,
-    )
 }

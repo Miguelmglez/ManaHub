@@ -1,5 +1,6 @@
 <component name="ProjectCodeStyleConfiguration">
   <code_scheme name="Project" version="173">
+    <option name="AUTODETECT_INDENTS" value="false" />
     <JavaCodeStyleSettings>
       <option name="IMPORT_LAYOUT_TABLE">
         <value>
@@ -35,8 +36,9 @@
       </option>
     </JavaCodeStyleSettings>
     <JetCodeStyleSettings>
-      <option name="BLANK_LINES_AROUND_BLOCK_WHEN_BRANCHES" value="1" />
-      <option name="IF_RPAREN_ON_NEW_LINE" value="false" />
+      <option name="SPACE_BEFORE_EXTEND_COLON" value="false" />
+      <option name="INSERT_WHITESPACES_IN_SIMPLE_ONE_LINE_METHOD" value="false" />
+      <option name="SPACE_BEFORE_LAMBDA_ARROW" value="false" />
       <option name="CODE_STYLE_DEFAULTS" value="KOTLIN_OFFICIAL" />
     </JetCodeStyleSettings>
     <codeStyleSettings language="XML">
@@ -156,9 +158,10 @@
       <option name="CODE_STYLE_DEFAULTS" value="KOTLIN_OFFICIAL" />
       <option name="KEEP_LINE_BREAKS" value="false" />
       <option name="KEEP_BLANK_LINES_IN_DECLARATIONS" value="1" />
-      <option name="KEEP_BLANK_LINES_IN_CODE" value="0" />
+      <option name="KEEP_BLANK_LINES_IN_CODE" value="1" />
       <option name="KEEP_BLANK_LINES_BEFORE_RBRACE" value="1" />
       <indentOptions>
+        <option name="CONTINUATION_INDENT_SIZE" value="4" />
         <option name="SMART_TABS" value="true" />
       </indentOptions>
     </codeStyleSettings>

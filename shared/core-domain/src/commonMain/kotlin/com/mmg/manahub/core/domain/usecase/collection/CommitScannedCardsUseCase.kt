@@ -1,11 +1,11 @@
 package com.mmg.manahub.core.domain.usecase.collection
 
-import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.core.model.DataResult
+import kotlinx.datetime.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
-import kotlinx.datetime.Clock
 
 /**
  * A single card entry queued by the scanner, ready to be committed to the collection.
@@ -13,7 +13,7 @@ import kotlinx.datetime.Clock
  * Kept presentation-agnostic so the domain layer does not depend on the scanner UI's
  * `ScannedCard` model. The scanner ViewModel maps its session entries into this shape.
  */
-data class ScannedCardCommit(
+data class CardCommit(
     val scryfallId: String,
     val isFoil:     Boolean,
     val condition:  String,
@@ -25,7 +25,7 @@ data class ScannedCardCommit(
  * Outcome of [CommitScannedCardsUseCase.invoke].
  *
  * @property committedCopies Total card copies successfully written to the collection.
- * @property failedEntries Number of [ScannedCardCommit] entries that either returned a non-success
+ * @property failedEntries Number of [CardCommit] entries that either returned a non-success
  *   [DataResult] or threw while being written — write-path hardening audit (2026-09-06): a
  *   throwing entry used to abort the WHOLE batch (an uncaught exception from
  *   [AddCardToCollectionUseCase.addReturningOutcome] propagated straight out of the `forEach`),
@@ -71,7 +71,7 @@ class CommitScannedCardsUseCase(
      * @param userId resolved user id (null for guest) forwarded to the collection write.
      */
     suspend operator fun invoke(
-        entries: List<ScannedCardCommit>,
+        entries: List<CardCommit>,
         userId: String? = null,
     ): CommitScanResult {
         if (entries.isEmpty()) {

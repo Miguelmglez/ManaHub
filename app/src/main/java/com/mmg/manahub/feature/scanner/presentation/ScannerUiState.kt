@@ -2,38 +2,9 @@ package com.mmg.manahub.feature.scanner.presentation
 
 import android.graphics.PointF
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardSelectionEntry
+import com.mmg.manahub.core.model.CardSelectionSession
 import com.mmg.manahub.core.ui.components.MagicToastType
-import java.util.UUID
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Session models
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * A single card entry inside a scan session, capturing all collection parameters
- * chosen by the user at the moment of scanning.
- */
-data class ScannedCard(
-    val card: Card,
-    val quantity: Int,
-    val isFoil: Boolean,
-    val language: String,
-    val condition: String,
-    val setCode: String,
-    val timestamp: Long,
-    // Write-path hardening audit (2026-09-06): stable identity for queue operations (edit/remove/
-    // duplicate/partial-retry) -- timestamp alone collides when two entries share a millisecond.
-    val id: String = UUID.randomUUID().toString(),
-)
-
-/**
- * Accumulates all cards scanned in the current session.
- * Duplicate entries (same scryfallId + isFoil + language + condition) are
- * merged by incrementing [ScannedCard.quantity] rather than creating a new row.
- */
-data class ScanSession(
-    val cards: List<ScannedCard> = emptyList(),
-)
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  UI State
@@ -111,7 +82,7 @@ data class ScannerUiState(
     val isSearching: Boolean = false,
     val lastDetectedCard: Card? = null,
     val error: String? = null,
-    val scanSession: ScanSession = ScanSession(),
+    val scanSession: CardSelectionSession = CardSelectionSession(),
     // Mode bar state
     val selectedIsFoil: Boolean = false,
     val selectedLanguage: String = "en",
@@ -123,7 +94,7 @@ data class ScannerUiState(
     val showEditSheet: Boolean = false,
     val showPriceDetailSheet: Boolean = false,
     // Edit card
-    val editingCard: ScannedCard? = null,
+    val editingCard: CardSelectionEntry? = null,
     val availablePrints: List<Card> = emptyList(),
     val isLoadingPrints: Boolean = false,
     // Toast
@@ -158,7 +129,7 @@ data class ScannerUiState(
 
     // Variant selector sheet
     val showVariantSelector: Boolean = false,
-    val variantSelectorEntry: ScannedCard? = null,
+    val variantSelectorEntry: CardSelectionEntry? = null,
     val cardVariants: List<Card> = emptyList(),
     val isLoadingVariants: Boolean = false,
     // Full-screen image viewer

@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -39,6 +38,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.AddToPhotos
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.GridView
@@ -82,7 +82,6 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.data.network.RateLimitExhaustedException
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRarity
@@ -122,6 +121,7 @@ import org.koin.androidx.compose.koinViewModel
 fun AddCardScreen(
     onNavigateBack: () -> Unit,
     onNavigateToScanner: () -> Unit,
+    onNavigateToMultiAdd: () -> Unit,
     onNavigateToCardDetail: (String) -> Unit,
     viewModel: AddCardViewModel = koinViewModel(),
     sharedTransitionScope: SharedTransitionScope? = null,
@@ -151,10 +151,11 @@ fun AddCardScreen(
                 color = mc.backgroundSecondary,
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(horizontal = 4.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onNavigateBack) {
@@ -168,12 +169,21 @@ fun AddCardScreen(
                         text = stringResource(R.string.addcard_title),
                         style = ty.titleLarge,
                         color = mc.textPrimary,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 8.dp),
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .padding(horizontal = 8.dp),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
+                    IconButton(onClick = onNavigateToMultiAdd) {
+                        Icon(
+                            imageVector = Icons.Default.AddToPhotos,
+                            contentDescription = stringResource(R.string.addcard_multi_add_button),
+                            tint = mc.textPrimary,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                    }
                     IconButton(onClick = onNavigateToScanner) {
                         Icon(
                             imageVector = Icons.Default.CameraAlt,
@@ -184,15 +194,15 @@ fun AddCardScreen(
                 }
             }
         },
-
         containerColor = mc.background,
     ) { padding ->
         HexGridBackground(modifier = Modifier.fillMaxSize(), color = mc.primaryAccent.copy(alpha = 0.05f))
 
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding),
         ) {
             SearchSurface(
                 uiState = uiState,
@@ -204,7 +214,6 @@ fun AddCardScreen(
                 onAdvancedSearch = { showAdvancedSearch = true },
                 onForceSearch = viewModel::forceSearch,
                 onLoadNextPage = viewModel::loadNextPage,
-                onLoadNextSpotlight = viewModel::loadSpotlightFeed,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
                 onViewModeToggle = viewModel::onViewModeToggle,
@@ -253,7 +262,6 @@ private fun SearchSurface(
     onAdvancedSearch: () -> Unit,
     onForceSearch: () -> Unit,
     onLoadNextPage: () -> Unit,
-    onLoadNextSpotlight: () -> Unit,
     sharedTransitionScope: SharedTransitionScope?,
     animatedVisibilityScope: AnimatedVisibilityScope?,
     onViewModeToggle: () -> Unit,
@@ -264,9 +272,10 @@ private fun SearchSurface(
     val keyboardController = LocalSoftwareKeyboardController.current
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
     ) {
         Spacer(Modifier.height(12.dp))
 
@@ -292,20 +301,22 @@ private fun SearchSurface(
                             Icon(
                                 Icons.Default.Clear,
                                 contentDescription = stringResource(R.string.action_close),
-                                tint = mc.textDisabled
+                                tint = mc.textDisabled,
                             )
                         }
                     } else {
-                        val languageDescription = stringResource(
-                            R.string.addcard_language_button,
-                            CardConstants.getLanguageName(uiState.searchLanguage),
-                        )
+                        val languageDescription =
+                            stringResource(
+                                R.string.addcard_language_button,
+                                CardConstants.getLanguageName(uiState.searchLanguage),
+                            )
                         Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .clickable(onClick = onShowLanguageSheet)
-                                .semantics { contentDescription = languageDescription },
+                            modifier =
+                                Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .clickable(onClick = onShowLanguageSheet)
+                                    .semantics { contentDescription = languageDescription },
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
@@ -317,20 +328,22 @@ private fun SearchSurface(
                 },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = {
-                    focusManager.clearFocus(force = true)
-                    keyboardController?.hide()
-                    onForceSearch()
-                }),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = mc.primaryAccent,
-                    unfocusedBorderColor = mc.primaryAccent.copy(alpha = 0.25f),
-                    cursorColor = mc.primaryAccent,
-                    focusedTextColor = mc.textPrimary,
-                    unfocusedTextColor = mc.textPrimary,
-                    focusedContainerColor = mc.surface,
-                    unfocusedContainerColor = mc.surface,
-                ),
+                keyboardActions =
+                    KeyboardActions(onSearch = {
+                        focusManager.clearFocus(force = true)
+                        keyboardController?.hide()
+                        onForceSearch()
+                    }),
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = mc.primaryAccent,
+                        unfocusedBorderColor = mc.primaryAccent.copy(alpha = 0.25f),
+                        cursorColor = mc.primaryAccent,
+                        focusedTextColor = mc.textPrimary,
+                        unfocusedTextColor = mc.textPrimary,
+                        focusedContainerColor = mc.surface,
+                        unfocusedContainerColor = mc.surface,
+                    ),
                 shape = CardShape,
             )
             BadgedBox(
@@ -341,7 +354,7 @@ private fun SearchSurface(
                             contentColor = mc.onAccent,
                         ) { Text("${uiState.activeFilterCount}") }
                     }
-                }
+                },
             ) {
                 IconButton(
                     onClick = {
@@ -349,10 +362,11 @@ private fun SearchSurface(
                         keyboardController?.hide()
                         onAdvancedSearch()
                     },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CardShape)
-                        .background(mc.primaryAccent.copy(alpha = 0.1f)),
+                    modifier =
+                        Modifier
+                            .size(48.dp)
+                            .clip(CardShape)
+                            .background(mc.primaryAccent.copy(alpha = 0.1f)),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Tune,
@@ -371,9 +385,10 @@ private fun SearchSurface(
         // ── Active filters indicator ─────────────────────────────────────────
         AnimatedVisibility(visible = uiState.activeFilterCount > 0) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -381,7 +396,7 @@ private fun SearchSurface(
                     stringResource(R.string.collection_active_filters, uiState.activeFilterCount),
                     style = ty.bodyMedium,
                     color = mc.primaryAccent,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 )
                 TextButton(
                     onClick = onClearFilters,
@@ -396,8 +411,6 @@ private fun SearchSurface(
             }
         }
 
-
-
         // ── Content states ────────────────────────────────────────────────────
         val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         val isIdle = uiState.query.length < 2 && uiState.activeFilterCount == 0
@@ -411,6 +424,7 @@ private fun SearchSurface(
                         )
                     }
                 }
+
                 uiState.error != null && uiState.results.isEmpty() -> {
                     val rateLimitRetryAfterMs = RateLimitExhaustedException.retryAfterMsOrNull(uiState.error)
                     if (uiState.error == "SCRYFALL_404") {
@@ -419,7 +433,7 @@ private fun SearchSurface(
                                 title = stringResource(R.string.addcard_no_results),
                                 subtitle = stringResource(R.string.addcard_no_results_subtitle),
                                 actionLabel = stringResource(R.string.collection_clear_filters),
-                                onAction = onClearAll
+                                onAction = onClearAll,
                             )
                         }
                     } else if (rateLimitRetryAfterMs != null) {
@@ -434,16 +448,17 @@ private fun SearchSurface(
                             subtitle = stringResource(R.string.error_rate_limited_retry_countdown, remainingSeconds),
                             actionLabel = stringResource(R.string.retry),
                             enabled = remainingSeconds <= 0,
-                            onAction = onForceSearch
+                            onAction = onForceSearch,
                         )
                     } else {
                         EmptyState(
                             title = stringResource(R.string.error_unknown),
                             actionLabel = stringResource(R.string.retry),
-                            onAction = onForceSearch
+                            onAction = onForceSearch,
                         )
                     }
                 }
+
                 isIdle -> {
                     EmptyState(
                         title = stringResource(R.string.addcard_index_title),
@@ -460,16 +475,18 @@ private fun SearchSurface(
                         animatedVisibilityScope = animatedVisibilityScope,
                     )*/
                 }
+
                 uiState.results.isEmpty() -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         EmptyState(
                             title = stringResource(R.string.addcard_no_results),
                             subtitle = stringResource(R.string.addcard_no_results_subtitle),
                             actionLabel = if (uiState.activeFilterCount > 0) stringResource(R.string.collection_clear_filters) else null,
-                            onAction = if (uiState.activeFilterCount > 0) onClearFilters else null
+                            onAction = if (uiState.activeFilterCount > 0) onClearFilters else null,
                         )
                     }
                 }
+
                 else -> {
                     Column(modifier = Modifier.fillMaxSize()) {
                         Row(
@@ -481,43 +498,49 @@ private fun SearchSurface(
                                 text = stringResource(R.string.advsearch_show_results, uiState.totalCards),
                                 style = MaterialTheme.magicTypography.labelLarge,
                                 color = mc.textSecondary,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
                             )
 
                             IconButton(onClick = onViewModeToggle, modifier = Modifier.size(24.dp)) {
                                 Icon(
-                                    imageVector = if (uiState.viewMode == CollectionViewMode.GRID) Icons.AutoMirrored.Filled.List else Icons.Default.GridView,
+                                    imageVector =
+                                        if (uiState.viewMode ==
+                                            CollectionViewMode.GRID
+                                        ) {
+                                            Icons.AutoMirrored.Filled.List
+                                        } else {
+                                            Icons.Default.GridView
+                                        },
                                     contentDescription = stringResource(R.string.collection_view_grid),
                                     tint = mc.textSecondary,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(24.dp),
                                 )
                             }
                         }
 
-                    if (uiState.viewMode == CollectionViewMode.LIST) {
-
-                        ResultsList(
-                            results = uiState.results,
-                            uiState = uiState,
-                            hasMore = uiState.hasMore,
-                            contentPaddingBottom = navBarBottom,
-                            onCardSelected = onCardSelected,
-                            onLoadNextPage = onLoadNextPage,
-                            sharedTransitionScope = sharedTransitionScope,
-                            animatedVisibilityScope = animatedVisibilityScope,
-                        )
-                    } else {
-                        ResultsGrid(
-                            results = uiState.results,
-                            uiState = uiState,
-                            hasMore = uiState.hasMore,
-                            contentPaddingBottom = navBarBottom,
-                            onCardSelected = onCardSelected,
-                            onLoadNextPage = onLoadNextPage,
-                            sharedTransitionScope = sharedTransitionScope,
-                            animatedVisibilityScope = animatedVisibilityScope,
-                        )
-                    }
+                        if (uiState.viewMode == CollectionViewMode.LIST) {
+                            ResultsList(
+                                results = uiState.results,
+                                uiState = uiState,
+                                hasMore = uiState.hasMore,
+                                contentPaddingBottom = navBarBottom,
+                                onCardSelected = onCardSelected,
+                                onLoadNextPage = onLoadNextPage,
+                                sharedTransitionScope = sharedTransitionScope,
+                                animatedVisibilityScope = animatedVisibilityScope,
+                            )
+                        } else {
+                            ResultsGrid(
+                                results = uiState.results,
+                                uiState = uiState,
+                                hasMore = uiState.hasMore,
+                                contentPaddingBottom = navBarBottom,
+                                onCardSelected = onCardSelected,
+                                onLoadNextPage = onLoadNextPage,
+                                sharedTransitionScope = sharedTransitionScope,
+                                animatedVisibilityScope = animatedVisibilityScope,
+                            )
+                        }
                     }
                 }
             }
@@ -525,125 +548,6 @@ private fun SearchSurface(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Idle state — discovery grid of random cards from one Scryfall set
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-private fun SpotlightGrid(
-    spotlightCards: List<Card>,
-    spotlightSet: MagicSet?,
-    isSpotlightLoading: Boolean,
-    contentPaddingBottom: Dp,
-    onCardSelected: (Card) -> Unit,
-    onLoadNextSpotlight: () -> Unit,
-    sharedTransitionScope: SharedTransitionScope?,
-    animatedVisibilityScope: AnimatedVisibilityScope?,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val gridState = rememberLazyGridState()
-
-    LaunchedEffect(gridState.isScrollInProgress) {
-        if (gridState.isScrollInProgress) {
-            focusManager.clearFocus(force = true)
-            keyboardController?.hide()
-        }
-    }
-
-    LazyVerticalGrid(
-        state = gridState,
-        columns = GridCells.Adaptive(minSize = 100.dp),
-        verticalArrangement = Arrangement.spacedBy(spacing.sm),
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-        contentPadding = PaddingValues(top = 4.dp, bottom = 4.dp + contentPaddingBottom),
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        if (spotlightSet != null) {
-            item(span = { GridItemSpan(maxLineSpan) }, contentType = "spotlight_header") {
-                Text(
-                    text = stringResource(R.string.addcard_spotlight_header, spotlightSet.name),
-                    style = ty.labelLarge,
-                    color = mc.textSecondary,
-                    modifier = Modifier.padding(top = spacing.md, bottom = spacing.xs)
-                )
-            }
-        }
-        items(spotlightCards, key = { it.scryfallId }, contentType = { "spotlight_card" }) { card ->
-            SpotlightCardTile(
-                card = card,
-                onClick = {
-                    focusManager.clearFocus(force = true)
-                    keyboardController?.hide()
-                    onCardSelected(card)
-                },
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope,
-            )
-        }
-        if (isSpotlightLoading) {
-            item(span = { GridItemSpan(maxLineSpan) }, contentType = "spotlight_loading") {
-                Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                    MagicLoadingSpinner(
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
-        } else if (spotlightCards.isNotEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }, contentType = "spotlight_footer") {
-                LaunchedEffect(true) {
-                    onLoadNextSpotlight()
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-private fun SpotlightCardTile(
-    card: Card,
-    onClick: () -> Unit,
-    sharedTransitionScope: SharedTransitionScope?,
-    animatedVisibilityScope: AnimatedVisibilityScope?,
-) {
-    val mc = MaterialTheme.magicColors
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            // Full MTG card aspect ratio (745:1040) so the whole card is shown.
-            .aspectRatio(0.717f)
-            .clip(CardShape)
-            .then(
-                if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                    with(sharedTransitionScope) {
-                        Modifier.sharedBounds(
-                            sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
-                            animatedVisibilityScope = animatedVisibilityScope,
-                            clipInOverlayDuringTransition = OverlayClip(CardShape),
-                            renderInOverlayDuringTransition = true,
-                        )
-                    }
-                } else Modifier
-            )
-            .background(mc.surfaceVariant)
-            .clickable(onClick = onClick),
-    ) {
-        AsyncImage(
-            model = card.imageNormal,
-            contentDescription = card.name,
-            placeholder = painterResource(Res.drawable.mtg_card_back),
-            error = painterResource(Res.drawable.mtg_card_back),
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize(),
-        )
-    }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Typed-query results list
@@ -677,7 +581,7 @@ private fun ResultsList(
         state = listState,
         verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(top = 4.dp, bottom = 4.dp + contentPaddingBottom),
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
     ) {
         items(results, key = { it.scryfallId }, contentType = { "card" }) { card ->
             SearchResultItem(
@@ -733,10 +637,10 @@ private fun ResultsGrid(
     }
 
     LazyVerticalGrid(
-        columns               = GridCells.Adaptive(minSize = 100.dp),
-        state                 = rememberLazyGridState(),
-        contentPadding        = PaddingValues(top = 4.dp, bottom = 4.dp + contentPaddingBottom ),
-        verticalArrangement   = Arrangement.spacedBy(8.dp),
+        columns = GridCells.Adaptive(minSize = 100.dp),
+        state = rememberLazyGridState(),
+        contentPadding = PaddingValues(top = 4.dp, bottom = 4.dp + contentPaddingBottom),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(results, key = { it.scryfallId }, contentType = { "card" }) { card ->
@@ -777,7 +681,8 @@ private fun SearchResultGridItem(
     onClick: () -> Unit,
     uiState: AddCardUiState,
     sharedTransitionScope: SharedTransitionScope?,
-    animatedVisibilityScope: AnimatedVisibilityScope?){
+    animatedVisibilityScope: AnimatedVisibilityScope?,
+) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     Surface(
@@ -785,32 +690,37 @@ private fun SearchResultGridItem(
         shape = CardShape,
         color = MaterialTheme.magicColors.surface,
     ) {
-
-        Column(modifier = Modifier.clip(CardShape)
-            .background(MaterialTheme.magicColors.surfaceVariant),
-            horizontalAlignment = Alignment.Start) {
+        Column(
+            modifier =
+                Modifier
+                    .clip(CardShape)
+                    .background(MaterialTheme.magicColors.surfaceVariant),
+            horizontalAlignment = Alignment.Start,
+        ) {
             AsyncImage(
                 model = card.imageNormal,
                 contentDescription = card.name,
                 placeholder = painterResource(Res.drawable.mtg_card_back),
                 error = painterResource(Res.drawable.mtg_card_back),
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .aspectRatio(0.716f)
-                    .clip(CardShape)
-                    .then(
-                        if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                            with(sharedTransitionScope) {
-                                Modifier.sharedBounds(
-                                    sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
-                                    animatedVisibilityScope = animatedVisibilityScope,
-                                    clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(6.dp)),
-                                    renderInOverlayDuringTransition = true,
-                                )
-                            }
-                        } else Modifier
-                    )
-                    .background(MaterialTheme.magicColors.surfaceVariant),
+                modifier =
+                    Modifier
+                        .aspectRatio(0.716f)
+                        .clip(CardShape)
+                        .then(
+                            if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                                with(sharedTransitionScope) {
+                                    Modifier.sharedBounds(
+                                        sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
+                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(6.dp)),
+                                        renderInOverlayDuringTransition = true,
+                                    )
+                                }
+                            } else {
+                                Modifier
+                            },
+                        ).background(MaterialTheme.magicColors.surfaceVariant),
             )
             CardName(
                 name = card.name,
@@ -819,14 +729,21 @@ private fun SearchResultGridItem(
                 color = mc.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = MaterialTheme.spacing.xs)
-                    .padding(top = MaterialTheme.spacing.xs)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = MaterialTheme.spacing.xs)
+                        .padding(top = MaterialTheme.spacing.xs),
             )
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = MaterialTheme.spacing.xs).padding(top = MaterialTheme.spacing.xs, bottom = MaterialTheme.spacing.xs),
-                verticalAlignment = Alignment.CenterVertically
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = MaterialTheme.spacing.xs,
+                        ).padding(top = MaterialTheme.spacing.xs, bottom = MaterialTheme.spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 SetSymbol(
                     setCode = card.setCode,
@@ -840,16 +757,17 @@ private fun SearchResultGridItem(
                     style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 10.sp),
                     color = mc.textSecondary,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                val formattedPrice = PriceFormatter.formatFromScryfall(
-                    priceUsd = card.priceUsd,
-                    priceEur = card.priceEur,
-                    preferredCurrency = uiState.preferredCurrency
-                )
+                val formattedPrice =
+                    PriceFormatter.formatFromScryfall(
+                        priceUsd = card.priceUsd,
+                        priceEur = card.priceEur,
+                        preferredCurrency = uiState.preferredCurrency,
+                    )
                 if (formattedPrice != "—") {
                     Text(
                         text = formattedPrice,
@@ -857,13 +775,9 @@ private fun SearchResultGridItem(
                         color = mc.goldMtg,
                     )
                 }
-
             }
-
-
         }
     }
-
 }
 // ─────────────────────────────────────────────────────────────────────────────
 //  Search result row
@@ -900,22 +814,24 @@ private fun SearchResultItem(
                 placeholder = painterResource(Res.drawable.mtg_card_back),
                 error = painterResource(Res.drawable.mtg_card_back),
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(width = 44.dp, height = 60.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .then(
-                        if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                            with(sharedTransitionScope) {
-                                Modifier.sharedBounds(
-                                    sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
-                                    animatedVisibilityScope = animatedVisibilityScope,
-                                    clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(6.dp)),
-                                    renderInOverlayDuringTransition = true,
-                                )
-                            }
-                        } else Modifier
-                    )
-                    .background(mc.surfaceVariant),
+                modifier =
+                    Modifier
+                        .size(width = 44.dp, height = 60.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .then(
+                            if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                                with(sharedTransitionScope) {
+                                    Modifier.sharedBounds(
+                                        sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
+                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(6.dp)),
+                                        renderInOverlayDuringTransition = true,
+                                    )
+                                }
+                            } else {
+                                Modifier
+                            },
+                        ).background(mc.surfaceVariant),
             )
 
             // Name / type / set
@@ -976,17 +892,18 @@ private fun SearchResultItem(
                                     " // ",
                                     style = MaterialTheme.magicTypography.titleMedium,
                                     color = MaterialTheme.magicColors.textSecondary,
-                                    modifier = Modifier.padding(horizontal = MaterialTheme.spacing.xxs)
+                                    modifier = Modifier.padding(horizontal = MaterialTheme.spacing.xxs),
                                 )
                             }
                         }
                     }
                 }
-                val formattedPrice = PriceFormatter.formatFromScryfall(
-                    priceUsd = card.priceUsd,
-                    priceEur = card.priceEur,
-                    preferredCurrency = uiState.preferredCurrency
-                )
+                val formattedPrice =
+                    PriceFormatter.formatFromScryfall(
+                        priceUsd = card.priceUsd,
+                        priceEur = card.priceEur,
+                        preferredCurrency = uiState.preferredCurrency,
+                    )
                 if (formattedPrice != "—") {
                     Text(
                         text = formattedPrice,

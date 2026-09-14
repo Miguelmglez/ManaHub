@@ -90,7 +90,7 @@ import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import com.mmg.manahub.feature.home.presentation.HomeAction
 import com.mmg.manahub.feature.home.presentation.HomeHeroState
 import com.mmg.manahub.feature.home.presentation.HomeScreen
-import com.mmg.manahub.feature.multiadd.presentation.MassiveAddCardScreen
+import com.mmg.manahub.feature.multiadd.presentation.MultiAddCardScreen
 import com.mmg.manahub.feature.news.presentation.NewsScreen
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.manahub.feature.news.presentation.VideoPlayerScreen
@@ -558,12 +558,12 @@ fun AppNavGraph(
                     }
 
                     composable(Screen.CollectionMultiAddCard.route) {
-                        MassiveAddCardScreen(
+                        MultiAddCardScreen(
                             onBack = { navController.popBackStack() },
                             sharedTransitionScope = this@SharedTransitionLayout,
                             animatedVisibilityScope = this@composable,
-                            onNavigateToCardDetail = { scryfallId ->
-                                navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
+                            onNavigateToCardDetail = { card ->
+                                navController.navigate(Screen.CollectionCardDetail.createRoute(card.scryfallId))
                             },
                         )
                     }

@@ -38,7 +38,7 @@ object FeatureFlags {
     /** Flags for the Massive Add Cards feature. */
     object MassiveAdd {
         /** Massive Add Cards feature (multi-card input for collection/decks). */
-        const val MASSIVE_CARDS_ENABLED = false
+        const val MASSIVE_CARDS_ENABLED = true
     }
 
     /** Flags for Online Multiplayer sessions and Tournaments. */

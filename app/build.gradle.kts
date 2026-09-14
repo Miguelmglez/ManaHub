@@ -60,27 +60,27 @@ android {
         buildConfigField(
             "String",
             "YOUTUBE_API_KEY",
-            "\"${localProperties.getProperty("YOUTUBE_API_KEY", "")}\""
+            "\"${localProperties.getProperty("YOUTUBE_API_KEY", "")}\"",
         )
         buildConfigField(
             "String",
             "SUPABASE_URL",
-            "\"${requiredProperty("SUPABASE_URL")}\""
+            "\"${requiredProperty("SUPABASE_URL")}\"",
         )
         buildConfigField(
             "String",
             "SUPABASE_ANON_KEY",
-            "\"${requiredProperty("SUPABASE_ANON_KEY")}\""
+            "\"${requiredProperty("SUPABASE_ANON_KEY")}\"",
         )
         buildConfigField(
             "String",
             "GOOGLE_CLIENT_ID",
-            "\"${requiredProperty("GOOGLE_CLIENT_ID")}\""
+            "\"${requiredProperty("GOOGLE_CLIENT_ID")}\"",
         )
         buildConfigField(
             "String",
             "CLOUDFLARE_WORKER_URL",
-            "\"${localProperties.getProperty("CLOUDFLARE_WORKER_URL", "https://manahub-draft-api.miguel-mglez.workers.dev/")}\""
+            "\"${localProperties.getProperty("CLOUDFLARE_WORKER_URL", "https://manahub-draft-api.miguel-mglez.workers.dev/")}\"",
         )
         buildConfigField(
             "String",
@@ -90,7 +90,7 @@ android {
             // required — CommunityAggregateApi builds request URLs via "${baseUrl}v1/..." string
             // concatenation (see its KDoc: "must end with `/`"), matching the CLOUDFLARE_WORKER_URL
             // convention above.
-            "\"${localProperties.getProperty("COMMUNITY_WORKER_URL", "https://manahub-community.miguel-mglez.workers.dev/")}\""
+            "\"${localProperties.getProperty("COMMUNITY_WORKER_URL", "https://manahub-community.miguel-mglez.workers.dev/")}\"",
         )
         buildConfigField(
             "String",
@@ -102,7 +102,7 @@ android {
             // compiles now and the real subdomain only needs a `local.properties` override (or this
             // default updated) once deployed. Trailing slash required — CompetitiveApi builds
             // request URLs via "${baseUrl}meta/..." / "${baseUrl}limited/..." string concatenation.
-            "\"${localProperties.getProperty("COMPETITIVE_WORKER_URL", "https://manahub-competitive.miguel-mglez.workers.dev/")}\""
+            "\"${localProperties.getProperty("COMPETITIVE_WORKER_URL", "https://manahub-competitive.miguel-mglez.workers.dev/")}\"",
         )
 
         ndk {
@@ -168,7 +168,7 @@ android {
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
             signingConfig = signingConfigs.getByName("release")
         }
@@ -204,7 +204,7 @@ android {
             // KMP migration — Phase 3: Manually link CMP resources from :shared:core-ui
             // until the android-kmp-library + CMP resource merging is stabilized.
             assets.srcDirs(
-                file("build/generated/cmp-assets")
+                file("build/generated/cmp-assets"),
             )
         }
         getByName("androidTest") {
@@ -225,8 +225,6 @@ android {
         }
     }
 }
-
-
 
 dependencies {
     // KMP migration — Phase 0, Spike A: shared pure-Kotlin domain models (CollectionViewMode, GroupingMode).
@@ -297,7 +295,7 @@ dependencies {
     ksp(libs.room.compiler)
 
     implementation(libs.retrofit)
-    implementation(libs.retrofit.gson)  // Kept for DraftModule (Cloudflare/YouTube manual JSON parsing)
+    implementation(libs.retrofit.gson) // Kept for DraftModule (Cloudflare/YouTube manual JSON parsing)
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.datetime)

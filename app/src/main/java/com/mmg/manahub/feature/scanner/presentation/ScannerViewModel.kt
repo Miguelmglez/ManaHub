@@ -8,9 +8,11 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.usecase.collection.CardCommit
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
-import com.mmg.manahub.core.domain.usecase.collection.ScannedCardCommit
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardSelectionEntry
+import com.mmg.manahub.core.model.CardSelectionSession
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.ui.components.MagicToastType
@@ -172,7 +174,7 @@ class ScannerViewModel @Inject constructor(
      * Must be called after any mutation that modifies [ScannerUiState.scanSession].
      */
     private fun persistQueue() {
-        val cards = _uiState.value.scanSession.cards
+        val cards = _uiState.value.scanSession.entries
         val array = JSONArray()
         for (entry in cards) {
             val obj = JSONObject().apply {
@@ -208,7 +210,7 @@ class ScannerViewModel @Inject constructor(
         val json = prefs.getString(PREF_KEY_QUEUE, null) ?: return
         try {
             val array = JSONArray(json)
-            val cards = mutableListOf<ScannedCard>()
+            val entries = mutableListOf<CardSelectionEntry>()
             for (i in 0 until array.length()) {
                 val obj = array.getJSONObject(i)
                 val card = Card(
@@ -250,8 +252,8 @@ class ScannerViewModel @Inject constructor(
                     artist            = null,
                     scryfallUri       = "",
                 )
-                cards.add(
-                    ScannedCard(
+                entries.add(
+                    CardSelectionEntry(
                         card      = card,
                         quantity  = obj.getInt("quantity"),
                         isFoil    = obj.getBoolean("isFoil"),
@@ -265,8 +267,8 @@ class ScannerViewModel @Inject constructor(
                     )
                 )
             }
-            if (cards.isNotEmpty()) {
-                _uiState.update { it.copy(scanSession = ScanSession(cards)) }
+            if (entries.isNotEmpty()) {
+                _uiState.update { it.copy(scanSession = CardSelectionSession(entries)) }
             }
         } catch (e: Exception) {
             // Non-fatal: session data lost but app remains functional.
@@ -389,7 +391,7 @@ class ScannerViewModel @Inject constructor(
                 // tracks the RESOLVED printing's language (result.card.lang), not the mode-bar
                 // filter (confirmedState.selectedLanguage) — see addToSession's KDoc (W2.11):
                 // ScannedCard.language must be truthful data, so its identity key must match.
-                val isInSession = confirmedState.scanSession.cards.any { entry ->
+                val isInSession = confirmedState.scanSession.entries.any { entry ->
                     entry.card.scryfallId == result.card.scryfallId &&
                             entry.isFoil == confirmedState.selectedIsFoil &&
                             entry.language == result.card.lang &&
@@ -466,20 +468,20 @@ class ScannerViewModel @Inject constructor(
      */
     private fun addToSession(card: Card) {
         _uiState.update { state ->
-            val existingIndex = state.scanSession.cards.indexOfFirst { entry ->
+            val existingIndex = state.scanSession.entries.indexOfFirst { entry ->
                 entry.card.scryfallId == card.scryfallId &&
                     entry.isFoil == state.selectedIsFoil &&
                     entry.language == card.lang &&
                     entry.condition == state.selectedCondition
             }
-            val updatedCards = if (existingIndex >= 0) {
-                state.scanSession.cards.toMutableList().also {
+            val updatedEntries = if (existingIndex >= 0) {
+                state.scanSession.entries.toMutableList().also {
                     it[existingIndex] = it[existingIndex].copy(
                         quantity = it[existingIndex].quantity + state.selectedQuantity,
                     )
                 }
             } else {
-                state.scanSession.cards + ScannedCard(
+                state.scanSession.entries + CardSelectionEntry(
                     card = card,
                     quantity = state.selectedQuantity,
                     isFoil = state.selectedIsFoil,
@@ -487,9 +489,10 @@ class ScannerViewModel @Inject constructor(
                     condition = state.selectedCondition,
                     setCode = card.setCode,
                     timestamp = System.currentTimeMillis(),
+                    id = UUID.randomUUID().toString(),
                 )
             }
-            state.copy(scanSession = state.scanSession.copy(cards = updatedCards))
+            state.copy(scanSession = state.scanSession.copy(entries = updatedEntries))
         }
         persistQueue()
     }
@@ -514,8 +517,8 @@ class ScannerViewModel @Inject constructor(
     //  Individual Actions (Collection & Wishlist)
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** Maps a UI [ScannedCard] to the domain-layer commit shape. */
-    private fun ScannedCard.toCommit(): ScannedCardCommit = ScannedCardCommit(
+    /** Maps a UI [CardSelectionEntry] to the domain-layer commit shape. */
+    private fun CardSelectionEntry.toCommit(): CardCommit = CardCommit(
         scryfallId = card.scryfallId,
         isFoil     = isFoil,
         condition  = condition,
@@ -524,7 +527,7 @@ class ScannerViewModel @Inject constructor(
     )
 
     /** Adds a single queue entry to the user's collection. */
-    fun onAddEntryToCollection(entry: ScannedCard) {
+    fun onAddEntryToCollection(entry: CardSelectionEntry) {
         viewModelScope.launch {
             // Route through the scanner commit use case so this counts as a scan
             // (CardScanned XP) rather than a manual add — and is never double-counted.
@@ -561,7 +564,7 @@ class ScannerViewModel @Inject constructor(
      * Adds a single queue entry to the user's local wishlist.
      * No authentication required — wishlist entries are stored locally via Room.
      */
-    fun onAddEntryToWishlist(entry: ScannedCard) {
+    fun onAddEntryToWishlist(entry: CardSelectionEntry) {
         viewModelScope.launch {
             val wishlistEntry = WishlistEntry(
                 id             = UUID.randomUUID().toString(),
@@ -600,11 +603,11 @@ class ScannerViewModel @Inject constructor(
      * No authentication required — entries are stored locally via Room.
      */
     fun onAddAllToWishlist() {
-        val cards = _uiState.value.scanSession.cards
-        if (cards.isEmpty()) return
+        val entries = _uiState.value.scanSession.entries
+        if (entries.isEmpty()) return
 
         viewModelScope.launch {
-            for (entry in cards) {
+            for (entry in entries) {
                 val wishlistEntry = WishlistEntry(
                     id             = UUID.randomUUID().toString(),
                     userId         = "",  // local-only; no auth required
@@ -627,11 +630,11 @@ class ScannerViewModel @Inject constructor(
             }
             analyticsHelper.logEvent(
                 "scanner_add_all_wishlist",
-                mapOf("count" to cards.size.toString()),
+                mapOf("count" to entries.size.toString()),
             )
             _uiState.update {
                 it.copy(
-                    toastMessage = context.getString(R.string.scanner_toast_added_all_to_wishlist, cards.size),
+                    toastMessage = context.getString(R.string.scanner_toast_added_all_to_wishlist, entries.size),
                     toastType = MagicToastType.SUCCESS,
                 )
             }
@@ -741,7 +744,7 @@ class ScannerViewModel @Inject constructor(
      * Opens the edit sheet for a specific scanned card.
      * Fetches all available prints (sets) for that card to populate the set picker.
      */
-    fun onEditScannedCard(entry: ScannedCard) {
+    fun onEditScannedCard(entry: CardSelectionEntry) {
         _uiState.update {
             it.clearedForOverlay().copy(
                 editingCard = entry,
@@ -770,14 +773,14 @@ class ScannerViewModel @Inject constructor(
      * Updates an existing entry in the scan session with new attributes,
      * then persists the updated queue to SharedPreferences.
      */
-    fun onUpdateScannedCard(updatedEntry: ScannedCard) {
+    fun onUpdateScannedCard(updatedEntry: CardSelectionEntry) {
         val original = _uiState.value.editingCard ?: return
         _uiState.update { state ->
-            val updatedList = state.scanSession.cards.map {
+            val updatedList = state.scanSession.entries.map {
                 if (it.id == original.id) updatedEntry else it
             }
             state.copy(
-                scanSession = state.scanSession.copy(cards = updatedList),
+                scanSession = state.scanSession.copy(entries = updatedList),
                 showEditSheet = false,
                 editingCard = null,
             )
@@ -834,12 +837,12 @@ class ScannerViewModel @Inject constructor(
         _uiState.update { it.copy(showQueueSheet = false, multiSelectedIds = emptySet()) }
     }
 
-    /** Removes a single [ScannedCard] from the session and persists the change. */
-    fun onRemoveSessionCard(entry: ScannedCard) {
+    /** Removes a single [CardSelectionEntry] from the session and persists the change. */
+    fun onRemoveSessionCard(entry: CardSelectionEntry) {
         _uiState.update { state ->
             state.copy(
                 scanSession = state.scanSession.copy(
-                    cards = state.scanSession.cards.filter { it.id != entry.id },
+                    entries = state.scanSession.entries.filter { it.id != entry.id },
                 ),
                 multiSelectedIds = state.multiSelectedIds - entry.card.scryfallId,
                 // W2026-09-06: clearing the overlay when the card is removed from queue
@@ -853,7 +856,7 @@ class ScannerViewModel @Inject constructor(
     fun onClearSession() {
         _uiState.update {
             it.copy(
-                scanSession = ScanSession(),
+                scanSession = CardSelectionSession(),
                 multiSelectedIds = emptySet(),
                 showQueueSheet = false,
             )
@@ -867,25 +870,13 @@ class ScannerViewModel @Inject constructor(
     //  Multi-select in the queue sheet
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** Toggles the long-press selection state of a session entry. */
-    fun onToggleMultiSelect(entry: ScannedCard) {
-        _uiState.update { state ->
-            val id = entry.card.scryfallId
-            val updated = if (id in state.multiSelectedIds) {
-                state.multiSelectedIds - id
-            } else {
-                state.multiSelectedIds + id
-            }
-            state.copy(multiSelectedIds = updated)
-        }
-    }
 
     /** Deletes all currently selected entries from the session and persists the change. */
     fun onDeleteSelected() {
         _uiState.update { state ->
             state.copy(
                 scanSession = state.scanSession.copy(
-                    cards = state.scanSession.cards.filter {
+                    entries = state.scanSession.entries.filter {
                         it.card.scryfallId !in state.multiSelectedIds
                     },
                 ),
@@ -919,23 +910,23 @@ class ScannerViewModel @Inject constructor(
      */
     fun onAddAllToCollection() {
         val state = _uiState.value
-        val cards = state.scanSession.cards
-        if (cards.isEmpty() || state.isCommittingQueue) return
+        val entries = state.scanSession.entries
+        if (entries.isEmpty() || state.isCommittingQueue) return
 
         _uiState.update { it.copy(isCommittingQueue = true) }
         viewModelScope.launch {
             try {
-                val result = commitScannedCards(cards.map { it.toCommit() })
+                val result = commitScannedCards(entries.map { it.toCommit() })
 
                 analyticsHelper.logEvent(
                     "scanner_add_all",
-                    mapOf("count" to cards.size.toString(), "failed" to result.failedEntries.toString()),
+                    mapOf("count" to entries.size.toString(), "failed" to result.failedEntries.toString()),
                 )
 
                 if (result.failedEntries == 0) {
                     _uiState.update {
                         it.copy(
-                            toastMessage = context.getString(R.string.scanner_toast_added_all_to_collection, cards.size),
+                            toastMessage = context.getString(R.string.scanner_toast_added_all_to_collection, entries.size),
                             toastType = MagicToastType.SUCCESS,
                         )
                     }
@@ -944,18 +935,18 @@ class ScannerViewModel @Inject constructor(
                     // Stable id, not timestamp: two queue entries can share a millisecond (burst
                     // recognition, or a duplicate-entry action firing twice), which would silently
                     // drop the failed one from this filter alongside the succeeded one.
-                    val succeededIds = cards.filterIndexed { index, _ ->
+                    val succeededIds = entries.filterIndexed { index, _ ->
                         result.entrySucceeded.getOrElse(index) { false }
                     }.mapTo(mutableSetOf()) { it.id }
                     _uiState.update { s ->
                         s.copy(
                             scanSession = s.scanSession.copy(
-                                cards = s.scanSession.cards.filterNot { it.id in succeededIds },
+                                entries = s.scanSession.entries.filterNot { it.id in succeededIds },
                             ),
                             toastMessage = context.getString(
                                 R.string.scanner_toast_add_all_partial_failure,
                                 result.failedEntries,
-                                cards.size,
+                                entries.size,
                             ),
                             toastType = MagicToastType.WARNING,
                         )
@@ -1012,7 +1003,7 @@ class ScannerViewModel @Inject constructor(
     //  Variant selector
     // ─────────────────────────────────────────────────────────────────────────
 
-    fun onOpenVariantSelector(entry: ScannedCard) {
+    fun onOpenVariantSelector(entry: CardSelectionEntry) {
         variantLoadJob?.cancel()
         _uiState.update {
             it.clearedForOverlay().copy(
@@ -1049,11 +1040,11 @@ class ScannerViewModel @Inject constructor(
     fun onSelectVariant(variant: Card) {
         val original = _uiState.value.variantSelectorEntry ?: return
         _uiState.update { state ->
-            val updatedCards = state.scanSession.cards.map {
+            val updatedEntries = state.scanSession.entries.map {
                 if (it.id == original.id) it.copy(card = variant, setCode = variant.setCode) else it
             }
             state.copy(
-                scanSession = state.scanSession.copy(cards = updatedCards),
+                scanSession = state.scanSession.copy(entries = updatedEntries),
                 showVariantSelector = false,
                 variantSelectorEntry = null,
                 editingCard = if (state.editingCard?.id == original.id) {
@@ -1077,33 +1068,33 @@ class ScannerViewModel @Inject constructor(
     //  Duplicate scanned card
     // ─────────────────────────────────────────────────────────────────────────
 
-    fun onIncrementSessionCardQuantity(entry: ScannedCard) {
+    fun onIncrementSessionCardQuantity(entry: CardSelectionEntry) {
         _uiState.update { state ->
-            val updatedCards = state.scanSession.cards.map {
+            val updatedEntries = state.scanSession.entries.map {
                 if (it.id == entry.id) it.copy(quantity = it.quantity + 1) else it
             }
-            state.copy(scanSession = state.scanSession.copy(cards = updatedCards))
+            state.copy(scanSession = state.scanSession.copy(entries = updatedEntries))
         }
         persistQueue()
     }
 
-    fun onDecrementSessionCardQuantity(entry: ScannedCard) {
+    fun onDecrementSessionCardQuantity(entry: CardSelectionEntry) {
         if (entry.quantity <= 1) {
             onRemoveSessionCard(entry)
             return
         }
         _uiState.update { state ->
-            val updatedCards = state.scanSession.cards.map {
+            val updatedEntries = state.scanSession.entries.map {
                 if (it.id == entry.id) it.copy(quantity = (it.quantity - 1).coerceAtLeast(1)) else it
             }
-            state.copy(scanSession = state.scanSession.copy(cards = updatedCards))
+            state.copy(scanSession = state.scanSession.copy(entries = updatedEntries))
         }
         persistQueue()
     }
 
     fun onRemoveLastDetectedCard() {
         val lastCard = _uiState.value.lastDetectedCard ?: return
-        val entryToRemove = _uiState.value.scanSession.cards.lastOrNull {
+        val entryToRemove = _uiState.value.scanSession.entries.lastOrNull {
             it.card.scryfallId == lastCard.scryfallId
         }
         if (entryToRemove != null) {
@@ -1116,23 +1107,23 @@ class ScannerViewModel @Inject constructor(
     /**
      * Duplicates [original] and inserts the copy immediately after it in the scan queue (in
      * place, NOT appended at the end), so quickly stamping several physical copies of the same
-     * card keeps them visually grouped. Backs the "Duplicate" action in [QueueCardItem] (replaced
+     * card keeps them visually grouped. Backs the "Duplicate" action in [CardQueueItem] (replaced
      * the old per-copy "Variants" button — item 6 of the 2026-07-17 scanner UX pass). Unlike the
      * old `onAddDuplicateScannedCard` this never touches the edit sheet's visibility, since it is
      * no longer reachable from inside [EditScannedCardSheet].
      */
-    fun onDuplicateSessionCard(original: ScannedCard) {
+    fun onDuplicateSessionCard(original: CardSelectionEntry) {
         // id must also be regenerated -- copy() otherwise carries the original's id, giving two
         // distinct queue entries the same identity.
         val duplicate = original.copy(id = UUID.randomUUID().toString(), timestamp = System.currentTimeMillis())
         _uiState.update { state ->
-            val index = state.scanSession.cards.indexOfFirst { it.id == original.id }
-            val updatedCards = if (index >= 0) {
-                state.scanSession.cards.toMutableList().apply { add(index + 1, duplicate) }
+            val index = state.scanSession.entries.indexOfFirst { it.id == original.id }
+            val updatedEntries = if (index >= 0) {
+                state.scanSession.entries.toMutableList().apply { add(index + 1, duplicate) }
             } else {
-                state.scanSession.cards + duplicate
+                state.scanSession.entries + duplicate
             }
-            state.copy(scanSession = state.scanSession.copy(cards = updatedCards))
+            state.copy(scanSession = state.scanSession.copy(entries = updatedEntries))
         }
         persistQueue()
     }

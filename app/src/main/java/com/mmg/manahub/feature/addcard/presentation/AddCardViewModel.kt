@@ -1,15 +1,14 @@
 package com.mmg.manahub.feature.addcard.presentation
 
-import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.model.AdvancedSearchQuery
-import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.card.GetSpotlightFeedUseCase
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
+import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.CollectionViewMode
+import com.mmg.manahub.core.model.DataResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,25 +24,22 @@ import kotlinx.coroutines.launch
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 class AddCardViewModel(
-    private val searchCards:        SearchCardsUseCase,
-    private val userPreferences:    UserPreferencesRepository,
+    private val searchCards: SearchCardsUseCase,
+    private val userPreferences: UserPreferencesRepository,
     private val buildScryfallQuery: BuildScryfallQueryUseCase,
-    private val getSpotlightFeed:   GetSpotlightFeedUseCase,
-) : ViewModel() {
+    private val getSpotlightFeed: GetSpotlightFeedUseCase,
+): ViewModel() {
 
     private val _uiState = MutableStateFlow(AddCardUiState())
     val uiState: StateFlow<AddCardUiState> = _uiState.asStateFlow()
 
-    private val textQueryFlow  = MutableStateFlow("")
+    private val textQueryFlow = MutableStateFlow("")
     private val activeQueryFlow = MutableStateFlow<AdvancedSearchQuery?>(null)
 
-    private val forceSearchTrigger = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private val forceSearchTrigger =
+        kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     private var lastEffectiveQuery: String? = null
-    private var currentSpotlightSetIndex: Int = 0
-    private var hasMoreSpotlightSets: Boolean = true
-
-    val gridState = LazyGridState()
 
     init {
         viewModelScope.launch {
@@ -51,15 +47,13 @@ class AddCardViewModel(
                 textQueryFlow.debounce(400L),
                 activeQueryFlow,
                 userPreferences.preferencesFlow,
-            ) { text, active, prefs ->
+            ) {text, active, prefs->
                 Triple(text, active, prefs)
             }.distinctUntilChanged()
 
             combine(
                 dataFlow,
-                forceSearchTrigger.onStart { emit(Unit) }
-            ) { data, _ -> data }
-                .collectLatest { (text, active, prefs) ->
+                forceSearchTrigger.onStart {emit(Unit)}) {data, _-> data}.collectLatest {(text, active, prefs)->
                     _uiState.update {
                         it.copy(
                             preferredCurrency = prefs.preferredCurrency,
@@ -67,38 +61,38 @@ class AddCardViewModel(
                         )
                     }
 
-                    val advancedString = active?.let { buildScryfallQuery(it) } ?: ""
+                    val advancedString = active?.let {buildScryfallQuery(it)} ?: ""
                     val combinedQuery = when {
                         text.isNotBlank() && advancedString.isNotBlank() -> "$text $advancedString"
-                        text.isNotBlank()                                -> text
-                        advancedString.isNotBlank()                      -> advancedString
-                        else                                             -> ""
+                        text.isNotBlank() -> text
+                        advancedString.isNotBlank() -> advancedString
+                        else -> ""
                     }
 
                     if (combinedQuery.isBlank() || (text.length < 2 && advancedString.isBlank())) {
-                        _uiState.update { 
+                        _uiState.update {
                             it.copy(
-                                results = emptyList(), 
+                                results = emptyList(),
                                 isSearching = false,
                                 isLoadingMore = false,
                                 hasMore = false,
                                 currentPage = 1,
                                 error = null
-                            ) 
+                            )
                         }
                         lastEffectiveQuery = null
                         return@collectLatest
                     }
 
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
-                            isSearching = true, 
+                            isSearching = true,
                             error = null,
                             isLoadingMore = false,
                             hasMore = false,
                             currentPage = 1
                             // We don't clear results here to keep stale results visible (F-08)
-                        ) 
+                        )
                     }
                     val lang = _uiState.value.searchLanguage
                     val effectiveQuery = if (lang != "en" && !hasLangToken(combinedQuery)) {
@@ -121,19 +115,18 @@ class AddCardViewModel(
                                 )
                             }
                         }
+
                         is DataResult.Error -> _uiState.update {
                             it.copy(error = result.message, isSearching = false)
                         }
                     }
                 }
-                
-            // Launch spotlight feed fetch
-            loadSpotlightFeed()
+
         }
     }
 
     private fun hasLangToken(query: String): Boolean {
-        return query.split("\\s+".toRegex()).any { it.startsWith("lang:") }
+        return query.split("\\s+".toRegex()).any {it.startsWith("lang:")}
     }
 
     fun forceSearch() {
@@ -143,12 +136,12 @@ class AddCardViewModel(
     fun loadNextPage() {
         val query = lastEffectiveQuery ?: return
         val currentState = _uiState.value
-        
+
         if (!currentState.hasMore || currentState.isLoadingMore || currentState.isSearching) return
-        
+
         val nextPage = currentState.currentPage + 1
-        _uiState.update { it.copy(isLoadingMore = true) }
-        
+        _uiState.update {it.copy(isLoadingMore = true)}
+
         viewModelScope.launch {
             when (val result = searchCards(query, nextPage)) {
                 is DataResult.Success -> _uiState.update {
@@ -159,6 +152,7 @@ class AddCardViewModel(
                         currentPage = nextPage
                     )
                 }
+
                 is DataResult.Error -> _uiState.update {
                     it.copy(isLoadingMore = false, error = result.message)
                 }
@@ -167,22 +161,24 @@ class AddCardViewModel(
     }
 
     fun onQueryChange(query: String) {
-        _uiState.update { it.copy(query = query) }
+        _uiState.update {it.copy(query = query)}
         textQueryFlow.value = query
     }
 
     fun onAdvancedQuerySearch(query: AdvancedSearchQuery) {
-        _uiState.update { it.copy(activeQuery = query) }
+        _uiState.update {it.copy(activeQuery = query)}
         activeQueryFlow.value = query
-        
-        val nameCriterion = query.criteria.filterIsInstance<com.mmg.manahub.core.model.SearchCriterion.Name>().firstOrNull()
+
+        val nameCriterion =
+            query.criteria.filterIsInstance<com.mmg.manahub.core.model.SearchCriterion.Name>()
+                .firstOrNull()
         if (nameCriterion != null && nameCriterion.value.isNotBlank()) {
             onQueryChange(nameCriterion.value)
         }
     }
 
     fun onClearFilters() {
-        _uiState.update { it.copy(activeQuery = null) }
+        _uiState.update {it.copy(activeQuery = null)}
         activeQueryFlow.value = null
     }
 
@@ -207,53 +203,25 @@ class AddCardViewModel(
     fun onLanguageChange(code: String) {
         viewModelScope.launch {
             val lang = when (code) {
-                "es"  -> com.mmg.manahub.core.model.CardLanguage.SPANISH
-                "de"  -> com.mmg.manahub.core.model.CardLanguage.GERMAN
-                "fr"  -> com.mmg.manahub.core.model.CardLanguage.FRENCH
-                "it"  -> com.mmg.manahub.core.model.CardLanguage.ITALIAN
-                "pt"  -> com.mmg.manahub.core.model.CardLanguage.PORTUGUESE
-                "ja"  -> com.mmg.manahub.core.model.CardLanguage.JAPANESE
-                "ko"  -> com.mmg.manahub.core.model.CardLanguage.KOREAN
-                "ru"  -> com.mmg.manahub.core.model.CardLanguage.RUSSIAN
+                "es" -> com.mmg.manahub.core.model.CardLanguage.SPANISH
+                "de" -> com.mmg.manahub.core.model.CardLanguage.GERMAN
+                "fr" -> com.mmg.manahub.core.model.CardLanguage.FRENCH
+                "it" -> com.mmg.manahub.core.model.CardLanguage.ITALIAN
+                "pt" -> com.mmg.manahub.core.model.CardLanguage.PORTUGUESE
+                "ja" -> com.mmg.manahub.core.model.CardLanguage.JAPANESE
+                "ko" -> com.mmg.manahub.core.model.CardLanguage.KOREAN
+                "ru" -> com.mmg.manahub.core.model.CardLanguage.RUSSIAN
                 "zhs" -> com.mmg.manahub.core.model.CardLanguage.CHINESE_SIMPLIFIED
                 "zht" -> com.mmg.manahub.core.model.CardLanguage.CHINESE_TRADITIONAL
-                else  -> com.mmg.manahub.core.model.CardLanguage.ENGLISH
+                else -> com.mmg.manahub.core.model.CardLanguage.ENGLISH
             }
             userPreferences.setCardLanguage(lang)
         }
     }
 
-    fun onErrorDismissed() = _uiState.update { it.copy(error = null) }
+    fun onErrorDismissed() = _uiState.update {it.copy(error = null)}
 
-    fun loadSpotlightFeed() {
-        val currentState = _uiState.value
-        if (currentState.isSpotlightLoading || !hasMoreSpotlightSets) return
-        if (currentState.query.length >= 2 || currentState.activeQuery != null) return // Only load if idle
-        
-        _uiState.update { it.copy(isSpotlightLoading = true) }
-        viewModelScope.launch {
-            when (val result = getSpotlightFeed(currentSpotlightSetIndex)) {
-                is DataResult.Success -> {
-                    _uiState.update { 
-                        it.copy(
-                            spotlightCards = it.spotlightCards + result.data.cards,
-                            spotlightSet = result.data.sourceSet,
-                            isSpotlightLoading = false
-                        )
-                    }
-                    currentSpotlightSetIndex = result.data.nextSetIndex
-                }
-                is DataResult.Error -> {
-                    _uiState.update { it.copy(isSpotlightLoading = false) }
-                    if (result.message == "No more sets available") {
-                        hasMoreSpotlightSets = false
-                    }
-                }
-            }
-        }
-    }
-
-    fun onViewModeToggle(){
-        _uiState.update { it.copy(viewMode = if (it.viewMode == CollectionViewMode.GRID) CollectionViewMode.LIST else CollectionViewMode.GRID) }
+    fun onViewModeToggle() {
+        _uiState.update {it.copy(viewMode = if (it.viewMode == CollectionViewMode.GRID) CollectionViewMode.LIST else CollectionViewMode.GRID)}
     }
 }
