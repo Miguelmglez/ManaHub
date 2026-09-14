@@ -227,7 +227,7 @@ private fun CardsFlowDirectionContent(
     }
 
     // C1 (design review): the sticky CTA is a real Column sibling, not a Box overlay with a
-    // guessed bottom-padding reservation (see FormatStepContent for the full rationale).
+    // guessed bottom-padding reservation (see ReviewStepContent for the full rationale).
     Box(Modifier.fillMaxSize().onGloballyPositioned { rootCoordinates = it }) {
         Column(Modifier.fillMaxSize()) {
             LazyColumn(

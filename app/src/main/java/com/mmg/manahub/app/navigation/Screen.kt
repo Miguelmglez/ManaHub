@@ -20,7 +20,7 @@ sealed class Screen(val route: String) {
         fun routeWithTab(tab: String) = "collection?tab=$tab"
     }
     object CollectionAddCard  : Screen("collection/add")
-    object CollectionMassiveAddCard  : Screen("collection/massiveAddCard")
+    object CollectionMultiAddCard  : Screen("collection/multiaddcard")
 
     object CollectionScanner  : Screen("collection/scanner")
     object CollectionCardDetail : Screen("collection/detail/{scryfallId}?sharedTransitionKey={sharedTransitionKey}") {
@@ -84,6 +84,9 @@ sealed class Screen(val route: String) {
      * `tribe:<subtype>` key, [colors] a concatenated
      * [com.mmg.manahub.feature.decks.domain.engine.ManaColor] symbol string (e.g. "WU"). All blank
      * by default (a plain "Build from seed" entry point passes none).
+     *
+     * Deck Wizard v4 (R13): [format]/[deckId] are REQUIRED, not optional — the wizard always builds
+     * INTO an existing Deck Studio draft, never creates a fresh one of its own anymore.
      */
     object DeckWizard : Screen(
         "deck/wizard?archetype={archetype}&theme={theme}&tribe={tribe}&colors={colors}&seeds={seeds}&format={format}&deckId={deckId}"
@@ -98,33 +101,33 @@ sealed class Screen(val route: String) {
          *   init for the matching `split("|")`. When present, forces the wizard's Flow A
          *   (cards-first) entry, mirroring how [archetype]/[theme]/[tribe]/[colors] force Flow
          *   B/C's picks.
-         * @param format Deck Wizard Commander v3 plan (Phase 6, D12) — a raw
-         *   [com.mmg.manahub.core.model.DeckFormat] enum name. When present, the wizard skips its
-         *   own FORMAT step (`FormatStepContent` is kept only as the fallback for the no-arg entry
-         *   points above). Deck Studio's wizard CTA always passes this.
+         * @param format Deck Wizard v4 (R13) — a raw [com.mmg.manahub.core.model.DeckFormat] enum
+         *   name, REQUIRED. The wizard never has its own format step; the format always comes from
+         *   the deck being built/edited, chosen at creation in `DeckListScreen`'s
+         *   `DeckCreationSheet`. Making this non-nullable here is deliberate: a wizard route without
+         *   a format must fail to compile, not fail at runtime.
          * @param deckId Deck Wizard Commander v3 plan (Phase 6, D12) — the id of the draft the
-         *   wizard was launched FROM. When present, the wizard's atomic write targets this deck
-         *   (never creates a new one) and, on finish, pops back to the Studio destination that
-         *   launched it instead of creating a second Studio back-stack entry.
+         *   wizard was launched FROM, REQUIRED for the same reason as [format] (every wizard launch
+         *   targets an existing draft created by Deck Studio). The wizard's atomic write targets
+         *   this deck (never creates a new one) and, on finish, pops back to the Studio destination
+         *   that launched it instead of creating a second Studio back-stack entry.
          */
         fun createRoute(
+            format: String,
+            deckId: String,
             archetype: String? = null,
             theme: String? = null,
             tribe: String? = null,
             colors: String? = null,
             seeds: List<String>? = null,
-            format: String? = null,
-            deckId: String? = null,
         ): String {
-            val params = mutableListOf<String>()
+            val params = mutableListOf("format=${Uri.encode(format)}", "deckId=${Uri.encode(deckId)}")
             if (!archetype.isNullOrEmpty()) params += "archetype=${Uri.encode(archetype)}"
             if (!theme.isNullOrEmpty()) params += "theme=${Uri.encode(theme)}"
             if (!tribe.isNullOrEmpty()) params += "tribe=${Uri.encode(tribe)}"
             if (!colors.isNullOrEmpty()) params += "colors=${Uri.encode(colors)}"
             if (!seeds.isNullOrEmpty()) params += "seeds=${Uri.encode(seeds.joinToString("|"))}"
-            if (!format.isNullOrEmpty()) params += "format=${Uri.encode(format)}"
-            if (!deckId.isNullOrEmpty()) params += "deckId=${Uri.encode(deckId)}"
-            return if (params.isEmpty()) baseRoute else "$baseRoute?${params.joinToString("&")}"
+            return "$baseRoute?${params.joinToString("&")}"
         }
     }
     // Screen.DeckImprovement (the standalone Deck Doctor screen) was RETIRED in Phase 0.5 of

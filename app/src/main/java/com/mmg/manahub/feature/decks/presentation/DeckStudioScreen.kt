@@ -221,7 +221,10 @@ fun DeckStudioScreen(
     // never imports Screen directly, mirroring onNavigateToCommunityDecksByCard's own convention).
     // [seeds] (plan D7, 4.3): a combo's component card names, hands off to the wizard's Flow A --
     // null/empty for every other entry point (Discoveries v2's "Build this" passes null here too).
-    onNavigateToWizard: (archetype: String?, theme: String?, tribe: String?, colors: String?, seeds: List<String>?) -> Unit = { _, _, _, _, _ -> },
+    // Deck Wizard v4 (R13): [deckId]/[format] are now REQUIRED leading args -- the wizard never has
+    // its own format step, so every call site here always supplies the CURRENTLY open draft's own
+    // id/format (this screen only ever operates on a loaded deck when these fire).
+    onNavigateToWizard: (deckId: String, format: String, archetype: String?, theme: String?, tribe: String?, colors: String?, seeds: List<String>?) -> Unit = { _, _, _, _, _, _, _ -> },
     // Deck Wizard Commander v3 plan (Phase 6, item 4/D12): Studio's own "regenerate this EXISTING
     // draft through the wizard" entry point -- passes the draft's own format + id so the wizard's
     // atomic write targets it directly instead of creating a second deck (D12). Unlike
@@ -393,13 +396,19 @@ fun DeckStudioScreen(
 
     val inspirationsEnabled = FeatureFlags.Decks.DISCOVERIES_V2_ENABLED
     val seedEnabled = FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED
-    val handleBuildFromSeed: () -> Unit = {
-        onNavigateToWizard(null, null, null, null, null)
-    }
-
     val isCommanderFormat = uiState.deck?.format
         ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
         ?.isCommanderFormat == true
+    // Deck Wizard v4 (Task 2, R14): "Build from seed" is gated to isCommanderFormat at its render
+    // site (DeckStudioTopBar below) -- this guard is defense-in-depth, mirroring the codebase's
+    // "never trust the UI-only disabled state" precedent (onSelectFormat/onToggleUseCommunityData).
+    val handleBuildFromSeed: () -> Unit = {
+        val deckId = uiState.deck?.id
+        val format = uiState.deck?.format
+        if (deckId != null && format != null && isCommanderFormat) {
+            onNavigateToWizard(deckId, format, null, null, null, null, null)
+        }
+    }
 
     // Deck Wizard Commander v3 plan (Phase 6, item 4): confirm before a non-empty draft is
     // replaced (plan §8); an already-empty draft has nothing to lose, so it skips the dialog.
@@ -722,14 +731,20 @@ fun DeckStudioScreen(
                 matchingCards = uiState.discoveryMatchingCards,
                 isLoading = uiState.isLoadingDiscoveries,
                 onBuildThis = { discovery ->
-                    viewModel.closeInspirations()
-                    onNavigateToWizard(
-                        discovery.archetype?.name,
-                        discovery.theme?.name,
-                        discovery.tribe,
-                        discovery.dominantColors.joinToString("") { it.symbol },
-                        null,
-                    )
+                    val deckId = uiState.deck?.id
+                    val format = uiState.deck?.format
+                    if (deckId != null && format != null) {
+                        viewModel.closeInspirations()
+                        onNavigateToWizard(
+                            deckId,
+                            format,
+                            discovery.archetype?.name,
+                            discovery.theme?.name,
+                            discovery.tribe,
+                            discovery.dominantColors.joinToString("") { it.symbol },
+                            null,
+                        )
+                    }
                 },
                 inspirationsTab = uiState.inspirationsTab,
                 onSelectTab = viewModel::onSelectInspirationsTab,
@@ -742,8 +757,12 @@ fun DeckStudioScreen(
                 comboCardsByName = uiState.comboCardsByName,
                 isLoadingCombos = uiState.isLoadingCombos,
                 onUseComboAsSeed = { cardNames ->
-                    viewModel.closeInspirations()
-                    onNavigateToWizard(null, null, null, null, cardNames)
+                    val deckId = uiState.deck?.id
+                    val format = uiState.deck?.format
+                    if (deckId != null && format != null) {
+                        viewModel.closeInspirations()
+                        onNavigateToWizard(deckId, format, null, null, null, null, cardNames)
+                    }
                 },
                 // Combos tab only -- Strategies-tab card taps open the inline zoom overlay
                 // (self-contained inside InspirationsSheetContentV2) and never call this.
@@ -1027,7 +1046,11 @@ private fun DeckStudioTopBar(
                     )
                     // Deck Builder v2 (plan D10/§3.7): visible when the v2 wizard is enabled. The
                     // legacy seed-sheet sibling flag was RETIRED in WS7.2 (2026-07-28).
-                    if (FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED) {
+                    // Deck Wizard v4 (Task 2, R14): also gated on isCommanderFormat -- the wizard is
+                    // only ready for Commander/Commander Casual after this campaign; every 60-card
+                    // format stays hidden until its own wave ships (see isCommanderFormat's own
+                    // computation above, the ONE place this decision lives).
+                    if (FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED && isCommanderFormat) {
                         DropdownMenuItem(
                             text = {
                                 Text(

@@ -247,7 +247,7 @@ internal fun ResultContent(
     }
 
     // C1 (design review): the sticky CTA is a real Column sibling, not a Box overlay with a
-    // guessed bottom-padding reservation (see FormatStepContent for the full rationale).
+    // guessed bottom-padding reservation (see ReviewStepContent for the full rationale).
     Column(Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.weight(1f).fillMaxWidth(),

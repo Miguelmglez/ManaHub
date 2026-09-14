@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,11 +30,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -62,7 +59,6 @@ import coil3.compose.AsyncImage
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardRow
 import com.mmg.manahub.core.ui.components.MagicToastHost
@@ -84,18 +80,17 @@ import org.koin.androidx.compose.koinViewModel
 
 /**
  * Steps shown by [WizardStepIndicator]; GENERATING/RESULT replace the whole body instead.
- * Deck Wizard v4 (W1.1/G1/R1): Commander's format is chosen at deck creation and arrives via nav
- * arg (`Screen.DeckWizard.createRoute`), so FORMAT is no longer a Commander step at all --
- * `COMMANDER_PICK → STRATEGY → MANUAL_ADDS → REVIEW`. Every Casual flow (A/B/C) still runs
- * `FORMAT → ENTRY → DIRECTION → MANUAL_ADDS → REVIEW` -- `FormatStepContent` survives only for
- * those entry points that still arrive without the arg ([WizardPhase.IDENTITY] stays unreachable
- * dead code for every flow, see [DeckWizardViewModel.onNextFromDirection]'s KDoc).
+ * Deck Wizard v4 (R13): the format is chosen at deck creation and arrives via a REQUIRED nav arg
+ * (`Screen.DeckWizard.createRoute`) -- there is no format step for ANY flow any more. Commander
+ * runs `COMMANDER_PICK → STRATEGY → MANUAL_ADDS → REVIEW`; every Casual flow (A/B/C) runs
+ * `ENTRY → DIRECTION → MANUAL_ADDS → REVIEW` ([WizardPhase.IDENTITY] stays unreachable dead code
+ * for every flow, see [DeckWizardViewModel.onNextFromDirection]'s KDoc).
  */
 private fun stepPhasesFor(uiState: DeckWizardUiState): List<WizardPhase> {
     if (uiState.selectedFormat?.isCommanderFormat == true) {
         return listOf(WizardPhase.COMMANDER_PICK, WizardPhase.STRATEGY, WizardPhase.MANUAL_ADDS, WizardPhase.REVIEW)
     }
-    return listOf(WizardPhase.FORMAT, WizardPhase.ENTRY, WizardPhase.DIRECTION, WizardPhase.MANUAL_ADDS, WizardPhase.REVIEW)
+    return listOf(WizardPhase.ENTRY, WizardPhase.DIRECTION, WizardPhase.MANUAL_ADDS, WizardPhase.REVIEW)
 }
 
 /**
@@ -167,11 +162,6 @@ fun DeckWizardScreen(
                     label = "DeckWizardPhase",
                 ) { phase ->
                     when (phase) {
-                        WizardPhase.FORMAT -> FormatStepContent(
-                            uiState = uiState,
-                            onSelectFormat = viewModel::onSelectFormat,
-                            onNext = viewModel::onNextFromFormat,
-                        )
                         WizardPhase.ENTRY -> EntryStepContent(
                             onSelect = viewModel::onSelectEntryFlow,
                         )
@@ -389,163 +379,6 @@ internal fun WizardStickyButton(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  Step 1 — Format
-// ═══════════════════════════════════════════════════════════════════════════════
-
-private val V1_FORMATS = listOf(DeckFormat.COMMANDER, DeckFormat.CASUAL)
-private val COMING_SOON_FORMATS = listOf(
-    DeckFormat.STANDARD, DeckFormat.PIONEER, DeckFormat.MODERN,
-    DeckFormat.LEGACY, DeckFormat.VINTAGE, DeckFormat.PAUPER,
-)
-
-@Composable
-private fun FormatStepContent(
-    uiState: DeckWizardUiState,
-    onSelectFormat: (DeckFormat) -> Unit,
-    onNext: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    // C1 (design review): the sticky CTA is a real Column sibling (not a Box overlay with a
-    // guessed bottom-padding reservation) — its real measured height, whatever the device's
-    // nav-bar inset turns out to be, is what the list actually loses, never a magic-number guess.
-    Column(Modifier.fillMaxSize()) {
-        Column(Modifier.padding(horizontal = spacing.lg, vertical = spacing.md)) {
-            Text(stringResource(R.string.deck_wizard_format_title), style = ty.titleLarge, color = mc.textPrimary)
-            Text(
-                stringResource(R.string.deck_wizard_format_subtitle),
-                style = ty.bodyMedium,
-                color = mc.textSecondary,
-                modifier = Modifier.padding(top = spacing.xxs),
-            )
-        }
-        // Visual-overhaul pass: one-format-per-row list matching the "Pick a strategy" step's
-        // StrategyOptionRow shape (DeckWizardEntryFlows.kt) instead of the old icon-badge grid
-        // tile -- see FormatCard's KDoc for why the row body is a local duplicate rather than an
-        // import of that file-private composable.
-        LazyColumn(
-            contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(spacing.sm),
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-        ) {
-            items(V1_FORMATS, key = { it.name }) { format ->
-                FormatCard(
-                    format = format,
-                    selected = uiState.selectedFormat == format,
-                    comingSoon = false,
-                    onClick = { onSelectFormat(format) },
-                )
-            }
-            items(COMING_SOON_FORMATS, key = { it.name }) { format ->
-                FormatCard(format = format, selected = false, comingSoon = true, onClick = {})
-            }
-        }
-        WizardStickyButton(
-            label = stringResource(R.string.deck_wizard_next),
-            enabled = uiState.selectedFormat != null,
-            onClick = onNext,
-        )
-    }
-}
-
-/**
- * One or two short, factual rules sentences per format so a [FormatCard] explains what the format
- * actually IS instead of just naming it -- real MTG rules text (English), never invented. Returns
- * `null` for any [DeckFormat] not covered here (there is none today, but this stays defensive).
- */
-private fun formatRulesDescriptionRes(format: DeckFormat): Int? = when (format) {
-    DeckFormat.COMMANDER -> R.string.deck_wizard_format_desc_commander
-    DeckFormat.CASUAL -> R.string.deck_wizard_format_desc_casual
-    DeckFormat.STANDARD -> R.string.deck_wizard_format_desc_standard
-    DeckFormat.PIONEER -> R.string.deck_wizard_format_desc_pioneer
-    DeckFormat.MODERN -> R.string.deck_wizard_format_desc_modern
-    DeckFormat.LEGACY -> R.string.deck_wizard_format_desc_legacy
-    DeckFormat.VINTAGE -> R.string.deck_wizard_format_desc_vintage
-    DeckFormat.PAUPER -> R.string.deck_wizard_format_desc_pauper
-    else -> null
-}
-
-/**
- * A [DeckFormat] pick, one full-width row per format -- deliberately built to the EXACT visual
- * shape of `StrategyOptionRow` (DeckWizardEntryFlows.kt, the "Pick a strategy" step's row: label +
- * 2-line description in a weighted Column, trailing 24dp circular selected-checkmark, same
- * selected fill/border/typography). `StrategyOptionRow` itself is `private` in a different file
- * with no other cross-file consumer -- this codebase's existing convention for a wizard-only row
- * shape shared only in spirit (not code) across files is a short per-file duplicate rather than
- * promoting it to `internal` and creating cross-file coupling for a single extra call site.
- */
-@Composable
-private fun FormatCard(format: DeckFormat, selected: Boolean, comingSoon: Boolean, onClick: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    val descriptionRes = formatRulesDescriptionRes(format)
-
-    Surface(
-        onClick = onClick,
-        enabled = !comingSoon,
-        shape = SmallCardShape,
-        color = if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface,
-        border = if (selected) androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent) else null,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(spacing.md).heightIn(min = 48.dp).fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.md),
-        ) {
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                    Text(
-                        text = format.displayName,
-                        style = ty.titleMedium,
-                        color = if (comingSoon) mc.textDisabled else mc.textPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (comingSoon) {
-                        // C2 (design review, kept from the old grid tile): surfaceVariant would
-                        // double up with the already-dim textDisabled label into a near-invisible
-                        // badge on HallowedPrint.
-                        Surface(shape = ChipShape, color = mc.textDisabled.copy(alpha = 0.25f)) {
-                            Text(
-                                text = stringResource(R.string.deck_wizard_coming_soon),
-                                style = ty.labelSmall,
-                                color = mc.textDisabled,
-                                modifier = Modifier.padding(horizontal = spacing.xs, vertical = spacing.xxs),
-                            )
-                        }
-                    }
-                }
-                if (descriptionRes != null) {
-                    Text(
-                        text = stringResource(descriptionRes),
-                        style = ty.bodySmall,
-                        color = if (comingSoon) mc.textDisabled else mc.textSecondary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = spacing.xxs),
-                    )
-                }
-            }
-            Surface(
-                shape = CircleShape,
-                color = if (selected) mc.primaryAccent else mc.surfaceVariant,
-                modifier = Modifier.size(24.dp),
-            ) {
-                if (selected) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Check, contentDescription = null, tint = mc.onAccent, modifier = Modifier.size(16.dp))
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
 //  Step 4 — Review & Generate
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -563,7 +396,8 @@ private fun ReviewStepContent(
     val isCommander = uiState.selectedFormat?.isCommanderFormat == true
 
     // C1 (design review): the sticky CTA is a real Column sibling, weight(1f) + verticalScroll on
-    // the content above it -- no guessed bottom-padding reservation (see FormatStepContent).
+    // the content above it -- its real measured height is what the list actually loses, never a
+    // guessed bottom-padding reservation.
     Column(Modifier.fillMaxSize()) {
         Column(
             Modifier

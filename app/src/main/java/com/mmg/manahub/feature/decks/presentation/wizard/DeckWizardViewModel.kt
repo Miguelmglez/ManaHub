@@ -84,13 +84,14 @@ import kotlinx.coroutines.launch
  * Phase 3.1) — ONE screen, ONE ViewModel, no per-step nav destination (mirrors the Playtest
  * mulligan/battle-phase-in-one-screen precedent).
  *
- * [COMMANDER_PICK]/[STRATEGY]/[MANUAL_ADDS] (Deck Wizard & Engine Rework plan, Workstream 2) are the
- * NEW Commander-only sequence: `FORMAT → COMMANDER_PICK → STRATEGY → MANUAL_ADDS → REVIEW`,
- * REPLACING Commander's old `FORMAT → DIRECTION → IDENTITY → REVIEW` path (Commander now never
- * visits [DIRECTION]/[IDENTITY] — those two phases, and [ENTRY], stay Casual-only, byte-identical to
- * before this workstream).
+ * Deck Wizard v4 (R13): there is no FORMAT phase — the wizard never renders its own format step.
+ * The format arrives as a required nav arg ([DeckWizardViewModel]'s `init`) and picks the starting
+ * phase directly: Commander formats start at [COMMANDER_PICK] (`COMMANDER_PICK → STRATEGY →
+ * MANUAL_ADDS → REVIEW`), Casual starts at [ENTRY] (`ENTRY → DIRECTION → MANUAL_ADDS → REVIEW`).
+ * [IDENTITY] stays unreachable dead code for every flow (see [DeckWizardViewModel
+ * .onNextFromDirection]'s KDoc).
  */
-enum class WizardPhase { FORMAT, ENTRY, COMMANDER_PICK, STRATEGY, MANUAL_ADDS, DIRECTION, IDENTITY, REVIEW, GENERATING, RESULT }
+enum class WizardPhase { ENTRY, COMMANDER_PICK, STRATEGY, MANUAL_ADDS, DIRECTION, IDENTITY, REVIEW, GENERATING, RESULT }
 
 /**
  * Deck Engine Unification plan (§5 Phase 3.1) — the three ways a build can start. [CARDS] is the
@@ -118,9 +119,12 @@ sealed interface DeckWizardEvent {
 }
 
 data class DeckWizardUiState(
-    val phase: WizardPhase = WizardPhase.FORMAT,
+    // Deck Wizard v4 (R13): never observed by production UI -- init resolves the real starting
+    // phase synchronously from the required format nav arg before the first collector ever reads
+    // this StateFlow. This default only matters to tests that construct DeckWizardUiState() directly.
+    val phase: WizardPhase = WizardPhase.ENTRY,
 
-    // ── Step 1 — Format ────────────────────────────────────────────────────────
+    // ── Format (Deck Wizard v4, R13: fixed for the whole session, arrives via nav arg only) ─────
     val selectedFormat: DeckFormat? = null,
 
     // ── Entry chooser (Deck Engine Unification plan §5 Phase 3.1) ────────────────
@@ -391,16 +395,17 @@ data class DeckWizardUiState(
 }
 
 /**
- * QA fix (Deck Engine Unification plan RUN 3b, edge-case audit 2026-07-20): both
- * [WizardPhase.FORMAT] and [WizardPhase.ENTRY] are reachable via normal back-navigation at ANY
- * point after the user has already populated state in a flow ([DeckWizardViewModel.onBackPressed]
- * routes DIRECTION→ENTRY/FORMAT and ENTRY→FORMAT) — so a user can pick a Direction (commander,
- * archetype, colors, seeds...), back out, and pick a DIFFERENT format or entry flow without that
- * state ever being cleared. Without this reset, stale scratch state from an ABANDONED flow rode
- * into the build: a stale [DeckWizardUiState.selectedArchetype] survived a Casual→Commander format
- * switch straight into [StrategyProfile] via `onGenerate`, and a stale [DeckWizardUiState
- * .selectedCommander] survived a Commander→Casual switch into [DeckWizardViewModel.wizardDeckName]
- * and (pre-fix) [BuildDeckFromTemplateUseCase]'s seed-tag inference.
+ * QA fix (Deck Engine Unification plan RUN 3b, edge-case audit 2026-07-20): [WizardPhase.ENTRY] is
+ * reachable via normal back-navigation at ANY point after the user has already populated state in a
+ * flow ([DeckWizardViewModel.onBackPressed] routes DIRECTION→ENTRY) — so a user can pick a
+ * Direction (commander, archetype, colors, seeds...), back out, and pick a DIFFERENT entry flow
+ * without that state ever being cleared. Deck Wizard v4 (R13): format itself can no longer change
+ * mid-session (it is fixed at init from the nav arg), but the entry-flow reset below still matters
+ * for Casual's own A/B/C flow switch. Without this reset, stale scratch state from an ABANDONED flow
+ * rode into the build: a stale [DeckWizardUiState.selectedArchetype] survived into
+ * [StrategyProfile] via `onGenerate`, and a stale [DeckWizardUiState.selectedCommander] survived
+ * into [DeckWizardViewModel.wizardDeckName] and (pre-fix) [BuildDeckFromTemplateUseCase]'s seed-tag
+ * inference.
  *
  * Every field here represents "one Direction/Identity/Review-step attempt" scratch state, NOT a
  * session-level preference — [DeckWizardUiState.useCommunityData]/[DeckWizardUiState.fillLands]/
@@ -563,6 +568,25 @@ class DeckWizardViewModel(
     private var isWritingCommanderDeck = false
 
     init {
+        // Deck Wizard v4 (R13): "format" is now a REQUIRED nav arg (Screen.DeckWizard.createRoute)
+        // -- the wizard never renders its own format step, ever. A format the wizard has no
+        // dedicated build path for (any 60-card format besides Casual -- reachable only via a
+        // Discoveries/combo hand-off from a non-Commander draft) falls back to the same permissive
+        // Casual pipeline those hand-offs already used before this arg existed; a missing/malformed
+        // arg (a corrupted deep link) falls back the same way. Reuses onSelectFormat/onNextFromFormat
+        // rather than duplicating their phase transition logic. Resolved FIRST, before the
+        // Discoveries hand-off block below -- onSelectFormat calls resetDirectionScratchState(),
+        // which would otherwise wipe an archetype/theme/tribe/colors prefill applied before it.
+        val requestedFormat = savedStateHandle.get<String?>("format")?.takeIf { it.isNotEmpty() }
+            ?.let { name -> DeckFormat.entries.firstOrNull { it.name == name } }
+        launchedFromDeckId = savedStateHandle.get<String?>("deckId")?.takeIf { it.isNotEmpty() }
+        val resolvedFormat = requestedFormat?.takeIf { it.isCommanderFormat || it == DeckFormat.CASUAL }
+            ?: DeckFormat.CASUAL.also {
+                if (requestedFormat != null) crashReporter.log("deck_wizard_unsupported_format_fallback_casual")
+            }
+        onSelectFormat(resolvedFormat)
+        onNextFromFormat()
+
         // Discoveries v2 "Build this" hand-off (D11) — optional, all blank by default. Deck Engine
         // Unification (D2): nav args carry the unified taxonomy directly (raw ArchetypeId/ThemeId
         // enum names + a tribe key) instead of the old SeedStrategy-name/free-text-theme pair.
@@ -593,19 +617,6 @@ class DeckWizardViewModel(
         }
         if (seedsArg.isNotEmpty()) {
             _uiState.update { it.copy(entryFlow = WizardEntryFlow.CARDS) }
-        }
-
-        // Deck Wizard Commander v3 plan (Phase 6, D12/6.1): a "format" arg (Deck Studio's own
-        // wizard CTA, not yet built) preselects the format and skips the FORMAT step entirely --
-        // FormatStepContent stays the fallback for every other entry point above, which never pass
-        // this arg. Reuses onSelectFormat/onNextFromFormat rather than duplicating their phase
-        // transition logic.
-        val formatArg = savedStateHandle.get<String?>("format")?.takeIf { it.isNotEmpty() }
-            ?.let { name -> DeckFormat.entries.firstOrNull { it.name == name } }
-        launchedFromDeckId = savedStateHandle.get<String?>("deckId")?.takeIf { it.isNotEmpty() }
-        if (formatArg != null) {
-            onSelectFormat(formatArg)
-            onNextFromFormat()
         }
 
         viewModelScope.launch {
@@ -657,25 +668,24 @@ class DeckWizardViewModel(
         planSectionsSearchJob?.cancel()
     }
 
-    // ── Step 1 — Format ───────────────────────────────────────────────────────
+    // ── Format (Deck Wizard v4, R13) ─────────────────────────────────────────
 
+    /** No longer reachable from the UI (there is no format step) -- called once from `init` with
+     * the resolved nav-arg format, and kept public only as a test-setup convenience for exercising
+     * one format's flow from a `viewModel()` fixture built without a "format" savedState entry. */
     fun onSelectFormat(format: DeckFormat) {
         // v1 targets Commander (+ Commander Casual) and Casual only (plan D1) — the other 6
-        // restored 60-card formats render "coming soon" and disabled in the UI, but guard here too
-        // since this is the actual source of truth (never trust the UI-only disabled state).
+        // restored 60-card formats are never reachable here (init's resolvedFormat already folds
+        // them into CASUAL), but guard here too since this is the actual source of truth.
         if (!format.isCommanderFormat && format != DeckFormat.CASUAL) return
         // Edge-case fix (Phase 6 adversarial pass): the wizard was launched to REBUILD a specific
-        // existing Commander draft (launchedFromDeckId, D12) -- back-navigating to FORMAT and
-        // picking Casual would silently abandon that draft (generateCasualDeck never reads
-        // launchedFromDeckId) and create an unrelated new deck instead. A rebuild launch has no
-        // legitimate reason to change format at all.
+        // existing Commander draft (launchedFromDeckId, D12) -- a rebuild launch has no legitimate
+        // reason to change format at all.
         if (launchedFromDeckId != null && !format.isCommanderFormat) return
-        // QA fix (RUN 3b): FORMAT is reachable via back-navigation at any point after Direction-step
-        // state has already been populated (see resetDirectionScratchState's KDoc) -- an ACTUAL
-        // format change wipes every per-flow scratch field and resets the entry chooser to CARDS, so
-        // a stale commander/archetype/colors pick from the abandoned format can never leak into a
-        // build under the new one. A re-tap of the CURRENTLY selected format is a pure no-op-ish
-        // write (never wipes state the user hasn't actually left).
+        // QA fix (RUN 3b): an ACTUAL format change wipes every per-flow scratch field and resets the
+        // entry chooser to CARDS, so a stale commander/archetype/colors pick from the abandoned
+        // format can never leak into a build under the new one. A re-tap of the CURRENTLY selected
+        // format is a pure no-op-ish write (never wipes state the user hasn't actually left).
         if (_uiState.value.selectedFormat == format) {
             _uiState.update { it.copy(selectedFormat = format) }
             return
@@ -1767,11 +1777,11 @@ class DeckWizardViewModel(
     // ── Navigation between phases ────────────────────────────────────────────
 
     /**
-     * Deck Wizard & Engine Rework plan, Workstream 2 — Commander now routes to the NEW
-     * [WizardPhase.COMMANDER_PICK] step (replacing its old `DIRECTION` entry, see [WizardPhase]'s
-     * KDoc); it still forces [WizardEntryFlow.CARDS] and skips [WizardPhase.ENTRY] entirely (the
-     * commander IS the mandatory first pick; there is nothing for the chooser to offer). Casual
-     * routes through the entry chooser instead — byte-identical to before this workstream.
+     * Picks the wizard's starting phase for the format [onSelectFormat] just resolved -- Commander
+     * routes straight to [WizardPhase.COMMANDER_PICK] (forcing [WizardEntryFlow.CARDS]; the
+     * commander IS the mandatory first pick, so [WizardPhase.ENTRY] has nothing to offer), Casual
+     * routes through the entry chooser. Deck Wizard v4 (R13): called ONCE from `init`, never from
+     * the UI -- there is no format step to advance FROM any more.
      */
     fun onNextFromFormat() {
         val format = _uiState.value.selectedFormat ?: return
@@ -1917,11 +1927,10 @@ class DeckWizardViewModel(
     fun onBackPressed(): Boolean {
         val state = _uiState.value
         return when (state.phase) {
-            WizardPhase.FORMAT -> true
-            WizardPhase.ENTRY -> { _uiState.update { it.copy(phase = WizardPhase.FORMAT) }; false }
-            // W1.1 (G1/R1): FORMAT is no longer a Commander step -- the deck's format is chosen at
-            // creation and arrives by nav arg, so COMMANDER_PICK is now the FIRST Commander step and
-            // its own back action exits the wizard instead of routing to a step that no longer exists.
+            // Deck Wizard v4 (R13): there is no FORMAT step to route back to any more -- ENTRY
+            // (Casual) and COMMANDER_PICK (Commander) are both genuinely the FIRST step of their
+            // respective flows now, so back from either exits the wizard.
+            WizardPhase.ENTRY -> true
             WizardPhase.COMMANDER_PICK -> true
             WizardPhase.STRATEGY -> { _uiState.update { it.copy(phase = WizardPhase.COMMANDER_PICK) }; false }
             // Workstream 3 -- MANUAL_ADDS is now shared by BOTH Commander (from STRATEGY) and every
@@ -1932,13 +1941,8 @@ class DeckWizardViewModel(
                 false
             }
             // Commander never reaches DIRECTION/IDENTITY anymore (it routes through COMMANDER_PICK/
-            // STRATEGY/MANUAL_ADDS above) -- this branch is Casual-only now, kept byte-identical
-            // (the `selectedFormat == COMMANDER` arm is defensive dead code, harmless to leave).
-            WizardPhase.DIRECTION -> {
-                val target = if (state.selectedFormat?.isCommanderFormat == true) WizardPhase.FORMAT else WizardPhase.ENTRY
-                _uiState.update { it.copy(phase = target) }
-                false
-            }
+            // STRATEGY/MANUAL_ADDS above) -- this branch is Casual-only, always targets ENTRY.
+            WizardPhase.DIRECTION -> { _uiState.update { it.copy(phase = WizardPhase.ENTRY) }; false }
             // Workstream 3 -- IDENTITY is now unreachable dead code for EVERY flow (Commander since
             // WS2, Casual since this workstream: onNextFromDirection never routes here anymore).
             // Kept, not deleted, matching this file's established "defensive dead code, harmless to

@@ -225,19 +225,26 @@ class DeckWizardViewModelTest {
 
     // ── Phase navigation ─────────────────────────────────────────────────────
 
+    // Deck Wizard v4 (R13): there is no FORMAT phase any more -- a route without a "format" nav
+    // arg (a fixture built with an empty savedState, mirroring a corrupted deep link) falls back to
+    // CASUAL and lands on ENTRY, exactly as if a real Casual deck had launched the wizard.
     @Test
-    fun `initial phase is FORMAT`() = runTest(dispatcher) {
+    fun `no format nav arg falls back to CASUAL and lands on ENTRY`() = runTest(dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
-        assertEquals(WizardPhase.FORMAT, vm.uiState.value.phase)
+        assertEquals(DeckFormat.CASUAL, vm.uiState.value.selectedFormat)
+        assertEquals(WizardPhase.ENTRY, vm.uiState.value.phase)
     }
 
     @Test
-    fun `onNextFromFormat is a no-op when no format is selected`() = runTest(dispatcher) {
-        val vm = viewModel()
+    fun `a real format nav arg lands on the correct starting phase for that format`() = runTest(dispatcher) {
+        val commanderVm = viewModel(mapOf("format" to "COMMANDER"))
         advanceUntilIdle()
-        vm.onNextFromFormat()
-        assertEquals(WizardPhase.FORMAT, vm.uiState.value.phase)
+        assertEquals(WizardPhase.COMMANDER_PICK, commanderVm.uiState.value.phase)
+
+        val casualVm = viewModel(mapOf("format" to "CASUAL"))
+        advanceUntilIdle()
+        assertEquals(WizardPhase.ENTRY, casualVm.uiState.value.phase)
     }
 
     @Test
@@ -295,14 +302,14 @@ class DeckWizardViewModelTest {
     }
 
     @Test
-    fun `back from ENTRY returns to FORMAT`() = runTest(dispatcher) {
+    fun `back from ENTRY exits the wizard (R13 -- no FORMAT step to return to)`() = runTest(dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         assertEquals(WizardPhase.ENTRY, vm.uiState.value.phase)
-        assertTrue(!vm.onBackPressed())
-        assertEquals(WizardPhase.FORMAT, vm.uiState.value.phase)
+        assertTrue(vm.onBackPressed())
+        assertEquals(WizardPhase.ENTRY, vm.uiState.value.phase)
     }
 
     @Test
@@ -347,11 +354,14 @@ class DeckWizardViewModelTest {
     }
 
     @Test
-    fun `a non-v1 format is rejected -- selectedFormat stays null`() = runTest(dispatcher) {
+    fun `a non-v1 format is rejected -- selectedFormat is unchanged`() = runTest(dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
+        // Deck Wizard v4 (R13): init already resolved a real format (CASUAL, the no-arg fallback) --
+        // onSelectFormat's own v1-only guard must leave that untouched, not null it out.
+        assertEquals(DeckFormat.CASUAL, vm.uiState.value.selectedFormat)
         vm.onSelectFormat(DeckFormat.STANDARD)
-        assertNull(vm.uiState.value.selectedFormat)
+        assertEquals(DeckFormat.CASUAL, vm.uiState.value.selectedFormat)
     }
 
     @Test
@@ -1115,8 +1125,10 @@ class DeckWizardViewModelTest {
         assertEquals(WizardPhase.DIRECTION, vm.uiState.value.phase)
         vm.onBackPressed()
         assertEquals(WizardPhase.ENTRY, vm.uiState.value.phase)
-        vm.onBackPressed()
-        assertEquals(WizardPhase.FORMAT, vm.uiState.value.phase)
+        // Deck Wizard v4 (R13): ENTRY is genuinely the first Casual step now -- back from here
+        // exits the wizard instead of routing to a FORMAT step that no longer exists.
+        assertTrue(vm.onBackPressed())
+        assertEquals(WizardPhase.ENTRY, vm.uiState.value.phase)
     }
 
     @Test
@@ -1224,12 +1236,12 @@ class DeckWizardViewModelTest {
     }
 
     @Test
-    fun `no format nav arg leaves the wizard on the FORMAT step as before`() = runTest(dispatcher) {
+    fun `no format nav arg falls back to CASUAL (R13 -- format is always required)`() = runTest(dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
         val state = vm.uiState.value
-        assertEquals(null, state.selectedFormat)
-        assertEquals(WizardPhase.FORMAT, state.phase)
+        assertEquals(DeckFormat.CASUAL, state.selectedFormat)
+        assertEquals(WizardPhase.ENTRY, state.phase)
     }
 
     // ── Combo "Use as seed" hand-off (Deck Engine Unification plan D7, 4.3) ──
@@ -2104,10 +2116,9 @@ class DeckWizardViewModelTest {
         assertEquals(ArchetypeId.AGGRO, vm.uiState.value.selectedArchetype)
         assertTrue(vm.uiState.value.colorIdentity.isNotEmpty())
 
-        // Back out (DIRECTION -> ENTRY -> FORMAT) and pick Commander instead.
-        vm.onBackPressed()
-        vm.onBackPressed()
-        assertEquals(WizardPhase.FORMAT, vm.uiState.value.phase)
+        // Deck Wizard v4 (R13): there is no FORMAT step to back-navigate into any more -- exercise
+        // onSelectFormat directly (the thing actually under test), same as a fresh Commander launch
+        // of this same VM instance would.
         vm.onSelectFormat(DeckFormat.COMMANDER)
 
         val state = vm.uiState.value

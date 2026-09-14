@@ -126,6 +126,7 @@
     <string name="addcard_index_title">Browse the MTG universe!</string>
     <string name="addcard_index_subtitle">Type the name of a card or open the Advanced search to find by its attributes</string>
 
+    <string name="addcard_multi_add_button">Add multiple</string>
     <string name="addcard_scanner_button">Open Scanner</string>
     <string name="addcard_spotlight_header">Latest Set: %1$s</string>
     <string name="addcard_language_button">Search language: %1$s. Tap to change.</string>
@@ -142,6 +143,10 @@
     <string name="card_condition_pl">Played</string>
     <string name="card_condition_p">Poor</string>
 
+    <!-- ══════════════════════════════════════════
+         MULTI ADD CARD SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="multi_add_card_proceed_with_selected_cta">Proceed with %1$d selected</string>
     <!-- ══════════════════════════════════════════
          CARD DETAIL SCREEN
     ═══════════════════════════════════════════ -->
@@ -1063,11 +1068,8 @@
     <string name="deck_wizard_title">Build a Deck</string>
     <string name="deck_wizard_step_of">Step %1$d of %2$d</string>
     <string name="deck_wizard_next">Next</string>
-    <string name="deck_wizard_coming_soon">Coming soon</string>
     <string name="deck_wizard_build_this">Build this</string>
-    <!-- Step 1 — Format -->
-    <string name="deck_wizard_format_title">Choose a format</string>
-    <string name="deck_wizard_format_subtitle">Commander and Casual have the deepest deck templates today.</string>
+    <!-- Format rules copy, reused by DeckCreationSheet's format picker (the wizard itself has no format step, Deck Wizard v4 R13) -->
     <string name="deck_wizard_format_desc_commander">100-card singleton deck: 99 cards plus a legendary commander that sets your color identity. Starts at 40 life — 21+ combat damage from one commander is also a loss.</string>
     <string name="deck_wizard_format_desc_casual">60-card minimum deck with up to 4 copies of any card (basic lands excluded). Starts at 20 life under standard 2-player rules.</string>
     <string name="deck_wizard_format_desc_standard">Rotating format — legal sets are roughly the last two years.</string>

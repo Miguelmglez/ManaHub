@@ -90,7 +90,7 @@ import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import com.mmg.manahub.feature.home.presentation.HomeAction
 import com.mmg.manahub.feature.home.presentation.HomeHeroState
 import com.mmg.manahub.feature.home.presentation.HomeScreen
-import com.mmg.manahub.feature.massiveadd.presentation.MassiveAddCardScreen
+import com.mmg.manahub.feature.multiadd.presentation.MassiveAddCardScreen
 import com.mmg.manahub.feature.news.presentation.NewsScreen
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.manahub.feature.news.presentation.VideoPlayerScreen
@@ -475,7 +475,7 @@ fun AppNavGraph(
                                     is HomeAction.OpenCompetitive->{
                                         navController.navigate(Screen.Competitive.route)
                                     }
-                                    is HomeAction.OpenMultiAdd-> navController.navigate(Screen.CollectionMassiveAddCard)
+                                    is HomeAction.OpenMultiAdd-> navController.navigate(Screen.CollectionMultiAddCard)
                                     // ── Widget board: handled in HomeScreen/VM ───────────
                                     HomeAction.OpenWidgetGallery,
                                     HomeAction.ResetLayout,
@@ -548,6 +548,7 @@ fun AppNavGraph(
                         AddCardScreen(
                             onNavigateBack = { navController.popBackStack() },
                             onNavigateToScanner = { navController.navigate(Screen.CollectionScanner.route) },
+                            onNavigateToMultiAdd = { navController.navigate(Screen.CollectionMultiAddCard.route)},
                             onNavigateToCardDetail = { scryfallId ->
                                 navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
                             },
@@ -556,7 +557,7 @@ fun AppNavGraph(
                         )
                     }
 
-                    composable(Screen.CollectionMassiveAddCard.route) {
+                    composable(Screen.CollectionMultiAddCard.route) {
                         MassiveAddCardScreen(
                             onBack = { navController.popBackStack() },
                             sharedTransitionScope = this@SharedTransitionLayout,
@@ -736,14 +737,19 @@ fun AppNavGraph(
                     onNavigateToCommunityDeckDetail = { archidektId ->
                         navController.navigate(Screen.CommunityDeckDetail.createRoute(archidektId))
                     },
-                    onNavigateToWizard = { archetype, theme, tribe, colors, seeds ->
-                        navController.navigate(Screen.DeckWizard.createRoute(archetype, theme, tribe, colors, seeds))
+                    onNavigateToWizard = { deckId, format, archetype, theme, tribe, colors, seeds ->
+                        navController.navigate(
+                            Screen.DeckWizard.createRoute(
+                                format = format, deckId = deckId,
+                                archetype = archetype, theme = theme, tribe = tribe, colors = colors, seeds = seeds,
+                            )
+                        )
                     },
                     onNavigateToWizardFromDraft = { deckId, format ->
                         navController.navigate(Screen.DeckWizard.createRoute(format = format, deckId = deckId))
                     },
                     onNavigateToMassiveAddCards = {
-                        navController.navigate(Screen.CollectionMassiveAddCard.route)
+                        navController.navigate(Screen.CollectionMultiAddCard.route)
                     },
                 )
             }
@@ -761,10 +767,10 @@ fun AppNavGraph(
                     navArgument("deckId") { type = NavType.StringType; defaultValue = ""; nullable = false },
                 ),
             ) { backStackEntry ->
-                // Deck Wizard Commander v3 plan (Phase 6, D12): the "format"/"deckId" nav args
-                // (Screen.DeckWizard.createRoute) are read by DeckWizardViewModel to preselect the
-                // format and skip the FORMAT step, AND to target the wizard's atomic write at this
-                // SAME existing draft (generateCommanderDeck, Run 9) instead of creating a new one.
+                // Deck Wizard v4 (R13): "format"/"deckId" are now REQUIRED nav args (Screen
+                // .DeckWizard.createRoute) -- the wizard never has its own format step, and reads
+                // these to know its format from construction and to target the wizard's atomic
+                // write at this SAME existing draft instead of creating a new one.
                 val launchedFromDeckId = backStackEntry.arguments?.getString("deckId")?.takeIf { it.isNotEmpty() }
                 DeckWizardScreen(
                     onBack = { navController.popBackStack() },

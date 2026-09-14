@@ -5,11 +5,47 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-10 (v4 campaign, Run 3 — W3 + W4.1/W4.4 done; see
-`docs/plans/deck-wizard-commander-v4-progress.md` for the full per-item log, gitignored).
+**Last updated:** 2026-09-14 (v4 campaign, Run 6 — W5 landed + the format step deleted for real,
+R13/R14; see `docs/plans/deck-wizard-commander-v4-progress.md` for the full per-item log, gitignored).
 **Owning plan (v3, shipped):** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the
 AI-planning-doc rule now that the campaign has shipped; this file is the durable record that
 survives. **v4 (active):** `docs/plans/deck-wizard-commander-v4-plan.md` (gitignored).
+
+## v4 — Run 6 (2026-09-14): the format step, deleted for real (R13/R14)
+
+Prior runs removed `WizardPhase.FORMAT` from the COMMANDER phase list only, but left the enum
+value, `FormatStepContent`, and every Casual/no-arg entry point still able to render it —
+`Screen.DeckWizard.createRoute`'s `format`/`deckId` args were optional, and "Build from seed"
+(`DeckStudioScreen.kt`'s `handleBuildFromSeed`) called `onNavigateToWizard(null, null, null, null,
+null)` with no format/deckId at all, so the format step still reached the user on every "Build from
+seed" tap. **R13/R14 (user, 2026-09-14) made this unrepresentable at the type level, not just
+unreachable by convention:**
+- `WizardPhase.FORMAT` no longer exists (enum value deleted; the compiler forced every exhaustive
+  `when` to be fixed). `FormatStepContent`/`FormatCard`/`V1_FORMATS`/`COMING_SOON_FORMATS` deleted.
+- `Screen.DeckWizard.createRoute(format: String, deckId: String, ...)` — both required, no default,
+  moved to the front of the param list. A wizard route without a format is now a compile error.
+- `DeckWizardViewModel`'s `init` always resolves a format (falls back to `CASUAL` for a
+  missing/unsupported arg) and picks the correct starting phase (`COMMANDER_PICK` for Commander
+  formats, `ENTRY` for Casual) before the UI ever collects the first state. Back from either first
+  step now exits the wizard.
+- `DeckStudioScreen`'s `onNavigateToWizard` callback gained required `deckId`/`format` params; all 3
+  internal call sites (Build from seed, Discoveries hand-off, combo hand-off) now pass the currently
+  open draft's own id/format.
+- **"Build from seed" is now gated on `isCommanderFormat`** (R14) — hidden for every 60-card format
+  until that wave ships. Reuses the existing `isCommanderFormat` val (already computed for "Rebuild
+  with the Wizard"); no second format predicate introduced.
+- `onSelectFormat`/`onNextFromFormat` KEPT as VM functions (unreachable from the UI now, used only by
+  `init` and ~150 existing test call sites as a test-setup idiom) — a deliberate scope call to avoid
+  rewriting a large swath of `DeckWizardViewModelTest.kt` for zero behavioral gain; documented in the
+  functions' own KDoc.
+- **Known redundancy, reported not merged (user's call, per the brief):** "Build from seed" and
+  "Rebuild with the Wizard" are both visible on the same Commander decks now and, on an EMPTY draft,
+  do the exact same thing. On a NON-EMPTY draft they diverge: "Rebuild" confirms before replacing
+  every card and reuses the deck's existing commander/strategy; "Build from seed" has no confirmation
+  and starts cold. Full findings tracker entry: Run 6.
+- **Known gap, reported not fixed:** the empty-deck landing panel's own "Build from seed" option card
+  is still visible regardless of format (only gated on the feature flag) — it no-ops safely on tap for
+  a non-Commander draft, but is visually inconsistent with the overflow menu's format gate.
 
 ## v4 — Run 2 (2026-09-10): W2 (Commander pick step)
 

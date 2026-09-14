@@ -793,7 +793,7 @@ private val KEPT_OUTSIDE_PLAN_IDS = setOf("interaction", "standalone", "offplan"
 /** Same [SnapshotStateMap] + flattened-`List<String>` [Saver] shape as `DeckStudioScreen.kt`'s
  * `CollapsedCategorySectionsSaver` -- duplicated locally (not promoted to a shared file) per this
  * codebase's own "small per-file duplicate over cross-file coupling for one extra call site"
- * convention (see [FormatCard]'s KDoc for the same judgment call made elsewhere in this file). */
+ * convention (the same judgment call this file makes elsewhere for its own single-use rows). */
 private const val PLAN_SECTIONS_SAVER_DELIMITER = "|||"
 
 private val CollapsedPlanSectionsSaver: Saver<SnapshotStateMap<String, Boolean>, List<String>> = Saver(
