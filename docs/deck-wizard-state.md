@@ -5,11 +5,44 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-14 (v4 campaign, Run 6 — W5 landed + the format step deleted for real,
-R13/R14; see `docs/plans/deck-wizard-commander-v4-progress.md` for the full per-item log, gitignored).
+**Last updated:** 2026-09-14 (v4 campaign, Run 8 — R15 entry-point placement + the persist-time
+replace guard; see `docs/plans/deck-wizard-commander-v4-progress.md` for the full per-item log,
+gitignored). Commit `e299e1ce` on `feature/deck-wizard`.
 **Owning plan (v3, shipped):** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the
 AI-planning-doc rule now that the campaign has shipped; this file is the durable record that
 survives. **v4 (active):** `docs/plans/deck-wizard-commander-v4-plan.md` (gitignored).
+
+## v4 — Run 8 (2026-09-14): R15 — the two wizard entry points, disjoint by construction
+
+Run 6 gated both "Build from seed" and "Rebuild with the Wizard" to `isCommanderFormat`, leaving
+them both visible on the same Commander deck and — after R13 started passing a real `deckId` into
+"Build from seed" — able to silently replace a non-empty deck's cards with no confirmation (closed
+in Run 7 at the UI level only). **R15 (user, 2026-09-14) made the two entry points mutually
+exclusive by render condition, and added a structural guard so a silent overwrite can never happen
+again regardless of which entry point reaches the write:**
+- **"Build from seed" now renders ONLY on the empty-deck state card** — deleted outright from the
+  overflow menu. It never confirms (nothing to lose by construction).
+- **"Rebuild with the Wizard" now renders ONLY in the overflow menu on a non-empty deck** — gained
+  `&& !isEmptyDeck` on its existing gate. It always confirms.
+- `resolveWizardNavDecision` (`DeckStudioScreen.kt`) simplified: took a `WizardEntryPoint` param
+  instead of `isEmptyDeck` — each entry point's outcome no longer varies by deck state, since each is
+  only ever rendered in the one condition where its rule is correct.
+- **Structural guard, independent of the UI:** `Screen.DeckWizard.createRoute` gained a required
+  `replaceConfirmed: Boolean` nav arg (no default — every real call site must decide); `DeckWizardViewModel`
+  re-checks the launched deck's REAL card count right before persisting (not at launch) and refuses
+  an unconfirmed write into a non-empty deck — a `MagicToast` (ERROR) plus a non-fatal, deck left
+  byte-identical. This also closes a previously-unflagged gap: the Discoveries/combo hand-offs never
+  had a confirm dialog of their own; they are now protected by the same guard.
+- **Known incident, recorded and resolved before this run started:** an earlier wizard commit
+  (`803fbd9e`) had swept part of the user's own in-progress Multi Add work into itself and did not
+  compile from a clean tree; its "green build" had come from a worktree seeded with the dirty main
+  tree. The user fixed it by committing their own work directly (`bb7fd0fc`). This run verified
+  `bb7fd0fc` compiles clean before starting and built its own verification worktree from that commit
+  alone. Full trace: Run 8 in the progress tracker, and `feedback_partial_file_entanglement_surgical_staging`'s
+  "Verifying the result" section.
+- **Open item (unchanged):** Discoveries/combo hand-offs are safe (refuse rather than overwrite) but
+  have no confirm-and-proceed path of their own on a non-empty deck — a future pass may want to give
+  them their own dialog instead of a hard refusal.
 
 ## v4 — Run 6 (2026-09-14): the format step, deleted for real (R13/R14)
 
