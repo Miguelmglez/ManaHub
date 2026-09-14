@@ -105,6 +105,56 @@ class BuildCommanderDeckUseCaseTest {
     }
 
     @Test
+    fun `W6 Task 4 -- ambiguity groups are structurally valid over a real fixture`() = runTest {
+        val useCase = newUseCase()
+        val fixture = MockCollectionRich.targetFixtures.first { fx -> fx.mainboard.any { it.card.scryfallId == "cmd-edgar-markov" } }
+        val commander = fixture.mainboard.first { it.card.scryfallId == "cmd-edgar-markov" }.card
+        val identity = commander.colorIdentity.toManaColors()
+        val owned = ownedFrom(MockCollectionRich.ownedCards, MockCollectionRich.ownedBasics)
+
+        val outcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, identity, owned, deckId = "edgar-ambiguity")
+        val placedIds = outcome.result.entries.map { it.card.scryfallId }.toSet()
+
+        outcome.result.ambiguityGroups.forEach { group ->
+            assertTrue(group.remainingSlots > 0, "an ambiguity group must represent a real, unresolved shortfall: $group")
+            assertTrue(group.candidateIds.size >= 2, "a lone remaining candidate is a placement, not an ambiguity: $group")
+            assertTrue(group.candidateIds.none { it in placedIds }, "an ambiguity group must only list UNPLACED candidates: $group")
+            assertTrue(group.candidateIds.toSet().size == group.candidateIds.size, "an ambiguity group must not list a candidate twice: $group")
+        }
+    }
+
+    @Test
+    fun `W6 Task 4 -- a genuinely scarce role surfaces a real ambiguity group`() = runTest {
+        // "card_draw" (ideal 12) and "removal_spot" (ideal 9, a real generic-baseline role tagged
+        // via CardTag.REMOVAL's own key "removal") both get abundant, identically-scored supply --
+        // but 55 off-plan manual adds (D7/R5: always kept) eat most of the 99-card budget first,
+        // shrinking the remaining non-land target well below the combined 21-card ideal of the two
+        // roles. Neither role can reach its own ideal before the deck runs out of room, so BOTH end
+        // up with genuine leftover ties.
+        val useCase = newUseCase()
+        val commander = card(id = "cmd-vanilla-2", name = "Vanilla Commander II", typeLine = "Legendary Creature — Human", cmc = 3.0, colors = listOf("G"), colorIdentity = listOf("G"))
+        val drawFillers = (1..40).map { i ->
+            OwnedCard(card(id = "draw-$i", name = "Draw Filler $i", typeLine = "Sorcery", cmc = 2.0, colors = listOf("G"), colorIdentity = listOf("G"), tags = listOf(roleTagFor("card_draw"))), 1)
+        }
+        val removalFillers = (1..40).map { i ->
+            OwnedCard(card(id = "removal-$i", name = "Removal Filler $i", typeLine = "Instant", cmc = 2.0, colors = listOf("G"), colorIdentity = listOf("G"), tags = listOf(roleTagFor("removal"))), 1)
+        }
+        val manualAdds = (1..55).map { i ->
+            ManualAdd(card(id = "offplan-$i", name = "Off-plan Filler $i", typeLine = "Artifact", cmc = 1.0, colors = emptyList(), colorIdentity = emptyList()), isOwned = true)
+        }
+        val basics = MockCollectionRich.ownedBasics.filter { it.card.colorIdentity.contains("G") || it.card.name == "Forest" }
+        val owned = drawFillers + removalFillers + basics.map { OwnedCard(it.card, it.quantity) }
+
+        val outcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, setOf(ManaColor.G), owned, manualAdds = manualAdds, deckId = "scarcity-test")
+        assertTrue(outcome.result.ambiguityGroups.isNotEmpty(), "expected at least one real ambiguity group under genuine total-slot scarcity")
+        outcome.result.ambiguityGroups.forEach { group ->
+            assertTrue(group.sectionId == "card_draw" || group.sectionId == "removal_spot", "unexpected section in a synthetic 2-role scenario: $group")
+            assertTrue(group.candidateIds.size >= 2, "expected multiple plausible candidates, got: $group")
+            assertTrue(group.remainingSlots > 0, "expected a real shortfall, got: $group")
+        }
+    }
+
+    @Test
     fun `manual adds -- owned, unowned, off-plan, and a land are all preserved`() = runTest {
         val useCase = newUseCase()
         val commander = MockCollectionThin.commander

@@ -5,6 +5,7 @@ import com.mmg.manahub.feature.decks.domain.engine.CardSection
 import com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 
 /** The staged progress [BuildDeckFromTemplateUseCase] emits (plan §3.3). [TOP_UP_FROM_COLLECTION]
  * (Wizard Quality Campaign B2b) runs after [RESOLVING_GAPS] and before [FILLING_LANDS]: it tops the
@@ -147,6 +148,12 @@ data class WizardFillStats(
  * @property refinementSwaps D11: how many of the ≤`MAX_REFINEMENT_SWAPS` (8) refinement-pass swaps
  *           were actually accepted (each one strictly increased `analysis.totalScore`). `0` until
  *           Phase 2 implements the refinement pass — this field exists as a contract only.
+ * @property ambiguityGroups W6 Task 4 (E6) — sections the engine could not resolve on its own: a
+ *           role band still short of its ideal at the end of placement, with the real leftover
+ *           candidates that would have advanced it, when several of them cleared within a relative
+ *           epsilon of each other's marginal gain. Empty by default (Casual/`TemplateBuildResult`
+ *           paths never populate this). W7 (a later run) renders these as the Choice screen; this
+ *           run only produces and exposes the data.
  */
 data class WizardBuildResult(
     val entries: List<DeckEntry>,
@@ -154,6 +161,22 @@ data class WizardBuildResult(
     val gapSections: List<CardSection>,
     val fillStats: WizardFillStats,
     val refinementSwaps: Int = 0,
+    val ambiguityGroups: List<AmbiguityGroup> = emptyList(),
+)
+
+/**
+ * One unresolved section (W6 Task 4, E6): [sectionId] is a [RoleKey] still short of
+ * [remainingSlots] copies of its [com.mmg.manahub.feature.decks.domain.engine.RoleTarget.ideal] at
+ * the end of placement, and [candidateIds] are the real leftover (never-placed) candidates whose
+ * recomputed marginal gain cleared within [BuildCommanderDeckUseCase.AMBIGUITY_EPSILON] of the
+ * strongest one — i.e. genuinely plausible alternatives, not every card that merely touches the
+ * role. Always `candidateIds.size >= 2` (a lone remaining candidate is not an ambiguity, the engine
+ * would simply place it) and `remainingSlots > 0` (a filled section never appears here).
+ */
+data class AmbiguityGroup(
+    val sectionId: RoleKey,
+    val candidateIds: List<String>,
+    val remainingSlots: Int,
 )
 
 /**

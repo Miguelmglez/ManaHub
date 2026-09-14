@@ -188,6 +188,25 @@ class BuildCommanderDeckUseCase(
             placedNonLand += DeckEntry(card = chosen, quantity = 1, isOwned = true, isSideboard = false)
         }
 
+        // W6 Task 4 (E6): sections still short of ideal at the end of placement, with the real
+        // leftover candidates whose recomputed gain clears within AMBIGUITY_EPSILON of the best.
+        val ambiguityGroups = plan.skeleton.roleTargets.mapNotNull { (role, target) ->
+            if (role in plan.skeleton.antiRoles) return@mapNotNull null
+            val remaining = target.ideal - (state.roleCounts[role] ?: 0)
+            if (remaining <= 0) return@mapNotNull null
+            val scored = remainingCandidates
+                .filter { c -> (candidateProfiles[c]?.roleConfidence?.get(role) ?: 0f) > 0f }
+                .mapNotNull { c ->
+                    val pip = PlacementScorer.pipFactor(c, colorCount, manaBaseAnalyzer, estimatedSourcesByColor, landTarget)
+                    PlacementScorer.marginalGain(candidateProfiles.getValue(c), state, plan, curveTargets, axisIdeals, pip)?.let { c to it }
+                }
+            if (scored.size < 2) return@mapNotNull null
+            val best = scored.maxOf { it.second }
+            val within = scored.filter { (_, gain) -> gain >= best * (1f - AMBIGUITY_EPSILON) }.map { it.first.scryfallId }
+            if (within.size < 2) return@mapNotNull null
+            AmbiguityGroup(sectionId = role, candidateIds = within, remainingSlots = remaining)
+        }
+
         // ── Land fill v2 (2.4) ──────────────────────────────────────────────────────────────────
         onStage(CommanderBuildStage.FILLING_LANDS)
         val remainingLandSlots = (landTarget - manualLand.sumOf { 1 }).coerceAtLeast(0)
@@ -263,6 +282,7 @@ class BuildCommanderDeckUseCase(
             gapSections = gapSections,
             fillStats = fillStats,
             refinementSwaps = refinementSwaps,
+            ambiguityGroups = ambiguityGroups,
         )
         onStage(CommanderBuildStage.DONE)
         return CommanderBuildOutcome(result, plan, pin)
@@ -601,11 +621,18 @@ class BuildCommanderDeckUseCase(
         }
     }
 
-    private companion object {
+    companion object {
         /** Commander formats: 100 total cards including the commander -> 99 non-commander slots. */
-        const val NON_COMMANDER_SLOTS = 99
-        const val ITERATION_CAP_SLACK = 20
-        const val MAX_REFINEMENT_SWAPS = 8
-        const val KARSTEN_REBALANCE_CAP = 5
+        private const val NON_COMMANDER_SLOTS = 99
+        private const val ITERATION_CAP_SLACK = 20
+        private const val MAX_REFINEMENT_SWAPS = 8
+        private const val KARSTEN_REBALANCE_CAP = 5
+
+        /** W6 Task 4 (E6): a candidate within this relative fraction of the section's best remaining
+         * gain counts as a genuine alternative, not a clear loser. Judgment call, verified by hand
+         * against [com.mmg.manahub.feature.decks.domain.engine.analysisv3.MockCollectionRich]: wide
+         * enough to surface the plan's own worked example (7 plausible cards for the last 2 Removal
+         * slots), narrow enough that a typical build does not ask dozens of questions. */
+        const val AMBIGUITY_EPSILON = 0.15f
     }
 }
