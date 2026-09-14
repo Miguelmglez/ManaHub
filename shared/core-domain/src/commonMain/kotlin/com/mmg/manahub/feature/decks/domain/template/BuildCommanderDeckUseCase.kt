@@ -25,6 +25,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.PlacementScorer
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.StrategyPick
+import com.mmg.manahub.feature.decks.domain.engine.WizardPreferenceStore
 import com.mmg.manahub.feature.decks.domain.engine.SynergyGraph
 import com.mmg.manahub.feature.decks.domain.engine.toPin
 import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
@@ -73,6 +74,11 @@ class BuildCommanderDeckUseCase(
      *        every pre-existing call site/test keeps compiling unchanged (an empty deckId still
      *        seeds deterministically, it just is not tied to any real deck) — every wizard launch
      *        route requires a real `deckId` nav argument (R13), so production always supplies one.
+     * @param preferenceStore W6 Task 5 (E8) — when non-null, cards the user previously chose on the
+     *        Choice screen get a small, capped bonus (see [PREFERENCE_BONUS]'s own KDoc) applied
+     *        AFTER the real marginal gain, so it can only reorder a near-tie, never satisfy the D8
+     *        filler floor or override a band need on its own. `null` (the default) is byte-for-byte
+     *        inert — every pre-existing call site/test keeps compiling unchanged.
      */
     suspend operator fun invoke(
         format: DeckFormat,
@@ -85,6 +91,7 @@ class BuildCommanderDeckUseCase(
         includeNonBasicLands: Boolean = false,
         onStage: (CommanderBuildStage) -> Unit = {},
         deckId: String = "",
+        preferenceStore: WizardPreferenceStore? = null,
     ): CommanderBuildOutcome {
         require(format.isCommanderFormat) { "BuildCommanderDeckUseCase requires a Commander-shaped format, got $format" }
         val archetypeFormat = ArchetypeFormat.of(format)
@@ -164,6 +171,7 @@ class BuildCommanderDeckUseCase(
 
         // ── The loop (2.3) ──────────────────────────────────────────────────────────────────────
         onStage(CommanderBuildStage.PLACING_CARDS)
+        val preferredIds = preferenceStore?.preferredCardIds()?.toSet() ?: emptySet()
         val remainingCandidates = candidateCards.toMutableList()
         var iterations = 0
         val iterationCap = candidateCards.size + nonLandTarget + ITERATION_CAP_SLACK
@@ -174,7 +182,10 @@ class BuildCommanderDeckUseCase(
             remainingCandidates.forEach { card ->
                 val profile = candidateProfiles.getValue(card)
                 val pip = PlacementScorer.pipFactor(card, colorCount, manaBaseAnalyzer, estimatedSourcesByColor, landTarget)
-                val gain = PlacementScorer.marginalGain(profile, state, plan, curveTargets, axisIdeals, pip) ?: return@forEach
+                val rawGain = PlacementScorer.marginalGain(profile, state, plan, curveTargets, axisIdeals, pip) ?: return@forEach
+                // W6 Task 5 (E8): the preference bonus is applied AFTER the real objective clears
+                // the D8 floor, so it can only reorder a near-tie, never conjure a placement on its own.
+                val gain = if (card.scryfallId in preferredIds) rawGain + PlacementScorer.PREFERENCE_BONUS else rawGain
                 if (best == null || gain > bestGain ||
                     (gain == bestGain && stableSeed(deckId, card.scryfallId) < stableSeed(deckId, best!!.scryfallId))
                 ) {

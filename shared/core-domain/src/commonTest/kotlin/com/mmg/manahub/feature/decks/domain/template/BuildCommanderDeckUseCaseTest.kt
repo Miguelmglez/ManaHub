@@ -154,6 +154,55 @@ class BuildCommanderDeckUseCaseTest {
         }
     }
 
+    private class FakePreferenceStore(private val ids: List<String>) : com.mmg.manahub.feature.decks.domain.engine.WizardPreferenceStore {
+        override suspend fun recordPick(cardId: String) = error("not needed for this test")
+        override suspend fun preferredCardIds(): List<String> = ids
+    }
+
+    @Test
+    fun `W6 Task 5 -- a preferred card reorders a near-tie without needing to win on gain alone`() = runTest {
+        // Same tied-filler scarcity scenario as Task 3's determinism test: 90 identical "ramp"
+        // fillers competing for ~63 slots, so the un-preferenced outcome is decided purely by the
+        // deckId seed. Preferring one of the SEED-LOSING fillers must flip it into the final deck.
+        val useCase = newUseCase()
+        val commander = card(id = "cmd-vanilla-3", name = "Vanilla Commander III", typeLine = "Legendary Creature — Human", cmc = 3.0, colors = listOf("G"), colorIdentity = listOf("G"))
+        val fillers = (1..90).map { i ->
+            OwnedCard(card(id = "pref-filler-$i", name = "Pref Filler $i", typeLine = "Creature — Bear", cmc = 2.0, colors = listOf("G"), colorIdentity = listOf("G"), tags = listOf(roleTagFor("ramp"))), 1)
+        }
+        val basics = MockCollectionRich.ownedBasics.filter { it.card.colorIdentity.contains("G") || it.card.name == "Forest" }
+        val owned = fillers + basics.map { OwnedCard(it.card, it.quantity) }
+
+        val baseline = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, setOf(ManaColor.G), owned, deckId = "pref-test")
+        val baselinePlaced = baseline.result.entries.map { it.card.scryfallId }.toSet()
+        val loser = fillers.map { it.card.scryfallId }.first { it !in baselinePlaced }
+
+        val withPreference = useCase(
+            DeckFormat.COMMANDER, commander, StrategyPick.Custom, setOf(ManaColor.G), owned,
+            deckId = "pref-test", preferenceStore = FakePreferenceStore(listOf(loser)),
+        )
+        assertTrue(loser in withPreference.result.entries.map { it.card.scryfallId }, "a preferred near-tie loser must be placed once preferred")
+    }
+
+    @Test
+    fun `W6 Task 5 -- preference never overrides a band need (an anti-role card stays unplaced)`() = runTest {
+        // "stax_piece" is the GENERIC baseline's own anti-role band for a MIDRANGE-leaning identity
+        // in some skeletons; simplest reliable proof here is a card with NO real role/axis signal at
+        // all (clears NEITHER roleGain nor axisGain), which the D8 filler floor rejects regardless of
+        // the preference bonus (the bonus is only ever ADDED to an already-non-null gain).
+        val useCase = newUseCase()
+        val commander = MockCollectionThin.commander
+        val owned = ownedFrom(MockCollectionThin.ownedCards, MockCollectionThin.ownedBasics)
+        val vanillaFillerId = "cmd-vanilla-unrelated-filler"
+        val vanillaFiller = card(id = vanillaFillerId, name = "Truly Vanilla Filler", typeLine = "Creature — Bear", cmc = 2.0, colors = commander.colorIdentity, colorIdentity = commander.colorIdentity)
+        val ownedWithFiller = owned + OwnedCard(vanillaFiller, 1)
+
+        val outcome = useCase(
+            DeckFormat.COMMANDER, commander, StrategyPick.Custom, commander.colorIdentity.toManaColors(), ownedWithFiller,
+            preferenceStore = FakePreferenceStore(listOf(vanillaFillerId)),
+        )
+        assertTrue(vanillaFillerId !in outcome.result.entries.map { it.card.scryfallId }, "a card with zero role/axis gain must stay unplaced even when preferred (D8 floor)")
+    }
+
     @Test
     fun `manual adds -- owned, unowned, off-plan, and a land are all preserved`() = runTest {
         val useCase = newUseCase()

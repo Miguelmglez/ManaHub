@@ -36,6 +36,14 @@ object PlacementScorer {
      * naturally prefers an under-filled band over topping off one already at its ideal. */
     private const val ROLE_PLATEAU_CREDIT = 0.01f
 
+    /** W6 Task 5 (E8) -- a card the user previously chose on the Choice screen gets this bonus
+     * added to its ALREADY-computed marginal gain (never contributes on its own): bounded well
+     * below a typical under-ideal role/axis contribution (roughly a third of [ROLE_PLATEAU_CREDIT]
+     * scaled by [ROLE_WEIGHT]), same "bias, never override" discipline as the retired community
+     * prior and [com.mmg.manahub.feature.decks.domain.engine.CommanderArchetypeBias] -- it can
+     * reorder a genuine near-tie, it can never satisfy the D8 filler floor or beat a real band need. */
+    const val PREFERENCE_BONUS = 0.01f
+
     /** [combineDiminishing]'s per-step decay: the 2nd-strongest need counts at 40% of its own value,
      * the 3rd at 16%, etc. Judgment call verified by hand against [MockCollectionRich] (W6 Task 2):
      * strong enough that a genuinely multi-purpose card still separates from a single-purpose one,
