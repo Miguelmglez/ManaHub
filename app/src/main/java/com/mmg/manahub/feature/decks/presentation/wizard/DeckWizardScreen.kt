@@ -254,6 +254,7 @@ fun DeckWizardScreen(
                         WizardPhase.REVIEW -> ReviewStepContent(
                             uiState = uiState,
                             onToggleFillLands = viewModel::onToggleFillLands,
+                            onToggleIncludeNonBasicLands = viewModel::onToggleIncludeNonBasicLands,
                             onToggleUseCommunityData = viewModel::onToggleUseCommunityData,
                             onGenerate = viewModel::onGenerate,
                         )
@@ -552,6 +553,7 @@ private fun FormatCard(format: DeckFormat, selected: Boolean, comingSoon: Boolea
 private fun ReviewStepContent(
     uiState: DeckWizardUiState,
     onToggleFillLands: () -> Unit,
+    onToggleIncludeNonBasicLands: () -> Unit,
     onToggleUseCommunityData: () -> Unit,
     onGenerate: () -> Unit,
 ) {
@@ -655,30 +657,63 @@ private fun ReviewStepContent(
                 }
             }
 
-            Surface(
-                onClick = onToggleFillLands,
-                shape = SmallCardShape,
-                color = mc.surface,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier = Modifier.padding(spacing.md).fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+            // Casual-only (W5.2): the legacy all-or-nothing land-fill toggle for Motor A/
+            // BuildDeckFromTemplateUseCase. Commander gets its own "Include non-basic lands" switch
+            // below (basics are unconditional for Commander per R12 -- there is nothing left for a
+            // Commander-facing all-or-nothing toggle to gate).
+            if (!isCommander) {
+                Surface(
+                    onClick = onToggleFillLands,
+                    shape = SmallCardShape,
+                    color = mc.surface,
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.deck_wizard_fill_lands_title), style = ty.bodyMedium, color = mc.textPrimary)
-                        Text(stringResource(R.string.deck_wizard_fill_lands_subtitle), style = ty.labelSmall, color = mc.textSecondary)
+                    Row(
+                        modifier = Modifier.padding(spacing.md).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.deck_wizard_fill_lands_title), style = ty.bodyMedium, color = mc.textPrimary)
+                            Text(stringResource(R.string.deck_wizard_fill_lands_subtitle), style = ty.labelSmall, color = mc.textSecondary)
+                        }
+                        Switch(
+                            checked = uiState.fillLands,
+                            onCheckedChange = { onToggleFillLands() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = mc.onAccent,
+                                checkedTrackColor = mc.primaryAccent,
+                                uncheckedThumbColor = mc.textDisabled,
+                                uncheckedTrackColor = mc.surfaceVariant,
+                            ),
+                        )
                     }
-                    Switch(
-                        checked = uiState.fillLands,
-                        onCheckedChange = { onToggleFillLands() },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = mc.onAccent,
-                            checkedTrackColor = mc.primaryAccent,
-                            uncheckedThumbColor = mc.textDisabled,
-                            uncheckedTrackColor = mc.surfaceVariant,
-                        ),
-                    )
+                }
+            } else {
+                Surface(
+                    onClick = onToggleIncludeNonBasicLands,
+                    shape = SmallCardShape,
+                    color = mc.surface,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(spacing.md).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.deck_wizard_include_nonbasic_lands_title), style = ty.bodyMedium, color = mc.textPrimary)
+                            Text(stringResource(R.string.deck_wizard_include_nonbasic_lands_subtitle), style = ty.labelSmall, color = mc.textSecondary)
+                        }
+                        Switch(
+                            checked = uiState.includeNonBasicLands,
+                            onCheckedChange = { onToggleIncludeNonBasicLands() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = mc.onAccent,
+                                checkedTrackColor = mc.primaryAccent,
+                                uncheckedThumbColor = mc.textDisabled,
+                                uncheckedTrackColor = mc.surfaceVariant,
+                            ),
+                        )
+                    }
                 }
             }
 

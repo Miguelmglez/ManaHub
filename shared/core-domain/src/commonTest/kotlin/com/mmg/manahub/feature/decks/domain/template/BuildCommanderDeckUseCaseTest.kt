@@ -236,6 +236,70 @@ class BuildCommanderDeckUseCaseTest {
         )
         assertEquals(originalAnalysis, rebuiltAnalysis, "round_trip_identity: full DeckAnalysis must match, not just totalScore")
     }
+
+    // ── R12/E13 (Deck Wizard Commander v4, W5.3) -- basics are unlimited, never gated by ownership ──
+    /**
+     * The literal acceptance test named in the v4 plan (§4 W5.3) and the campaign brief: an
+     * `ownedCollection` with the commander + a real non-land pool but ZERO basic-land copies on
+     * hand must still reach a full 100-card deck with a correct, non-degenerate basic-land spread,
+     * and never report a `ColorSourceShortage`/`UnfixedSplash` for an OWNERSHIP reason.
+     *
+     * [BuildCommanderDeckUseCase] is pure `commonMain` with NO `CardRepository` (D7/R5 -- see this
+     * file's own header comment) -- it cannot itself fetch a real [Card] the collection has never
+     * seen. The production guarantee that a real basic-land [Card] object always exists in
+     * `ownedCollection` by the time this use case runs is [com.mmg.manahub.feature.decks
+     * .presentation.wizard.DeckWizardViewModel.guaranteeBasicsAvailable] (Android, tested at the VM
+     * layer in `DeckWizardViewModelTest`'s W0_2/W5_3 cases). This test exercises the OTHER half of
+     * the R12 guarantee, the half this pure engine test CAN prove: basic-land placement must never
+     * be gated by OWNED QUANTITY -- a basic [OwnedCard] at quantity 0 (a real Card object the app
+     * knows about, but the collection reports zero actual copies of -- exactly what a genuinely
+     * unscanned-basics collection looks like once the VM boundary above has run) must still be
+     * placed in full, unlimited quantity. [resolveBasicCard]/[fillLandsV2]'s Stage B never consult
+     * [OwnedCard.quantity] for a basic (only its `.card`), so this is the correct, safe way to prove
+     * the R12 rule at this layer without inventing a synthetic scryfallId (which would violate the
+     * collection-only architecture and could corrupt a real persisted deck's card references).
+     */
+    @Test
+    fun `R12 -- a collection with ZERO owned basic-land copies still reaches 100 cards with a correct spread and no ownership-driven shortage`() = runTest {
+        val useCase = newUseCase()
+        val fixture = MockCollectionRich.targetFixtures.first { fx -> fx.mainboard.any { it.card.scryfallId == "cmd-edgar-markov" } }
+        val commander = fixture.mainboard.first { it.card.scryfallId == "cmd-edgar-markov" }.card
+        val identity = commander.colorIdentity.toManaColors()
+        val zeroQtyBasics = identity.mapNotNull { color ->
+            val name = com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator.LAND_FOR_COLOR[color.symbol] ?: return@mapNotNull null
+            OwnedCard(
+                com.mmg.manahub.feature.decks.domain.engine.card(
+                    id = "r12-zero-qty-$name", name = name, typeLine = "Basic Land — $name",
+                    cmc = 0.0, colors = emptyList(), colorIdentity = listOf(color.symbol),
+                ),
+                quantity = 0,
+            )
+        }
+        val owned = ownedFrom(MockCollectionRich.ownedCards) + zeroQtyBasics
+
+        val outcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, identity, owned)
+
+        assertEquals(100, outcome.result.entries.sumOf { it.quantity }, "a zero-owned-basics collection must still reach exactly 100 cards")
+        val landEntries = outcome.result.entries.filter { com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator.isLand(it.card) }
+        assertTrue(landEntries.sumOf { it.quantity } > 0, "basics must actually be placed despite zero owned quantity")
+        assertTrue(
+            landEntries.all { com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator.isBasicLand(it.card) },
+            "no non-basic land was owned in this fixture -- every placed land must be a basic",
+        )
+
+        val shortageFindings = outcome.result.analysis.pillars.flatMap { it.findings }
+            .filter { it is com.mmg.manahub.feature.decks.domain.engine.Finding.ColorSourceShortage || it is com.mmg.manahub.feature.decks.domain.engine.Finding.UnfixedSplash }
+        assertTrue(shortageFindings.isEmpty(), "zero owned basic quantity must never cause an ownership-driven mana-base shortage: $shortageFindings")
+
+        // NOTE: gapSections legitimately CAN report an unrelated role gap here (e.g. "role:mana_fix",
+        // a mana-ROCK/creature role -- MockCollectionRich's shared 150-distractor pool is not sized
+        // per-commander and can genuinely lack enough fixing artifacts for Edgar specifically; this
+        // is a real content gap, orthogonal to R12) -- the R12-specific claim is narrower and already
+        // covered above: no ownership-driven COLOR SOURCE shortage/splash finding, and the full land
+        // count is reached. Asserting on gapSections generically here would conflate "the wizard
+        // built a complete, correctly-fixed mana base" (R12's actual promise) with "the shared mock
+        // pool happens to contain enough mana rocks for this one commander" (unrelated to this fix).
+    }
 }
 
 private fun List<String>.toManaColors(): Set<ManaColor> =

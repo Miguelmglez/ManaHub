@@ -91,15 +91,20 @@ object CommanderMatrixV2 {
         val identity = spec.commander.colorIdentity.toManaColors()
         val useCase1 = newBuildUseCase()
         val started = System.currentTimeMillis()
+        // W5.2 (G10/R8/E10): the wizard's UI default is OFF, but this real-collection corpus segment
+        // is exercising the FULL land engine (including a real collection's owned non-basic lands,
+        // e.g. duals/fetches) -- explicit `true` preserves the pre-W5.2 always-on Stage A behaviour
+        // so this corpus's byte-identical guarantee holds; it is not a claim about the wizard's
+        // presented default.
         val outcome = runCatching {
-            useCase1(DeckFormat.COMMANDER, spec.commander, spec.pick, identity, owned)
+            useCase1(DeckFormat.COMMANDER, spec.commander, spec.pick, identity, owned, includeNonBasicLands = true)
         }.getOrElse { t ->
             return HarnessMetricsV2Calculator.forFailedBuild(spec.label, spec.commander.name, spec.strategySource, t.message ?: t.toString())
         }
         val runtimeMs = System.currentTimeMillis() - started
 
         val secondOutcome = runCatching {
-            newBuildUseCase()(DeckFormat.COMMANDER, spec.commander, spec.pick, identity, owned)
+            newBuildUseCase()(DeckFormat.COMMANDER, spec.commander, spec.pick, identity, owned, includeNonBasicLands = true)
         }.getOrNull()
 
         val roundTrip = runCatching {

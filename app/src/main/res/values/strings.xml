@@ -1250,6 +1250,9 @@
     <string name="deck_wizard_commander_expectation_copy">Built only from your collection — any gaps are reported, never filled with weak cards.</string>
     <string name="deck_wizard_fill_lands_title">Fill basic lands automatically</string>
     <string name="deck_wizard_fill_lands_subtitle">Color-weighted from the final mana curve</string>
+    <!-- Deck Wizard Commander v4 plan (W5.2, G10/R8) -->
+    <string name="deck_wizard_include_nonbasic_lands_title">Include non-basic lands</string>
+    <string name="deck_wizard_include_nonbasic_lands_subtitle">On: draws your owned dual/utility lands, balanced against basics. Off: basics only.</string>
     <string name="deck_wizard_use_community_data_title">Also use community trends</string>
     <string name="deck_wizard_use_community_data_subtitle">Prioritize your owned cards that are popular in similar decks</string>
     <string name="deck_wizard_expectation_copy">This is a deeper build — we compare community-known decks against your collection, so it can take a little longer than the old builder.</string>

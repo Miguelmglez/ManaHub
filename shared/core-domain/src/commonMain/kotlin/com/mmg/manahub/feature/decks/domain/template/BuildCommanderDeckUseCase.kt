@@ -55,6 +55,12 @@ class BuildCommanderDeckUseCase(
      * @param ownedCollection the caller's full owned pool (commander + basics + everything else) —
      *        this class does its own filtering (legality, identity, dedupe); pass the raw owned set.
      * @param manualAdds D7/R5: the ONLY unowned cards that can enter the build; always kept.
+     * @param fillLands whether the land engine runs at all (basics are unconditional once it does —
+     *        R12; `false` is a test-only escape hatch to inspect the pre-land-fill non-land board).
+     * @param includeNonBasicLands R8/E10: gates ONLY Stage A (owned non-basic lands) of
+     *        [fillLandsV2] — basics (Stage B) always run when [fillLands] is true, regardless of
+     *        this flag. Default `false`: "Include non-basic lands", off by default per the product
+     *        decision (G10).
      * @param onStage Deck Wizard Commander v3 plan, Phase 6 (6.3) — fired at each build-loop stage
      *        boundary so a caller (the wizard VM) can drive a real Generating-step progress UI.
      *        Defaulted to a no-op so every pre-existing call site/test keeps compiling unchanged.
@@ -69,6 +75,7 @@ class BuildCommanderDeckUseCase(
         ownedCollection: List<OwnedCard>,
         manualAdds: List<ManualAdd> = emptyList(),
         fillLands: Boolean = true,
+        includeNonBasicLands: Boolean = false,
         onStage: (CommanderBuildStage) -> Unit = {},
     ): CommanderBuildOutcome {
         require(format.isCommanderFormat) { "BuildCommanderDeckUseCase requires a Commander-shaped format, got $format" }
@@ -182,6 +189,7 @@ class BuildCommanderDeckUseCase(
                 ownedCollection = ownedCollection,
                 usedNames = (manualNonLand.map { it.card.name } + manualLand.map { it.card.name } + placedNonLand.map { it.card.name }).toMutableSet(),
                 archetypeFormat = archetypeFormat,
+                includeNonBasicLands = includeNonBasicLands,
             )
         }
 
@@ -367,8 +375,9 @@ class BuildCommanderDeckUseCase(
         return RefineResult(current, swaps)
     }
 
-    /** Owned non-basic lands (Stage A) -> commander+mainboard-weighted basics (Stage B) -> a
-     * bounded Karsten rebalance (Stage C, ≤ [KARSTEN_REBALANCE_CAP] moves) — D10, fixes F9. */
+    /** Owned non-basic lands (Stage A, gated on [includeNonBasicLands] — R8/E10) -> commander+
+     * mainboard-weighted basics (Stage B, always runs — R12) -> a bounded Karsten rebalance
+     * (Stage C, ≤ [KARSTEN_REBALANCE_CAP] moves) — D10, fixes F9. */
     private fun fillLandsV2(
         identity: Set<ManaColor>,
         colorCount: Int,
@@ -379,58 +388,63 @@ class BuildCommanderDeckUseCase(
         ownedCollection: List<OwnedCard>,
         usedNames: MutableSet<String>,
         archetypeFormat: ArchetypeFormat,
+        includeNonBasicLands: Boolean,
     ): List<DeckEntry> {
         val identitySymbols = identity.map { it.symbol }.toSet()
         val placed = mutableListOf<DeckEntry>()
-
-        // ── Stage A: owned non-basic lands within identity ─────────────────────────────────────
-        val mix = ArchetypeData.landMixFor(archetypeFormat, colorCount)
-        val nonBasicCap = ((1.0 - (mix.basicsRatio.start + mix.basicsRatio.endInclusive) / 2.0) * landTarget)
-            .let { kotlin.math.round(it).toInt() }
-            .coerceIn(0, remainingLandSlots)
-
-        val ownedNonBasics = ownedCollection.map { it.card }
-            .filter { BasicLandCalculator.isLand(it) && !BasicLandCalculator.isBasicLand(it) }
-            .filter { identitySymbols.containsAll(it.colorIdentity) }
-            .filter { it.name !in usedNames }
-            .distinctBy { it.name }
-
         val intensity = manaBaseAnalyzer.maxSinglePipIntensity(nonLandMainboard + DeckEntry(commander, 1, true, false))
         val sources = mutableMapOf<ManaColor, Int>()
-        val colorProducers = ownedNonBasics
-            .map { card -> card to manaBaseAnalyzer.producedColors(card, identity).intersect(identitySymbolsToColors(identitySymbols)) }
-            .filter { it.second.isNotEmpty() }
-            .sortedWith(
-                compareByDescending<Pair<Card, Set<ManaColor>>> { (_, colors) ->
-                    colors.sumOf { c -> (intensity[c] ?: 0).let { need -> (need - (sources[c] ?: 0)).coerceAtLeast(0) } }
-                }.thenBy { it.first.name }.thenBy { it.first.scryfallId }
-            )
 
-        var remaining = nonBasicCap
-        for ((card, colors) in colorProducers) {
-            if (remaining <= 0) break
-            if (card.name in usedNames) continue
-            usedNames += card.name
-            placed += DeckEntry(card, 1, true, false)
-            colors.forEach { c -> sources[c] = (sources[c] ?: 0) + 1 }
-            remaining--
-        }
-        // Colourless / rainbow utility lands only fill LEFTOVER Stage-A budget after every colour
-        // deficit above has had first claim (plan 2.4: "colourless utility lands allowed only
-        // while sources stay >= need for every colour" — approximated as "only once colour fixing
-        // has already had priority for the whole Stage-A cap").
-        val utilityLands = ownedNonBasics
-            .filter { it !in colorProducers.map { pair -> pair.first } }
-            .filter { ArchetypeRoleClassifier.classify(it).isNotEmpty() }
-            .sortedWith(compareBy<Card> { it.name }.thenBy { it.scryfallId })
-        for (card in utilityLands) {
-            if (remaining <= 0) break
-            if (card.name in usedNames) continue
-            val stillShort = intensity.any { (c, need) -> need > (sources[c] ?: 0) }
-            if (stillShort) continue
-            usedNames += card.name
-            placed += DeckEntry(card, 1, true, false)
-            remaining--
+        // ── Stage A: owned non-basic lands within identity — OFF by default (R8), skipped straight
+        //    to Stage B/basics when includeNonBasicLands is false; remainingLandSlots is unchanged,
+        //    basics simply absorb every slot Stage A would have used. ─────────────────────────────
+        if (includeNonBasicLands) {
+            val mix = ArchetypeData.landMixFor(archetypeFormat, colorCount)
+            val nonBasicCap = ((1.0 - (mix.basicsRatio.start + mix.basicsRatio.endInclusive) / 2.0) * landTarget)
+                .let { kotlin.math.round(it).toInt() }
+                .coerceIn(0, remainingLandSlots)
+
+            val ownedNonBasics = ownedCollection.map { it.card }
+                .filter { BasicLandCalculator.isLand(it) && !BasicLandCalculator.isBasicLand(it) }
+                .filter { identitySymbols.containsAll(it.colorIdentity) }
+                .filter { it.name !in usedNames }
+                .distinctBy { it.name }
+
+            val colorProducers = ownedNonBasics
+                .map { card -> card to manaBaseAnalyzer.producedColors(card, identity).intersect(identitySymbolsToColors(identitySymbols)) }
+                .filter { it.second.isNotEmpty() }
+                .sortedWith(
+                    compareByDescending<Pair<Card, Set<ManaColor>>> { (_, colors) ->
+                        colors.sumOf { c -> (intensity[c] ?: 0).let { need -> (need - (sources[c] ?: 0)).coerceAtLeast(0) } }
+                    }.thenBy { it.first.name }.thenBy { it.first.scryfallId }
+                )
+
+            var remaining = nonBasicCap
+            for ((card, colors) in colorProducers) {
+                if (remaining <= 0) break
+                if (card.name in usedNames) continue
+                usedNames += card.name
+                placed += DeckEntry(card, 1, true, false)
+                colors.forEach { c -> sources[c] = (sources[c] ?: 0) + 1 }
+                remaining--
+            }
+            // Colourless / rainbow utility lands only fill LEFTOVER Stage-A budget after every colour
+            // deficit above has had first claim (plan 2.4: "colourless utility lands allowed only
+            // while sources stay >= need for every colour" — approximated as "only once colour fixing
+            // has already had priority for the whole Stage-A cap").
+            val utilityLands = ownedNonBasics
+                .filter { it !in colorProducers.map { pair -> pair.first } }
+                .filter { ArchetypeRoleClassifier.classify(it).isNotEmpty() }
+                .sortedWith(compareBy<Card> { it.name }.thenBy { it.scryfallId })
+            for (card in utilityLands) {
+                if (remaining <= 0) break
+                if (card.name in usedNames) continue
+                val stillShort = intensity.any { (c, need) -> need > (sources[c] ?: 0) }
+                if (stillShort) continue
+                usedNames += card.name
+                placed += DeckEntry(card, 1, true, false)
+                remaining--
+            }
         }
 
         // ── Stage B: basics, commander pips included, Phyrexian excluded (F9) ──────────────────
@@ -449,8 +463,7 @@ class BuildCommanderDeckUseCase(
             basics.forEach { (name, qty) -> sources[nameToColor(name)] = (sources[nameToColor(name)] ?: 0) + qty }
             placed += basics.mapNotNull { (name, qty) ->
                 if (qty <= 0) return@mapNotNull null
-                val card = ownedCollection.map { it.card }.firstOrNull { it.name == name }
-                    ?: return@mapNotNull null
+                val card = resolveBasicCard(name, ownedCollection) ?: return@mapNotNull null
                 DeckEntry(card, qty, true, false)
             }
         }
@@ -484,10 +497,38 @@ class BuildCommanderDeckUseCase(
             "Wastes" to distribution.wastes,
         )
 
+    /**
+     * R12/E13: the ONE lookup for "the [Card] object backing basic-land [name]" — used by both
+     * Stage B's materialization and Stage C's rebalance, replacing two independent copies. Basics
+     * are documented as an unlimited resource (never gated by ownership): the VM boundary
+     * ([com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardViewModel
+     * .guaranteeBasicsAvailable]) is responsible for making sure every WUBRG/Wastes basic the
+     * identity needs has a real [Card] object in [ownedCollection] BEFORE this use case ever runs,
+     * so a `null` here should be unreachable in production. If it ever IS null (a boundary
+     * regression, an offline fetch failure that degraded silently, or a `commonTest` fixture that
+     * doesn't stub every basic), this returns `null` defensively (matches the pre-existing
+     * drop-this-allocation behavior — never a crash) and records a non-fatal breadcrumb so the
+     * regression is observable instead of silently re-dropping basics again.
+     */
+    private fun resolveBasicCard(name: String, ownedCollection: List<OwnedCard>): Card? {
+        val card = ownedCollection.map { it.card }.firstOrNull { it.name == name }
+        if (card == null) {
+            crashReporter.log("deck_wizard_basic_land_unresolved")
+            crashReporter.recordException(
+                IllegalStateException("[BuildCommanderDeckUseCase] resolveBasicCard: '$name' missing from ownedCollection -- R12 says this should be unreachable (the VM boundary should have guaranteed it)"),
+            )
+        }
+        return card
+    }
+
     /** Stage C (D10): moves up to [KARSTEN_REBALANCE_CAP] basic-land copies from the
      * MOST-oversupplied colour to the MOST-undersupplied one, mutating [placed]/[sources] in
      * place. Stops early once no colour is short of [ManaBaseAnalyzer.requiredSources]. Never
-     * touches non-basic entries (Stage A already resolved those against the same [intensity]). */
+     * touches non-basic entries (Stage A already resolved those against the same [intensity]).
+     * R12/E13: a missing [resolveBasicCard] for the SHORT colour skips only that move
+     * (`return@repeat`) rather than aborting rebalancing for every OTHER colour — this should be
+     * unreachable in production (see [resolveBasicCard]'s own KDoc) but stays defensive against a
+     * partial-fetch failure rather than compounding it into a total rebalance abort. */
     private fun rebalance(
         placed: MutableList<DeckEntry>,
         sources: MutableMap<ManaColor, Int>,
@@ -512,7 +553,7 @@ class BuildCommanderDeckUseCase(
             val shortBasicName = BasicLandCalculator.LAND_FOR_COLOR[shortColor.symbol] ?: return
             val excessEntryIndex = placed.indexOfFirst { it.card.name == excessBasicName && BasicLandCalculator.isBasicLand(it.card) && it.quantity > 0 }
             if (excessEntryIndex < 0) return
-            val shortCard = ownedCollection.map { it.card }.firstOrNull { it.name == shortBasicName } ?: return
+            val shortCard = resolveBasicCard(shortBasicName, ownedCollection) ?: return@repeat
 
             val excessEntry = placed[excessEntryIndex]
             placed[excessEntryIndex] = excessEntry.copy(quantity = excessEntry.quantity - 1)

@@ -82,6 +82,89 @@ class LandFillV2Test {
         assertTrue(findings.isEmpty(), "mono-colour deck with unlimited owned Plains must clear Karsten: $findings")
     }
 
+    // ── W5.2 (G10/R8/E10): default is OFF -- Stage A never fires unless explicitly requested ──────
+    @Test
+    fun `includeNonBasicLands defaults to OFF -- owned duals are never drawn without the caller opting in`() = runTest {
+        val useCase = newUseCase()
+        val commander = card(id = "cmd-default-off", name = "Default Off Commander", typeLine = "Legendary Creature", cmc = 2.0, colors = listOf("W", "U"), colorIdentity = listOf("W", "U"), manaCost = "{1}{W}{U}")
+        val owned = listOf(
+            OwnedCard(commander, 1),
+            basic("Plains", "W", "basic-plains-off"),
+            basic("Island", "U", "basic-island-off"),
+            dual("dual-wu-off-1", "Hallowed Fountain", listOf("W", "U")),
+            dual("dual-wu-off-2", "Tundra", listOf("W", "U")),
+        )
+
+        // No includeNonBasicLands arg passed -- exercises the DEFAULT, not an explicit false.
+        val outcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, setOf(ManaColor.W, ManaColor.U), owned)
+
+        val landEntries = outcome.result.entries.filter { BasicLandCalculator.isLand(it.card) }
+        assertTrue(landEntries.isNotEmpty(), "sanity: some lands must be placed")
+        assertTrue(
+            landEntries.all { BasicLandCalculator.isBasicLand(it.card) },
+            "the default (OFF) must place ONLY basics -- owned duals must never be drawn without opting in, got ${landEntries.map { it.card.name }}",
+        )
+    }
+
+    // ── W5.2 parity: the wizard's OFF-mode basic split is BasicLandCalculator.calculateFromPips's
+    //    own output for the same mainboard -- literally the same function, same inputs (E10's "one
+    //    land calculation, shared"). Mono-colour so Stage C's Karsten rebalance has no second colour
+    //    to move a copy from/to and can never perturb Stage B's raw distribution -- this isolates
+    //    the parity claim from Stage C's own (correct, but separate) refinement. ────────────────────
+    @Test
+    fun `W5_2 -- OFF mode basic distribution equals BasicLandCalculator's independent calculateFromPips for the same mainboard`() = runTest {
+        val useCase = newUseCase()
+        val commander = card(id = "cmd-parity-mono", name = "Parity Mono Commander", typeLine = "Legendary Creature", cmc = 2.0, colors = listOf("W"), colorIdentity = listOf("W"), manaCost = "{1}{W}{W}")
+        val owned = listOf(OwnedCard(commander, 1), basic("Plains", "W", "basic-plains-parity"))
+
+        val outcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, setOf(ManaColor.W), owned, includeNonBasicLands = false)
+
+        val landEntries = outcome.result.entries.filter { BasicLandCalculator.isLand(it.card) }
+        assertTrue(
+            landEntries.all { BasicLandCalculator.isBasicLand(it.card) },
+            "OFF mode must place ONLY basics, got ${landEntries.map { it.card.name }}",
+        )
+
+        // Independent recompute: the SAME function, same inputs the wizard's own Stage B used
+        // (commander-only pips, no non-basic lands, the ACTUAL land count the wizard placed).
+        val manaBaseAnalyzer = com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer()
+        val pipsByColor = manaBaseAnalyzer.pipDistribution(
+            listOf(com.mmg.manahub.feature.decks.domain.engine.DeckEntry(commander, 1, isOwned = true)),
+        ).entries.associate { (color, count) -> color.symbol to count }
+        val totalLandTarget = landEntries.sumOf { it.quantity }
+        val expected = BasicLandCalculator.calculateFromPips(
+            pipsByColor = pipsByColor,
+            nonBasicLands = emptyList(),
+            totalLandTarget = totalLandTarget,
+            commanderIdentity = setOf("W"),
+        )
+
+        val actualPlains = landEntries.filter { it.card.name == "Plains" }.sumOf { it.quantity }
+        assertEquals(expected.plains, actualPlains, "the wizard's OFF-mode Plains count must equal BasicLandCalculator.calculateFromPips' own independent output for the same mainboard")
+    }
+
+    // ── W5.2 ON mode: Stage A draws owned non-basics WITHOUT starving basics ───────────────────────
+    @Test
+    fun `includeNonBasicLands ON draws owned duals while basics still form the backbone`() = runTest {
+        val useCase = newUseCase()
+        val commander = card(id = "cmd-on-backbone", name = "On Backbone Commander", typeLine = "Legendary Creature", cmc = 2.0, colors = listOf("W", "U"), colorIdentity = listOf("W", "U"), manaCost = "{1}{W}{U}")
+        val owned = listOf(
+            OwnedCard(commander, 1),
+            basic("Plains", "W", "basic-plains-backbone"),
+            basic("Island", "U", "basic-island-backbone"),
+            dual("dual-wu-backbone-1", "Hallowed Fountain", listOf("W", "U")),
+            dual("dual-wu-backbone-2", "Tundra", listOf("W", "U")),
+        )
+
+        val outcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, setOf(ManaColor.W, ManaColor.U), owned, includeNonBasicLands = true)
+
+        val landEntries = outcome.result.entries.filter { BasicLandCalculator.isLand(it.card) }
+        val basicCount = landEntries.filter { BasicLandCalculator.isBasicLand(it.card) }.sumOf { it.quantity }
+        val nonBasicCount = landEntries.filterNot { BasicLandCalculator.isBasicLand(it.card) }.sumOf { it.quantity }
+        assertTrue(nonBasicCount > 0, "ON mode must actually draw the owned duals (Stage A must fire)")
+        assertTrue(basicCount > nonBasicCount, "basics must still form the backbone, not be starved by non-basics -- basics=$basicCount nonBasics=$nonBasicCount")
+    }
+
     // ── 2-colour: a couple of owned dual lands on top of basics ─────────────────────────────────
     @Test
     fun `two-colour identity -- zero shortage findings when owned duals plus basics can satisfy Karsten need`() = runTest {
@@ -96,7 +179,7 @@ class LandFillV2Test {
             dual("dual-wu-3", "Adarkar Wastes", listOf("W", "U")),
         )
 
-        val outcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, setOf(ManaColor.W, ManaColor.U), owned)
+        val outcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, setOf(ManaColor.W, ManaColor.U), owned, includeNonBasicLands = true)
 
         val findings = shortages(outcome.result.analysis.pillars.flatMap { it.findings })
         assertTrue(findings.isEmpty(), "2-colour deck with owned WU duals + basics must clear Karsten: $findings")
@@ -126,7 +209,7 @@ class LandFillV2Test {
             rainbow("rainbow-3c-3", "City of Brass", listOf("W", "U", "B")),
         ) + (4..10).map { i -> rainbow("rainbow-3c-$i", "Rainbow Land $i", listOf("W", "U", "B")) }
 
-        val outcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, setOf(ManaColor.W, ManaColor.U, ManaColor.B), owned)
+        val outcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, setOf(ManaColor.W, ManaColor.U, ManaColor.B), owned, includeNonBasicLands = true)
 
         val findings = shortages(outcome.result.analysis.pillars.flatMap { it.findings })
         assertTrue(findings.isEmpty(), "3-colour deck with owned duals/rainbow lands + basics must clear Karsten: $findings")
@@ -144,7 +227,7 @@ class LandFillV2Test {
             symbols.mapIndexed { i, s -> basic(BasicLandCalculator.LAND_FOR_COLOR.getValue(s), s, "basic-5c-$i") } +
             rainbowLands
 
-        val outcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, symbols.map { ManaColor.entries.first { c -> c.symbol == it } }.toSet(), owned)
+        val outcome = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, symbols.map { ManaColor.entries.first { c -> c.symbol == it } }.toSet(), owned, includeNonBasicLands = true)
 
         val findings = shortages(outcome.result.analysis.pillars.flatMap { it.findings })
         assertTrue(findings.isEmpty(), "5-colour deck with 20 owned rainbow lands + basics must clear Karsten: $findings")

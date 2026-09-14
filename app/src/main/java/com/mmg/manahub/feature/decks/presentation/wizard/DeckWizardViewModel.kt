@@ -342,7 +342,16 @@ data class DeckWizardUiState(
     val selectedThemeHint: String? = null,
 
     // ── Step 4 — Review ────────────────────────────────────────────────────────
+    /** Casual-only (D7's escape hatch, legacy [BuildDeckFromTemplateUseCase] all-or-nothing land
+     * fill). Kept separate from [includeNonBasicLands] deliberately (Deck Wizard Commander v4,
+     * W5.2): the two toggles have different defaults and different meanings, and sharing one field
+     * would have silently flipped Casual's default the moment Commander's got renamed. */
     val fillLands: Boolean = true,
+    /** Commander-only (R8/E10, Deck Wizard Commander v4 W5.2) — gates ONLY Stage A (owned
+     * non-basic lands) of [com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase]'s
+     * land fill; basics (Stage B) always run regardless, per R12. Default OFF: G10 found the OLD
+     * all-or-nothing toggle under-filling real builds. */
+    val includeNonBasicLands: Boolean = false,
     /** Deck Engine Unification plan (§5 Phase 3.5) — the shared source step. Motor B only ever
      * re-ranks OWNED cards by community popularity (never pulls in unowned cards), so this is a
      * plain on/off "also use community trends" toggle rather than a 3-way collection/community/both
@@ -394,8 +403,9 @@ data class DeckWizardUiState(
  * and (pre-fix) [BuildDeckFromTemplateUseCase]'s seed-tag inference.
  *
  * Every field here represents "one Direction/Identity/Review-step attempt" scratch state, NOT a
- * session-level preference — [DeckWizardUiState.useCommunityData]/[DeckWizardUiState.fillLands]
- * are deliberately excluded (legitimate across a format/flow switch). [DeckWizardUiState.entryFlow]
+ * session-level preference — [DeckWizardUiState.useCommunityData]/[DeckWizardUiState.fillLands]/
+ * [DeckWizardUiState.includeNonBasicLands] are deliberately excluded (legitimate across a
+ * format/flow switch). [DeckWizardUiState.entryFlow]
  * is also excluded: both call sites ([DeckWizardViewModel.onSelectFormat]/[DeckWizardViewModel
  * .onSelectEntryFlow]) set it themselves right after calling this, to the value that call is
  * actually selecting.
@@ -1742,6 +1752,9 @@ class DeckWizardViewModel(
 
     fun onToggleFillLands() = _uiState.update { it.copy(fillLands = !it.fillLands) }
 
+    /** Commander-only (W5.2). Casual keeps [onToggleFillLands]/[DeckWizardUiState.fillLands]. */
+    fun onToggleIncludeNonBasicLands() = _uiState.update { it.copy(includeNonBasicLands = !it.includeNonBasicLands) }
+
     /** Deck Engine Unification plan (§5 Phase 3.5) — no-op when [DeckWizardUiState
      * .communityEngineAvailable] is false (the UI never renders the toggle in that case either; this
      * guard is the actual source of truth, mirrors [onSelectFormat]'s "never trust the UI-only
@@ -2012,13 +2025,12 @@ class DeckWizardViewModel(
         var ownedCollection = collectionSnapshot
             .groupBy { it.card.scryfallId }
             .map { (_, entries) -> OwnedCard(entries.first().card, entries.sumOf { entry -> entry.userCard.quantity }) }
-        // W0.2 (G10/E10): a real collection can legitimately own ZERO copies of some basic land
-        // type -- materializeBasics can only place a basic it finds a Card object for in
-        // ownedCollection, so without this a whole colour's worth of basics silently drops (the
-        // 94-card bug). Mirrors DeckStudioViewModel.applyLandSuggestions' own fetch-if-missing.
-        if (state.fillLands) {
-            ownedCollection = ensureBasicsAvailable(ownedCollection, identity)
-        }
+        // R12/E13 (Deck Wizard Commander v4, W5.3): basics are an unconditional, ownership-exempt
+        // resource -- this guarantee now runs UNCONDITIONALLY, never gated on the (Commander-only)
+        // includeNonBasicLands toggle, because BuildCommanderDeckUseCase's own fillLands arg is
+        // ALWAYS true for Commander below. Mirrors DeckStudioViewModel.applyLandSuggestions' own
+        // fetch-if-missing.
+        ownedCollection = guaranteeBasicsAvailable(ownedCollection, identity)
         // PLAN_SECTIONS' manual adds share DeckWizardUiState.seedCards with Flow A's seed picker --
         // see onAddSeed/isCommanderManualAddValid, which already gates identity/legality for a
         // Commander spec before a card can land in this list.
@@ -2034,7 +2046,10 @@ class DeckWizardViewModel(
                 identity = identity,
                 ownedCollection = ownedCollection,
                 manualAdds = manualAdds,
-                fillLands = state.fillLands,
+                // R12: basics are unconditional for Commander -- the land engine always runs;
+                // includeNonBasicLands (default OFF, W5.2) gates ONLY Stage A's owned non-basics.
+                fillLands = true,
+                includeNonBasicLands = state.includeNonBasicLands,
                 onStage = { stage ->
                     _uiState.update { s ->
                         s.copy(
@@ -2093,15 +2108,22 @@ class DeckWizardViewModel(
     }
 
     /**
-     * W0.2 (G10/E10): synthesizes [OwnedCard] entries for whichever WUBRG basics (or Wastes, for a
-     * colourless identity) [ownedCollection] has zero Card object for, fetched via [cardRepository]
-     * exactly as [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
-     * .applyLandSuggestions] already does for the same reason -- basics are a commodity Studio
-     * treats as always-obtainable regardless of the collection's real owned quantity. A fetch
-     * failure (offline, unstubbed test double) is swallowed: the caller then simply sees the SAME
-     * gap it would have seen before this fix, never a crash.
+     * R12/E13 (Deck Wizard Commander v4, W5.3 -- originally W0.2/G10/E10's symptom fix, now
+     * documented as the RULE it stands in for): basic lands are an unconditional, unlimited
+     * resource the wizard may always place, regardless of collection ownership. Synthesizes
+     * [OwnedCard] entries for whichever WUBRG basics (or Wastes, for a colourless identity)
+     * [ownedCollection] has zero real [com.mmg.manahub.core.model.Card] object for, fetched via
+     * [cardRepository] exactly as [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
+     * .applyLandSuggestions] already does for the same reason. This is the ONE authoritative
+     * boundary guarantee that makes [com.mmg.manahub.feature.decks.domain.template
+     * .BuildCommanderDeckUseCase.resolveBasicCard]'s `null` case unreachable in production --
+     * called UNCONDITIONALLY (never gated on any land toggle), because R12 says basics are always
+     * available whether or not the "Include non-basic lands" toggle is on. A fetch failure
+     * (offline, unstubbed test double) is swallowed: the caller then simply sees the SAME gap it
+     * would have seen before this fix, never a crash (and the use case's own defensive breadcrumb
+     * fires as a second observability layer if that gap ever reaches the engine).
      */
-    private suspend fun ensureBasicsAvailable(ownedCollection: List<OwnedCard>, identity: Set<ManaColor>): List<OwnedCard> {
+    private suspend fun guaranteeBasicsAvailable(ownedCollection: List<OwnedCard>, identity: Set<ManaColor>): List<OwnedCard> {
         val neededNames = if (identity.isEmpty()) {
             setOf("Wastes")
         } else {

@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
+// COMMENTS_REVIEWED: 2026-09-10
 
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
@@ -114,8 +115,8 @@ class DeckWizardViewModelTest {
     // (replaceAllCardsWithSource/updateArchetypeOverride/etc.) still exercise real behavior against
     // the mocked deckRepository above.
     private val buildCommanderDeckUseCase = spyk(BuildCommanderDeckUseCase(deckAnalysisPipeline, crashReporter))
-    // Deck Wizard v4, W0.2 -- relaxed: no existing test exercises the basic-land pre-warm path
-    // directly, and an unstubbed call is swallowed by ensureBasicsAvailable's own runCatching, so
+    // Deck Wizard v4, W0.2/W5.3 -- relaxed: no existing test exercises the basic-land pre-warm path
+    // directly, and an unstubbed call is swallowed by guaranteeBasicsAvailable's own runCatching, so
     // this only needs to exist, never to be configured.
     private val cardRepository = mockk<CardRepository>(relaxed = true)
 
@@ -1369,7 +1370,7 @@ class DeckWizardViewModelTest {
         // and verifies the VM's OWN wiring (persist() is real -- see buildCommanderDeckUseCase's
         // spyk() construction above -- so the assertions below still exercise the real write path).
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any())
         } returns commanderOutcome()
         val vm = viewModel()
         advanceUntilIdle()
@@ -1415,7 +1416,7 @@ class DeckWizardViewModelTest {
             DeckEntry(card = card(id = "spell-$i", name = "Spell $i"), quantity = 1, isOwned = true)
         }
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any())
         } returns commanderOutcome(entries = listOf(DeckEntry(card = commander, quantity = 1, isOwned = true, isSideboard = false)) + ninetyNineEntries)
         val vm = viewModel()
         advanceUntilIdle()
@@ -1448,7 +1449,7 @@ class DeckWizardViewModelTest {
         coEvery { cardRepository.searchCardByName("Forest") } returns DataResult.Success(forest)
         val ownedCollectionSlot = slot<List<OwnedCard>>()
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), capture(ownedCollectionSlot), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), any(), any(), capture(ownedCollectionSlot), any(), any(), any(), any())
         } returns commanderOutcome()
         val vm = viewModel()
         advanceUntilIdle()
@@ -1464,6 +1465,39 @@ class DeckWizardViewModelTest {
 
         assertTrue(
             "a Commander build must pre-warm a real Forest Card object even though the collection owns zero, got ${ownedCollectionSlot.captured.map { it.card.name }}",
+            ownedCollectionSlot.captured.any { it.card.name == "Forest" },
+        )
+    }
+
+    @Test
+    fun `W5_3 -- the 94-card bug fix still applies with includeNonBasicLands toggled ON`() = runTest(dispatcher) {
+        // R12: guaranteeBasicsAvailable runs UNCONDITIONALLY (never gated on the Commander-only
+        // includeNonBasicLands toggle) -- this proves the pre-warm survives the toggle either way,
+        // not just at its default (OFF).
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val forest = card(id = "forest-real-2", name = "Forest", typeLine = "Basic Land — Forest", cmc = 0.0, colors = emptyList(), colorIdentity = listOf("G"))
+        coEvery { cardRepository.searchCardByName("Forest") } returns DataResult.Success(forest)
+        val ownedCollectionSlot = slot<List<OwnedCard>>()
+        val includeNonBasicLandsSlot = slot<Boolean>()
+        coEvery {
+            buildCommanderDeckUseCase(any(), any(), any(), any(), capture(ownedCollectionSlot), any(), any(), capture(includeNonBasicLandsSlot), any())
+        } returns commanderOutcome()
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        vm.onNextFromManualAdds()
+        vm.onToggleIncludeNonBasicLands()
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        assertTrue("the toggle must actually thread through as ON", includeNonBasicLandsSlot.captured)
+        assertTrue(
+            "the pre-warm must still fire with the toggle ON, got ${ownedCollectionSlot.captured.map { it.card.name }}",
             ownedCollectionSlot.captured.any { it.card.name == "Forest" },
         )
     }
@@ -2094,7 +2128,7 @@ class DeckWizardViewModelTest {
         val strategyPickSlot = slot<com.mmg.manahub.feature.decks.domain.engine.StrategyPick>()
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), capture(strategyPickSlot), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase(any(), any(), capture(strategyPickSlot), any(), any(), any(), any(), any(), any())
         } returns commanderOutcome()
         vm.onNextFromFormat()
         vm.onSelectCommander(commander)
