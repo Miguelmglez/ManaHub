@@ -378,14 +378,19 @@ class BuildCommanderDeckUseCase(
      * atomic transaction as before (W7 Task 2/E11: only WHEN it is called moved, to Choice-screen
      * resolution time, not the mechanism).
      *
-     * @param resolutions [RoleKey] -> the user's chosen replacement card ids for that group, in the
-     *        order they should fill [CommanderDraftBuild.tentativeByRole]'s slots for that role.
-     *        Ids outside the group's own [AmbiguityGroup.candidateIds], or beyond the number of
-     *        tentative slots the role actually has, are dropped defensively rather than applied —
-     *        every remaining tentative slot for a role keeps the engine's own default. An empty (or
-     *        partially-empty) map is exactly "let the wizard finish": every unresolved slot stays at
-     *        its seeded default, which is what makes this call byte-identical to the single-shot
-     *        [invoke] path when [resolutions] is empty.
+     * @param resolutions [RoleKey] -> the user's FINAL selection for that role: up to
+     *        `remainingSlots` ids drawn from [CommanderDraftBuild.tentativeByRole]'s own ids for that
+     *        role UNION the group's own [AmbiguityGroup.candidateIds] — i.e. "which cards should end
+     *        up occupying this role's swappable slots", not merely "which replacements to apply". An
+     *        id in the selection that already IS a tentative default for the role stays in its own
+     *        slot; a tentative default absent from the selection is replaced, one-for-one, by the
+     *        selection's chosen alternatives (an alternative is any selected id that is not itself a
+     *        tentative default). Selecting fewer than `remainingSlots` ids never shrinks the deck —
+     *        any tentative slot with no replacement to fill it keeps the engine's own default. An id
+     *        outside the tentative-∪-candidateIds union is dropped defensively rather than applied. An
+     *        empty (or partially-empty) map is exactly "let the wizard finish": every unresolved slot
+     *        stays at its seeded default, which is what makes this call byte-identical to the
+     *        single-shot [invoke] path when [resolutions] is empty.
      */
     suspend fun finalize(
         draft: CommanderDraftBuild,
@@ -399,10 +404,22 @@ class BuildCommanderDeckUseCase(
         resolutions.forEach { (role, chosenIds) ->
             val group = groupsByRole[role] ?: return@forEach
             val tentativeSlots = draft.tentativeByRole[role] ?: return@forEach
-            val validIds = chosenIds.filter { it in group.candidateIds }.take(tentativeSlots.size)
-            validIds.forEachIndexed { index, replacementId ->
+            val tentativeSlotSet = tentativeSlots.toSet()
+            val unionIds = tentativeSlotSet + group.candidateIds
+            // The user's final selection for this role, capped to how many swappable slots it
+            // actually has — an id outside tentative-∪-alternatives is dropped, never applied.
+            val selection = chosenIds.filter { it in unionIds }.distinct().take(tentativeSlots.size)
+            val selectionSet = selection.toSet()
+            // Tentative defaults the user did NOT keep, in their original slot order — these are the
+            // ONLY slots a replacement may land in (a kept default never moves).
+            val droppedSlots = tentativeSlots.filterNot { it in selectionSet }
+            // Selected ids that are not themselves a tentative default -- the alternatives the user
+            // actually chose, in the order they appeared in the resolution.
+            val newAlternativeIds = selection.filterNot { it in tentativeSlotSet }
+            droppedSlots.forEachIndexed { index, tentativeId ->
+                val replacementId = newAlternativeIds.getOrNull(index) ?: return@forEachIndexed
                 val replacement = draft.candidatesById[replacementId] ?: return@forEachIndexed
-                val slotIndex = placedNonLand.indexOfFirst { it.card.scryfallId == tentativeSlots[index] }
+                val slotIndex = placedNonLand.indexOfFirst { it.card.scryfallId == tentativeId }
                 if (slotIndex >= 0) {
                     placedNonLand[slotIndex] = DeckEntry(card = replacement, quantity = 1, isOwned = true, isSideboard = false)
                 }

@@ -155,6 +155,28 @@ class BuildCommanderDeckUseCaseFinalizeTest {
     }
 
     @Test
+    fun `keep-A-swap-B -- selecting one tentative default plus one alternative replaces only the DROPPED default`() = runTest {
+        val useCase = newUseCase()
+        val (commander, owned, manualAdds) = scarcityOwned()
+        val identity = setOf(ManaColor.G)
+
+        val draft = useCase.buildWithGroups(DeckFormat.COMMANDER, commander, StrategyPick.Custom, identity, owned, manualAdds = manualAdds, deckId = "finalize-keep-swap")
+        val group = draft.ambiguityGroups.first { it.remainingSlots >= 2 }
+        val tentativeDefaults = draft.tentativeByRole.getValue(group.sectionId)
+        val kept = tentativeDefaults[0]
+        val dropped = tentativeDefaults[1]
+        val replacement = group.candidateIds.first()
+
+        // The user explicitly KEEPS the first tentative default and swaps the second for `replacement`.
+        val outcome = useCase.finalize(draft, resolutions = mapOf(group.sectionId to listOf(kept, replacement)))
+        val resultIds = outcome.result.entries.map { it.card.scryfallId }.toSet()
+
+        assertTrue(kept in resultIds, "the tentative default the user explicitly kept must stay in the deck")
+        assertTrue(dropped !in resultIds, "the tentative default absent from the selection must be evicted")
+        assertTrue(replacement in resultIds, "the user's chosen alternative must replace the DROPPED default, not the kept one")
+    }
+
+    @Test
     fun `a resolution beyond the group's remainingSlots cap is clamped, never over-applied`() = runTest {
         val useCase = newUseCase()
         val (commander, owned, manualAdds) = scarcityOwned()
