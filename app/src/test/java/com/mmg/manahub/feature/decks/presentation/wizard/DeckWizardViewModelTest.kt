@@ -2631,8 +2631,39 @@ class DeckWizardViewModelTest {
         assertEquals(emptyList<String>(), vm.uiState.value.choiceSelections["removal_spot"])
     }
 
+    // W7 Fix 3 (E8) -- superseded the pre-fix `onToggleChoiceCard records a preference ONLY for an
+    // actively-selected alternative, never a kept default` test, which asserted recordPick fired
+    // the instant the user tapped an alternative. That was the defect: a tap the user later
+    // reversed, or made right before abandoning Choice, was ALREADY recorded as a preference by
+    // then. Preferences now record once, at successful-persist time, for exactly the alternatives
+    // in the FINAL resolution -- the 4 tests below cover select-then-deselect, select-then-abandon,
+    // a failed persist, and a genuinely successful resolution.
+
     @Test
-    fun `onToggleChoiceCard records a preference ONLY for an actively-selected alternative, never a kept default`() = runTest(dispatcher) {
+    fun `W7 Fix 3 -- selecting then deselecting an alternative before finishing records nothing`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns twoGroupChoiceDraft()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
+        val vm = viewModel()
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        vm.onToggleChoiceCard("removal_spot", "tent-1") // deselect the kept default
+        vm.onToggleChoiceCard("removal_spot", "alt-a") // actively choose an alternative
+        vm.onToggleChoiceCard("removal_spot", "alt-a") // then reverse the choice
+        vm.onToggleChoiceCard("removal_spot", "tent-1") // back to the kept default
+        vm.onFinishChoices()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { wizardPreferenceStore.recordPick(any()) }
+    }
+
+    @Test
+    fun `W7 Fix 3 -- selecting an alternative then abandoning Choice records nothing`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
             buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
@@ -2643,12 +2674,63 @@ class DeckWizardViewModelTest {
         vm.onGenerate()
         advanceUntilIdle()
 
-        vm.onToggleChoiceCard("removal_spot", "tent-1") // deselect the kept default
-        vm.onToggleChoiceCard("removal_spot", "alt-a") // actively choose an alternative
+        vm.onToggleChoiceCard("removal_spot", "tent-1")
+        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        vm.onBackPressed() // abandons Choice -- see onAbandonChoice's own KDoc
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { wizardPreferenceStore.recordPick(any()) }
+    }
+
+    @Test
+    fun `W7 Fix 3 -- a failed persist records nothing`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns twoGroupChoiceDraft()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
+        coEvery {
+            deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any())
+        } throws RuntimeException("persist boom")
+        val vm = viewModel()
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        vm.onToggleChoiceCard("removal_spot", "tent-1")
+        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        vm.onFinishChoices()
+        advanceUntilIdle()
+
+        assertEquals("TPL", vm.uiState.value.buildError)
+        coVerify(exactly = 0) { wizardPreferenceStore.recordPick(any()) }
+    }
+
+    @Test
+    fun `W7 Fix 3 -- a successful resolution records exactly the user-chosen alternatives, never tentative defaults`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns twoGroupChoiceDraft()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
+        val vm = viewModel()
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        // "removal_spot" -- the user swaps the default for an alternative (genuine pick).
+        vm.onToggleChoiceCard("removal_spot", "tent-1")
+        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        // "card_draw" is left untouched -- resolved by the engine's own tentative default, never a
+        // preference (mirrors "Choose the remaining N for me"/"Let the wizard finish" defaults).
+        vm.onFinishChoices()
         advanceUntilIdle()
 
         coVerify(exactly = 1) { wizardPreferenceStore.recordPick("alt-a") }
         coVerify(exactly = 0) { wizardPreferenceStore.recordPick("tent-1") }
+        coVerify(exactly = 0) { wizardPreferenceStore.recordPick("tent-2") }
     }
 
     @Test

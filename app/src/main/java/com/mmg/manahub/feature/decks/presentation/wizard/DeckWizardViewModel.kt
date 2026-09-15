@@ -2260,6 +2260,18 @@ class DeckWizardViewModel(
         isWritingCommanderDeck = false
         pendingFinalize = null // W7 Fix 2: only clear the resumable attempt on real success.
 
+        // W7 Fix 3 (E8): record a preference ONLY now -- for exactly the alternatives present in
+        // the FINAL resolution that persisted successfully, never a tentative default (kept,
+        // auto-filled via "Choose the remaining N for me", or defaulted by "Let the wizard
+        // finish"). A tap the user later reversed or abandoned never reaches this point at all.
+        val genuineAlternatives = resolutions.flatMap { (role, ids) ->
+            val tentative = draft.tentativeByRole[role].orEmpty()
+            ids.filterNot { it in tentative }
+        }
+        if (genuineAlternatives.isNotEmpty()) {
+            viewModelScope.launch { genuineAlternatives.forEach { wizardPreferenceStore.recordPick(it) } }
+        }
+
         crashlytics.log("deck_wizard_generate_succeeded")
         crashlytics.setCustomKey("deck_wizard_template_source", "COMMANDER_V3_ENGINE")
         logCommanderBuildTelemetry(state, strategyPick, draft.ownedCollection.size, outcome.result)
@@ -2285,10 +2297,10 @@ class DeckWizardViewModel(
      * on a not-yet-selected id; deselecting always frees a slot). A role absent from
      * [DeckWizardUiState.choiceSelections] displays -- and behaves as if pre-selected with -- its
      * own [CommanderDraftBuild.tentativeByRole] defaults (see that field's own KDoc).
-     * [WizardPreferenceStore.recordPick] fires ONLY when the newly-added id is a genuine
-     * alternative (not a tentative default the user merely kept), per E8's "actively chosen"
-     * contract -- never for a default kept, and never from [onAutoFillChoiceSection]/
-     * [onFinishChoices], which never call this function.
+     * W7 Fix 3: this function no longer records a [WizardPreferenceStore] preference itself --
+     * a tap the user later reverses, or makes before abandoning Choice, must never become a
+     * preference (E8's "actively chosen" contract means chosen AND KEPT through to a successful
+     * build). See [finalizeCommanderDraft]'s own recording block for where this now happens.
      */
     fun onToggleChoiceCard(role: RoleKey, cardId: String) {
         val state = _uiState.value
@@ -2300,9 +2312,6 @@ class DeckWizardViewModel(
         if (isAdding && current.size >= group.remainingSlots) return // cap reached -- ignore the tap
         val updated = if (isAdding) current + cardId else current - cardId
         _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to updated)) }
-        if (isAdding && cardId !in tentative) {
-            viewModelScope.launch { wizardPreferenceStore.recordPick(cardId) }
-        }
     }
 
     /** "Choose the remaining N for me" (per-section) — fills whichever of [role]'s slots the user
