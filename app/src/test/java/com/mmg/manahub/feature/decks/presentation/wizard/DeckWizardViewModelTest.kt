@@ -2708,6 +2708,93 @@ class DeckWizardViewModelTest {
     }
 
     @Test
+    fun `W7 Fix 2 -- retrying after a finalize failure re-runs finalize with the SAME resolved draft, never a fresh buildWithGroups`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns twoGroupChoiceDraft()
+        var finalizeCallCount = 0
+        val resolutionsSeen = mutableListOf<Map<RoleKey, List<String>>>()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), capture(resolutionsSeen), any(), any()) } answers {
+            finalizeCallCount++
+            if (finalizeCallCount == 1) throw RuntimeException("finalize boom")
+            commanderOutcome()
+        }
+        val vm = viewModel()
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        // The user resolves "removal_spot" before the finalize step fails.
+        vm.onToggleChoiceCard("removal_spot", "tent-1")
+        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        vm.onFinishChoices()
+        advanceUntilIdle()
+
+        assertEquals("TPL", vm.uiState.value.buildError)
+        coVerify(exactly = 1) { buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
+
+        vm.events.test {
+            vm.onRetryGeneration()
+            advanceUntilIdle()
+            val event = awaitItem()
+            assertTrue(event is DeckWizardEvent.OpenDeckStudio)
+        }
+
+        // Still only ONE buildWithGroups call across the whole failure-then-retry cycle -- the
+        // retry reused the already-resolved draft instead of re-walking from REVIEW.
+        coVerify(exactly = 1) { buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 2) { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) }
+        // Both the failed attempt and the successful retry carried the user's ORIGINAL selection.
+        assertEquals(listOf(listOf("alt-a"), listOf("alt-a")), resolutionsSeen.map { it["removal_spot"] })
+        assertNull(vm.uiState.value.buildError)
+    }
+
+    @Test
+    fun `W7 Fix 2 -- retrying after a persist failure deletes the orphan and re-persists the SAME resolved draft`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns twoGroupChoiceDraft()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
+        var persistCallCount = 0
+        coEvery {
+            deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any())
+        } answers {
+            persistCallCount++
+            if (persistCallCount == 1) throw RuntimeException("persist boom")
+        }
+        val vm = viewModel()
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        vm.onToggleChoiceCard("removal_spot", "tent-1")
+        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        vm.onFinishChoices()
+        advanceUntilIdle()
+
+        assertEquals("TPL", vm.uiState.value.buildError)
+        coVerify(exactly = 0) { deckRepository.deleteDeck(any()) }
+
+        vm.events.test {
+            vm.onRetryGeneration()
+            advanceUntilIdle()
+            val event = awaitItem()
+            assertTrue(event is DeckWizardEvent.OpenDeckStudio)
+        }
+
+        // The orphan from the failed write is cleaned up, buildWithGroups never re-runs, and the
+        // retry's persist call carries the same user-chosen alternative.
+        coVerify(exactly = 1) { deckRepository.deleteDeck("wizard-deck-1") }
+        coVerify(exactly = 1) { buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 2) { deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any()) }
+        assertNull(vm.uiState.value.buildError)
+    }
+
+    @Test
     fun `abandoning the Choice screen via back writes nothing and returns to REVIEW`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {

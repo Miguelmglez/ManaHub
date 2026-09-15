@@ -601,6 +601,26 @@ class DeckWizardViewModel(
      * is true, reset the moment the write finishes (success or failure). */
     private var isWritingCommanderDeck = false
 
+    /** W7 Fix 2: the exact args of the last [finalizeCommanderDraft] attempt, so
+     * [onRetryGeneration] can re-run the SAME finalize/persist call after a failure instead of
+     * sending the user back to REVIEW -- which would re-run [generateCommanderDeck] from scratch
+     * and silently overwrite [DeckWizardUiState.commanderDraftBuild]/`choiceSelections` (the
+     * user's Choice-screen picks). Set right before every [finalizeCommanderDraft] call site;
+     * cleared only on that call's eventual success. A failure BEFORE a draft exists (the
+     * [buildCommanderDeckUseCase.buildWithGroups] step) leaves this null, so Retry still falls
+     * back to re-walking from REVIEW in that case -- there is nothing to resume. */
+    private var pendingFinalize: PendingFinalize? = null
+
+    private data class PendingFinalize(
+        val state: DeckWizardUiState,
+        val format: DeckFormat,
+        val commander: Card,
+        val strategyPick: StrategyPick,
+        val manualAdds: List<ManualAdd>,
+        val draft: CommanderDraftBuild,
+        val resolutions: Map<RoleKey, List<String>>,
+    )
+
     init {
         // Deck Wizard v4 (R13): "format" is now a REQUIRED nav arg (Screen.DeckWizard.createRoute)
         // -- the wizard never renders its own format step, ever. A format the wizard has no
@@ -2104,6 +2124,7 @@ class DeckWizardViewModel(
         }
 
         if (draft.ambiguityGroups.isEmpty()) {
+            pendingFinalize = PendingFinalize(state, format, commander, strategyPick, manualAdds, draft, resolutions = emptyMap())
             finalizeCommanderDraft(state, format, commander, strategyPick, manualAdds, draft, resolutions = emptyMap())
         } else {
             _uiState.update {
@@ -2237,6 +2258,7 @@ class DeckWizardViewModel(
             return
         }
         isWritingCommanderDeck = false
+        pendingFinalize = null // W7 Fix 2: only clear the resumable attempt on real success.
 
         crashlytics.log("deck_wizard_generate_succeeded")
         crashlytics.setCustomKey("deck_wizard_template_source", "COMMANDER_V3_ENGINE")
@@ -2322,6 +2344,7 @@ class DeckWizardViewModel(
                 buildError = null,
             )
         }
+        pendingFinalize = PendingFinalize(state, format, commander, strategyPick, manualAdds, draft, resolutions = state.choiceSelections)
         generateJob = viewModelScope.launch {
             finalizeCommanderDraft(state, format, commander, strategyPick, manualAdds, draft, resolutions = state.choiceSelections)
         }
@@ -2668,6 +2691,7 @@ class DeckWizardViewModel(
         if (isWritingCommanderDeck) return
         generateJob?.cancel()
         cleanupPendingDeck()
+        pendingFinalize = null // Cancel means start over -- Retry must not resume a cancelled attempt.
         _uiState.update {
             it.copy(
                 phase = WizardPhase.REVIEW,
@@ -2676,15 +2700,30 @@ class DeckWizardViewModel(
                 commanderBuildStage = null,
                 commanderCompletedStages = emptyList(),
                 buildError = null,
+                commanderDraftBuild = null,
+                choiceSelections = emptyMap(),
             )
         }
     }
 
-    /** Retries generation after a [DeckWizardUiState.buildError] without re-walking the steps.
-     * Cleans up any deck orphaned by the failed attempt FIRST (see [cleanupPendingDeck]) so a
-     * failure-then-retry cycle never leaves a dangling partial draft behind. */
+    /** W7 Fix 2: retries generation after a [DeckWizardUiState.buildError] without re-walking the
+     * steps. When the failure happened during [finalizeCommanderDraft] (a [pendingFinalize] attempt
+     * exists -- the placement loop already produced a resolved [CommanderDraftBuild]), re-run that
+     * SAME finalize/persist call with the SAME draft and resolutions, so the user's Choice-screen
+     * picks survive the retry. [cleanupPendingDeck] runs first regardless (a failed persist can
+     * have already created a partial deck to discard before the retry creates -- or reuses -- one).
+     * Only a failure BEFORE any draft exists (no [pendingFinalize]) falls back to the old
+     * re-walk-from-REVIEW behavior, since there is nothing resolved yet to resume. */
     fun onRetryGeneration() {
         cleanupPendingDeck()
+        val retry = pendingFinalize
+        if (retry != null) {
+            _uiState.update { it.copy(buildError = null, phase = WizardPhase.GENERATING) }
+            generateJob = viewModelScope.launch {
+                finalizeCommanderDraft(retry.state, retry.format, retry.commander, retry.strategyPick, retry.manualAdds, retry.draft, retry.resolutions)
+            }
+            return
+        }
         _uiState.update { it.copy(buildError = null, phase = WizardPhase.REVIEW) }
     }
 
