@@ -5,13 +5,35 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-15 (v4 campaign, Run 12/W7 Task 0 — the ambiguous-slot engine contract
-fixed via tentative-and-mark; W7 Tasks 1-4/W8 not yet attempted. See
+**Last updated:** 2026-09-15 (v4 campaign, Run 13/W7 Step 0 — real candidates-per-group numbers
+measured; W7 Tasks 1-4/W8 not yet attempted. See
 `docs/plans/deck-wizard-commander-v4-progress.md` for the full per-item log, gitignored). Commit
-`fe9be6f7` on `feature/deck-wizard`.
+`7fcb6d01` on `feature/deck-wizard`.
 **Owning plan (v3, shipped):** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the
 AI-planning-doc rule now that the campaign has shipped; this file is the durable record that
 survives. **v4 (active):** `docs/plans/deck-wizard-commander-v4-plan.md` (gitignored).
+
+## v4 — Run 13 (2026-09-15): W7 Step 0 — candidates-per-group, measured for real
+
+**Measurement only, no UI/VM/persist changes.** Before designing the Choice screen, measured how
+many candidates each `AmbiguityGroup` actually offers (not just how many groups exist, which Run 12
+already covered). Real 180-spec harness: **`candidates/group (n=640) min=2 p25=3 median=5 p75=9
+p90=14 max=34`**; **`candidates/remainingSlots ratio min=0.17 p50=0.89 p90=2.13 max=34.00`**. HARD
+metrics/score/ambiguity-volume unchanged from Run 12 (180/180, 77/84/87/90/95, min1/p25 3/median
+3/p75 4/max 8).
+
+**Reading:** the median section is close to 1:1 candidates-to-slots (a user can see everything), but
+the tail genuinely needs a cap — up to 34 candidates competing for as few as 1 slot. **Recommended
+K = 10** displayed candidates per section (covers p75 fully, ordered by marginal gain with
+`deckId`-seeded tie-break per E4): "Choose for me" / "Let the wizard finish" must still resolve from
+the engine's own full `candidatesById`, never the capped display list, so truncation never hides a
+pick the wizard itself would have made. Not yet implemented in any Composable — a number for Task 1
+to build against.
+
+**Not attempted this run:** W7 Tasks 1-4 (Choice screen UI, persist-once at resolution, Build-tab-
+in-both-paths, retiring `CommanderResultContent`) and W8. Everything Run 12 staged for Tasks 1-4
+(`CommanderDraftBuild`/`finalize()` contract, `WizardPreferenceStore.recordPick`, the
+`generateCommanderDeck:~2018` call site) is unchanged.
 
 ## v4 — Run 12 (2026-09-15): W7 Task 0 — ambiguous slots get real room
 
@@ -491,9 +513,10 @@ Things that differ from Commander and are NOT solved by this campaign:
 
 ## 8. Open items
 
-- **W7 Tasks 1-4 + W8 not yet built (Run 12, 2026-09-15)** — Choice screen UI, persist-once at
+- **W7 Tasks 1-4 + W8 not yet built (Run 13, 2026-09-15)** — Choice screen UI, persist-once at
   resolution time, Build-tab-in-both-finish-paths, retiring the Result screen, harness v3/telemetry/
-  cleanup. See Run 12's entry above; `CommanderDraftBuild`/`finalize()` (Task 0) are ready for it.
+  cleanup. See Run 12/13's entries above; `CommanderDraftBuild`/`finalize()` (Task 0) plus a measured
+  display cap **K=10** (Run 13) are ready for it.
 - User confirmation (non-blocking, defaults in force): preselect the top recommended strategy (yes);
   show Commander-only catalog entries the commander does not signal under "Other plans" (yes).
 - Device runtime check of the build loop on a mid-range phone (plan P6).
