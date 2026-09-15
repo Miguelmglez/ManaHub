@@ -287,7 +287,8 @@ off suggestion use cases below). New engine, pure `commonMain`,
 **The durable record is `docs/deck-wizard-state.md`** (architecture contract, D1-D16 decisions,
 engine defects F1-F18, the 60-card wave's inheritance notes) — read it before touching any wizard
 code. `FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED` is `true` (Deck Wizard Commander v3 plan, Phase 8,
-2026-09-09). Only the must-know invariants live here:
+2026-09-09; v4 campaign layered the Choice screen + harness v3 + telemetry on top, 2026-09-15). Only
+the must-know invariants live here:
 
 - **Commander/Commander Casual build through `BuildCommanderDeckUseCase`** (`shared/core-domain/
   .../feature/decks/domain/template/`, `PlacementScorer` + `DeckAnalysisPipeline` verify/refine) —
@@ -297,8 +298,47 @@ code. `FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED` is `true` (Deck Wizard Comman
   `MainboardTrimmer`/`CandidatePoolGenerator` pipeline** — non-goal for this campaign, do not
   pre-emptively port it; see the state doc §7 for the 60-card wave's plan to do so.
   `CandidatePoolGenerator` stays alive solely for Casual's Scryfall backstop — do not delete without
-  first retiring Casual's own build path.
+  first retiring Casual's own build path. Community trends (EDHREC/Archidekt aggregates) are gone
+  from the Commander path entirely — Casual-only legacy toggle, see the "Use community data" note
+  below.
   → memory: `project_deck_wizard_commander_v3_plan`
+- **No format step for Commander (R13/R14).** `Screen.DeckWizard.createRoute` requires `format` and
+  `deckId` — a wizard route without them is a compile error, not a runtime fallback.
+  `WizardPhase.FORMAT`/`FormatStepContent` do not exist any more. Commander's steps are
+  `COMMANDER_PICK → STRATEGY → PLAN_SECTIONS → REVIEW → GENERATING → CHOICE → GENERATING`. The two
+  wizard entry points are mutually exclusive by render condition (R15): "Build from seed" renders
+  ONLY on the empty-deck state card and never confirms; "Rebuild with the Wizard" renders ONLY in
+  the overflow menu on a non-empty deck and always confirms. A structural guard independent of the
+  UI backs this up — `createRoute`'s required `replaceConfirmed: Boolean` nav arg, re-checked by
+  `DeckWizardViewModel` against the launched deck's REAL card count right before persisting (not at
+  launch), refusing an unconfirmed write into a non-empty deck (`MagicToast` + non-fatal).
+- **The Choice screen, not a Result screen (E11).** A build with unresolved near-ties surfaces
+  `WizardPhase.CHOICE`: only the sections the engine could not resolve, each capped at its remaining
+  slots, with a per-section "Choose the remaining N for me" and one global "Let the wizard finish".
+  `BuildCommanderDeckUseCase.buildWithGroups()` (plan resolve + pool + placement, tentative-and-mark
+  ambiguity detection LIVE during the loop) + `.finalize(draft, resolutions)` (applies resolutions,
+  land fill, verify/refine) replace the old single `invoke()` internals — `invoke()` itself is now
+  just `buildWithGroups().let { finalize(it, emptyMap()) }`, so the single-shot path is
+  byte-identical to every pre-existing call site BY CONSTRUCTION. **Persistence happens exactly
+  ONCE**, at `finalizeCommanderDraft` (shared by the zero-ambiguity direct path and
+  `onFinishChoices`) — never at draft-build time. `onRetryGeneration` resumes the SAME
+  finalize/persist attempt (`pendingFinalize`) after a failure, never discarding the user's
+  Choice-screen picks by re-walking from REVIEW. Abandoning Choice (back/system) writes nothing.
+  Preferences (`WizardPreferenceStore`) are recorded only for genuinely chosen alternatives, only
+  after a successful persist — never for a tentative default, a reversed tap, or an abandoned
+  attempt.
+- **One legality predicate everywhere (R7/E9, W0.1).** `DeckLegality.isLegalForFormat(card, format)`
+  is the ONLY legality check — enforced for `COMMANDER`, ignored entirely for
+  `COMMANDER_CASUAL`/`CASUAL`/`DRAFT`. The builder's candidate pool and `AnalysisEngine`'s P5
+  pillar both call it, so a build and its own analysis can never disagree on which cards are
+  legal — regression-guarded by `WizardHarnessV3Test`'s legality segment.
+- **Basics are always available, ownership-exempt (R12).** `BuildCommanderDeckUseCase
+  .resolveBasicCard` only needs the basic land's `Card` OBJECT present in `ownedCollection`, never a
+  positive owned quantity — `DeckWizardViewModel.guaranteeBasicsAvailable` pre-warms any missing
+  basic via `CardRepository.searchCardByName` before the raw use case ever runs. A collection with
+  zero real copies of a needed basic still reaches the full land target.
+- **`CardSection.realCount` (`Σ contributions.quantity`) is what every UI consumer renders** — the
+  Choice screen's own sections included; `current` (confidence-weighted) stays score-only.
 - **Persistence is ONE atomic write** — `BuildCommanderDeckUseCase.persist()` calls
   `DeckRepository.persistCommanderBuild` (cards + archetype/theme/posture/tribe pin +
   `strategyLocked`, all in a single Room `@Transaction` on Android via
@@ -306,11 +346,17 @@ code. `FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED` is `true` (Deck Wizard Comman
   `WebDeckRepository`). `DeckWizardViewModel.isWritingCommanderDeck` stays as defense-in-depth for
   the ViewModel's own in-memory state, not because the DB write can land half-written.
 - **Collection-only, D7** — no Scryfall backstop for Commander; manual adds (owned or not) are
-  always kept. A thin real collection can legitimately fail to reach 100 cards for a
+  always kept, bypassing the auto-placement pool's own legality/identity filters entirely (D7's
+  "always kept" is deliberate — legality for a MANUAL add is still checked by analysis, per the
+  legality bullet above). A thin real collection can legitimately fail to reach 100 cards for a
   narrow-legality commander (e.g. a colourless one) — that is an honest gap, never force-filled.
 - **Never `.valueOf()` on a persisted enum string**; calibration is normative (fixtures are a
   regression harness, never a training set); the golden/corpus/calibration/skeleton-differentiation
   analysis suites must stay byte-identical across wizard-only changes.
+- **Telemetry** goes through the ViewModel (`FirebaseCrashlytics`/`CrashReporter`), never a
+  Composable directly; no card/deck names or other free text in any Crashlytics key or exception
+  message (`BuildCommanderDeckUseCase`'s blocker telemetry logs format + colour-identity size, never
+  `commander.name`). ≤4 custom keys per logical operation.
 
 **The SINGLE deck create + edit surface.** Both new decks AND existing decks route here: DeckList FAB +
 empty-state, Collection/Stats/Home/CardDetail deck-open, and Home → "Build deck" all navigate to

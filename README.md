@@ -60,9 +60,11 @@ Build and manage decks backed by your collection and real-time Scryfall data.
 - Card detail with double-faced support; quick add/remove from search or your collection
 - **Deck creation wizard**: guided multi-step builder for Commander & Commander Casual, built by the
   SAME scoring/analysis engine that grades the deck afterward — pick a curated strategy (or go
-  Custom), fill remaining plan sections from your collection, and get a staged build with a
-  transparent gap report (no silent placeholder cards). Casual keeps a separate, community-template-
-  matched build path.
+  Custom), fill remaining plan sections from your collection. Genuine close calls the engine can't
+  break on its own surface as a short Choice screen (only the real questions, with a one-tap "let
+  the wizard decide" for any of them); every other card is placed automatically with a transparent
+  gap report (no silent placeholder cards). Casual keeps a separate, community-template-matched
+  build path.
 - **Collection discoveries**: synergy clusters detected in your own collection (strategies and
   tribes), each with a one-tap "Build this" handoff into the wizard
 

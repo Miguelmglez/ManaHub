@@ -5,13 +5,51 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-15 (v4 campaign, Run 14/W7 fixes — the design-review and edge-case-audit
-findings on the Choice screen (7.0c/7.0d/7.0e) all fixed and tested; W8 not started. See
+**Last updated:** 2026-09-15 (v4 campaign, Run 15/W8 — harness v3, telemetry, cleanup and docs; the
+campaign is now closed except F18/Edgar, which awaits a user decision (§8). See
 `docs/plans/deck-wizard-commander-v4-progress.md` for the full per-item log, gitignored). Commits
-`0ed707fe`..`d52eba32` on `feature/deck-wizard`.
+`16ed41b2`..`c1a712e1` on `feature/deck-wizard` (this run), on top of `0ed707fe`..`d52eba32` (Run 14).
 **Owning plan (v3, shipped):** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the
 AI-planning-doc rule now that the campaign has shipped; this file is the durable record that
 survives. **v4 (active):** `docs/plans/deck-wizard-commander-v4-plan.md` (gitignored).
+
+## v4 — Run 15 (2026-09-15): W8 — harness v3, telemetry, cleanup and docs
+
+**Five tasks, five commits, all green.** The final workstream — no audit or design exploration was
+in scope (the brief's own inputs were already verified in source by the main session); the only
+review run was `pre-push-security-gate` before each commit.
+
+- **T1 (`16ed41b2`)** — fixed the wasmJs test-compile break: `WizardHarnessMockSegmentsTest.kt`'s
+  `"%.2f".format(...)` (JVM-only) replaced with a manual multiplatform 2-decimal formatter.
+  `compileTestKotlinWasmJs` now green.
+- **T2 (`7d549261`)** — a `commonTest` case protecting W6c's `NEAR_TIE_BAND` seeded variety, which
+  had only the harness measurement guarding it. Candidates near-tied via a narrow `suggestedTags`
+  confidence spread (not exact matches): same `deckId` stays byte-identical, two different
+  `deckId`s diverge. Verified (not committed) that reverting the band to `0f` fails both this test
+  and the pre-existing W6 Task 3 exact-tie test.
+- **T3 (`c1a712e1`)** — harness v3: legality (Commander-banned cards excluded from the auto-
+  placement pool, `COMMANDER_CASUAL` ignores legality, builder/analysis agreement), land-mode
+  (non-basic OFF/ON, zero-owned-basics still reaches the full target), choice determinism (HARD,
+  180/180 real specs), variety (TRACKED, real 12-spec sample, median Jaccard 0.636 vs W6c's 0.65
+  baseline, documented alert at ≤0.85). Harness v2's own HARD metrics re-confirmed byte-identical.
+- **T4 (`e1db1b32`)** — fixed a pre-existing PII leak (`BuildCommanderDeckUseCase`'s blocker
+  telemetry logged the commander's card name; now format + colour-identity size) and added the v4
+  Choice/land-mode/rebuild-confirm telemetry taxonomy the crashlytics-ux-auditor proposed — routed
+  through ViewModels, never Crashlytics from a Composable, no operation over 4 custom keys.
+- **T5 (this commit)** — cleanup confirmed nothing further to delete (grepped `includeOutsideCollection`:
+  every real call site is Casual's legacy `DeckWizardSpec`/`BuildDeckFromTemplateUseCase` path, the
+  Commander path never reads it; `deck_wizard_format_desc_*` strings, `CommanderResultContent`, and
+  the three spec-only-never-emitted telemetry keys were already confirmed gone in prior runs).
+  Rewrote this file's own `feature/decks/CLAUDE.md` Deck Wizard section for v4 (no format step,
+  R13-R15 entry-point guard, the Choice screen contract, the one legality predicate, R12 basics
+  exemption, telemetry rules) and fixed a stale §7 line (`FormatStepContent` does NOT exist as a
+  fallback — it was deleted). This §1/§5/§6/§8 final pass, the README, and project memory.
+
+**Gate:** `shared:core-domain:jvmTest` (`feature.decks.*`) 561 tests/1 pre-existing failure (Edgar,
+unchanged and untouched); `compileKotlinWasmJs`/`compileTestKotlinWasmJs` green;
+`app:testDebugUnitTest` (`feature.decks.*`) green (`ScannerViewModelTest.kt` quarantined-in-place
+per invocation, never committed); `app:assembleDebug` green; golden/corpus/calibration suites
+byte-identical throughout (no scoring-engine file touched this run).
 
 ## v4 — Run 14 (2026-09-15): W7 fixes — design review + edge-case audit findings on the Choice flow
 
@@ -574,20 +612,51 @@ Things that differ from Commander and are NOT solved by this campaign:
 - **Sideboard.** Out of scope for the builder; the analysis only checks size.
 - **Harness.** Add 60-card segments to harness v2; the v3 corpus already has Modern fixtures
   (14–22) usable as `MockCollectionRich` seeds for 60-card reconstructions.
-- **UI.** `FormatStepContent` (kept as fallback), `COMING_SOON_FORMATS`, Studio CTA gating by
+- **UI.** `FormatStepContent`/`COMING_SOON_FORMATS` were DELETED for Commander (R13/R14, Run 6) —
+  the 60-card wave needs its OWN format-selection UI, not a revived fallback. Studio CTA gating by
   `isCommanderFormat` — flip per format when ready.
 
 ---
 
 ## 8. Open items
 
-- **W7 Tasks 1-4 + W8 not yet built (Run 13, 2026-09-15)** — Choice screen UI, persist-once at
-  resolution time, Build-tab-in-both-finish-paths, retiring the Result screen, harness v3/telemetry/
-  cleanup. See Run 12/13's entries above; `CommanderDraftBuild`/`finalize()` (Task 0) plus a measured
-  display cap **K=10** (Run 13) are ready for it.
+- **v4 campaign CLOSED except one residual decision (2026-09-15).** W0-W8 are all done: Choice
+  screen (W7), harness v3 + telemetry + cleanup + docs (W8). The only thing standing between this
+  campaign and a clean close is F18/Edgar below — everything else in this section is either a
+  pre-existing (non-blocking) gap the campaign never claimed to close, or genuinely deferred to the
+  60-card wave (§7).
+- **F18/Edgar residual — awaiting the user's decision.** A Custom build for Edgar Markov (tribal
+  Vampires, fast/cheap/aggressive) resolves macro MIDRANGE (38.9% prototype-distance score) instead
+  of AGGRO (32.4%), margin 0.035 against the `MACRO_AMBIGUITY_MARGIN` 0.08 needed for a decisive
+  call — a genuine near-miss, not a masked bug (§6's F18 entry has the full mechanism trace: W6b's
+  majority-vote tag bias + internal-tribe wiring are real fixes, proven on 3 of 4 reconstruction
+  fixtures; Edgar's is the one honest residual). Closing it needs a Deck Analysis Engine v3
+  calibration-layer change (prototype weights/anchors) — explicitly out of this campaign's scope
+  (ADR-007 §4: golden/corpus/calibration must stay byte-identical). `MockCollectionRichReconstructionTest
+  > Custom build resolves the fixture's own expected macro` is the ONE test carrying this forward as
+  a documented, unforced failure — do not weaken it, do not re-fabricate its fixture input, do not
+  mark it `@Ignore`d without the user's own written say-so. Two ways forward, both requiring a human
+  decision: accept the residual (update the test's own docstring to say "3 of 4" instead of implying
+  all 4 pass) or open a calibration-scoped follow-up campaign.
+- **`Migration53To54Test` (Room v54) has never executed on a device** — no emulator was available
+  during v3 or v4. Needs a device/emulator run before this migration can be considered proven, not
+  just written.
+- Device runtime check of the build loop on a mid-range phone (plan P6) — never done; W6 deliberately
+  made generation slower (versatility objective, more terms per candidate) and W7's Choice screen
+  adds a second network-free-but-CPU-bound pass (`finalize()`), so this is more relevant now than
+  when first flagged.
+- **No Compose visual-regression harness exists in this repo** (no Roborazzi/Paparazzi loop) — every
+  Choice-screen/Commander-pick/Studio design-review pass this campaign ran was a manual
+  `compose-design-reviewer` read-through against source + the `compose-ui` skill's dos-and-donts,
+  never a pixel-diff. Worth a future investment if visual regressions on this screen become a
+  recurring cost.
+- **`ScannerViewModelTest.kt` is owned by the user and does not compile at HEAD** (their commit
+  `bb7fd0fc` removed `ScannerUiState.cards`; user decision 2026-09-14: they will fix it themselves).
+  Every `:app` test/compile invocation across this whole campaign quarantined ONLY that file
+  (rename-in-place with a trap, never edited, never committed) — remove this bullet once the user's
+  own fix lands; `shared:core-domain:jvmTest` is and always was unaffected.
 - User confirmation (non-blocking, defaults in force): preselect the top recommended strategy (yes);
   show Commander-only catalog entries the commander does not signal under "Other plans" (yes).
-- Device runtime check of the build loop on a mid-range phone (plan P6).
 - `CandidatePoolGenerator` (checked P7, re-confirmed P8): still has a live caller —
   `BuildDeckFromTemplateUseCase`'s Scryfall backstop fill, which only Casual builds ever reach now
   that Commander dispatches to `BuildCommanderDeckUseCase`. Not dead code; do not delete without
