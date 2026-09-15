@@ -315,6 +315,42 @@ byte-identical during wizard work.
 | Final `PlacementScorer` weights | n/a | **NO CHANGE** — `roles 0.45 · axes 0.30 · curve 0.10 · power 0.10 · community <=1.15` (initial weights), confirmed sufficient by the numbers on this row (never fitted to the real collection, ADR-007 §4 — see progress tracker Run 11 §7.2 for the full evidence) |
 | Runtime per build (JVM, real collection) | min 40 ms / median 99 ms / max 332 ms (build + analyze) | min 50 ms / median 107 ms / max 231 ms (build + analyze, `BuildCommanderDeckUseCase`) |
 
+**W6b (2026-09-15) — real-collection evidence W6's own report omitted, per the campaign's own
+demand for numbers, not claims:**
+- **Score distribution after W6b's F18 fix, all 3 baselines side by side:** v3 baseline 78/88/96
+  (min/median/max) → post-W6 76/87/95 → post-W6b 76/87/95 (byte-identical to post-W6; F18's fix is
+  scoped to Custom-mode internal tribe/tag targeting and does not move the aggregate distribution —
+  re-run via `WizardCommanderHarnessV2Test`, 180/180 HARD metrics pass).
+- **Score-dip diagnosis (v3 78/88/96 → post-W6 76/87/95):** diagnosed as an ACCEPTED TRADE-OFF of
+  W6's E5 "versatility" placement objective, not a regression re-introduced or fixable by W6b.
+  Pre-W6, placement was "effectively-first-match" (a card's marginal gain came from ~one role/axis
+  it filled); W6 replaced this with a gain that sums EVERY live band/axis a candidate advances
+  (diminishing returns) — a deliberate, documented design change (plan §0 E5: "a card serving three
+  live needs outranks a card serving one"). Evidence for "accepted trade-off" over "bug": the shift
+  is small and UNIFORM across the whole distribution (min -2, median -1, max -1 — not a handful of
+  builds cratering), consistent with a systemic re-optimization toward versatile-but-not-always-
+  highest-scoring cards rather than a targeted defect. No specific miscalibration (double-counted
+  axis, wrong weight) was found on inspection of `PlacementScorer.axisGain`/`roleGain`; closing the
+  gap further would mean re-tuning the placement objective against the SCORING engine's own weights
+  — a calibration change, out of W6b's scope (golden/corpus/calibration must stay byte-identical).
+- **Ambiguity volume** (questions per build = `WizardBuildResult.ambiguityGroups.size`, full
+  180-spec real matrix): min 0, p25 0, median 1, p75 2, max 4; 51/180 (28%) builds ask zero
+  questions. Epsilon = 0.15 (`BuildCommanderDeckUseCase.AMBIGUITY_EPSILON`, W6 Task 4/E6) — chosen
+  as a relative-gain-closeness band around the strongest remaining candidate; this distribution
+  (median 1, max 4, more than a quarter asking none) shows it is NOT over-firing into a "thirty
+  questions" flood, nor silently mute — it triggers on genuine near-ties only. No fixture asked more
+  than 4 questions in this pass.
+- **Variety** (card-overlap % between two independent builds — different `deckId` seeds — for the
+  same commander+strategy, W6 Task 3/E4's seeded tie-break): a deterministic 12-spec sample (every
+  15th of the 180) measured 0.96–1.00 Jaccard overlap on scryfallId sets, 11/12 samples IDENTICAL
+  (1.00). **Finding: in practice, variety across two different deckIds is close to zero on this real
+  collection.** This is not a bug in the tie-break itself — E4 was designed to make an otherwise-
+  arbitrary tie DETERMINISTIC and per-deck, not to manufacture variety — but it does mean two users
+  building the same commander+strategy from the same collection will almost always get literally the
+  same deck today, because exact marginal-gain ties are rare with real (non-integer, non-duplicated)
+  card data. Flagged as a real product-facing limitation, not fixed (no instruction to add
+  intentional randomization, and doing so would need a product decision, not an engineering one).
+
 **P0.5 baseline reproduction:** `./gradlew :app:testDebugUnitTest --tests
 "com.mmg.manahub.feature.decks.harness.P0BaselineTest"` (requires `testdata/wizard-harness/`
 checked out — gitignored real user data, Assume-skips otherwise). Full matrix run (99 of
@@ -348,7 +384,7 @@ Acceptance bands in force: see plan §5 until P7 replaces them here.
 | — | `EvaluateDeckUseCase` emits a gamification event on every call | `emitProgression` flag | **done P0 (2026-09-08)** |
 | — | `BuildCommanderDeckUseCase.persist()` is 4 sequential non-transactional writes -- a cancellation mid-write (reachable via Studio's "Rebuild with the Wizard" CTA, D12 rebuild-in-place) can leave an existing draft with cards replaced but a stale pin | `DeckRepository.persistCommanderBuild` (new) is ONE Room `@Transaction` via `DeckDao.persistCommanderBuild` on Android; commonMain default keeps the 4-call fallback for `WebDeckRepository` | **closed P8 (Run 12)** — instrumented Room tests (happy path + genuine FK-violation rollback) added mirroring the existing `replaceAllCardsWithSource` proof; `isWritingCommanderDeck` kept as defense-in-depth for the ViewModel's own in-memory state, not because the DB can land half-written any more |
 | F17 | Colorless-identity commander (e.g. "Page, Loose Leaf") builds a `DeckTooSmall` BLOCKER — `BasicLandCalculator`/`BasicLandDistribution` has no colourless "Wastes" slot at all, so Stage B of `fillLandsV2` allocates zero basics for an empty identity | `BasicLandDistribution.wastes` (new field, folded into `total`/`toMap()`'s `"C"` key) + `BasicLandCalculator.allocate` returns an all-Wastes distribution when `commanderIdentity` is explicitly empty (distinct from `null` = no constraint) + `BuildCommanderDeckUseCase.materializeBasics`/`nameToColor` place Wastes like any other basic. Coloured-identity behaviour byte-identical (verified by the full pre-existing `LandFillV2Test` suite + a new colourless-identity case). | **CLOSED P8 (Run 12)** — land fill itself is fixed (`land_target`/`mana_sources` harness metrics green for "Page, Loose Leaf"). The harness's colourless-commander exclusion STAYS, re-diagnosed to a DIFFERENT, genuine cause: this real collection owns only 59 colourless nonland cards total, well under Commander's ~62-card nonland target once lands are correctly filled — a real MTG color-identity constraint (colourless commander ⇒ colourless cards + Wastes only) colliding with real collection sparsity, not an engine defect, and unfixable without a Scryfall backstop D7 forbids. → memory: `feedback_colourless_commander_deck_size_vs_land_fill`. |
-| F18 | `CommanderPlanResolver.resolve`'s `StrategyPick.Custom` branch always targets the archetype-null generic BELL-shaped baseline skeleton regardless of the commander's own aggression signal, so a fast/cheap/tribal-aggressive Custom build (Edgar Markov) reads MIDRANGE post-build instead of AGGRO | `CommanderArchetypeBias.commanderTagArchetype` (new, tag-tier ONLY — the color-identity tier was tried and reverted, it regressed a real fixture) gives Custom's INTERNAL skeleton a bounded build hint; persisted `StrategyPin` stays Custom/null (E12). `CommanderPlanResolverTest`'s assertion rewritten per the plan's own instruction | **build-hint CLOSED, post-build reconstruction still open (W6 Run 9, 2026-09-14)** — Edgar's Custom BUILD now correctly targets AGGRO bands, but `MockCollectionRichReconstructionTest`'s post-build macro re-inference still lands ambiguous (~0.0796 margin vs the 0.08 threshold) after W6 Task 2's scoring rescale — see that plan's Run 9 progress entry and `PlacementScorer`'s weight KDoc for the full diagnosis (extensive hand-tuning could not close this without regressing 3 other fixtures) |
+| F18 | `CommanderPlanResolver.resolve`'s `StrategyPick.Custom` branch always targets the archetype-null generic BELL-shaped baseline skeleton regardless of the commander's own aggression signal, so a fast/cheap/tribal-aggressive Custom build (Edgar Markov) reads MIDRANGE post-build instead of AGGRO | `CommanderArchetypeBias.commanderTagArchetype` (new, tag-tier ONLY — the color-identity tier was tried and reverted, it regressed a real fixture) gives Custom's INTERNAL skeleton a bounded build hint; persisted `StrategyPin` stays Custom/null (E12). `CommanderPlanResolverTest`'s assertion rewritten per the plan's own instruction | **W6b (2026-09-15) — audited and made production-honest, residual CONFIRMED genuine, not closed.** W6's own "build-hint CLOSED" claim rested on a FABRICATED test input: `Fixture01EdgarMarkov`'s commander carried a hand-added `CardTag.AGGRO`, but `"aggro"` is a `TagDictionary` MANUAL-PICK-ONLY entry (`plain(...)`, no detection rule) — production never assigns it (ADR-007 §4 violation). Replaced with `CardTag.TOKENS`, which a real Edgar Markov DOES earn in production (`TagDictionary`'s `"tokens"` rule: `allOf("create","token")`, confidence 0.95 clears `SuggestTagsUseCase.DEFAULT_AUTO_THRESHOLD` 0.90 against Edgar's own oracle text) and which reverse-maps to `ArchetypeId.AGGRO` the same as the fabricated tag did — the tag-tier bias itself was legitimate, just proven on the wrong input. Also: (1) `CommanderArchetypeBias.commanderTagArchetype` was order-dependent (`firstNotNullOfOrNull`) — rewritten as a majority vote over all commander tags, alphabetical tie-break; (2) a Custom build's INTERNAL tribe target was `null` even for a tribal-lord commander (`pin.tribe` only exists for Curated) — added `CommanderPlan.internalTribe` (`TribeDeriver.derivedLordTribe`, the SAME derivation `RecommendCommanderStrategiesUseCase` already used, now extracted and shared) and wired it into `BuildCommanderDeckUseCase`'s placement-time `dominantTribeAxis`/`dominantTribeKey` + `SynergyGraph.axisIdeals`'s new optional tribe-ideal param — before this wiring the plan's tribe axis was a no-op at placement time. **Net result:** `MockCollectionRichReconstructionTest`'s Custom-macro case is GREEN for Meren/Karlov/Urza; Edgar is a genuine near-miss, margin 0.035 vs the 0.08 `MACRO_AMBIGUITY_MARGIN` needed (was already red pre-W6b for the SAME reason under the fabricated tag — confirmed by re-running at HEAD `460db325` before any W6b change). Closing it further requires touching Deck Analysis Engine v3 calibration (prototype weights/anchors), explicitly out of scope for this campaign (ADR-007 §4, golden/corpus/calibration must stay byte-identical) — reported honestly per the campaign's own "never tune a fixture/threshold to reach green" rule rather than forced. Harness v2 (180 specs) confirms 180/180 HARD metrics still pass and the score distribution is UNCHANGED by this work (min 76/p25 85/median 87/p75 89/max 95, same as post-W6). |
 
 Known engine debt deliberately NOT touched by this campaign (see ADR-007 "Known debt"): SYNERGY P4
 calibration, PRISON never resolving, 60-card CONTROL inevitability ceiling, `DRAFT` has no skeleton,
@@ -395,10 +431,19 @@ Things that differ from Commander and are NOT solved by this campaign:
   first retiring Casual's own build path (60-card wave, §7).
 - **F17 CLOSED P8** (land fill fixed; see §6 for the re-diagnosed residual real-collection-sparsity
   case, which is not this defect and not fixable within this campaign's D7 scope).
-- **F18 build-hint CLOSED (W6 Run 9, 2026-09-14)** — see §6. The remaining residual (Edgar's
-  post-build macro re-inference lands ambiguous rather than a confident AGGRO win) is now W6's own
-  tracked open item, not D6-contract work — the plan's own instruction to rewrite
-  `CommanderPlanResolverTest`'s assertion has been carried out.
+- **F18 — real fix landed, honest residual remains OPEN (W6b, 2026-09-15)** — see §6. W6's
+  "build-hint CLOSED" was proven on a fabricated tag; W6b fixed the fixture + the underlying
+  mechanism (majority-vote tag bias + a real internal tribe target wired through placement). 3 of 4
+  reconstruction fixtures now genuinely pass; Edgar remains a real 0.035-vs-0.08 margin near-miss
+  that needs a calibration-layer change to close — explicitly out of this campaign's scope. Do not
+  re-fabricate a test input to force this green; either accept the residual (update
+  `MockCollectionRichReconstructionTest`'s own docstring to say "3 of 4" instead of implying all 4
+  pass) or open a calibration-scoped follow-up campaign.
+- Also flagged by W6b, not yet actioned: **variety across two different `deckId`s for the same
+  commander+strategy is ~0% in practice** (11/12 sampled real-collection pairs built byte-identical
+  decks) — the W6 Task 3 seeded tie-break makes ties deterministic but does not manufacture variety,
+  and real (non-tied) marginal-gain data rarely ties. Needs a product decision (intentional
+  randomization?) before any engineering follow-up.
 - **`persist()` atomicity CLOSED P8** — `DeckRepository.persistCommanderBuild` / `DeckDao
   .persistCommanderBuild` is one real Room `@Transaction`. No open item here any more.
 
