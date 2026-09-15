@@ -5,12 +5,48 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-15 (v4 campaign, Run 11/W6c — real seeded variety (Defect 1) + real
-evidence for the W6 score dip (Defect 2); see `docs/plans/deck-wizard-commander-v4-progress.md` for
-the full per-item log, gitignored). Commit `b848b9b1` on `feature/deck-wizard`.
+**Last updated:** 2026-09-15 (v4 campaign, Run 12/W7 Task 0 — the ambiguous-slot engine contract
+fixed via tentative-and-mark; W7 Tasks 1-4/W8 not yet attempted. See
+`docs/plans/deck-wizard-commander-v4-progress.md` for the full per-item log, gitignored). Commit
+`fe9be6f7` on `feature/deck-wizard`.
 **Owning plan (v3, shipped):** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the
 AI-planning-doc rule now that the campaign has shipped; this file is the durable record that
 survives. **v4 (active):** `docs/plans/deck-wizard-commander-v4-plan.md` (gitignored).
+
+## v4 — Run 12 (2026-09-15): W7 Task 0 — ambiguous slots get real room
+
+**Contract fix, no UI yet.** W6 Task 4's `ambiguityGroups` were computed AFTER the placement loop
+had already filled every non-land slot with other cards, so a group like "pick 2 of these 7
+Removal" had no room left — honouring a user pick would have evicted an unrelated card. Fixed via
+**tentative-and-mark** (chosen over reserving slots up front, which would need predicting future
+gain trajectories the loop itself produces): ambiguity is now detected LIVE, at the exact iteration
+a slot is decided — the winning card is placed immediately (E4's seeded variety stays real) but its
+OWN slot is marked tentative for the first still-short role it fills, when a genuinely still-
+unplaced alternative clears within `AMBIGUITY_EPSILON` at that same decision point. Resolving a
+group can therefore only ever swap ITS OWN tentative slot(s) — no other card in the board moves.
+
+`BuildCommanderDeckUseCase` is now `buildWithGroups(...)` (plan resolve + candidate pool + the
+placement loop, no lands, no persist — returns `CommanderDraftBuild`) + `finalize(draft,
+resolutions)` (applies resolutions, then land fill, verify/refine, produces the `WizardBuildResult`
+— still no persist, that stays the caller's job via the untouched `persist()`). `invoke()` is now
+`buildWithGroups().let { finalize(it, emptyMap()) }`, so the single-shot path is byte-identical to
+every pre-existing call site/test BY CONSTRUCTION, not by a separate equality assumption.
+
+**Re-measured ambiguity volume (180-spec real-collection harness): min 1 / p25 3 / median 3 / p75 4
+/ max 8, 0/180 builds with zero groups** — up from W6's after-the-fact median 1 / max 4, which
+undercounted because a role rarely stays below its own ideal after the WHOLE 99-card loop finishes.
+**This means W7's "zero ambiguity groups → skip the Choice screen" path will be rare, not common, on
+real collections** — worth keeping in mind when the Choice screen UI is built. Harness otherwise
+unchanged: 180/180 HARD metrics (determinism + round-trip identity included), score distribution
+identical to pre-Task-0 (min 77 / p25 84 / median 87 / p75 90 / max 95 — expected, scoring math
+untouched). `:shared:core-domain:jvmTest` 554 tests (549 + 5 new `finalize()` tests), 1 failure (the
+documented Edgar/AGGRO reconstruction margin, the sole permitted exception).
+
+**Not attempted this run:** W7 Tasks 1-4 (the Choice screen UI, moving persist to resolution time,
+landing on Deck Studio's Build tab in both finish paths, retiring the score-ring Result screen) and
+W8 (harness v3, telemetry, cleanup, docs). See the progress tracker's Run 12 entry for exactly what
+a follow-up run should build on (`CommanderDraftBuild`'s fields already give the Choice screen
+everything it needs).
 
 ## v4 — Run 8 (2026-09-14): R15 — the two wizard entry points, disjoint by construction
 
@@ -455,6 +491,9 @@ Things that differ from Commander and are NOT solved by this campaign:
 
 ## 8. Open items
 
+- **W7 Tasks 1-4 + W8 not yet built (Run 12, 2026-09-15)** — Choice screen UI, persist-once at
+  resolution time, Build-tab-in-both-finish-paths, retiring the Result screen, harness v3/telemetry/
+  cleanup. See Run 12's entry above; `CommanderDraftBuild`/`finalize()` (Task 0) are ready for it.
 - User confirmation (non-blocking, defaults in force): preselect the top recommended strategy (yes);
   show Commander-only catalog entries the commander does not signal under "Other plans" (yes).
 - Device runtime check of the build loop on a mid-range phone (plan P6).
