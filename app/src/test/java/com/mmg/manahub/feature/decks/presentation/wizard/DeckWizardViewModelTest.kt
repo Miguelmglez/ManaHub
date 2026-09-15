@@ -31,10 +31,14 @@ import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.availableIn
 import com.mmg.manahub.feature.decks.domain.engine.card
 import com.mmg.manahub.feature.decks.domain.engine.StrategyPin
+import com.mmg.manahub.feature.decks.domain.engine.RoleKey
+import com.mmg.manahub.feature.decks.domain.engine.WizardPreferenceStore
+import com.mmg.manahub.feature.decks.domain.template.AmbiguityGroup
 import com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildStage
 import com.mmg.manahub.feature.decks.domain.template.CommanderBuildOutcome
+import com.mmg.manahub.feature.decks.domain.template.CommanderDraftBuild
 import com.mmg.manahub.feature.decks.domain.template.CategorySuggestions
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
 import com.mmg.manahub.feature.decks.domain.template.DeckTemplateArchetypeInfo
@@ -119,6 +123,10 @@ class DeckWizardViewModelTest {
     // directly, and an unstubbed call is swallowed by guaranteeBasicsAvailable's own runCatching, so
     // this only needs to exist, never to be configured.
     private val cardRepository = mockk<CardRepository>(relaxed = true)
+    // Deck Wizard v4, W7 Task B (E4/E8) -- relaxed: recordPick/preferredCardIds are fire-and-forget
+    // from this VM's own perspective (no test asserts on the store's OWN persisted state), so this
+    // only needs to exist as a valid collaborator, never to be configured.
+    private val wizardPreferenceStore = mockk<WizardPreferenceStore>(relaxed = true)
 
     private val collectionProfileUseCase = CollectionProfileUseCase(ioDispatcher = dispatcher)
 
@@ -161,6 +169,24 @@ class DeckWizardViewModelTest {
             pin = StrategyPin(archetype = null, posture = null, themes = emptyList(), tribe = null),
         )
 
+    /** Deck Wizard v4, W7 Task B -- a minimal, relaxed [CommanderDraftBuild] fixture for stubbing
+     * [buildCommanderDeckUseCase]'s [BuildCommanderDeckUseCase.buildWithGroups] in a Commander-format
+     * `onGenerate()` test. Every unspecified property reads back as an empty/relaxed default
+     * (mockk's own contract) -- a test overrides only what it actually inspects: [ambiguityGroups]
+     * (empty by default -- the zero-group path is what most existing tests exercise, matching the
+     * pre-W7 single-shot build they were written against), [tentativeByRole], [candidatesById]. */
+    private fun commanderDraft(
+        ambiguityGroups: List<AmbiguityGroup> = emptyList(),
+        tentativeByRole: Map<RoleKey, List<String>> = emptyMap(),
+        candidatesById: Map<String, Card> = emptyMap(),
+    ): CommanderDraftBuild {
+        val draft = mockk<CommanderDraftBuild>(relaxed = true)
+        every { draft.ambiguityGroups } returns ambiguityGroups
+        every { draft.tentativeByRole } returns tentativeByRole
+        every { draft.candidatesById } returns candidatesById
+        return draft
+    }
+
     private val suggestionCard = card(id = "sugg-1", name = "Suggested Spell")
 
     /** [buildResult] with an empty [TemplateBuildResult.deckCards] (so [writeResultIntoNewDeck]
@@ -196,6 +222,7 @@ class DeckWizardViewModelTest {
         deckAnalysisPipeline = deckAnalysisPipeline,
         buildCommanderDeckUseCase = buildCommanderDeckUseCase,
         cardRepository = cardRepository,
+        wizardPreferenceStore = wizardPreferenceStore,
     )
 
     @Before
@@ -1381,8 +1408,13 @@ class DeckWizardViewModelTest {
         // itself is exercised by BuildCommanderDeckUseCaseTest, so this VM test stubs its outcome
         // and verifies the VM's OWN wiring (persist() is real -- see buildCommanderDeckUseCase's
         // spyk() construction above -- so the assertions below still exercise the real write path).
+        // W7 Task B split invoke() into buildWithGroups()+finalize() -- a zero-group draft (the
+        // default) still reaches finalize() straight away, byte-identical to the old single-shot path.
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery {
+            buildCommanderDeckUseCase.finalize(any(), any(), any(), any())
         } returns commanderOutcome()
         val vm = viewModel()
         advanceUntilIdle()
@@ -1395,10 +1427,15 @@ class DeckWizardViewModelTest {
         vm.onNextFromCommanderPick()
         vm.onNextFromStrategy()
         vm.onNextFromManualAdds()
-        vm.onGenerate()
-        advanceUntilIdle()
-
-        assertEquals(WizardPhase.RESULT, vm.uiState.value.phase)
+        // W7 Task D (plan 7.5): Commander never lands on WizardPhase.RESULT any more -- a successful
+        // build fires OpenDeckStudio directly (see finalizeCommanderDraft's own KDoc).
+        vm.events.test {
+            vm.onGenerate()
+            advanceUntilIdle()
+            val event = awaitItem()
+            assertTrue(event is DeckWizardEvent.OpenDeckStudio)
+            assertEquals("wizard-deck-1", (event as DeckWizardEvent.OpenDeckStudio).deckId)
+        }
         // BUG-1: DeckStudioViewModel.rebuildUiState resolves the commander from the deck's ENTRIES
         // (allEntries.find { it.scryfallId == commanderId }), not from Deck.commanderCardId alone --
         // without this write the commander was invisible in the built deck. Since the Phase 8 JOB 2
@@ -1428,7 +1465,10 @@ class DeckWizardViewModelTest {
             DeckEntry(card = card(id = "spell-$i", name = "Spell $i"), quantity = 1, isOwned = true)
         }
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery {
+            buildCommanderDeckUseCase.finalize(any(), any(), any(), any())
         } returns commanderOutcome(entries = listOf(DeckEntry(card = commander, quantity = 1, isOwned = true, isSideboard = false)) + ninetyNineEntries)
         val vm = viewModel()
         advanceUntilIdle()
@@ -1461,7 +1501,12 @@ class DeckWizardViewModelTest {
         coEvery { cardRepository.searchCardByName("Forest") } returns DataResult.Success(forest)
         val ownedCollectionSlot = slot<List<OwnedCard>>()
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), capture(ownedCollectionSlot), any(), any(), any(), any(), any())
+            // buildWithGroups' param order (format, commander, strategyPick, identity,
+            // ownedCollection, ...) keeps ownedCollection at the SAME position invoke() had it.
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), capture(ownedCollectionSlot), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery {
+            buildCommanderDeckUseCase.finalize(any(), any(), any(), any())
         } returns commanderOutcome()
         val vm = viewModel()
         advanceUntilIdle()
@@ -1492,7 +1537,13 @@ class DeckWizardViewModelTest {
         val ownedCollectionSlot = slot<List<OwnedCard>>()
         val includeNonBasicLandsSlot = slot<Boolean>()
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), capture(ownedCollectionSlot), any(), any(), capture(includeNonBasicLandsSlot), any(), any())
+            // buildWithGroups has no `fillLands` param -- includeNonBasicLands shifts from the 8th
+            // any() (invoke()) to the 7th here (format, commander, strategyPick, identity,
+            // ownedCollection, manualAdds, includeNonBasicLands, ...).
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), capture(ownedCollectionSlot), any(), capture(includeNonBasicLandsSlot), any(), any(), any())
+        } returns commanderDraft()
+        coEvery {
+            buildCommanderDeckUseCase.finalize(any(), any(), any(), any())
         } returns commanderOutcome()
         val vm = viewModel()
         advanceUntilIdle()
@@ -1532,7 +1583,10 @@ class DeckWizardViewModelTest {
     fun `R15 -- an unconfirmed launch into a non-empty deck refuses to persist, deck untouched`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery {
+            buildCommanderDeckUseCase.finalize(any(), any(), any(), any())
         } returns commanderOutcome()
         every { deckRepository.observeDeckWithCards("existing-deck-1") } returns flowOf(nonEmptyDeckWithCards("existing-deck-1"))
 
@@ -1563,7 +1617,10 @@ class DeckWizardViewModelTest {
     fun `R15 -- a confirmed launch into a non-empty deck persists normally`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery {
+            buildCommanderDeckUseCase.finalize(any(), any(), any(), any())
         } returns commanderOutcome()
         every { deckRepository.observeDeckWithCards("existing-deck-1") } returns flowOf(nonEmptyDeckWithCards("existing-deck-1"))
 
@@ -1576,10 +1633,15 @@ class DeckWizardViewModelTest {
         vm.onNextFromCommanderPick()
         vm.onNextFromStrategy()
         vm.onNextFromManualAdds()
-        vm.onGenerate()
-        advanceUntilIdle()
-
-        assertEquals(WizardPhase.RESULT, vm.uiState.value.phase)
+        // W7 Task D (plan 7.5): a successful Commander build fires OpenDeckStudio directly, never
+        // lands on WizardPhase.RESULT.
+        vm.events.test {
+            vm.onGenerate()
+            advanceUntilIdle()
+            val event = awaitItem()
+            assertTrue(event is DeckWizardEvent.OpenDeckStudio)
+            assertEquals("existing-deck-1", (event as DeckWizardEvent.OpenDeckStudio).deckId)
+        }
         assertEquals("existing-deck-1", vm.uiState.value.createdDeckId)
         coVerify { deckRepository.persistCommanderBuild(deckId = "existing-deck-1", slots = any(), archetypeOverride = any(), themesOverride = any(), posture = any(), tribeOverride = any(), strategyLocked = any()) }
     }
@@ -1588,7 +1650,10 @@ class DeckWizardViewModelTest {
     fun `R15 -- an unconfirmed launch into an EMPTY existing deck persists normally, nothing to lose`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery {
+            buildCommanderDeckUseCase.finalize(any(), any(), any(), any())
         } returns commanderOutcome()
         every { deckRepository.observeDeckWithCards("existing-deck-2") } returns flowOf(emptyDeckWithCards("existing-deck-2"))
 
@@ -1601,10 +1666,15 @@ class DeckWizardViewModelTest {
         vm.onNextFromCommanderPick()
         vm.onNextFromStrategy()
         vm.onNextFromManualAdds()
-        vm.onGenerate()
-        advanceUntilIdle()
-
-        assertEquals(WizardPhase.RESULT, vm.uiState.value.phase)
+        // W7 Task D (plan 7.5): a successful Commander build fires OpenDeckStudio directly, never
+        // lands on WizardPhase.RESULT.
+        vm.events.test {
+            vm.onGenerate()
+            advanceUntilIdle()
+            val event = awaitItem()
+            assertTrue(event is DeckWizardEvent.OpenDeckStudio)
+            assertEquals("existing-deck-2", (event as DeckWizardEvent.OpenDeckStudio).deckId)
+        }
         assertEquals("existing-deck-2", vm.uiState.value.createdDeckId)
         coVerify { deckRepository.persistCommanderBuild(deckId = "existing-deck-2", slots = any(), archetypeOverride = any(), themesOverride = any(), posture = any(), tribeOverride = any(), strategyLocked = any()) }
     }
@@ -2234,7 +2304,12 @@ class DeckWizardViewModelTest {
         val strategyPickSlot = slot<com.mmg.manahub.feature.decks.domain.engine.StrategyPick>()
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase(any(), any(), capture(strategyPickSlot), any(), any(), any(), any(), any(), any(), any())
+            // strategyPick is position 3 in BOTH invoke() and buildWithGroups() -- unaffected by
+            // buildWithGroups dropping the `fillLands` param (which sits AFTER this position).
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), capture(strategyPickSlot), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery {
+            buildCommanderDeckUseCase.finalize(any(), any(), any(), any())
         } returns commanderOutcome()
         vm.onNextFromFormat()
         vm.onSelectCommander(commander)
@@ -2445,5 +2520,216 @@ class DeckWizardViewModelTest {
 
         val suggestion = vm.uiState.value.seedStrategySuggestion
         assertTrue(suggestion != null && suggestion.candidates.any { it.profile.archetype == ArchetypeId.AGGRO })
+    }
+
+    // ── W7 Task B -- the Choice screen (2026-09-15) ─────────────────────────────
+
+    private val choiceTentative1 = card(id = "tent-1", name = "Tentative One", colorIdentity = listOf("G"))
+    private val choiceTentative2 = card(id = "tent-2", name = "Tentative Two", colorIdentity = listOf("G"))
+    private val choiceAltA = card(id = "alt-a", name = "Alt A", colorIdentity = listOf("G"))
+    private val choiceAltB = card(id = "alt-b", name = "Alt B", colorIdentity = listOf("G"))
+    private val choiceAltC = card(id = "alt-c", name = "Alt C", colorIdentity = listOf("G"))
+
+    /** Two ambiguity groups (mirrors the real harness -- median 3-4 groups/build, never just one)
+     * so "resolve one, leave the other untouched" is a genuine test of [DeckWizardViewModel
+     * .onFinishChoices]'s "honour decided, default undecided" contract, not a single-group
+     * coincidence. */
+    private fun twoGroupChoiceDraft() = commanderDraft(
+        ambiguityGroups = listOf(
+            AmbiguityGroup(sectionId = "removal_spot", candidateIds = listOf("alt-a", "alt-b"), remainingSlots = 1),
+            AmbiguityGroup(sectionId = "card_draw", candidateIds = listOf("alt-c"), remainingSlots = 1),
+        ),
+        tentativeByRole = mapOf("removal_spot" to listOf("tent-1"), "card_draw" to listOf("tent-2")),
+        candidatesById = mapOf(
+            "tent-1" to choiceTentative1, "tent-2" to choiceTentative2,
+            "alt-a" to choiceAltA, "alt-b" to choiceAltB, "alt-c" to choiceAltC,
+        ),
+    )
+
+    private fun kotlinx.coroutines.test.TestScope.advanceCommanderToReview(vm: DeckWizardViewModel) {
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        vm.onNextFromManualAdds()
+    }
+
+    @Test
+    fun `a build with ambiguity groups lands on CHOICE and persists nothing yet`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns twoGroupChoiceDraft()
+        val vm = viewModel()
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        assertEquals(WizardPhase.CHOICE, vm.uiState.value.phase)
+        assertNotNull(vm.uiState.value.commanderDraftBuild)
+        assertTrue(vm.uiState.value.choiceSelections.isEmpty())
+        coVerify(exactly = 0) { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `a zero-group build skips CHOICE and finalizes with empty resolutions, straight to opening Deck Studio`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
+        val vm = viewModel()
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+
+        // W7 Task D (plan 7.5): never lands on WizardPhase.RESULT -- fires OpenDeckStudio directly.
+        vm.events.test {
+            vm.onGenerate()
+            advanceUntilIdle()
+            val event = awaitItem()
+            assertTrue(event is DeckWizardEvent.OpenDeckStudio)
+        }
+        assertNull(vm.uiState.value.commanderDraftBuild)
+        coVerify(exactly = 1) { buildCommanderDeckUseCase.finalize(any(), emptyMap(), any(), any()) }
+    }
+
+    @Test
+    fun `onToggleChoiceCard enforces the remainingSlots cap and a deselect frees the slot`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns twoGroupChoiceDraft()
+        val vm = viewModel()
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        // Untouched -- the effective selection is the tentative default, which already occupies the
+        // section's ONE slot; the cap must be respected against that IMPLICIT default too.
+        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        assertNull("selecting an alternative while the tentative default still occupies the only slot must be a no-op", vm.uiState.value.choiceSelections["removal_spot"])
+
+        // Deselect the default first -- frees the slot.
+        vm.onToggleChoiceCard("removal_spot", "tent-1")
+        assertEquals(emptyList<String>(), vm.uiState.value.choiceSelections["removal_spot"])
+
+        // Now the alternative can be selected.
+        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        assertEquals(listOf("alt-a"), vm.uiState.value.choiceSelections["removal_spot"])
+
+        // A second alternative cannot be added on top of a full section.
+        vm.onToggleChoiceCard("removal_spot", "alt-b")
+        assertEquals(listOf("alt-a"), vm.uiState.value.choiceSelections["removal_spot"])
+
+        // Deselecting the chosen alternative frees the slot again.
+        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        assertEquals(emptyList<String>(), vm.uiState.value.choiceSelections["removal_spot"])
+    }
+
+    @Test
+    fun `onToggleChoiceCard records a preference ONLY for an actively-selected alternative, never a kept default`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns twoGroupChoiceDraft()
+        val vm = viewModel()
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        vm.onToggleChoiceCard("removal_spot", "tent-1") // deselect the kept default
+        vm.onToggleChoiceCard("removal_spot", "alt-a") // actively choose an alternative
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { wizardPreferenceStore.recordPick("alt-a") }
+        coVerify(exactly = 0) { wizardPreferenceStore.recordPick("tent-1") }
+    }
+
+    @Test
+    fun `onAutoFillChoiceSection fills only the section's still-unselected slots with tentative defaults`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns twoGroupChoiceDraft()
+        val vm = viewModel()
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        // The section is already "full" via its implicit tentative default -- auto-fill has nothing
+        // left to do and must be a no-op (never duplicate/exceed remainingSlots).
+        vm.onAutoFillChoiceSection("removal_spot")
+        assertNull(vm.uiState.value.choiceSelections["removal_spot"])
+
+        // Deselect the default, leaving a real gap -- auto-fill puts it right back.
+        vm.onToggleChoiceCard("removal_spot", "tent-1")
+        vm.onAutoFillChoiceSection("removal_spot")
+        assertEquals(listOf("tent-1"), vm.uiState.value.choiceSelections["removal_spot"])
+    }
+
+    @Test
+    fun `onFinishChoices honours a decided section exactly, defaults an undecided one, and persists ONCE`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns twoGroupChoiceDraft()
+        val resolutionsSlot = slot<Map<RoleKey, List<String>>>()
+        coEvery {
+            buildCommanderDeckUseCase.finalize(any(), capture(resolutionsSlot), any(), any())
+        } returns commanderOutcome()
+        val vm = viewModel()
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        // The user decides "removal_spot" (swaps its default for alt-a) and never touches "card_draw".
+        vm.onToggleChoiceCard("removal_spot", "tent-1")
+        vm.onToggleChoiceCard("removal_spot", "alt-a")
+
+        // W7 Task D (plan 7.5): never lands on WizardPhase.RESULT -- fires OpenDeckStudio directly.
+        vm.events.test {
+            vm.onFinishChoices()
+            advanceUntilIdle()
+            val event = awaitItem()
+            assertTrue(event is DeckWizardEvent.OpenDeckStudio)
+        }
+        assertNull(vm.uiState.value.commanderDraftBuild)
+        coVerify(exactly = 1) { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) }
+        assertEquals(listOf("alt-a"), resolutionsSlot.captured["removal_spot"])
+        assertTrue("an untouched section must be ABSENT from resolutions, not defaulted explicitly", "card_draw" !in resolutionsSlot.captured)
+    }
+
+    @Test
+    fun `abandoning the Choice screen via back writes nothing and returns to REVIEW`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns twoGroupChoiceDraft()
+        val vm = viewModel()
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+        assertEquals(WizardPhase.CHOICE, vm.uiState.value.phase)
+
+        // Make a selection, THEN abandon -- the in-memory selection must not leak into a later build.
+        vm.onToggleChoiceCard("removal_spot", "tent-1")
+        val shouldPopWizard = vm.onBackPressed()
+
+        assertFalse("abandoning Choice unwinds internally -- the wizard itself must stay open", shouldPopWizard)
+        assertEquals(WizardPhase.REVIEW, vm.uiState.value.phase)
+        assertNull(vm.uiState.value.commanderDraftBuild)
+        assertTrue(vm.uiState.value.choiceSelections.isEmpty())
+        coVerify(exactly = 0) { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.createDeck(any(), any(), any()) }
     }
 }

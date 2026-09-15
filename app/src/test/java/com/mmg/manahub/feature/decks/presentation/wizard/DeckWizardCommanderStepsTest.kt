@@ -263,4 +263,26 @@ class DeckWizardCommanderStepsTest {
         assertEquals(1, availability["role:ramp"])
         assertEquals(1, availability["mv:2"])
     }
+
+    // ── choiceDisplayIds (W7 Task B, R10) ───────────────────────────────────────
+
+    @Test
+    fun `tentative defaults always show, even when the cap would otherwise hide them`() {
+        // A pathological cap of 0 alternatives must still show every tentative default -- the cap
+        // only ever truncates ALTERNATIVES, never the engine's own pre-selected picks.
+        val ids = choiceDisplayIds(tentativeIds = listOf("tent-1", "tent-2"), alternativeIds = listOf("alt-1", "alt-2"), cap = 0)
+        assertEquals(listOf("tent-1", "tent-2"), ids)
+    }
+
+    @Test
+    fun `alternatives beyond the cap are truncated, preserving gain order`() {
+        val ids = choiceDisplayIds(tentativeIds = listOf("tent-1"), alternativeIds = listOf("alt-1", "alt-2", "alt-3"), cap = 2)
+        assertEquals(listOf("tent-1", "alt-1", "alt-2"), ids)
+    }
+
+    @Test
+    fun `an id present in both lists is never duplicated`() {
+        val ids = choiceDisplayIds(tentativeIds = listOf("tent-1"), alternativeIds = listOf("tent-1", "alt-1"), cap = 10)
+        assertEquals(listOf("tent-1", "alt-1"), ids)
+    }
 }

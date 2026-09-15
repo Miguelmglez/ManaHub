@@ -42,9 +42,11 @@ import com.mmg.manahub.feature.decks.domain.engine.PillarId
 import com.mmg.manahub.feature.decks.domain.engine.PlacementScorer
 import com.mmg.manahub.feature.decks.domain.engine.PostureId
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
+import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.StrategyProfile
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
+import com.mmg.manahub.feature.decks.domain.engine.WizardPreferenceStore
 import com.mmg.manahub.feature.decks.domain.engine.toPin
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.StrategyPick
@@ -54,6 +56,7 @@ import com.mmg.manahub.feature.decks.domain.template.CategorySuggestions
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfile
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
 import com.mmg.manahub.feature.decks.domain.template.CollectionTribeSignal
+import com.mmg.manahub.feature.decks.domain.template.CommanderDraftBuild
 import com.mmg.manahub.feature.decks.domain.template.DeckWizardSpec
 import com.mmg.manahub.feature.decks.domain.template.ManualAdd
 import com.mmg.manahub.feature.decks.domain.template.OwnedCard
@@ -91,8 +94,15 @@ import kotlinx.coroutines.launch
  * MANUAL_ADDS → REVIEW`), Casual starts at [ENTRY] (`ENTRY → DIRECTION → MANUAL_ADDS → REVIEW`).
  * [IDENTITY] stays unreachable dead code for every flow (see [DeckWizardViewModel
  * .onNextFromDirection]'s KDoc).
+ *
+ * W7 (Choice flow, R10/R11): [CHOICE] is Commander-only, inserted between [GENERATING] and
+ * [RESULT] whenever [BuildCommanderDeckUseCase.buildWithGroups] surfaces at least one
+ * [com.mmg.manahub.feature.decks.domain.template.AmbiguityGroup] — the SAME "replaces the whole
+ * body, no step indicator" treatment [GENERATING]/[RESULT] already get (see [stepPhasesFor] in
+ * `DeckWizardScreen.kt`, unchanged by this addition). A zero-group build skips [CHOICE] entirely
+ * and finalizes straight to [RESULT], same as before this run.
  */
-enum class WizardPhase { ENTRY, COMMANDER_PICK, STRATEGY, MANUAL_ADDS, DIRECTION, IDENTITY, REVIEW, GENERATING, RESULT }
+enum class WizardPhase { ENTRY, COMMANDER_PICK, STRATEGY, MANUAL_ADDS, DIRECTION, IDENTITY, REVIEW, GENERATING, CHOICE, RESULT }
 
 /**
  * Deck Engine Unification plan (§5 Phase 3.1) — the three ways a build can start. [CARDS] is the
@@ -381,17 +391,22 @@ data class DeckWizardUiState(
     val commanderCompletedStages: List<com.mmg.manahub.feature.decks.domain.template.CommanderBuildStage> = emptyList(),
     val buildError: String? = null,
 
-    // ── Result ─────────────────────────────────────────────────────────────────
+    // ── Result (Casual only -- W7 Task D retired the Commander Result screen, plan 7.5;
+    //    Commander now fires DeckWizardEvent.OpenDeckStudio directly from finalizeCommanderDraft) ──
     val buildResult: TemplateBuildResult? = null,
-    /** Deck Wizard Commander v3 plan, Phase 6 -- the Commander build path's OWN result shape
-     * (D2/D15: the same [com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis] Studio shows),
-     * populated instead of [buildResult] whenever [DeckWizardViewModel.onGenerate] dispatches a
-     * Commander-format spec through [BuildCommanderDeckUseCase]. `null` for every Casual build
-     * (which still populates [buildResult]) and until a Commander build actually completes. The
-     * Result screen's own UI content (6.3/6.4) is NOT wired to render this yet -- tracked as
-     * remaining Phase 6 work. */
-    val commanderBuildResult: WizardBuildResult? = null,
     val createdDeckId: String? = null,
+
+    // ── Choice (W7 Task B, Commander only) ────────────────────────────────────
+    /** The engine's pre-land, pre-persist draft — held in memory only while [WizardPhase.CHOICE] is
+     * showing (never persisted, never surviving process death by design — see
+     * [DeckWizardViewModel.onFinishChoices]'s own KDoc). `null` outside that phase. */
+    val commanderDraftBuild: CommanderDraftBuild? = null,
+    /** Per-role selections made so far on the Choice screen: [RoleKey] -> the user's FINAL chosen
+     * ids for that role (tentative ∪ alternatives — see [BuildCommanderDeckUseCase.finalize]'s own
+     * KDoc for the exact contract). A role ABSENT from this map has not been touched by the user —
+     * the UI still displays its tentative defaults as pre-selected, and finalizing with this map
+     * as-is keeps that role's engine defaults untouched. */
+    val choiceSelections: Map<RoleKey, List<String>> = emptyMap(),
 ) {
     /** Casual + 3-or-more colors: a non-blocking hint, never a hard gate (D9). */
     val showColorDisciplineHint: Boolean
@@ -523,6 +538,13 @@ class DeckWizardViewModel(
     // collection happens to own zero copies of. Appended last, required (no default: CardRepository
     // has no cheap fake, matches every other repository param above).
     private val cardRepository: CardRepository,
+    // Deck Wizard v4, W7 Task B (E4/E8) -- lets a build bias placement toward cards the user
+    // previously chose on the Choice screen (buildWithGroups' own preferenceStore param), and lets
+    // onToggleChoiceCard record a freshly-made choice for FUTURE builds. Appended last, required
+    // (no default -- a KeyValueStore-backed instance costs nothing to construct in production, and
+    // an inert fake belongs in each test's own construction site, matching every other required
+    // repository param above).
+    private val wizardPreferenceStore: WizardPreferenceStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DeckWizardUiState())
@@ -1966,6 +1988,8 @@ class DeckWizardViewModel(
             // Flow B/C's DIRECTION) collapses to one target.
             WizardPhase.REVIEW -> { _uiState.update { it.copy(phase = WizardPhase.MANUAL_ADDS) }; false }
             WizardPhase.GENERATING -> { onCancelGeneration(); false }
+            // W7 Task B (R10): abandoning Choice writes nothing -- see onAbandonChoice's own KDoc.
+            WizardPhase.CHOICE -> { onAbandonChoice(); false }
             WizardPhase.RESULT -> true
         }
     }
@@ -2007,14 +2031,17 @@ class DeckWizardViewModel(
         }
     }
 
-    /** The Commander/Commander Casual build path (Deck Wizard Commander v3 plan, Phase 6). Builds
-     * via [buildCommanderDeckUseCase] (D1: the SAME objective [com.mmg.manahub.feature.decks.domain
-     * .usecase.DeckAnalysisPipeline] verifies), then persists atomically into [launchedFromDeckId]
-     * when the wizard was launched from an existing draft, or a freshly created deck otherwise
-     * (D12). A cancellation before the write below runs leaves an existing [launchedFromDeckId]
-     * draft completely untouched (nothing has been written to it yet); a fresh deck created by this
-     * function is tracked via [pendingDeckId] so [onCancelGeneration]/[onRetryGeneration] can clean
-     * it up the same way the Casual path already does. */
+    /** The Commander/Commander Casual build path (Deck Wizard Commander v3 plan, Phase 6; split into
+     * a build-then-finalize pair in W7 Task B). Runs [buildCommanderDeckUseCase]'s placement loop
+     * only (D1: the SAME objective [com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline]
+     * verifies) -- a build with at least one [com.mmg.manahub.feature.decks.domain.template
+     * .AmbiguityGroup] hands the in-memory draft to [WizardPhase.CHOICE] instead of finalizing
+     * immediately (R10); a zero-group build calls [finalizeCommanderDraft] straight away, exactly
+     * as the old single-shot path did (byte-identical by construction -- see
+     * [BuildCommanderDeckUseCase.invoke]'s own KDoc). Nothing is persisted by this function itself;
+     * see [finalizeCommanderDraft]'s KDoc for the write path (E11: persist happens exactly once,
+     * whichever branch reaches it).
+     */
     private suspend fun generateCommanderDeck(state: DeckWizardUiState, format: DeckFormat) {
         val crashlytics = FirebaseCrashlytics.getInstance()
         crashlytics.log("deck_wizard_generate_started")
@@ -2034,38 +2061,29 @@ class DeckWizardViewModel(
         // (selectedArchetype/selectedStrategyThemes/selectedTribeKey) plus a display-only catalog id
         // pointer (selectedCuratedStrategyId) -- re-resolve the StrategyPick the build engine wants
         // from that id (null id = Custom, D6).
-        val strategyPick: StrategyPick = state.selectedCuratedStrategyId
-            ?.let { id -> CuratedStrategyCatalog.byId(id) }
-            ?.let { strategy -> StrategyPick.Curated(strategy, state.selectedTribeKey) }
-            ?: StrategyPick.Custom
+        val strategyPick = resolveStrategyPick(state)
 
         var ownedCollection = collectionSnapshot
             .groupBy { it.card.scryfallId }
             .map { (_, entries) -> OwnedCard(entries.first().card, entries.sumOf { entry -> entry.userCard.quantity }) }
         // R12/E13 (Deck Wizard Commander v4, W5.3): basics are an unconditional, ownership-exempt
         // resource -- this guarantee now runs UNCONDITIONALLY, never gated on the (Commander-only)
-        // includeNonBasicLands toggle, because BuildCommanderDeckUseCase's own fillLands arg is
-        // ALWAYS true for Commander below. Mirrors DeckStudioViewModel.applyLandSuggestions' own
-        // fetch-if-missing.
+        // includeNonBasicLands toggle, because [finalizeCommanderDraft] always fills lands for
+        // Commander. Mirrors DeckStudioViewModel.applyLandSuggestions' own fetch-if-missing.
         ownedCollection = guaranteeBasicsAvailable(ownedCollection, identity)
         // PLAN_SECTIONS' manual adds share DeckWizardUiState.seedCards with Flow A's seed picker --
         // see onAddSeed/isCommanderManualAddValid, which already gates identity/legality for a
         // Commander spec before a card can land in this list.
-        val manualAdds = state.seedCards.map { card ->
-            ManualAdd(card = card, isOwned = cardSnapshot.any { it.scryfallId == card.scryfallId })
-        }
+        val manualAdds = resolveManualAdds(state)
 
-        val outcome = runCatching {
-            buildCommanderDeckUseCase(
+        val draft = runCatching {
+            buildCommanderDeckUseCase.buildWithGroups(
                 format = format,
                 commander = commander,
                 strategyPick = strategyPick,
                 identity = identity,
                 ownedCollection = ownedCollection,
                 manualAdds = manualAdds,
-                // R12: basics are unconditional for Commander -- the land engine always runs;
-                // includeNonBasicLands (default OFF, W5.2) gates ONLY Stage A's owned non-basics.
-                fillLands = true,
                 includeNonBasicLands = state.includeNonBasicLands,
                 onStage = { stage ->
                     _uiState.update { s ->
@@ -2076,6 +2094,81 @@ class DeckWizardViewModel(
                     }
                 },
                 deckId = launchedFromDeckId.orEmpty(), // seeds placement tie-breaks (E4)
+                preferenceStore = wizardPreferenceStore,
+            )
+        }.getOrElse { t ->
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            logFailure("deck_wizard_generate_crashed", t)
+            _uiState.update { it.copy(buildError = appContext.getString(R.string.deck_wizard_build_error)) }
+            return
+        }
+
+        if (draft.ambiguityGroups.isEmpty()) {
+            finalizeCommanderDraft(state, format, commander, strategyPick, manualAdds, draft, resolutions = emptyMap())
+        } else {
+            _uiState.update {
+                it.copy(
+                    phase = WizardPhase.CHOICE,
+                    commanderDraftBuild = draft,
+                    choiceSelections = emptyMap(),
+                )
+            }
+        }
+    }
+
+    /** D4/D6: re-resolves the [StrategyPick] the build engine wants from the STRATEGY step's
+     * persisted pin fields -- shared by [generateCommanderDeck] and [onFinishChoices] so both read
+     * the SAME strategy a Choice-screen build was actually run against. */
+    private fun resolveStrategyPick(state: DeckWizardUiState): StrategyPick =
+        state.selectedCuratedStrategyId
+            ?.let { id -> CuratedStrategyCatalog.byId(id) }
+            ?.let { strategy -> StrategyPick.Curated(strategy, state.selectedTribeKey) }
+            ?: StrategyPick.Custom
+
+    /** Shared by [generateCommanderDeck] and [onFinishChoices] -- see [generateCommanderDeck]'s own
+     * comment on `manualAdds` for the identity/legality gating this list already went through. */
+    private fun resolveManualAdds(state: DeckWizardUiState): List<ManualAdd> =
+        state.seedCards.map { card -> ManualAdd(card = card, isOwned = cardSnapshot.any { it.scryfallId == card.scryfallId }) }
+
+    /**
+     * W7 Task B (E11) — completes and persists a [CommanderDraftBuild] exactly ONCE: applies
+     * [resolutions] (empty = every tentative default stands, byte-identical to the old single-shot
+     * build), runs land fill/verify/refine, then writes atomically into [launchedFromDeckId] when
+     * the wizard was launched from an existing draft, or a freshly created deck otherwise (D12).
+     * Called from either [generateCommanderDeck] directly (zero ambiguity groups) or
+     * [onFinishChoices] (the user resolved, or explicitly finished, the Choice screen) — never both
+     * for the same build, so persistence still happens exactly once per generation.
+     *
+     * A cancellation before the write below runs leaves an existing [launchedFromDeckId] draft
+     * completely untouched (nothing has been written to it yet); a fresh deck created by this
+     * function is tracked via [pendingDeckId] so [onCancelGeneration]/[onRetryGeneration] can clean
+     * it up the same way the Casual path already does.
+     */
+    private suspend fun finalizeCommanderDraft(
+        state: DeckWizardUiState,
+        format: DeckFormat,
+        commander: Card,
+        strategyPick: StrategyPick,
+        manualAdds: List<ManualAdd>,
+        draft: CommanderDraftBuild,
+        resolutions: Map<RoleKey, List<String>>,
+    ) {
+        val crashlytics = FirebaseCrashlytics.getInstance()
+        val outcome = runCatching {
+            buildCommanderDeckUseCase.finalize(
+                draft = draft,
+                resolutions = resolutions,
+                // R12: basics are unconditional for Commander -- the land engine always runs;
+                // includeNonBasicLands (default OFF, W5.2) gates ONLY Stage A's owned non-basics.
+                fillLands = true,
+                onStage = { stage ->
+                    _uiState.update { s ->
+                        s.copy(
+                            commanderCompletedStages = s.commanderBuildStage?.let { s.commanderCompletedStages + it } ?: s.commanderCompletedStages,
+                            commanderBuildStage = stage,
+                        )
+                    }
+                },
             )
         }.getOrElse { t ->
             if (t is kotlinx.coroutines.CancellationException) throw t
@@ -2147,9 +2240,109 @@ class DeckWizardViewModel(
 
         crashlytics.log("deck_wizard_generate_succeeded")
         crashlytics.setCustomKey("deck_wizard_template_source", "COMMANDER_V3_ENGINE")
-        logCommanderBuildTelemetry(state, strategyPick, ownedCollection.size, outcome.result)
+        logCommanderBuildTelemetry(state, strategyPick, draft.ownedCollection.size, outcome.result)
         _uiState.update {
-            it.copy(phase = WizardPhase.RESULT, commanderBuildResult = outcome.result, createdDeckId = writeOutcome)
+            it.copy(
+                createdDeckId = writeOutcome,
+                commanderDraftBuild = null,
+                choiceSelections = emptyMap(),
+            )
+        }
+        // W7 Task D (plan 7.5) -- the Commander Result screen is retired: Deck Studio's Build tab
+        // (R11, Task C) is the hand-off now, not an intermediate summary screen. The Choice screen
+        // already gave the user their one chance to review/decide the build's close calls, so there
+        // is nothing left for a separate Result step to show. Casual is UNCHANGED -- it still routes
+        // through WizardPhase.RESULT/ResultContent (generateCasualDeck, untouched by this run).
+        _events.send(DeckWizardEvent.OpenDeckStudio(writeOutcome))
+    }
+
+    // ── Choice (W7 Task B, R10) ──────────────────────────────────────────────────
+
+    /** Toggles [cardId] in [role]'s selection, respecting [com.mmg.manahub.feature.decks.domain
+     * .template.AmbiguityGroup.remainingSlots] as a hard cap (an already-full section ignores a tap
+     * on a not-yet-selected id; deselecting always frees a slot). A role absent from
+     * [DeckWizardUiState.choiceSelections] displays -- and behaves as if pre-selected with -- its
+     * own [CommanderDraftBuild.tentativeByRole] defaults (see that field's own KDoc).
+     * [WizardPreferenceStore.recordPick] fires ONLY when the newly-added id is a genuine
+     * alternative (not a tentative default the user merely kept), per E8's "actively chosen"
+     * contract -- never for a default kept, and never from [onAutoFillChoiceSection]/
+     * [onFinishChoices], which never call this function.
+     */
+    fun onToggleChoiceCard(role: RoleKey, cardId: String) {
+        val state = _uiState.value
+        val draft = state.commanderDraftBuild ?: return
+        val group = draft.ambiguityGroups.firstOrNull { it.sectionId == role } ?: return
+        val tentative = draft.tentativeByRole[role].orEmpty()
+        val current = state.choiceSelections[role] ?: tentative
+        val isAdding = cardId !in current
+        if (isAdding && current.size >= group.remainingSlots) return // cap reached -- ignore the tap
+        val updated = if (isAdding) current + cardId else current - cardId
+        _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to updated)) }
+        if (isAdding && cardId !in tentative) {
+            viewModelScope.launch { wizardPreferenceStore.recordPick(cardId) }
+        }
+    }
+
+    /** "Choose the remaining N for me" (per-section) — fills whichever of [role]'s slots the user
+     * has not yet decided with the engine's own tentative defaults, leaving any already-made
+     * selection (a kept default or a chosen alternative) untouched. */
+    fun onAutoFillChoiceSection(role: RoleKey) {
+        val state = _uiState.value
+        val draft = state.commanderDraftBuild ?: return
+        val group = draft.ambiguityGroups.firstOrNull { it.sectionId == role } ?: return
+        val tentative = draft.tentativeByRole[role].orEmpty()
+        val current = state.choiceSelections[role] ?: tentative
+        val missing = group.remainingSlots - current.size
+        if (missing <= 0) return
+        val fill = tentative.filter { it !in current }.take(missing)
+        if (fill.isEmpty()) return
+        _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to (current + fill))) }
+    }
+
+    /** Global "Let the wizard finish" — the Choice screen's ONE finish action (R10): resolves every
+     * section the user has already decided exactly as chosen, and every untouched section with the
+     * engine's own tentative defaults (an absent [DeckWizardUiState.choiceSelections] entry — see
+     * [BuildCommanderDeckUseCase.finalize]'s own KDoc), then persists ONCE via
+     * [finalizeCommanderDraft] (E11). Re-entrancy-guarded the same way [onGenerate] is (a
+     * synchronous phase check before the async work starts).
+     */
+    fun onFinishChoices() {
+        val state = _uiState.value
+        if (state.phase != WizardPhase.CHOICE) return
+        val draft = state.commanderDraftBuild ?: return
+        val format = state.selectedFormat ?: return
+        val commander = state.selectedCommander ?: return
+        val strategyPick = resolveStrategyPick(state)
+        val manualAdds = resolveManualAdds(state)
+        _uiState.update {
+            it.copy(
+                phase = WizardPhase.GENERATING,
+                commanderBuildStage = null,
+                commanderCompletedStages = emptyList(),
+                buildError = null,
+            )
+        }
+        generateJob = viewModelScope.launch {
+            finalizeCommanderDraft(state, format, commander, strategyPick, manualAdds, draft, resolutions = state.choiceSelections)
+        }
+    }
+
+    /** Abandoning the Choice screen (UI/system back) writes NOTHING — the in-memory draft is simply
+     * dropped, matching every other pre-persist wizard step's back semantics (R10: abandonment must
+     * leave the repository untouched, byte-identical). Process death mid-Choice has the same effect
+     * by construction: [DeckWizardUiState.commanderDraftBuild] is plain in-memory VM state, never
+     * SavedStateHandle-backed, so it is simply gone on process restore — there is nothing to clean
+     * up because nothing was ever written.
+     */
+    private fun onAbandonChoice() {
+        _uiState.update {
+            it.copy(
+                phase = WizardPhase.REVIEW,
+                commanderDraftBuild = null,
+                choiceSelections = emptyMap(),
+                commanderBuildStage = null,
+                commanderCompletedStages = emptyList(),
+            )
         }
     }
 

@@ -1298,10 +1298,19 @@
     <string name="deck_wizard_source_community">Built from community data</string>
     <string name="deck_wizard_source_synthetic">Built from your deck archetype</string>
     <string name="deck_wizard_open_studio">Open in Deck Studio</string>
-    <!-- Deck Wizard Commander v3 plan (Phase 6, 6.4) -->
-    <string name="deck_wizard_commander_result_fill_summary">%1$d cards placed by the wizard · %2$d kept from your manual adds · %3$d lands</string>
-    <string name="deck_wizard_commander_result_gap_row">%1$s %2$d/%3$d — no more in your collection</string>
+    <!-- deck_wizard_commander_result_fill_summary / deck_wizard_commander_result_gap_row (Deck Wizard
+         Commander v3 plan, Phase 6) were REMOVED (W7 Task D, plan 7.5) alongside CommanderResultContent. -->
     <string name="deck_wizard_suggestion_added">%1$s added</string>
+    <!-- Deck Wizard v4, W7 Task B (R10): the Choice screen -->
+    <string name="deck_wizard_choice_title">A few close calls</string>
+    <string name="deck_wizard_choice_subtitle">Several cards were an equally good fit — pick your favorites, or let the wizard decide.</string>
+    <string name="deck_wizard_choice_section_choose">Choose %1$d</string>
+    <string name="deck_wizard_choice_section_selected">%1$d/%2$d selected</string>
+    <string name="deck_wizard_choice_current_pick">Current pick</string>
+    <string name="deck_wizard_choice_autofill_section">Choose the rest for me</string>
+    <string name="deck_wizard_choice_finish">Let the wizard finish</string>
+    <string name="deck_wizard_choice_error_title">Nothing to choose from</string>
+    <string name="deck_wizard_choice_error_message">The draft build is missing — go back and generate again.</string>
     <string name="deck_wizard_name_suffix_deck">%1$s Deck</string>
     <string name="deck_wizard_name_default">New %1$s Deck</string>
 

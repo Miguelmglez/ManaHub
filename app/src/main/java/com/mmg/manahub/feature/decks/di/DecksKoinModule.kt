@@ -2,14 +2,19 @@ package com.mmg.manahub.feature.decks.di
 // COMMENTS_REVIEWED: 2026-09-08
 
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.common.DataStoreKeyValueStore
+import com.mmg.manahub.core.common.KeyValueStore
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.data.local.userPrefsDataStore
 import com.mmg.manahub.core.data.remote.DeckstatsClient
 import com.mmg.manahub.core.data.remote.DeckstatsFetcherImpl
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.EdhrecPowerResolver
+import com.mmg.manahub.feature.decks.domain.engine.KeyValueWizardPreferenceStore
 import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
 import com.mmg.manahub.feature.decks.domain.engine.PowerResolver
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
+import com.mmg.manahub.feature.decks.domain.engine.WizardPreferenceStore
 import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
 import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.DeckstatsFetcher
@@ -135,6 +140,12 @@ fun decksKoinModule(): Module = module {
     // Deck Wizard Commander v3 plan (Phase 2/6): the placement engine BuildDeckFromTemplateUseCase's
     // Commander branch is retiring toward -- consumes the SAME DeckAnalysisPipeline singleton above.
     single { BuildCommanderDeckUseCase(deckAnalysisPipeline = get(), crashReporter = get()) }
+    // Deck Wizard v4, W7 Task B (E8) -- shares the app's own "user_prefs" DataStore file (never a
+    // second preferences file) via the SAME internal accessor UserPreferencesDataStore uses. Bound
+    // to the interface type (feedback_koin_single_concrete_type_mismatch): every consumer's
+    // constructor param is typed as KeyValueStore/WizardPreferenceStore, never the concrete class.
+    single<KeyValueStore> { DataStoreKeyValueStore(get<android.content.Context>().userPrefsDataStore) }
+    single<WizardPreferenceStore> { KeyValueWizardPreferenceStore(get()) }
     single { SuggestAddsUseCase(deckScorer = get()) }
     // Deck Analysis Category Sections rework (W0, D3): the old Deck Doctor "Cuts" suggestion tab
     // was deleted, so NOTHING in production resolves `SuggestCutsUseCase` via Koin any more --
@@ -282,6 +293,9 @@ fun decksKoinModule(): Module = module {
             buildCommanderDeckUseCase = get(),
             // Deck Wizard v4, W0.2 -- pre-warms real basic-land Card objects before a Commander build.
             cardRepository = get(),
+            // Deck Wizard v4, W7 Task B (E4/E8) -- biases placement toward previously-chosen Choice
+            // picks and records freshly-made ones.
+            wizardPreferenceStore = get(),
         )
     }
 }

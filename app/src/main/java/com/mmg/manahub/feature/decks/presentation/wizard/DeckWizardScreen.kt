@@ -252,25 +252,26 @@ fun DeckWizardScreen(
                             onCancel = viewModel::onCancelGeneration,
                             onRetry = viewModel::onRetryGeneration,
                         )
-                        WizardPhase.RESULT -> if (uiState.selectedFormat?.isCommanderFormat == true) {
-                            // Deck Wizard Commander v3 plan (Phase 6, 6.4): commanderBuildResult
-                            // carries the SAME DeckAnalysis Studio shows -- never the legacy
-                            // TemplateBuildResult/SuggestionCategory vocabulary below.
-                            CommanderResultContent(
-                                uiState = uiState,
-                                onCardClick = onCardClick,
-                                onOpenDeckStudio = viewModel::onOpenDeckStudio,
-                                onBack = handleBack,
-                            )
-                        } else {
-                            ResultContent(
-                                uiState = uiState,
-                                onAddSuggestion = viewModel::onAddCommunitySuggestion,
-                                onCardClick = onCardClick,
-                                onOpenDeckStudio = viewModel::onOpenDeckStudio,
-                                onBack = handleBack,
-                            )
-                        }
+                        // Deck Wizard v4, W7 Task B (R10) -- Commander-only, inserted whenever the
+                        // build surfaced at least one ambiguity group; a zero-group build skips this
+                        // phase entirely (see WizardPhase.CHOICE's own KDoc).
+                        WizardPhase.CHOICE -> ChoiceStepContent(
+                            uiState = uiState,
+                            onToggleCard = viewModel::onToggleChoiceCard,
+                            onAutoFillSection = viewModel::onAutoFillChoiceSection,
+                            onFinish = viewModel::onFinishChoices,
+                            onCardClick = onCardClick,
+                        )
+                        // W7 Task D (plan 7.5): Commander never reaches RESULT any more --
+                        // finalizeCommanderDraft fires DeckWizardEvent.OpenDeckStudio directly once
+                        // the write succeeds (see that function's own KDoc). RESULT is Casual-only now.
+                        WizardPhase.RESULT -> ResultContent(
+                            uiState = uiState,
+                            onAddSuggestion = viewModel::onAddCommunitySuggestion,
+                            onCardClick = onCardClick,
+                            onOpenDeckStudio = viewModel::onOpenDeckStudio,
+                            onBack = handleBack,
+                        )
                     }
                 }
             }

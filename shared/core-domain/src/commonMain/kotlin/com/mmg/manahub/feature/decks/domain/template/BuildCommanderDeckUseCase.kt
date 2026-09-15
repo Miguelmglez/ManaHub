@@ -267,7 +267,10 @@ class BuildCommanderDeckUseCase(
         // CommanderDraftBuild.tentativeByRole's KDoc for why this replaces the old after-the-fact
         // (and therefore roomless) ambiguity computation.
         val tentativeSlotIdsByRole = mutableMapOf<RoleKey, MutableList<String>>()
-        val tentativeAlternatesByRole = mutableMapOf<RoleKey, MutableSet<String>>()
+        // W7 Task B (E4) -- the Choice screen orders a section's alternatives by marginal gain, so
+        // this keeps the BEST gain ever recorded for each alternate id (an id can be re-scored at
+        // multiple decision points across the loop) rather than only its membership.
+        val tentativeAlternateGainsByRole = mutableMapOf<RoleKey, MutableMap<String, Float>>()
         while (placedNonLand.size - manualNonLand.size < nonLandTarget && remainingCandidates.isNotEmpty() && iterations < iterationCap) {
             iterations++
             var best: Card? = null
@@ -320,11 +323,14 @@ class BuildCommanderDeckUseCase(
                         c.scryfallId to gain
                     }
                     .filter { (_, gain) -> gain >= bestGain * (1f - AMBIGUITY_EPSILON) }
-                    .map { it.first }
                     .toList()
                 if (alternates.isNotEmpty()) {
                     tentativeSlotIdsByRole.getOrPut(tentativeRole) { mutableListOf() } += chosen.scryfallId
-                    tentativeAlternatesByRole.getOrPut(tentativeRole) { mutableSetOf() } += alternates
+                    val gainsForRole = tentativeAlternateGainsByRole.getOrPut(tentativeRole) { mutableMapOf() }
+                    alternates.forEach { (id, gain) ->
+                        val existing = gainsForRole[id]
+                        if (existing == null || gain > existing) gainsForRole[id] = gain
+                    }
                 }
             }
 
@@ -337,11 +343,17 @@ class BuildCommanderDeckUseCase(
         // only a card that is STILL unplaced when the whole loop ends is a genuinely available
         // swap-in, so the final candidate pool is the filter, not the snapshot taken at record time.
         val finalRemainingIds = remainingCandidates.map { it.scryfallId }.toSet()
-        val ambiguityGroups = tentativeAlternatesByRole.mapNotNull { (role, altIds) ->
+        // W7 Task B (E4): candidateIds is ordered by marginal gain (best first), the same `deckId`
+        // seed breaking a gain tie -- this is the order a Choice screen renders, capped display-side.
+        val ambiguityGroups = tentativeAlternateGainsByRole.mapNotNull { (role, gains) ->
             val slots = tentativeSlotIdsByRole[role] ?: return@mapNotNull null
-            val available = altIds.filter { it in finalRemainingIds }
+            val available = gains.filterKeys { it in finalRemainingIds }
             if (available.size < 2) return@mapNotNull null
-            AmbiguityGroup(sectionId = role, candidateIds = available.sorted(), remainingSlots = slots.size)
+            val ordered = available.entries.sortedWith(
+                compareByDescending<Map.Entry<String, Float>> { it.value }
+                    .thenBy { stableSeed(deckId, it.key) },
+            ).map { it.key }
+            AmbiguityGroup(sectionId = role, candidateIds = ordered, remainingSlots = slots.size)
         }
 
         val remainingLandSlots = (landTarget - manualLand.sumOf { 1 }).coerceAtLeast(0)
