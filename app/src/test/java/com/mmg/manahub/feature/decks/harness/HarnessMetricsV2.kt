@@ -73,6 +73,10 @@ data class V2BuildMetrics(
      * during placement instead of after-the-fact, so this is a genuinely different (and meaningful)
      * number than W6's own after-the-fact count. */
     val ambiguityGroupCount: Int = 0,
+    /** W7 Step 0: per-group `candidateIds.size` and `candidateIds.size / remainingSlots` ratio, for
+     * sizing the Choice screen's per-section display cap (K). Empty when [ambiguityGroupCount] is 0. */
+    val candidatesPerGroup: List<Int> = emptyList(),
+    val candidateToSlotRatios: List<Double> = emptyList(),
 ) {
     val allHardMetricsPass: Boolean
         get() = !buildFailed && noBlockerOk && sizeOrGapsOk && determinismOk && commanderOnceOk &&
@@ -270,6 +274,8 @@ object HarnessMetricsV2Calculator {
             refinementSwaps = result.refinementSwaps,
             runtimeMs = runtimeMs,
             ambiguityGroupCount = result.ambiguityGroups.size,
+            candidatesPerGroup = result.ambiguityGroups.map { it.candidateIds.size },
+            candidateToSlotRatios = result.ambiguityGroups.map { it.candidateIds.size.toDouble() / it.remainingSlots },
         )
     }
 }

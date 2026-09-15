@@ -74,6 +74,21 @@ class WizardCommanderHarnessV2Test {
                 "[wizard-harness-v2] ambiguity groups min=${ambiguity.first()} p25=${apct(0.25)} median=${apct(0.5)} " +
                     "p75=${apct(0.75)} max=${ambiguity.last()} zero_groups=${ambiguity.count { it == 0 }}/${ambiguity.size}",
             )
+            // W7 Step 0: candidates-per-group distribution, to size the Choice screen's display cap K.
+            val candSizes = nonFailed.flatMap { it.candidatesPerGroup }.sorted()
+            val ratios = nonFailed.flatMap { it.candidateToSlotRatios }.sorted()
+            if (candSizes.isNotEmpty()) {
+                fun cpct(p: Double) = candSizes[(p * (candSizes.size - 1)).toInt().coerceIn(0, candSizes.size - 1)]
+                fun rpct(p: Double) = ratios[(p * (ratios.size - 1)).toInt().coerceIn(0, ratios.size - 1)]
+                println(
+                    "[wizard-harness-v2] candidates/group (n=${candSizes.size}) min=${candSizes.first()} p25=${cpct(0.25)} " +
+                        "median=${cpct(0.5)} p75=${cpct(0.75)} p90=${cpct(0.9)} max=${candSizes.last()}",
+                )
+                println(
+                    "[wizard-harness-v2] candidates/remainingSlots ratio min=${"%.2f".format(ratios.first())} " +
+                        "p50=${"%.2f".format(rpct(0.5))} p90=${"%.2f".format(rpct(0.9))} max=${"%.2f".format(ratios.last())}",
+                )
+            }
         }
         metrics.filterNot { it.allHardMetricsPass }.take(30).forEach { m ->
             println(
