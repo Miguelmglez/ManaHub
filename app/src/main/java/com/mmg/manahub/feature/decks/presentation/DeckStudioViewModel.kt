@@ -1067,9 +1067,8 @@ class DeckStudioViewModel(
             FirebaseCrashlytics.getInstance().log("deck_studio_commander_mutation_blocked")
             return
         }
-        // X2 (H3/S4): a mainboard mutation while Suggestions is showing recomputes incrementally
-        // instead of invalidating -- invalidateSuggestions() would drop the orchestrator's
-        // AnalysisCache, which is exactly what the incremental path below needs to stay primed.
+        // While Suggestions is showing, recompute incrementally instead of invalidating --
+        // invalidateSuggestions() would drop the orchestrator's primed AnalysisCache.
         val recomputeInline = !isSideboard && _uiState.value.selectedTab == DeckStudioTab.SUGGESTIONS
         if (!recomputeInline) invalidateSuggestions()
         viewModelScope.launch {
@@ -1096,9 +1095,7 @@ class DeckStudioViewModel(
                     source = existingSource(scryfallId, isSideboard) ?: DeckCardSource.USER,
                 )
             }.onSuccess {
-                // Sequenced AFTER the repository write succeeds (plan X2) -- the incremental
-                // recompute reads its own in-memory cache, not the repository, but this ordering
-                // keeps "write, then reflect" as one visible guarantee across both paths.
+                // Sequenced after the write succeeds so "write, then reflect" holds across both paths.
                 if (recomputeInline) refreshAnalysisAfterMutation(scryfallId, deckDoctorOrchestrator::onAddCard)
             }.onFailure {
                 logFailure("deck_studio_add_failed", it)
@@ -1107,18 +1104,7 @@ class DeckStudioViewModel(
         }
     }
 
-    /**
-     * X2 (H3/S4, Deck Wizard Commander v5): while the Analysis tab is showing, a mainboard
-     * add/remove recomputes [DeckDoctorOrchestrator]'s Health in place instead of leaving it stale
-     * until the user leaves and re-enters the tab. Prefers the orchestrator's incremental cache
-     * ([DeckDoctorOrchestrator.onAddCard]/[DeckDoctorOrchestrator.onCutCard], internally debounced);
-     * falls back to a full [DeckDoctorOrchestrator.loadAnalysis] only when that cache can't resolve
-     * the card offline (e.g. a just-imported/never-cached id) — see those methods' own KDoc.
-     *
-     * @param applyToCache one of [DeckDoctorOrchestrator.onAddCard], [DeckDoctorOrchestrator.onCutCard]
-     *   (decrement-or-drop, one copy) or [DeckDoctorOrchestrator.onRemoveCardCompletely] (the whole
-     *   slot regardless of quantity) — the caller picks the one matching its own repository write.
-     */
+    /** Applies the mutation to the orchestrator's cache; falls back to a full reload when the cache can't resolve the card offline. */
     private fun refreshAnalysisAfterMutation(scryfallId: String, applyToCache: (String) -> Boolean) {
         val handled = applyToCache(scryfallId)
         if (!handled && ::deckId.isInitialized) {
@@ -1139,7 +1125,6 @@ class DeckStudioViewModel(
             FirebaseCrashlytics.getInstance().log("deck_studio_commander_mutation_blocked")
             return
         }
-        // X2 (H3/S4): see addCardToDeck's matching comment.
         val recomputeInline = !isSideboard && _uiState.value.selectedTab == DeckStudioTab.SUGGESTIONS
         if (!recomputeInline) invalidateSuggestions()
         viewModelScope.launch {
@@ -1163,7 +1148,6 @@ class DeckStudioViewModel(
 
     /** Removes a card slot entirely (the "delete" action in the detail sheet). */
     fun removeCard(scryfallId: String, isSideboard: Boolean = false) {
-        // X2 (H3/S4): see addCardToDeck's matching comment.
         val recomputeInline = !isSideboard && _uiState.value.selectedTab == DeckStudioTab.SUGGESTIONS
         if (!recomputeInline) invalidateSuggestions()
         viewModelScope.launch {
@@ -1854,11 +1838,7 @@ class DeckStudioViewModel(
         }
     }
 
-    /**
-     * X1 (H7/S3, Deck Wizard Commander v5 plan): breadcrumb for a section that rendered at least
-     * one [com.mmg.manahub.feature.decks.presentation.components.SectionRenderItem.Unresolved]
-     * placeholder — count only, never a card id/name, per the telemetry discipline (CLAUDE.md).
-     */
+    /** Breadcrumb for a section that rendered an unresolved-card placeholder -- count only, never a card id/name. */
     fun recordUnresolvedSectionCards(sectionId: String, count: Int) {
         if (count <= 0) return
         FirebaseCrashlytics.getInstance().apply {

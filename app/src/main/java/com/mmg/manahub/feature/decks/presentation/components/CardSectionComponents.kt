@@ -95,24 +95,14 @@ internal enum class SectionRingTone {
 
 internal data class SectionRingState(val progress: Float, val tone: SectionRingTone)
 
-/**
- * X1 (H7/S3, Deck Wizard Commander v5 plan): what [CardSectionRow] renders for one
- * [CardSection.contributions] entry -- a contribution the caller's `resolveCard` can't resolve
- * (e.g. the commander slot when the caller only indexes non-commander mainboard cards, or a
- * just-imported slot still resolving) is NEVER dropped, only rendered as [Unresolved]. This keeps
- * the section's displayed count always equal to the rendered thumbnail count (S3).
- */
+/** What [CardSectionRow] renders for one contribution -- an unresolvable card is never dropped, only shown as [Unresolved], so the count always matches the rendered thumbnails. */
 internal sealed class SectionRenderItem {
     abstract val contribution: CardContribution
     data class Resolved(override val contribution: CardContribution, val card: Card) : SectionRenderItem()
     data class Unresolved(override val contribution: CardContribution) : SectionRenderItem()
 }
 
-/**
- * Pure (Compose-free, unit-testable) mapping from [CardSection.contributions] to what actually
- * renders -- a plain `.mapNotNull { resolveCard(it) }` is exactly the H7 bug (a resolvable-elsewhere
- * card silently vanishes from its own section while the header's count still includes it).
- */
+/** Pure mapping from contributions to what renders -- never silently drops an unresolved card. */
 internal fun resolveSectionRenderItems(
     contributions: List<CardContribution>,
     resolveCard: (String) -> Card?,
@@ -334,12 +324,7 @@ fun CardSectionRow(
      * pre-existing caller incl. Deck Studio's own Analysis tab) omits the line entirely — this is
      * a purely additive param, zero behavior change for any caller that doesn't pass it. */
     ownedAvailabilityHint: Int? = null,
-    /** X1 (H7/S3): fired with the section id + unresolved-contribution count whenever this section
-     * renders at least one [SectionRenderItem.Unresolved] placeholder -- the ViewModel is the ONLY
-     * caller allowed to reach Crashlytics (no direct Crashlytics call from a Composable), so this is
-     * a plain callback. `{ _, _ -> }` (default) is a silent no-op for every caller that doesn't wire
-     * one (the wizard's Plan Sections step, [com.mmg.manahub.feature.decks.presentation.components
-     * .SynergyAxisComponents]'s producer/payoff rows) -- purely additive, zero behavior change. */
+    /** Fired with section id + unresolved count when this section renders an unresolved placeholder -- Composables never call Crashlytics directly, so the ViewModel owns that. */
     onUnresolvedContributions: (sectionId: String, count: Int) -> Unit = { _, _ -> },
 ) {
     val mc = MaterialTheme.magicColors
@@ -374,9 +359,7 @@ fun CardSectionRow(
 
                 if (expanded) {
                     Spacer(Modifier.height(spacing.sm))
-                    // X1 (H7/S3): NEVER `mapNotNull`/skip an unresolved contribution here -- the
-                    // header's count above already includes it, so a silent skip is exactly the
-                    // "counter says 1, list shows nothing" bug this rework fixes.
+                    // Never skip an unresolved contribution -- the header's count above already includes it.
                     val renderItems = resolveSectionRenderItems(section.contributions, resolveCard)
                     val unresolvedCount = renderItems.count { it is SectionRenderItem.Unresolved }
                     LaunchedEffect(section.id, unresolvedCount) {
@@ -459,13 +442,7 @@ private fun SectionCardThumbnail(
     }
 }
 
-/**
- * X1 (H7/S3): rendered in place of [SectionCardThumbnail] for a [SectionRenderItem.Unresolved]
- * contribution -- the mainboard slot IS counted (the header's number already includes it) but its
- * [Card] could not be resolved by this call site's `resolveCard`, so we show a generic card-back
- * with an accessible description instead of skipping the slot outright. Not clickable -- there is
- * no [Card] id here that [onCardClick] could safely navigate to.
- */
+/** Rendered in place of [SectionCardThumbnail] when a contribution can't be resolved -- not clickable, since there's no card id to navigate to. */
 @Composable
 private fun SectionCardUnresolvedThumbnail(modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors

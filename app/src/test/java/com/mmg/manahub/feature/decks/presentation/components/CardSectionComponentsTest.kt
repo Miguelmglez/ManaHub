@@ -101,7 +101,7 @@ class CardSectionComponentsTest {
         assertEquals(22, section.realCount)
     }
 
-    // ── X1 (H7/S3, Deck Wizard Commander v5 plan): resolveSectionRenderItems ───────────────────
+    // ── resolveSectionRenderItems ────────────────────────────────────────────────────────────
 
     private fun contribution(id: String, quantity: Int = 1) = CardContribution(scryfallId = id, quantity = quantity, confidence = 1f)
 

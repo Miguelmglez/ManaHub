@@ -112,9 +112,7 @@ class DeckStudioViewModelTest {
     // ── Real engine + use cases (deterministic fixed PowerResolver) ───────────
     private val scorer = DeckScorer(RoleClassifier(), fixedPower(normalized = 0.6f))
     private val eventBus = ProgressionEventBus()
-    // Deck Wizard Commander v5 (X2, H3/S4): spyk (not a plain instance) so the debounce-coalescing
-    // tests below can coVerify the exact call COUNT while every other test keeps the real,
-    // unstubbed evaluation behavior (spyk delegates to the wrapped instance unless overridden).
+    // spyk (not a plain instance) so the debounce-coalescing tests below can coVerify the exact call count.
     private val evaluateDeckUseCase = spyk(EvaluateDeckUseCase(scorer, eventBus, dispatcher))
     private val inferDeckIdentityUseCase = InferDeckIdentityUseCase()
 
@@ -2131,11 +2129,7 @@ class DeckStudioViewModelTest {
     @Test
     fun `manual edit on BUILD tab invalidates suggestions requiring re-analysis on next SUGGESTIONS open`() =
         runTest(dispatcher) {
-            // Arrange — open SUGGESTIONS first to set suggestionsLoaded=true, then go back to BUILD
-            // (Deck Wizard Commander v5, X2/H3/S4: a mutation while SUGGESTIONS is showing now
-            // recomputes incrementally instead of invalidating -- see the dedicated Group below --
-            // so this test must actually be ON the Build tab to exercise the invalidate path its
-            // name promises).
+            // Arrange — go back to BUILD; a SUGGESTIONS-tab mutation recomputes in place instead of invalidating.
             stubResolvableDeck()
             val vm = createVm()
             advanceUntilIdle()
@@ -2160,8 +2154,7 @@ class DeckStudioViewModelTest {
 
     @Test
     fun `removeCard on BUILD tab invalidates suggestions`() = runTest(dispatcher) {
-        // Arrange — prime the suggestions, then go back to BUILD (X2/H3/S4: removeCard while
-        // SUGGESTIONS is showing now recomputes incrementally instead -- see the dedicated Group).
+        // Arrange — prime suggestions, then go back to BUILD (a SUGGESTIONS-tab removeCard recomputes in place instead).
         stubResolvableDeck()
         val vm = createVm()
         advanceUntilIdle()
@@ -2239,9 +2232,7 @@ class DeckStudioViewModelTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Group 13b — Deck Wizard Commander v5 (X2, H3/S4): live refresh from Browse while on the
-    //  Analysis tab -- a mainboard add/remove recomputes Health IN PLACE instead of leaving it
-    //  stale until the user leaves and re-enters the tab.
+    //  Group 13b — live refresh: a mainboard add/remove recomputes Health in place while on Analysis.
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
@@ -2320,9 +2311,7 @@ class DeckStudioViewModelTest {
                 evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
             }
 
-            // Act — three taps faster than the orchestrator's debounce window (200ms): advance just
-            // enough virtual time for each add's own repo write + cache mutation to run, never
-            // enough for the debounced recompute itself to fire.
+            // Act — taps faster than the 200ms debounce window; each write+cache-mutation runs, but the recompute itself never fires early.
             vm.addCardToDeck(elfCard.scryfallId)
             advanceTimeBy(50)
             vm.addCardToDeck(elfCard.scryfallId)
@@ -2330,8 +2319,7 @@ class DeckStudioViewModelTest {
             vm.addCardToDeck(elfCard.scryfallId)
             advanceUntilIdle()
 
-            // Assert — all 3 mutations landed (proves the debounce coalesces the RECOMPUTE, never
-            // drops a mutation), but only ONE additional evaluation pass ran.
+            // Assert — all 3 mutations landed but only ONE additional evaluation pass ran (debounce coalesces the recompute, never drops a mutation).
             assertEquals(initialNonLandCount + 3, vm.uiState.value.health!!.profile.nonLandCount)
             coVerify(exactly = 2) {
                 evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
@@ -2349,15 +2337,13 @@ class DeckStudioViewModelTest {
             advanceUntilIdle()
             val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
 
-            // Act — start a mutation (schedules the debounced recompute), then leave the tab BEFORE
-            // the debounce window (200ms) elapses.
+            // Act — start a mutation, then leave the tab before the 200ms debounce elapses.
             vm.addCardToDeck(elfCard.scryfallId)
             advanceTimeBy(50)
             vm.onSelectTab(DeckStudioTab.BUILD)
             advanceUntilIdle()
 
-            // Assert — no crash reaching here is itself the primary assertion; the cancelled
-            // recompute must never leak a stale/partial update into health either.
+            // Assert — reaching here without a crash is itself part of the point; health must also stay unchanged.
             assertEquals(DeckStudioTab.BUILD, vm.uiState.value.selectedTab)
             assertEquals(
                 "a cancelled recompute must never publish an update",

@@ -68,8 +68,7 @@ class DeckDoctorOrchestratorTest {
     private val crashReporter = mockk<CrashReporter>(relaxed = true)
 
     private val scorer = DeckScorer(RoleClassifier(), fixedPower(normalized = 0.6f))
-    // Deck Wizard Commander v5 (X2, H3/S4): spyk so the debounce-coalescing tests below can
-    // coVerify the exact call count -- every other test here keeps the real evaluation behavior.
+    // spyk so the debounce-coalescing tests below can coVerify the exact call count.
     private val evaluateDeckUseCase = spyk(EvaluateDeckUseCase(scorer, ProgressionEventBus(), dispatcher))
     private val inferDeckIdentityUseCase = InferDeckIdentityUseCase()
 
@@ -166,8 +165,7 @@ class DeckDoctorOrchestratorTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Deck Wizard Commander v5 (X2, H3/S4): incremental recompute -- debounce coalescing,
-    //  onRemoveCardCompletely, and cancelPendingRecompute.
+    //  Incremental recompute -- debounce coalescing, onRemoveCardCompletely, cancelPendingRecompute.
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
@@ -229,9 +227,7 @@ class DeckDoctorOrchestratorTest {
             orchestrator.cancelPendingRecompute()
             advanceUntilIdle()
 
-            // The in-memory cache mutation from onAddCard is NOT undone by cancelling the
-            // recompute (a later add/cut in the SAME session still works off it) -- only the
-            // pending Health evaluation never ran.
+            // The cache mutation from onAddCard is not undone by cancelling -- only the pending Health evaluation never ran.
             assertEquals(3, orchestrator.cachedMainboardQuantity(spellCard.scryfallId))
             assertEquals("a cancelled recompute must never publish a stale/partial Health update",
                 healthBeforeCancel, orchestrator.state.value.health)

@@ -2366,8 +2366,7 @@ private fun SuggestionsTab(
     // param (W8 telemetry) is the expanded pillar this section belongs to -- not derivable from
     // CardSection alone, so it's passed alongside rather than looked up again by the caller.
     onBrowseSection: (CardSection, PillarId) -> Unit = { _, _ -> },
-    // X1 (H7/S3): forwarded to every CardSectionRow's onUnresolvedContributions -- see
-    // DeckStudioViewModel.recordUnresolvedSectionCards's own KDoc for the telemetry contract.
+    // Forwarded to every CardSectionRow's onUnresolvedContributions.
     onUnresolvedSection: (String, Int) -> Unit = { _, _ -> },
 ) {
     val mc = MaterialTheme.magicColors
@@ -2376,10 +2375,8 @@ private fun SuggestionsTab(
     // memoized map instead of a linear `find` per card per section per pillar -- CardSectionRow's
     // resolveCard callback is invoked once per rendered thumbnail, so an O(n) scan there is O(n*m)
     // across the whole expanded pillar's sections.
-    // X1 fix (H7/S3, Deck Wizard Commander v5 plan): uiState.cards EXCLUDES the commander mainboard
-    // slot (see DeckStudioViewModel's commanderCard/cards split) -- a section the commander itself
-    // fills (e.g. a Merfolk commander in a "Merfolk" tribe section) resolved to nothing here even
-    // though the header's count included it. Resolve against the FULL mainboard.
+    // uiState.cards excludes the commander mainboard slot -- resolve against commander + mainboard
+    // so a section the commander itself fills isn't shown as empty.
     val cardById = remember(uiState.cards, uiState.commanderCard) {
         (uiState.cards + listOfNotNull(uiState.commanderCard)).associateBy { it.scryfallId }
     }
