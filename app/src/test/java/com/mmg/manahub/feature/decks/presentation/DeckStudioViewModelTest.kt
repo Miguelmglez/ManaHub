@@ -2016,11 +2016,47 @@ class DeckStudioViewModelTest {
         }
 
     @Test
+    fun `W7 fix 1 -- the pop-back signal forces BUILD when written onto an ALREADY-CONSTRUCTED instance's handle`() =
+        runTest(dispatcher) {
+            // Reproduces the real pop-back path: AppNavGraph writes the key onto the PREVIOUS
+            // back-stack entry's SavedStateHandle -- which belongs to an already-initialised
+            // DeckStudioViewModel, not a fresh one. A one-shot `init` read (the original, broken
+            // implementation) would miss this entirely because init never runs again.
+            stubResolvableDeck()
+            val handle = SavedStateHandle(mapOf("deckId" to DECK_ID))
+            val vm = DeckStudioViewModel(
+                deckRepository = deckRepository,
+                cardRepository = cardRepository,
+                userCardRepository = userCardRepository,
+                searchCardsUseCase = searchCardsUseCase,
+                suggestTagsUseCase = suggestTagsUseCase,
+                evaluateDeckUseCase = evaluateDeckUseCase,
+                inferDeckIdentityUseCase = inferDeckIdentityUseCase,
+                getDeckGameStatsUseCase = getDeckGameStatsUseCase,
+                importDeckUseCase = importDeckUseCase,
+                wishlistRepository = wishlistRepository,
+                userPreferences = userPreferences,
+                crashReporter = crashReporter,
+                appContext = appContext,
+                savedStateHandle = handle,
+            )
+            advanceUntilIdle()
+            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            advanceUntilIdle()
+            assertEquals(DeckStudioTab.SUGGESTIONS, vm.uiState.value.selectedTab)
+
+            // Simulate AppNavGraph's pop-back write onto this SAME instance's handle.
+            handle[DECK_STUDIO_SELECT_BUILD_TAB_KEY] = true
+            advanceUntilIdle()
+
+            assertEquals(DeckStudioTab.BUILD, vm.uiState.value.selectedTab)
+        }
+
+    @Test
     fun `W7 Task C -- the pop-back-to-existing-entry signal forces the BUILD tab on init`() =
         runTest(dispatcher) {
-            // Simulates the Studio entry having been left on Analysis (SUGGESTIONS) BEFORE the user
-            // triggered "Rebuild with the Wizard" -- the wizard's pop-back path must still land on
-            // Build, not silently keep whatever was selected before the rebuild.
+            // Keeps the fresh-construction case green too (the key can also arrive via the
+            // constructor's initial SavedStateHandle map, e.g. after process death).
             stubResolvableDeck()
             val vm = createVmSelectingBuildTab(DECK_ID)
             advanceUntilIdle()

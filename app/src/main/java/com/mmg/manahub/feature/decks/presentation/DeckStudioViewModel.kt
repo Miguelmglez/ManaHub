@@ -505,12 +505,17 @@ class DeckStudioViewModel(
             }
         }
 
-        // W7 Task C (R11): consume the wizard's "land on Build" signal once, synchronously --
-        // see DECK_STUDIO_SELECT_BUILD_TAB_KEY's own KDoc for why only the pop-back-to-existing-
-        // entry path needs this (a fresh navigation already defaults to BUILD).
-        if (savedStateHandle.get<Boolean>(DECK_STUDIO_SELECT_BUILD_TAB_KEY) == true) {
-            savedStateHandle.remove<Boolean>(DECK_STUDIO_SELECT_BUILD_TAB_KEY)
-            _uiState.update { it.copy(selectedTab = DeckStudioTab.BUILD) }
+        // W7 fix 1: consume the wizard's "land on Build" signal REACTIVELY -- see
+        // DECK_STUDIO_SELECT_BUILD_TAB_KEY's own KDoc. A one-shot init read (the original
+        // implementation) only fires on a NEW ViewModel; the pop-back path writes the key onto
+        // an ALREADY-CONSTRUCTED instance's handle, whose init never runs again.
+        viewModelScope.launch {
+            savedStateHandle.getStateFlow(DECK_STUDIO_SELECT_BUILD_TAB_KEY, false).collect { shouldSelectBuild ->
+                if (shouldSelectBuild) {
+                    savedStateHandle[DECK_STUDIO_SELECT_BUILD_TAB_KEY] = false
+                    _uiState.update { it.copy(selectedTab = DeckStudioTab.BUILD) }
+                }
+            }
         }
 
         // Nav passes "" (not null) for an absent optional StringType arg → treat
