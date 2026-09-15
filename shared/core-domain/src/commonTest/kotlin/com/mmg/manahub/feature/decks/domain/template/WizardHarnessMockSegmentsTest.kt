@@ -24,6 +24,7 @@ import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import kotlinx.coroutines.test.runTest
+import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -61,6 +62,14 @@ private fun List<MockCollectionCard>.toOwned(): List<OwnedCard> = map { OwnedCar
 
 private fun hasBlocker(result: WizardBuildResult) =
     result.analysis.pillars.any { p -> p.findings.any { it.severity == FindingSeverity.BLOCKER } }
+
+// String.format is JVM-only; wasmJs needs a manual multiplatform 2-decimal formatter for log output.
+private fun formatTwoDecimals(value: Double): String {
+    val rounded = kotlin.math.round(value * 100.0) / 100.0
+    val whole = rounded.toInt()
+    val fraction = kotlin.math.abs(((rounded - whole) * 100.0).roundToInt())
+    return "$whole.${fraction.toString().padStart(2, '0')}"
+}
 
 /** Compact HARD-metric report for one mock-segment build — a deliberately smaller mirror of
  * app/src/test's `V2BuildMetrics` (same field DEFINITIONS, see this file's own header for why the
@@ -215,7 +224,7 @@ class WizardHarnessMockCollectionRichSegmentTest {
                     failures += "${m.label}: blocker=${!m.noBlockerOk} size_or_gaps=${!m.sizeOrGapsOk} " +
                         "determinism=${!m.determinismOk} commander_once=${!m.commanderOnceOk} " +
                         "legality_identity=${!m.legalityIdentityOk} anti_role=${m.antiRoleViolations} " +
-                        "offplan_share=${"%.2f".format(m.offplanShare)} round_trip=${!m.roundTripIdentityOk} " +
+                        "offplan_share=${formatTwoDecimals(m.offplanShare)} round_trip=${!m.roundTripIdentityOk} " +
                         "land_target=${!m.landTargetOk}(${m.landCount}) score=${m.totalScore} blockers=${m.blockerFindings} gaps=${m.gapSectionsDebug}"
                 }
             }
