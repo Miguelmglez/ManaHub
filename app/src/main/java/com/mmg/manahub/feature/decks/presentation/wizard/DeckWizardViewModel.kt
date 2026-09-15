@@ -611,6 +611,19 @@ class DeckWizardViewModel(
      * back to re-walking from REVIEW in that case -- there is nothing to resume. */
     private var pendingFinalize: PendingFinalize? = null
 
+    /** W8 (telemetry, `deck_wizard_choice_resolution_mode`) -- which roles the user MANUALLY toggled
+     * a card for vs. AUTO-filled via "Choose the remaining N for me", reset at the top of every fresh
+     * [generateCommanderDeck] call (a resumed retry via [pendingFinalize] must NOT reset these, since
+     * it re-runs the SAME resolutions, not a new Choice-screen pass). */
+    private val manuallyToggledChoiceRoles = mutableSetOf<RoleKey>()
+    private val autoFilledChoiceRoles = mutableSetOf<RoleKey>()
+
+    /** W8 (telemetry, `deck_wizard_generate_duration_ms_bucket`) -- wall-clock from
+     * [generateCommanderDeck]'s entry to [finalizeCommanderDraft]'s successful persist, Choice-screen
+     * think time included (matches the crashlytics-ux-auditor's own spec: "generateCommanderDeck
+     * entry to finalizeCommanderDraft success"). */
+    private var commanderGenerationStartAtMs: Long? = null
+
     private data class PendingFinalize(
         val state: DeckWizardUiState,
         val format: DeckFormat,
@@ -2068,6 +2081,10 @@ class DeckWizardViewModel(
         crashlytics.setCustomKey("deck_wizard_format", format.name)
         crashlytics.setCustomKey("deck_wizard_seed_count", state.seedCards.size)
         crashlytics.setCustomKey("deck_wizard_entry_flow", state.entryFlow.name)
+        crashlytics.setCustomKey("deck_wizard_land_mode", if (state.includeNonBasicLands) "non_basic_included" else "basics_only")
+        commanderGenerationStartAtMs = System.currentTimeMillis()
+        manuallyToggledChoiceRoles.clear()
+        autoFilledChoiceRoles.clear()
 
         val commander = state.selectedCommander
         if (commander == null) {
@@ -2127,6 +2144,8 @@ class DeckWizardViewModel(
             pendingFinalize = PendingFinalize(state, format, commander, strategyPick, manualAdds, draft, resolutions = emptyMap())
             finalizeCommanderDraft(state, format, commander, strategyPick, manualAdds, draft, resolutions = emptyMap())
         } else {
+            crashlytics.log("deck_wizard_choice_shown")
+            crashlytics.setCustomKey("deck_wizard_choice_group_count_bucket", countBucket(draft.ambiguityGroups.size))
             _uiState.update {
                 it.copy(
                     phase = WizardPhase.CHOICE,
@@ -2274,6 +2293,18 @@ class DeckWizardViewModel(
 
         crashlytics.log("deck_wizard_generate_succeeded")
         crashlytics.setCustomKey("deck_wizard_template_source", "COMMANDER_V3_ENGINE")
+        crashlytics.setCustomKey(
+            "deck_wizard_choice_resolution_mode",
+            classifyChoiceResolutionMode(draft, resolutions),
+        )
+        crashlytics.setCustomKey(
+            "deck_wizard_preference_bonus_applied_count_bucket",
+            countBucket(outcome.result.fillStats.preferenceBonusAppliedCount),
+        )
+        commanderGenerationStartAtMs?.let { startedAt ->
+            crashlytics.setCustomKey("deck_wizard_generate_duration_ms_bucket", durationBucket(System.currentTimeMillis() - startedAt))
+        }
+        commanderGenerationStartAtMs = null
         logCommanderBuildTelemetry(state, strategyPick, draft.ownedCollection.size, outcome.result)
         _uiState.update {
             it.copy(
@@ -2323,6 +2354,7 @@ class DeckWizardViewModel(
             return // cap reached -- ignore the tap
         }
         val updated = if (isAdding) current + cardId else current - cardId
+        manuallyToggledChoiceRoles += role
         _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to updated)) }
     }
 
@@ -2339,6 +2371,7 @@ class DeckWizardViewModel(
         if (missing <= 0) return
         val fill = tentative.filter { it !in current }.take(missing)
         if (fill.isEmpty()) return
+        autoFilledChoiceRoles += role
         _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to (current + fill))) }
     }
 
@@ -2379,6 +2412,7 @@ class DeckWizardViewModel(
      * up because nothing was ever written.
      */
     private fun onAbandonChoice() {
+        FirebaseCrashlytics.getInstance().log("deck_wizard_choice_abandoned")
         _uiState.update {
             it.copy(
                 phase = WizardPhase.REVIEW,
@@ -2463,6 +2497,42 @@ class DeckWizardViewModel(
         }
         crashlytics.setCustomKey("deck_wizard_strategy_source", strategySource)
         crashlytics.setCustomKey("deck_wizard_refinement_swaps", result.refinementSwaps)
+    }
+
+    /** W8 (telemetry) -- classifies HOW the Choice screen's ambiguity groups were resolved, over
+     * [manuallyToggledChoiceRoles]/[autoFilledChoiceRoles] (a role can appear in both, e.g. an
+     * auto-fill followed by a manual tweak -- that still counts as manual, the stronger signal). A
+     * group present in neither set was resolved purely via "Let the wizard finish" (its
+     * [CommanderDraftBuild.tentativeByRole] default, never touched). Zero groups (nothing to
+     * resolve) reads as `wizard_finish_all`, matching a direct zero-ambiguity build. */
+    private fun classifyChoiceResolutionMode(draft: CommanderDraftBuild, resolutions: Map<RoleKey, List<String>>): String {
+        val groups = draft.ambiguityGroups
+        if (groups.isEmpty()) return "wizard_finish_all"
+        val perGroup = groups.map { group ->
+            when {
+                group.sectionId in manuallyToggledChoiceRoles -> "manual"
+                group.sectionId in autoFilledChoiceRoles -> "autofill"
+                group.sectionId !in resolutions -> "wizard"
+                else -> "manual"
+            }
+        }
+        val distinct = perGroup.toSet()
+        return when {
+            distinct == setOf("manual") -> "fully_manual"
+            distinct == setOf("autofill") -> "per_section_autofill"
+            distinct == setOf("wizard") -> "wizard_finish_all"
+            else -> "mixed"
+        }
+    }
+
+    /** W8 (telemetry) -- new bucket domain (wall-clock duration), distinct from [countBucket]/
+     * [scoreBucket]'s count/score domains per the auditor's own spec. */
+    private fun durationBucket(durationMs: Long): String = when {
+        durationMs < 2_000L -> "<2s"
+        durationMs < 5_000L -> "2-5s"
+        durationMs < 10_000L -> "5-10s"
+        durationMs < 30_000L -> "10-30s"
+        else -> "30s+"
     }
 
     private fun scoreBucket(score: Int): String = when {
@@ -2739,6 +2809,7 @@ class DeckWizardViewModel(
         cleanupPendingDeck()
         val retry = pendingFinalize
         if (retry != null) {
+            FirebaseCrashlytics.getInstance().log("deck_wizard_finalize_retry_resumed")
             _uiState.update { it.copy(buildError = null, phase = WizardPhase.GENERATING) }
             generateJob = viewModelScope.launch {
                 finalizeCommanderDraft(retry.state, retry.format, retry.commander, retry.strategyPick, retry.manualAdds, retry.draft, retry.resolutions)

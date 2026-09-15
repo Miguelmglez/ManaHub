@@ -128,6 +128,9 @@ data class WizardFillStats(
     val placedByWizard: Int,
     val placedManual: Int,
     val lands: Int,
+    /** W8 (telemetry): [CommanderDraftBuild.preferenceBonusAppliedCount], carried through so the
+     * caller can report preference-prior hit rate without re-deriving it from the draft. */
+    val preferenceBonusAppliedCount: Int = 0,
 )
 
 /**

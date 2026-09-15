@@ -85,6 +85,10 @@ data class CommanderDraftBuild(
      * ids a resolution supplies) with the caller's chosen replacements; the rest keep their default. */
     val tentativeByRole: Map<RoleKey, List<String>>,
     val ambiguityGroups: List<AmbiguityGroup>,
+    /** W8 (telemetry): how many main-loop placements were a preferred card (E8's
+     * [PlacementScorer.PREFERENCE_BONUS] applied) at the moment they were chosen -- surfaced onto
+     * [WizardFillStats] so the wizard can report preference-prior hit rate without re-deriving it. */
+    val preferenceBonusAppliedCount: Int = 0,
 )
 
 class BuildCommanderDeckUseCase(
@@ -271,6 +275,7 @@ class BuildCommanderDeckUseCase(
         // this keeps the BEST gain ever recorded for each alternate id (an id can be re-scored at
         // multiple decision points across the loop) rather than only its membership.
         val tentativeAlternateGainsByRole = mutableMapOf<RoleKey, MutableMap<String, Float>>()
+        var preferenceBonusAppliedCount = 0
         while (placedNonLand.size - manualNonLand.size < nonLandTarget && remainingCandidates.isNotEmpty() && iterations < iterationCap) {
             iterations++
             var best: Card? = null
@@ -302,6 +307,7 @@ class BuildCommanderDeckUseCase(
                 }
             }
             val chosen = best ?: break
+            if (chosen.scryfallId in preferredIds) preferenceBonusAppliedCount++
             val chosenProfile = candidateProfiles.getValue(chosen)
 
             // W7 Task 0 (7.0): does THIS slot fill a role still short of ideal, with a genuine
@@ -379,6 +385,7 @@ class BuildCommanderDeckUseCase(
             candidatesById = candidateCards.associateBy { it.scryfallId },
             tentativeByRole = tentativeSlotIdsByRole,
             ambiguityGroups = ambiguityGroups,
+            preferenceBonusAppliedCount = preferenceBonusAppliedCount,
         )
     }
 
@@ -468,8 +475,8 @@ class BuildCommanderDeckUseCase(
         var analysis = health?.analysis
         if (analysis == null || hasBlocker(analysis)) {
             crashReporter.log("deck_wizard_blocker_after_build")
-            crashReporter.setCustomKey("deck_wizard_blocker_commander", draft.commander.name)
-            crashReporter.recordException(IllegalStateException("[BuildCommanderDeckUseCase] deck_wizard_blocker_after_build: commander=${draft.commander.name} format=${draft.format}"))
+            crashReporter.setCustomKey("deck_wizard_blocker_commander", "${draft.format}_${draft.identity.size}c")
+            crashReporter.recordException(IllegalStateException("[BuildCommanderDeckUseCase] deck_wizard_blocker_after_build: format=${draft.format} identitySize=${draft.identity.size}"))
         }
 
         var refinementSwaps = 0
@@ -504,6 +511,7 @@ class BuildCommanderDeckUseCase(
             placedByWizard = finalNonLand.size - draft.manualNonLandCount,
             placedManual = draft.manualNonLandCount,
             lands = landEntries.sumOf { it.quantity },
+            preferenceBonusAppliedCount = draft.preferenceBonusAppliedCount,
         )
 
         val result = WizardBuildResult(

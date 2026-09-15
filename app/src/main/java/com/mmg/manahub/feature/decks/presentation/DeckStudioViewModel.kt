@@ -1707,6 +1707,13 @@ class DeckStudioViewModel(
         }
     }
 
+    /** W8 (telemetry) -- the "Rebuild with the Wizard" replace-confirm dialog had zero telemetry;
+     * called from the Composable's own `showRebuildConfirm` gate/dialog callbacks (never Crashlytics
+     * directly from a Composable, per this project's telemetry rule). */
+    fun onRebuildConfirmShown() = FirebaseCrashlytics.getInstance().log("deck_wizard_rebuild_confirm_shown")
+    fun onRebuildConfirmConfirmed() = FirebaseCrashlytics.getInstance().log("deck_wizard_rebuild_confirm_confirmed")
+    fun onRebuildConfirmCancelled() = FirebaseCrashlytics.getInstance().log("deck_wizard_rebuild_confirm_cancelled")
+
     /** Deletes the deck unconditionally and navigates back. */
     fun deleteDeckUnconditionally(onNavigateBack: () -> Unit) {
         if (!::deckId.isInitialized) return

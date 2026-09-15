@@ -431,7 +431,10 @@ fun DeckStudioScreen(
     // no more empty-deck skip branch to consider.
     val handleRebuildWithWizard: () -> Unit = {
         when (resolveWizardNavDecision(WizardEntryPoint.REBUILD, isCommanderFormat, hasTriggeredWizardNav)) {
-            WizardNavDecision.REQUIRE_CONFIRM -> showRebuildConfirm = true
+            WizardNavDecision.REQUIRE_CONFIRM -> {
+                viewModel.onRebuildConfirmShown()
+                showRebuildConfirm = true
+            }
             WizardNavDecision.NAVIGATE_NOW -> Unit // unreachable for this entry point (R15)
             WizardNavDecision.NO_OP -> Unit
         }
@@ -835,7 +838,10 @@ fun DeckStudioScreen(
 
     if (showRebuildConfirm) {
         MagicAlertDialog(
-            onDismissRequest = { showRebuildConfirm = false },
+            onDismissRequest = {
+                showRebuildConfirm = false
+                viewModel.onRebuildConfirmCancelled()
+            },
             title = stringResource(R.string.deck_studio_rebuild_confirm_title),
             text = stringResource(R.string.deck_studio_rebuild_confirm_message),
             confirmLabel = stringResource(R.string.action_confirm),
@@ -843,6 +849,7 @@ fun DeckStudioScreen(
             confirmColor = MagicCtaColor.Error,
             onConfirm = {
                 showRebuildConfirm = false
+                viewModel.onRebuildConfirmConfirmed()
                 if (!hasTriggeredWizardNav) {
                     val deckId = uiState.deck?.id
                     val format = uiState.deck?.format
@@ -852,7 +859,10 @@ fun DeckStudioScreen(
                     }
                 }
             },
-            onDismiss = { showRebuildConfirm = false },
+            onDismiss = {
+                showRebuildConfirm = false
+                viewModel.onRebuildConfirmCancelled()
+            },
         )
     }
 
