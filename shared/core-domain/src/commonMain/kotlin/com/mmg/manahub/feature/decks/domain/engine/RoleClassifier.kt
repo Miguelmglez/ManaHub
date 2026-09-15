@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.engine
+// COMMENTS_REVIEWED: 2026-09-15
 
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
@@ -404,6 +405,19 @@ object TribeDeriver {
 
     /** The card's full per-tribe identity: its own subtypes ∪ the tribes it pays off. */
     fun tribeKeys(card: Card): Set<String> = subtypeKeys(card) + payoffTribeKeys(card)
+
+    /**
+     * The tribe [card] is a real tribal LORD for — BOTH its own creature subtype AND a named
+     * oracle-text payoff (e.g. Edgar Markov: subtypes {vampire, knight}, payoff {vampire} ->
+     * "vampire"). Payoff-only is deliberately not trusted (a generic "<word> you control" regex
+     * also fires on non-tribal phrasing, e.g. Urza's "for each artifact you control"); requiring
+     * the subtype intersection filters that false-positive class out. `minOrNull()` is the
+     * deterministic tie-break when more than one tribe qualifies (W6b: shared by
+     * [CommanderPlanResolver]'s Custom build path and [RecommendCommanderStrategiesUseCase] — the
+     * SAME derivation, extracted here so neither call site can drift from the other).
+     */
+    fun derivedLordTribe(card: Card): String? =
+        payoffTribeKeys(card).intersect(subtypeKeys(card)).minOrNull()
 
     private fun isTribalType(typeLine: String): Boolean =
         typeLine.contains("Creature", ignoreCase = true) ||

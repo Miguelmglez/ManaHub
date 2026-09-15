@@ -54,7 +54,17 @@ object CommanderArchetypeBias {
      * centre of the prototype space and building explicitly toward its OWN bands pulls a deck's
      * continuous axis position toward that same centre — i.e. exactly the position least likely to
      * separate from its neighbours by the ambiguity margin.
+     *
+     * W6b: resolves by majority vote over ALL of [commanderTags], not the first match — a
+     * commander whose tags map to more than one archetype must not depend on tag list order
+     * (`firstNotNullOfOrNull` did). A tie is broken by [ArchetypeId.name] alphabetically, which is
+     * likewise independent of input order.
      */
-    fun commanderTagArchetype(commanderTags: List<CardTag>): ArchetypeId? =
-        commanderTags.firstNotNullOfOrNull { DeckIdentitySeedTags.archetypeForTag(it) }
+    fun commanderTagArchetype(commanderTags: List<CardTag>): ArchetypeId? {
+        val votes = commanderTags.mapNotNull { DeckIdentitySeedTags.archetypeForTag(it) }
+        if (votes.isEmpty()) return null
+        val counts = votes.groupingBy { it }.eachCount()
+        val topCount = counts.values.max()
+        return counts.filterValues { it == topCount }.keys.minByOrNull { it.name }
+    }
 }

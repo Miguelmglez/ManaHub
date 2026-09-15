@@ -45,6 +45,13 @@ sealed interface StrategyPick {
  * @property manaFixBand [ResolvedArchetypeSkeleton.manaFixTarget] — `null` when the skeleton has no
  *           `mana_fix` role band (colorless-only identity — see [ArchetypeSkeletonResolver
  *           .resolveWithColorCount]'s own fail-closed convention).
+ * @property internalTribe (W6b, F18) the raw `"tribe:<subtype>"` key this plan's tribe axis credit
+ *           is based on — [StrategyPick.Curated]'s own `pin.tribe`, or (Custom only)
+ *           [TribeDeriver.derivedLordTribe] of the commander. `null` when neither applies. The
+ *           SINGLE source of truth [com.mmg.manahub.feature.decks.domain.template
+ *           .BuildCommanderDeckUseCase] reads for its OWN placement-time `dominantTribeAxis`/
+ *           `dominantTribeKey` — see that class's own call site for why this must not be
+ *           re-derived independently from `pin.tribe` a second time.
  */
 data class CommanderPlan(
     val skeleton: ResolvedArchetypeSkeleton,
@@ -52,6 +59,7 @@ data class CommanderPlan(
     val curveTargets: List<CurveTargets.CurveBucketTarget>,
     val landBand: RoleTarget,
     val manaFixBand: RoleTarget?,
+    val internalTribe: String? = null,
 )
 
 object CommanderPlanResolver {
@@ -108,12 +116,21 @@ object CommanderPlanResolver {
             deckFormat = format,
         )
 
-        val tribeAxis = pin.tribe?.let { tribeAxisKey(it) }
+        // F18 (W6b): a Custom pick has no persisted tribe (pin.tribe stays null, per F18's own
+        // KDoc above), but its INTERNAL axis target may still credit the commander's own tribe —
+        // same TribeDeriver.derivedLordTribe RecommendCommanderStrategiesUseCase already uses for
+        // its Tribal recommendation, so both call sites resolve the SAME tribe for the SAME
+        // commander. A Curated pick's tribe already comes from pin.tribe; this is Custom-only.
+        val internalTribe = pin.tribe ?: when (pick) {
+            is StrategyPick.Curated -> null
+            StrategyPick.Custom -> TribeDeriver.derivedLordTribe(commander)
+        }
+        val tribeAxis = internalTribe?.let { tribeAxisKey(it) }
         val commanderAxisProfile = SynergyGraph.cardAxisProfile(
             card = commander,
             format = archetypeFormat,
             dominantTribeAxis = tribeAxis,
-            dominantTribeKey = pin.tribe,
+            dominantTribeKey = internalTribe,
         )
         val commanderAxes = commanderAxisProfile.produces.keys + commanderAxisProfile.consumes.keys
         val themeAxes = pin.themes.flatMap { THEME_TARGET_AXES[it].orEmpty() }.toSet()
@@ -125,6 +142,7 @@ object CommanderPlanResolver {
             curveTargets = CurveTargets.forSkeleton(skeleton),
             landBand = skeleton.lands,
             manaFixBand = skeleton.manaFixTarget(),
+            internalTribe = internalTribe,
         )
     }
 

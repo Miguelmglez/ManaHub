@@ -103,19 +103,23 @@ class BuildCommanderDeckUseCase(
             is StrategyPick.Curated -> strategyPick.strategy.toPin(strategyPick.tribe)
             StrategyPick.Custom -> com.mmg.manahub.feature.decks.domain.engine.StrategyPin(null, null, emptyList(), null)
         }
-        // A curated tribal pick's tribe is the ONLY tribe axis credit source during placement — the
-        // final mainboard's own dominant tribe cannot be known before the mainboard is built, and
+        // The tribe axis credit source during placement is plan.internalTribe (W6b) — a curated
+        // tribal pick's own pin.tribe, OR (Custom only) the commander's derived tribal-lord tribe;
+        // see CommanderPlan.internalTribe's own KDoc for why this must be read from the plan, not
+        // re-derived from pin.tribe here (that would silently drop the Custom case). The final
+        // mainboard's own dominant tribe cannot be known before the mainboard is built, and
         // re-deriving it mid-loop would require rebuilding a SynergyGraph per placement (the O(n^2)
-        // cost the graph's own header explicitly avoids). This is a documented simplification.
-        val dominantTribeAxis = pin.tribe?.let { "TRIBE:${it.removePrefix(com.mmg.manahub.feature.decks.domain.engine.TribeDeriver.TRIBE_PREFIX)}" }
-        val dominantTribeKey = pin.tribe
+        // cost the graph's own header explicitly avoids) — this plan-resolved tribe is a documented
+        // simplification, fixed for the whole build.
+        val dominantTribeAxis = plan.internalTribe?.let { "TRIBE:${it.removePrefix(com.mmg.manahub.feature.decks.domain.engine.TribeDeriver.TRIBE_PREFIX)}" }
+        val dominantTribeKey = plan.internalTribe
 
         val landTarget = LandTargetResolver.resolve(format, plan.skeleton, profile = null, manaBaseAnalyzer = manaBaseAnalyzer)
         val (manualNonLand, manualLand) = manualAdds.partition { !BasicLandCalculator.isLand(it.card) }
         val nonLandTarget = (NON_COMMANDER_SLOTS - landTarget - manualNonLand.size).coerceAtLeast(0)
 
         val curveTargets = CurveTargets.forSkeleton(plan.skeleton, nonLandCount = nonLandTarget)
-        val axisIdeals = SynergyGraph.axisIdeals(archetypeFormat, nonLandCount = nonLandTarget)
+        val axisIdeals = SynergyGraph.axisIdeals(archetypeFormat, nonLandCount = nonLandTarget, dominantTribeAxis = dominantTribeAxis)
         val colorCount = identity.count { it != ManaColor.C }
 
         // G11d: an estimated manabase (even split of landTarget across identity colours) so pipFactor's shortage term is live, not permanently inert.

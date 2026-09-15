@@ -273,12 +273,21 @@ class WizardHarnessMockCollectionThinSegmentTest {
         // proxied here as "has SOME role confidence OR axis contribution", the same floor
         // BuildCommanderDeckUseCase's own PlacementScorer.marginalGain enforces internally; a card
         // with truly zero role/axis signal reaching the deck would mean the floor broke.
+        // F18 (W6b): a Custom build's floor now includes the commander's OWN derived tribe axis
+        // (TribeDeriver.derivedLordTribe, same as BuildCommanderDeckUseCase's own dominantTribeAxis
+        // for this StrategyPick) -- this mock's Edgar Markov commander legitimately credits its
+        // Vampire subtype cards via TRIBE:vampire now, so the mirror check below must apply the
+        // SAME substitution or it misreads a real, floor-clearing tribal placement as filler.
+        val dominantTribe = TribeDeriver.derivedLordTribe(commander)
+        val dominantTribeAxis = dominantTribe?.let { "TRIBE:${it.removePrefix(TribeDeriver.TRIBE_PREFIX)}" }
         val wizardPlacedNonLand = entries.filterNot { BasicLandCalculator.isLand(it.card) || it.card.scryfallId == commander.scryfallId }
         val filler = wizardPlacedNonLand.filter { entry ->
             val roles = ArchetypeRoleClassifier.classify(entry.card)
             val axes = com.mmg.manahub.feature.decks.domain.engine.SynergyGraph.cardAxisProfile(
                 entry.card,
                 com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat.COMMANDER,
+                dominantTribeAxis,
+                dominantTribe,
             )
             roles.values.none { it > 0f } && axes.produces.isEmpty() && axes.consumes.isEmpty()
         }.map { it.card.name }

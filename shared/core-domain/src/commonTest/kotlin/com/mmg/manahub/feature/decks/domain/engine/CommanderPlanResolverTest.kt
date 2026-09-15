@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.engine
+// COMMENTS_REVIEWED: 2026-09-15
 
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckFormat
@@ -116,9 +117,14 @@ class CommanderPlanResolverTest {
 
     @Test
     fun `F18 -- Custom biases the internal skeleton toward the commander's own tag-derived archetype`() {
-        // E12 -- a Custom build MAY aim internally at what the commander actually does. A
-        // real Edgar-Markov-shaped commander (Vampire tribal lord, AGGRO-tagged) must resolve
-        // AGGRO, not the generic baseline and never MIDRANGE.
+        // E12 -- a Custom build MAY aim internally at what the commander actually does.
+        // edgarLike's oracle text is real Edgar-Markov-shaped token-creation text, so
+        // TagDictionary's "tokens" rule (allOf "create"+"token", confidence 0.95 >= the 0.90
+        // auto-confirm threshold) would genuinely confirm CardTag.TOKENS on this card in
+        // production -- the tag set here is production-derivable, not fabricated (W6b). TOKENS
+        // reverse-maps to ArchetypeId.AGGRO (SeedStrategy.AGGRO.primaryTags), so a real
+        // Vampire-tribal-lord-shaped commander must resolve AGGRO, not the generic baseline and
+        // never MIDRANGE.
         val identity = setOf(ManaColor.B, ManaColor.R)
         val edgarLike = card(
             id = "cmd-edgar-like",
@@ -127,7 +133,9 @@ class CommanderPlanResolverTest {
             cmc = 4.0,
             colors = listOf("B", "R"),
             colorIdentity = listOf("B", "R"),
-            tags = listOf(com.mmg.manahub.core.model.CardTag.AGGRO),
+            oracleText = "Whenever you cast a Vampire spell, create a 1/1 black Vampire creature " +
+                "token with lifelink. Other Vampires you control get +1/+1.",
+            tags = listOf(com.mmg.manahub.core.model.CardTag.TOKENS),
         )
         commanderFormats.forEach { format ->
             val plan = CommanderPlanResolver.resolve(

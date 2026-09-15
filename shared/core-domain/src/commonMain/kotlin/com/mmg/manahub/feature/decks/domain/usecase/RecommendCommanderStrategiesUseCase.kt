@@ -106,18 +106,9 @@ class RecommendCommanderStrategiesUseCase {
         val baseCommanderAxes = SynergyGraph.cardAxisProfile(commander, archetypeFormat)
             .let { it.produces.keys + it.consumes.keys }
 
-        // A tribe is only "derived" when it is BOTH the commander's own creature subtype AND a named
-        // oracle-text payoff (a real tribal lord, e.g. Edgar Markov: subtypes {vampire, knight},
-        // payoff {vampire} -> "vampire"). Payoff-only is deliberately NOT trusted as a fallback:
-        // [TribeDeriver.payoffTribeKeys]'s generic "<word> you control" regex also fires on
-        // non-tribal phrasing (e.g. Urza, Lord High Artificer's own "for each artifact you control"
-        // resolves a spurious payoff tribe "artifact") -- requiring the subtype intersection is what
-        // filters that class of false positive out, at the cost of only crediting commanders whose
-        // OWN body is a member of the tribe they pay off (true for essentially every real tribal
-        // lord commander, per Commander convention).
-        val payoffTribes = TribeDeriver.payoffTribeKeys(commander)
-        val subtypeTribes = TribeDeriver.subtypeKeys(commander)
-        val derivedTribe = payoffTribes.intersect(subtypeTribes).minOrNull()
+        // W6b: extracted to TribeDeriver.derivedLordTribe (shared verbatim with
+        // CommanderPlanResolver's Custom build path, see that function's own KDoc).
+        val derivedTribe = TribeDeriver.derivedLordTribe(commander)
 
         val tagArchetypes = ownTags.mapNotNull { DeckIdentitySeedTags.archetypeForTag(it) }.toSet()
         val tagThemes = ownTags.mapNotNull { DeckIdentitySeedTags.themeForTag(it) }.toSet()

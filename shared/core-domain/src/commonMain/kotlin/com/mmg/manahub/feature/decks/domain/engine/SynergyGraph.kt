@@ -470,18 +470,28 @@ object SynergyGraph {
      * is a no-op scale, so the default returns the raw [COMMANDER_AXIS_IDEALS] table unscaled;
      * pass a real deck's non-land count to get the SAME scaled ideals [build] would use for that
      * deck's size. Covers every axis in [COMMANDER_AXIS_IDEALS] (includes `ENGINE`); `TRIBE:<x>`
-     * axes are deliberately excluded here (their ideal is a fixed constant independent of format,
-     * see [TRIBE_PRODUCER_IDEAL]/[TRIBE_PAYOFF_IDEAL], not part of this per-format table).
+     * axes are deliberately excluded here BY DEFAULT (their ideal is a fixed constant independent
+     * of format, see [TRIBE_PRODUCER_IDEAL]/[TRIBE_PAYOFF_IDEAL], not part of this per-format
+     * table) -- pass [dominantTribeAxis] to add that ONE dynamic axis's ideal to the returned map
+     * (W6b: [com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase]'s placement
+     * loop needs it so [PlacementScorer.axisGain]'s `axisIdeals[axis]` lookup does not silently
+     * miss the deck's own tribe axis, mirroring [build]'s own inline TRIBE-ideal computation
+     * exactly so placement-time and grading-time never disagree on what that axis's ideal is).
      */
-    fun axisIdeals(format: ArchetypeFormat, nonLandCount: Int? = null): Map<AxisKey, AxisIdeal> {
+    fun axisIdeals(format: ArchetypeFormat, nonLandCount: Int? = null, dominantTribeAxis: AxisKey? = null): Map<AxisKey, AxisIdeal> {
         val realisticBaseline = if (format == ArchetypeFormat.COMMANDER) REALISTIC_COMMANDER_NONLAND else REALISTIC_SIXTY_NONLAND
         val scaleTo = nonLandCount ?: realisticBaseline
-        return COMMANDER_AXIS_IDEALS.mapValues { (_, ideal) ->
+        val base = COMMANDER_AXIS_IDEALS.mapValues { (_, ideal) ->
             AxisIdeal(
                 producerIdeal = effectiveIdeal(ideal.producerIdeal, scaleTo, realisticBaseline),
                 payoffIdeal = effectiveIdeal(ideal.payoffIdeal, scaleTo, realisticBaseline),
             )
         }
+        if (dominantTribeAxis == null) return base
+        return base + (dominantTribeAxis to AxisIdeal(
+            producerIdeal = effectiveIdeal(TRIBE_PRODUCER_IDEAL, scaleTo, realisticBaseline),
+            payoffIdeal = effectiveIdeal(TRIBE_PAYOFF_IDEAL, scaleTo, realisticBaseline),
+        ))
     }
 
     /** Substitutes the generic `"TRIBE"` axis a [RoleSpec] declares (e.g. `tribe_payoff.consumes`,

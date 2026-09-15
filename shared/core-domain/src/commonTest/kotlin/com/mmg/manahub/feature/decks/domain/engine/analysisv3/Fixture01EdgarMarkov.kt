@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.engine.analysisv3
+// COMMENTS_REVIEWED: 2026-09-15
 
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
@@ -16,12 +17,15 @@ fun fixture01EdgarMarkov(): AnalysisV3Fixture {
         typeLine = "Legendary Creature — Vampire Knight", cmc = 6.0,
         colorIdentity = listOf("R", "W", "B"), power = "4", toughness = "4",
         oracleText = "Eminence — Whenever you cast a Vampire spell, if Edgar Markov is on the battlefield or in the command zone, create a 1/1 black Vampire creature token with lifelink. Other Vampires you control get +1/+1. Whenever Edgar Markov attacks, create X 1/1 black Vampire creature tokens with lifelink, where X is the number of Vampires you control.",
-        // W6 Task 1 (F18/E12): a real production Edgar Markov carries an AGGRO-classified tag from
-        // the tagging engine (fast wide-attacking Vampire tribal aggro is its defining identity, per
-        // this fixture's own header) -- this fixture predates that classifier signal, added here so
-        // MockCollectionRichReconstructionTest's Custom-build acceptance case (a real ground-truth
-        // check, not a synthetic one) exercises the SAME tag-based bias production would apply.
-        tags = listOf(CardTag.AGGRO),
+        // W6b: TagDictionary's "tokens" STRATEGY rule (allOf "create"+"token", baseConfidence 0.95)
+        // fires on this exact oracle text ("create a 1/1 ... token" / "create X 1/1 ... tokens"),
+        // clearing SuggestTagsUseCase.DEFAULT_AUTO_THRESHOLD (0.90) -- a real production Edgar
+        // Markov carries CardTag.TOKENS as a CONFIRMED, engine-detected tag, not a manually-assigned
+        // one. TOKENS reverse-maps to ArchetypeId.AGGRO via DeckIdentitySeedTags (SeedStrategy
+        // .AGGRO.primaryTags includes it), so this is production-honest AGGRO signal (replaces the
+        // fabricated CardTag.AGGRO this fixture previously carried -- "aggro" itself is a
+        // manual-pick-only TagDictionary entry with no detection rule, ADR-007 §4 violation).
+        tags = listOf(CardTag.TOKENS),
     )
     val nonland = listOf(
         entry(commander),
