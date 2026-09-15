@@ -49,6 +49,7 @@ import io.mockk.mockkStatic
 import io.mockk.just
 import io.mockk.Runs
 import io.mockk.slot
+import io.mockk.spyk
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -111,7 +112,10 @@ class DeckStudioViewModelTest {
     // ── Real engine + use cases (deterministic fixed PowerResolver) ───────────
     private val scorer = DeckScorer(RoleClassifier(), fixedPower(normalized = 0.6f))
     private val eventBus = ProgressionEventBus()
-    private val evaluateDeckUseCase = EvaluateDeckUseCase(scorer, eventBus, dispatcher)
+    // Deck Wizard Commander v5 (X2, H3/S4): spyk (not a plain instance) so the debounce-coalescing
+    // tests below can coVerify the exact call COUNT while every other test keeps the real,
+    // unstubbed evaluation behavior (spyk delegates to the wrapped instance unless overridden).
+    private val evaluateDeckUseCase = spyk(EvaluateDeckUseCase(scorer, eventBus, dispatcher))
     private val inferDeckIdentityUseCase = InferDeckIdentityUseCase()
 
     // ── Group C / C2: per-deck game stats use case (relaxed; deckStatsFlow is lazy) ──
@@ -2127,13 +2131,19 @@ class DeckStudioViewModelTest {
     @Test
     fun `manual edit on BUILD tab invalidates suggestions requiring re-analysis on next SUGGESTIONS open`() =
         runTest(dispatcher) {
-            // Arrange — open SUGGESTIONS first to set suggestionsLoaded=true.
+            // Arrange — open SUGGESTIONS first to set suggestionsLoaded=true, then go back to BUILD
+            // (Deck Wizard Commander v5, X2/H3/S4: a mutation while SUGGESTIONS is showing now
+            // recomputes incrementally instead of invalidating -- see the dedicated Group below --
+            // so this test must actually be ON the Build tab to exercise the invalidate path its
+            // name promises).
             stubResolvableDeck()
             val vm = createVm()
             advanceUntilIdle()
             vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
             advanceUntilIdle()
             assertTrue(vm.uiState.value.suggestionsLoaded)
+            vm.onSelectTab(DeckStudioTab.BUILD)
+            advanceUntilIdle()
 
             // Act — manual mutation on BUILD tab must invalidate.
             vm.addCardToDeck(removalCard.scryfallId)
@@ -2150,13 +2160,16 @@ class DeckStudioViewModelTest {
 
     @Test
     fun `removeCard on BUILD tab invalidates suggestions`() = runTest(dispatcher) {
-        // Arrange — prime the suggestions.
+        // Arrange — prime the suggestions, then go back to BUILD (X2/H3/S4: removeCard while
+        // SUGGESTIONS is showing now recomputes incrementally instead -- see the dedicated Group).
         stubResolvableDeck()
         val vm = createVm()
         advanceUntilIdle()
         vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
         advanceUntilIdle()
         assertTrue(vm.uiState.value.suggestionsLoaded)
+        vm.onSelectTab(DeckStudioTab.BUILD)
+        advanceUntilIdle()
 
         // Act
         vm.removeCard(removalCard.scryfallId)
@@ -2224,6 +2237,134 @@ class DeckStudioViewModelTest {
         // Assert
         assertFalse("setCommander must invalidate suggestions", vm.uiState.value.suggestionsLoaded)
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Group 13b — Deck Wizard Commander v5 (X2, H3/S4): live refresh from Browse while on the
+    //  Analysis tab -- a mainboard add/remove recomputes Health IN PLACE instead of leaving it
+    //  stale until the user leaves and re-enters the tab.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `addCardToDeck while on SUGGESTIONS recomputes health in place without a tab switch`() =
+        runTest(dispatcher) {
+            // Arrange
+            stubResolvableDeck()
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            advanceUntilIdle()
+            assertTrue(vm.uiState.value.suggestionsLoaded)
+            val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
+
+            // Act — a Browse-sheet add while Analysis is showing.
+            vm.addCardToDeck(elfCard.scryfallId)
+            advanceUntilIdle()
+
+            // Assert — recomputed in place: still loaded, still on the SAME tab, new count visible.
+            assertTrue("must stay loaded -- an incremental recompute, not an invalidate",
+                vm.uiState.value.suggestionsLoaded)
+            assertEquals(DeckStudioTab.SUGGESTIONS, vm.uiState.value.selectedTab)
+            assertEquals(
+                "the added copy must be reflected in the SAME health snapshot",
+                initialNonLandCount + 1,
+                vm.uiState.value.health!!.profile.nonLandCount,
+            )
+        }
+
+    @Test
+    fun `removeCardFromDeck while on SUGGESTIONS recomputes health in place`() = runTest(dispatcher) {
+        // Arrange — bump elfCard to 2 copies first so the removal decrements rather than deletes.
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+            commanderDeckWithCards(
+                slots = listOf(
+                    DeckSlot(commander.scryfallId, 1),
+                    DeckSlot(removalCard.scryfallId, 1),
+                    DeckSlot(elfCard.scryfallId, 2),
+                )
+            )
+        )
+        coEvery { cardRepository.getCardById(commander.scryfallId) } returns DataResult.Success(commander)
+        coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns DataResult.Success(removalCard)
+        coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+        every { wishlistRepository.observeLocal() } returns flowOf(emptyList())
+        coEvery { cardRepository.searchWithRawQuery(any()) } returns emptyList()
+        val vm = createVm()
+        advanceUntilIdle()
+        vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+        advanceUntilIdle()
+        val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
+
+        // Act
+        vm.removeCardFromDeck(elfCard.scryfallId)
+        advanceUntilIdle()
+
+        // Assert
+        assertTrue(vm.uiState.value.suggestionsLoaded)
+        assertEquals(DeckStudioTab.SUGGESTIONS, vm.uiState.value.selectedTab)
+        assertEquals(initialNonLandCount - 1, vm.uiState.value.health!!.profile.nonLandCount)
+    }
+
+    @Test
+    fun `three rapid adds while on SUGGESTIONS coalesce into exactly one recompute`() =
+        runTest(dispatcher) {
+            // Arrange
+            stubResolvableDeck()
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            advanceUntilIdle()
+            val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
+            // 1 call already spent on the full loadAnalysis pass above.
+            coVerify(exactly = 1) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+
+            // Act — three taps faster than the orchestrator's debounce window (200ms): advance just
+            // enough virtual time for each add's own repo write + cache mutation to run, never
+            // enough for the debounced recompute itself to fire.
+            vm.addCardToDeck(elfCard.scryfallId)
+            advanceTimeBy(50)
+            vm.addCardToDeck(elfCard.scryfallId)
+            advanceTimeBy(50)
+            vm.addCardToDeck(elfCard.scryfallId)
+            advanceUntilIdle()
+
+            // Assert — all 3 mutations landed (proves the debounce coalesces the RECOMPUTE, never
+            // drops a mutation), but only ONE additional evaluation pass ran.
+            assertEquals(initialNonLandCount + 3, vm.uiState.value.health!!.profile.nonLandCount)
+            coVerify(exactly = 2) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `switching tabs mid-recompute cancels cleanly -- no crash, no stale health leak`() =
+        runTest(dispatcher) {
+            // Arrange
+            stubResolvableDeck()
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            advanceUntilIdle()
+            val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
+
+            // Act — start a mutation (schedules the debounced recompute), then leave the tab BEFORE
+            // the debounce window (200ms) elapses.
+            vm.addCardToDeck(elfCard.scryfallId)
+            advanceTimeBy(50)
+            vm.onSelectTab(DeckStudioTab.BUILD)
+            advanceUntilIdle()
+
+            // Assert — no crash reaching here is itself the primary assertion; the cancelled
+            // recompute must never leak a stale/partial update into health either.
+            assertEquals(DeckStudioTab.BUILD, vm.uiState.value.selectedTab)
+            assertEquals(
+                "a cancelled recompute must never publish an update",
+                initialNonLandCount,
+                vm.uiState.value.health!!.profile.nonLandCount,
+            )
+        }
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Group 14 — isEmptyDeck property

@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.orchestrator
-// COMMENTS_REVIEWED: 2026-09-08
+// COMMENTS_REVIEWED: 2026-09-15
 
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.repository.DeckRepository
@@ -30,6 +30,7 @@ import com.mmg.manahub.feature.decks.domain.usecase.SimilarDeckResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -199,6 +200,12 @@ class DeckDoctorOrchestrator(
     /** The in-flight Motor B ("Decks like yours") fetch job — cancelled before every new launch,
      * so only the LATEST fetch can ever survive to update [state]. */
     private var communityJob: Job? = null
+
+    /** X2 (H3/S4, Deck Wizard Commander v5): the in-flight debounced [recomputeIncremental] job --
+     * cancelled before every new launch so N rapid [onAddCard]/[onCutCard] taps coalesce into ONE
+     * evaluation pass instead of N, and cancelled by [invalidate]/[cancelPendingRecompute] so a tab
+     * switch away from Suggestions mid-recompute never leaks a stale update into [state]. */
+    private var recomputeJob: Job? = null
 
     /**
      * Workstream 8.4 -- bumped once per [loadAnalysis] call, BEFORE its coroutine is launched.
@@ -505,7 +512,12 @@ class DeckDoctorOrchestrator(
      */
     private fun recomputeIncremental() {
         val context = analysisCache ?: return
-        scope.launch {
+        // X2 (H3/S4): coalesce rapid +/+/+ taps (e.g. a Browse sheet quantity stepper) into ONE
+        // recompute -- cancel-and-relaunch means only the LAST call in a fast burst survives past
+        // the debounce window and actually evaluates.
+        recomputeJob?.cancel()
+        recomputeJob = scope.launch {
+            delay(RECOMPUTE_DEBOUNCE_MS)
             val mainboard = context.workingMainboard
             val weightOverrides = weightsProvider()
             val weights = weightOverrides.toScoreWeights()
@@ -568,6 +580,20 @@ class DeckDoctorOrchestrator(
     }
 
     /**
+     * X2 (H3/S4): drops the ENTIRE [scryfallId] slot regardless of quantity (the "delete" action in
+     * the detail sheet, [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.removeCard]
+     * — distinct from [onCutCard], which only decrements one copy) and recomputes incrementally.
+     * Returns `false` when there is no primed [analysisCache] — the caller must fall back to a full
+     * [loadAnalysis] in that case.
+     */
+    fun onRemoveCardCompletely(scryfallId: String): Boolean {
+        val context = analysisCache ?: return false
+        context.workingMainboard = context.workingMainboard.filterNot { it.card.scryfallId == scryfallId }
+        recomputeIncremental()
+        return true
+    }
+
+    /**
      * The working-mainboard quantity for [scryfallId] if [analysisCache] is primed, else `null`
      * (the host falls back to its own live-deck quantity source). Lets the host compute the
      * correct repository write (decrement vs. delete) BEFORE calling [onCutCard].
@@ -592,9 +618,18 @@ class DeckDoctorOrchestrator(
         if (_state.value.isLoaded) {
             analysisJob?.cancel()
             communityJob?.cancel()
+            recomputeJob?.cancel()
             analysisCache = null
             _state.update { it.copy(isLoaded = false, stage = null, completedStages = emptyList()) }
         }
+    }
+
+    /** X2: cancels an in-flight debounced [recomputeIncremental] without touching [analysisCache]
+     * or [DeckDoctorState.isLoaded] -- called when the host leaves the Suggestions tab mid-recompute
+     * (unlike [invalidate], the cache stays primed so a later incremental add/cut on this SAME
+     * session still works without a full [loadAnalysis]). */
+    fun cancelPendingRecompute() {
+        recomputeJob?.cancel()
     }
 
     /**
@@ -717,6 +752,12 @@ class DeckDoctorOrchestrator(
     }
 
     private companion object {
+        /** X2 debounce window for [recomputeIncremental] -- coalesces a rapid tap burst into one
+         * evaluation pass. Short enough that a single tap still feels instant (well under the ~100ms
+         * perceptible-delay threshold once the debounce plus one evaluation pass complete), long
+         * enough to absorb a multi-tap quantity stepper (typical human tap cadence is >100ms apart). */
+        const val RECOMPUTE_DEBOUNCE_MS = 200L
+
         /** Signature-card count for the 60-card canonical aggregate key (Phase 3.2 precedent: 2-3). */
         const val SIGNATURE_CARD_COUNT = 3
 

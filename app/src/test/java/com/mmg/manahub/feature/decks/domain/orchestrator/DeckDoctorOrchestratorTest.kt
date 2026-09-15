@@ -15,13 +15,17 @@ import com.mmg.manahub.feature.decks.domain.engine.card
 import com.mmg.manahub.feature.decks.domain.engine.fixedPower
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.spyk
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -64,12 +68,15 @@ class DeckDoctorOrchestratorTest {
     private val crashReporter = mockk<CrashReporter>(relaxed = true)
 
     private val scorer = DeckScorer(RoleClassifier(), fixedPower(normalized = 0.6f))
-    private val evaluateDeckUseCase = EvaluateDeckUseCase(scorer, ProgressionEventBus(), dispatcher)
+    // Deck Wizard Commander v5 (X2, H3/S4): spyk so the debounce-coalescing tests below can
+    // coVerify the exact call count -- every other test here keeps the real evaluation behavior.
+    private val evaluateDeckUseCase = spyk(EvaluateDeckUseCase(scorer, ProgressionEventBus(), dispatcher))
     private val inferDeckIdentityUseCase = InferDeckIdentityUseCase()
 
     private val landCard = card(id = "land-1", name = "Forest", typeLine = "Basic Land — Forest", colors = emptyList(), colorIdentity = listOf("G"))
+    private val spellCard = card(id = "spell-1", name = "Naturalize", typeLine = "Instant", colors = listOf("G"), colorIdentity = listOf("G"))
 
-    private val slots = listOf(DeckSlot(landCard.scryfallId, 10))
+    private val slots = listOf(DeckSlot(landCard.scryfallId, 10), DeckSlot(spellCard.scryfallId, 2))
 
     private fun stubDeck() {
         every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
@@ -91,7 +98,13 @@ class DeckDoctorOrchestratorTest {
         evaluateDeckUseCase = evaluateDeckUseCase,
         inferDeckIdentityUseCase = inferDeckIdentityUseCase,
         crashReporter = crashReporter,
-        resolveCard = { id -> if (id == landCard.scryfallId) landCard else null },
+        resolveCard = { id ->
+            when (id) {
+                landCard.scryfallId -> landCard
+                spellCard.scryfallId -> spellCard
+                else -> null
+            }
+        },
         weightsProvider = { ScoreWeightOverrides.NONE },
         // Motor B ("Decks like yours") is left null/defaulted -- SEARCHING_COMMUNITY never fires
         // in this configuration, keeping these tests focused on the READING_DECK_PLAN -> null
@@ -151,4 +164,76 @@ class DeckDoctorOrchestratorTest {
         assertNull("the doctor must never be left stuck displaying a stale stage", orchestrator.state.value.stage)
         assertTrue(orchestrator.state.value.isLoaded)
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Deck Wizard Commander v5 (X2, H3/S4): incremental recompute -- debounce coalescing,
+    //  onRemoveCardCompletely, and cancelPendingRecompute.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `onRemoveCardCompletely drops the whole slot regardless of quantity`() = runTest(dispatcher) {
+        stubDeck()
+        val orchestrator = createOrchestrator(this)
+        orchestrator.loadAnalysis(DECK_ID)
+        advanceUntilIdle()
+        assertEquals(2, orchestrator.cachedMainboardQuantity(spellCard.scryfallId))
+
+        val handled = orchestrator.onRemoveCardCompletely(spellCard.scryfallId)
+        advanceUntilIdle()
+
+        assertTrue(handled)
+        assertNull("the whole slot must be gone, not just decremented", orchestrator.cachedMainboardQuantity(spellCard.scryfallId))
+    }
+
+    @Test
+    fun `onRemoveCardCompletely on an unprimed cache returns false`() = runTest(dispatcher) {
+        val orchestrator = createOrchestrator(this)
+        assertFalse(orchestrator.onRemoveCardCompletely(spellCard.scryfallId))
+    }
+
+    @Test
+    fun `three rapid onAddCard calls coalesce into exactly one recompute`() = runTest(dispatcher) {
+        stubDeck()
+        val orchestrator = createOrchestrator(this)
+        orchestrator.loadAnalysis(DECK_ID)
+        advanceUntilIdle()
+        coVerify(exactly = 1) {
+            evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        }
+
+        // Each call is faster than the orchestrator's internal debounce window.
+        orchestrator.onAddCard(spellCard.scryfallId)
+        advanceTimeBy(50)
+        orchestrator.onAddCard(spellCard.scryfallId)
+        advanceTimeBy(50)
+        orchestrator.onAddCard(spellCard.scryfallId)
+        advanceUntilIdle()
+
+        assertEquals(5, orchestrator.cachedMainboardQuantity(spellCard.scryfallId))
+        coVerify(exactly = 2) {
+            evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        }
+    }
+
+    @Test
+    fun `cancelPendingRecompute stops an in-flight debounced recompute without touching the cache`() =
+        runTest(dispatcher) {
+            stubDeck()
+            val orchestrator = createOrchestrator(this)
+            orchestrator.loadAnalysis(DECK_ID)
+            advanceUntilIdle()
+            val healthBeforeCancel = orchestrator.state.value.health
+
+            orchestrator.onAddCard(spellCard.scryfallId)
+            advanceTimeBy(50)
+            orchestrator.cancelPendingRecompute()
+            advanceUntilIdle()
+
+            // The in-memory cache mutation from onAddCard is NOT undone by cancelling the
+            // recompute (a later add/cut in the SAME session still works off it) -- only the
+            // pending Health evaluation never ran.
+            assertEquals(3, orchestrator.cachedMainboardQuantity(spellCard.scryfallId))
+            assertEquals("a cancelled recompute must never publish a stale/partial Health update",
+                healthBeforeCancel, orchestrator.state.value.health)
+        }
 }

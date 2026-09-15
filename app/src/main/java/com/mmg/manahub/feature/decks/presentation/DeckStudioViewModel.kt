@@ -990,6 +990,12 @@ class DeckStudioViewModel(
 
     fun onSelectTab(tab: DeckStudioTab) {
         if (tab == DeckStudioTab.SUGGESTIONS && deckFormat == DeckFormat.DRAFT) return
+        // X2 (H3/S4): leaving Suggestions mid-recompute cancels the debounced pass cleanly --
+        // the analysis CACHE stays primed (unlike invalidateSuggestions), so a later add/cut on
+        // this same session still recomputes incrementally instead of forcing a full reload.
+        if (_uiState.value.selectedTab == DeckStudioTab.SUGGESTIONS && tab != DeckStudioTab.SUGGESTIONS) {
+            deckDoctorOrchestrator.cancelPendingRecompute()
+        }
         _uiState.update { it.copy(selectedTab = tab) }
         // Lazily run the first Deck Doctor analysis the first time the user opens
         // Suggestions — never on init (keeps Phase-1 "straight into the editor" fast
@@ -1058,7 +1064,11 @@ class DeckStudioViewModel(
             FirebaseCrashlytics.getInstance().log("deck_studio_commander_mutation_blocked")
             return
         }
-        invalidateSuggestions()
+        // X2 (H3/S4): a mainboard mutation while Suggestions is showing recomputes incrementally
+        // instead of invalidating -- invalidateSuggestions() would drop the orchestrator's
+        // AnalysisCache, which is exactly what the incremental path below needs to stay primed.
+        val recomputeInline = !isSideboard && _uiState.value.selectedTab == DeckStudioTab.SUGGESTIONS
+        if (!recomputeInline) invalidateSuggestions()
         viewModelScope.launch {
             // resolveCard hits getCardById, which can throw. Keep it INSIDE the
             // protected block so a lookup failure logs + falls back to an unresolved
@@ -1082,10 +1092,34 @@ class DeckStudioViewModel(
                     deckId, scryfallId, currentQty + 1, isSideboard,
                     source = existingSource(scryfallId, isSideboard) ?: DeckCardSource.USER,
                 )
+            }.onSuccess {
+                // Sequenced AFTER the repository write succeeds (plan X2) -- the incremental
+                // recompute reads its own in-memory cache, not the repository, but this ordering
+                // keeps "write, then reflect" as one visible guarantee across both paths.
+                if (recomputeInline) refreshAnalysisAfterMutation(scryfallId, deckDoctorOrchestrator::onAddCard)
             }.onFailure {
                 logFailure("deck_studio_add_failed", it)
                 _events.send(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_studio_add_failed)))
             }
+        }
+    }
+
+    /**
+     * X2 (H3/S4, Deck Wizard Commander v5): while the Analysis tab is showing, a mainboard
+     * add/remove recomputes [DeckDoctorOrchestrator]'s Health in place instead of leaving it stale
+     * until the user leaves and re-enters the tab. Prefers the orchestrator's incremental cache
+     * ([DeckDoctorOrchestrator.onAddCard]/[DeckDoctorOrchestrator.onCutCard], internally debounced);
+     * falls back to a full [DeckDoctorOrchestrator.loadAnalysis] only when that cache can't resolve
+     * the card offline (e.g. a just-imported/never-cached id) — see those methods' own KDoc.
+     *
+     * @param applyToCache one of [DeckDoctorOrchestrator.onAddCard], [DeckDoctorOrchestrator.onCutCard]
+     *   (decrement-or-drop, one copy) or [DeckDoctorOrchestrator.onRemoveCardCompletely] (the whole
+     *   slot regardless of quantity) — the caller picks the one matching its own repository write.
+     */
+    private fun refreshAnalysisAfterMutation(scryfallId: String, applyToCache: (String) -> Boolean) {
+        val handled = applyToCache(scryfallId)
+        if (!handled && ::deckId.isInitialized) {
+            deckDoctorOrchestrator.loadAnalysis(deckId)
         }
     }
 
@@ -1102,10 +1136,12 @@ class DeckStudioViewModel(
             FirebaseCrashlytics.getInstance().log("deck_studio_commander_mutation_blocked")
             return
         }
-        invalidateSuggestions()
+        // X2 (H3/S4): see addCardToDeck's matching comment.
+        val recomputeInline = !isSideboard && _uiState.value.selectedTab == DeckStudioTab.SUGGESTIONS
+        if (!recomputeInline) invalidateSuggestions()
         viewModelScope.launch {
             val currentQty = currentQuantity(scryfallId, isSideboard)
-            if (currentQty <= 1) {
+            val result = if (currentQty <= 1) {
                 runCatching { deckRepository.removeCardFromDeck(deckId, scryfallId, isSideboard) }
                     .onFailure { logFailure("deck_studio_remove_failed", it) }
             } else {
@@ -1118,14 +1154,18 @@ class DeckStudioViewModel(
                     )
                 }.onFailure { logFailure("deck_studio_decrement_failed", it) }
             }
+            if (recomputeInline && result.isSuccess) refreshAnalysisAfterMutation(scryfallId, deckDoctorOrchestrator::onCutCard)
         }
     }
 
     /** Removes a card slot entirely (the "delete" action in the detail sheet). */
     fun removeCard(scryfallId: String, isSideboard: Boolean = false) {
-        invalidateSuggestions()
+        // X2 (H3/S4): see addCardToDeck's matching comment.
+        val recomputeInline = !isSideboard && _uiState.value.selectedTab == DeckStudioTab.SUGGESTIONS
+        if (!recomputeInline) invalidateSuggestions()
         viewModelScope.launch {
             runCatching { deckRepository.removeCardFromDeck(deckId, scryfallId, isSideboard) }
+                .onSuccess { if (recomputeInline) refreshAnalysisAfterMutation(scryfallId, deckDoctorOrchestrator::onRemoveCardCompletely) }
                 .onFailure { logFailure("deck_studio_delete_failed", it) }
         }
     }
