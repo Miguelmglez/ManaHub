@@ -5,9 +5,9 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-14 (v4 campaign, Run 8 — R15 entry-point placement + the persist-time
-replace guard; see `docs/plans/deck-wizard-commander-v4-progress.md` for the full per-item log,
-gitignored). Commit `e299e1ce` on `feature/deck-wizard`.
+**Last updated:** 2026-09-15 (v4 campaign, Run 11/W6c — real seeded variety (Defect 1) + real
+evidence for the W6 score dip (Defect 2); see `docs/plans/deck-wizard-commander-v4-progress.md` for
+the full per-item log, gitignored). Commit `b848b9b1` on `feature/deck-wizard`.
 **Owning plan (v3, shipped):** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the
 AI-planning-doc rule now that the campaign has shipped; this file is the durable record that
 survives. **v4 (active):** `docs/plans/deck-wizard-commander-v4-plan.md` (gitignored).
@@ -307,7 +307,7 @@ byte-identical during wizard work.
 | Metric | Before (P0 baseline) | After (P7) |
 |---|---|---|
 | Real collection: cards / unique / eligible commanders | 1344 / 1309 / 93 (P0.2) | 1344 / 1309 / 90 legal-and-non-colorless (a few dropped by the harness's own `isLegal` filter, matching P0's own methodology, plus 1 colorless "Page, Loose Leaf" edge case excluded and diagnosed, §6) |
-| Real-collection Commander builds: score distribution (min/p25/median/p75/max) | 40 / 82 / 85 / 88 / 91 (legacy Motor A build, scored by `DeckAnalysisPipeline`, 99 builds) | **78 / 85 / 88 / 91 / 96** (NEW `BuildCommanderDeckUseCase` engine, 180 builds = 90 commanders x {top recommendation, Custom}) |
+| Real-collection Commander builds: score distribution (min/p25/median/p75/max) | 40 / 82 / 85 / 88 / 91 (legacy Motor A build, scored by `DeckAnalysisPipeline`, 99 builds) | **78 / 85 / 88 / 91 / 96** (NEW `BuildCommanderDeckUseCase` engine, 180 builds = 90 commanders x {top recommendation, Custom}); **77 / 84 / 87 / 90 / 95 after W6/W6b/W6c** (versatility objective + real seeded variety — see W6c below for the evidenced trade-off) |
 | Share of builds with 0 BLOCKER | 97.0% (3/99 had ≥1 BLOCKER) | **100% of the 180 in-scope builds** (0 BLOCKER); the 1 excluded colorless commander is a diagnosed pre-existing `BasicLandCalculator` gap, not a scored build |
 | Median off-plan share (wizard-placed) | 0.0 (min 0.0, max 0.136) | 0/180 builds exceed the 15% `offplan_share` HARD ceiling (exact per-build shares not separately archived this run — every build passed the ceiling check) |
 | Gap sections (`current < min`) | avg 3.17 sections/build, avg 12.96 total missing count | not re-measured as an average this run (harness v2 tracks `gap_section_count`/`gaps_total` per spec in the JSON report, `testdata/wizard-harness/reports/`, gitignored) — all 180 builds satisfied `size_or_gaps` (declared gaps + entries reach the 100-card target) |
@@ -350,6 +350,39 @@ demand for numbers, not claims:**
   same deck today, because exact marginal-gain ties are rare with real (non-integer, non-duplicated)
   card data. Flagged as a real product-facing limitation, not fixed (no instruction to add
   intentional randomization, and doing so would need a product decision, not an engineering one).
+
+**W6c (2026-09-15) — real seeded variety, and real evidence for the score dip (closes both open
+items W6b left above):**
+- **Variety fix.** `BuildCommanderDeckUseCase`'s tie-break only fired on an EXACT float gain match,
+  which almost never happens against W6's normalized, continuous scoring — E4's seeded variety was
+  live in the code but dead in practice (W6b's 11/12-identical finding). Replaced with a RELATIVE
+  near-tie band (`NEAR_TIE_BAND = 0.12`, distinct from and narrower than `AMBIGUITY_EPSILON = 0.15`
+  per the plan's own rule): a candidate within the band of the running best gain is decided by
+  `stableSeed(deckId, cardId)` instead of gain order. Applied to both the main non-land placement
+  loop and `fillLandsV2`'s Stage A land ordering (`nearTieOrdered()`, a new shared helper).
+- **Band chosen from a measured trade-off curve** (0.02 / 0.06 / 0.12, all < 0.15) against the full
+  180-spec real-collection matrix: variety improves monotonically (median Jaccard card-overlap
+  between two different `deckId` builds of the same commander+strategy: 0.88 → 0.76 → 0.65;
+  identical-build count 7 → 0 → 0 of 180) while the score distribution stays flat at every band
+  (median 87 unchanged in all three; min/p75/max move by at most 1 point) — 0.12 was the widest
+  band tested and bought real variety at zero measured score cost, so it was kept. Two different
+  `deckId`s building the same commander+strategy now typically share ~65% of their cards instead of
+  being byte-identical; rebuilding the SAME `deckId` stays byte-identical (determinism HARD metric
+  unaffected). Full curve + methodology: progress tracker Run 11.
+- **Score-dip evidence (Defect 2).** Measured placed-card power directly (same
+  `EdhrecPowerResolver` normalization the scorer uses, over every wizard-placed non-land card,
+  full 180-spec matrix) in an isolated worktree at pre-W6 commit `3d5c8e04` vs. current:
+  mean power **0.135 → 0.157 (+16.6% relative)**, UNIFORMLY across the whole distribution
+  (every percentile +0.013 to +0.029), while score dropped by exactly 1 point at every percentile
+  (min 78→77, median 88→87, max 96→95). **Verdict: EVIDENCED TRADE-OFF, not a regression** — this
+  is the concrete confirmation of W6's E5 claim (card quality now genuinely decides more
+  placements), at a score cost within noise. No weight retuning performed; `PlacementScorer`
+  weights unchanged from the Run 12 "NO CHANGE" calibration verdict.
+- Both W6b open items (`docs`'s §8, "variety ~0% in practice") are now RESOLVED: variety is real
+  and measured, and the score dip has a metric behind it instead of "on inspection." Verify
+  gauntlet: harness v2 180/180 HARD, `feature.decks.*` 549 tests/1 pre-existing failure (Edgar,
+  unchanged), `compileKotlinWasmJs`/`compileKotlinJvm`/`assembleDebug` green, golden/corpus/
+  calibration untouched (no scoring-engine file touched this run). Commit `b848b9b1`.
 
 **P0.5 baseline reproduction:** `./gradlew :app:testDebugUnitTest --tests
 "com.mmg.manahub.feature.decks.harness.P0BaselineTest"` (requires `testdata/wizard-harness/`
@@ -439,11 +472,15 @@ Things that differ from Commander and are NOT solved by this campaign:
   re-fabricate a test input to force this green; either accept the residual (update
   `MockCollectionRichReconstructionTest`'s own docstring to say "3 of 4" instead of implying all 4
   pass) or open a calibration-scoped follow-up campaign.
-- Also flagged by W6b, not yet actioned: **variety across two different `deckId`s for the same
-  commander+strategy is ~0% in practice** (11/12 sampled real-collection pairs built byte-identical
-  decks) — the W6 Task 3 seeded tie-break makes ties deterministic but does not manufacture variety,
-  and real (non-tied) marginal-gain data rarely ties. Needs a product decision (intentional
-  randomization?) before any engineering follow-up.
+- **Variety CLOSED W6c (2026-09-15)** — was ~0% in practice (11/12 sampled real-collection pairs
+  built byte-identical decks) because the tie-break fired only on an exact float match. Fixed with
+  a relative `NEAR_TIE_BAND` (0.12) in the main placement loop and `fillLandsV2`'s Stage A ordering;
+  two different `deckId`s now typically share ~65% of their cards (median Jaccard 0.65) at zero
+  measured score cost. See §5's W6c entry for the full trade-off curve. No open item here any more.
+- **Score-dip evidence CLOSED W6c (2026-09-15)** — W6b's "accepted trade-off, on inspection" now has
+  a metric: placed-card power rose +16.6% relative (mean 0.135→0.157, uniformly across the
+  distribution) for a uniform 1-point score cost, measured pre-W6 (`3d5c8e04`) vs. current. No
+  weight retuning performed or needed. No open item here any more.
 - **`persist()` atomicity CLOSED P8** — `DeckRepository.persistCommanderBuild` / `DeckDao
   .persistCommanderBuild` is one real Room `@Transaction`. No open item here any more.
 
