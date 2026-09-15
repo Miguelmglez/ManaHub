@@ -855,6 +855,11 @@
          anchor instead of the LazyRow simply being absent. -->
     <string name="deck_analysis_section_empty">No cards yet</string>
 
+    <!-- Deck Wizard Commander v5 plan (X1, H7/S3, 2026-09-15): accessible description for
+         SectionCardUnresolvedThumbnail, a mainboard slot counted by the section header whose
+         Card object this call site could not resolve (e.g. a still-loading import). -->
+    <string name="deck_analysis_section_card_unresolved">Card details unavailable</string>
+
     <!-- Deck Analysis Engine v3, Phase 5 (UI, 2026-08-27): PillarTile's "not applicable" state
          (PillarResult.notApplicable) — SYNERGY on a zero-edge deck. Never renders as "0". -->
     <string name="deck_analysis_pillar_not_applicable_badge">N/A</string>

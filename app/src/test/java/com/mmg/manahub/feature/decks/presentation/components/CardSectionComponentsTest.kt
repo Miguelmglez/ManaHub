@@ -1,7 +1,9 @@
 package com.mmg.manahub.feature.decks.presentation.components
 
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.feature.decks.domain.engine.CardContribution
 import com.mmg.manahub.feature.decks.domain.engine.CardSection
+import com.mmg.manahub.util.TestFixtures
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -97,5 +99,48 @@ class CardSectionComponentsTest {
         val section = CardSection(id = "role:ramp", label = "Ramp", current = 8, min = 4, ideal = 8, max = 12, contributions = contributions(22))
         assertEquals(8, section.current)
         assertEquals(22, section.realCount)
+    }
+
+    // ── X1 (H7/S3, Deck Wizard Commander v5 plan): resolveSectionRenderItems ───────────────────
+
+    private fun contribution(id: String, quantity: Int = 1) = CardContribution(scryfallId = id, quantity = quantity, confidence = 1f)
+
+    @Test
+    fun `commander-only tribe section -- one resolvable contribution renders one item`() {
+        val commanderId = "commander-1"
+        val contributions = listOf(contribution(commanderId))
+        val resolveCard: (String) -> Card? = { id ->
+            if (id == commanderId) TestFixtures.buildCard(scryfallId = commanderId) else null
+        }
+        val items = resolveSectionRenderItems(contributions, resolveCard)
+        assertEquals(1, items.size)
+        assertTrue(items.single() is SectionRenderItem.Resolved)
+    }
+
+    @Test
+    fun `unresolvable contribution renders as a placeholder, never dropped -- count stays equal`() {
+        val contributions = listOf(contribution("resolvable"), contribution("unresolvable"))
+        val resolveCard: (String) -> Card? = { id ->
+            if (id == "resolvable") TestFixtures.buildCard(scryfallId = id) else null
+        }
+        val items = resolveSectionRenderItems(contributions, resolveCard)
+        // The counter (contributions.size) must always equal the rendered item count.
+        assertEquals(contributions.size, items.size)
+        assertTrue(items[0] is SectionRenderItem.Resolved)
+        assertTrue(items[1] is SectionRenderItem.Unresolved)
+        assertEquals("unresolvable", items[1].contribution.scryfallId)
+    }
+
+    @Test
+    fun `all unresolvable -- every contribution still renders as a placeholder`() {
+        val contributions = listOf(contribution("a"), contribution("b"), contribution("c"))
+        val items = resolveSectionRenderItems(contributions) { null }
+        assertEquals(3, items.size)
+        assertTrue(items.all { it is SectionRenderItem.Unresolved })
+    }
+
+    @Test
+    fun `empty contributions -- empty render list, no crash`() {
+        assertEquals(0, resolveSectionRenderItems(emptyList()) { null }.size)
     }
 }

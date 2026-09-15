@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation
-// COMMENTS_REVIEWED: 2026-09-08
+// COMMENTS_REVIEWED: 2026-09-15
 
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
@@ -1808,6 +1808,20 @@ class DeckStudioViewModel(
     private fun invalidateSuggestions() {
         if (deckDoctorOrchestrator.state.value.isLoaded) {
             deckDoctorOrchestrator.invalidate()
+        }
+    }
+
+    /**
+     * X1 (H7/S3, Deck Wizard Commander v5 plan): breadcrumb for a section that rendered at least
+     * one [com.mmg.manahub.feature.decks.presentation.components.SectionRenderItem.Unresolved]
+     * placeholder — count only, never a card id/name, per the telemetry discipline (CLAUDE.md).
+     */
+    fun recordUnresolvedSectionCards(sectionId: String, count: Int) {
+        if (count <= 0) return
+        FirebaseCrashlytics.getInstance().apply {
+            setCustomKey("deck_analysis_section_id", sectionId)
+            setCustomKey("deck_analysis_section_unresolved_count", count)
+            log("deck_analysis_section_unresolved_cards")
         }
     }
 
