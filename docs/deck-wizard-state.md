@@ -5,13 +5,51 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-15 (v4 campaign, Run 13/W7 Step 0 — real candidates-per-group numbers
-measured; W7 Tasks 1-4/W8 not yet attempted. See
-`docs/plans/deck-wizard-commander-v4-progress.md` for the full per-item log, gitignored). Commit
-`7fcb6d01` on `feature/deck-wizard`.
+**Last updated:** 2026-09-15 (v4 campaign, Run 14/W7 fixes — the design-review and edge-case-audit
+findings on the Choice screen (7.0c/7.0d/7.0e) all fixed and tested; W8 not started. See
+`docs/plans/deck-wizard-commander-v4-progress.md` for the full per-item log, gitignored). Commits
+`0ed707fe`..`d52eba32` on `feature/deck-wizard`.
 **Owning plan (v3, shipped):** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the
 AI-planning-doc rule now that the campaign has shipped; this file is the durable record that
 survives. **v4 (active):** `docs/plans/deck-wizard-commander-v4-plan.md` (gitignored).
+
+## v4 — Run 14 (2026-09-15): W7 fixes — design review + edge-case audit findings on the Choice flow
+
+**Six fix groups, six commits, all green.** Fixed every finding the main session had already
+verified in source (7.0c/7.0d/7.0e) — no re-audit performed, per this run's own brief.
+
+- **Fix 1 (`0ed707fe`)** — `DeckStudioViewModel`'s Build-tab-on-pop-back signal
+  (`DECK_STUDIO_SELECT_BUILD_TAB_KEY`) was read once in `init`, so it never fired when
+  `AppNavGraph` wrote it onto an ALREADY-CONSTRUCTED instance's `SavedStateHandle` (the real
+  pop-back path). Now collected reactively via `savedStateHandle.getStateFlow(...)`.
+- **Fix 2 (`9bc80b8f`)** — `onRetryGeneration` always sent the wizard back to REVIEW, so the next
+  Generate re-ran `buildWithGroups` and silently overwrote the user's Choice-screen picks. A new
+  `pendingFinalize` field (set at both `finalizeCommanderDraft` call sites, cleared only on success)
+  lets Retry re-run the SAME finalize/persist call with the SAME draft and resolutions.
+- **Fix 3 (`6364dc79`)** — `onToggleChoiceCard` recorded a `WizardPreferenceStore` preference the
+  instant an alternative was tapped, so a reversed pick or an abandoned Choice screen still polluted
+  preferences. Recording moved to `finalizeCommanderDraft`, after a successful persist, over the
+  FINAL resolutions map only.
+- **Fixes 4-6 (`a749a5f1`)** — design review P0/P1/P2 on `DeckWizardChoiceStep.kt`: cap-reached
+  toast + dimmed disabled rows, `Modifier.selectable`/`Role.Checkbox` TalkBack semantics,
+  `mtg_card_back` AsyncImage fallback, a "Wizard's pick" badge (was an ambiguous "Current pick"
+  caption), a "N of M sections decided" summary + per-section decided/still-default line,
+  `WizardStickyButton` swapped from a raw M3 `Button` to `MagicCtaButton`, a dedicated Info
+  `contentDescription`, per-section memoisation, hoisted `isFull`, merged progress text, and a
+  "Show N more" collapse for alternatives beyond the first 3 (tentative picks never collapse).
+- **Fix 7 (`d52eba32`)** — closed the edge-case audit's one genuinely unexecuted scenario: a
+  >10-alternative group's "Choose for me"/"Let the wizard finish" resolve from the engine's own
+  `tentativeByRole`/`ambiguityGroups`, never `CHOICE_ALTERNATIVES_CAP`'s display-only truncation
+  (that constant lives ONLY in the Compose file). The audit's other flagged scenario (zero-groups
+  direct finalize) turned out to already be covered by a pre-existing test — verified, not
+  duplicated.
+
+**Gate:** `:app:assembleDebug` BUILD SUCCESSFUL; `:shared:core-domain:compileKotlinWasmJs`
+SUCCESSFUL (UP-TO-DATE — no shared/commonMain file touched this run); real 180-spec harness
+(`WizardCommanderHarnessV2Test`) still `180/180 HARD`, scores `77/84/87/90/95`, ambiguity
+`min1/p25 3/median 3/p75 4/max 8` — byte-identical to Run 13; `shared:core-domain:jvmTest` 658
+tests / 1 failure (the pre-existing, untouched Edgar Markov case awaiting a user decision, per
+Run 13's own note — not re-audited or weakened); app-module `feature/decks.*` package 554/554.
 
 ## v4 — Run 13 (2026-09-15): W7 Step 0 — candidates-per-group, measured for real
 
