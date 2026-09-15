@@ -480,6 +480,36 @@ items W6b left above):**
   unchanged), `compileKotlinWasmJs`/`compileKotlinJvm`/`assembleDebug` green, golden/corpus/
   calibration untouched (no scoring-engine file touched this run). Commit `b848b9b1`.
 
+**W8 (2026-09-15) — harness v3: legality, land-mode, choice determinism, variety.** Adds new
+segments on top of harness v2, byte-identical HARD metrics unchanged (180/180, score
+`77/84/87/90/95`, ambiguity `min1/p25 3/median 3/p75 4/max 8`, candidates/group unchanged —
+re-confirmed by re-running `WizardCommanderHarnessV2Test` after this work).
+- **Legality (R7/E9), commonTest, synthetic fixtures** (`WizardHarnessV3Test`): a Commander-banned
+  card never enters `BuildCommanderDeckUseCase`'s auto-placement candidate pool for `COMMANDER`
+  (absent from `candidatesById` ∪ `placedNonLand`); `COMMANDER_CASUAL` ignores legality entirely
+  (the same card enters the pool). A manually-added banned card surfaces `Finding.IllegalCard`
+  (BLOCKER) in the analysis for `COMMANDER`, never for `COMMANDER_CASUAL` -- confirms the builder's
+  pool filter and the analysis pillar agree on the same `isLegalForFormat` predicate (W0.1).
+- **Lands (R8/R12), commonTest, synthetic fixtures** (`WizardHarnessV3Test`): non-basic lands OFF
+  places ONLY basics and still reaches the full resolved `landTarget` (no ownership-driven gap);
+  non-basic lands ON uses an owned in-identity dual (needs a 2+-color identity -- `LAND_MIX`'s
+  mono-color bucket is 1.0..1.0 basics BY DESIGN, "no dedicated fixing") while basics stay the
+  numeric majority; a collection with ZERO owned copies of a basic (but the Card OBJECT present,
+  mirroring `DeckWizardViewModel.guaranteeBasicsAvailable`'s contract, R12's ownership-exemption)
+  still reaches the full land target.
+- **Choice determinism (HARD), real 180-spec matrix** (`WizardHarnessV3RealCollectionTest`):
+  finalizing with the engine's own `tentativeByRole` picks made EXPLICIT must equal leaving them
+  implicit (the single-shot path) -- `180/180` specs checked, all 180 had real ambiguity groups to
+  exercise the check (not a vacuous pass).
+- **Variety (TRACKED, alert threshold), real 12-spec sample** (every 15th of 180, mirrors W6b's own
+  sampling convention): median Jaccard card-overlap between two different `deckId`s = **0.636**,
+  consistent with W6c's 0.65 baseline (measured on a different, larger sample). Alert threshold
+  documented in the test itself: median `<= 0.85` -- a regression toward W6b's pre-fix ~0.88-1.00
+  near-identical builds would cross it before the median ever reaches a literal 1.0.
+- Gate: `shared:core-domain:jvmTest` (`feature.decks.*`) 561 tests/1 pre-existing failure (Edgar,
+  unchanged), `compileKotlinWasmJs`/`compileTestKotlinWasmJs` green, `app:testDebugUnitTest`
+  (`feature.decks.*`) green, `app:assembleDebug` green.
+
 **P0.5 baseline reproduction:** `./gradlew :app:testDebugUnitTest --tests
 "com.mmg.manahub.feature.decks.harness.P0BaselineTest"` (requires `testdata/wizard-harness/`
 checked out — gitignored real user data, Assume-skips otherwise). Full matrix run (99 of

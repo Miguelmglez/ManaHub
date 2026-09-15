@@ -39,13 +39,15 @@ data class CommanderSpecV2(val label: String, val commander: Card, val strategyS
 
 object CommanderMatrixV2 {
 
-    private fun newPipeline(): DeckAnalysisPipeline = DeckAnalysisPipeline(
+    // W8 (harness v3): widened private -> internal so WizardHarnessV3RealCollectionTest (same
+    // package/module) can build against the SAME pipeline/use-case wiring, never a second copy.
+    internal fun newPipeline(): DeckAnalysisPipeline = DeckAnalysisPipeline(
         EvaluateDeckUseCase(DeckScorer(RoleClassifier(), NeutralPowerResolver), ProgressionEventBus()),
         InferDeckIdentityUseCase(),
         HarnessCrashReporter,
     )
 
-    private fun newBuildUseCase(): BuildCommanderDeckUseCase = BuildCommanderDeckUseCase(newPipeline(), HarnessCrashReporter)
+    internal fun newBuildUseCase(): BuildCommanderDeckUseCase = BuildCommanderDeckUseCase(newPipeline(), HarnessCrashReporter)
 
     /** Every eligible owned commander x {top recommendation, Custom} — plan §7.1's real-collection
      * segment. A commander with an empty/fully-unresolved recommendation list falls back to Custom
