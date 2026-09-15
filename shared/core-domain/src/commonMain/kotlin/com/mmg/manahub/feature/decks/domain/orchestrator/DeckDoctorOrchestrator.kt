@@ -201,11 +201,11 @@ class DeckDoctorOrchestrator(
      * so only the LATEST fetch can ever survive to update [state]. */
     private var communityJob: Job? = null
 
-    /** X2 (H3/S4, Deck Wizard Commander v5): the in-flight debounced [recomputeIncremental] job --
-     * cancelled before every new launch so N rapid [onAddCard]/[onCutCard] taps coalesce into ONE
-     * evaluation pass instead of N, and cancelled by [invalidate]/[cancelPendingRecompute] so a tab
-     * switch away from Suggestions mid-recompute never leaks a stale update into [state]. */
+    /** In-flight debounced [recomputeIncremental] job -- cancelled before every relaunch so rapid taps coalesce into one evaluation. */
     private var recomputeJob: Job? = null
+
+    /** True from the moment a mutation is applied to [analysisCache] until [performRecompute] publishes Health for it -- lets a host that cancelled the pending recompute run it immediately on return, see [recomputeNowIfDirty]. */
+    private var recomputeDirty: Boolean = false
 
     /**
      * Workstream 8.4 -- bumped once per [loadAnalysis] call, BEFORE its coroutine is launched.
@@ -262,6 +262,8 @@ class DeckDoctorOrchestrator(
     fun loadAnalysis(deckId: String) {
         analysisCache = null
         analysisJob?.cancel()
+        recomputeJob?.cancel()
+        recomputeDirty = false
         // Workstream 8.4 -- this pass's own identity, captured BEFORE launch so every stage-emitting
         // sub-job it spawns ([recomputeCommunityInternal]) can tell whether it is still the CURRENT
         // pass by the time it actually gets to update [DeckDoctorState.stage].
@@ -512,33 +514,46 @@ class DeckDoctorOrchestrator(
      */
     private fun recomputeIncremental() {
         val context = analysisCache ?: return
-        // X2 (H3/S4): coalesce rapid +/+/+ taps (e.g. a Browse sheet quantity stepper) into ONE
-        // recompute -- cancel-and-relaunch means only the LAST call in a fast burst survives past
-        // the debounce window and actually evaluates.
+        recomputeDirty = true
+        // Coalesce rapid taps into one recompute -- cancel-and-relaunch keeps only the last call.
         recomputeJob?.cancel()
         recomputeJob = scope.launch {
             delay(RECOMPUTE_DEBOUNCE_MS)
-            val mainboard = context.workingMainboard
-            val weightOverrides = weightsProvider()
-            val weights = weightOverrides.toScoreWeights()
-            val health = evaluateDeckUseCase(
-                mainboard = mainboard,
-                format = context.format,
-                commanderIdentity = context.commanderIdentity,
-                seedTags = context.seedTags,
-                weights = weights,
-                archetypeOverride = context.archetypeOverride,
-                themesOverride = context.themesOverride,
-                postureOverride = context.postureOverride,
-                commanderTags = context.commanderTags,
-                // Deck Analysis Engine v3 (spec §8) -- raw overrides, see the sibling call site above.
-                scoreWeightOverrides = weightOverrides,
-                sideboardCount = context.sideboardCount,
-            )
-            _state.update {
-                it.copy(health = withUnresolvedWarning(health, context.unresolvedCount))
-            }
+            performRecompute(context)
         }
+    }
+
+    /** Evaluates [context] and publishes Health, clearing [recomputeDirty] -- shared by the debounced [recomputeIncremental] and the immediate [recomputeNowIfDirty]. */
+    private suspend fun performRecompute(context: AnalysisCache) {
+        val mainboard = context.workingMainboard
+        val weightOverrides = weightsProvider()
+        val weights = weightOverrides.toScoreWeights()
+        val health = evaluateDeckUseCase(
+            mainboard = mainboard,
+            format = context.format,
+            commanderIdentity = context.commanderIdentity,
+            seedTags = context.seedTags,
+            weights = weights,
+            archetypeOverride = context.archetypeOverride,
+            themesOverride = context.themesOverride,
+            postureOverride = context.postureOverride,
+            commanderTags = context.commanderTags,
+            // Deck Analysis Engine v3 (spec §8) -- raw overrides, see the sibling call site above.
+            scoreWeightOverrides = weightOverrides,
+            sideboardCount = context.sideboardCount,
+        )
+        _state.update {
+            it.copy(health = withUnresolvedWarning(health, context.unresolvedCount))
+        }
+        recomputeDirty = false
+    }
+
+    /** Runs a mutation that was left pending by [cancelPendingRecompute] immediately, with no debounce delay -- a no-op when nothing is dirty. */
+    fun recomputeNowIfDirty() {
+        if (!recomputeDirty) return
+        val context = analysisCache ?: return
+        recomputeJob?.cancel()
+        recomputeJob = scope.launch { performRecompute(context) }
     }
 
     /**
@@ -579,13 +594,7 @@ class DeckDoctorOrchestrator(
         return true
     }
 
-    /**
-     * X2 (H3/S4): drops the ENTIRE [scryfallId] slot regardless of quantity (the "delete" action in
-     * the detail sheet, [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.removeCard]
-     * — distinct from [onCutCard], which only decrements one copy) and recomputes incrementally.
-     * Returns `false` when there is no primed [analysisCache] — the caller must fall back to a full
-     * [loadAnalysis] in that case.
-     */
+    /** Drops the entire [scryfallId] slot regardless of quantity (distinct from [onCutCard]'s one-copy decrement); returns false if [analysisCache] isn't primed. */
     fun onRemoveCardCompletely(scryfallId: String): Boolean {
         val context = analysisCache ?: return false
         context.workingMainboard = context.workingMainboard.filterNot { it.card.scryfallId == scryfallId }
@@ -619,15 +628,13 @@ class DeckDoctorOrchestrator(
             analysisJob?.cancel()
             communityJob?.cancel()
             recomputeJob?.cancel()
+            recomputeDirty = false
             analysisCache = null
             _state.update { it.copy(isLoaded = false, stage = null, completedStages = emptyList()) }
         }
     }
 
-    /** X2: cancels an in-flight debounced [recomputeIncremental] without touching [analysisCache]
-     * or [DeckDoctorState.isLoaded] -- called when the host leaves the Suggestions tab mid-recompute
-     * (unlike [invalidate], the cache stays primed so a later incremental add/cut on this SAME
-     * session still works without a full [loadAnalysis]). */
+    /** Cancels an in-flight debounced [recomputeIncremental] without touching [analysisCache] -- the mutation stays dirty, see [recomputeNowIfDirty]. */
     fun cancelPendingRecompute() {
         recomputeJob?.cancel()
     }
@@ -752,10 +759,7 @@ class DeckDoctorOrchestrator(
     }
 
     private companion object {
-        /** X2 debounce window for [recomputeIncremental] -- coalesces a rapid tap burst into one
-         * evaluation pass. Short enough that a single tap still feels instant (well under the ~100ms
-         * perceptible-delay threshold once the debounce plus one evaluation pass complete), long
-         * enough to absorb a multi-tap quantity stepper (typical human tap cadence is >100ms apart). */
+        /** Debounce window for [recomputeIncremental] -- coalesces a rapid tap burst into one evaluation pass. */
         const val RECOMPUTE_DEBOUNCE_MS = 200L
 
         /** Signature-card count for the 60-card canonical aggregate key (Phase 3.2 precedent: 2-3). */

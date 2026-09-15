@@ -2366,6 +2366,72 @@ class DeckStudioViewModelTest {
             )
         }
 
+    @Test
+    fun `switching tabs mid-recompute then returning to SUGGESTIONS recomputes exactly once and reflects the add`() =
+        runTest(dispatcher) {
+            // Arrange
+            stubResolvableDeck()
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            advanceUntilIdle()
+            val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
+            coVerify(exactly = 1) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+
+            // Act — mutate, leave before the debounce fires (health stays stale, per the test above), then return.
+            vm.addCardToDeck(elfCard.scryfallId)
+            advanceTimeBy(50)
+            vm.onSelectTab(DeckStudioTab.BUILD)
+            advanceUntilIdle()
+            assertEquals(initialNonLandCount, vm.uiState.value.health!!.profile.nonLandCount)
+
+            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            advanceUntilIdle()
+
+            // Assert — the return itself triggers the ONE deferred evaluation and now shows the add.
+            assertEquals(initialNonLandCount + 1, vm.uiState.value.health!!.profile.nonLandCount)
+            coVerify(exactly = 2) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `a mutation whose write completes after the tab switch still updates health, and returning triggers no extra recompute`() =
+        runTest(dispatcher) {
+            // Arrange
+            stubResolvableDeck()
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            advanceUntilIdle()
+            val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
+            coVerify(exactly = 1) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+
+            // Act — start the mutation, then switch tabs before its launched coroutine has even run.
+            vm.addCardToDeck(elfCard.scryfallId)
+            vm.onSelectTab(DeckStudioTab.BUILD)
+            advanceUntilIdle()
+
+            // Assert — the write + its debounced recompute complete off-tab, health already current.
+            assertEquals(DeckStudioTab.BUILD, vm.uiState.value.selectedTab)
+            assertEquals(initialNonLandCount + 1, vm.uiState.value.health!!.profile.nonLandCount)
+            coVerify(exactly = 2) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+
+            // Act — return to SUGGESTIONS; nothing is dirty, so no further evaluation runs.
+            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            advanceUntilIdle()
+
+            coVerify(exactly = 2) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+        }
+
     // ─────────────────────────────────────────────────────────────────────────
     //  Group 14 — isEmptyDeck property
     // ─────────────────────────────────────────────────────────────────────────

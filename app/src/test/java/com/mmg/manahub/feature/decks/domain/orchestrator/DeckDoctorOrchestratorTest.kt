@@ -236,4 +236,49 @@ class DeckDoctorOrchestratorTest {
             assertEquals("a cancelled recompute must never publish a stale/partial Health update",
                 healthBeforeCancel, orchestrator.state.value.health)
         }
+
+    @Test
+    fun `recomputeNowIfDirty applies a mutation left pending by cancelPendingRecompute immediately`() =
+        runTest(dispatcher) {
+            stubDeck()
+            val orchestrator = createOrchestrator(this)
+            orchestrator.loadAnalysis(DECK_ID)
+            advanceUntilIdle()
+            coVerify(exactly = 1) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+
+            orchestrator.onAddCard(spellCard.scryfallId)
+            advanceTimeBy(50)
+            orchestrator.cancelPendingRecompute()
+            advanceUntilIdle()
+            coVerify(exactly = 1) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+
+            orchestrator.recomputeNowIfDirty()
+            advanceUntilIdle()
+
+            assertEquals(3, orchestrator.cachedMainboardQuantity(spellCard.scryfallId))
+            coVerify(exactly = 2) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `recomputeNowIfDirty is a no-op when nothing is pending`() = runTest(dispatcher) {
+        stubDeck()
+        val orchestrator = createOrchestrator(this)
+        orchestrator.loadAnalysis(DECK_ID)
+        advanceUntilIdle()
+        val healthAfterLoad = orchestrator.state.value.health
+
+        orchestrator.recomputeNowIfDirty()
+        advanceUntilIdle()
+
+        assertEquals(healthAfterLoad, orchestrator.state.value.health)
+        coVerify(exactly = 1) {
+            evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        }
+    }
 }

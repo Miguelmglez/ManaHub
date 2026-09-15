@@ -990,9 +990,8 @@ class DeckStudioViewModel(
 
     fun onSelectTab(tab: DeckStudioTab) {
         if (tab == DeckStudioTab.SUGGESTIONS && deckFormat == DeckFormat.DRAFT) return
-        // X2 (H3/S4): leaving Suggestions mid-recompute cancels the debounced pass cleanly --
-        // the analysis CACHE stays primed (unlike invalidateSuggestions), so a later add/cut on
-        // this same session still recomputes incrementally instead of forcing a full reload.
+        // Leaving Suggestions mid-recompute cancels the debounced pass -- the cache stays primed,
+        // and a pending mutation is picked up by recomputeNowIfDirty() below on return.
         if (_uiState.value.selectedTab == DeckStudioTab.SUGGESTIONS && tab != DeckStudioTab.SUGGESTIONS) {
             deckDoctorOrchestrator.cancelPendingRecompute()
         }
@@ -1002,8 +1001,12 @@ class DeckStudioViewModel(
         // and avoids a Scryfall call for a deck the user may never analyse). Reads the
         // orchestrator's TRUE current state directly (not the merged _uiState, which is
         // only eventually-consistent via the init collector) so this gate is race-free.
-        if (tab == DeckStudioTab.SUGGESTIONS && !deckDoctorOrchestrator.state.value.isLoaded && ::deckId.isInitialized) {
-            deckDoctorOrchestrator.loadAnalysis(deckId)
+        if (tab == DeckStudioTab.SUGGESTIONS && ::deckId.isInitialized) {
+            if (!deckDoctorOrchestrator.state.value.isLoaded) {
+                deckDoctorOrchestrator.loadAnalysis(deckId)
+            } else {
+                deckDoctorOrchestrator.recomputeNowIfDirty()
+            }
         }
     }
 
