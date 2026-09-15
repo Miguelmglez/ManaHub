@@ -2301,6 +2301,8 @@ class DeckWizardViewModel(
      * a tap the user later reverses, or makes before abandoning Choice, must never become a
      * preference (E8's "actively chosen" contract means chosen AND KEPT through to a successful
      * build). See [finalizeCommanderDraft]'s own recording block for where this now happens.
+     * W7 fix 4.1 (design review P0): a blocked tap (cap already reached) surfaces a
+     * [DeckWizardEvent.ShowToast] explaining why, since a disabled row alone gives no feedback.
      */
     fun onToggleChoiceCard(role: RoleKey, cardId: String) {
         val state = _uiState.value
@@ -2309,7 +2311,17 @@ class DeckWizardViewModel(
         val tentative = draft.tentativeByRole[role].orEmpty()
         val current = state.choiceSelections[role] ?: tentative
         val isAdding = cardId !in current
-        if (isAdding && current.size >= group.remainingSlots) return // cap reached -- ignore the tap
+        if (isAdding && current.size >= group.remainingSlots) {
+            viewModelScope.launch {
+                _events.send(
+                    DeckWizardEvent.ShowToast(
+                        appContext.getString(R.string.deck_wizard_choice_cap_reached, group.remainingSlots),
+                        MagicToastType.INFO,
+                    )
+                )
+            }
+            return // cap reached -- ignore the tap
+        }
         val updated = if (isAdding) current + cardId else current - cardId
         _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to updated)) }
     }

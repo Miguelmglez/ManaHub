@@ -1304,13 +1304,20 @@
     <!-- Deck Wizard v4, W7 Task B (R10): the Choice screen -->
     <string name="deck_wizard_choice_title">A few close calls</string>
     <string name="deck_wizard_choice_subtitle">Several cards were an equally good fit — pick your favorites, or let the wizard decide.</string>
-    <string name="deck_wizard_choice_section_choose">Choose %1$d</string>
-    <string name="deck_wizard_choice_section_selected">%1$d/%2$d selected</string>
-    <string name="deck_wizard_choice_current_pick">Current pick</string>
+    <!-- W7 fix 6 (design review P2): deck_wizard_choice_section_progress merges the old
+         two-line "Choose N" + "x/N selected" pair into one. -->
+    <string name="deck_wizard_choice_section_progress">%1$d of %2$d chosen</string>
+    <string name="deck_wizard_choice_wizards_pick">Wizard\'s pick</string>
+    <string name="deck_wizard_choice_decided_by_you">Decided by you</string>
+    <string name="deck_wizard_choice_still_on_wizards_picks">Still on the wizard\'s picks</string>
+    <string name="deck_wizard_choice_show_more">Show %1$d more</string>
     <string name="deck_wizard_choice_autofill_section">Choose the rest for me</string>
     <string name="deck_wizard_choice_finish">Let the wizard finish</string>
     <string name="deck_wizard_choice_error_title">Nothing to choose from</string>
     <string name="deck_wizard_choice_error_message">The draft build is missing — go back and generate again.</string>
+    <string name="deck_wizard_choice_cap_reached">You can choose up to %1$d — deselect one first</string>
+    <string name="deck_wizard_choice_view_details">View details for %1$s</string>
+    <string name="deck_wizard_choice_sections_progress">%1$d of %2$d sections decided</string>
     <string name="deck_wizard_name_suffix_deck">%1$s Deck</string>
     <string name="deck_wizard_name_default">New %1$s Deck</string>
 

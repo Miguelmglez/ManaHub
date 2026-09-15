@@ -231,6 +231,8 @@ class DeckWizardViewModelTest {
         mockkStatic(FirebaseCrashlytics::class)
         every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
         every { appContext.getString(any()) } returns "TPL"
+        // W7 fix 4.1: onToggleChoiceCard's cap-reached toast uses the vararg getString overload.
+        every { appContext.getString(any(), *anyVararg()) } returns "TPL"
         every { userCardRepository.observeCollection() } returns flowOf(emptyList())
         coEvery { deckRepository.createDeck(any(), any(), any()) } returns "wizard-deck-1"
         // Default: no analysis available (degrades PLAN_SECTIONS to its error state) -- tests that

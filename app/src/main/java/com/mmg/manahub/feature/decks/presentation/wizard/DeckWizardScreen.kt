@@ -33,8 +33,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,6 +59,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardRow
+import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -356,25 +355,17 @@ internal fun WizardStickyButton(
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
+    // W7 fix 5.6 (design review): swapped the raw M3 Button for MagicCtaButton -- it supports the
+    // same full-width sticky layout (fillMaxWidth + fixed height, Box-centered content) plus the
+    // shared gradient/glow/disabled-state language every other CTA in the app already uses.
     Surface(color = mc.background, modifier = modifier.fillMaxWidth().navigationBarsPadding()) {
-        Button(
+        MagicCtaButton(
+            text = label,
             onClick = onClick,
             enabled = enabled,
-            shape = ChipShape,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = mc.primaryAccent,
-                contentColor = mc.background,
-                // C2 (design review): surfaceVariant is near-invisible on HallowedPrint; this is
-                // the PRIMARY CTA before a selection is made, so it must stay visibly a button.
-                disabledContainerColor = mc.textDisabled.copy(alpha = 0.25f),
-                disabledContentColor = mc.textDisabled,
-            ),
             modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.md).height(52.dp),
-        ) {
-            Text(text = label, style = ty.titleMedium)
-        }
+        )
     }
 }
 
