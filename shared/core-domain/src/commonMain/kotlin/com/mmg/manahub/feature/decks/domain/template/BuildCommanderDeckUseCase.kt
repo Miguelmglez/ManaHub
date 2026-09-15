@@ -190,11 +190,23 @@ class BuildCommanderDeckUseCase(
                 // W6 Task 5 (E8): the preference bonus is applied AFTER the real objective clears
                 // the D8 floor, so it can only reorder a near-tie, never conjure a placement on its own.
                 val gain = if (card.scryfallId in preferredIds) rawGain + PlacementScorer.PREFERENCE_BONUS else rawGain
-                if (best == null || gain > bestGain ||
-                    (gain == bestGain && stableSeed(deckId, card.scryfallId) < stableSeed(deckId, best!!.scryfallId))
-                ) {
-                    best = card
-                    bestGain = gain
+                // W6c (E4/R9): an exact-float-tie check almost never fires against live scored data
+                // (see G11's own root-cause note), so real variety needs a RELATIVE near-tie band,
+                // not just an equality check. `currentBest` is snapshotted before the branch so the
+                // seed comparison below always reads the candidate that held `best` at the START of
+                // this decision, never one just written by an earlier branch in the same call.
+                val currentBest = best
+                when {
+                    currentBest == null -> { best = card; bestGain = gain }
+                    gain > bestGain * (1f + NEAR_TIE_BAND) -> { best = card; bestGain = gain }
+                    gain > bestGain * (1f - NEAR_TIE_BAND) -> {
+                        // Near-tie: the running bestGain stays anchored to the STRONGEST gain seen
+                        // in the band (so the band doesn't drift downward pick after pick), but the
+                        // WINNER among the tied candidates is decided by the seed, not by gain order.
+                        if (gain > bestGain) bestGain = gain
+                        if (stableSeed(deckId, card.scryfallId) < stableSeed(deckId, currentBest.scryfallId)) best = card
+                    }
+                    else -> Unit // clearly worse than the current best -- not a candidate for this slot
                 }
             }
             val chosen = best ?: break
@@ -358,6 +370,27 @@ class BuildCommanderDeckUseCase(
         return hash
     }
 
+    /** W6c (E4/R9): descending-by-[keyOf], but items whose key sits within [NEAR_TIE_BAND] of the
+     * top value of their own cluster are treated as a near-tie and ordered by [stableSeed] instead
+     * -- the one-time-sort counterpart to the main placement loop's inline near-tie band above,
+     * used by [fillLandsV2]'s Stage A ordering so seeded variety applies to every ordering the seed
+     * governs, not just the non-land loop. */
+    private fun <T> nearTieOrdered(items: List<T>, deckId: String, idOf: (T) -> String, keyOf: (T) -> Double): List<T> {
+        if (items.size <= 1) return items
+        val sorted = items.sortedByDescending(keyOf)
+        val result = ArrayList<T>(items.size)
+        var i = 0
+        while (i < sorted.size) {
+            val top = keyOf(sorted[i])
+            val band = top * NEAR_TIE_BAND
+            var j = i + 1
+            while (j < sorted.size && (top - keyOf(sorted[j])) <= band) j++
+            result += sorted.subList(i, j).sortedBy { stableSeed(deckId, idOf(it)) }
+            i = j
+        }
+        return result
+    }
+
     private fun fold(state: PlacementScorer.PlacementState, profile: PlacementScorer.CandidateProfile): PlacementScorer.PlacementState {
         val roleCounts = state.roleCounts.toMutableMap()
         profile.roleConfidence.forEach { (role, confidence) ->
@@ -477,14 +510,16 @@ class BuildCommanderDeckUseCase(
                 .filter { it.name !in usedNames }
                 .distinctBy { it.name }
 
-            val colorProducers = ownedNonBasics
-                .map { card -> card to manaBaseAnalyzer.producedColors(card, identity).intersect(identitySymbolsToColors(identitySymbols)) }
-                .filter { it.second.isNotEmpty() }
-                .sortedWith(
-                    compareByDescending<Pair<Card, Set<ManaColor>>> { (_, colors) ->
-                        colors.sumOf { c -> (intensity[c] ?: 0).let { need -> (need - (sources[c] ?: 0)).coerceAtLeast(0) } }
-                    }.thenBy { stableSeed(deckId, it.first.scryfallId) }
-                )
+            val colorProducers = nearTieOrdered(
+                items = ownedNonBasics
+                    .map { card -> card to manaBaseAnalyzer.producedColors(card, identity).intersect(identitySymbolsToColors(identitySymbols)) }
+                    .filter { it.second.isNotEmpty() },
+                deckId = deckId,
+                idOf = { (card, _) -> card.scryfallId },
+                keyOf = { (_, colors) ->
+                    colors.sumOf { c -> (intensity[c] ?: 0).let { need -> (need - (sources[c] ?: 0)).coerceAtLeast(0) } }.toDouble()
+                },
+            )
 
             var remaining = nonBasicCap
             for ((card, colors) in colorProducers) {
@@ -649,5 +684,17 @@ class BuildCommanderDeckUseCase(
          * enough to surface the plan's own worked example (7 plausible cards for the last 2 Removal
          * slots), narrow enough that a typical build does not ask dozens of questions. */
         const val AMBIGUITY_EPSILON = 0.15f
+
+        /** W6c (E4/R9): candidates whose marginal gain sits within this RELATIVE band of the
+         * running best are a near-tie, broken by [stableSeed] instead of raw gain -- this is what
+         * makes E4's seeded variety real against live, non-integer scored data, where an exact
+         * float tie almost never happens (G11's own root-cause note). Deliberately SMALLER than
+         * [AMBIGUITY_EPSILON]: a near-tie the wizard silently auto-resolves must be narrower than a
+         * near-tie worth asking the user about, or this would auto-decide cases E6's ambiguity
+         * detector is supposed to surface as a question. Chosen from harness evidence trading off
+         * variety (Jaccard card-overlap between two different `deckId` builds of the same
+         * commander+strategy) against the real-collection score distribution -- see
+         * docs/plans/deck-wizard-commander-v4-progress.md's W6c entry for the measured curve. */
+        const val NEAR_TIE_BAND = 0.12f
     }
 }
