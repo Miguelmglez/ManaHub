@@ -105,6 +105,61 @@ class BuildCommanderDeckUseCaseTest {
     }
 
     @Test
+    fun `W8 T2 -- near-tie variety needs NEAR_TIE_BAND, not just exact ties`() = runTest {
+        // The W6-Task-3 test above uses candidates that tie EXACTLY (same tag/cmc/power) -- an
+        // exact-float tie-break would already pass it. Real scored data almost never produces an
+        // exact tie (G11's own root-cause note), so this test uses candidates that are NEAR but
+        // NOT exactly tied (a narrow suggestedTags confidence spread, all above the classifier's
+        // SUGGESTED_TAG_FLOOR) -- the only way two different deckIds can still diverge over these is
+        // a RELATIVE near-tie band. If NEAR_TIE_BAND regresses to an exact-float comparison, the
+        // highest-confidence filler always wins first regardless of deckId and this test fails.
+        val useCase = newUseCase()
+        val commander = card(id = "cmd-vanilla-neartie", name = "Vanilla Commander II", typeLine = "Legendary Creature — Human", cmc = 3.0, colors = listOf("G"), colorIdentity = listOf("G"))
+        // "sac_outlet" (unlike "ramp") is a plain ROLE_SPECS tagMatcher, not one of the 5 roles
+        // routed through LEGACY_ROLE_MAP's RoleClassifier -- that legacy classifier only reads
+        // card.tags/userTags, never suggestedTags, so it cannot express a graded confidence.
+        val roleTag = roleTagFor("sac_outlet")
+        val fillers = (1..90).map { i ->
+            // 6 confidence tiers spanning ~0.90-0.975 (~7.7% spread), diluted further by the other
+            // (identical, per-filler) role/axis/curve/power weight terms -- well inside NEAR_TIE_BAND
+            // (0.12) but never an exact match between any two fillers on different tiers.
+            val confidence = 0.90f + (i % 6) * 0.015f
+            OwnedCard(
+                card(
+                    id = "neartie-filler-$i",
+                    name = "Near-Tie Filler $i",
+                    typeLine = "Creature — Bear",
+                    cmc = 2.0,
+                    colors = listOf("G"),
+                    colorIdentity = listOf("G"),
+                    suggestedTags = listOf(com.mmg.manahub.core.model.SuggestedTag(tag = roleTag, confidence = confidence)),
+                ),
+                1,
+            )
+        }
+        val basics = MockCollectionRich.ownedBasics.filter { it.card.colorIdentity.contains("G") || it.card.name == "Forest" }
+        val owned = fillers + basics.map { OwnedCard(it.card, it.quantity) }
+        val identity = setOf(ManaColor.G)
+
+        suspend fun build(deckId: String) = useCase(DeckFormat.COMMANDER, commander, StrategyPick.Custom, identity, owned, deckId = deckId)
+        fun nonLandIds(outcome: CommanderBuildOutcome) = outcome.result.entries
+            .filterNot { BasicLandCalculator.isLand(it.card) }
+            .map { it.card.scryfallId }
+            .sorted()
+
+        val sameA1 = build("neartie-deck-A")
+        val sameA2 = build("neartie-deck-A")
+        assertEquals(nonLandIds(sameA1), nonLandIds(sameA2), "the SAME deckId rebuilt over near-tied (not exactly tied) candidates must stay byte-identical")
+
+        val deckA = build("neartie-deck-A")
+        val deckB = build("neartie-deck-B")
+        assertTrue(
+            nonLandIds(deckA) != nonLandIds(deckB),
+            "two DIFFERENT deckIds over near-tied (not exactly tied) candidates must diverge -- this is exactly what NEAR_TIE_BAND (${BuildCommanderDeckUseCase.NEAR_TIE_BAND}) protects; regressing to an exact-float tie-break always places the highest-confidence fillers first regardless of deckId",
+        )
+    }
+
+    @Test
     fun `W6 Task 4 -- ambiguity groups are structurally valid over a real fixture`() = runTest {
         val useCase = newUseCase()
         val fixture = MockCollectionRich.targetFixtures.first { fx -> fx.mainboard.any { it.card.scryfallId == "cmd-edgar-markov" } }
