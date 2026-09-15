@@ -267,17 +267,10 @@ object SectionSearchQuery {
      * Local collection filter: the [com.mmg.manahub.core.model.CardTag] keys equivalent to this
      * section, for pre-filtering `CardSearchSheet`'s Collection tab.
      *
-     * `role:*`/`fingerprint:*` ids: per D6 the [RoleKey] vocabulary and the tagging engine's
-     * [com.mmg.manahub.core.model.CardTag] vocabulary are largely the SAME string keys -- BUT the
-     * task brief explicitly asked to verify this, not trust it. All 37 [RoleKey]s referenced from
-     * `ArchetypeData`'s bands were spot-checked against `TagDictionary.kt`'s current entries; 5 do
-     * NOT have a matching `CardTag` key: `removal_spot` / `removal_mass` (only a generic
-     * `"removal"` tag exists, which would incorrectly conflate spot removal with board wipes),
-     * `finisher` (no such tag at all), `equipment_or_aura` (only `"equipment"` and
-     * `"equipment_matters"` exist, neither an exact match), and `tribe_members` (tribe membership
-     * is a runtime [TribeDeriver.subtypeKeys] structural fact, not a static tag). Those 5 return
-     * `emptySet()` rather than guessing a near-miss key. [NO_COLLECTION_TAG_EQUIVALENT] is that
-     * exception list.
+     * `role:*`/`fingerprint:*` ids: read from [CategoryVocabulary] (Deck Wizard Commander v5, X0)
+     * -- the ONE authoritative table [ArchetypeRoleClassifier.tagMatcher] also reads, so the
+     * analysis attribution and this Collection filter agree by construction (S2). See
+     * [CategoryVocabulary]'s own KDoc for the widened/narrowed-membership citations.
      *
      * `tribe:*` ids also return `emptySet()`: a `tribe:elf` fingerprint key is a runtime-derived
      * label ([TribeDeriver.tribeKeys]), never a literal [com.mmg.manahub.core.model.CardTag] on
@@ -349,15 +342,7 @@ object SectionSearchQuery {
         if (key == "tribe_members") context.dominantTribe?.let { "t:$it" }
         else ROLE_ORACLE_FRAGMENTS[key]
 
-    private fun tagKeyOrEmpty(key: RoleKey): Set<String> =
-        if (key in NO_COLLECTION_TAG_EQUIVALENT) emptySet() else setOf(key)
-
-    /** Role keys spot-checked against `TagDictionary.kt` with NO matching `CardTag` key (see
-     * [collectionTagKeysFor] KDoc). All 37 [RoleKey]s referenced by [ArchetypeData]'s bands were
-     * checked; these 5 are the only misses. */
-    private val NO_COLLECTION_TAG_EQUIVALENT: Set<RoleKey> = setOf(
-        "removal_spot", "removal_mass", "finisher", "equipment_or_aura", "tribe_members",
-    )
+    private fun tagKeyOrEmpty(key: RoleKey): Set<String> = CategoryVocabulary.cardTagKeysFor(key)
 
     // ── Plan roles -- direct oracle tag (W3 table 1, 20 rows) ───────────────────────────────
 
