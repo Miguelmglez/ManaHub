@@ -69,6 +69,10 @@ data class V2BuildMetrics(
     val landsPlaced: Int = 0,
     val refinementSwaps: Int = 0,
     val runtimeMs: Long = 0,
+    /** W7 Task 0 (7.0) re-measurement: `WizardBuildResult.ambiguityGroups.size` — now computed LIVE
+     * during placement instead of after-the-fact, so this is a genuinely different (and meaningful)
+     * number than W6's own after-the-fact count. */
+    val ambiguityGroupCount: Int = 0,
 ) {
     val allHardMetricsPass: Boolean
         get() = !buildFailed && noBlockerOk && sizeOrGapsOk && determinismOk && commanderOnceOk &&
@@ -265,6 +269,7 @@ object HarnessMetricsV2Calculator {
             landsPlaced = result.fillStats.lands,
             refinementSwaps = result.refinementSwaps,
             runtimeMs = runtimeMs,
+            ambiguityGroupCount = result.ambiguityGroups.size,
         )
     }
 }

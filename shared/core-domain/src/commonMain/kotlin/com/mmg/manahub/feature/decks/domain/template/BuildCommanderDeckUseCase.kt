@@ -46,6 +46,47 @@ data class CommanderBuildOutcome(
     val pin: com.mmg.manahub.feature.decks.domain.engine.StrategyPin,
 )
 
+/**
+ * W7 Task 0 (7.0) — the non-land placement loop's output BEFORE land fill/verify/refine/persist,
+ * carrying everything [BuildCommanderDeckUseCase.finalize] needs to complete the build. Every slot
+ * in [placedNonLand] that belongs to one of [ambiguityGroups] is currently occupied by the engine's
+ * own seeded pick (a tentative default, per [tentativeByRole]) — the SAME card a single-shot build
+ * would keep — so a caller that never resolves anything gets a byte-identical result to the old
+ * one-pass build. Resolving a group only ever swaps ITS OWN tentative slot(s); no other card in the
+ * board is touched, which is what fixes the "no room" defect the old after-the-fact ambiguity
+ * detection had (see [BuildCommanderDeckUseCase.buildWithGroups]'s own KDoc).
+ */
+data class CommanderDraftBuild(
+    val format: DeckFormat,
+    val commander: Card,
+    val identity: Set<ManaColor>,
+    val plan: CommanderPlan,
+    val pin: com.mmg.manahub.feature.decks.domain.engine.StrategyPin,
+    val archetypeFormat: ArchetypeFormat,
+    val placedNonLand: List<DeckEntry>,
+    val manualNonLandCount: Int,
+    val manualIds: Set<String>,
+    val manualLand: List<DeckEntry>,
+    val landTarget: Int,
+    val remainingLandSlots: Int,
+    val colorCount: Int,
+    val ownedCollection: List<OwnedCard>,
+    val includeNonBasicLands: Boolean,
+    val deckId: String,
+    /** Cards never placed by the loop — the ONLY pool [finalize] may still place from (refine, or a
+     * user's resolution swap), so a swap can never evict an unrelated already-placed card. */
+    val remainingCandidates: List<Card>,
+    val candidateProfiles: Map<Card, PlacementScorer.CandidateProfile>,
+    /** Every candidate ever scored, by id — resolves an [AmbiguityGroup.candidateIds] entry (or a
+     * user's chosen replacement id) back to its [Card] for [finalize]'s swap. */
+    val candidatesById: Map<String, Card>,
+    /** [RoleKey] -> the scryfallIds of [placedNonLand] slots currently holding a tentative default
+     * for that role, in placement order — [finalize] replaces the first N of these (N = however many
+     * ids a resolution supplies) with the caller's chosen replacements; the rest keep their default. */
+    val tentativeByRole: Map<RoleKey, List<String>>,
+    val ambiguityGroups: List<AmbiguityGroup>,
+)
+
 class BuildCommanderDeckUseCase(
     private val deckAnalysisPipeline: DeckAnalysisPipeline,
     private val crashReporter: CrashReporter,
@@ -93,6 +134,49 @@ class BuildCommanderDeckUseCase(
         deckId: String = "",
         preferenceStore: WizardPreferenceStore? = null,
     ): CommanderBuildOutcome {
+        // W7 Task 0 (7.0): the single-shot path is just buildWithGroups -> finalize with no
+        // resolutions, i.e. every tentative default stands -- this is what makes "finalizing with
+        // the engine's own picks equals the single-shot build" true BY CONSTRUCTION, not by a
+        // separate equality test happening to pass.
+        val draft = buildWithGroups(
+            format = format,
+            commander = commander,
+            strategyPick = strategyPick,
+            identity = identity,
+            ownedCollection = ownedCollection,
+            manualAdds = manualAdds,
+            includeNonBasicLands = includeNonBasicLands,
+            onStage = onStage,
+            deckId = deckId,
+            preferenceStore = preferenceStore,
+        )
+        return finalize(draft, resolutions = emptyMap(), fillLands = fillLands, onStage = onStage)
+    }
+
+    /**
+     * W7 Task 0 (7.0) — runs plan resolution, the candidate pool, and the non-land placement loop
+     * ONLY (no land fill, no verify/refine, no persist); returns a [CommanderDraftBuild] for
+     * [finalize] to complete. This REPLACES the old defect where `ambiguityGroups` were computed
+     * AFTER the whole loop had already filled every non-land slot with other cards, so a group like
+     * "pick 2 of these 7 Removal" had no room left — honouring the user's pick would have meant
+     * evicting an unrelated card. Ambiguity is now detected LIVE, at the exact iteration a slot is
+     * decided: when the chosen card fills a role still short of its ideal AND at least one other
+     * still-unplaced candidate for that same role clears within [AMBIGUITY_EPSILON] of its gain, the
+     * chosen card's OWN slot is marked tentative for that role (its own KDoc). The chosen card still
+     * gets placed immediately (seeded variety, E4, stays real) — it is simply flagged as swappable.
+     */
+    suspend fun buildWithGroups(
+        format: DeckFormat,
+        commander: Card,
+        strategyPick: StrategyPick,
+        identity: Set<ManaColor>,
+        ownedCollection: List<OwnedCard>,
+        manualAdds: List<ManualAdd> = emptyList(),
+        includeNonBasicLands: Boolean = false,
+        onStage: (CommanderBuildStage) -> Unit = {},
+        deckId: String = "",
+        preferenceStore: WizardPreferenceStore? = null,
+    ): CommanderDraftBuild {
         require(format.isCommanderFormat) { "BuildCommanderDeckUseCase requires a Commander-shaped format, got $format" }
         val archetypeFormat = ArchetypeFormat.of(format)
             ?: error("BuildCommanderDeckUseCase requires a Commander-shaped format, got $format")
@@ -179,6 +263,11 @@ class BuildCommanderDeckUseCase(
         val remainingCandidates = candidateCards.toMutableList()
         var iterations = 0
         val iterationCap = candidateCards.size + nonLandTarget + ITERATION_CAP_SLACK
+        // W7 Task 0 (7.0): per-role tentative-slot tracking, live during the loop -- see
+        // CommanderDraftBuild.tentativeByRole's KDoc for why this replaces the old after-the-fact
+        // (and therefore roomless) ambiguity computation.
+        val tentativeSlotIdsByRole = mutableMapOf<RoleKey, MutableList<String>>()
+        val tentativeAlternatesByRole = mutableMapOf<RoleKey, MutableSet<String>>()
         while (placedNonLand.size - manualNonLand.size < nonLandTarget && remainingCandidates.isNotEmpty() && iterations < iterationCap) {
             iterations++
             var best: Card? = null
@@ -210,63 +299,148 @@ class BuildCommanderDeckUseCase(
                 }
             }
             val chosen = best ?: break
+            val chosenProfile = candidateProfiles.getValue(chosen)
+
+            // W7 Task 0 (7.0): does THIS slot fill a role still short of ideal, with a genuine
+            // still-unplaced alternative at THIS exact decision point? First eligible role wins (a
+            // card rarely ties for two roles at once; documented simplification, see the class KDoc).
+            val tentativeRole = plan.skeleton.roleTargets.keys.firstOrNull { role ->
+                role !in plan.skeleton.antiRoles &&
+                    (chosenProfile.roleConfidence[role] ?: 0f) > 0f &&
+                    (state.roleCounts[role] ?: 0) < plan.skeleton.roleTargets.getValue(role).ideal
+            }
+            if (tentativeRole != null) {
+                val alternates = remainingCandidates.asSequence()
+                    .filter { it != chosen }
+                    .filter { c -> (candidateProfiles[c]?.roleConfidence?.get(tentativeRole) ?: 0f) > 0f }
+                    .mapNotNull { c ->
+                        val pip = PlacementScorer.pipFactor(c, colorCount, manaBaseAnalyzer, estimatedSourcesByColor, landTarget)
+                        val rawGain = PlacementScorer.marginalGain(candidateProfiles.getValue(c), state, plan, curveTargets, axisIdeals, pip) ?: return@mapNotNull null
+                        val gain = if (c.scryfallId in preferredIds) rawGain + PlacementScorer.PREFERENCE_BONUS else rawGain
+                        c.scryfallId to gain
+                    }
+                    .filter { (_, gain) -> gain >= bestGain * (1f - AMBIGUITY_EPSILON) }
+                    .map { it.first }
+                    .toList()
+                if (alternates.isNotEmpty()) {
+                    tentativeSlotIdsByRole.getOrPut(tentativeRole) { mutableListOf() } += chosen.scryfallId
+                    tentativeAlternatesByRole.getOrPut(tentativeRole) { mutableSetOf() } += alternates
+                }
+            }
+
             remainingCandidates.remove(chosen)
-            state = fold(state, candidateProfiles.getValue(chosen))
+            state = fold(state, chosenProfile)
             placedNonLand += DeckEntry(card = chosen, quantity = 1, isOwned = true, isSideboard = false)
         }
 
-        // W6 Task 4 (E6): sections still short of ideal at the end of placement, with the real
-        // leftover candidates whose recomputed gain clears within AMBIGUITY_EPSILON of the best.
-        val ambiguityGroups = plan.skeleton.roleTargets.mapNotNull { (role, target) ->
-            if (role in plan.skeleton.antiRoles) return@mapNotNull null
-            val remaining = target.ideal - (state.roleCounts[role] ?: 0)
-            if (remaining <= 0) return@mapNotNull null
-            val scored = remainingCandidates
-                .filter { c -> (candidateProfiles[c]?.roleConfidence?.get(role) ?: 0f) > 0f }
-                .mapNotNull { c ->
-                    val pip = PlacementScorer.pipFactor(c, colorCount, manaBaseAnalyzer, estimatedSourcesByColor, landTarget)
-                    PlacementScorer.marginalGain(candidateProfiles.getValue(c), state, plan, curveTargets, axisIdeals, pip)?.let { c to it }
+        // Alternates recorded mid-loop can themselves get placed later (for a DIFFERENT role) --
+        // only a card that is STILL unplaced when the whole loop ends is a genuinely available
+        // swap-in, so the final candidate pool is the filter, not the snapshot taken at record time.
+        val finalRemainingIds = remainingCandidates.map { it.scryfallId }.toSet()
+        val ambiguityGroups = tentativeAlternatesByRole.mapNotNull { (role, altIds) ->
+            val slots = tentativeSlotIdsByRole[role] ?: return@mapNotNull null
+            val available = altIds.filter { it in finalRemainingIds }
+            if (available.size < 2) return@mapNotNull null
+            AmbiguityGroup(sectionId = role, candidateIds = available.sorted(), remainingSlots = slots.size)
+        }
+
+        val remainingLandSlots = (landTarget - manualLand.sumOf { 1 }).coerceAtLeast(0)
+        return CommanderDraftBuild(
+            format = format,
+            commander = commander,
+            identity = identity,
+            plan = plan,
+            pin = pin,
+            archetypeFormat = archetypeFormat,
+            placedNonLand = placedNonLand,
+            manualNonLandCount = manualNonLand.size,
+            manualIds = manualIds,
+            manualLand = manualLand.map { DeckEntry(card = it.card, quantity = 1, isOwned = it.isOwned, isSideboard = false) },
+            landTarget = landTarget,
+            remainingLandSlots = remainingLandSlots,
+            colorCount = colorCount,
+            ownedCollection = ownedCollection,
+            includeNonBasicLands = includeNonBasicLands,
+            deckId = deckId,
+            remainingCandidates = remainingCandidates,
+            candidateProfiles = candidateProfiles,
+            candidatesById = candidateCards.associateBy { it.scryfallId },
+            tentativeByRole = tentativeSlotIdsByRole,
+            ambiguityGroups = ambiguityGroups,
+        )
+    }
+
+    /**
+     * W7 Task 0 (7.0) — completes a [CommanderDraftBuild]: applies [resolutions] (a swap within the
+     * SAME tentative slot(s) only, never touching any other card — see [CommanderDraftBuild]'s own
+     * KDoc), then runs land fill, verify/refine, and produces the final [WizardBuildResult]. Does
+     * NOT persist — the caller (the wizard VM) still calls [persist] itself, in the SAME single
+     * atomic transaction as before (W7 Task 2/E11: only WHEN it is called moved, to Choice-screen
+     * resolution time, not the mechanism).
+     *
+     * @param resolutions [RoleKey] -> the user's chosen replacement card ids for that group, in the
+     *        order they should fill [CommanderDraftBuild.tentativeByRole]'s slots for that role.
+     *        Ids outside the group's own [AmbiguityGroup.candidateIds], or beyond the number of
+     *        tentative slots the role actually has, are dropped defensively rather than applied —
+     *        every remaining tentative slot for a role keeps the engine's own default. An empty (or
+     *        partially-empty) map is exactly "let the wizard finish": every unresolved slot stays at
+     *        its seeded default, which is what makes this call byte-identical to the single-shot
+     *        [invoke] path when [resolutions] is empty.
+     */
+    suspend fun finalize(
+        draft: CommanderDraftBuild,
+        resolutions: Map<RoleKey, List<String>> = emptyMap(),
+        fillLands: Boolean = true,
+        onStage: (CommanderBuildStage) -> Unit = {},
+    ): CommanderBuildOutcome {
+        val groupsByRole = draft.ambiguityGroups.associateBy { it.sectionId }
+        val placedNonLand = draft.placedNonLand.toMutableList()
+        val remainingCandidates = draft.remainingCandidates.toMutableList()
+        resolutions.forEach { (role, chosenIds) ->
+            val group = groupsByRole[role] ?: return@forEach
+            val tentativeSlots = draft.tentativeByRole[role] ?: return@forEach
+            val validIds = chosenIds.filter { it in group.candidateIds }.take(tentativeSlots.size)
+            validIds.forEachIndexed { index, replacementId ->
+                val replacement = draft.candidatesById[replacementId] ?: return@forEachIndexed
+                val slotIndex = placedNonLand.indexOfFirst { it.card.scryfallId == tentativeSlots[index] }
+                if (slotIndex >= 0) {
+                    placedNonLand[slotIndex] = DeckEntry(card = replacement, quantity = 1, isOwned = true, isSideboard = false)
                 }
-            if (scored.size < 2) return@mapNotNull null
-            val best = scored.maxOf { it.second }
-            val within = scored.filter { (_, gain) -> gain >= best * (1f - AMBIGUITY_EPSILON) }.map { it.first.scryfallId }
-            if (within.size < 2) return@mapNotNull null
-            AmbiguityGroup(sectionId = role, candidateIds = within, remainingSlots = remaining)
+                remainingCandidates.removeAll { it.scryfallId == replacementId }
+            }
         }
 
         // ── Land fill v2 (2.4) ──────────────────────────────────────────────────────────────────
         onStage(CommanderBuildStage.FILLING_LANDS)
-        val remainingLandSlots = (landTarget - manualLand.sumOf { 1 }).coerceAtLeast(0)
         val landEntries = mutableListOf<DeckEntry>()
-        manualLand.forEach { landEntries += DeckEntry(card = it.card, quantity = 1, isOwned = it.isOwned, isSideboard = false) }
-
-        if (fillLands && remainingLandSlots > 0) {
+        landEntries += draft.manualLand
+        if (fillLands && draft.remainingLandSlots > 0) {
             landEntries += fillLandsV2(
-                identity = identity,
-                colorCount = colorCount,
-                landTarget = landTarget,
-                remainingLandSlots = remainingLandSlots,
+                identity = draft.identity,
+                colorCount = draft.colorCount,
+                landTarget = draft.landTarget,
+                remainingLandSlots = draft.remainingLandSlots,
                 nonLandMainboard = placedNonLand,
-                commander = commander,
-                ownedCollection = ownedCollection,
-                usedNames = (manualNonLand.map { it.card.name } + manualLand.map { it.card.name } + placedNonLand.map { it.card.name }).toMutableSet(),
-                archetypeFormat = archetypeFormat,
-                includeNonBasicLands = includeNonBasicLands,
-                deckId = deckId,
+                commander = draft.commander,
+                ownedCollection = draft.ownedCollection,
+                usedNames = (placedNonLand.map { it.card.name } + draft.manualLand.map { it.card.name }).toMutableSet(),
+                archetypeFormat = draft.archetypeFormat,
+                includeNonBasicLands = draft.includeNonBasicLands,
+                deckId = draft.deckId,
             )
         }
 
-        val commanderEntry = DeckEntry(card = commander, quantity = 1, isOwned = true, isSideboard = false)
+        val commanderEntry = DeckEntry(card = draft.commander, quantity = 1, isOwned = true, isSideboard = false)
         val fullMainboard = listOf(commanderEntry) + placedNonLand + landEntries
 
         // ── Verify + refine (2.5) ───────────────────────────────────────────────────────────────
         onStage(CommanderBuildStage.VERIFYING_AND_REFINING)
-        var health = analyze(fullMainboard, format, commander, pin)
+        var health = analyze(fullMainboard, draft.format, draft.commander, draft.pin)
         var analysis = health?.analysis
         if (analysis == null || hasBlocker(analysis)) {
             crashReporter.log("deck_wizard_blocker_after_build")
-            crashReporter.setCustomKey("deck_wizard_blocker_commander", commander.name)
-            crashReporter.recordException(IllegalStateException("[BuildCommanderDeckUseCase] deck_wizard_blocker_after_build: commander=${commander.name} format=$format"))
+            crashReporter.setCustomKey("deck_wizard_blocker_commander", draft.commander.name)
+            crashReporter.recordException(IllegalStateException("[BuildCommanderDeckUseCase] deck_wizard_blocker_after_build: commander=${draft.commander.name} format=${draft.format}"))
         }
 
         var refinementSwaps = 0
@@ -275,19 +449,19 @@ class BuildCommanderDeckUseCase(
             val refined = refine(
                 analysis = analysis,
                 nonLandMainboard = finalNonLand,
-                manualIds = manualIds,
+                manualIds = draft.manualIds,
                 remainingCandidates = remainingCandidates,
-                candidateProfiles = candidateProfiles,
+                candidateProfiles = draft.candidateProfiles,
                 landEntries = landEntries,
                 commanderEntry = commanderEntry,
-                format = format,
-                commander = commander,
-                pin = pin,
+                format = draft.format,
+                commander = draft.commander,
+                pin = draft.pin,
             )
             finalNonLand = refined.nonLand
             refinementSwaps = refined.swaps
             if (refined.swaps > 0) {
-                health = analyze(listOf(commanderEntry) + finalNonLand + landEntries, format, commander, pin)
+                health = analyze(listOf(commanderEntry) + finalNonLand + landEntries, draft.format, draft.commander, draft.pin)
                 analysis = health?.analysis ?: analysis
             }
         }
@@ -298,8 +472,8 @@ class BuildCommanderDeckUseCase(
             .filter { section -> val min = section.min; min != null && section.current < min }
 
         val fillStats = WizardFillStats(
-            placedByWizard = finalNonLand.size - manualNonLand.size,
-            placedManual = manualNonLand.size,
+            placedByWizard = finalNonLand.size - draft.manualNonLandCount,
+            placedManual = draft.manualNonLandCount,
             lands = landEntries.sumOf { it.quantity },
         )
 
@@ -309,10 +483,10 @@ class BuildCommanderDeckUseCase(
             gapSections = gapSections,
             fillStats = fillStats,
             refinementSwaps = refinementSwaps,
-            ambiguityGroups = ambiguityGroups,
+            ambiguityGroups = draft.ambiguityGroups,
         )
         onStage(CommanderBuildStage.DONE)
-        return CommanderBuildOutcome(result, plan, pin)
+        return CommanderBuildOutcome(result, draft.plan, draft.pin)
     }
 
     // ── Write path (2.6, D12/D13) ──────────────────────────────────────────────────────────────

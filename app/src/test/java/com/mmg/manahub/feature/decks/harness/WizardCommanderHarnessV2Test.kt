@@ -67,6 +67,13 @@ class WizardCommanderHarnessV2Test {
             )
             val runtimes = nonFailed.map { it.runtimeMs }.sorted()
             println("[wizard-harness-v2] runtime ms min=${runtimes.first()} median=${runtimes[runtimes.size / 2]} max=${runtimes.last()}")
+            // W7 Task 0 (7.0) re-measurement: ambiguity volume under the LIVE (tentative-slot) detector.
+            val ambiguity = nonFailed.map { it.ambiguityGroupCount }.sorted()
+            fun apct(p: Double) = ambiguity[(p * (ambiguity.size - 1)).toInt().coerceIn(0, ambiguity.size - 1)]
+            println(
+                "[wizard-harness-v2] ambiguity groups min=${ambiguity.first()} p25=${apct(0.25)} median=${apct(0.5)} " +
+                    "p75=${apct(0.75)} max=${ambiguity.last()} zero_groups=${ambiguity.count { it == 0 }}/${ambiguity.size}",
+            )
         }
         metrics.filterNot { it.allHardMetricsPass }.take(30).forEach { m ->
             println(
