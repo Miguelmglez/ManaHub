@@ -2600,6 +2600,52 @@ class DeckWizardViewModelTest {
     }
 
     @Test
+    fun `W7 Fix 7 -- a group with more than 10 alternatives resolves from the engine's full candidate pool, never the UI's display cap`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        // CHOICE_ALTERNATIVES_CAP (DeckWizardChoiceStep.kt) is 10 -- this group's real pool is
+        // deliberately larger, so a regression that sources "Choose for me"/"Let the wizard
+        // finish" from the CAPPED display list instead of the engine's own data would surface here.
+        val manyAlternativeIds = (1..15).map { "alt-$it" }
+        val manyAlternativeCards = manyAlternativeIds.associateWith { id -> card(id = id, name = "Alt $id", colorIdentity = listOf("G")) }
+        val bigDraft = commanderDraft(
+            ambiguityGroups = listOf(AmbiguityGroup(sectionId = "removal_spot", candidateIds = manyAlternativeIds, remainingSlots = 2)),
+            tentativeByRole = mapOf("removal_spot" to listOf("tent-1", "tent-2")),
+            candidatesById = manyAlternativeCards + mapOf("tent-1" to choiceTentative1, "tent-2" to choiceTentative2),
+        )
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns bigDraft
+        val draftSlot = slot<CommanderDraftBuild>()
+        coEvery { buildCommanderDeckUseCase.finalize(capture(draftSlot), any(), any(), any()) } returns commanderOutcome()
+        val vm = viewModel()
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        assertEquals(WizardPhase.CHOICE, vm.uiState.value.phase)
+        // The VM's in-memory draft keeps the FULL 15-candidate group -- CHOICE_ALTERNATIVES_CAP is
+        // purely a DeckWizardChoiceStep.kt display concern, never applied at the domain/VM layer.
+        assertEquals(15, vm.uiState.value.commanderDraftBuild?.ambiguityGroups?.first()?.candidateIds?.size)
+
+        // "Choose the remaining N for me" -- deselect one tentative default, then auto-fill: the
+        // replacement must come from the engine's own tentative set, never the 15-alternative pool.
+        vm.onToggleChoiceCard("removal_spot", "tent-2")
+        vm.onAutoFillChoiceSection("removal_spot")
+        assertEquals(listOf("tent-1", "tent-2"), vm.uiState.value.choiceSelections["removal_spot"])
+
+        // "Let the wizard finish" -- resolves cleanly even though the group's real pool is far
+        // beyond the display cap, and the draft handed to finalize is the SAME unmodified one.
+        vm.events.test {
+            vm.onFinishChoices()
+            advanceUntilIdle()
+            val event = awaitItem()
+            assertTrue(event is DeckWizardEvent.OpenDeckStudio)
+        }
+        assertEquals(15, draftSlot.captured.ambiguityGroups.first().candidateIds.size)
+    }
+
+    @Test
     fun `onToggleChoiceCard enforces the remainingSlots cap and a deselect frees the slot`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
