@@ -306,6 +306,16 @@ data class DeckStudioUiState(
 }
 
 /**
+ * W7 Task C (R11) — the key [AppNavGraph] writes on the PREVIOUS back-stack entry's
+ * `SavedStateHandle` before popping back to an existing Studio entry from a finished wizard
+ * "rebuild in place" (the pop-back path reuses this ViewModel instance, so `selectedTab` would
+ * otherwise keep whatever tab was active before the rebuild was launched — a fresh navigation
+ * needs no such signal, since a brand-new [DeckStudioUiState] already defaults to
+ * [DeckStudioTab.BUILD]). Consumed once in [DeckStudioViewModel]'s `init`.
+ */
+internal const val DECK_STUDIO_SELECT_BUILD_TAB_KEY = "deck_studio_select_build_tab_on_resume"
+
+/**
  * Drives the unified Deck Studio editor against a single live draft deck.
  *
  * Unlike the retired `DeckMagicDetailViewModel` (an in-memory draft that flushed to Room on
@@ -493,6 +503,14 @@ class DeckStudioViewModel(
                     DeckDoctorEvent.ExternalPoolFailed -> _events.send(DeckStudioEvent.ExternalPoolFailed)
                 }
             }
+        }
+
+        // W7 Task C (R11): consume the wizard's "land on Build" signal once, synchronously --
+        // see DECK_STUDIO_SELECT_BUILD_TAB_KEY's own KDoc for why only the pop-back-to-existing-
+        // entry path needs this (a fresh navigation already defaults to BUILD).
+        if (savedStateHandle.get<Boolean>(DECK_STUDIO_SELECT_BUILD_TAB_KEY) == true) {
+            savedStateHandle.remove<Boolean>(DECK_STUDIO_SELECT_BUILD_TAB_KEY)
+            _uiState.update { it.copy(selectedTab = DeckStudioTab.BUILD) }
         }
 
         // Nav passes "" (not null) for an absent optional StringType arg → treat

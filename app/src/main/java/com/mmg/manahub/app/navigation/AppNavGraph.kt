@@ -70,6 +70,7 @@ import com.mmg.manahub.feature.collection.presentation.CollectionScreen
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckDetailScreen
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksScreen
 import com.mmg.manahub.feature.competitive.presentation.CompetitiveScreen
+import com.mmg.manahub.feature.decks.presentation.DECK_STUDIO_SELECT_BUILD_TAB_KEY
 import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
 import com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
@@ -788,6 +789,14 @@ fun AppNavGraph(
                             // pop back to reveal that EXISTING Studio entry (its Room-backed flow
                             // picks up the new cards reactively) instead of pushing a second Studio
                             // entry on top of it, which navigate+popUpTo below would do.
+                            // W7 Task C (R11): this pop-back reuses the EXISTING DeckStudioViewModel
+                            // instance, whose selectedTab keeps whatever was active before the
+                            // rebuild was launched -- signal it to land on Build via the previous
+                            // entry's own SavedStateHandle (DeckStudioViewModel consumes+clears it
+                            // once in init).
+                            navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.set(DECK_STUDIO_SELECT_BUILD_TAB_KEY, true)
                             navController.popBackStack()
                         } else {
                             // Replace the wizard on the back stack with Deck Studio so system back

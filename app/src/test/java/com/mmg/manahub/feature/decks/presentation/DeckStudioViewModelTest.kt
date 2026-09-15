@@ -1979,9 +1979,54 @@ class DeckStudioViewModelTest {
             )
         }
 
+    /** W7 Task C (R11) -- mirrors [createVm] but ALSO seeds [DECK_STUDIO_SELECT_BUILD_TAB_KEY] on
+     * the SavedStateHandle, exactly as [com.mmg.manahub.app.navigation.AppNavGraph]'s wizard
+     * pop-back path does before popping back to an existing Studio entry. */
+    private fun createVmSelectingBuildTab(deckId: String): DeckStudioViewModel =
+        DeckStudioViewModel(
+            deckRepository = deckRepository,
+            cardRepository = cardRepository,
+            userCardRepository = userCardRepository,
+            searchCardsUseCase = searchCardsUseCase,
+            suggestTagsUseCase = suggestTagsUseCase,
+            evaluateDeckUseCase = evaluateDeckUseCase,
+            inferDeckIdentityUseCase = inferDeckIdentityUseCase,
+            getDeckGameStatsUseCase = getDeckGameStatsUseCase,
+            importDeckUseCase = importDeckUseCase,
+            wishlistRepository = wishlistRepository,
+            userPreferences = userPreferences,
+            crashReporter = crashReporter,
+            appContext = appContext,
+            savedStateHandle = SavedStateHandle(mapOf("deckId" to deckId, DECK_STUDIO_SELECT_BUILD_TAB_KEY to true)),
+        )
+
     // ─────────────────────────────────────────────────────────────────────────
     //  Group 8 — Tab selection + lazy Suggestions loading
     // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `a fresh navigation (no deckId) already defaults to the BUILD tab -- no signal needed`() =
+        runTest(dispatcher) {
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(null)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            val vm = createVm()
+            advanceUntilIdle()
+
+            assertEquals(DeckStudioTab.BUILD, vm.uiState.value.selectedTab)
+        }
+
+    @Test
+    fun `W7 Task C -- the pop-back-to-existing-entry signal forces the BUILD tab on init`() =
+        runTest(dispatcher) {
+            // Simulates the Studio entry having been left on Analysis (SUGGESTIONS) BEFORE the user
+            // triggered "Rebuild with the Wizard" -- the wizard's pop-back path must still land on
+            // Build, not silently keep whatever was selected before the rebuild.
+            stubResolvableDeck()
+            val vm = createVmSelectingBuildTab(DECK_ID)
+            advanceUntilIdle()
+
+            assertEquals(DeckStudioTab.BUILD, vm.uiState.value.selectedTab)
+        }
 
     @Test
     fun `onSelectTab BUILD updates selectedTab without triggering analysis`() =
