@@ -5,7 +5,14 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-16 (v5 campaign, Run R4 — placement quality (X5): role-overflow cost + hard
+**Last updated:** 2026-09-16 (v5 campaign, Run R5b — three edge-case-audit fixes, independently
+confirmed in source before this run started: (1) a build with fallback placements but zero ambiguity
+now reaches the Choice screen instead of a silent direct persist; (2) `refine()`'s shortlist no longer
+lets a null marginal gain in as a `-1f` sentinel, so an exhausted pool can no longer swap a flagged
+fallback pick for a fresh, unflagged off-plan one; (3) `DeckDoctorOrchestrator`'s incremental recompute
+gained a monotonic mutation-generation guard so a stale evaluation that resumes after a newer mutation
+can never overwrite it or clear the dirty flag out from under it. No engine scoring math touched;
+harness v2/v3 numbers unchanged (see §8 below). Previously: 2026-09-16 (v5 campaign, Run R4 — placement quality (X5): role-overflow cost + hard
 overflow gate (S7, fixes "Ramp 14/8"), axis-gain density-producer gate + Standalone/off-plan fallback
 tiers flagged on the Choice screen (S8/D4/H9, fixes over-eager "Off-plan"), refine's fixed 8-swap loop
 replaced by a bounded local search. Real-collection harness: 180/180 HARD (incl. 2 new: no avoidable
@@ -25,6 +32,64 @@ telemetry, cleanup and docs; the campaign closed except F18/Edgar, which awaited
 **Owning plan (v3, shipped):** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the
 AI-planning-doc rule now that the campaign has shipped; this file is the durable record that
 survives. **v4 (active):** `docs/plans/deck-wizard-commander-v4-plan.md` (gitignored).
+
+## v5 — Run R5b (2026-09-16): three edge-case-audit fixes (Choice-screen honesty, refine shortlist, orchestrator race)
+
+An `android-edge-case-tester` audit found three defects on top of Run R4's work; the main session
+independently confirmed all three in source before this run started. Three commits, all green.
+
+- **Fix 1 (`e4ca7f4e`) — a build with fallback placements but no ambiguity now reaches the Choice
+  screen.** `DeckWizardViewModel.generateCommanderDeck` gated the phase transition on
+  `draft.ambiguityGroups.isEmpty()` alone; `FallbackFlagCard` (the only surface that renders
+  `fallbackStandaloneIds`/`fallbackOffPlanIds`) never got a chance to show for a build that needed
+  off-skeleton or off-plan fills but produced no near-tie. Now routes to `WizardPhase.CHOICE` when
+  there are ambiguity groups OR any fallback ids — the Choice screen already renders correctly with
+  zero groups (fallback card + existing finish action, no UI change needed). Single-persist contract
+  unchanged; a fallback-only build's `resolutions` stay empty (nothing was ever selectable), so no
+  preference is recorded. New `deck_wizard_choice_shown_reason` telemetry key ("ambiguity" vs
+  "fallback_only").
+- **Fix 2 (`45fdebce`) — `refine()`'s shortlist no longer sentinel-scores a null marginal gain.** A
+  null `PlacementScorer.marginalGain` (no role gain, no axis gain — the engine's own off-plan
+  definition) was scored as `-1f` instead of excluded, so an exhausted `remainingCandidates` pool of
+  all-null-gain cards could still win a swap against a flagged fallback victim (e.g. by clearing a
+  mana-base shortage the victim caused in the trial re-analysis), replacing a correctly-flagged
+  `fallbackOffPlanIds` pick with a fresh, unflagged one. Fixed by dropping null-gain candidates from
+  the shortlist outright, mirroring the main placement loop's own filler-floor discipline.
+- **Fix 3 (`989d54f3`) — `DeckDoctorOrchestrator`'s incremental recompute gained a monotonic
+  mutation-generation guard.** `performRecompute` published Health and cleared `recomputeDirty`
+  unconditionally; since the evaluate call suspends, a job that resumes after a newer mutation landed
+  could still publish stale Health and incorrectly clear the dirty flag out from under the newer,
+  still-pending mutation — leaving the analysis stuck stale after a tab switch
+  (`recomputeNowIfDirty()` no-ops on the wrongly-cleared flag). Fixed with a `mutationGeneration`
+  counter (mirrors the file's own pre-existing `stagingGeneration` pattern for the identical class of
+  problem), bumped on every mutation and re-checked before `performRecompute` publishes or clears the
+  flag.
+
+**Tests:** each fix has a new regression test that fails without it and passes with it (verified by
+temporarily reverting each fix and re-running). Fix 1: `DeckWizardViewModelTest` — a fallback-plus-
+zero-groups draft lands on CHOICE, and "Let the wizard finish" still finalizes/persists exactly once
+with empty resolutions. Fix 2: `BuildCommanderDeckUseCaseTest` — a hand-patched `CommanderDraftBuild`
+(triple-black-pip victim starved of sources by a fixed 2-Swamp land base, colorless zero-gain
+replacement in `remainingCandidates`) proves the shortage-clearing swap either doesn't happen or gets
+flagged. Fix 3: `DeckDoctorOrchestratorTest` — a gated evaluate stub drives a second mutation to full
+completion synchronously inside the first mutation's own resumption, reproducing the stale-publish
+race deterministically without relying on real thread timing.
+
+**No engine scoring math touched by any of the three fixes.** Fix 2 changes WHICH cards a thin/
+exhausted pool's `refine()` step can swap in, which could theoretically move harness numbers on a
+build that actually hits this path — the real 180-spec harness shows `0 standalone, 0 off-plan`
+fallback fills throughout (per Run R4's own note, that collection is rich enough never to trigger it),
+so harness v2/v3 numbers are unchanged: score 78/85/88/90/96, 180/180 HARD, determinism 180/180 (176
+with real ambiguity groups), variety median Jaccard 0.6456 — byte-identical to Run R4. Fix 1 changes
+ViewModel-level phase routing only (not measured by the harness, which drives the builder directly),
+so no harness metric was expected to move from it, and none did.
+
+**Gate:** `shared:core-domain:jvmTest` (`feature.decks.*`) 602 tests/1 failure (Edgar/F18, the
+accepted pre-existing baseline, unchanged); corpus summary `ORIGINAL ... macro correct: 8/16` / `NEW
+60-CARD ... 3/5` unchanged; `compileKotlinWasmJs`/`compileTestKotlinWasmJs` green;
+`app:testDebugUnitTest` (`feature.decks.*`) green (ran alongside unrelated, unfinished work from a
+separate concurrent session in the same working tree — verified via `git show`/`git diff --cached`
+that only this run's own hunks were staged and committed); `app:assembleDebug` green.
 
 ## v5 — Run R4 (2026-09-16): placement quality — no overflow, no avoidable off-plan (X5)
 
