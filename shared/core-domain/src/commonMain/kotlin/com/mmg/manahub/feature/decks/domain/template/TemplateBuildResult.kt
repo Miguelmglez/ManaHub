@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.template
+// COMMENTS_REVIEWED: 2026-09-16
 
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.feature.decks.domain.engine.CardSection
@@ -131,6 +132,10 @@ data class WizardFillStats(
     /** W8 (telemetry): [CommanderDraftBuild.preferenceBonusAppliedCount], carried through so the
      * caller can report preference-prior hit rate without re-deriving it from the draft. */
     val preferenceBonusAppliedCount: Int = 0,
+    /** Deck Wizard Commander v5 (D4/S8): count-only telemetry for [WizardBuildResult
+     * .fallbackStandaloneIds]/[WizardBuildResult.fallbackOffPlanIds] -- never card names/ids. */
+    val fallbackStandaloneCount: Int = 0,
+    val fallbackOffPlanCount: Int = 0,
 )
 
 /**
@@ -148,9 +153,8 @@ data class WizardFillStats(
  *           the same sections/ids the Analysis tab shows, never a separate gap vocabulary.
  * @property fillStats provenance summary for the result screen's "X placed by the wizard, Y kept
  *           from your manual adds, Z lands" copy.
- * @property refinementSwaps D11: how many of the ≤`MAX_REFINEMENT_SWAPS` (8) refinement-pass swaps
- *           were actually accepted (each one strictly increased `analysis.totalScore`). `0` until
- *           Phase 2 implements the refinement pass — this field exists as a contract only.
+ * @property refinementSwaps D11: how many of the refinement pass's local-search swaps were
+ *           actually accepted (each one strictly increased `analysis.totalScore`).
  * @property ambiguityGroups W6 Task 4 (E6) — sections the engine could not resolve on its own: a
  *           role band still short of its ideal at the end of placement, with the real leftover
  *           candidates that would have advanced it, when several of them cleared within a relative
@@ -165,6 +169,15 @@ data class WizardBuildResult(
     val fillStats: WizardFillStats,
     val refinementSwaps: Int = 0,
     val ambiguityGroups: List<AmbiguityGroup> = emptyList(),
+    /** Deck Wizard Commander v5 (D4/S8) -- non-manual [entries] placed only once the main
+     * placement loop had no more skeleton/axis-relevant candidate: has its own classified role,
+     * just not one the skeleton targets ("Standalone" in [com.mmg.manahub.feature.decks.domain
+     * .engine.AnalysisEngine]'s own final-analysis sense). Always resolvable against [entries]. */
+    val fallbackStandaloneIds: List<String> = emptyList(),
+    /** The genuine last resort: no classified role and no axis edge, placed only because neither
+     * the loop nor the Standalone fallback had anything left. Empty whenever an on-plan or
+     * Standalone candidate remained. */
+    val fallbackOffPlanIds: List<String> = emptyList(),
 )
 
 /**

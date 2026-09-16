@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.template
-// COMMENTS_REVIEWED: 2026-09-09
+// COMMENTS_REVIEWED: 2026-09-16
 
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.repository.CardSlotWrite
@@ -89,6 +89,14 @@ data class CommanderDraftBuild(
      * [PlacementScorer.PREFERENCE_BONUS] applied) at the moment they were chosen -- surfaced onto
      * [WizardFillStats] so the wizard can report preference-prior hit rate without re-deriving it. */
     val preferenceBonusAppliedCount: Int = 0,
+    /** D4/S8 -- non-manual cards placed AFTER the main loop found no more skeleton/axis-relevant
+     * candidate: has its own classified role (any [RoleKey], not necessarily one the skeleton
+     * targets) but would not otherwise have cleared the loop's own D8 floor. Never populated while
+     * the main loop could still place a skeleton/axis-relevant candidate. */
+    val fallbackStandaloneIds: List<String> = emptyList(),
+    /** D4/S8 -- the genuine last resort: no classified role and no axis edge either, placed only
+     * because neither the main loop nor the Standalone fallback had anything left to offer. */
+    val fallbackOffPlanIds: List<String> = emptyList(),
 )
 
 class BuildCommanderDeckUseCase(
@@ -278,12 +286,28 @@ class BuildCommanderDeckUseCase(
         var preferenceBonusAppliedCount = 0
         while (placedNonLand.size - manualNonLand.size < nonLandTarget && remainingCandidates.isNotEmpty() && iterations < iterationCap) {
             iterations++
-            var best: Card? = null
-            var bestGain = 0f
+            // S7: a candidate that would push a non-anti role past its own max is excluded outright
+            // this iteration whenever a non-overflowing candidate still clears the D8 floor --
+            // "loses to any on-plan alternative" rather than merely scoring lower against it. A
+            // single forward pass records both signals so the selection pass below never re-scores.
+            var anyNonOverflowingPositive = false
+            val rawGains = HashMap<String, Float?>(remainingCandidates.size)
+            val overflowFlags = HashMap<String, Boolean>(remainingCandidates.size)
             remainingCandidates.forEach { card ->
                 val profile = candidateProfiles.getValue(card)
                 val pip = PlacementScorer.pipFactor(card, colorCount, manaBaseAnalyzer, estimatedSourcesByColor, landTarget)
-                val rawGain = PlacementScorer.marginalGain(profile, state, plan, curveTargets, axisIdeals, pip) ?: return@forEach
+                val gain = PlacementScorer.marginalGain(profile, state, plan, curveTargets, axisIdeals, pip)
+                val overflow = PlacementScorer.causesRoleOverflow(profile, plan, state.roleCounts)
+                rawGains[card.scryfallId] = gain
+                overflowFlags[card.scryfallId] = overflow
+                if (gain != null && gain > 0f && !overflow) anyNonOverflowingPositive = true
+            }
+
+            var best: Card? = null
+            var bestGain = 0f
+            remainingCandidates.forEach { card ->
+                val rawGain = rawGains[card.scryfallId] ?: return@forEach
+                if (overflowFlags[card.scryfallId] == true && anyNonOverflowingPositive) return@forEach
                 // W6 Task 5 (E8): the preference bonus is applied AFTER the real objective clears
                 // the D8 floor, so it can only reorder a near-tie, never conjure a placement on its own.
                 val gain = if (card.scryfallId in preferredIds) rawGain + PlacementScorer.PREFERENCE_BONUS else rawGain
@@ -345,6 +369,41 @@ class BuildCommanderDeckUseCase(
             placedNonLand += DeckEntry(card = chosen, quantity = 1, isOwned = true, isSideboard = false)
         }
 
+        // ── Fallback (D4/S8) ────────────────────────────────────────────────────────────────────
+        // The loop above only ever chose a skeleton/axis-relevant candidate (the D8 floor) and, per
+        // the overflow gate, never one that overflows a role while a clean alternative existed --
+        // it stops the moment none remain, not because slots ran out. Fill whatever is still open
+        // with the best Standalone card (any classified role, even one the skeleton never targets
+        // -- AnalysisEngine's own "standalone" bucket), off-plan (no role, no edge) only once that
+        // pool is exhausted too. Both tiers are recorded so the Choice screen can flag them honestly.
+        val fallbackStandaloneIds = mutableListOf<String>()
+        val fallbackOffPlanIds = mutableListOf<String>()
+        if (placedNonLand.size - manualNonLand.size < nonLandTarget && remainingCandidates.isNotEmpty()) {
+            val eligible = remainingCandidates.filterNot { card ->
+                candidateProfiles.getValue(card).roleConfidence.any { (role, confidence) -> confidence > 0f && role in plan.skeleton.antiRoles }
+            }
+            val (standalonePool, offPlanPool) = eligible.partition { candidateProfiles.getValue(it).roleConfidence.isNotEmpty() }
+
+            fun placeFallback(pool: List<Card>, idSink: MutableList<String>) {
+                val ordered = nearTieOrdered(
+                    items = pool,
+                    deckId = deckId,
+                    idOf = { it.scryfallId },
+                    keyOf = { candidateProfiles.getValue(it).powerNormalized.toDouble() },
+                )
+                for (card in ordered) {
+                    if (placedNonLand.size - manualNonLand.size >= nonLandTarget) break
+                    val profile = candidateProfiles.getValue(card)
+                    state = fold(state, profile)
+                    placedNonLand += DeckEntry(card = card, quantity = 1, isOwned = true, isSideboard = false)
+                    remainingCandidates.remove(card)
+                    idSink += card.scryfallId
+                }
+            }
+            placeFallback(standalonePool, fallbackStandaloneIds)
+            if (placedNonLand.size - manualNonLand.size < nonLandTarget) placeFallback(offPlanPool, fallbackOffPlanIds)
+        }
+
         // Alternates recorded mid-loop can themselves get placed later (for a DIFFERENT role) --
         // only a card that is STILL unplaced when the whole loop ends is a genuinely available
         // swap-in, so the final candidate pool is the filter, not the snapshot taken at record time.
@@ -386,6 +445,8 @@ class BuildCommanderDeckUseCase(
             tentativeByRole = tentativeSlotIdsByRole,
             ambiguityGroups = ambiguityGroups,
             preferenceBonusAppliedCount = preferenceBonusAppliedCount,
+            fallbackStandaloneIds = fallbackStandaloneIds,
+            fallbackOffPlanIds = fallbackOffPlanIds,
         )
     }
 
@@ -481,6 +542,8 @@ class BuildCommanderDeckUseCase(
 
         var refinementSwaps = 0
         var finalNonLand: List<DeckEntry> = placedNonLand
+        val fallbackStandaloneIds = draft.fallbackStandaloneIds.toMutableSet()
+        val fallbackOffPlanIds = draft.fallbackOffPlanIds.toMutableSet()
         if (analysis != null) {
             val refined = refine(
                 analysis = analysis,
@@ -493,6 +556,9 @@ class BuildCommanderDeckUseCase(
                 format = draft.format,
                 commander = draft.commander,
                 pin = draft.pin,
+                plan = draft.plan,
+                fallbackStandaloneIds = fallbackStandaloneIds,
+                fallbackOffPlanIds = fallbackOffPlanIds,
             )
             finalNonLand = refined.nonLand
             refinementSwaps = refined.swaps
@@ -507,11 +573,19 @@ class BuildCommanderDeckUseCase(
         val gapSections = finalAnalysis.pillars.flatMap { it.sections }
             .filter { section -> val min = section.min; min != null && section.current < min }
 
+        // D4: refine() may have swapped a fallback pick for a genuinely better replacement -- only
+        // ids still on the final board are still a fallback the Choice screen needs to flag.
+        val finalNonLandIds = finalNonLand.map { it.card.scryfallId }.toSet()
+        val finalFallbackStandaloneIds = fallbackStandaloneIds.filter { it in finalNonLandIds }
+        val finalFallbackOffPlanIds = fallbackOffPlanIds.filter { it in finalNonLandIds }
+
         val fillStats = WizardFillStats(
             placedByWizard = finalNonLand.size - draft.manualNonLandCount,
             placedManual = draft.manualNonLandCount,
             lands = landEntries.sumOf { it.quantity },
             preferenceBonusAppliedCount = draft.preferenceBonusAppliedCount,
+            fallbackStandaloneCount = finalFallbackStandaloneIds.size,
+            fallbackOffPlanCount = finalFallbackOffPlanIds.size,
         )
 
         val result = WizardBuildResult(
@@ -521,6 +595,8 @@ class BuildCommanderDeckUseCase(
             fillStats = fillStats,
             refinementSwaps = refinementSwaps,
             ambiguityGroups = draft.ambiguityGroups,
+            fallbackStandaloneIds = finalFallbackStandaloneIds,
+            fallbackOffPlanIds = finalFallbackOffPlanIds,
         )
         onStage(CommanderBuildStage.DONE)
         return CommanderBuildOutcome(result, draft.plan, draft.pin)
@@ -639,11 +715,21 @@ class BuildCommanderDeckUseCase(
 
     private data class RefineResult(val nonLand: List<DeckEntry>, val swaps: Int)
 
-    /** D11: ≤ [MAX_REFINEMENT_SWAPS] swaps of a wizard-placed off-plan card for the best remaining
-     * unplaced candidate, accepted only when [com.mmg.manahub.feature.decks.domain.engine
-     * .DeckAnalysis.totalScore] strictly increases. The commander and manual adds are never
-     * touched (this loop only ever iterates [nonLandMainboard] entries whose id is NOT in
-     * [manualIds]). */
+    /**
+     * X5 -- bounded local search, replacing the old fixed-victim-order/first-remaining-candidate
+     * swap loop. Each round retargets the WORST current wizard-placed card (off-plan first, then
+     * role overflow, then lowest EDHREC power as a cheap "least individually strong" tiebreak),
+     * shortlists the [REFINE_TRIAL_SAMPLE] remaining candidates [PlacementScorer.marginalGain]
+     * ranks highest against the board WITHOUT that victim (a fast pre-filter, pip-neutral by
+     * design -- this is a ranking heuristic only), verifies each shortlisted trial through a real
+     * [com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis], and keeps whichever raises
+     * `totalScore` the most. Stops the moment a round finds no improving swap (a local optimum) or
+     * [REFINE_MAX_SWAPS] is reached -- "quality over speed" (runtime is tracked, not capped
+     * tightly). The commander and manual adds are never touched (only entries whose id is NOT in
+     * [manualIds] are ever a victim). A swap that clears a fallback pick removes its id from
+     * [fallbackStandaloneIds]/[fallbackOffPlanIds] so the Choice screen only flags what is still on
+     * the final board.
+     */
     private suspend fun refine(
         analysis: com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis,
         nonLandMainboard: List<DeckEntry>,
@@ -655,32 +741,81 @@ class BuildCommanderDeckUseCase(
         format: DeckFormat,
         commander: Card,
         pin: com.mmg.manahub.feature.decks.domain.engine.StrategyPin,
+        plan: CommanderPlan,
+        fallbackStandaloneIds: MutableSet<String>,
+        fallbackOffPlanIds: MutableSet<String>,
     ): RefineResult {
-        val offplanIds = analysis.pillars.flatMap { it.sections }
-            .filter { it.id == "offplan" }
-            .flatMap { section -> section.contributions.map { it.scryfallId } }
-            .toMutableList()
-        if (offplanIds.isEmpty() || remainingCandidates.isEmpty()) return RefineResult(nonLandMainboard, 0)
+        if (remainingCandidates.isEmpty()) return RefineResult(nonLandMainboard, 0)
 
         var current = nonLandMainboard.toMutableList()
+        var currentAnalysis = analysis
         var currentScore = analysis.totalScore
         var swaps = 0
 
-        val offplanQueue = offplanIds.filter { id -> id !in manualIds && current.any { it.card.scryfallId == id } }.toMutableList()
-        while (swaps < MAX_REFINEMENT_SWAPS && offplanQueue.isNotEmpty() && remainingCandidates.isNotEmpty()) {
-            val victimId = offplanQueue.removeAt(0)
-            val victim = current.firstOrNull { it.card.scryfallId == victimId } ?: continue
-            val replacement = remainingCandidates.firstOrNull() ?: break
+        // Curve/axis targets scale off `current.size`, which stays fixed across every 1-for-1 swap
+        // this loop ever makes -- computed once, not per round.
+        val curveTargetsNow = CurveTargets.forSkeleton(plan.skeleton, nonLandCount = current.size)
+        val archetypeFormat = ArchetypeFormat.of(format) ?: return RefineResult(current, 0)
+        val dominantTribeAxis = plan.internalTribe?.let { "TRIBE:${it.removePrefix(com.mmg.manahub.feature.decks.domain.engine.TribeDeriver.TRIBE_PREFIX)}" }
+        val axisIdealsNow = SynergyGraph.axisIdeals(archetypeFormat, nonLandCount = current.size, dominantTribeAxis = dominantTribeAxis)
 
-            val candidateBoard = current.filterNot { it.card.scryfallId == victimId } + DeckEntry(replacement, 1, true, false)
-            val trialHealth = analyze(listOf(commanderEntry) + candidateBoard + landEntries, format, commander, pin)
-            val trialScore = trialHealth?.analysis?.totalScore
-            if (trialScore != null && trialScore > currentScore) {
-                current = candidateBoard.toMutableList()
-                currentScore = trialScore
-                remainingCandidates.remove(replacement)
-                swaps++
+        while (swaps < REFINE_MAX_SWAPS && remainingCandidates.isNotEmpty()) {
+            val offplanIdsNow = currentAnalysis.pillars.flatMap { it.sections }
+                .filter { it.id == "offplan" }
+                .flatMap { section -> section.contributions.map { it.scryfallId } }
+                .toSet()
+            val roleCountsNow = ArchetypeRoleClassifier.deckRoleCounts(current)
+            fun overflowCountOf(entry: DeckEntry): Int = ArchetypeRoleClassifier.classify(entry.card).keys.count { role ->
+                role !in plan.skeleton.antiRoles &&
+                    plan.skeleton.roleTargets[role]?.let { (roleCountsNow[role] ?: 0) > it.max } == true
             }
+
+            val victim = current.asSequence()
+                .filter { it.card.scryfallId !in manualIds }
+                .sortedWith(
+                    compareByDescending<DeckEntry> { if (it.card.scryfallId in offplanIdsNow) 1 else 0 }
+                        .thenByDescending { overflowCountOf(it) }
+                        .thenBy { candidateProfiles[it.card]?.powerNormalized ?: 1f },
+                )
+                .firstOrNull { it.card.scryfallId in offplanIdsNow || overflowCountOf(it) > 0 } ?: break
+
+            val boardWithoutVictim = current.filterNot { it.card.scryfallId == victim.card.scryfallId }
+            val stateWithoutVictim = boardWithoutVictim.fold(PlacementScorer.PlacementState()) { acc, entry ->
+                candidateProfiles[entry.card]?.let { fold(acc, it) } ?: acc
+            }
+            val shortlist = remainingCandidates
+                .mapNotNull { candidate ->
+                    val profile = candidateProfiles[candidate] ?: return@mapNotNull null
+                    val gain = PlacementScorer.marginalGain(profile, stateWithoutVictim, plan, curveTargetsNow, axisIdealsNow, pipFactor = 1f)
+                    candidate to (gain ?: -1f)
+                }
+                .sortedByDescending { it.second }
+                .take(REFINE_TRIAL_SAMPLE)
+                .map { it.first }
+            if (shortlist.isEmpty()) break
+
+            var bestReplacement: Card? = null
+            var bestTrialScore = currentScore
+            var bestTrialAnalysis: com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis? = null
+            for (replacement in shortlist) {
+                val candidateBoard = boardWithoutVictim + DeckEntry(replacement, 1, true, false)
+                val trialHealth = analyze(listOf(commanderEntry) + candidateBoard + landEntries, format, commander, pin)
+                val trialScore = trialHealth?.analysis?.totalScore ?: continue
+                if (trialScore > bestTrialScore) {
+                    bestTrialScore = trialScore
+                    bestReplacement = replacement
+                    bestTrialAnalysis = trialHealth.analysis
+                }
+            }
+            val replacement = bestReplacement ?: break
+
+            current = (boardWithoutVictim + DeckEntry(replacement, 1, true, false)).toMutableList()
+            remainingCandidates.remove(replacement)
+            fallbackStandaloneIds.remove(victim.card.scryfallId)
+            fallbackOffPlanIds.remove(victim.card.scryfallId)
+            currentScore = bestTrialScore
+            currentAnalysis = bestTrialAnalysis ?: currentAnalysis
+            swaps++
         }
         return RefineResult(current, swaps)
     }
@@ -886,7 +1021,17 @@ class BuildCommanderDeckUseCase(
         /** Commander formats: 100 total cards including the commander -> 99 non-commander slots. */
         private const val NON_COMMANDER_SLOTS = 99
         private const val ITERATION_CAP_SLACK = 20
-        private const val MAX_REFINEMENT_SWAPS = 8
+
+        /** X5 -- generous vs. the old fixed 8 (quality over speed, user directive): a local search
+         * that verifies every trial through a real analysis needs headroom to actually reach a
+         * local optimum on a build with several weak/off-plan slots, not stop arbitrarily early. */
+        private const val REFINE_MAX_SWAPS = 20
+
+        /** X5 -- how many remaining candidates get a full trial analysis per round, pre-filtered by
+         * [PlacementScorer.marginalGain] (cheap) against the board without that round's victim.
+         * Bounds refine's cost to `REFINE_MAX_SWAPS * REFINE_TRIAL_SAMPLE` real analyses in the
+         * worst case, rather than testing every remaining candidate every round. */
+        private const val REFINE_TRIAL_SAMPLE = 4
         private const val KARSTEN_REBALANCE_CAP = 5
 
         /** W6 Task 4 (E6): a candidate within this relative fraction of the section's best remaining
