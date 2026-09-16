@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.usecase
+// COMMENTS_REVIEWED: 2026-09-16
 
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.model.CardTag
@@ -336,19 +337,14 @@ class InferDeckArchetypeUseCase {
         val interactionDensity = density("removal_spot") + density("removal_mass") + density("counterspell") + density("stax_piece")
         val interaction = (interactionDensity / interactionAnchor).coerceIn(0f, 1f)
 
-        // inevitability: card_draw + recursion + tutor + finisher density ("if the game goes long,
-        // do I win"). INEVITABILITY_ANCHOR derived from COMBO's OWN band per format:
-        //  - Commander: card_draw(12) + tutor(8) + finisher(5) + GENERIC/Commander's own
-        //    recursion(2, COMBO itself bands no recursion) = 27 / nonland (100 - COMBO's own 38
-        //    lands ideal = 62) = 0.435 density; COMBO/Commander inevitability prototype = 0.90 ->
-        //    anchor = 0.435/0.90 = 0.484.
-        //  - 60-card: card_draw(13) + tutor(8) + finisher(6) = 27 / nonland (60 - COMBO's own 23
-        //    lands ideal = 37) = 0.730 density (GENERIC/60-card bands no `recursion` role at all --
-        //    unlike Commander, there is no fallback figure to add, so this format's sum omits it
-        //    rather than inventing one); COMBO/60-card inevitability prototype = 0.85 -> anchor =
-        //    0.730/0.85 = 0.859.
+        // inevitability: card_draw + recursion + tutor density, anchored on COMBO's own band per
+        // format (ADR-009 Amendment R2b) -- `finisher` dropped from this sum: its density
+        // anti-correlates with the prototype ranking across macros (AGGRO/MIDRANGE run many
+        // finishers as fast board-closers, already captured by `clock`, not long-game resilience),
+        // so including it made this axis read AGGRO/MIDRANGE's own textbook bands far above their
+        // own prototypes. See ADR-009 for the full per-macro derivation table.
         val inevitabilityAnchor = if (isCommander) INEVITABILITY_ANCHOR_COMMANDER else INEVITABILITY_ANCHOR_SIXTY
-        val inevitabilityDensity = density("card_draw") + density("recursion") + density("tutor") + density("finisher")
+        val inevitabilityDensity = density("card_draw") + density("recursion") + density("tutor")
         val inevitability = (inevitabilityDensity / inevitabilityAnchor).coerceIn(0f, 1f)
 
         // linearity: share of non-land copies participating (as producer OR payoff) in the
@@ -597,8 +593,8 @@ class InferDeckArchetypeUseCase {
         const val CLOCK_DENSITY_ANCHOR_SIXTY = 0.326f
         const val INTERACTION_ANCHOR_COMMANDER = 0.624f
         const val INTERACTION_ANCHOR_SIXTY = 0.900f
-        const val INEVITABILITY_ANCHOR_COMMANDER = 0.484f
-        const val INEVITABILITY_ANCHOR_SIXTY = 0.859f
+        const val INEVITABILITY_ANCHOR_COMMANDER = 0.394f
+        const val INEVITABILITY_ANCHOR_SIXTY = 0.668f
 
         /** `sqrt(4 axes * 1.0^2 max per-axis gap)` — see [prototypeScore]'s own KDoc. */
         val MAX_PROTOTYPE_DISTANCE = sqrt(4.0).toFloat()

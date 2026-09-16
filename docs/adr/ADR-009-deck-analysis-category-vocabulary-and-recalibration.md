@@ -1,7 +1,8 @@
 # ADR-009 — Deck Analysis Category Vocabulary and F18 Recalibration Attempt
 
-**Status:** Accepted (vocabulary unification) / F18 recalibration attempted and stopped, not forced ·
-**Date:** 2026-09-16 · **Related:** ADR-007 (Deck Analysis Engine v3), ADR-008 (collection sync)
+**Status:** Accepted (vocabulary unification) / `inevitability` axis re-derived and kept (R2b amendment,
+Edgar still open, honestly reported) · **Date:** 2026-09-16 · **Related:** ADR-007 (Deck Analysis
+Engine v3), ADR-008 (collection sync)
 
 ## Context
 
@@ -195,3 +196,151 @@ before/after table above — 575/575 minus the one pre-existing failure, both be
 - `RoleClassifier`'s private oracle fallback tables remain a black box to `CategoryVocabulary` — any
   future desire to close the legacy-role gap needs to either widen `RoleClassifier`'s public surface or
   duplicate its regex patterns (with the drift risk that implies), a real trade-off not resolved here.
+
+## Amendment (R2b, 2026-09-16) — `inevitability` axis re-derivation
+
+**User decision:** fix `inevitability` now, in a dedicated run, before the remaining wizard
+workstreams (`docs/plans/deck-wizard-commander-v5-plan.md` §3 X6b). Same discipline as Decision 2:
+derive from `ArchetypeData` bands + arithmetic, never tune until Edgar passes; if corpus accuracy
+regresses, revert.
+
+### Corrected self-check arithmetic
+
+R2's own diagnosis undercounted every macro's density: `ArchetypeSkeletonResolver.resolve`
+(`roles = generic.roleTargets + archetype.roleTargets`, override wins on key collision) means a
+macro that does not override `recursion`/`tutor` still inherits `GENERIC`'s own band for that key —
+R2's hand arithmetic dropped that inherited term (e.g. it read AGGRO Commander as
+`card_draw(8)+finisher(9)=17`, omitting `GENERIC`'s own `recursion(2)`/`tutor(2)`). The table below
+uses the corrected, resolver-accurate per-macro sums.
+
+### Per-macro derivation — Commander (nonland = 100 − macro's own lands ideal)
+
+| Macro | card_draw | recursion | tutor | finisher | sum(cd+rec+tut) | nonland | density (no finisher) | prototype | OLD anchor (0.484) → value → residual | NEW anchor (0.394) → value → residual |
+|---|---|---|---|---|---|---|---|---|---|---|
+| AGGRO | 8 | 2 (generic) | 2 (generic) | 9 | 12 | 65 | 0.1846 | 0.15 | 0.6677 → **+0.518** | 0.4683 → **+0.318** |
+| MIDRANGE | 12 (generic) | 4 | 2 (generic) | 11 | 18 | 63 | 0.2857 | 0.45 | 0.9513 → **+0.501** | 0.7247 → **+0.275** |
+| CONTROL | 13 | 2 (generic) | 2 (generic) | 6 | 17 | 62 | 0.2742 | 0.80 | 0.7667 → −0.033 | 0.6955 → −0.105 |
+| COMBO (anchor source) | 12 | 2 (generic) | 8 | 5 | 22 | 62 | 0.3548 | 0.90 | 0.9000 → 0.000 | 0.9000 → 0.000 |
+| PRISON | 6 | 2 (generic) | 4 | 5 | 12 | 64 | 0.1875 | 0.70 | 0.5490 → −0.151 | 0.4756 → **−0.224** |
+
+`NEW anchor = (12+2+8)/62 / 0.90 = 0.35484/0.90 = 0.39427 ≈ 0.394` (same COMBO-band-per-format
+derivation method the file already documents, applied to the reduced 3-term sum).
+
+### Per-macro derivation — 60-card (nonland = 60 − macro's own lands ideal)
+
+| Macro | card_draw | recursion | tutor | finisher | sum(cd+rec+tut) | nonland | density (no finisher) | prototype | OLD anchor (0.859) → value → residual | NEW anchor (0.668) → value → residual |
+|---|---|---|---|---|---|---|---|---|---|---|
+| AGGRO | 2 | 0 (no band) | 0 (no band) | 12 | 2 | 39 | 0.0513 | 0.10 | 0.4181 → **+0.318** | 0.0768 → −0.023 |
+| MIDRANGE | 4 | 0 | 0 | 13 | 4 | 36 | 0.1111 | 0.40 | 0.5501 → **+0.150** | 0.1664 → **−0.234** |
+| CONTROL | 11 | 0 | 0 | 5 | 11 | 34 | 0.3235 | 0.75 | 0.5481 → −0.202 | 0.4845 → **−0.266** |
+| COMBO (anchor source) | 13 | 0 | 8 | 6 | 21 | 37 | 0.5676 | 0.85 | 0.8494 → 0.000 | 0.8500 → 0.000 |
+| PRISON | 4 | 0 | 4 | 4 | 8 | 38 | 0.2105 | 0.60 | 0.3678 → −0.232 | 0.3153 → **−0.285** |
+
+`NEW anchor = (13+0+8)/37 / 0.85 = 0.56757/0.85 = 0.66773 ≈ 0.668`.
+
+### Density-definition finding, applied
+
+Per this run's brief, the density formula itself was checked before touching the anchor scheme:
+`finisher` density **anti-correlates** with the inevitability prototype ranking across the 5 macros
+— AGGRO/MIDRANGE (low/mid prototype) carry the HIGHEST finisher counts (creature-based board
+closers, already the `clock` axis's own signal), while COMBO/PRISON/CONTROL (the 3 highest
+prototypes) carry the lowest. No single scalar transform (multiplicative anchor, or even a two-point
+affine fit through the two extremal macros — verified by hand, worse on 3 of 5 macros) can make a
+formula containing a term that moves the *wrong direction* relative to its own target
+self-consistent. `finisher` stays a legitimate skeleton/placement role elsewhere (unchanged); it is
+removed ONLY from this axis's own density sum, on the model-fidelity grounds spec §2.1's own
+framing already supports ("if the game goes long, do I win" describes resource resilience — the
+grindy engine, not a closer already counted by `clock`).
+
+**Considered and rejected:** an unconstrained 4-weight least-squares fit across the 5 macros
+(`numpy.linalg.lstsq`) was computed for reference — it produces a NEGATIVE `finisher` weight
+(−5.26, Commander) to cancel the anti-correlation. Rejected: a negative coefficient on a named spec
+ingredient is empirical curve-fitting to 5 data points, not a citable modelling decision, and ADR-007
+§4 forbids fitting to any corpus (the prototype table itself, treated as a curve target, is exactly
+that anti-pattern). The finisher-removal fix keeps the SAME derivation method already used for
+`clock`/`interaction` (a documented judgment call about which named/extra ingredients belong in the
+sum, then ONE macro's own band solves the anchor) — it is not a new mechanism.
+
+**Not touched:** `CONTROL`'s known inability to reach its own 60-card `inevitability` prototype
+(ADR-007 "Known debt") is the SAME structural gap (`recursion`/`tutor` unbanded for 60-card CONTROL)
+— this amendment's residual for CONTROL worsens slightly (−0.202 → −0.266, 60-card) as a direct,
+expected consequence of removing `finisher`'s partial compensation, not a new defect. Left as
+carried, already-deferred debt.
+
+### Corpus before/after (`DeckAnalysisV3CorpusTest.everyFixture_matchesSpecExpectations`, 22 fixtures)
+
+| | Before (R2 baseline, commit `08fd04ed`) | After (this amendment) |
+|---|---|---|
+| ORIGINAL (1–16/17) macro correct | 6/16 | **8/16** |
+| ORIGINAL themes correct | 16/16 | 16/16 |
+| ORIGINAL posture correct | 14/17 | **15/17** |
+| ORIGINAL in-band (65–95) | 15/16 | 15/16 |
+| NEW 60-card (18–22) macro correct | 3/5 | 3/5 |
+| NEW 60-card themes/posture/in-band | 5/5 / 5/5 / 5/5 | 5/5 / 5/5 / 5/5 |
+
+Per-fixture: fixture 4 (Omnath, was `null`) and fixture 16 (Tron, was `null`) now resolve their
+expected `MIDRANGE`. Fixture 8 (Chainer)'s posture now correctly detects `ATTRITION`. **Zero
+fixtures flip from correct to incorrect** (verified line-by-line against both raw CSVs); the negative
+fixture (17) still correctly resolves `null` (P4 unchanged at 25). Edgar (1) stays `null`, confidence
+rose `0.0088 → 0.0476` (still below the 0.08 `MACRO_AMBIGUITY_MARGIN`). No score, P1–P5, or theme-set
+value moved for any fixture that was already correct before this amendment.
+
+### Edgar / Meren (`MockCollectionRichReconstructionTest`, wizard-built decks against the real collection)
+
+| Fixture | Before (R2) | After |
+|---|---|---|
+| Edgar Markov (expected AGGRO) | resolved `null`, confidence 0.0262 | resolved `null`, confidence 0.0150 — **still red, still honestly reported** |
+| Meren (expected MIDRANGE) | resolved `null`, margin 0.068 < 0.08 | resolved `MIDRANGE`, confidence 0.140 — **now correct** |
+| Karlov (expected MIDRANGE) | correct | correct, confidence 0.209 |
+| Urza (expected COMBO) | correct | correct, confidence 0.140 |
+
+`MockCollectionRichReconstructionTest`'s "Custom build resolves the fixture's own expected macro"
+test stays red for Edgar alone (was red for Edgar AND Meren before). Its "own strategy pin
+reconstructs within tolerance" test stays green (wizard scores 86/87/85/88 vs fixture 82/87/82/83 —
+all within the 8-point tolerance, unchanged shape). `CommanderPlanResolverTest`'s D6 assertion:
+untouched, still green.
+
+### Harness (real collection, `testdata/wizard-harness/`, gitignored)
+
+| Metric | R2 baseline | After |
+|---|---|---|
+| Harness v2 — HARD metrics | 180/180 pass | 180/180 pass |
+| Harness v2 — score min/p25/median/p75/max | 77/85/87/90/95 | 77/84/87/90/96 |
+| Harness v2 — runtime ms min/median/max | not separately re-measured at R2 | 53/121/253 |
+| Harness v3 — determinism | 180/180 | 180/180 |
+| Harness v3 — variety, median Jaccard | 0.610 | 0.610 (unchanged) |
+
+### Test re-baseline (not fixtures)
+
+Three synthetic unit tests in `InferDeckArchetypeUseCaseTest` (`controlShapedDeckClassifiesAsControl`,
+`standardControlShapedDeckClassifiesAsControl`, `resemblanceProfileAlwaysHasAllFiveMacrosSummingToOne`)
+built their CONTROL-shaped decks with only 4 `DRAW_ENGINE`-tagged filler cards, relying on 4
+`WIN_CON`-tagged "finisher" cards to close the gap to CONTROL's own `inevitability` prototype — a
+gap this amendment's own table shows was there even before (CONTROL residual was already negative at
+R2). With `finisher` removed from the axis, these 3 synthetic decks no longer carry enough
+`card_draw` density and resolve `null` instead of `CONTROL`. These are hand-built synthetic decks
+(NOT `analysisv3/Fixture*` or `MockCollectionRich`/`Thin` — the immutable fixture rule does not cover
+them), so the filler count was raised 4 → 10 to give the deck a genuine, textbook-sized Commander
+control card-advantage suite (`ep.658` baseline cites 12 card advantage) that carries the axis on its
+own. No assertion's expected macro changed; only the input deck's own composition was widened to
+still be a legitimate CONTROL shell under the corrected formula.
+
+### Gate
+
+`:shared:core-domain:jvmTest --tests "com.mmg.manahub.feature.decks.*"`: 576 tests, 1 failed (Edgar,
+same single failure as the R2 baseline — no new failures). `:shared:core-domain:compileKotlinWasmJs`
++ `compileTestKotlinWasmJs`: green. `:app:testDebugUnitTest --tests "com.mmg.manahub.feature.decks.*"`:
+572 tests, 0 failed, 2 skipped (pre-existing, unrelated). `:app:assembleDebug`: green.
+
+### Decision: keep, not revert
+
+Corpus macro accuracy improved (6/16 → 8/16, zero regressions), posture accuracy improved (14/17 →
+15/17), Meren newly resolves correctly, harness numbers are unchanged within noise, and no relative/
+ordering invariant moved. Per D1's own success gate, this clears the bar to keep. Edgar remains red —
+an honest result, not the target function: AGGRO's own residual improved (+0.518 → +0.318) but did
+not clear zero, because AGGRO's `card_draw`/`recursion`/`tutor` band is genuinely non-trivial (12,
+inherited `recursion`/`tutor` included) against a very low prototype (0.15) — closing this fully
+would need a further, dedicated redesign (weighting `recursion`/`tutor` differently from `card_draw`,
+or a per-format review of whether `GENERIC`'s inherited `recursion(2)`/`tutor(2)` bleed-through
+belongs in every macro's reachability at all), left as the next `inevitability` follow-up rather than
+forced here.

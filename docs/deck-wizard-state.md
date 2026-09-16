@@ -5,9 +5,11 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-16 (v5 campaign, Run R2 — category vocabulary unification (X0, shipped)
-plus an F18 recalibration attempt per the user's own decision, STOPPED and reported rather than
-forced; see ADR-009 and §6/§8 below). Previously: 2026-09-15 (v4 campaign, Run 15/W8 — harness v3,
+**Last updated:** 2026-09-16 (v5 campaign, Run R2b — `inevitability` axis re-derived per the user's own
+decision; corpus macro accuracy 6/16 → 8/16, Meren fixed, Edgar still red and honestly reported; see
+ADR-009 Amendment and §6/§8 below). Previously: 2026-09-16 (v5 campaign, Run R2 — category vocabulary
+unification (X0, shipped) plus the F18 recalibration DIAGNOSIS that R2b acted on). Previously:
+2026-09-15 (v4 campaign, Run 15/W8 — harness v3,
 telemetry, cleanup and docs; the campaign closed except F18/Edgar, which awaited a user decision. See
 `docs/plans/deck-wizard-commander-v4-progress.md` for the full per-item log, gitignored). Commits
 `16ed41b2`..`c1a712e1` on `feature/deck-wizard` (this run), on top of `0ed707fe`..`d52eba32` (Run 14).
@@ -26,6 +28,29 @@ shows nothing but Browse finds cards" defect. Full per-key membership citations,
 and the F18 recalibration diagnosis (attempted per the user's D1 decision, STOPPED per the campaign's
 own stop clause — no calibration constant changed) are in ADR-009. `MockCollectionRichReconstructionTest`'s
 macro-reconstruction test remains the one known, documented, unforced red test.
+
+## v5 — Run R2b (2026-09-16): `inevitability` axis re-derivation (X6b)
+
+One commit (this run's own). Acted on R2's diagnosis: the `inevitability` axis's anchor was derived
+from COMBO's own band alone and, self-checked against AGGRO/MIDRANGE's own `ArchetypeData` bands, was
+inconsistent (AGGRO's own textbook band read ≈0.54 against its own 0.15 prototype). Root cause found
+(not just the anchor): `finisher` density anti-correlates with the inevitability prototype ranking
+across the 5 macros (AGGRO/MIDRANGE run the MOST finishers despite the LOWEST/mid prototype — those
+cards are `clock`'s own board-closer signal, not long-game resilience). Fix: dropped `finisher` from
+the axis's density sum (kept `card_draw + recursion + tutor`), re-derived both format anchors from
+COMBO's own band using the same per-format, one-macro-solves-the-anchor method already used for
+`clock`/`interaction`. An unconstrained least-squares alternative was computed and rejected (produces
+a negative `finisher` weight — empirical curve-fitting to 5 points, not a citable model decision).
+
+Measured: corpus macro accuracy **6/16 → 8/16** (fixtures 4/16 newly correct, zero regressions,
+negative fixture still correctly ambiguous), posture 14/17 → 15/17, harness v2/v3 unchanged within
+noise. **Meren now resolves correctly** (was red at R2). **Edgar stays red** — its own residual
+improved but did not clear zero; a further, dedicated redesign would be needed and was not forced.
+Kept per D1's own success gate (accuracy up, zero regressions, revert-if-not was the standing
+instruction). 3 synthetic `InferDeckArchetypeUseCaseTest` decks re-baselined (not fixtures — their
+own CONTROL-shaped mainboard's draw-engine count raised 4→10 to still clear CONTROL's own prototype
+under the corrected formula). Full derivation table, before/after corpus CSV, and the rejected
+alternative: ADR-009 "Amendment (R2b)".
 
 ## v4 — Run 15 (2026-09-15): W8 — harness v3, telemetry, cleanup and docs
 
@@ -595,7 +620,7 @@ Acceptance bands in force: see plan §5 until P7 replaces them here.
 | — | `EvaluateDeckUseCase` emits a gamification event on every call | `emitProgression` flag | **done P0 (2026-09-08)** |
 | — | `BuildCommanderDeckUseCase.persist()` is 4 sequential non-transactional writes -- a cancellation mid-write (reachable via Studio's "Rebuild with the Wizard" CTA, D12 rebuild-in-place) can leave an existing draft with cards replaced but a stale pin | `DeckRepository.persistCommanderBuild` (new) is ONE Room `@Transaction` via `DeckDao.persistCommanderBuild` on Android; commonMain default keeps the 4-call fallback for `WebDeckRepository` | **closed P8 (Run 12)** — instrumented Room tests (happy path + genuine FK-violation rollback) added mirroring the existing `replaceAllCardsWithSource` proof; `isWritingCommanderDeck` kept as defense-in-depth for the ViewModel's own in-memory state, not because the DB can land half-written any more |
 | F17 | Colorless-identity commander (e.g. "Page, Loose Leaf") builds a `DeckTooSmall` BLOCKER — `BasicLandCalculator`/`BasicLandDistribution` has no colourless "Wastes" slot at all, so Stage B of `fillLandsV2` allocates zero basics for an empty identity | `BasicLandDistribution.wastes` (new field, folded into `total`/`toMap()`'s `"C"` key) + `BasicLandCalculator.allocate` returns an all-Wastes distribution when `commanderIdentity` is explicitly empty (distinct from `null` = no constraint) + `BuildCommanderDeckUseCase.materializeBasics`/`nameToColor` place Wastes like any other basic. Coloured-identity behaviour byte-identical (verified by the full pre-existing `LandFillV2Test` suite + a new colourless-identity case). | **CLOSED P8 (Run 12)** — land fill itself is fixed (`land_target`/`mana_sources` harness metrics green for "Page, Loose Leaf"). The harness's colourless-commander exclusion STAYS, re-diagnosed to a DIFFERENT, genuine cause: this real collection owns only 59 colourless nonland cards total, well under Commander's ~62-card nonland target once lands are correctly filled — a real MTG color-identity constraint (colourless commander ⇒ colourless cards + Wastes only) colliding with real collection sparsity, not an engine defect, and unfixable without a Scryfall backstop D7 forbids. → memory: `feedback_colourless_commander_deck_size_vs_land_fill`. |
-| F18 | `CommanderPlanResolver.resolve`'s `StrategyPick.Custom` branch always targets the archetype-null generic BELL-shaped baseline skeleton regardless of the commander's own aggression signal, so a fast/cheap/tribal-aggressive Custom build (Edgar Markov) reads MIDRANGE post-build instead of AGGRO | `CommanderArchetypeBias.commanderTagArchetype` (new, tag-tier ONLY — the color-identity tier was tried and reverted, it regressed a real fixture) gives Custom's INTERNAL skeleton a bounded build hint; persisted `StrategyPin` stays Custom/null (E12). `CommanderPlanResolverTest`'s assertion rewritten per the plan's own instruction | **v5 R2 (2026-09-16) — recalibration attempted per user decision, STOPPED and reported, not forced. See ADR-009.** W6b (2026-09-15) had already confirmed the residual genuine (margin 0.035 vs 0.08) and traced it to the calibration layer. The v5 campaign's own X0 workstream (category-vocabulary unification, `CategoryVocabulary`) was verified via an isolated `git worktree` comparison to have ZERO effect on this failure (byte-identical failure message before/after). A fresh diagnosis (post-X0) measured Edgar's own axes (`clock=0.577 interaction=0.197 inevitability=0.636 linearity=0.446` against AGGRO's Commander prototype `0.85/0.20/0.15/0.55`) and found the `inevitability` axis is the dominant mismatch (0.486 of the total distance) — and, via the SAME self-consistency method `InferDeckArchetypeUseCase`'s own `clock`/`interaction` anchors were derived by, that AGGRO's OWN `ArchetypeData` Commander band, run through the inevitability formula, lands at ≈0.54 (not 0.15); MIDRANGE's own band lands even further off (≈0.95 vs its own 0.45). This is a real, citable inconsistency in the `inevitability` axis's anchor derivation (anchored on COMBO alone, never cross-checked against the other 4 macros) — but a fix requires redesigning that axis's per-macro weighting, not a single constant, and cannot be safely scoped and re-verified against the full 22-fixture corpus within this run without risking exactly the regression ADR-007 §4 forbids. Meren is now ALSO measured red (margin 0.068 < 0.08) at this same diagnosis pass. No calibration constant/anchor/weight/prototype value was changed. `MockCollectionRichReconstructionTest`'s macro-reconstruction test remains red, unmodified, for the same reason. `CommanderPlanResolverTest`'s D6 assertion untouched. No fixture data touched. Harness v2 (180 specs, real collection) confirms 180/180 HARD metrics pass, score distribution 77/85/87/90/95 (min/p25/median/p75/max) — unchanged from the post-W6b baseline. |
+| F18 | `CommanderPlanResolver.resolve`'s `StrategyPick.Custom` branch always targets the archetype-null generic BELL-shaped baseline skeleton regardless of the commander's own aggression signal, so a fast/cheap/tribal-aggressive Custom build (Edgar Markov) reads MIDRANGE post-build instead of AGGRO | `CommanderArchetypeBias.commanderTagArchetype` (new, tag-tier ONLY — the color-identity tier was tried and reverted, it regressed a real fixture) gives Custom's INTERNAL skeleton a bounded build hint; persisted `StrategyPin` stays Custom/null (E12). `CommanderPlanResolverTest`'s assertion rewritten per the plan's own instruction. **v5 R2b (2026-09-16):** `inevitability` axis re-derived (see ADR-009 Amendment) | **STILL RED for Edgar specifically — honestly reported, not forced.** R2 diagnosed the `inevitability` axis's anchor as derived from COMBO's band alone, inconsistent when self-checked against AGGRO/MIDRANGE's own bands. R2b's fix: dropped `finisher` from the axis's density sum (its density anti-correlates with the prototype ranking across macros — a citable modelling defect, not a tuning knob) and re-derived both format anchors from COMBO's own (now 3-term) band. Result: corpus macro accuracy **6/16 → 8/16** (fixtures 4 Omnath, 16 Tron newly correct, zero regressions), posture 14/17 → 15/17, **Meren now resolves correctly** (was red at R2, margin 0.068 < 0.08). Edgar's own residual improved (AGGRO's own textbook band read +0.518 over-target → +0.318) but did not clear zero — its `card_draw+recursion+tutor` band is still non-trivial against a very low (0.15) prototype. Harness v2 unchanged (180/180 HARD, score 77/84/87/90/96), harness v3 unchanged (determinism 180/180, median Jaccard 0.610). Kept per D1's own gate (accuracy up, zero regressions). Full per-macro derivation table, corpus/harness numbers, and the rejected-alternatives (least-squares weights) note: ADR-009 "Amendment (R2b)". |
 
 Known engine debt deliberately NOT touched by this campaign (see ADR-007 "Known debt"): SYNERGY P4
 calibration, PRISON never resolving, 60-card CONTROL inevitability ceiling, `DRAFT` has no skeleton,
@@ -978,3 +1003,10 @@ Things that differ from Commander and are NOT solved by this campaign:
   `inevitability` axis's anchor derivation is self-inconsistent across macros) — no calibration
   constant changed, `MockCollectionRichReconstructionTest`'s macro test remains the one documented
   red test. Full detail: `docs/adr/ADR-009-deck-analysis-category-vocabulary-and-recalibration.md`.
+- 2026-09-16 — v5 Run R2b: acted on R2's diagnosis. Dropped `finisher` from the `inevitability` axis's
+  density sum (its density anti-correlates with the prototype ranking across macros — a citable
+  modelling defect, not a tuning knob) and re-derived both format anchors from COMBO's own band using
+  the same method already used for `clock`/`interaction`. Corpus macro accuracy 6/16 → 8/16 (zero
+  regressions), Meren now resolves correctly, Edgar stays red (honestly reported, not forced). Kept
+  per the user's own gate (accuracy up, revert-if-not was the standing instruction). Full derivation
+  and numbers: ADR-009 "Amendment (R2b)".
