@@ -1,8 +1,9 @@
 package com.mmg.manahub.feature.decks.domain.engine
-// COMMENTS_REVIEWED: 2026-09-10
+// COMMENTS_REVIEWED: 2026-09-16
 
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -219,7 +220,14 @@ object AnalysisEngine {
         val p1 = evaluateManaBase(mainboard, archetypeFormat, colorIdentity, skeleton, roleCounts, landCount, avgMv, profile, manaBaseAnalyzer, attribution)
         val p2 = evaluateCurve(avgMv, nonLand, nonLandCount, skeleton, roleCounts, themes)
         val p3 = evaluatePlanRoles(skeleton, roleCounts, attribution)
-        val p4 = evaluateSynergy(mainboard, nonLand, nonLandCount, profile, archetype, themes, synergyGraph, archetypeFormat)
+        // `ramp`/[ArchetypeData.MANA_FIX_KEY] get an UNCONDITIONAL role:<key> section from P1
+        // ([evaluateManaBase]'s rampSection/manaFixSection) regardless of whether this deck's own
+        // skeleton targets them -- always excluded from SYNERGY's fingerprint grouping too, not
+        // just when present in roleTargets.
+        val p4 = evaluateSynergy(
+            mainboard, nonLand, nonLandCount, profile, archetype, themes, synergyGraph, archetypeFormat,
+            skeleton.roleTargets.keys + setOf("ramp", ArchetypeData.MANA_FIX_KEY),
+        )
         val p5 = evaluateLegality(mainboard, format, colorIdentity, sideboardCount)
 
         val analysis = compose(listOf(p1, p2, p3, p4, p5), strategyInfo, weights)
@@ -481,7 +489,13 @@ object AnalysisEngine {
             val contributions = attribution[key].orEmpty().collapsed()
 
             coverage += RoleCoverageEntry(roleKey = key, label = label, current = have, min = band.min, ideal = band.ideal, max = band.max, isAntiRole = isAnti)
-            sections += CardSection(id = "role:$key", label = label, current = have, min = band.min, ideal = band.ideal, max = band.max, isAntiRole = isAnti, contributions = contributions)
+            // "ramp" already gets its own role:ramp section from the MANA_BASE pillar above
+            // (rampSection) -- PLAN_ROLES must not re-emit a second, identically-labeled one (S6:
+            // no duplicate categories). Coverage/score/findings below are UNCHANGED for "ramp" --
+            // only this duplicate DISPLAY section is skipped.
+            if (key != "ramp") {
+                sections += CardSection(id = "role:$key", label = label, current = have, min = band.min, ideal = band.ideal, max = band.max, isAntiRole = isAnti, contributions = contributions)
+            }
 
             val weight = band.ideal.coerceAtLeast(1)
             if (isAnti) {
@@ -564,6 +578,10 @@ object AnalysisEngine {
      * [profile]'s CardTag-fingerprint alignment, [SYNERGY_ALIGNMENT_THRESHOLD]) are UNCHANGED —
      * nothing in spec §7 asks to remove that view, and it answers a genuinely different question
      * ("which named strategy does this card pull toward") than the graph-based subscore now does.
+     * A TRIBAL-category [com.mmg.manahub.core.model.CardTag] GROUPS into the `tribe:<x>` key space
+     * instead of its own `fingerprint:<x>` id (one tribe key space, no "Human"/"Human (tribe)"
+     * duplicate) — the [DeckProfile.tagFingerprint] THRESHOLD LOOKUP itself is untouched (still the
+     * tag's own bare key), only the section a clearing card lands in moved.
      * ONLY the old catch-all `"offplan"` bucket (cards the tag-fingerprint check does not align to
      * ANY key) is rebuilt as a real 3-way split, spec §7:
      *  - **`"interaction"`**: the card carries [INTERACTION_ROLES] — legitimate, not off-plan.
@@ -588,6 +606,7 @@ object AnalysisEngine {
         themes: List<ThemeId>,
         graph: DeckSynergyGraph,
         format: ArchetypeFormat,
+        roleKeys: Set<RoleKey>,
     ): PillarResult {
         // ── The graph-based signal every metric below and the offplan 3-way split share ────────
         val edgeCardIds = buildSet { graph.edges.forEach { add(it.fromCardId); add(it.toCardId) } }
@@ -668,8 +687,32 @@ object AnalysisEngine {
         // ── Sections: unchanged tag-fingerprint groups + the new offplan 3-way split ────────────
         data class AlignedEntry(val entry: DeckEntry, val alignedKeys: Set<String>)
         val alignedEntries = nonLand.map { entry ->
-            val keys = ((entry.card.tags + entry.card.userTags).map { it.key } + TribeDeriver.tribeKeys(entry.card)).toSet()
-            val alignedKeys = keys.filter { (profile.tagFingerprint[it] ?: 0f) >= SYNERGY_ALIGNMENT_THRESHOLD }.toSet()
+            // A manually/dictionary-assigned TRIBAL CardTag ("human", "goblin", ...) means the same
+            // thing as a `tribe:<x>` key -- it must GROUP into that ONE key space, never surface as
+            // its own `fingerprint:<x>` section (H8: "Human" vs "Human (tribe)" duplicate). The
+            // THRESHOLD LOOKUP still uses the tag's own bare key -- [DeckScorer.fingerprint] (a
+            // scoring-affecting function, untouched here per the "scores move only in R2" rule)
+            // still aggregates TRIBAL tags under their bare key, so re-keying the lookup itself
+            // would silently change which cards clear [SYNERGY_ALIGNMENT_THRESHOLD].
+            // A tag whose bare key IS a [RoleKey] this deck's own skeleton targets already has a
+            // real, band-backed `role:<key>` section (P3, or P1 for `ramp`/`mana_fix` specifically)
+            // -- it is dropped here entirely rather than folded, so it never emits a second,
+            // plainer `fingerprint:<key>` for the SAME category (S6: no duplicate categories). This
+            // is what a seed-floored ROLE-category tag (e.g. `card_draw`, `counterspell` --
+            // [DeckScorer.fingerprint]'s seed step floors ANY key regardless of category) would
+            // otherwise slip through as, since only STRATEGY/ARCHETYPE/TRIBAL tags are normally
+            // eligible for the fingerprint at all.
+            val tagKeyPairs = (entry.card.tags + entry.card.userTags)
+                .filterNot { it.key in roleKeys }
+                .map { tag ->
+                    val groupKey = if (tag.category == TagCategory.TRIBAL) TribeDeriver.TRIBE_PREFIX + tag.key else tag.key
+                    tag.key to groupKey
+                }
+            val tribeKeyPairs = TribeDeriver.tribeKeys(entry.card).map { it to it }
+            val alignedKeys = (tagKeyPairs + tribeKeyPairs)
+                .filter { (lookupKey, _) -> (profile.tagFingerprint[lookupKey] ?: 0f) >= SYNERGY_ALIGNMENT_THRESHOLD }
+                .map { (_, groupKey) -> groupKey }
+                .toSet()
             AlignedEntry(entry, alignedKeys)
         }
         val byKey = linkedMapOf<String, MutableList<DeckEntry>>()
@@ -784,7 +827,7 @@ object AnalysisEngine {
     )
 
     private fun axisLabel(axis: AxisKey): String = when {
-        axis.startsWith("TRIBE:") -> "${axis.removePrefix("TRIBE:").replaceFirstChar { it.uppercase() }} (tribe)"
+        axis.startsWith("TRIBE:") -> tribeSuffixLabel(axis.removePrefix("TRIBE:"))
         else -> AXIS_LABELS[axis] ?: axis.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
     }
 
@@ -800,9 +843,11 @@ object AnalysisEngine {
      */
     private fun synergyStrategyLabel(key: String): String = key.replace('_', ' ').replaceFirstChar { it.uppercase() }
 
-    /** `"tribe:elf"` -> `"Elf (tribe)"` (plan's exact W2 spec for tribe-key sections). */
-    private fun synergyTribeLabel(tribeKey: String): String =
-        "${tribeKey.removePrefix(TribeDeriver.TRIBE_PREFIX).replaceFirstChar { it.uppercase() }} (tribe)"
+    /** `"tribe:elf"` -> `"Elf (Tribe)"` (the ONE tribe-label spelling, mirrored by the presentation
+     * layer's `deck_analysis_axis_tribe_format` string -- H8/S6, no second core-domain spelling). */
+    private fun synergyTribeLabel(tribeKey: String): String = tribeSuffixLabel(tribeKey.removePrefix(TribeDeriver.TRIBE_PREFIX))
+
+    private fun tribeSuffixLabel(subtype: String): String = "${subtype.replaceFirstChar { it.uppercase() }} (Tribe)"
 
     // ── P5 — Legality & construction ────────────────────────────────────────────────────────
 

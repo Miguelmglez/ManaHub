@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
 import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.feature.decks.domain.engine.analysisv3.AnalysisV3Fixture
 import com.mmg.manahub.feature.decks.domain.engine.analysisv3.AnalysisV3Fixtures
 import com.mmg.manahub.feature.decks.domain.engine.analysisv3.NO_POSTURE
@@ -350,6 +351,61 @@ class DeckAnalysisV3CorpusTest {
                 listOf(CardTag.STAX), setOf(ManaColor.W, ManaColor.U, ManaColor.B, ManaColor.R, ManaColor.G),
             )
             assertEquals(withoutPrior, withOpposingPrior, "fixture ${fixture.id} (${fixture.name}) must be fully inert to any commander prior")
+        }
+    }
+
+    /** Full [DeckAnalysis] for [fixture] -- the same pipeline [snapshotFor] runs, but returning the
+     * whole analysis (sections included) rather than the flattened [FixtureSnapshot]. */
+    private fun analysisFor(fixture: AnalysisV3Fixture): DeckAnalysis {
+        val archetypeFormat = requireNotNull(fixture.archetypeFormat)
+        val profile = scorer.profile(fixture.mainboard, fixture.format, fixture.colorIdentity, emptyList())
+        val inferred = inferDeckArchetypeUseCase(fixture.mainboard, archetypeFormat, fixture.commanderTags, fixture.colorIdentity)
+        return AnalysisEngine.evaluate(
+            mainboard = fixture.mainboard, format = fixture.format, colorIdentity = fixture.colorIdentity,
+            profile = profile, archetype = inferred.macro, posture = inferred.posture, themes = inferred.themes,
+            isManualOverride = false, confidence = inferred.confidence,
+        )
+    }
+
+    /**
+     * Deck Wizard v5, X4 (S6/H8 audit) -- run the ENGINE over the full corpus (not a lookup table)
+     * and assert no two emitted sections, across every pillar of ONE analysis, share a normalized
+     * label ("Human" vs "Human (tribe)" vs "Human (Tribe)" is exactly the shape this catches).
+     */
+    @Test
+    fun everyFixture_neverEmitsTwoSectionsWithTheSameNormalizedLabel() {
+        AnalysisV3Fixtures.ALL.forEach { fixture ->
+            val sections = analysisFor(fixture).pillars.flatMap { it.sections }
+            val byLabel = sections.groupBy { it.label.trim().lowercase() }
+            val duplicates = byLabel.filterValues { it.size > 1 }
+            assertTrue(
+                duplicates.isEmpty(),
+                "fixture ${fixture.id} (${fixture.name}) has duplicate section labels: ${duplicates.mapValues { (_, v) -> v.map { it.id } }}",
+            )
+        }
+    }
+
+    /**
+     * Deck Wizard v5, X4 (H8) -- a TRIBAL-category [com.mmg.manahub.core.model.CardTag] on any
+     * corpus card must never surface its own `fingerprint:<key>` section; that signal folds into
+     * the `tribe:<key>` key space (see [AnalysisEngine.evaluateSynergy]'s own KDoc on this fold).
+     * Reads each fixture's OWN real card tags -- not a hardcoded tribal-word list.
+     */
+    @Test
+    fun corpus_neverEmitsAFingerprintSectionForATribalCardTagKey() {
+        AnalysisV3Fixtures.ALL.forEach { fixture ->
+            val tribalTagKeys = fixture.mainboard.flatMap { it.card.tags + it.card.userTags }
+                .filter { it.category == TagCategory.TRIBAL }
+                .map { it.key }
+                .toSet()
+            if (tribalTagKeys.isEmpty()) return@forEach
+            val sectionIds = analysisFor(fixture).pillars.flatMap { it.sections }.map { it.id }
+            tribalTagKeys.forEach { key ->
+                assertTrue(
+                    "fingerprint:$key" !in sectionIds,
+                    "fixture ${fixture.id} (${fixture.name}) must not emit fingerprint:$key for a TRIBAL card tag: $sectionIds",
+                )
+            }
         }
     }
 

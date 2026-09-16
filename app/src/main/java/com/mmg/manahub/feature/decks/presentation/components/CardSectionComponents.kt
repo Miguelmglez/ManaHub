@@ -194,7 +194,7 @@ fun CardSectionHeader(
 
     if (!hasBand) {
         SectionHeader(
-            title = section.label,
+            title = section.displayLabel(),
             expanded = expanded,
             onToggle = onToggle,
             leading = leading,
@@ -252,7 +252,7 @@ fun CardSectionHeader(
     val ringContentDescription = toneLabel
 
     SectionHeader(
-        title = section.label,
+        title = section.displayLabel(),
         expanded = expanded,
         onToggle = onToggle,
         leading = leading,
@@ -390,7 +390,7 @@ fun CardSectionRow(
                     if (onBrowse != null) {
                         Spacer(Modifier.height(spacing.md))
                         MagicCtaButton(
-                            text = stringResource(R.string.deck_analysis_section_browse, section.label),
+                            text = stringResource(R.string.deck_analysis_section_browse, section.displayLabel()),
                             onClick = onBrowse,
                             style = MagicCtaStyle.Outlined,
                             modifier = Modifier.fillMaxWidth(),

@@ -1,10 +1,12 @@
 package com.mmg.manahub.feature.decks.presentation.components
+// COMMENTS_REVIEWED: 2026-09-16
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.mmg.manahub.R
 import com.mmg.manahub.feature.decks.domain.engine.AxisKey
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.CardSection
 import com.mmg.manahub.feature.decks.domain.engine.CurveShape
 import com.mmg.manahub.feature.decks.domain.engine.DeckRole
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
@@ -12,6 +14,7 @@ import com.mmg.manahub.feature.decks.domain.engine.Finding
 import com.mmg.manahub.feature.decks.domain.engine.PillarId
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.ScoreReason
+import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
 import com.mmg.manahub.feature.decks.domain.usecase.ArchetypeResolution
 import kotlin.math.roundToInt
@@ -269,6 +272,20 @@ fun AxisKey.axisDisplayLabel(): String = when {
     this == "LOCK" -> stringResource(R.string.deck_analysis_axis_lock)
     this == "ENGINE" -> stringResource(R.string.deck_analysis_axis_engine)
     else -> replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
+}
+
+/**
+ * Presentation-layer label for a [CardSection] — mirrors [AxisKey.axisDisplayLabel]'s own split:
+ * a `tribe:<subtype>` section's "(Tribe)" qualifier is UI-owned text via the SAME string resource
+ * the axis-card view already uses, not [CardSection.label]'s core-domain literal (Deck Wizard v5,
+ * H8/S6 — the "Human" vs "Human (tribe)" vs "Human (Tribe)" 3-way duplicate is now ONE spelling
+ * everywhere). Every other section id keeps its engine-supplied [CardSection.label] unchanged.
+ */
+@Composable
+fun CardSection.displayLabel(): String = if (id.startsWith(TribeDeriver.TRIBE_PREFIX)) {
+    stringResource(R.string.deck_analysis_axis_tribe_format, id.removePrefix(TribeDeriver.TRIBE_PREFIX).replaceFirstChar { it.uppercase() })
+} else {
+    label
 }
 
 /**

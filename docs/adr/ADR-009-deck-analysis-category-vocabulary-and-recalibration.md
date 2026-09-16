@@ -1,7 +1,8 @@
 # ADR-009 — Deck Analysis Category Vocabulary and F18 Recalibration Attempt
 
 **Status:** Accepted (vocabulary unification) / `inevitability` axis re-derived and kept (R2b amendment,
-Edgar still open, honestly reported) · **Date:** 2026-09-16 · **Related:** ADR-007 (Deck Analysis
+Edgar still open, honestly reported) / category-detection cleanup landed, counters-payoff detection
+left unchanged (R3a amendment) · **Date:** 2026-09-16 · **Related:** ADR-007 (Deck Analysis
 Engine v3), ADR-008 (collection sync)
 
 ## Context
@@ -344,3 +345,160 @@ would need a further, dedicated redesign (weighting `recursion`/`tutor` differen
 or a per-format review of whether `GENERIC`'s inherited `recursion(2)`/`tutor(2)` bleed-through
 belongs in every macro's reachability at all), left as the next `inevitability` follow-up rather than
 forced here.
+
+## Amendment (R3a, 2026-09-16) — category detection cleanup (duplicate/near-duplicate sections)
+
+**User report (verbatim, 2026-09-15):** "revisa que no haya categorías duplicadas que no tengan
+sentido, a veces he visto categorías como 'Human' y 'Human (tribe)' esto es redundante e
+innecesario, debes mejorar la detección de categorías, depúralas." Plus: every category must find
+the same cards in the Collection browse and in the analysis (already Decision 1's own guarantee for
+the roles it covers).
+
+### Root cause (verified against code)
+
+`TagDictionary.kt:806-814` declares plain TRIBAL `CardTag`s (`human`, `merfolk`, `elf`, `zombie`,
+`vampire`, …) with no `DetectionRule` (manual-pick-only, category `TRIBAL`). `AnalysisEngine
+.evaluateSynergy` builds its per-key SYNERGY sections from EVERY identity-category tag a card
+carries — a plain TRIBAL tag's bare key ("human") produced its own `fingerprint:human` section
+labeled "Human" (`synergyStrategyLabel`), while `TribeDeriver.tribeKeys` (structural: creature
+subtype + oracle-payoff tribes) independently produced `tribe:human` labeled "Human (tribe)"
+(`synergyTribeLabel`). A third spelling, "Human (Tribe)" (title case), already existed in the
+presentation layer for the `TRIBE:` `AxisKey` used by the axis-pairing view
+(`R.string.deck_analysis_axis_tribe_format`). Three code paths, three spellings, for what is always
+the SAME real-world fact ("this card is or cares about Humans").
+
+### Additional finding, same class of bug: `ramp`/`card_draw`/`counterspell` (not just tribes)
+
+The corpus audit's very first failure (fixture 1, Edgar Markov) was a THIRD shape: `evaluatePlanRoles`
+(P3) iterates every key in `skeleton.roleTargets` with no exclusion for `"ramp"` (only
+`ArchetypeData.MANA_FIX_KEY` was excluded, per its own pre-existing comment "owned by P1, not
+re-shown here" — a comment whose own stated intent, read literally, already covered `ramp` too, but
+the code never implemented that half of it) — so P3 emitted its OWN `role:ramp` section, identical
+id AND label to P1's unconditional `rampSection`. Fixed the same way `MANA_FIX_KEY` already was, but
+scoped to the DISPLAY section only (`if (key != "ramp") sections += ...`) — `coverage`/
+`weightedRatios`/`findings` for `"ramp"` are computed exactly as before, so P3's own `subscore` does
+not move (unlike `MANA_FIX_KEY`'s pre-existing full early-`return`, which already excludes it from
+scoring too — that established, byte-identical behavior for `mana_fix` was left untouched).
+
+Writing the corpus audit test (below) surfaced the SAME defect shape on non-tribe keys, at much
+higher volume on the real collection than the tribe case: `role:ramp` (P1, `evaluateManaBase`'s
+UNCONDITIONAL `rampSection` — shown regardless of whether the deck's own skeleton even targets
+ramp) collided with `fingerprint:ramp` (SYNERGY, from the `ramp` ARCHETYPE `CardTag`, always
+eligible for the fingerprint since ARCHETYPE is an `IDENTITY_CATEGORIES` member). Separately,
+`role:card_draw`/`role:counterspell` (P3, `evaluatePlanRoles`, shown whenever the deck's resolved
+skeleton targets that `RoleKey`) collided with `fingerprint:card_draw`/`fingerprint:counterspell` —
+these two ARE `TagCategory.ROLE` (not an `IDENTITY_CATEGORIES` member), but `DeckScorer.fingerprint`'s
+SEED step (`seedTags.forEach { normalized[seed.key] = maxOf(..., SEED_FLOOR) }`, `SEED_FLOOR = 0.6f`)
+floors ANY seed key regardless of category — a commander/top-card identity seed carrying a ROLE tag
+(common: `InferDeckIdentityUseCase` seeds from the commander + top mainboard cards) is enough to
+clear `SYNERGY_ALIGNMENT_THRESHOLD` (0.4f) and produce a competing fingerprint section. Real-collection
+measurement (`WizardHarnessSectionVocabularyTest`, before this fix): **81/180 builds (45%)** had a
+duplicate label — 75 from `card_draw`, 6 from `counterspell`; the corpus's own fixture 1 (Edgar) hit
+the `ramp` case and fixture 16 (Tron) hit it independently via a different code path (see below).
+
+Fix, generalized rather than three separate special cases: `evaluateSynergy` now takes the caller's
+own `roleKeys: Set<RoleKey>` (`skeleton.roleTargets.keys` plus the two P1-unconditional keys, `"ramp"`
+and `ArchetypeData.MANA_FIX_KEY` — Tron's skeleton does not target `ramp` at all, yet P1 still shows
+it unconditionally, so the exclusion cannot be conditioned on `roleTargets` membership alone) and
+drops ANY card tag whose bare key is in that set from the fingerprint grouping entirely — no fold,
+since the richer `role:<key>` section (real band, real Browse) already covers it. This subsumes what
+would otherwise need three separate named exceptions and generalizes to any future RoleKey/CardTag
+name collision without a further code change. Zero score movement: `subscore`/`alignedCopies` are
+computed from `DeckSynergyGraph.edges`, not this grouping (unchanged assertion from Decision 1);
+`skeleton.roleTargets`/`DeckScorer.fingerprint`/`SEED_FLOOR` themselves are untouched.
+
+### Fix 1 — one key space for tribe identity in sections
+
+`AnalysisEngine.evaluateSynergy`'s per-card key computation now maps every `TagCategory.TRIBAL`
+card tag's key to `TribeDeriver.TRIBE_PREFIX + key` for SECTION GROUPING purposes only — a plain
+"human" tag can never again produce its own `fingerprint:human` section; it folds into whatever
+`tribe:human` section a structurally-derived Human card would also land in. **The alignment
+THRESHOLD LOOKUP is deliberately left reading the tag's own bare key** (`profile.tagFingerprint`,
+built by `DeckScorer.fingerprint`, untouched by this amendment) — re-keying the lookup itself would
+change which cards clear `SYNERGY_ALIGNMENT_THRESHOLD` (a scoring-affecting change, forbidden
+outside the R2 run per this campaign's own standing constraint). Grouping and lookup are therefore
+two separate keys per tag, joined as pairs and filtered before the grouping key is read — see
+`AnalysisEngine.evaluateSynergy`'s own comment on this split. No `subscore`/`alignedCopies` value is
+touched (those are computed from `DeckSynergyGraph.edges`, never from the fingerprint sections —
+see this file's pre-existing "Sections: what changed and what deliberately did NOT" KDoc).
+
+### Fix 2 — one label spelling
+
+`AnalysisEngine`'s two core-domain fallback label functions (`axisLabel`'s `TRIBE:` branch and
+`synergyTribeLabel`) now share one private helper (`tribeSuffixLabel`) producing `"<Subtype>
+(Tribe)"` — the SAME spelling the presentation layer's `deck_analysis_axis_tribe_format` string
+resource already used for the axis-pairing view, so the two remaining code paths (core-domain
+fallback, presentation string) can never drift again. The presentation layer additionally gained
+`CardSection.displayLabel()` (`DeckDoctorStrings.kt`) — a `tribe:<x>` section's user-facing text is
+now UI-owned (the same `stringResource` call, not `CardSection.label`'s core-domain literal), mirroring
+`AxisKey.axisDisplayLabel()`'s own split. `CardSectionComponents.kt`'s three `section.label` render
+sites (both `CardSectionHeader` title slots + `CardSectionRow`'s "Browse for X" button) now call
+`section.displayLabel()` — shared by Deck Studio's Analysis tab and the wizard's PLAN_SECTIONS step,
+since both render through this same component.
+
+### Section-emission audit (corpus + real collection, run not read from a table)
+
+Per this run's own instruction — audit by RUNNING analyses, not by enumerating lookup tables (the
+mistake the v4 campaign made). `DeckAnalysisV3CorpusTest.everyFixture_neverEmitsTwoSectionsWithTheSameNormalizedLabel`
+and `.corpus_neverEmitsAFingerprintSectionForATribalCardTagKey` run every one of the 22 corpus
+fixtures' OWN `DeckAnalysis` and inspect the emitted `PillarResult.sections` directly. Full per-id
+inventory (kept/merged/removed + reason): `docs/deck-wizard-state.md` §8.1.
+
+**Real collection (harness, gitignored):** `WizardHarnessSectionVocabularyTest` runs the SAME
+`CommanderMatrixV2` build pipeline `WizardCommanderHarnessV2Test` drives (every eligible owned
+commander × {top recommendation, Custom}) and checks the same two invariants against every real
+build's own analysis. No TRIBAL-category card tag exists anywhere in this specific harness snapshot
+(the tag is manual-pick-only and this harness re-derives tags from the offline `TagDictionary`
+pipeline, which never assigns one) — the check still runs and reports `tribalTagKeys=0`, an honest
+"nothing to find" result rather than a skipped assertion.
+
+### Fix 3 decision — `counters_payoff` vs `plus_counters` producer/payoff split: NOT changed
+
+The plan asked whether `counters_payoff` (ROLE, 0.85, `TagDictionary.kt:646-648`, rule
+`allOf("+1/+1 counter")`) should gain a distinguishing oracle pattern from `plus_counters`
+(STRATEGY, 0.95, `TagDictionary.kt:365-367`, the IDENTICAL rule) so a future producer/payoff SYNERGY
+engine (the next campaign run) can tell "puts counters on things" apart from "rewards having
+counters". **Decision: do not change the `TagDictionary` rule in this run.**
+
+Reasoning:
+1. **No current consumer needs the split.** The engine that would read a real producer/payoff
+   distinction for the COUNTERS axis (the "Engines first" SYNERGY redesign) has not landed yet — it
+   is explicitly the NEXT campaign run, not this one. Introducing a detection change now, with no
+   reader to validate it against, means the change could only be checked against the existing
+   corpus/golden suites (which do not exercise counters-axis producer/payoff separation at all) —
+   a change that "passes" only because nothing yet depends on its correctness is not a verified fix.
+2. **Decision 1 (this ADR) already unified `counters_payoff`/`plus_counters` as ONE membership** for
+   `CategoryVocabulary`/Browse-parity purposes, specifically BECAUSE production cannot currently
+   distinguish them. Narrowing the oracle rule now, without also revisiting that vocabulary decision
+   in the same pass, would leave `CategoryVocabulary` and the underlying tag detection newly
+   disagreeing about scope — reopening H2 (the original "Browse finds cards the analysis doesn't"
+   defect this campaign's R2 run fixed) for no consumer's benefit yet.
+3. **Any `TagDictionary` rule change requires the full ADR-007 §4 corpus-verification discipline**
+   (macro correct N/M, in-band N/M, per-fixture score, before/after) — a real, nontrivial pass this
+   run's scope (detection/duplicate cleanup) did not budget for, and better done alongside the run
+   that actually introduces the producer/payoff consumer, so the new rule can be verified against a
+   real reader instead of verified in a vacuum.
+
+**Recommendation for the next run (the SYNERGY engine redesign):** when that run builds the
+producer/payoff split for the COUNTERS axis, treat `counters_payoff`/`plus_counters` as ONE
+membership on BOTH sides (as `CategoryVocabulary` already does) rather than trying to force a split
+from today's identical detection rule. If that run's own design genuinely needs the distinction, it
+should introduce and verify the new `TagDictionary` pattern itself (e.g. a trigger/"for each"/
+counter-consumption shape that only fires for a genuine payoff), with its own corpus before/after
+table, since it is the first consumer that can actually exercise whether the new rule is correct.
+
+### Gate
+
+`:shared:core-domain:jvmTest` (`feature.decks.*`): 580 tests, 1 failed (Edgar, byte-identical
+message to the R2b baseline — no new failures). `:shared:core-domain:compileKotlinWasmJs` +
+`compileTestKotlinWasmJs`: BUILD SUCCESSFUL. `:app:testDebugUnitTest` (`feature.decks.*`): 573
+tests, 0 failed, 2 skipped (pre-existing `GoldenDeckHarnessTest` gate, unrelated). `:app:assembleDebug`:
+BUILD SUCCESSFUL. Harness (real collection, gitignored, present on this machine):
+`WizardHarnessSectionVocabularyTest` — before the fix, `analyzed=180 duplicateLabelFailures=81
+fingerprintTribalLeaks=0`; after, `analyzed=180 duplicateLabelFailures=0 fingerprintTribalLeaks=0
+tribalTagKeys=0` (no TRIBAL-category tag exists in this harness snapshot — an honest "nothing to
+find" result, not a skipped check). `WizardCommanderHarnessV2Test` (re-run, unchanged): 180/180 HARD
+metrics, score min/p25/median/p75/max **77/84/87/90/96** — byte-identical to the ADR-009 R2/R2b
+baseline. `WizardHarnessV3RealCollectionTest` (re-run, unchanged): choice determinism 180/180,
+variety median Jaccard **0.610** — byte-identical to R2b. No `ArchetypeData` band, weight, anchor,
+or prototype value touched.

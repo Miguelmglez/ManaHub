@@ -5,7 +5,10 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-16 (v5 campaign, Run R2b — `inevitability` axis re-derived per the user's own
+**Last updated:** 2026-09-16 (v5 campaign, Run R3a — category detection cleanup: TRIBAL card tags fold
+into the `tribe:` key space, one label spelling everywhere, section-emission audit over corpus + real
+collection, counters-payoff detection deliberately left unchanged; see ADR-009 Amendment (R3a) and §8.1
+below). Previously: 2026-09-16 (v5 campaign, Run R2b — `inevitability` axis re-derived per the user's own
 decision; corpus macro accuracy 6/16 → 8/16, Meren fixed, Edgar still red and honestly reported; see
 ADR-009 Amendment and §6/§8 below). Previously: 2026-09-16 (v5 campaign, Run R2 — category vocabulary
 unification (X0, shipped) plus the F18 recalibration DIAGNOSIS that R2b acted on). Previously:
@@ -51,6 +54,61 @@ instruction). 3 synthetic `InferDeckArchetypeUseCaseTest` decks re-baselined (no
 own CONTROL-shaped mainboard's draw-engine count raised 4→10 to still clear CONTROL's own prototype
 under the corrected formula). Full derivation table, before/after corpus CSV, and the rejected
 alternative: ADR-009 "Amendment (R2b)".
+
+## v5 — Run R3a (2026-09-16): category detection cleanup (X4)
+
+One commit (this run's own). Closes the user's own report ("Human" vs "Human (tribe)" duplicate
+categories) and the plan's own H8/S6 finding.
+
+- **Root cause:** `TagDictionary`'s plain TRIBAL `CardTag`s (`human`, `elf`, `goblin`, …, manual-pick
+  only, no `DetectionRule`) produced their OWN `fingerprint:<key>` SYNERGY section, independent of
+  `TribeDeriver`'s structurally-derived `tribe:<key>` section for the SAME real-world fact — three
+  spellings existed across the codebase ("Human", "Human (tribe)", "Human (Tribe)").
+- **Fix 1 (grouping):** `AnalysisEngine.evaluateSynergy` now GROUPS a TRIBAL-category tag's key into
+  the `tribe:` namespace for section identity — the alignment THRESHOLD LOOKUP still reads the tag's
+  own bare key (`DeckScorer.fingerprint`, a scoring-affecting function, untouched — no score moved
+  outside the R2 run). A card can never again emit its own `fingerprint:<tribe-word>` section.
+- **Fix 2 (one spelling):** `AnalysisEngine`'s two core-domain label fallbacks (`axisLabel`'s
+  `TRIBE:` branch, `synergyTribeLabel`) now share one helper producing `"<Subtype> (Tribe)"` — the
+  SAME spelling the presentation layer's `deck_analysis_axis_tribe_format` string already used for
+  the axis-pairing view. New `CardSection.displayLabel()` (`DeckDoctorStrings.kt`) makes the actual
+  UI-rendered tribe label a presentation-layer string (mirrors `AxisKey.axisDisplayLabel()`), wired
+  into `CardSectionComponents.kt`'s 3 render sites — shared by Deck Studio's Analysis tab AND the
+  wizard's PLAN_SECTIONS step (same component, one fix covers both).
+- **Audit (run over corpus + real collection, not read from a table) — found MUCH more than tribes.**
+  `DeckAnalysisV3CorpusTest` gained 2 tests running every one of the 22 corpus fixtures' own
+  `DeckAnalysis`; `WizardHarnessSectionVocabularyTest` (new, `app/src/test`) runs the SAME
+  real-collection build matrix `WizardCommanderHarnessV2Test` drives (180 real builds) and checks the
+  same two invariants — before this run's fixes, **81/180 real builds (45%) had a duplicate section
+  label**, overwhelmingly `card_draw` (75) and `counterspell` (6), plus the corpus itself caught a
+  THIRD shape (`role:ramp` emitted twice by two different pillars, fixture 1 Edgar) and a fourth
+  (`role:ramp`/`fingerprint:ramp`, fixture 16 Tron). Root cause, generalized: any `CardTag` whose bare
+  key coincides with a `RoleKey` that already has its own band-backed `role:<key>` section (P1's
+  unconditional `ramp`/`mana_fix`, or P3's per-skeleton roles) can ALSO leak into SYNERGY's fingerprint
+  grouping — either because the tag's own category is eligible for the fingerprint (`ramp` is
+  ARCHETYPE) or because `DeckScorer.fingerprint`'s seed-floor step floors ANY seed key regardless of
+  category (`card_draw`/`counterspell` are ROLE, normally ineligible). Fixed by threading the deck's
+  own `roleKeys` set into `evaluateSynergy` and dropping any coincident tag from the fingerprint
+  grouping entirely (no fold — the richer role-based section already exists); the pre-existing P3/P1
+  `role:ramp` double-emission fixed the same way `mana_fix` already was, scoped to the SECTION only so
+  P3's own score is untouched. After: `analyzed=180 duplicateLabelFailures=0`. See §8.1 for the full
+  per-id inventory this audit produced.
+- **Counters `producer` vs `payoff` split (`counters_payoff`/`plus_counters`): left UNCHANGED.**
+  Both `TagDictionary` rules are the identical `allOf("+1/+1 counter")` — a distinguishing pattern
+  was considered but deliberately NOT added this run: no current consumer needs the split (the
+  SYNERGY producer/payoff engine redesign is the NEXT run, not this one), Decision 1 already unified
+  the two as ONE membership for vocabulary-parity reasons, and any detection change needs the full
+  ADR-007 §4 corpus-verification pass this run's scope did not budget for. Full reasoning,
+  citations, and the recommendation for the next run's own producer/payoff engine: ADR-009
+  "Amendment (R3a)".
+- **No score movement anywhere** — `subscore`/`alignedCopies` are computed from `DeckSynergyGraph
+  .edges`, never from the fingerprint/tribe display sections this run touched. Fixtures untouched.
+
+**Gate:** `shared:core-domain:jvmTest` (`feature.decks.*`) 580 tests/1 failure (Edgar, unchanged);
+`compileKotlinWasmJs`/`compileTestKotlinWasmJs` green; `app:testDebugUnitTest` (`feature.decks.*`)
+573 tests/0 failed/2 skipped (pre-existing, unrelated); `assembleDebug` green; harness v2 unchanged
+(180/180 HARD, score 77/84/87/90/96), harness v3 unchanged (determinism 180/180, variety 0.610) —
+byte-identical to the R2b baseline, confirming zero score movement. Full inventory: §8.1 below.
 
 ## v4 — Run 15 (2026-09-15): W8 — harness v3, telemetry, cleanup and docs
 
@@ -718,6 +776,36 @@ Things that differ from Commander and are NOT solved by this campaign:
   weight retuning performed or needed. No open item here any more.
 - **`persist()` atomicity CLOSED P8** — `DeckRepository.persistCommanderBuild` / `DeckDao
   .persistCommanderBuild` is one real Room `@Transaction`. No open item here any more.
+
+---
+
+## 8.1 Category/section vocabulary inventory (v5 Run R3a audit)
+
+Produced by RUNNING the engine over the 22 corpus fixtures + 180 real-collection builds (harness,
+gitignored) and inspecting every emitted `PillarResult.sections` id/label directly — not by reading
+`ROLE_LABELS`/`AXIS_LABELS`/`CategoryVocabulary` tables (the v4 campaign's own regression lesson).
+
+| Section id shape | Label | Emitted by | Kept / merged / removed | Reason |
+|---|---|---|---|---|
+| `fingerprint:<x>` (x = STRATEGY/ARCHETYPE CardTag key, x not a RoleKey) | `synergyStrategyLabel(x)`, Title Case | SYNERGY (`evaluateSynergy`) | **Kept** | Genuinely distinct from any role vocabulary (e.g. `fingerprint:tokens`, `fingerprint:sacrifice`) — the only per-key display for these strategy identities. |
+| `tribe:<subtype>` | `"<Subtype> (Tribe)"` | SYNERGY (`evaluateSynergy`, both structurally-derived and now folded-in manual TRIBAL tags) | **Merged** (was 2 ids: `fingerprint:<x>` for a manual TRIBAL tag + `tribe:<x>` for the structural derivation) | H8: a manual TRIBAL CardTag ("human") and a structurally-derived tribe are the SAME real-world fact; one section, one spelling now (was 3 spellings across 3 code paths — see ADR-009 "Fix 2"). |
+| `fingerprint:ramp` | "Ramp" | SYNERGY (`evaluateSynergy`, from the `ramp` ARCHETYPE CardTag) | **Removed** | Duplicated `role:ramp` (P1, unconditional). |
+| `fingerprint:card_draw` | "Card draw" | SYNERGY (`evaluateSynergy`, from a seed-floored ROLE CardTag) | **Removed** | Duplicated `role:card_draw` (P3, whenever the skeleton targets it) — the single highest-volume real-collection duplicate found (75/180 builds). |
+| `fingerprint:counterspell` | "Counterspell" | SYNERGY (`evaluateSynergy`, seed-floored ROLE CardTag) | **Removed** | Same shape as `card_draw` (6/180 builds). |
+| `fingerprint:<other RoleKey coincidence>` | — | SYNERGY (`evaluateSynergy`) | **Removed (structural rule, not per-key)** | Generalized: ANY CardTag key coinciding with a `RoleKey` this deck's own `role:`-vocabulary already shows is now excluded from the fingerprint grouping, not just the 3 keys actually observed — the exclusion is data-driven (`roleKeys` param), so a future coincidence closes automatically. |
+| `role:ramp` (2nd copy, from P3) | "Ramp" | PLAN_ROLES (`evaluatePlanRoles`) | **Removed (P3's copy only)** | P1's `evaluateManaBase.rampSection` already owns this id unconditionally; P3's own pre-existing comment ("owned by P1... P3 explicitly excludes it") already stated this intent for `mana_fix` but the code never extended it to `ramp`. P3's coverage/score/findings for `ramp` are UNCHANGED — only the duplicate display section is dropped. |
+| `role:mana_fix` | "Mana Fixing" | MANA_BASE (`evaluateManaBase`) only | **Kept as-is** | Already correctly single-sourced before this run (P3 already excluded `MANA_FIX_KEY`). |
+| `role:<key>` (every other RoleKey) | `ArchetypeRoleClassifier.label(key)` | PLAN_ROLES | **Kept** | One band-backed section per targeted role; no other pillar emits these ids. |
+| `produces:<color>` | `ManaColor.displayName` | MANA_BASE | **Kept** | Per-color land production; no collision with any other pillar. |
+| `mana_rock` / `mana_dork` | "Mana Rocks" / "Mana Dorks" | MANA_BASE | **Kept** | Distinct ids and labels from `role:mana_fix`/the `mana_rock`/`mana_dork` RoleKeys (a genuinely different structural CardTag-key-based count, audited 2026-08-24 per `feature/decks/CLAUDE.md`). |
+| `interaction` / `standalone` / `offplan` | "Interaction" / "Standalone" / "Off-plan" | SYNERGY | **Kept** | Mutually exclusive 3-way split (spec §7); no Browse for `offplan` by design. |
+| `engine:*` (axis-pairing view) | via `AxisKey.axisDisplayLabel()` | Not a `CardSection` — a separate Compose-only render over `graph.axes`, not part of `PillarResult.sections` | **Out of scope for this run** | X3 (SYNERGY "Engines first" redesign, the NEXT run) owns whether/how this view co-exists with the fingerprint/tribe sections above; this run only unified the TRIBE label SPELLING it already used (`AnalysisEngine.axisLabel`'s core-domain fallback now matches it) so it can never drift again, without touching its layout. |
+
+**Counters producer/payoff (`counters_payoff`/`plus_counters`): investigated, NOT changed.** Both
+`TagDictionary` rules are identical (`allOf("+1/+1 counter")`); a distinguishing detection pattern
+was considered and deliberately deferred to the next run (the SYNERGY producer/payoff engine), which
+is the first consumer that can actually verify whether a new rule is correct. Full reasoning:
+ADR-009 "Amendment (R3a)".
 
 ---
 
