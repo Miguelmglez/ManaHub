@@ -72,11 +72,13 @@ data class CardContribution(
  * other); it is simply no longer user-visible.
  */
 data class CardSection(
-    /** "role:removal_spot" | "mv:3" | "mv:7plus" | "produces:B" | "fingerprint:tokens" |
-     * "tribe:elf" | "interaction" | "standalone" | "offplan" | "legal" | "illegal".
-     * "interaction"/"standalone"/"offplan" (Deck Analysis Engine v3, PHASE 4, spec §7) are the
-     * 3-way split of the old catch-all "offplan" bucket -- see
-     * [AnalysisEngine.evaluateSynergy]'s own KDoc for the split rule. See
+    /** "role:removal_spot" | "mv:3" | "mv:7plus" | "produces:B" | "engine:LIFE:producers" |
+     * "engine:LIFE:payoffs" | "tribe:elf" | "interaction" | "standalone" | "offplan" | "legal" |
+     * "illegal". "interaction"/"standalone"/"offplan" (Deck Analysis Engine v3, PHASE 4, spec §7)
+     * are the 3-way split of the old catch-all "offplan" bucket -- see
+     * [AnalysisEngine.evaluateSynergy]'s own KDoc for the split rule. `engine:<axis>:producers`/
+     * `engine:<axis>:payoffs` (Deck Wizard Commander v5, D2/D3) replaced the old loose
+     * `fingerprint:<key>` SYNERGY sections -- see [PillarResult.synergyEngines]. See
      * [com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery] (W3) for how this id maps
      * to a browse query. */
     val id: String,
@@ -306,6 +308,34 @@ data class PillarResult(
     val alignedNonLandCopies: Int = 0,
     val totalNonLandCopies: Int = 0,
     val notApplicable: Boolean = false,
+    /** [PillarId.SYNERGY] ONLY — "Engines first" (v5): the deck's producer -> payoff pairs, one
+     * entry per axis that clears [SynergyEngineState]'s visibility rule. [SynergyEngine.producers]/
+     * [SynergyEngine.payoffs] are the SAME [CardContribution] lists behind this pillar's own
+     * `engine:<axis>:producers`/`engine:<axis>:payoffs` [sections] entries — never re-derived —
+     * kept here as a separate, display-only, UI-ready grouping so a renderer can pair the two sides
+     * into one card without re-matching ids. Empty for every other pillar. */
+    val synergyEngines: List<SynergyEngine> = emptyList(),
+)
+
+/** [PillarResult.synergyEngines] visibility (Deck Wizard Commander v5, D3): [COMPLETE] once the
+ * axis has at least one producer AND one payoff copy in the deck; [MISSING_PAYOFFS]/
+ * [MISSING_PRODUCERS] when only one side is present but that side alone already reaches half its
+ * own ideal (a real, half-built engine worth surfacing, flagged incomplete); otherwise the axis is
+ * not an engine yet and emits no [SynergyEngine] at all. */
+enum class SynergyEngineState { COMPLETE, MISSING_PAYOFFS, MISSING_PRODUCERS }
+
+/** One producer -> payoff pair for the SYNERGY "Engines" list (D2/D3). [producerIdeal]/
+ * [payoffIdeal] are this axis's already deck-size-scaled ideals ([SynergyGraph.axisIdeals]) —
+ * never re-derived by a UI caller. Real counts only ([CardContribution.quantity] sums, S3) —
+ * [SynergyGraph]'s confidence-weighted `producerCopies`/`payoffCopies` are for scoring, not display. */
+data class SynergyEngine(
+    val axis: AxisKey,
+    val label: String,
+    val producers: List<CardContribution>,
+    val payoffs: List<CardContribution>,
+    val producerIdeal: Int,
+    val payoffIdeal: Int,
+    val state: SynergyEngineState,
 )
 
 /**

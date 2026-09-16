@@ -573,17 +573,18 @@ object AnalysisEngine {
      * `"dominant axis"` (the `consistency` term) reuses [InferDeckArchetypeUseCase]'s own Phase-3a
      * definition (`graph.axes.maxByOrNull { it.health }`) rather than inventing a second one.
      *
-     * ## Sections: what changed and what deliberately did NOT
-     * The pre-existing per-key `fingerprint:<key>`/`tribe:<x>` DISPLAY sections (grouped by
-     * [profile]'s CardTag-fingerprint alignment, [SYNERGY_ALIGNMENT_THRESHOLD]) are UNCHANGED —
-     * nothing in spec §7 asks to remove that view, and it answers a genuinely different question
-     * ("which named strategy does this card pull toward") than the graph-based subscore now does.
-     * A TRIBAL-category [com.mmg.manahub.core.model.CardTag] GROUPS into the `tribe:<x>` key space
-     * instead of its own `fingerprint:<x>` id (one tribe key space, no "Human"/"Human (tribe)"
-     * duplicate) — the [DeckProfile.tagFingerprint] THRESHOLD LOOKUP itself is untouched (still the
-     * tag's own bare key), only the section a clearing card lands in moved.
-     * ONLY the old catch-all `"offplan"` bucket (cards the tag-fingerprint check does not align to
-     * ANY key) is rebuilt as a real 3-way split, spec §7:
+     * ## Sections: "Engines first" (Deck Wizard Commander v5, D2/D3)
+     * Display order: (1) [SynergyEngine] producer/payoff pairs, one per axis clearing
+     * [SynergyEngineState]'s visibility rule ([PillarResult.synergyEngines], mirrored here as
+     * `engine:<axis>:producers`/`engine:<axis>:payoffs` [CardSection]s); (2) the deck's own
+     * dominant tribe, once (`tribe:<x>`); (3) interaction/standalone/off-plan. The old loose
+     * `fingerprint:<key>` list (one section per [profile]'s CardTag-fingerprint-aligned STRATEGY
+     * key) is REMOVED — a card that used to land there with no engine role and no dominant-tribe
+     * membership now falls through into the residual interaction/standalone/off-plan classification
+     * below, exactly as an unaligned card always has. This is a DISPLAY-only change: alignment
+     * against [SYNERGY_ALIGNMENT_THRESHOLD] still only decides section membership, never [subscore]
+     * (unchanged formula above, reads only [graph]).
+     * The catch-all `"offplan"` bucket is a real 3-way split, spec §7:
      *  - **`"interaction"`**: the card carries [INTERACTION_ROLES] — legitimate, not off-plan.
      *    A Swords to Plowshares must never read as off-plan (checked FIRST, unconditionally).
      *  - **`"standalone"`**: NOT interaction, but has a real reason to be in the deck: either it
@@ -684,24 +685,51 @@ object AnalysisEngine {
         val subscore = if (notApplicable) 0 else (100 * bandRatioScoreF(raw, band.ideal, band.max)).roundToInt().coerceIn(0, 100)
         val shown = sortFindings(conflictFindings)
 
-        // ── Sections: unchanged tag-fingerprint groups + the new offplan 3-way split ────────────
+        // ── Engines (v5, D2/D3): one producer -> payoff pair per axis clearing the visibility
+        // rule -- payoff-optional axes (MILL_OPP, LOCK, see SynergyGraph.payoffPolicyFor) have no
+        // real payoff role at all ("the producers ARE the win condition"), so they are excluded
+        // from this pairing rather than permanently reading as "missing payoffs" on a well-built
+        // stax/mill deck. The deck's own dominant TRIBE axis is excluded too -- it gets its own
+        // section below, once, not folded into the generic engine list.
+        val dominantTribeAxis = graph.axes.map { it.axis }.firstOrNull { it.startsWith("TRIBE:") }
+        val axisIdeals = SynergyGraph.axisIdeals(format, nonLandCount, dominantTribeAxis)
+        val engines = graph.axes
+            .filter { it.axis != "MILL_OPP" && it.axis != "LOCK" && it.axis != dominantTribeAxis }
+            .mapNotNull { axisState ->
+                val breakdown = graph.axisBreakdown[axisState.axis] ?: return@mapNotNull null
+                val producerCopies = breakdown.producers.sumOf { it.quantity }
+                val payoffCopies = breakdown.payoffs.sumOf { it.quantity }
+                val payoffIdeal = axisIdeals[axisState.axis]?.payoffIdeal ?: return@mapNotNull null
+                val state = when {
+                    producerCopies >= 1 && payoffCopies >= 1 -> SynergyEngineState.COMPLETE
+                    producerCopies >= 1 && producerCopies * 2 >= axisState.producerIdeal -> SynergyEngineState.MISSING_PAYOFFS
+                    payoffCopies >= 1 && payoffCopies * 2 >= payoffIdeal -> SynergyEngineState.MISSING_PRODUCERS
+                    else -> null
+                } ?: return@mapNotNull null
+                SynergyEngine(
+                    axis = axisState.axis,
+                    label = axisLabel(axisState.axis),
+                    producers = breakdown.producers,
+                    payoffs = breakdown.payoffs,
+                    producerIdeal = axisState.producerIdeal,
+                    payoffIdeal = payoffIdeal,
+                    state = state,
+                )
+            }
+        val engineSections = engines.flatMap { engine ->
+            listOf(
+                CardSection(id = "engine:${engine.axis}:producers", label = "${engine.label} producers", current = engine.producers.sumOf { it.quantity }, contributions = engine.producers),
+                CardSection(id = "engine:${engine.axis}:payoffs", label = "${engine.label} payoffs", current = engine.payoffs.sumOf { it.quantity }, contributions = engine.payoffs),
+            )
+        }
+
+        // ── The deck's own tribe, once (D2) + the interaction/standalone/off-plan residual ──────
+        // A card whose ONLY alignment used to be a loose STRATEGY fingerprint key (e.g. "lifegain")
+        // now falls through to this residual classification instead of getting its own removed
+        // section -- its information already surfaced above via the matching engine, if it has one.
+        val dominantTribeKey = dominantTribeAxis?.let { TribeDeriver.TRIBE_PREFIX + it.removePrefix("TRIBE:") }
         data class AlignedEntry(val entry: DeckEntry, val alignedKeys: Set<String>)
         val alignedEntries = nonLand.map { entry ->
-            // A manually/dictionary-assigned TRIBAL CardTag ("human", "goblin", ...) means the same
-            // thing as a `tribe:<x>` key -- it must GROUP into that ONE key space, never surface as
-            // its own `fingerprint:<x>` section (H8: "Human" vs "Human (tribe)" duplicate). The
-            // THRESHOLD LOOKUP still uses the tag's own bare key -- [DeckScorer.fingerprint] (a
-            // scoring-affecting function, untouched here per the "scores move only in R2" rule)
-            // still aggregates TRIBAL tags under their bare key, so re-keying the lookup itself
-            // would silently change which cards clear [SYNERGY_ALIGNMENT_THRESHOLD].
-            // A tag whose bare key IS a [RoleKey] this deck's own skeleton targets already has a
-            // real, band-backed `role:<key>` section (P3, or P1 for `ramp`/`mana_fix` specifically)
-            // -- it is dropped here entirely rather than folded, so it never emits a second,
-            // plainer `fingerprint:<key>` for the SAME category (S6: no duplicate categories). This
-            // is what a seed-floored ROLE-category tag (e.g. `card_draw`, `counterspell` --
-            // [DeckScorer.fingerprint]'s seed step floors ANY key regardless of category) would
-            // otherwise slip through as, since only STRATEGY/ARCHETYPE/TRIBAL tags are normally
-            // eligible for the fingerprint at all.
             val tagKeyPairs = (entry.card.tags + entry.card.userTags)
                 .filterNot { it.key in roleKeys }
                 .map { tag ->
@@ -715,20 +743,16 @@ object AnalysisEngine {
                 .toSet()
             AlignedEntry(entry, alignedKeys)
         }
-        val byKey = linkedMapOf<String, MutableList<DeckEntry>>()
+        val tribeEntries = mutableListOf<DeckEntry>()
         val residual = mutableListOf<DeckEntry>()
         alignedEntries.forEach { (entry, alignedKeys) ->
-            if (alignedKeys.isEmpty()) residual += entry else alignedKeys.forEach { key -> byKey.getOrPut(key) { mutableListOf() } += entry }
+            if (dominantTribeKey != null && dominantTribeKey in alignedKeys) tribeEntries += entry else residual += entry
         }
-        val fingerprintSections = byKey.map { (key, entries) ->
-            val isTribe = key.startsWith(TribeDeriver.TRIBE_PREFIX)
-            CardSection(
-                id = if (isTribe) key else "fingerprint:$key",
-                label = if (isTribe) synergyTribeLabel(key) else synergyStrategyLabel(key),
-                current = entries.sumOf { it.quantity },
-                contributions = entries.toContributions(),
-            )
-        }.sortedByDescending { it.current }
+        val tribeSections = if (dominantTribeKey != null && tribeEntries.isNotEmpty()) {
+            listOf(CardSection(id = dominantTribeKey, label = synergyTribeLabel(dominantTribeKey), current = tribeEntries.sumOf { it.quantity }, contributions = tribeEntries.toContributions()))
+        } else {
+            emptyList()
+        }
 
         val interaction = mutableListOf<DeckEntry>()
         val standalone = mutableListOf<DeckEntry>()
@@ -749,7 +773,7 @@ object AnalysisEngine {
             id = PillarId.SYNERGY,
             subscore = subscore,
             findings = shown,
-            sections = fingerprintSections + listOf(
+            sections = engineSections + tribeSections + listOf(
                 offplanSplitSection("interaction", "Interaction", interaction),
                 offplanSplitSection("standalone", "Standalone", standalone),
                 offplanSplitSection("offplan", "Off-plan", offplan),
@@ -757,6 +781,7 @@ object AnalysisEngine {
             alignedNonLandCopies = alignedCopies,
             totalNonLandCopies = nonLandCount,
             notApplicable = notApplicable,
+            synergyEngines = engines,
         )
     }
 

@@ -53,18 +53,17 @@ class AnalysisEngineSynergyP4Test {
         return analysis.pillars.first { it.id == PillarId.SYNERGY }
     }
 
-    // ── Pre-existing, UNCHANGED behavior: per-key fingerprint sections ─────────────────────────
+    // ── Deck Wizard Commander v5 (D2): the old loose fingerprint:<key> sections are gone ────────
 
     @Test
-    fun cardAlignedOnTwoFingerprintKeys_appearsInBothSections() {
+    fun cardAlignedOnlyToLooseFingerprintKeys_emitsNoFingerprintSection() {
         val synergy = synergyOf(mainboard())
 
-        val tokensSection = synergy.sections.firstOrNull { it.id == "fingerprint:tokens" }
-        val sacrificeSection = synergy.sections.firstOrNull { it.id == "fingerprint:sacrifice" }
-        assertTrue(tokensSection != null, "expected a fingerprint:tokens section: ${synergy.sections.map { it.id }}")
-        assertTrue(sacrificeSection != null, "expected a fingerprint:sacrifice section: ${synergy.sections.map { it.id }}")
-        assertTrue(tokensSection.contributions.any { it.scryfallId == "dual-card" }, "dual-card must appear under tokens")
-        assertTrue(sacrificeSection.contributions.any { it.scryfallId == "dual-card" }, "dual-card must appear under sacrifice")
+        assertTrue(synergy.sections.none { it.id.startsWith("fingerprint:") }, "no fingerprint:* section: ${synergy.sections.map { it.id }}")
+        // dual-card has no ROLE/edge signal in this 2-card fixture, so with its old sections
+        // removed it now falls through to the residual offplan classification.
+        val offplanSection = synergy.sections.first { it.id == "offplan" }
+        assertTrue(offplanSection.contributions.any { it.scryfallId == "dual-card" })
     }
 
     @Test
@@ -73,10 +72,13 @@ class AnalysisEngineSynergyP4Test {
 
         val offplanSection = synergy.sections.first { it.id == "offplan" }
         assertTrue(offplanSection.contributions.any { it.scryfallId == "offplan-card" })
-        val otherSections = synergy.sections.filterNot { it.id == "offplan" }
+        // A card can still legitimately count toward a structural engine axis (e.g. a bare
+        // Instant toward the SPELLS producer side) -- offplan is a role/edge classification, not
+        // exclusivity across every section (a card can appear in more than one section by design).
+        val otherSections = synergy.sections.filterNot { it.id == "offplan" || it.id.startsWith("engine:") }
         assertFalse(
             otherSections.any { section -> section.contributions.any { it.scryfallId == "offplan-card" } },
-            "offplan-card must not appear in any other section",
+            "offplan-card must not appear in any non-engine section",
         )
     }
 

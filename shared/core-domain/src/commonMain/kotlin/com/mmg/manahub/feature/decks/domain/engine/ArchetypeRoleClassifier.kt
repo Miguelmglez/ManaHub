@@ -220,6 +220,10 @@ object ArchetypeRoleClassifier {
 
     private fun axisSetFor(map: Map<RoleKey, Set<AxisKey>>, key: RoleKey): Set<AxisKey> = map[key].orEmpty()
 
+    // SYNERGY "Engines" UI (v5): the inverse of AXIS_PRODUCES/AXIS_CONSUMES, one axis -> its role set.
+    fun producerRoleKeysForAxis(axis: AxisKey): Set<RoleKey> = AXIS_PRODUCES.filterValues { axis in it }.keys
+    fun payoffRoleKeysForAxis(axis: AxisKey): Set<RoleKey> = AXIS_CONSUMES.filterValues { axis in it }.keys
+
     /**
      * Every [RoleSpec] this classifier evaluates BEYOND [LEGACY_ROLE_MAP] (the 5 legacy-backed
      * roles are handled directly in [classify], not via this list, to avoid a double lookup).

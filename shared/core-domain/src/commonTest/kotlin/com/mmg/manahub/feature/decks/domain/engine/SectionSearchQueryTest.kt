@@ -189,19 +189,25 @@ class SectionSearchQueryTest {
         )
     }
 
-    // ── fingerprint:<key> reuses the same translation as role:<key> ────────────────────────
+    // ── engine:<axis>:producers/payoffs (Deck Wizard Commander v5) ──────────────────────────
 
     @Test
-    fun fingerprintFragment_reusesRoleTranslation() {
-        assertEquals(
-            SectionSearchQuery.fragmentFor("role:sac_outlet", ctx()),
-            SectionSearchQuery.fragmentFor("fingerprint:sac_outlet", ctx()),
+    fun engineFragment_everyEngineAxis_yieldsNonNullBothSides() {
+        val context = ctx()
+        val axes = listOf(
+            "LIFE", "DEATH", "TOKENS", "COUNTERS", "LANDFALL", "GRAVEYARD", "ETB", "SPELLS",
+            "ARTIFACTS", "ENCHANTMENTS", "ATTACHED", "ATTACK", "PLANESWALKERS", "GROUP", "ENGINE",
         )
+        val missing = axes.filter { axis ->
+            SectionSearchQuery.fragmentFor("engine:$axis:producers", context) == null ||
+                SectionSearchQuery.fragmentFor("engine:$axis:payoffs", context) == null
+        }
+        assertTrue(missing.isEmpty(), "engine axes with no fragment on one side: $missing")
     }
 
     @Test
-    fun fingerprintFragment_unknownKey_returnsNull() {
-        assertNull(SectionSearchQuery.fragmentFor("fingerprint:equipment_matters", ctx()))
+    fun engineFragment_unknownAxis_returnsNull() {
+        assertNull(SectionSearchQuery.fragmentFor("engine:NOT_AN_AXIS:producers", ctx()))
     }
 
     // ── Curve / mana-base / tribe / legality-pair / offplan structural ids ─────────────────
@@ -350,10 +356,10 @@ class SectionSearchQueryTest {
     }
 
     @Test
-    fun collectionTagKeysFor_fingerprintDelegatesSameAsRole() {
+    fun collectionTagKeysFor_engineDelegatesToTheAxisRoleUnion() {
         assertEquals(
-            SectionSearchQuery.collectionTagKeysFor("role:token_generator"),
-            SectionSearchQuery.collectionTagKeysFor("fingerprint:token_generator"),
+            setOf("lifegain_payoff"),
+            SectionSearchQuery.collectionTagKeysFor("engine:LIFE:payoffs"),
         )
     }
 
@@ -429,17 +435,18 @@ class SectionSearchQueryTest {
     }
 
     @Test
-    fun toAdvancedQuery_everyRoleKey_asFingerprint_yieldsNonDegenerateQuery() {
-        // fingerprint:<key> shares ROLE_CRITERIA with role:<key> for every key EXCEPT
-        // tribe_members (SYNERGY never emits a "fingerprint:tribe_members" section id -- that
-        // concept only exists under the PLAN_ROLES "role:" prefix, so it's excluded from the
-        // iterated set here rather than expecting ROLE_CRITERIA to carry a meaningless entry).
+    fun toAdvancedQuery_everyEngineAxis_yieldsNonDegenerateQueryBothSides() {
         val context = ctx()
-        val missing = (allArchetypeDataRoleKeys - "tribe_members").filter { key ->
-            val query = SectionSearchQuery.toAdvancedQuery("fingerprint:$key", context)
-            query == null || query.isEmpty()
+        val axes = listOf(
+            "LIFE", "DEATH", "TOKENS", "COUNTERS", "LANDFALL", "GRAVEYARD", "ETB", "SPELLS",
+            "ARTIFACTS", "ENCHANTMENTS", "ATTACHED", "ATTACK", "PLANESWALKERS", "GROUP", "ENGINE",
+        )
+        val missing = axes.filter { axis ->
+            val producers = SectionSearchQuery.toAdvancedQuery("engine:$axis:producers", context)
+            val payoffs = SectionSearchQuery.toAdvancedQuery("engine:$axis:payoffs", context)
+            producers == null || producers.isEmpty() || payoffs == null || payoffs.isEmpty()
         }
-        assertTrue(missing.isEmpty(), "RoleKeys with no fingerprint toAdvancedQuery mapping: $missing")
+        assertTrue(missing.isEmpty(), "engine axes with no toAdvancedQuery mapping on one side: $missing")
     }
 
     @Test

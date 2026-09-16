@@ -107,7 +107,7 @@ object SectionSearchQuery {
             "t:land produces:${sectionId.removePrefix("produces:")}"
         sectionId.startsWith("mv:") -> curveFragment(sectionId.removePrefix("mv:"))
         sectionId.startsWith("role:") -> roleFragment(sectionId.removePrefix("role:"), context)
-        sectionId.startsWith("fingerprint:") -> ROLE_ORACLE_FRAGMENTS[sectionId.removePrefix("fingerprint:")]
+        sectionId.startsWith("engine:") -> engineFragment(sectionId)
         sectionId.startsWith(TribeDeriver.TRIBE_PREFIX) -> tribeFragment(sectionId)
         else -> null
     }
@@ -209,7 +209,7 @@ object SectionSearchQuery {
         )
         sectionId.startsWith("mv:") -> curveCriteria(sectionId.removePrefix("mv:"))
         sectionId.startsWith("role:") -> roleCriteria(sectionId.removePrefix("role:"), context)
-        sectionId.startsWith("fingerprint:") -> ROLE_CRITERIA[sectionId.removePrefix("fingerprint:")]
+        sectionId.startsWith("engine:") -> engineCriteria(sectionId)
         sectionId.startsWith(TribeDeriver.TRIBE_PREFIX) -> tribeCriteria(sectionId)
         else -> null
     }
@@ -263,10 +263,74 @@ object SectionSearchQuery {
         return SearchCriterion.OracleTerms(anyOfGroups = listOf(terms))
     }
 
-    // role:/fingerprint: read CategoryVocabulary (also read by ArchetypeRoleClassifier); tribe:* stays empty (runtime label, not a CardTag).
+    // ── Engines (Deck Wizard Commander v5, D2/D3) — "engine:<axis>:producers"/"engine:<axis>:payoffs".
+    // Union of the axis's producer/payoff RoleKeys (ArchetypeRoleClassifier.AXIS_PRODUCES/
+    // AXIS_CONSUMES inverse), except ENGINE itself (its two sides are hardcoded in SynergyGraph.
+    // buildCardProfile, not in those tables) and SPELLS/ARTIFACTS/ENCHANTMENTS' producer side
+    // (a raw type-line density signal, not a role -- see SynergyGraph.structuralProducerAxes).
+
+    private val ENGINE_PRODUCER_ROLE_OVERRIDES: Map<AxisKey, Set<RoleKey>> = mapOf("ENGINE" to setOf("counterspell", "protection"))
+    private val ENGINE_PAYOFF_ROLE_OVERRIDES: Map<AxisKey, Set<RoleKey>> = mapOf("ENGINE" to setOf("finisher"))
+    private val ENGINE_PRODUCER_TYPE_FRAGMENT: Map<AxisKey, String> = mapOf(
+        "SPELLS" to "(t:instant or t:sorcery)",
+        "ARTIFACTS" to "t:artifact",
+        "ENCHANTMENTS" to "t:enchantment",
+    )
+    private val ENGINE_PRODUCER_TYPE_CRITERIA: Map<AxisKey, SearchCriterion> = mapOf(
+        "SPELLS" to SearchCriterion.CardType(setOf("instant", "sorcery"), matchAll = false),
+        "ARTIFACTS" to SearchCriterion.CardType(setOf("artifact")),
+        "ENCHANTMENTS" to SearchCriterion.CardType(setOf("enchantment")),
+    )
+
+    private fun engineRoleKeys(axis: AxisKey, isProducerSide: Boolean): Set<RoleKey> =
+        if (isProducerSide) ENGINE_PRODUCER_ROLE_OVERRIDES[axis] ?: ArchetypeRoleClassifier.producerRoleKeysForAxis(axis)
+        else ENGINE_PAYOFF_ROLE_OVERRIDES[axis] ?: ArchetypeRoleClassifier.payoffRoleKeysForAxis(axis)
+
+    private fun orJoinFragments(fragments: List<String>): String? = when (fragments.size) {
+        0 -> null
+        1 -> fragments[0]
+        else -> "(" + fragments.joinToString(" or ") { if (it.contains(' ')) "($it)" else it } + ")"
+    }
+
+    private fun engineFragment(sectionId: String): String? {
+        val (axis, side) = parseEngineSectionId(sectionId) ?: return null
+        val isProducerSide = side == "producers"
+        if (isProducerSide) ENGINE_PRODUCER_TYPE_FRAGMENT[axis]?.let { return it }
+        val roles = engineRoleKeys(axis, isProducerSide)
+        return orJoinFragments(roles.mapNotNull { ROLE_ORACLE_FRAGMENTS[it] })
+    }
+
+    /** Unions every role's [ROLE_CRITERIA] entry that is a single [SearchCriterion.CardFunction]
+     * (CardFunction's own OR semantics, `matchAll = false`, make this a real "any of these roles"
+     * union); when no role in the axis's set qualifies, falls back to the first role with ANY
+     * [ROLE_CRITERIA] entry so the query stays non-degenerate rather than losing precision to null —
+     * a documented simplification vs. the exhaustive union the string-path [engineFragment] builds. */
+    private fun engineCriteria(sectionId: String): List<SearchCriterion>? {
+        val (axis, side) = parseEngineSectionId(sectionId) ?: return null
+        val isProducerSide = side == "producers"
+        if (isProducerSide) ENGINE_PRODUCER_TYPE_CRITERIA[axis]?.let { return listOf(it) }
+        val roles = engineRoleKeys(axis, isProducerSide)
+        val functionOnlyRoles = roles.filter { (ROLE_CRITERIA[it]?.singleOrNull() as? SearchCriterion.CardFunction) != null }
+        if (functionOnlyRoles.isNotEmpty()) {
+            val tags = functionOnlyRoles.flatMap { (ROLE_CRITERIA.getValue(it).single() as SearchCriterion.CardFunction).functions }.toSet()
+            return listOf(SearchCriterion.CardFunction(tags))
+        }
+        return roles.firstNotNullOfOrNull { ROLE_CRITERIA[it] }
+    }
+
+    private fun parseEngineSectionId(sectionId: String): Pair<AxisKey, String>? {
+        val body = sectionId.removePrefix("engine:")
+        val separatorIndex = body.lastIndexOf(':')
+        if (separatorIndex <= 0) return null
+        return body.substring(0, separatorIndex) to body.substring(separatorIndex + 1)
+    }
+
+    // role:/engine: read CategoryVocabulary (also read by ArchetypeRoleClassifier); tribe:* stays empty (runtime label, not a CardTag).
     fun collectionTagKeysFor(sectionId: String): Set<String> = when {
         sectionId.startsWith("role:") -> tagKeyOrEmpty(sectionId.removePrefix("role:"))
-        sectionId.startsWith("fingerprint:") -> tagKeyOrEmpty(sectionId.removePrefix("fingerprint:"))
+        sectionId.startsWith("engine:") -> parseEngineSectionId(sectionId)
+            ?.let { (axis, side) -> engineRoleKeys(axis, side == "producers").flatMap { tagKeyOrEmpty(it) }.toSet() }
+            .orEmpty()
         sectionId == "mana_rock" -> setOf("mana_rock")
         sectionId == "mana_dork" -> setOf("mana_dork")
         else -> emptySet() // tribe:*, produces:*, mv:*, legal, illegal, offplan, interaction, standalone -- structural, not tag-keyed
@@ -446,6 +510,32 @@ object SectionSearchQuery {
             allOf = listOf("mill"),
             noneOf = listOf("target player", "each opponent", "that player", "target opponent"),
         )),
+        // Deck Wizard Commander v5 (Engines): 3 more Phase-1 producer/payoff roles with no function:
+        // tag, needed for engine:LIFE/COUNTERS/ATTACHED Browse -- TagDictionary.kt:734-738/739-743.
+        "lifegain_source" to listOf(
+            DetectionRule(allOf = listOf("gain", "life"), noneOf = listOf("gain control")),
+            DetectionRule(allOf = listOf("gains", "life")),
+            DetectionRule(allOf = listOf("lifelink")),
+        ),
+        "counters_source" to listOf(
+            DetectionRule(allOf = listOf("put a +1/+1 counter")),
+            DetectionRule(allOf = listOf("proliferate")),
+            DetectionRule(anyOf = listOf("adapt", "evolve", "outlast")),
+        ),
+        // TagDictionary.kt:780-785.
+        "combat_payoff" to listOf(DetectionRule(anyOf = listOf(
+            "whenever a creature you control attacks", "whenever one or more creatures you control attack",
+            "deals combat damage to a player",
+        ))),
+        // TagDictionary.kt:747-751 -- needed for engine:LANDFALL:producers Browse.
+        "extra_land_drop" to listOf(
+            DetectionRule(allOf = listOf("play an additional land")),
+            DetectionRule(allOf = listOf("put", "land", "onto the battlefield"), typeLineNoneOf = listOf("basic")),
+        ),
+        // TagDictionary.kt:760-765 -- needed for engine:ATTACK:producers Browse.
+        "haste_source" to listOf(DetectionRule(anyOf = listOf(
+            "creatures you control have haste", "other creatures you control have haste", "gains haste", "gain haste",
+        ))),
     )
 
     private val DICTIONARY_TRANSLATED_FRAGMENTS: Map<RoleKey, String> =
