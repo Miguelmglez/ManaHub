@@ -136,6 +136,15 @@ data class WizardFillStats(
      * .fallbackStandaloneIds]/[WizardBuildResult.fallbackOffPlanIds] -- never card names/ids. */
     val fallbackStandaloneCount: Int = 0,
     val fallbackOffPlanCount: Int = 0,
+    /** Deck Wizard 60-card wave (v6, plan §5 Phase 1.3): distinct non-land CARD NAMES on the final
+     * board (Commander == [placedByWizard] + [placedManual], since Commander never places more
+     * than 1 copy of anything; a 60-card build's copies collapse this below the raw card count). */
+    val distinctNames: Int = 0,
+    /** Deck Wizard 60-card wave (v6): how many of those distinct names reached exactly 4 copies —
+     * telemetry/harness signal for [com.mmg.manahub.feature.decks.domain.engine.PlacementScorer
+     * .CONSISTENCY_CREDIT]'s calibration (Phase 6), never used by the build itself. Always 0 for
+     * Commander (every copy count is 1). */
+    val fourOfCount: Int = 0,
 )
 
 /**

@@ -1448,7 +1448,7 @@ class DeckWizardViewModelTest {
         // atomicity fix, the commander's qty-1 entry is the FIRST slot in the one
         // persistCommanderBuild call, not a separate addCardToDeck call.
         coVerify {
-            deckRepository.persistCommanderBuild(
+            deckRepository.persistWizardBuild(
                 deckId = "wizard-deck-1",
                 slots = listOf(com.mmg.manahub.core.domain.repository.CardSlotWrite("cmd-1", 1, false, DeckCardSource.WIZARD)),
                 archetypeOverride = any(),
@@ -1492,7 +1492,7 @@ class DeckWizardViewModelTest {
         // 99 deckCards slots + 1 commander slot = 100 total, all in ONE persistCommanderBuild
         // call (Phase 8 JOB 2 atomicity fix).
         val slotsSlot = slot<List<com.mmg.manahub.core.domain.repository.CardSlotWrite>>()
-        coVerify { deckRepository.persistCommanderBuild(deckId = "wizard-deck-1", slots = capture(slotsSlot), archetypeOverride = any(), themesOverride = any(), posture = any(), tribeOverride = any(), strategyLocked = any()) }
+        coVerify { deckRepository.persistWizardBuild(deckId = "wizard-deck-1", slots = capture(slotsSlot), archetypeOverride = any(), themesOverride = any(), posture = any(), tribeOverride = any(), strategyLocked = any()) }
         assertEquals(100, slotsSlot.captured.size)
     }
 
@@ -1615,7 +1615,7 @@ class DeckWizardViewModelTest {
         }
         assertEquals(WizardPhase.GENERATING, vm.uiState.value.phase)
         assertNull(vm.uiState.value.createdDeckId)
-        coVerify(exactly = 0) { deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any()) }
         coVerify { crashReporter.recordException(any()) }
     }
 
@@ -1649,7 +1649,7 @@ class DeckWizardViewModelTest {
             assertEquals("existing-deck-1", (event as DeckWizardEvent.OpenDeckStudio).deckId)
         }
         assertEquals("existing-deck-1", vm.uiState.value.createdDeckId)
-        coVerify { deckRepository.persistCommanderBuild(deckId = "existing-deck-1", slots = any(), archetypeOverride = any(), themesOverride = any(), posture = any(), tribeOverride = any(), strategyLocked = any()) }
+        coVerify { deckRepository.persistWizardBuild(deckId = "existing-deck-1", slots = any(), archetypeOverride = any(), themesOverride = any(), posture = any(), tribeOverride = any(), strategyLocked = any()) }
     }
 
     @Test
@@ -1682,7 +1682,7 @@ class DeckWizardViewModelTest {
             assertEquals("existing-deck-2", (event as DeckWizardEvent.OpenDeckStudio).deckId)
         }
         assertEquals("existing-deck-2", vm.uiState.value.createdDeckId)
-        coVerify { deckRepository.persistCommanderBuild(deckId = "existing-deck-2", slots = any(), archetypeOverride = any(), themesOverride = any(), posture = any(), tribeOverride = any(), strategyLocked = any()) }
+        coVerify { deckRepository.persistWizardBuild(deckId = "existing-deck-2", slots = any(), archetypeOverride = any(), themesOverride = any(), posture = any(), tribeOverride = any(), strategyLocked = any()) }
     }
 
     @Test
@@ -2578,7 +2578,7 @@ class DeckWizardViewModelTest {
         assertNotNull(vm.uiState.value.commanderDraftBuild)
         assertTrue(vm.uiState.value.choiceSelections.isEmpty())
         coVerify(exactly = 0) { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) }
-        coVerify(exactly = 0) { deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -2623,7 +2623,7 @@ class DeckWizardViewModelTest {
         assertEquals(WizardPhase.CHOICE, vm.uiState.value.phase)
         assertEquals(fallbackDraft, vm.uiState.value.commanderDraftBuild)
         coVerify(exactly = 0) { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) }
-        coVerify(exactly = 0) { deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any()) }
 
         // The only way out of this phase-with-zero-groups build is "Let the wizard finish" --
         // it must still finalize exactly once, with no resolutions (nothing was ever selectable).
@@ -2635,7 +2635,7 @@ class DeckWizardViewModelTest {
             assertTrue(event is DeckWizardEvent.OpenDeckStudio)
         }
         coVerify(exactly = 1) { buildCommanderDeckUseCase.finalize(fallbackDraft, emptyMap(), any(), any()) }
-        coVerify(exactly = 1) { deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 1) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -2777,7 +2777,7 @@ class DeckWizardViewModelTest {
         } returns twoGroupChoiceDraft()
         coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
         coEvery {
-            deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any())
+            deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any())
         } throws RuntimeException("persist boom")
         val vm = viewModel()
         advanceUntilIdle()
@@ -2929,7 +2929,7 @@ class DeckWizardViewModelTest {
         coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
         var persistCallCount = 0
         coEvery {
-            deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any())
+            deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any())
         } answers {
             persistCallCount++
             if (persistCallCount == 1) throw RuntimeException("persist boom")
@@ -2959,7 +2959,7 @@ class DeckWizardViewModelTest {
         // retry's persist call carries the same user-chosen alternative.
         coVerify(exactly = 1) { deckRepository.deleteDeck("wizard-deck-1") }
         coVerify(exactly = 1) { buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
-        coVerify(exactly = 2) { deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 2) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any()) }
         assertNull(vm.uiState.value.buildError)
     }
 
@@ -2985,7 +2985,7 @@ class DeckWizardViewModelTest {
         assertNull(vm.uiState.value.commanderDraftBuild)
         assertTrue(vm.uiState.value.choiceSelections.isEmpty())
         coVerify(exactly = 0) { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) }
-        coVerify(exactly = 0) { deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any()) }
         coVerify(exactly = 0) { deckRepository.createDeck(any(), any(), any()) }
     }
 }

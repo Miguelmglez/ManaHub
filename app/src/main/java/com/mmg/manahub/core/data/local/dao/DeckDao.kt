@@ -260,16 +260,19 @@ interface DeckDao {
 
     /**
      * Deck Wizard Commander v3 plan (Phase 8, JOB 2): ONE Room transaction spanning the entire
-     * Commander-build persist -- card replacement + archetype/theme/posture pin + tribe pin +
+     * wizard-build persist -- card replacement + archetype/theme/posture pin + tribe pin +
      * strategy-locked flag, previously 4 separate suspend repository calls (see
-     * [com.mmg.manahub.core.domain.repository.DeckRepository.persistCommanderBuild]'s KDoc for the
+     * [com.mmg.manahub.core.domain.repository.DeckRepository.persistWizardBuild]'s KDoc for the
      * data-corruption gap this closes). A `suspend` default method annotated `@Transaction` runs
      * every call inside it -- blocking [clearDeckCards]/[upsertDeckCards] AND the other `suspend`
      * DAO methods below -- on Room's single transaction thread, so a failure/cancellation partway
      * through rolls EVERYTHING back, leaving the deck exactly as it was before this call.
+     *
+     * Deck Wizard 60-card wave (v6, plan §5 Phase 1.3): renamed from `persistCommanderBuild` --
+     * pure rename, every format now writes through this same entry point.
      */
     @Transaction
-    suspend fun persistCommanderBuild(
+    suspend fun persistWizardBuild(
         deckId: String,
         cards: List<DeckCardEntity>,
         archetypeOverride: String?,

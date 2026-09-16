@@ -114,14 +114,15 @@ class DeckDaoReplaceAllCardsWithSourceTransactionTest {
         )
     }
 
-    // ── Phase 8, JOB 2: persistCommanderBuild spans cards + pin in ONE transaction ─────────────────
+    // ── Phase 8, JOB 2: persistWizardBuild spans cards + pin in ONE transaction (renamed from
+    //    persistCommanderBuild, Deck Wizard 60-card wave v6, plan §5 Phase 1.3 -- pure rename) ────
 
     @Test
-    fun happyPath_persistCommanderBuild_writesCardsAndPinTogether() = runBlocking {
+    fun happyPath_persistWizardBuild_writesCardsAndPinTogether() = runBlocking {
         val deckId = "deck-pcb-1"
         deckDao.upsertDeck(makeDeck(deckId, updatedAt = 100L))
 
-        deckDao.persistCommanderBuild(
+        deckDao.persistWizardBuild(
             deckId = deckId,
             cards = listOf(DeckCardEntity(deckId = deckId, scryfallId = "commander-1", quantity = 1, source = "WIZARD")),
             archetypeOverride = "AGGRO",
@@ -142,14 +143,14 @@ class DeckDaoReplaceAllCardsWithSourceTransactionTest {
     }
 
     @Test
-    fun failurePath_persistCommanderBuild_midTransactionFkViolation_rollsBackCardsAndPinTogether() = runBlocking {
+    fun failurePath_persistWizardBuild_midTransactionFkViolation_rollsBackCardsAndPinTogether() = runBlocking {
         val deckId = "deck-pcb-2"
         deckDao.upsertDeck(makeDeck(deckId, updatedAt = 100L))
         deckDao.upsertDeckCard(DeckCardEntity(deckId = deckId, scryfallId = "pre-existing-card", quantity = 1))
 
         var threw = false
         try {
-            deckDao.persistCommanderBuild(
+            deckDao.persistWizardBuild(
                 deckId = deckId,
                 cards = listOf(
                     DeckCardEntity(deckId = deckId, scryfallId = "commander-1", quantity = 1, source = "WIZARD"),

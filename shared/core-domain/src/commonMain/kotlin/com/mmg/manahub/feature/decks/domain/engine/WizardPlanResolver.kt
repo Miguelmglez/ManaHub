@@ -44,6 +44,11 @@ sealed interface BuildAnchor {
     data class Sixty(val identity: Set<ManaColor>, val seeds: List<Card>) : BuildAnchor
 }
 
+/** The commander card for a [BuildAnchor.Commander] anchor, `null` for [BuildAnchor.Sixty] —
+ * convenience for a call site that needs "is there a commander" without a `when`. */
+val BuildAnchor.commanderOrNull: Card?
+    get() = (this as? BuildAnchor.Commander)?.card
+
 /**
  * A wizard build's fully-resolved target (Phase 1.1, generalized Phase 1.2). [skeleton] is ALWAYS
  * non-null-equivalent (a real [ResolvedArchetypeSkeleton], generic-baseline for

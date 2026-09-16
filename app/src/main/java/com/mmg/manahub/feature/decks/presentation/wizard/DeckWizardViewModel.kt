@@ -593,7 +593,7 @@ class DeckWizardViewModel(
 
     /** Edge-case fix (Phase 6 adversarial pass), kept as defense-in-depth after Phase 8 JOB 2 made
      * `buildCommanderDeckUseCase.persist` a single Room `@Transaction`
-     * ([com.mmg.manahub.core.data.local.dao.DeckDao.persistCommanderBuild]): true while that write
+     * ([com.mmg.manahub.core.data.local.dao.DeckDao.persistWizardBuild]): true while that write
      * is in flight. The DB itself can no longer land half-written (a cancelled/failed transaction
      * rolls back atomically), but a coroutine cancellation racing the `withContext(ioDispatcher)`
      * call could still leave THIS ViewModel's own in-memory state (`_uiState`, `generateJob`)

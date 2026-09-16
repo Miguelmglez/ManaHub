@@ -179,21 +179,24 @@ interface DeckRepository {
     suspend fun updateStrategyLocked(deckId: String, locked: Boolean)
 
     /**
-     * Deck Wizard Commander v3 plan (Phase 8, JOB 2): the ONE atomic write for a Commander build's
+     * Deck Wizard Commander v3 plan (Phase 8, JOB 2): the ONE atomic write for a wizard build's
      * whole persist step -- card replacement + archetype/theme/posture pin + tribe pin + the
      * strategy-locked flag. Before this, [com.mmg.manahub.feature.decks.domain.template
-     * .BuildCommanderDeckUseCase.persist] issued 4 SEPARATE suspend calls
+     * .BuildWizardDeckUseCase.persist] issued 4 SEPARATE suspend calls
      * ([replaceAllCardsWithSource] + [updateArchetypeOverride] + [updateTribeOverride] +
      * [updateStrategyLocked]); a cancellation or failure between any two of them could leave a
      * deck with NEW cards but a STALE pin (mitigated, not fixed, by a cancel-blocking guard in
      * `DeckWizardViewModel` -- see that guard's own KDoc for why it stays as defense-in-depth).
      *
+     * Deck Wizard 60-card wave (v6, plan §5 Phase 1.3): renamed from `persistCommanderBuild` --
+     * pure rename, every format now writes through this same entry point.
+     *
      * DEFAULT implementation (best-effort, NOT one transaction): the same 4 calls this replaces,
      * in the same order -- kept additive so `WebDeckRepository` compiles unchanged until it gets
      * a real transactional web store. Android's `DeckRepositoryImpl` overrides this with a genuine
-     * single Room `@Transaction` ([com.mmg.manahub.core.data.local.dao.DeckDao.persistCommanderBuild]).
+     * single Room `@Transaction` ([com.mmg.manahub.core.data.local.dao.DeckDao.persistWizardBuild]).
      */
-    suspend fun persistCommanderBuild(
+    suspend fun persistWizardBuild(
         deckId: String,
         slots: List<CardSlotWrite>,
         archetypeOverride: String?,

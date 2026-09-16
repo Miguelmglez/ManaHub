@@ -311,10 +311,11 @@ class DeckRepositoryImpl(
 
     /**
      * Deck Wizard Commander v3 plan (Phase 8, JOB 2): overrides the commonMain default (4 separate
-     * suspend calls) with a genuine single-transaction Room write via [DeckDao.persistCommanderBuild]
-     * -- see that method's KDoc for the data-corruption gap this closes.
+     * suspend calls) with a genuine single-transaction Room write via [DeckDao.persistWizardBuild]
+     * -- see that method's KDoc for the data-corruption gap this closes. Deck Wizard 60-card wave
+     * (v6, plan §5 Phase 1.3): renamed from `persistCommanderBuild` -- pure rename.
      */
-    override suspend fun persistCommanderBuild(
+    override suspend fun persistWizardBuild(
         deckId: String,
         slots: List<CardSlotWrite>,
         archetypeOverride: String?,
@@ -333,7 +334,7 @@ class DeckRepositoryImpl(
                     source = slot.source.name,
                 )
             }
-            deckDao.persistCommanderBuild(
+            deckDao.persistWizardBuild(
                 deckId = deckId,
                 cards = entities,
                 archetypeOverride = archetypeOverride,

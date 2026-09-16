@@ -11,14 +11,18 @@ import com.mmg.manahub.feature.decks.domain.engine.toPin
 
 /**
  * One manually-added card (Deck Wizard Commander v3 plan, D7/1.2): the ONLY way an unowned card
- * can enter a Commander build (R5 — no Scryfall backstop). Always kept by the placement engine
- * (Phase 2), even off-plan.
+ * can enter a build (R5 — no Scryfall backstop). Always kept by the placement engine, even
+ * off-plan.
  *
  * @property isOwned `false` for a card added via the Advanced Search "All cards" tab that the user
  *           does not own — persisted honestly (see [com.mmg.manahub.core.model.DeckCardSource],
  *           though provenance itself is `USER` regardless of ownership — D13).
+ * @property quantity Deck Wizard 60-card wave (v6, plan §5 Phase 1.3): appended, defaulted to 1 so
+ *           every pre-v6 call site compiles unchanged (Commander seeds are always exactly 1 copy).
+ *           `BuildWizardDeckUseCase` clamps this to [com.mmg.manahub.feature.decks.domain.engine
+ *           .CopyPolicy.maxSeedCopies] (legality only, never owned-clamped — S3) before placing it.
  */
-data class ManualAdd(val card: Card, val isOwned: Boolean)
+data class ManualAdd(val card: Card, val isOwned: Boolean, val quantity: Int = 1)
 
 /**
  * Deck Builder v2 wizard input (plan §3.2). Built by the wizard screens; consumed by

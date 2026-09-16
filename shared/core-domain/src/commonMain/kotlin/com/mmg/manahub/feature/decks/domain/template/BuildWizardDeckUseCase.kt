@@ -12,21 +12,28 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeData
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.AxisKey
+import com.mmg.manahub.feature.decks.domain.engine.BuildAnchor
 import com.mmg.manahub.feature.decks.domain.engine.CardSection
-import com.mmg.manahub.feature.decks.domain.engine.CommanderPlan
+import com.mmg.manahub.feature.decks.domain.engine.WizardPlan
 import com.mmg.manahub.feature.decks.domain.engine.WizardPlanResolver
+import com.mmg.manahub.feature.decks.domain.engine.CopyPolicy
 import com.mmg.manahub.feature.decks.domain.engine.CurveTargets
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.EdhrecPowerResolver
 import com.mmg.manahub.feature.decks.domain.engine.LandTargetResolver
+import com.mmg.manahub.feature.decks.domain.engine.commanderOrNull
 import com.mmg.manahub.feature.decks.domain.engine.isLegalForFormat
 import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.PlacementScorer
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.StrategyPick
+import com.mmg.manahub.feature.decks.domain.engine.StrategyPin
+import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 import com.mmg.manahub.feature.decks.domain.engine.WizardPreferenceStore
 import com.mmg.manahub.feature.decks.domain.engine.SynergyGraph
+import com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis
+import com.mmg.manahub.feature.decks.domain.engine.FindingSeverity
 import com.mmg.manahub.feature.decks.domain.engine.toPin
 import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 
@@ -37,33 +44,47 @@ import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
  * .analysisv3.MockCollectionCard], …) — callers map their own type into this one. */
 data class OwnedCard(val card: Card, val quantity: Int)
 
-/** [BuildCommanderDeckUseCase]'s terminal result before persistence — see [WizardBuildResult] for
+/** [BuildWizardDeckUseCase]'s terminal result before persistence — see [WizardBuildResult] for
  * the shape this class produces; this wrapper adds the resolved [plan] and [pin] so a caller (the
  * write path, a test) does not need to re-resolve them. */
-data class CommanderBuildOutcome(
+data class WizardBuildOutcome(
     val result: WizardBuildResult,
-    val plan: CommanderPlan,
-    val pin: com.mmg.manahub.feature.decks.domain.engine.StrategyPin,
+    val plan: WizardPlan,
+    val pin: StrategyPin,
 )
+
+/** Deck Wizard 60-card wave (v6), plan §5 Phase 1.3: kept so every pre-v6 call site/test that
+ * names `CommanderBuildOutcome` compiles unchanged — removed in Phase 7. */
+typealias CommanderBuildOutcome = WizardBuildOutcome
 
 /**
  * W7 Task 0 (7.0) — the non-land placement loop's output BEFORE land fill/verify/refine/persist,
- * carrying everything [BuildCommanderDeckUseCase.finalize] needs to complete the build. Every slot
+ * carrying everything [BuildWizardDeckUseCase.finalize] needs to complete the build. Every slot
  * in [placedNonLand] that belongs to one of [ambiguityGroups] is currently occupied by the engine's
  * own seeded pick (a tentative default, per [tentativeByRole]) — the SAME card a single-shot build
  * would keep — so a caller that never resolves anything gets a byte-identical result to the old
  * one-pass build. Resolving a group only ever swaps ITS OWN tentative slot(s); no other card in the
  * board is touched, which is what fixes the "no room" defect the old after-the-fact ambiguity
- * detection had (see [BuildCommanderDeckUseCase.buildWithGroups]'s own KDoc).
+ * detection had (see [BuildWizardDeckUseCase.buildWithGroups]'s own KDoc).
  */
-data class CommanderDraftBuild(
+data class WizardDraftBuild(
     val format: DeckFormat,
-    val commander: Card,
+    /** Deck Wizard 60-card wave (v6): what this build is targeted around — a [BuildAnchor.Commander]
+     * card or a [BuildAnchor.Sixty] colors+seeds pick. */
+    val anchor: BuildAnchor,
+    /** [BuildAnchor.commanderOrNull] hoisted for convenience — `null` for a [BuildAnchor.Sixty]
+     * build (v6: was non-null `Card` pre-v6; every internal/external reader of this field lives
+     * inside this file — verified by grep before this change). */
+    val commander: Card?,
     val identity: Set<ManaColor>,
-    val plan: CommanderPlan,
-    val pin: com.mmg.manahub.feature.decks.domain.engine.StrategyPin,
+    val plan: WizardPlan,
+    val pin: StrategyPin,
     val archetypeFormat: ArchetypeFormat,
+    /** Deck Wizard 60-card wave (v6, S2): ONE [DeckEntry] per card, `quantity` = copies placed —
+     * was one entry per COPY pre-v6 (every Commander copy count is 1, so this is a no-op shape
+     * change for the Commander path: `size` and `sumOf { quantity }` coincide). */
     val placedNonLand: List<DeckEntry>,
+    /** v6: copies (was entry COUNT pre-v6) — coincide for Commander (every manual add is 1 copy). */
     val manualNonLandCount: Int,
     val manualIds: Set<String>,
     val manualLand: List<DeckEntry>,
@@ -80,9 +101,18 @@ data class CommanderDraftBuild(
     /** Every candidate ever scored, by id — resolves an [AmbiguityGroup.candidateIds] entry (or a
      * user's chosen replacement id) back to its [Card] for [finalize]'s swap. */
     val candidatesById: Map<String, Card>,
+    /** Deck Wizard 60-card wave (v6, S2, plan 1.3): for every id in [candidatesById], how many MORE
+     * copies of it the engine could still place (`CopyPolicy.maxPlaceable` minus however many
+     * copies are already in [placedNonLand] at draft time) — the headroom [finalize] clamps a
+     * resolution's requested copies against. Always `<= 1` for Commander (every candidate's own
+     * `maxPlaceable` is 1). */
+    val candidateMaxCopies: Map<String, Int>,
     /** [RoleKey] -> the scryfallIds of [placedNonLand] slots currently holding a tentative default
      * for that role, in placement order — [finalize] replaces the first N of these (N = however many
-     * ids a resolution supplies) with the caller's chosen replacements; the rest keep their default. */
+     * ids a resolution supplies) with the caller's chosen replacements; the rest keep their default.
+     * v6 (S5): ONE ID PER TENTATIVE COPY — an id may appear more than once when 2+ copies of the
+     * same card were each placed into an ambiguous slot for this role (never happens for Commander,
+     * where every card's own cap is 1). */
     val tentativeByRole: Map<RoleKey, List<String>>,
     val ambiguityGroups: List<AmbiguityGroup>,
     /** W8 (telemetry): how many main-loop placements were a preferred card (E8's
@@ -99,7 +129,16 @@ data class CommanderDraftBuild(
     val fallbackOffPlanIds: List<String> = emptyList(),
 )
 
-class BuildCommanderDeckUseCase(
+/** Deck Wizard 60-card wave (v6), plan §5 Phase 1.3: kept so every pre-v6 call site/test that
+ * names `CommanderDraftBuild` compiles unchanged — removed in Phase 7. */
+typealias CommanderDraftBuild = WizardDraftBuild
+
+/** Deck Wizard 60-card wave (v6), plan §5 Phase 1.3: kept so every pre-v6 call site/test that
+ * names `BuildCommanderDeckUseCase` (constructor calls included -- a typealias supports those too)
+ * compiles unchanged — removed in Phase 7. */
+typealias BuildCommanderDeckUseCase = BuildWizardDeckUseCase
+
+class BuildWizardDeckUseCase(
     private val deckAnalysisPipeline: DeckAnalysisPipeline,
     private val crashReporter: CrashReporter,
     private val manaBaseAnalyzer: ManaBaseAnalyzer = ManaBaseAnalyzer(),
@@ -118,20 +157,14 @@ class BuildCommanderDeckUseCase(
      * @param onStage Deck Wizard Commander v3 plan, Phase 6 (6.3) — fired at each build-loop stage
      *        boundary so a caller (the wizard VM) can drive a real Generating-step progress UI.
      *        Defaulted to a no-op so every pre-existing call site/test keeps compiling unchanged.
-     *        Mirrors [BuildDeckFromTemplateUseCase]'s own `TemplateBuildProgress.Stage` emissions,
-     *        but as a plain callback (this use case is a single suspend function, not a `Flow`).
      * @param deckId W6 Task 3 (E4) — seeds every near-tie break (non-land placement, land Stage A
      *        orderings) via [stableSeed] instead of alphabetical card name/id. Rebuilding the SAME
      *        deck is therefore byte-identical (same [deckId] -> same seed -> same tie order); two
      *        different decks with the same commander and strategy diverge. Defaulted to `""` so
-     *        every pre-existing call site/test keeps compiling unchanged (an empty deckId still
-     *        seeds deterministically, it just is not tied to any real deck) — every wizard launch
-     *        route requires a real `deckId` nav argument (R13), so production always supplies one.
+     *        every pre-existing call site/test keeps compiling unchanged.
      * @param preferenceStore W6 Task 5 (E8) — when non-null, cards the user previously chose on the
-     *        Choice screen get a small, capped bonus (see [PREFERENCE_BONUS]'s own KDoc) applied
-     *        AFTER the real marginal gain, so it can only reorder a near-tie, never satisfy the D8
-     *        filler floor or override a band need on its own. `null` (the default) is byte-for-byte
-     *        inert — every pre-existing call site/test keeps compiling unchanged.
+     *        Choice screen get a small, capped bonus (see [PlacementScorer.PREFERENCE_BONUS]'s own
+     *        KDoc) applied AFTER the real marginal gain. `null` (the default) is byte-for-byte inert.
      */
     suspend operator fun invoke(
         format: DeckFormat,
@@ -145,7 +178,7 @@ class BuildCommanderDeckUseCase(
         onStage: (CommanderBuildStage) -> Unit = {},
         deckId: String = "",
         preferenceStore: WizardPreferenceStore? = null,
-    ): CommanderBuildOutcome {
+    ): WizardBuildOutcome {
         // W7 Task 0 (7.0): the single-shot path is just buildWithGroups -> finalize with no
         // resolutions, i.e. every tentative default stands -- this is what makes "finalizing with
         // the engine's own picks equals the single-shot build" true BY CONSTRUCTION, not by a
@@ -165,18 +198,12 @@ class BuildCommanderDeckUseCase(
         return finalize(draft, resolutions = emptyMap(), fillLands = fillLands, onStage = onStage)
     }
 
-    /**
-     * W7 Task 0 (7.0) — runs plan resolution, the candidate pool, and the non-land placement loop
-     * ONLY (no land fill, no verify/refine, no persist); returns a [CommanderDraftBuild] for
-     * [finalize] to complete. This REPLACES the old defect where `ambiguityGroups` were computed
-     * AFTER the whole loop had already filled every non-land slot with other cards, so a group like
-     * "pick 2 of these 7 Removal" had no room left — honouring the user's pick would have meant
-     * evicting an unrelated card. Ambiguity is now detected LIVE, at the exact iteration a slot is
-     * decided: when the chosen card fills a role still short of its ideal AND at least one other
-     * still-unplaced candidate for that same role clears within [AMBIGUITY_EPSILON] of its gain, the
-     * chosen card's OWN slot is marked tentative for that role (its own KDoc). The chosen card still
-     * gets placed immediately (seeded variety, E4, stays real) — it is simply flagged as swappable.
-     */
+    /** Deck Wizard 60-card wave (v6), plan §5 Phase 1.3: the pre-v6 Commander-only signature, kept
+     * so every existing call site/test compiles unchanged — a thin delegate onto
+     * [BuildAnchor.Commander]. [identity] is UNUSED (same precedent as [WizardPlanResolver]'s own
+     * 4-arg delegate, Phase 1.2): the sole production caller always derived it as
+     * `commander.colorIdentity`, which the anchor-based overload now derives internally. */
+    @Suppress("UNUSED_PARAMETER")
     suspend fun buildWithGroups(
         format: DeckFormat,
         commander: Card,
@@ -188,31 +215,90 @@ class BuildCommanderDeckUseCase(
         onStage: (CommanderBuildStage) -> Unit = {},
         deckId: String = "",
         preferenceStore: WizardPreferenceStore? = null,
-    ): CommanderDraftBuild {
-        require(format.isCommanderFormat) { "BuildCommanderDeckUseCase requires a Commander-shaped format, got $format" }
+    ): WizardDraftBuild = buildWithGroups(
+        format = format,
+        anchor = BuildAnchor.Commander(commander),
+        strategyPick = strategyPick,
+        ownedCollection = ownedCollection,
+        manualAdds = manualAdds,
+        includeNonBasicLands = includeNonBasicLands,
+        onStage = onStage,
+        deckId = deckId,
+        preferenceStore = preferenceStore,
+    )
+
+    /**
+     * W7 Task 0 (7.0) — runs plan resolution, the candidate pool, and the non-land placement loop
+     * ONLY (no land fill, no verify/refine, no persist); returns a [WizardDraftBuild] for
+     * [finalize] to complete. Ambiguity is detected LIVE, at the exact iteration a slot is decided:
+     * when the chosen card fills a role still short of its ideal AND at least one other
+     * still-unplaced candidate for that same role clears within [AMBIGUITY_EPSILON] of its gain, the
+     * chosen card's OWN slot is marked tentative for that role. The chosen card still gets placed
+     * immediately (seeded variety, E4, stays real) — it is simply flagged as swappable.
+     *
+     * Deck Wizard 60-card wave (v6), plan §5 Phase 1.3 (S1/S2/S5): generalized from "every card is
+     * exactly 1 copy, exactly 1 role slot" to copy-aware placement. A candidate stays in
+     * `remainingCandidates` (and may keep winning iterations) until its own
+     * [CopyPolicy.maxPlaceable] is reached; each additional copy's marginal gain is computed with
+     * `copyIndex` = however many copies are already on the board (S5's consistency credit). For
+     * every Commander candidate `maxPlaceable` is exactly 1 (`CopyPolicy`'s own Commander-shaped
+     * branch), so `copyIndex` is always 0 and this degenerates BYTE-IDENTICALLY to the pre-v6
+     * per-card loop — asserted by the existing Commander test suites (rule 0.3), not by reasoning.
+     */
+    suspend fun buildWithGroups(
+        format: DeckFormat,
+        anchor: BuildAnchor,
+        strategyPick: StrategyPick,
+        ownedCollection: List<OwnedCard>,
+        manualAdds: List<ManualAdd> = emptyList(),
+        includeNonBasicLands: Boolean = false,
+        onStage: (CommanderBuildStage) -> Unit = {},
+        deckId: String = "",
+        preferenceStore: WizardPreferenceStore? = null,
+    ): WizardDraftBuild {
+        when (anchor) {
+            is BuildAnchor.Commander -> require(format.isCommanderFormat) {
+                "BuildWizardDeckUseCase requires a Commander-shaped format for a Commander anchor, got $format"
+            }
+            is BuildAnchor.Sixty -> require(!format.isCommanderFormat) {
+                "BuildWizardDeckUseCase requires a non-Commander format for a Sixty anchor, got $format"
+            }
+        }
         val archetypeFormat = ArchetypeFormat.of(format)
-            ?: error("BuildCommanderDeckUseCase requires a Commander-shaped format, got $format")
+            ?: error("BuildWizardDeckUseCase requires a format with an archetype skeleton, got $format")
+        val commander = anchor.commanderOrNull
 
         onStage(CommanderBuildStage.RESOLVING_PLAN)
-        val plan = WizardPlanResolver.resolve(format, commander, strategyPick, identity)
+        val plan = WizardPlanResolver.resolve(format, anchor, strategyPick)
         val pin = when (strategyPick) {
             is StrategyPick.Curated -> strategyPick.strategy.toPin(strategyPick.tribe)
-            StrategyPick.Custom -> com.mmg.manahub.feature.decks.domain.engine.StrategyPin(null, null, emptyList(), null)
+            StrategyPick.Custom -> StrategyPin(null, null, emptyList(), null)
+        }
+        val identity: Set<ManaColor> = when (anchor) {
+            is BuildAnchor.Commander -> anchor.card.colorIdentity.toManaColorSet()
+            is BuildAnchor.Sixty -> anchor.identity
         }
         // The tribe axis credit source during placement is plan.internalTribe (W6b) — a curated
-        // tribal pick's own pin.tribe, OR (Custom only) the commander's derived tribal-lord tribe;
-        // see CommanderPlan.internalTribe's own KDoc for why this must be read from the plan, not
-        // re-derived from pin.tribe here (that would silently drop the Custom case). The final
-        // mainboard's own dominant tribe cannot be known before the mainboard is built, and
-        // re-deriving it mid-loop would require rebuilding a SynergyGraph per placement (the O(n^2)
-        // cost the graph's own header explicitly avoids) — this plan-resolved tribe is a documented
-        // simplification, fixed for the whole build.
-        val dominantTribeAxis = plan.internalTribe?.let { "TRIBE:${it.removePrefix(com.mmg.manahub.feature.decks.domain.engine.TribeDeriver.TRIBE_PREFIX)}" }
+        // tribal pick's own pin.tribe, OR (Custom only) the anchor's derived tribal-lord tribe; see
+        // WizardPlan.internalTribe's own KDoc for why this must be read from the plan, not
+        // re-derived here (that would silently drop the Custom case).
+        val dominantTribeAxis = plan.internalTribe?.let { "TRIBE:${it.removePrefix(TribeDeriver.TRIBE_PREFIX)}" }
         val dominantTribeKey = plan.internalTribe
 
         val landTarget = LandTargetResolver.resolve(format, plan.skeleton, profile = null, manaBaseAnalyzer = manaBaseAnalyzer)
-        val (manualNonLand, manualLand) = manualAdds.partition { !BasicLandCalculator.isLand(it.card) }
-        val nonLandTarget = (NON_COMMANDER_SLOTS - landTarget - manualNonLand.size).coerceAtLeast(0)
+        val (manualNonLandRaw, manualLandRaw) = manualAdds.partition { !BasicLandCalculator.isLand(it.card) }
+        // S3: manual adds are kept at the user's requested quantity, clamped ONLY by legality
+        // (CopyPolicy.maxSeedCopies) -- never by ownership; the engine's OWN extra copies (the main
+        // loop below) are separately capped by CopyPolicy.maxPlaceable (owned-clamped). For
+        // Commander every manual add's quantity is already 1, so this clamp is a no-op there.
+        fun clampedManualQuantity(manual: ManualAdd) =
+            manual.quantity.coerceAtMost(CopyPolicy.maxSeedCopies(manual.card, format)).coerceAtLeast(1)
+        val manualNonLand = manualNonLandRaw.map { it to clampedManualQuantity(it) }
+        val manualLandClamped = manualLandRaw.map { it to clampedManualQuantity(it) }
+        val manualNonLandCopies = manualNonLand.sumOf { it.second }
+
+        val totalSlots = if (anchor is BuildAnchor.Commander) NON_COMMANDER_SLOTS else format.targetDeckSize
+        val nonLandTarget = (totalSlots - landTarget - manualNonLandCopies).coerceAtLeast(0)
 
         val curveTargets = CurveTargets.forSkeleton(plan.skeleton, nonLandCount = nonLandTarget)
         val axisIdeals = SynergyGraph.axisIdeals(archetypeFormat, nonLandCount = nonLandTarget, dominantTribeAxis = dominantTribeAxis)
@@ -226,19 +312,27 @@ class BuildCommanderDeckUseCase(
             emptyMap()
         }
 
-        // ── Candidate pool (2.1) ────────────────────────────────────────────────────────────────
+        // ── Candidate pool (2.1, S2/S3) ─────────────────────────────────────────────────────────
         val identitySymbols = identity.map { it.symbol }.toSet()
         val manualIds = manualAdds.map { it.card.scryfallId }.toSet()
+        val commanderId = commander?.scryfallId
+        // S2: owned quantity per NAME, summed across every printing -- computed BEFORE the
+        // printing dedupe below (a user owning 2x printing A + 2x printing B of the same name owns
+        // 4 for CopyPolicy's purposes, even though the pool keeps only ONE printing per name).
+        val ownedByName: Map<String, Int> = ownedCollection
+            .filter { it.quantity > 0 }
+            .groupBy { it.card.name }
+            .mapValues { (_, owned) -> owned.sumOf { it.quantity } }
         val candidateCards = ownedCollection
             .filter { it.quantity > 0 }
             .map { it.card }
             .distinctBy { it.scryfallId }
-            .filter { it.scryfallId != commander.scryfallId }
+            .filter { it.scryfallId != commanderId }
             .filter { it.scryfallId !in manualIds }
             .filterNot { BasicLandCalculator.isLand(it) }
             .filter { isLegalForFormat(it, format) }
             .filter { identitySymbols.containsAll(it.colorIdentity) }
-            .distinctBy { it.name }
+            .distinctBy { it.name } // one PRINTING per name -- copies are tracked on that printing
             .sortedBy { it.scryfallId } // deterministic base order before any scoring
 
         val powerResolver = EdhrecPowerResolver { it.edhrecRank }
@@ -251,13 +345,21 @@ class BuildCommanderDeckUseCase(
                 powerNormalized = powerResolver.powerOf(card).normalized,
             )
         }
+        // S2: the TOTAL copies the engine may EVER place of this candidate -- static for the whole
+        // build (basics are excluded from candidateCards above, so Int.MAX_VALUE never appears).
+        val maxPlaceable: Map<String, Int> = candidateCards.associate { card ->
+            card.scryfallId to CopyPolicy.maxPlaceable(card, format, ownedByName[card.name])
+        }
 
         // ── Seed placement state with manual non-land adds (placed FIRST, D7/R5 — never dropped
         //    even off-plan; their contribution still counts toward remaining gain for the loop) ──
         onStage(CommanderBuildStage.PLACING_MANUAL_ADDS)
         var state = PlacementScorer.PlacementState()
-        val placedNonLand = mutableListOf<DeckEntry>()
-        manualNonLand.forEach { manual ->
+        // v6 (S2): a LinkedHashMap keyed by scryfallId -- ONE entry per card, `quantity` = copies,
+        // preserving first-placement order (manual adds first, then the main loop/fallback tiers)
+        // the same way the pre-v6 flat one-entry-per-copy MutableList did.
+        val placedNonLand = LinkedHashMap<String, DeckEntry>()
+        manualNonLand.forEach { (manual, quantity) ->
             val profile = PlacementScorer.CandidateProfile(
                 card = manual.card,
                 roleConfidence = ArchetypeRoleClassifier.classify(manual.card),
@@ -265,18 +367,29 @@ class BuildCommanderDeckUseCase(
                 mvBucketId = PlacementScorer.mvBucketId(manual.card),
                 powerNormalized = 0f,
             )
-            state = fold(state, profile)
-            placedNonLand += DeckEntry(card = manual.card, quantity = 1, isOwned = manual.isOwned, isSideboard = false)
+            repeat(quantity) { state = fold(state, profile) }
+            placedNonLand[manual.card.scryfallId] = DeckEntry(card = manual.card, quantity = quantity, isOwned = manual.isOwned, isSideboard = false)
         }
 
-        // ── The loop (2.3) ──────────────────────────────────────────────────────────────────────
+        fun copiesPlaced(id: String) = placedNonLand[id]?.quantity ?: 0
+        fun totalNonLandCopiesPlaced() = placedNonLand.values.sumOf { it.quantity } - manualNonLandCopies
+        fun placeCopy(card: Card) {
+            val existing = placedNonLand[card.scryfallId]
+            placedNonLand[card.scryfallId] = if (existing != null) {
+                existing.copy(quantity = existing.quantity + 1)
+            } else {
+                DeckEntry(card = card, quantity = 1, isOwned = true, isSideboard = false)
+            }
+        }
+
+        // ── The loop (2.3, S2/S5) ───────────────────────────────────────────────────────────────
         onStage(CommanderBuildStage.PLACING_CARDS)
         val preferredIds = preferenceStore?.preferredCardIds()?.toSet() ?: emptySet()
         val remainingCandidates = candidateCards.toMutableList()
         var iterations = 0
-        val iterationCap = candidateCards.size + nonLandTarget + ITERATION_CAP_SLACK
+        val iterationCap = candidateCards.sumOf { maxPlaceable.getValue(it.scryfallId) } + nonLandTarget + ITERATION_CAP_SLACK
         // W7 Task 0 (7.0): per-role tentative-slot tracking, live during the loop -- see
-        // CommanderDraftBuild.tentativeByRole's KDoc for why this replaces the old after-the-fact
+        // WizardDraftBuild.tentativeByRole's KDoc for why this replaces the old after-the-fact
         // (and therefore roomless) ambiguity computation.
         val tentativeSlotIdsByRole = mutableMapOf<RoleKey, MutableList<String>>()
         // W7 Task B (E4) -- the Choice screen orders a section's alternatives by marginal gain, so
@@ -284,7 +397,7 @@ class BuildCommanderDeckUseCase(
         // multiple decision points across the loop) rather than only its membership.
         val tentativeAlternateGainsByRole = mutableMapOf<RoleKey, MutableMap<String, Float>>()
         var preferenceBonusAppliedCount = 0
-        while (placedNonLand.size - manualNonLand.size < nonLandTarget && remainingCandidates.isNotEmpty() && iterations < iterationCap) {
+        while (totalNonLandCopiesPlaced() < nonLandTarget && remainingCandidates.isNotEmpty() && iterations < iterationCap) {
             iterations++
             // S7: a candidate that would push a non-anti role past its own max is excluded outright
             // this iteration whenever a non-overflowing candidate still clears the D8 floor --
@@ -296,7 +409,8 @@ class BuildCommanderDeckUseCase(
             remainingCandidates.forEach { card ->
                 val profile = candidateProfiles.getValue(card)
                 val pip = PlacementScorer.pipFactor(card, colorCount, manaBaseAnalyzer, estimatedSourcesByColor, landTarget)
-                val gain = PlacementScorer.marginalGain(profile, state, plan, curveTargets, axisIdeals, pip)
+                val copyIndex = copiesPlaced(card.scryfallId)
+                val gain = PlacementScorer.marginalGain(profile, state, plan, curveTargets, axisIdeals, pip, copyIndex = copyIndex)
                 val overflow = PlacementScorer.causesRoleOverflow(profile, plan, state.roleCounts)
                 rawGains[card.scryfallId] = gain
                 overflowFlags[card.scryfallId] = overflow
@@ -348,7 +462,7 @@ class BuildCommanderDeckUseCase(
                     .filter { c -> (candidateProfiles[c]?.roleConfidence?.get(tentativeRole) ?: 0f) > 0f }
                     .mapNotNull { c ->
                         val pip = PlacementScorer.pipFactor(c, colorCount, manaBaseAnalyzer, estimatedSourcesByColor, landTarget)
-                        val rawGain = PlacementScorer.marginalGain(candidateProfiles.getValue(c), state, plan, curveTargets, axisIdeals, pip) ?: return@mapNotNull null
+                        val rawGain = PlacementScorer.marginalGain(candidateProfiles.getValue(c), state, plan, curveTargets, axisIdeals, pip, copyIndex = copiesPlaced(c.scryfallId)) ?: return@mapNotNull null
                         val gain = if (c.scryfallId in preferredIds) rawGain + PlacementScorer.PREFERENCE_BONUS else rawGain
                         c.scryfallId to gain
                     }
@@ -364,9 +478,15 @@ class BuildCommanderDeckUseCase(
                 }
             }
 
-            remainingCandidates.remove(chosen)
+            placeCopy(chosen)
+            // S2: the candidate is removed the MOMENT it hits its own cap, so a maxed card never
+            // lists as an ambiguity alternate on a later iteration -- for Commander maxPlaceable is
+            // always 1, so this fires on the FIRST copy, byte-identical to the pre-v6 unconditional
+            // `remainingCandidates.remove(chosen)`.
+            if (copiesPlaced(chosen.scryfallId) >= (maxPlaceable[chosen.scryfallId] ?: 1)) {
+                remainingCandidates.remove(chosen)
+            }
             state = fold(state, chosenProfile)
-            placedNonLand += DeckEntry(card = chosen, quantity = 1, isOwned = true, isSideboard = false)
         }
 
         // ── Fallback (D4/S8) ────────────────────────────────────────────────────────────────────
@@ -378,12 +498,15 @@ class BuildCommanderDeckUseCase(
         // pool is exhausted too. Both tiers are recorded so the Choice screen can flag them honestly.
         val fallbackStandaloneIds = mutableListOf<String>()
         val fallbackOffPlanIds = mutableListOf<String>()
-        if (placedNonLand.size - manualNonLand.size < nonLandTarget && remainingCandidates.isNotEmpty()) {
+        if (totalNonLandCopiesPlaced() < nonLandTarget && remainingCandidates.isNotEmpty()) {
             val eligible = remainingCandidates.filterNot { card ->
                 candidateProfiles.getValue(card).roleConfidence.any { (role, confidence) -> confidence > 0f && role in plan.skeleton.antiRoles }
             }
             val (standalonePool, offPlanPool) = eligible.partition { candidateProfiles.getValue(it).roleConfidence.isNotEmpty() }
 
+            // S2: a Standalone/off-plan card may itself be placed up to its OWN maxPlaceable before
+            // the ordering moves on to the next candidate -- for Commander that cap is always 1, so
+            // this degenerates to the pre-v6 single-copy-per-card fallback loop.
             fun placeFallback(pool: List<Card>, idSink: MutableList<String>) {
                 val ordered = nearTieOrdered(
                     items = pool,
@@ -392,16 +515,23 @@ class BuildCommanderDeckUseCase(
                     keyOf = { candidateProfiles.getValue(it).powerNormalized.toDouble() },
                 )
                 for (card in ordered) {
-                    if (placedNonLand.size - manualNonLand.size >= nonLandTarget) break
+                    if (totalNonLandCopiesPlaced() >= nonLandTarget) break
+                    val cap = maxPlaceable[card.scryfallId] ?: 1
                     val profile = candidateProfiles.getValue(card)
-                    state = fold(state, profile)
-                    placedNonLand += DeckEntry(card = card, quantity = 1, isOwned = true, isSideboard = false)
-                    remainingCandidates.remove(card)
-                    idSink += card.scryfallId
+                    var placedAny = false
+                    while (totalNonLandCopiesPlaced() < nonLandTarget && copiesPlaced(card.scryfallId) < cap) {
+                        state = fold(state, profile)
+                        placeCopy(card)
+                        placedAny = true
+                    }
+                    if (placedAny) {
+                        remainingCandidates.remove(card)
+                        idSink += card.scryfallId
+                    }
                 }
             }
             placeFallback(standalonePool, fallbackStandaloneIds)
-            if (placedNonLand.size - manualNonLand.size < nonLandTarget) placeFallback(offPlanPool, fallbackOffPlanIds)
+            if (totalNonLandCopiesPlaced() < nonLandTarget) placeFallback(offPlanPool, fallbackOffPlanIds)
         }
 
         // Alternates recorded mid-loop can themselves get placed later (for a DIFFERENT role) --
@@ -421,18 +551,27 @@ class BuildCommanderDeckUseCase(
             AmbiguityGroup(sectionId = role, candidateIds = ordered, remainingSlots = slots.size)
         }
 
-        val remainingLandSlots = (landTarget - manualLand.sumOf { 1 }).coerceAtLeast(0)
-        return CommanderDraftBuild(
+        val manualLandEntries = manualLandClamped.map { (manual, quantity) ->
+            DeckEntry(card = manual.card, quantity = quantity, isOwned = manual.isOwned, isSideboard = false)
+        }
+        val remainingLandSlots = (landTarget - manualLandEntries.sumOf { it.quantity }).coerceAtLeast(0)
+        val candidatesById = candidateCards.associateBy { it.scryfallId }
+        val candidateMaxCopies: Map<String, Int> = candidatesById.mapValues { (id, _) ->
+            ((maxPlaceable[id] ?: 0) - copiesPlaced(id)).coerceAtLeast(0)
+        }
+
+        return WizardDraftBuild(
             format = format,
+            anchor = anchor,
             commander = commander,
             identity = identity,
             plan = plan,
             pin = pin,
             archetypeFormat = archetypeFormat,
-            placedNonLand = placedNonLand,
-            manualNonLandCount = manualNonLand.size,
+            placedNonLand = placedNonLand.values.toList(),
+            manualNonLandCount = manualNonLandCopies,
             manualIds = manualIds,
-            manualLand = manualLand.map { DeckEntry(card = it.card, quantity = 1, isOwned = it.isOwned, isSideboard = false) },
+            manualLand = manualLandEntries,
             landTarget = landTarget,
             remainingLandSlots = remainingLandSlots,
             colorCount = colorCount,
@@ -441,7 +580,8 @@ class BuildCommanderDeckUseCase(
             deckId = deckId,
             remainingCandidates = remainingCandidates,
             candidateProfiles = candidateProfiles,
-            candidatesById = candidateCards.associateBy { it.scryfallId },
+            candidatesById = candidatesById,
+            candidateMaxCopies = candidateMaxCopies,
             tentativeByRole = tentativeSlotIdsByRole,
             ambiguityGroups = ambiguityGroups,
             preferenceBonusAppliedCount = preferenceBonusAppliedCount,
@@ -451,61 +591,110 @@ class BuildCommanderDeckUseCase(
     }
 
     /**
-     * W7 Task 0 (7.0) — completes a [CommanderDraftBuild]: applies [resolutions] (a swap within the
-     * SAME tentative slot(s) only, never touching any other card — see [CommanderDraftBuild]'s own
+     * W7 Task 0 (7.0) — completes a [WizardDraftBuild]: applies [resolutions] (a swap within the
+     * SAME tentative slot(s) only, never touching any other card — see [WizardDraftBuild]'s own
      * KDoc), then runs land fill, verify/refine, and produces the final [WizardBuildResult]. Does
-     * NOT persist — the caller (the wizard VM) still calls [persist] itself, in the SAME single
-     * atomic transaction as before (W7 Task 2/E11: only WHEN it is called moved, to Choice-screen
-     * resolution time, not the mechanism).
+     * NOT persist — the caller still calls [persist] itself.
      *
-     * @param resolutions [RoleKey] -> the user's FINAL selection for that role: up to
-     *        `remainingSlots` ids drawn from [CommanderDraftBuild.tentativeByRole]'s own ids for that
-     *        role UNION the group's own [AmbiguityGroup.candidateIds] — i.e. "which cards should end
-     *        up occupying this role's swappable slots", not merely "which replacements to apply". An
-     *        id in the selection that already IS a tentative default for the role stays in its own
-     *        slot; a tentative default absent from the selection is replaced, one-for-one, by the
-     *        selection's chosen alternatives (an alternative is any selected id that is not itself a
-     *        tentative default). Selecting fewer than `remainingSlots` ids never shrinks the deck —
-     *        any tentative slot with no replacement to fill it keeps the engine's own default. An id
-     *        outside the tentative-∪-candidateIds union is dropped defensively rather than applied. An
-     *        empty (or partially-empty) map is exactly "let the wizard finish": every unresolved slot
-     *        stays at its seeded default, which is what makes this call byte-identical to the
-     *        single-shot [invoke] path when [resolutions] is empty.
+     * Deck Wizard 60-card wave (v6), plan §5 Phase 1.3 (S5): the SIGNATURE is UNCHANGED from
+     * pre-v6 — still `Map<RoleKey, List<String>>` — but the semantics generalize: a REPEATED id in
+     * the list means the caller wants MULTIPLE copies of that same card in the role's swappable
+     * slots (Commander's own world is exactly this with no repeats, since every card's own cap is
+     * 1). A same-named `finalize` overload differing ONLY in a Map value's generic type argument
+     * (`Map<RoleKey, List<String>>` vs `Map<RoleKey, Map<String, Int>>`, as an earlier draft of
+     * this plan literally specified) is NOT implementable here: it is both a genuine JVM platform
+     * signature clash (both erase to the same `(..., Map, ...)` bytecode signature) AND a Kotlin
+     * SOURCE-level overload-resolution ambiguity for any call site passing a generically-inferred
+     * argument (`emptyMap()`, MockK's `any()`) — verified against this codebase's own
+     * `DeckWizardViewModelTest.kt`, which mocks `finalize(any(), any(), any(), any())` at ~25 call
+     * sites that would all become ambiguous. The repeated-id-list design delivers the identical
+     * capability (multi-copy resolution, `BuildWizardDeckUseCaseSixtyTest`'s own case (f)) with
+     * ZERO signature change, so every pre-v6 call site (including those 25) keeps compiling with
+     * NO edits at all.
+     *
+     * Per-role algorithm (generalizes the pre-v6 contract 1:1 — see this method's own git history
+     * for the pre-v6 single-copy version this specializes to when no id ever repeats):
+     * `T` = `tentativeByRole[role].size` (copies); `tentativeCopies` = each id's own multiplicity
+     * within that list. The caller's [chosenIds] list is read in order, each id's own occurrences
+     * clamped to its remaining headroom (`candidateMaxCopies[id] + tentativeCopies[id]` — an id may
+     * "keep" every one of its OWN tentative copies even with zero fresh headroom) and the running
+     * total clamped to `T` (drop from the END of the caller's list order) into `desiredFlat`. Each
+     * tentative slot occupant is then matched 1:1 against `desiredFlat` (consuming one instance per
+     * match, so "2 copies of X tentative, 2 copies of X desired" stays fully in place); unmatched
+     * tentative occupants are `droppedSlots`, unmatched desired ids are `newAlternativeIds` — paired
+     * index-for-index, applied only where BOTH sides exist (a dropped slot with no available
+     * alternative keeps its engine-seeded default, exactly as the pre-v6 algorithm's own
+     * `getOrNull(index) ?: return@forEachIndexed` skip did). An empty [resolutions] map is exactly
+     * "let the wizard finish" — every unresolved slot stays at its seeded default (byte-identical to
+     * the single-shot [invoke] path).
      */
     suspend fun finalize(
-        draft: CommanderDraftBuild,
+        draft: WizardDraftBuild,
         resolutions: Map<RoleKey, List<String>> = emptyMap(),
         fillLands: Boolean = true,
         onStage: (CommanderBuildStage) -> Unit = {},
-    ): CommanderBuildOutcome {
+    ): WizardBuildOutcome {
         val groupsByRole = draft.ambiguityGroups.associateBy { it.sectionId }
-        val placedNonLand = draft.placedNonLand.toMutableList()
+        val placedNonLandMap = LinkedHashMap<String, DeckEntry>()
+        draft.placedNonLand.forEach { placedNonLandMap[it.card.scryfallId] = it }
         val remainingCandidates = draft.remainingCandidates.toMutableList()
+
         resolutions.forEach { (role, chosenIds) ->
             val group = groupsByRole[role] ?: return@forEach
             val tentativeSlots = draft.tentativeByRole[role] ?: return@forEach
-            val tentativeSlotSet = tentativeSlots.toSet()
-            val unionIds = tentativeSlotSet + group.candidateIds
-            // The user's final selection for this role, capped to how many swappable slots it
-            // actually has — an id outside tentative-∪-alternatives is dropped, never applied.
-            val selection = chosenIds.filter { it in unionIds }.distinct().take(tentativeSlots.size)
-            val selectionSet = selection.toSet()
-            // Tentative defaults the user did NOT keep, in their original slot order — these are the
-            // ONLY slots a replacement may land in (a kept default never moves).
-            val droppedSlots = tentativeSlots.filterNot { it in selectionSet }
-            // Selected ids that are not themselves a tentative default -- the alternatives the user
-            // actually chose, in the order they appeared in the resolution.
-            val newAlternativeIds = selection.filterNot { it in tentativeSlotSet }
+            if (tentativeSlots.isEmpty()) return@forEach
+            val totalSlots = tentativeSlots.size
+            val tentativeCopies = tentativeSlots.groupingBy { it }.eachCount()
+            val unionIds = tentativeCopies.keys + group.candidateIds.toSet()
+
+            val desiredFlat = mutableListOf<String>()
+            val perIdUsed = mutableMapOf<String, Int>()
+            outer@ for (id in chosenIds) {
+                if (id !in unionIds) continue
+                if (desiredFlat.size >= totalSlots) break@outer
+                val cap = (draft.candidateMaxCopies[id] ?: 0) + (tentativeCopies[id] ?: 0)
+                val used = perIdUsed[id] ?: 0
+                if (used >= cap) continue
+                perIdUsed[id] = used + 1
+                desiredFlat += id
+            }
+
+            // Consume one desired instance per tentative occupant it matches -- what's left over on
+            // each side is the real diff (see this method's own KDoc for the full derivation).
+            val remainingDesired = desiredFlat.toMutableList()
+            val droppedSlots = mutableListOf<String>()
+            tentativeSlots.forEach { id ->
+                val idx = remainingDesired.indexOf(id)
+                if (idx >= 0) remainingDesired.removeAt(idx) else droppedSlots += id
+            }
+            val newAlternativeIds = remainingDesired
+
             droppedSlots.forEachIndexed { index, tentativeId ->
                 val replacementId = newAlternativeIds.getOrNull(index) ?: return@forEachIndexed
                 val replacement = draft.candidatesById[replacementId] ?: return@forEachIndexed
-                val slotIndex = placedNonLand.indexOfFirst { it.card.scryfallId == tentativeId }
-                if (slotIndex >= 0) {
-                    placedNonLand[slotIndex] = DeckEntry(card = replacement, quantity = 1, isOwned = true, isSideboard = false)
+
+                val current = placedNonLandMap[tentativeId]
+                if (current != null) {
+                    if (current.quantity > 1) {
+                        placedNonLandMap[tentativeId] = current.copy(quantity = current.quantity - 1)
+                    } else {
+                        placedNonLandMap.remove(tentativeId)
+                    }
                 }
-                remainingCandidates.removeAll { it.scryfallId == replacementId }
+
+                val existingReplacement = placedNonLandMap[replacementId]
+                placedNonLandMap[replacementId] = if (existingReplacement != null) {
+                    existingReplacement.copy(quantity = existingReplacement.quantity + 1)
+                } else {
+                    DeckEntry(card = replacement, quantity = 1, isOwned = true, isSideboard = false)
+                }
+                val replacementCap = (draft.candidateMaxCopies[replacementId] ?: 0) + (tentativeCopies[replacementId] ?: 0)
+                if ((placedNonLandMap[replacementId]?.quantity ?: 0) >= replacementCap) {
+                    remainingCandidates.removeAll { it.scryfallId == replacementId }
+                }
             }
         }
+        val placedNonLand = placedNonLandMap.values.toList()
 
         // ── Land fill v2 (2.4) ──────────────────────────────────────────────────────────────────
         onStage(CommanderBuildStage.FILLING_LANDS)
@@ -527,8 +716,8 @@ class BuildCommanderDeckUseCase(
             )
         }
 
-        val commanderEntry = DeckEntry(card = draft.commander, quantity = 1, isOwned = true, isSideboard = false)
-        val fullMainboard = listOf(commanderEntry) + placedNonLand + landEntries
+        val commanderEntry = draft.commander?.let { DeckEntry(card = it, quantity = 1, isOwned = true, isSideboard = false) }
+        val fullMainboard = listOfNotNull(commanderEntry) + placedNonLand + landEntries
 
         // ── Verify + refine (2.5) ───────────────────────────────────────────────────────────────
         onStage(CommanderBuildStage.VERIFYING_AND_REFINING)
@@ -537,7 +726,7 @@ class BuildCommanderDeckUseCase(
         if (analysis == null || hasBlocker(analysis)) {
             crashReporter.log("deck_wizard_blocker_after_build")
             crashReporter.setCustomKey("deck_wizard_blocker_commander", "${draft.format}_${draft.identity.size}c")
-            crashReporter.recordException(IllegalStateException("[BuildCommanderDeckUseCase] deck_wizard_blocker_after_build: format=${draft.format} identitySize=${draft.identity.size}"))
+            crashReporter.recordException(IllegalStateException("[BuildWizardDeckUseCase] deck_wizard_blocker_after_build: format=${draft.format} identitySize=${draft.identity.size}"))
         }
 
         var refinementSwaps = 0
@@ -545,6 +734,10 @@ class BuildCommanderDeckUseCase(
         val fallbackStandaloneIds = draft.fallbackStandaloneIds.toMutableSet()
         val fallbackOffPlanIds = draft.fallbackOffPlanIds.toMutableSet()
         if (analysis != null) {
+            val ownedByName: Map<String, Int> = draft.ownedCollection
+                .filter { it.quantity > 0 }
+                .groupBy { it.card.name }
+                .mapValues { (_, owned) -> owned.sumOf { it.quantity } }
             val refined = refine(
                 analysis = analysis,
                 nonLandMainboard = finalNonLand,
@@ -557,18 +750,19 @@ class BuildCommanderDeckUseCase(
                 commander = draft.commander,
                 pin = draft.pin,
                 plan = draft.plan,
+                ownedByName = ownedByName,
                 fallbackStandaloneIds = fallbackStandaloneIds,
                 fallbackOffPlanIds = fallbackOffPlanIds,
             )
             finalNonLand = refined.nonLand
             refinementSwaps = refined.swaps
             if (refined.swaps > 0) {
-                health = analyze(listOf(commanderEntry) + finalNonLand + landEntries, draft.format, draft.commander, draft.pin)
+                health = analyze(listOfNotNull(commanderEntry) + finalNonLand + landEntries, draft.format, draft.commander, draft.pin)
                 analysis = health?.analysis ?: analysis
             }
         }
 
-        val finalAnalysis = checkNotNull(analysis) { "DeckAnalysisPipeline.analyze returned no analysis for a Commander build" }
+        val finalAnalysis = checkNotNull(analysis) { "DeckAnalysisPipeline.analyze returned no analysis for a wizard build" }
 
         val gapSections = finalAnalysis.pillars.flatMap { it.sections }
             .filter { section -> val min = section.min; min != null && section.current < min }
@@ -580,16 +774,20 @@ class BuildCommanderDeckUseCase(
         val finalFallbackOffPlanIds = fallbackOffPlanIds.filter { it in finalNonLandIds }
 
         val fillStats = WizardFillStats(
-            placedByWizard = finalNonLand.size - draft.manualNonLandCount,
+            placedByWizard = finalNonLand.sumOf { it.quantity } - draft.manualNonLandCount,
             placedManual = draft.manualNonLandCount,
             lands = landEntries.sumOf { it.quantity },
             preferenceBonusAppliedCount = draft.preferenceBonusAppliedCount,
             fallbackStandaloneCount = finalFallbackStandaloneIds.size,
             fallbackOffPlanCount = finalFallbackOffPlanIds.size,
+            // v6: finalNonLand is already ONE entry per distinct name (the pool is deduped by name
+            // at build time), so its own entry count IS the distinct-names count.
+            distinctNames = finalNonLand.size,
+            fourOfCount = finalNonLand.count { it.quantity == 4 },
         )
 
         val result = WizardBuildResult(
-            entries = listOf(commanderEntry) + finalNonLand + landEntries,
+            entries = listOfNotNull(commanderEntry) + finalNonLand + landEntries,
             analysis = finalAnalysis,
             gapSections = gapSections,
             fillStats = fillStats,
@@ -599,38 +797,49 @@ class BuildCommanderDeckUseCase(
             fallbackOffPlanIds = finalFallbackOffPlanIds,
         )
         onStage(CommanderBuildStage.DONE)
-        return CommanderBuildOutcome(result, draft.plan, draft.pin)
+        return WizardBuildOutcome(result, draft.plan, draft.pin)
     }
 
     // ── Write path (2.6, D12/D13) ──────────────────────────────────────────────────────────────
 
-    /**
-     * Persists [outcome]'s cards + pin into [deckId] in ONE atomic write —
-     * [DeckRepository.persistCommanderBuild] (Phase 8, JOB 2 — closed the 4-separate-calls gap this
-     * function used to have; see that method's KDoc) plus [DeckCardSource] provenance (D13): the
-     * commander and every engine-placed card are [DeckCardSource.WIZARD]; a card whose id is in
-     * [manualIds] is [DeckCardSource.USER]. Deck NAME and `commanderCardId`/`coverCardId` are
-     * deliberately NOT written here — those need the deck's current [com.mmg.manahub.core.model.Deck]
-     * row (via `DeckRepository.updateDeck`), which this use case is never handed (only a [deckId]
-     * string); Phase 6's wizard VM already holds that row (Studio's draft) and should call
-     * `updateDeck` itself alongside this method, in the same build-completion step.
-     */
+    /** Deck Wizard 60-card wave (v6), plan §5 Phase 1.3: the pre-v6 Commander-only signature, kept
+     * so every existing call site/test compiles unchanged -- a thin delegate onto
+     * [BuildAnchor.Commander]. */
     suspend fun persist(
         deckRepository: DeckRepository,
         deckId: String,
         commander: Card,
         manualIds: Set<String>,
-        outcome: CommanderBuildOutcome,
+        outcome: WizardBuildOutcome,
+    ) = persist(deckRepository, deckId, BuildAnchor.Commander(commander), manualIds, outcome)
+
+    /**
+     * Persists [outcome]'s cards + pin into [deckId] in ONE atomic write —
+     * [DeckRepository.persistWizardBuild] plus [DeckCardSource] provenance (D13): [anchor]'s own
+     * commander (if any) and every engine-placed card are [DeckCardSource.WIZARD]; a card whose id
+     * is in [manualIds] is [DeckCardSource.USER]. Deck NAME and `commanderCardId`/`coverCardId` are
+     * deliberately NOT written here — those need the deck's current [com.mmg.manahub.core.model.Deck]
+     * row (via `DeckRepository.updateDeck`), which this use case is never handed (only a [deckId]
+     * string); the wizard VM already holds that row and should call `updateDeck` itself alongside
+     * this method, in the same build-completion step.
+     */
+    suspend fun persist(
+        deckRepository: DeckRepository,
+        deckId: String,
+        anchor: BuildAnchor,
+        manualIds: Set<String>,
+        outcome: WizardBuildOutcome,
     ) {
+        val commanderId = anchor.commanderOrNull?.scryfallId
         val slots = outcome.result.entries.map { entry ->
-            val source = if (entry.card.scryfallId == commander.scryfallId || entry.card.scryfallId !in manualIds) {
+            val source = if (entry.card.scryfallId == commanderId || entry.card.scryfallId !in manualIds) {
                 DeckCardSource.WIZARD
             } else {
                 DeckCardSource.USER
             }
             CardSlotWrite(entry.card.scryfallId, entry.quantity, isSideboard = false, source = source)
         }
-        deckRepository.persistCommanderBuild(
+        deckRepository.persistWizardBuild(
             deckId = deckId,
             slots = slots,
             archetypeOverride = outcome.pin.archetype?.name,
@@ -642,6 +851,9 @@ class BuildCommanderDeckUseCase(
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────────────────────────
+
+    private fun List<String>.toManaColorSet(): Set<ManaColor> =
+        mapNotNull { symbol -> ManaColor.entries.firstOrNull { it.symbol == symbol } }.toSet()
 
     /** W6 Task 3 (E4): a stable, platform-independent hash of `deckId:cardId` (plain FNV-1a over
      * Unicode code points -- deliberately NOT `String.hashCode()`, to stay independent of any
@@ -695,8 +907,8 @@ class BuildCommanderDeckUseCase(
     private suspend fun analyze(
         mainboard: List<DeckEntry>,
         format: DeckFormat,
-        commander: Card,
-        pin: com.mmg.manahub.feature.decks.domain.engine.StrategyPin,
+        commander: Card?,
+        pin: StrategyPin,
     ) = runCatching {
         deckAnalysisPipeline.analyze(
             mainboard = mainboard,
@@ -710,10 +922,34 @@ class BuildCommanderDeckUseCase(
         )
     }.getOrNull()
 
-    private fun hasBlocker(analysis: com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis): Boolean =
-        analysis.pillars.any { pillar -> pillar.findings.any { it.severity == com.mmg.manahub.feature.decks.domain.engine.FindingSeverity.BLOCKER } }
+    private fun hasBlocker(analysis: DeckAnalysis): Boolean =
+        analysis.pillars.any { pillar -> pillar.findings.any { it.severity == FindingSeverity.BLOCKER } }
 
     private data class RefineResult(val nonLand: List<DeckEntry>, val swaps: Int)
+
+    /** v6 (S2): merge-or-insert one more copy of [card] into this board (one [DeckEntry] per card
+     * stays the invariant throughout [refine], same as [WizardDraftBuild.placedNonLand]). */
+    private fun List<DeckEntry>.plusCopy(card: Card): List<DeckEntry> {
+        val idx = indexOfFirst { it.card.scryfallId == card.scryfallId }
+        return if (idx >= 0) {
+            toMutableList().also { it[idx] = it[idx].copy(quantity = it[idx].quantity + 1) }
+        } else {
+            this + DeckEntry(card, 1, true, false)
+        }
+    }
+
+    /** v6 (S2): decrement-or-remove one copy of [cardId] from this board -- the [refine] counterpart
+     * to [plusCopy]. A no-op if [cardId] is not on the board. */
+    private fun List<DeckEntry>.minusCopy(cardId: String): List<DeckEntry> {
+        val idx = indexOfFirst { it.card.scryfallId == cardId }
+        if (idx < 0) return this
+        val entry = this[idx]
+        return if (entry.quantity > 1) {
+            toMutableList().also { it[idx] = entry.copy(quantity = entry.quantity - 1) }
+        } else {
+            toMutableList().also { it.removeAt(idx) }
+        }
+    }
 
     /**
      * X5 -- bounded local search, replacing the old fixed-victim-order/first-remaining-candidate
@@ -722,42 +958,51 @@ class BuildCommanderDeckUseCase(
      * shortlists the [REFINE_TRIAL_SAMPLE] remaining candidates [PlacementScorer.marginalGain]
      * ranks highest against the board WITHOUT that victim (a fast pre-filter, pip-neutral by
      * design -- this is a ranking heuristic only), verifies each shortlisted trial through a real
-     * [com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis], and keeps whichever raises
-     * `totalScore` the most. Stops the moment a round finds no improving swap (a local optimum) or
-     * [REFINE_MAX_SWAPS] is reached -- "quality over speed" (runtime is tracked, not capped
-     * tightly). The commander and manual adds are never touched (only entries whose id is NOT in
-     * [manualIds] are ever a victim). A swap that clears a fallback pick removes its id from
+     * [DeckAnalysis], and keeps whichever raises `totalScore` the most. Stops the moment a round
+     * finds no improving swap (a local optimum) or [REFINE_MAX_SWAPS] is reached. The commander and
+     * manual adds are never touched (only entries whose id is NOT in [manualIds] are ever a
+     * victim). A swap that clears a fallback pick removes its id from
      * [fallbackStandaloneIds]/[fallbackOffPlanIds] so the Choice screen only flags what is still on
      * the final board.
+     *
+     * Deck Wizard 60-card wave (v6, plan §5 Phase 1.3, S10 risks): victim/replacement are now COPY
+     * units, not whole entries -- a victim entry with `quantity > 1` loses exactly ONE copy
+     * ([minusCopy]), and a shortlisted replacement gains exactly one MORE copy ([plusCopy]),
+     * respecting [CopyPolicy.maxPlaceable] via [ownedByName] (a candidate already at its own cap on
+     * the board-without-victim is excluded from the shortlist outright). For Commander every
+     * `maxPlaceable` is 1, so every entry's `quantity` is always 1 and this degenerates
+     * byte-identically to the pre-v6 whole-entry swap.
      */
     private suspend fun refine(
-        analysis: com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis,
+        analysis: DeckAnalysis,
         nonLandMainboard: List<DeckEntry>,
         manualIds: Set<String>,
         remainingCandidates: MutableList<Card>,
         candidateProfiles: Map<Card, PlacementScorer.CandidateProfile>,
         landEntries: List<DeckEntry>,
-        commanderEntry: DeckEntry,
+        commanderEntry: DeckEntry?,
         format: DeckFormat,
-        commander: Card,
-        pin: com.mmg.manahub.feature.decks.domain.engine.StrategyPin,
-        plan: CommanderPlan,
+        commander: Card?,
+        pin: StrategyPin,
+        plan: WizardPlan,
+        ownedByName: Map<String, Int>,
         fallbackStandaloneIds: MutableSet<String>,
         fallbackOffPlanIds: MutableSet<String>,
     ): RefineResult {
         if (remainingCandidates.isEmpty()) return RefineResult(nonLandMainboard, 0)
 
-        var current = nonLandMainboard.toMutableList()
+        var current: List<DeckEntry> = nonLandMainboard
         var currentAnalysis = analysis
         var currentScore = analysis.totalScore
         var swaps = 0
 
-        // Curve/axis targets scale off `current.size`, which stays fixed across every 1-for-1 swap
-        // this loop ever makes -- computed once, not per round.
-        val curveTargetsNow = CurveTargets.forSkeleton(plan.skeleton, nonLandCount = current.size)
+        // Curve/axis targets scale off the board's own COPY count, which stays fixed across every
+        // 1-copy swap this loop ever makes -- computed once, not per round.
+        val nonLandCopyCount = current.sumOf { it.quantity }
+        val curveTargetsNow = CurveTargets.forSkeleton(plan.skeleton, nonLandCount = nonLandCopyCount)
         val archetypeFormat = ArchetypeFormat.of(format) ?: return RefineResult(current, 0)
-        val dominantTribeAxis = plan.internalTribe?.let { "TRIBE:${it.removePrefix(com.mmg.manahub.feature.decks.domain.engine.TribeDeriver.TRIBE_PREFIX)}" }
-        val axisIdealsNow = SynergyGraph.axisIdeals(archetypeFormat, nonLandCount = current.size, dominantTribeAxis = dominantTribeAxis)
+        val dominantTribeAxis = plan.internalTribe?.let { "TRIBE:${it.removePrefix(TribeDeriver.TRIBE_PREFIX)}" }
+        val axisIdealsNow = SynergyGraph.axisIdeals(archetypeFormat, nonLandCount = nonLandCopyCount, dominantTribeAxis = dominantTribeAxis)
 
         while (swaps < REFINE_MAX_SWAPS && remainingCandidates.isNotEmpty()) {
             val offplanIdsNow = currentAnalysis.pillars.flatMap { it.sections }
@@ -779,17 +1024,24 @@ class BuildCommanderDeckUseCase(
                 )
                 .firstOrNull { it.card.scryfallId in offplanIdsNow || overflowCountOf(it) > 0 } ?: break
 
-            val boardWithoutVictim = current.filterNot { it.card.scryfallId == victim.card.scryfallId }
+            val boardWithoutVictim = current.minusCopy(victim.card.scryfallId)
             val stateWithoutVictim = boardWithoutVictim.fold(PlacementScorer.PlacementState()) { acc, entry ->
-                candidateProfiles[entry.card]?.let { fold(acc, it) } ?: acc
+                val profile = candidateProfiles[entry.card] ?: return@fold acc
+                var next = acc
+                repeat(entry.quantity) { next = fold(next, profile) }
+                next
             }
             // A null gain is PlacementScorer's own off-plan definition (no role gain, no axis
             // gain) -- dropped here rather than sentinel-scored, so a thin pool can never swap
-            // in a fresh off-plan card without it landing in fallbackOffPlanIds first.
+            // in a fresh off-plan card without it landing in fallbackOffPlanIds first. A candidate
+            // already at its own maxPlaceable on boardWithoutVictim is excluded outright (v6).
             val shortlist = remainingCandidates
                 .mapNotNull { candidate ->
                     val profile = candidateProfiles[candidate] ?: return@mapNotNull null
-                    val gain = PlacementScorer.marginalGain(profile, stateWithoutVictim, plan, curveTargetsNow, axisIdealsNow, pipFactor = 1f)
+                    val alreadyOnBoard = boardWithoutVictim.firstOrNull { it.card.scryfallId == candidate.scryfallId }?.quantity ?: 0
+                    val cap = CopyPolicy.maxPlaceable(candidate, format, ownedByName[candidate.name])
+                    if (alreadyOnBoard >= cap) return@mapNotNull null
+                    val gain = PlacementScorer.marginalGain(profile, stateWithoutVictim, plan, curveTargetsNow, axisIdealsNow, pipFactor = 1f, copyIndex = alreadyOnBoard)
                     gain?.let { candidate to it }
                 }
                 .sortedByDescending { it.second }
@@ -799,10 +1051,10 @@ class BuildCommanderDeckUseCase(
 
             var bestReplacement: Card? = null
             var bestTrialScore = currentScore
-            var bestTrialAnalysis: com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis? = null
+            var bestTrialAnalysis: DeckAnalysis? = null
             for (replacement in shortlist) {
-                val candidateBoard = boardWithoutVictim + DeckEntry(replacement, 1, true, false)
-                val trialHealth = analyze(listOf(commanderEntry) + candidateBoard + landEntries, format, commander, pin)
+                val candidateBoard = boardWithoutVictim.plusCopy(replacement)
+                val trialHealth = analyze(listOfNotNull(commanderEntry) + candidateBoard + landEntries, format, commander, pin)
                 val trialScore = trialHealth?.analysis?.totalScore ?: continue
                 if (trialScore > bestTrialScore) {
                     bestTrialScore = trialScore
@@ -812,8 +1064,10 @@ class BuildCommanderDeckUseCase(
             }
             val replacement = bestReplacement ?: break
 
-            current = (boardWithoutVictim + DeckEntry(replacement, 1, true, false)).toMutableList()
-            remainingCandidates.remove(replacement)
+            current = boardWithoutVictim.plusCopy(replacement)
+            val replacementQuantity = current.firstOrNull { it.card.scryfallId == replacement.scryfallId }?.quantity ?: 0
+            val replacementCap = CopyPolicy.maxPlaceable(replacement, format, ownedByName[replacement.name])
+            if (replacementQuantity >= replacementCap) remainingCandidates.remove(replacement)
             fallbackStandaloneIds.remove(victim.card.scryfallId)
             fallbackOffPlanIds.remove(victim.card.scryfallId)
             currentScore = bestTrialScore
@@ -825,14 +1079,16 @@ class BuildCommanderDeckUseCase(
 
     /** Owned non-basic lands (Stage A, gated on [includeNonBasicLands] — R8/E10) -> commander+
      * mainboard-weighted basics (Stage B, always runs — R12) -> a bounded Karsten rebalance
-     * (Stage C, ≤ [KARSTEN_REBALANCE_CAP] moves) — D10, fixes F9. */
+     * (Stage C, ≤ [KARSTEN_REBALANCE_CAP] moves) — D10, fixes F9. [commander] is `null` for a
+     * [BuildAnchor.Sixty] build (v6) -- every commander-pip reference below degrades to
+     * `listOfNotNull(commander?.let { ... })`, an empty addition. */
     private fun fillLandsV2(
         identity: Set<ManaColor>,
         colorCount: Int,
         landTarget: Int,
         remainingLandSlots: Int,
         nonLandMainboard: List<DeckEntry>,
-        commander: Card,
+        commander: Card?,
         ownedCollection: List<OwnedCard>,
         usedNames: MutableSet<String>,
         archetypeFormat: ArchetypeFormat,
@@ -841,7 +1097,8 @@ class BuildCommanderDeckUseCase(
     ): List<DeckEntry> {
         val identitySymbols = identity.map { it.symbol }.toSet()
         val placed = mutableListOf<DeckEntry>()
-        val intensity = manaBaseAnalyzer.maxSinglePipIntensity(nonLandMainboard + DeckEntry(commander, 1, true, false))
+        val commanderPipEntry = listOfNotNull(commander?.let { DeckEntry(it, 1, true, false) })
+        val intensity = manaBaseAnalyzer.maxSinglePipIntensity(nonLandMainboard + commanderPipEntry)
         val sources = mutableMapOf<ManaColor, Int>()
 
         // ── Stage A: owned non-basic lands within identity — OFF by default (R8), skipped straight
@@ -901,7 +1158,7 @@ class BuildCommanderDeckUseCase(
         // ── Stage B: basics, commander pips included, Phyrexian excluded (F9) ──────────────────
         val basicSlots = remainingLandSlots - placed.size
         if (basicSlots > 0) {
-            val pipsRaw = manaBaseAnalyzer.pipDistribution(nonLandMainboard + DeckEntry(commander, 1, true, false))
+            val pipsRaw = manaBaseAnalyzer.pipDistribution(nonLandMainboard + commanderPipEntry)
             val pipsByColor = pipsRaw.entries.associate { (color, count) -> color.symbol to count }
             val nonBasicDeckCards = placed.map { com.mmg.manahub.core.model.DeckCard(it.card, it.quantity) }
             val distribution = BasicLandCalculator.calculateFromPips(
