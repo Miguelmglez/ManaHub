@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.harness
-// COMMENTS_REVIEWED: 2026-09-09
+// COMMENTS_REVIEWED: 2026-09-16
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
@@ -68,6 +68,11 @@ class WizardCommanderHarnessV2Test {
             val runtimes = nonFailed.map { it.runtimeMs }.sorted()
             println("[wizard-harness-v2] runtime ms min=${runtimes.first()} median=${runtimes[runtimes.size / 2]} max=${runtimes.last()}")
             // W7 Task 0 (7.0) re-measurement: ambiguity volume under the LIVE (tentative-slot) detector.
+            // X5 (S7/D4): fallback tier volume, so a run that leans heavily on Standalone/off-plan
+            // fallback is visible in the summary even when the HARD metrics still pass.
+            val fallbackStandalone = nonFailed.sumOf { it.fallbackStandaloneCount }
+            val fallbackOffPlan = nonFailed.sumOf { it.fallbackOffPlanCount }
+            println("[wizard-harness-v2] fallback placements: standalone=$fallbackStandalone offplan=$fallbackOffPlan across ${nonFailed.size} builds")
             val ambiguity = nonFailed.map { it.ambiguityGroupCount }.sorted()
             fun apct(p: Double) = ambiguity[(p * (ambiguity.size - 1)).toInt().coerceIn(0, ambiguity.size - 1)]
             println(
@@ -96,7 +101,8 @@ class WizardCommanderHarnessV2Test {
                     "size_or_gaps=${!m.sizeOrGapsOk} determinism=${!m.determinismOk} commander_once=${!m.commanderOnceOk} " +
                     "manual_adds=${!m.manualAddsKeptOk} legality_identity=${!m.legalityIdentityOk} " +
                     "anti_role=${m.antiRoleViolations} offplan=${"%.2f".format(m.offplanShare)} " +
-                    "round_trip=${!m.roundTripIdentityOk} mana_sources=${m.manaSourcesViolations} land_target=${!m.landTargetOk}(${m.landCount})",
+                    "round_trip=${!m.roundTripIdentityOk} mana_sources=${m.manaSourcesViolations} land_target=${!m.landTargetOk}(${m.landCount}) " +
+                    "role_overflow=${m.roleOverflowViolations} unflagged_offplan=${m.unflaggedOffplanCount}",
             )
         }
     }
@@ -124,5 +130,7 @@ class WizardCommanderHarnessV2Test {
         failing("round_trip_identity") { it.roundTripIdentityOk }
         failing("mana_sources") { it.manaSourcesOk }
         failing("land_target") { it.landTargetOk }
+        failing("no_avoidable_role_overflow") { it.noAvoidableRoleOverflowOk }
+        failing("no_avoidable_offplan") { it.noAvoidableOffplanOk }
     }
 }

@@ -243,16 +243,22 @@ class BuildCommanderDeckUseCaseTest {
         // "stax_piece" is the GENERIC baseline's own anti-role band for a MIDRANGE-leaning identity
         // in some skeletons; simplest reliable proof here is a card with NO real role/axis signal at
         // all (clears NEITHER roleGain nor axisGain), which the D8 filler floor rejects regardless of
-        // the preference bonus (the bonus is only ever ADDED to an already-non-null gain).
+        // the preference bonus (the bonus is only ever ADDED to an already-non-null gain). Deck
+        // Wizard Commander v5 (D4): this must use a collection PLENTIFUL enough that the main loop
+        // fills every non-land slot on its own -- MockCollectionThin is deliberately exhausted, so
+        // its own build now legitimately reaches the D4 fallback tiers, which are NOT gated by the
+        // preference bonus at all; that scenario proves nothing about the D8 floor specifically.
         val useCase = newUseCase()
-        val commander = MockCollectionThin.commander
-        val owned = ownedFrom(MockCollectionThin.ownedCards, MockCollectionThin.ownedBasics)
+        val fixture = MockCollectionRich.targetFixtures.first { fx -> fx.mainboard.any { it.card.scryfallId == "cmd-edgar-markov" } }
+        val commander = fixture.mainboard.first { it.card.scryfallId == "cmd-edgar-markov" }.card
+        val identity = commander.colorIdentity.toManaColors()
+        val owned = ownedFrom(MockCollectionRich.ownedCards, MockCollectionRich.ownedBasics)
         val vanillaFillerId = "cmd-vanilla-unrelated-filler"
         val vanillaFiller = card(id = vanillaFillerId, name = "Truly Vanilla Filler", typeLine = "Creature — Bear", cmc = 2.0, colors = commander.colorIdentity, colorIdentity = commander.colorIdentity)
         val ownedWithFiller = owned + OwnedCard(vanillaFiller, 1)
 
         val outcome = useCase(
-            DeckFormat.COMMANDER, commander, StrategyPick.Custom, commander.colorIdentity.toManaColors(), ownedWithFiller,
+            DeckFormat.COMMANDER, commander, StrategyPick.Custom, identity, ownedWithFiller,
             preferenceStore = FakePreferenceStore(listOf(vanillaFillerId)),
         )
         assertTrue(vanillaFillerId !in outcome.result.entries.map { it.card.scryfallId }, "a card with zero role/axis gain must stay unplaced even when preferred (D8 floor)")

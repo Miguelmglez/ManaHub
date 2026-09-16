@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.harness
-// COMMENTS_REVIEWED: 2026-09-09
+// COMMENTS_REVIEWED: 2026-09-16
 
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.model.Card
@@ -59,6 +59,21 @@ data class V2BuildMetrics(
     val landCount: Int = 0,
     val landBandMin: Int = 0,
     val landBandMax: Int = 0,
+    /** Deck Wizard Commander v5 (S7/X5): no wizard-placed, non-fallback card pushes a role past its
+     * own [com.mmg.manahub.feature.decks.domain.engine.RoleTarget.max] -- the main placement loop's
+     * overflow gate hard-excludes an overflowing candidate whenever a non-overflowing alternative
+     * clears the D8 floor, so this should hold by construction; a violation here means that gate
+     * has a real gap. */
+    val noAvoidableRoleOverflowOk: Boolean = true,
+    val roleOverflowViolations: List<String> = emptyList(),
+    /** Deck Wizard Commander v5 (S8/D4/X5): every card in the final analysis's "offplan" section is
+     * one of [com.mmg.manahub.feature.decks.domain.template.WizardBuildResult.fallbackOffPlanIds] --
+     * i.e. the wizard never slips an off-plan card in through the main loop, only through the
+     * explicitly flagged last-resort fallback. */
+    val noAvoidableOffplanOk: Boolean = true,
+    val unflaggedOffplanCount: Int = 0,
+    val fallbackStandaloneCount: Int = 0,
+    val fallbackOffPlanCount: Int = 0,
 
     // ── TRACKED ─────────────────────────────────────────────────────────────
     val totalScore: Int = 0,
@@ -81,7 +96,7 @@ data class V2BuildMetrics(
     val allHardMetricsPass: Boolean
         get() = !buildFailed && noBlockerOk && sizeOrGapsOk && determinismOk && commanderOnceOk &&
             manualAddsKeptOk && legalityIdentityOk && noEngineAntiRoleOk && offplanShareOk &&
-            roundTripIdentityOk && manaSourcesOk && landTargetOk
+            roundTripIdentityOk && manaSourcesOk && landTargetOk && noAvoidableRoleOverflowOk && noAvoidableOffplanOk
 }
 
 object HarnessMetricsV2Calculator {
@@ -239,6 +254,27 @@ object HarnessMetricsV2Calculator {
         val landCount = lands.sumOf { it.quantity }
         val landTargetOk = landCount in plan.skeleton.lands.min..plan.skeleton.lands.max
 
+        // ── no_avoidable_role_overflow (S7/X5) ─────────────────────────────
+        // Scoped to non-manual, non-fallback placements -- the main loop's own overflow gate hard-
+        // excludes an overflowing candidate only while a non-overflowing alternative exists; a
+        // fallback pick (last resort by construction, D4) is expected to sometimes overflow when
+        // that is genuinely the only card left, and is not what this metric is checking.
+        val fallbackIds = (result.fallbackStandaloneIds + result.fallbackOffPlanIds).toSet()
+        val mainLoopPlacedNonLand = wizardPlacedNonLand.filterNot { it.card.scryfallId in fallbackIds }
+        val mainLoopRoleCounts = ArchetypeRoleClassifier.deckRoleCounts(mainLoopPlacedNonLand)
+        val roleOverflowViolations = plan.skeleton.roleTargets
+            .filterKeys { it !in plan.skeleton.antiRoles }
+            .filter { (role, target) -> (mainLoopRoleCounts[role] ?: 0) > target.max }
+            .map { (role, target) -> "$role: ${mainLoopRoleCounts[role]}/${target.max}" }
+        val noAvoidableRoleOverflowOk = roleOverflowViolations.isEmpty()
+
+        // ── no_avoidable_offplan (S8/D4/X5) ────────────────────────────────
+        val unflaggedOffplan = wizardPlacedNonLand
+            .filter { it.card.scryfallId in offplanIds }
+            .filterNot { it.card.scryfallId in result.fallbackOffPlanIds }
+            .map { it.card.name }
+        val noAvoidableOffplanOk = unflaggedOffplan.isEmpty()
+
         return V2BuildMetrics(
             label = label,
             commanderName = commanderName,
@@ -265,6 +301,12 @@ object HarnessMetricsV2Calculator {
             landCount = landCount,
             landBandMin = plan.skeleton.lands.min,
             landBandMax = plan.skeleton.lands.max,
+            noAvoidableRoleOverflowOk = noAvoidableRoleOverflowOk,
+            roleOverflowViolations = roleOverflowViolations,
+            noAvoidableOffplanOk = noAvoidableOffplanOk,
+            unflaggedOffplanCount = unflaggedOffplan.size,
+            fallbackStandaloneCount = result.fallbackStandaloneIds.size,
+            fallbackOffPlanCount = result.fallbackOffPlanIds.size,
             totalScore = analysis.totalScore,
             pillarSubscores = analysis.pillars.associate { it.id.name to it.subscore },
             gapSectionCount = result.gapSections.size,

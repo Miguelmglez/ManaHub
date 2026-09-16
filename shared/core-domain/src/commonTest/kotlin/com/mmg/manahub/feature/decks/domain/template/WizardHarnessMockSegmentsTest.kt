@@ -243,15 +243,21 @@ class WizardHarnessMockCollectionRichSegmentTest {
  * below [DeckFormat.targetDeckSize] ([AnalysisEngine.evaluateLegality]) — an exhausted collection
  * MUST report it (that is the CORRECT, honest behaviour D8 asks for), so `no_blocker`/`land_target`/
  * literal `size_or_gaps==100` are not meaningful gates here BY CONSTRUCTION, not by a loosened
- * metric. What Thin's own build DOES have to prove: it builds without crashing, places no filler
- * (every wizard-placed card clears the floor), never exceeds owned quantity, is deterministic, and
- * the declared gaps + placed count together account for the WHOLE shortfall (i.e. nothing vanishes
- * silently even though the deck can never reach 100).
+ * metric.
+ *
+ * Deck Wizard Commander v5 (D4): the user's own instruction supersedes "no filler" as this class's
+ * own contract used to read it — a genuinely exhausted collection now fills every remaining slot it
+ * CAN with a Standalone (own role, off-skeleton) card, then a true off-plan one, rather than
+ * declaring a gap while an unplaced candidate still sits in the pool. What Thin's own build now has
+ * to prove: it builds without crashing, never exceeds owned quantity, is deterministic, and every
+ * card that reaches the floor by fallback rather than the main D8 floor is HONESTLY flagged in
+ * [WizardBuildResult.fallbackStandaloneIds]/[WizardBuildResult.fallbackOffPlanIds] — never a silent
+ * unflagged filler.
  */
 class WizardHarnessMockCollectionThinSegmentTest {
 
     @Test
-    fun `MockCollectionThin builds honestly with no filler and fully declared gaps`() = runTest {
+    fun `MockCollectionThin fills every viable slot, flagging fallback picks honestly (D4)`() = runTest {
         val commander = MockCollectionThin.commander
         val identity = commander.colorIdentity.toManaColors()
         val owned = MockCollectionThin.all.toOwned()
@@ -278,11 +284,10 @@ class WizardHarnessMockCollectionThinSegmentTest {
             .map { it.card.name }
         assertTrue(overOwned.isEmpty(), "MockCollectionThin must never place more non-basic copies than owned: $overOwned")
 
-        // No filler: every wizard-placed non-land, non-commander card must clear the floor (D8) --
-        // proxied here as "has SOME role confidence OR axis contribution", the same floor
-        // BuildCommanderDeckUseCase's own PlacementScorer.marginalGain enforces internally; a card
-        // with truly zero role/axis signal reaching the deck would mean the floor broke.
-        // F18 (W6b): a Custom build's floor now includes the commander's OWN derived tribe axis
+        // D4: a card with truly zero role/axis signal (the pre-v5 "filler" a D8-only floor would
+        // never place) may now reach the deck as a genuine last-resort fallback -- proxied here the
+        // same way the D8 floor itself reads it (no role confidence, no axis produce/consume edge).
+        // F18 (W6b): a Custom build's floor includes the commander's OWN derived tribe axis
         // (TribeDeriver.derivedLordTribe, same as BuildCommanderDeckUseCase's own dominantTribeAxis
         // for this StrategyPick) -- this mock's Edgar Markov commander legitimately credits its
         // Vampire subtype cards via TRIBE:vampire now, so the mirror check below must apply the
@@ -299,8 +304,10 @@ class WizardHarnessMockCollectionThinSegmentTest {
                 dominantTribe,
             )
             roles.values.none { it > 0f } && axes.produces.isEmpty() && axes.consumes.isEmpty()
-        }.map { it.card.name }
-        assertTrue(filler.isEmpty(), "MockCollectionThin must place no filler (D8): $filler")
+        }.map { it.card.scryfallId to it.card.name }
+        val flaggedFallbackIds = (result.fallbackStandaloneIds + result.fallbackOffPlanIds).toSet()
+        val unflaggedFiller = filler.filterNot { (id, _) -> id in flaggedFallbackIds }.map { it.second }
+        assertTrue(unflaggedFiller.isEmpty(), "MockCollectionThin must never place a silent, unflagged filler card (D4): $unflaggedFiller")
 
         // The declared shortfall must account for the WHOLE gap -- nothing vanishes silently.
         val actualSize = entries.sumOf { it.quantity }
@@ -310,13 +317,16 @@ class WizardHarnessMockCollectionThinSegmentTest {
             "sanity: MockCollectionThin's pool (39 cards incl. commander) cannot reach 100 -- if this ever " +
                 "passes, the fixture itself changed and this test's whole premise needs revisiting",
         )
-        println("MockCollectionThin: actualSize=$actualSize gapsTotal=$gapsTotal score=${result.analysis.totalScore} hasBlocker=${hasBlocker(result)}")
+        println(
+            "MockCollectionThin: actualSize=$actualSize gapsTotal=$gapsTotal score=${result.analysis.totalScore} " +
+                "hasBlocker=${hasBlocker(result)} fallbackStandalone=${result.fallbackStandaloneIds.size} fallbackOffPlan=${result.fallbackOffPlanIds.size}",
+        )
         // Reported, not gated: an exhausted collection's gapSections are bounded by how many of the
         // skeleton's OWN role/axis bands the engine tracks (not every missing nonland slot maps to a
         // named band) -- so gapsTotal alone can legitimately under-count the raw card shortfall. The
-        // real, unconditional guarantee is simpler and IS asserted above: no filler, no over-placement,
-        // deterministic, and the build completes with an honest (non-crashing) score instead of
-        // silently padding with a weak card. See this class's own KDoc for why literal
-        // size_or_gaps==100/no_blocker are not meaningful gates for a deliberately exhausted pool.
+        // real, unconditional guarantee is simpler and IS asserted above: no unflagged filler, no
+        // over-placement, deterministic, and the build completes with an honest (non-crashing) score.
+        // See this class's own KDoc for why literal size_or_gaps==100/no_blocker are not meaningful
+        // gates for a deliberately exhausted pool.
     }
 }
