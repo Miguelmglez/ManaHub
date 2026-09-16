@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.engine
-// COMMENTS_REVIEWED: 2026-09-14
+// COMMENTS_REVIEWED: 2026-09-16
 
 import com.mmg.manahub.core.model.Card
 
@@ -30,6 +30,13 @@ object PlacementScorer {
     const val AXIS_WEIGHT = 0.40f
     const val CURVE_WEIGHT = 0.10f
     const val POWER_WEIGHT = 0.10f
+
+    /** Deck Wizard Commander v5 (S7): a role's overflow past [RoleTarget.max] is the negative
+     * mirror of [roleGain]'s own under-ideal credit, so it is charged at the SAME weight
+     * ([ROLE_WEIGHT]) rather than a separately-tuned constant — a card whose overflow is its only
+     * meaningful signal on a role loses exactly what a real need on that same role would have
+     * earned it, never more (other channels -- axis/curve/power -- are untouched by this penalty). */
+    const val ROLE_OVERFLOW_WEIGHT = ROLE_WEIGHT
 
     /** Normalised credit while a role sits between [RoleTarget.ideal] and [RoleTarget.max] -- not
      * zero (still a legal, wanted card) but below a typical under-ideal fraction, so the loop
@@ -105,9 +112,41 @@ object PlacementScorer {
 
         val curveGain = curveGain(candidate, curveTargets, state.curveBucketCounts)
         val powerPrior = candidate.powerNormalized.coerceIn(0f, 1f)
+        val overflowPenalty = overflowCost(candidate, plan, state.roleCounts) * ROLE_OVERFLOW_WEIGHT
 
-        val weighted = roleGain * ROLE_WEIGHT + axisGain * AXIS_WEIGHT + curveGain * CURVE_WEIGHT + powerPrior * POWER_WEIGHT
+        val weighted = (
+            roleGain * ROLE_WEIGHT + axisGain * AXIS_WEIGHT + curveGain * CURVE_WEIGHT + powerPrior * POWER_WEIGHT - overflowPenalty
+            ).coerceAtLeast(0f)
         return weighted * pipFactor.coerceIn(0f, 1f)
+    }
+
+    /** S7 -- whether placing [candidate] on top of [roleCounts] pushes at least one non-anti role
+     * it matches past its own [RoleTarget.max]. Separate from [overflowCost] (a soft, per-candidate
+     * penalty) because "loses to any on-plan alternative" needs cross-candidate knowledge (does a
+     * non-overflowing option exist THIS iteration) that a single-candidate score cannot carry on
+     * its own -- the caller (the placement loop) hard-excludes an overflowing candidate whenever
+     * this is true for it AND a non-overflowing alternative clears the D8 floor. */
+    fun causesRoleOverflow(candidate: CandidateProfile, plan: CommanderPlan, roleCounts: Map<RoleKey, Int>): Boolean =
+        candidate.roleConfidence.any { (role, confidence) ->
+            confidence > 0f && role !in plan.skeleton.antiRoles &&
+                plan.skeleton.roleTargets[role]?.let { (roleCounts[role] ?: 0) >= it.max } == true
+        }
+
+    /** S7 -- normalised overflow depth of the WORST offending role this candidate matches (never
+     * combined across roles the way [combineDiminishing] combines positive gains: one badly
+     * overflowing role is already the whole problem, a second one does not make placing the card
+     * twice as bad). `(current - max + 1)` counts the copy THIS placement would itself add;
+     * dividing by `max` keeps it on the same `[0,1]` scale [roleGain]'s own fraction uses. */
+    private fun overflowCost(candidate: CandidateProfile, plan: CommanderPlan, roleCounts: Map<RoleKey, Int>): Float {
+        val costs = candidate.roleConfidence.mapNotNull { (role, confidence) ->
+            if (confidence <= 0f || role in plan.skeleton.antiRoles) return@mapNotNull null
+            val target = plan.skeleton.roleTargets[role] ?: return@mapNotNull null
+            val current = roleCounts[role] ?: 0
+            if (current < target.max) return@mapNotNull null
+            val overflowDepth = (current - target.max + 1).toFloat()
+            confidence * (overflowDepth / target.max.coerceAtLeast(1)).coerceIn(0f, 1f)
+        }
+        return costs.maxOrNull() ?: 0f
     }
 
     /**
@@ -192,6 +231,15 @@ object PlacementScorer {
             if (ideal.producerIdeal <= 0) return@forEach
             val current = producerCounts[axis] ?: 0
             if (current >= ideal.producerIdeal) return@forEach
+            // S8/H9: a bare type-line density producer (SPELLS/ARTIFACTS/ENCHANTMENTS -- no
+            // dedicated role backing its credit for THIS axis) only counts once the plan actually
+            // means to build the axis out (targeted, or a payoff already placed) -- otherwise it
+            // is exactly the "structurally connected to nothing" leak that read off-plan cards as
+            // on-plan (see AnalysisEngine's own offplan 3-way split for the final-analysis shape
+            // this mirrors).
+            val densityRole = SynergyGraph.DENSITY_PRODUCER_AXES[axis]
+            val isBareDensity = densityRole != null && (candidate.roleConfidence[densityRole] ?: 0f) <= 0f
+            if (isBareDensity && axis !in plan.targetAxes && (payoffCounts[axis] ?: 0) <= 0) return@forEach
             val weight = if (axis in plan.targetAxes) 1f else 0.5f
             val fraction = ((ideal.producerIdeal - current).toFloat() / ideal.producerIdeal).coerceIn(0f, 1f)
             contributions += confidence * fraction * weight

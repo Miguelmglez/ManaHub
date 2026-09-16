@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.engine
-// COMMENTS_REVIEWED: 2026-09-08
+// COMMENTS_REVIEWED: 2026-09-16
 
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.model.Card
@@ -294,7 +294,7 @@ object SynergyGraph {
      * cell is "type-line density · &lt;dedicated role&gt;" -- [OrphanProducers] conflict detection
      * for these axes reads the dedicated role's own count only, never the density-inflated
      * [AxisState.producerCopies]. */
-    private val DENSITY_PRODUCER_AXES: Map<AxisKey, RoleKey> = mapOf(
+    internal val DENSITY_PRODUCER_AXES: Map<AxisKey, RoleKey> = mapOf(
         "SPELLS" to "spell_copy",
         "ARTIFACTS" to "treasure_source",
         "ENCHANTMENTS" to "aura_buff",
