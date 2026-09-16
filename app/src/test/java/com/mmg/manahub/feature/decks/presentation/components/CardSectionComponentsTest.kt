@@ -143,4 +143,22 @@ class CardSectionComponentsTest {
     fun `empty contributions -- empty render list, no crash`() {
         assertEquals(0, resolveSectionRenderItems(emptyList()) { null }.size)
     }
+
+    // ── sectionThumbnailBadgeText (design review CRITICAL #2: header count vs. one thumbnail per contribution) ──
+
+    @Test
+    fun `singleton contribution -- no badge`() {
+        assertEquals(null, sectionThumbnailBadgeText(1))
+    }
+
+    @Test
+    fun `quantity above one -- badge reads the real count`() {
+        assertEquals("×4", sectionThumbnailBadgeText(4))
+    }
+
+    @Test
+    fun `zero or negative quantity -- no badge`() {
+        assertEquals(null, sectionThumbnailBadgeText(0))
+        assertEquals(null, sectionThumbnailBadgeText(-1))
+    }
 }

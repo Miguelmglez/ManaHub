@@ -63,8 +63,14 @@ Build and manage decks backed by your collection and real-time Scryfall data.
   Custom), fill remaining plan sections from your collection. Genuine close calls the engine can't
   break on its own surface as a short Choice screen (only the real questions, with a one-tap "let
   the wizard decide" for any of them); every other card is placed automatically with a transparent
-  gap report (no silent placeholder cards). Casual keeps a separate, community-template-matched
-  build path.
+  gap report (no silent placeholder cards). It never over-fills a role past its plan, never picks a
+  card that doesn't serve the plan while a fitting one remains, and when your collection genuinely
+  runs out it says so on that same screen instead of padding the deck quietly. Casual keeps a
+  separate, community-template-matched build path.
+- **Deck analysis**: every category the engine classifies can be browsed, in your collection and on
+  Scryfall, from the same button — and both find the same cards. Synergies are shown as engines,
+  pairing the cards that produce a resource with the cards that pay it off (life, tokens, counters,
+  graveyard…), each explained in a sentence and flagged when one half is missing.
 - **Collection discoveries**: synergy clusters detected in your own collection (strategies and
   tribes), each with a one-tap "Build this" handoff into the wizard
 

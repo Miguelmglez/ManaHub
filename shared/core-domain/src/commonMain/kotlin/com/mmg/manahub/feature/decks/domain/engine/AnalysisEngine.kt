@@ -848,7 +848,7 @@ object AnalysisEngine {
         "LANDFALL" to "Landfall", "GRAVEYARD" to "Graveyard", "ETB" to "ETB", "SPELLS" to "Spells",
         "ARTIFACTS" to "Artifacts", "ENCHANTMENTS" to "Enchantments", "ATTACHED" to "Equipment / Auras",
         "ATTACK" to "Attack", "PLANESWALKERS" to "Planeswalkers", "GROUP" to "Group Effects",
-        "MILL_OPP" to "Mill (Opponent)", "ENGINE" to "Engine", "LOCK" to "Stax Lock",
+        "MILL_OPP" to "Mill (Opponent)", "ENGINE" to "Support", "LOCK" to "Stax Lock",
     )
 
     private fun axisLabel(axis: AxisKey): String = when {

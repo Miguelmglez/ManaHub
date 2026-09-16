@@ -18,8 +18,10 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -187,26 +189,54 @@ private fun FallbackFlagCard(draft: CommanderDraftBuild, onCardClick: (String) -
                 )
             }
             if (standaloneCards.isNotEmpty()) {
-                Text(
-                    text = stringResource(R.string.deck_wizard_choice_fallback_standalone_subtitle, standaloneCards.size),
-                    style = ty.bodySmall,
-                    color = mc.textSecondary,
-                    modifier = Modifier.padding(top = spacing.xs, bottom = spacing.sm),
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                    standaloneCards.forEach { (id, card) -> FallbackFlagRow(card = card, onCardClick = { onCardClick(id) }) }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.xs), modifier = Modifier.padding(top = spacing.xs)) {
+                    Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = mc.goldMtg, modifier = Modifier.size(16.dp))
+                    Text(
+                        text = stringResource(R.string.deck_wizard_choice_fallback_standalone_subtitle, standaloneCards.size),
+                        style = ty.bodySmall,
+                        color = mc.textSecondary,
+                    )
                 }
+                FallbackFlagCardList(cards = standaloneCards, onCardClick = onCardClick, modifier = Modifier.padding(top = spacing.sm))
             }
             if (offPlanCards.isNotEmpty()) {
-                Text(
-                    text = stringResource(R.string.deck_wizard_choice_fallback_offplan_subtitle, offPlanCards.size),
-                    style = ty.bodySmall,
-                    color = mc.textSecondary,
-                    modifier = Modifier.padding(top = spacing.sm, bottom = spacing.sm),
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                    offPlanCards.forEach { (id, card) -> FallbackFlagRow(card = card, onCardClick = { onCardClick(id) }) }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.xs), modifier = Modifier.padding(top = spacing.sm)) {
+                    Icon(imageVector = Icons.Default.HelpOutline, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(16.dp))
+                    Text(
+                        text = stringResource(R.string.deck_wizard_choice_fallback_offplan_subtitle, offPlanCards.size),
+                        style = ty.bodySmall,
+                        color = mc.textSecondary,
+                    )
                 }
+                FallbackFlagCardList(cards = offPlanCards, onCardClick = onCardClick, modifier = Modifier.padding(top = spacing.sm))
+            }
+        }
+    }
+}
+
+/** One [FallbackFlagCard] subsection's card list -- capped at [DEFAULT_VISIBLE_ALTERNATIVES] with a
+ * "Show N more" affordance, mirroring [ChoiceSectionCard]'s own alternatives cap on the same screen. */
+@Composable
+private fun FallbackFlagCardList(cards: List<Pair<String, Card>>, onCardClick: (String) -> Unit, modifier: Modifier = Modifier) {
+    val ty = MaterialTheme.magicTypography
+    val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
+    var expanded by remember(cards) { mutableStateOf(false) }
+    val visibleCards = if (expanded) cards else cards.take(DEFAULT_VISIBLE_ALTERNATIVES)
+    val hiddenCount = cards.size - visibleCards.size
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+        visibleCards.forEach { (id, card) -> FallbackFlagRow(card = card, onCardClick = { onCardClick(id) }) }
+        if (!expanded && hiddenCount > 0) {
+            Box(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { expanded = true },
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    text = stringResource(R.string.deck_wizard_choice_show_more, hiddenCount),
+                    style = ty.labelMedium,
+                    color = mc.primaryAccent,
+                )
             }
         }
     }

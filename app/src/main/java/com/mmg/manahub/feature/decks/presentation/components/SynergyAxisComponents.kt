@@ -83,12 +83,18 @@ fun SynergyPackagesSection(
     }
 
     if (engines.isEmpty()) {
-        Text(
-            text = stringResource(R.string.deck_analysis_synergy_no_live_packages),
-            style = MaterialTheme.magicTypography.bodySmall,
-            color = mc.textSecondary,
-            modifier = modifier.fillMaxWidth().padding(vertical = spacing.sm),
-        )
+        Surface(
+            shape = CardShape,
+            color = mc.backgroundSecondary,
+            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
+            modifier = modifier.fillMaxWidth(),
+        ) {
+            EmptyState(
+                title = stringResource(R.string.deck_analysis_synergy_no_live_engines_title),
+                subtitle = stringResource(R.string.deck_analysis_synergy_no_live_engines_body),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         return
     }
 
@@ -96,10 +102,11 @@ fun SynergyPackagesSection(
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
         engines.forEach { engine ->
-            val producerSection = sections.firstOrNull { it.id == "engine:${engine.axis}:producers" }
-                ?: CardSection(id = "engine:${engine.axis}:producers", label = engine.label, current = engine.producers.sumOf { it.quantity }, contributions = engine.producers)
-            val payoffSection = sections.firstOrNull { it.id == "engine:${engine.axis}:payoffs" }
-                ?: CardSection(id = "engine:${engine.axis}:payoffs", label = engine.label, current = engine.payoffs.sumOf { it.quantity }, contributions = engine.payoffs)
+            // AnalysisEngine always emits both sides of an engine axis from the same graph pass -- a
+            // miss here means the two have drifted apart, so this fails loudly instead of silently
+            // rendering a band-less section.
+            val producerSection = sections.first { it.id == "engine:${engine.axis}:producers" }
+            val payoffSection = sections.first { it.id == "engine:${engine.axis}:payoffs" }
             SynergyEngineCard(
                 engine = engine,
                 producerSection = producerSection,
@@ -156,11 +163,13 @@ private fun SynergyEngineCard(
                         } else {
                             stringResource(R.string.deck_analysis_engine_missing_producers)
                         }
-                        Surface(shape = ChipShape, color = mc.goldMtg.copy(alpha = 0.15f)) {
+                        // goldMtg text on a 15%-goldMtg tonal fill drops below 4.5:1 on HallowedPrint
+                        // (3.24:1) -- a bordered surface with textPrimary ink clears AA on every theme.
+                        Surface(shape = ChipShape, color = mc.backgroundSecondary, border = BorderStroke(1.dp, mc.goldMtg)) {
                             Text(
                                 text = badgeText,
                                 style = ty.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = mc.goldMtg,
+                                color = mc.textPrimary,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             )
                         }

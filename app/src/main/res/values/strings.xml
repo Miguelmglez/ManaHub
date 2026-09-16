@@ -300,6 +300,7 @@
     <string name="scanner_ocr_scanning">Scanning</string>
     <string name="scanner_ocr_paused">Paused</string>
     <string name="scanner_permission_denied_settings">Camera permission denied. Open Settings to enable it.</string>
+    <string name="scanner_invalid_link">This scanner link is invalid.</string>
 
     <!-- Scanner — no-modal UI (bulk scanner) -->
     <string name="scanner_hash_db_missing">Card database not loaded — scanner identification disabled</string>
@@ -315,6 +316,14 @@
     <string name="scanner_queue_title">%1$d cards scanned</string>
     <string name="scanner_queue_search_hint">Filter by name…</string>
     <string name="scanner_queue_button_desc">Scan queue</string>
+    <string name="scanner_pause_recognition">Pause card recognition</string>
+    <string name="scanner_resume_recognition">Resume card recognition</string>
+    <string name="scanner_select_language">Select scan language</string>
+    <string name="scanner_disable_sound">Disable scanner sounds</string>
+    <string name="scanner_enable_sound">Enable scanner sounds</string>
+    <string name="scanner_disable_flash">Turn off scanner flash</string>
+    <string name="scanner_enable_flash">Turn on scanner flash</string>
+    <string name="scanner_remove_detected_card">Remove detected card</string>
     <string name="scanner_add_all">+ Add to collection</string>
     <string name="scanner_clear_session">Clear</string>
     <string name="scanner_quick_mode">Quick Mode</string>
@@ -373,6 +382,36 @@
     <string name="scanner_queue_auto_delete_title">Auto-delete on add</string>
     <string name="scanner_queue_auto_delete_desc">Remove entry from the queue when added to collection or wishlist</string>
     <string name="scanner_already_in_collection">Already in your collection</string>
+
+    <!-- Scanner — deck target queue -->
+    <string name="scanner_deck_queue_title">Scan queue for deck (%1$d)</string>
+    <string name="scanner_deck_queue_clear_all">Discard all scanned cards</string>
+    <string name="scanner_deck_queue_empty_title">No cards scanned yet</string>
+    <string name="scanner_deck_queue_empty_subtitle">Scan cards to add them to this deck.</string>
+    <string name="scanner_deck_queue_no_matches_title">No matching cards</string>
+    <string name="scanner_deck_queue_no_matches_subtitle">Try a different card name.</string>
+    <string name="scanner_deck_queue_auto_delete_title">Remove entry after adding it to the deck</string>
+    <string name="scanner_deck_queue_auto_delete_desc">Automatically remove successful additions from this queue</string>
+    <string name="scanner_deck_queue_auto_delete_a11y">Toggle automatic queue removal after adding to the deck</string>
+    <string name="scanner_deck_add_all_mainboard">Add all to Mainboard</string>
+    <string name="scanner_deck_add_all_sideboard">Add all to Sideboard</string>
+    <string name="scanner_deck_action_mainboard">Mainboard</string>
+    <string name="scanner_deck_action_sideboard">Sideboard</string>
+    <string name="scanner_deck_action_discard">Discard</string>
+    <string name="scanner_deck_action_mainboard_a11y">Add %1$s to Mainboard</string>
+    <string name="scanner_deck_action_sideboard_a11y">Add %1$s to Sideboard</string>
+    <string name="scanner_deck_action_discard_a11y">Discard %1$s</string>
+    <string name="scanner_deck_decrease_quantity_a11y">Decrease %1$s quantity</string>
+    <string name="scanner_deck_increase_quantity_a11y">Increase %1$s quantity</string>
+    <string name="scanner_deck_close_queue_a11y">Close deck scan queue</string>
+    <string name="scanner_deck_add_success">Added %1$d card(s) to %2$s.</string>
+    <string name="scanner_deck_add_blocked_commander">Commander entries were blocked. Add them to Sideboard instead.</string>
+    <string name="scanner_deck_add_no_cards">No cards were added.</string>
+    <string name="scanner_deck_add_failed">Could not add cards to the deck.</string>
+    <plurals name="scanner_deck_add_partial_success">
+        <item quantity="one">Added %1$d card(s); %2$d commander entry was blocked.</item>
+        <item quantity="other">Added %1$d card(s); %2$d commander entries were blocked.</item>
+    </plurals>
 
     <!-- ══════════════════════════════════════════
          STATS SCREEN
@@ -867,7 +906,8 @@
     <string name="deck_analysis_synergy_packages_header">Engines</string>
     <string name="deck_analysis_synergy_not_applicable_title">No detectable synergy plan</string>
     <string name="deck_analysis_synergy_not_applicable_body">This deck has no producer→payoff pairs the engine can detect. That doesn\'t mean it\'s poorly built — a straightforward removal-and-card-advantage plan can legitimately have no synergy graph at all — it just means this pillar has nothing to measure, so it\'s excluded from your score instead of scored as zero.</string>
-    <string name="deck_analysis_synergy_no_live_packages">No engine yet — an engine needs a producer or payoff side with real numbers in the deck.</string>
+    <string name="deck_analysis_synergy_no_live_engines_title">No engines yet</string>
+    <string name="deck_analysis_synergy_no_live_engines_body">An engine needs a producer or payoff side with real numbers in the deck. Add cards on either side to see one appear here.</string>
     <string name="deck_analysis_engine_title">%1$s engine</string>
     <string name="deck_analysis_engine_counts">%1$d producers → %2$d payoffs</string>
     <string name="deck_analysis_engine_missing_payoffs">Missing payoffs</string>
@@ -914,7 +954,7 @@
     <string name="deck_analysis_axis_group">Group Effects</string>
     <string name="deck_analysis_axis_mill_opp">Mill (Opponent)</string>
     <string name="deck_analysis_axis_lock">Stax Lock</string>
-    <string name="deck_analysis_axis_engine">Engine</string>
+    <string name="deck_analysis_axis_engine">Support</string>
     <string name="deck_analysis_axis_tribe_format">%1$s (Tribe)</string>
 
     <!-- Deck Analysis Engine v3, Phase 5 (UI): the archetype resemblance card — macro/posture/
@@ -990,6 +1030,35 @@
     <string name="deck_studio_discard_confirm_title">Discard this deck?</string>
     <string name="deck_studio_discard_confirm_body">This deck is empty and hasn\'t been named. It won\'t be saved.</string>
     <string name="deck_studio_add_card_fab">Add card to deck</string>
+    <string name="deck_studio_add_cards_title">Add cards</string>
+    <string name="deck_studio_search_manually">Search manually</string>
+    <string name="deck_studio_search_manually_desc">Browse your collection or all cards</string>
+    <string name="deck_studio_scan_cards">Scan cards</string>
+    <string name="deck_studio_scan_cards_desc">Use the camera to recognize cards</string>
+    <string name="deck_studio_scan_cards_unavailable">Load the deck before scanning cards.</string>
+    <string name="deck_studio_add_cards_method_a11y">Choose how to add cards</string>
+    <string name="deck_studio_deck_value">Estimated deck value</string>
+    <string name="deck_studio_deck_value_mainboard">Mainboard</string>
+    <string name="deck_studio_deck_value_sideboard">Sideboard</string>
+    <string name="deck_studio_deck_value_empty">No cards</string>
+    <string name="deck_studio_deck_value_unknown">No price data</string>
+    <string name="deck_studio_deck_value_partial">%1$d cards without price</string>
+    <string name="deck_studio_deck_value_mainboard_a11y">Mainboard estimated value: %1$s</string>
+    <string name="deck_studio_deck_value_sideboard_a11y">Sideboard estimated value: %1$s</string>
+    <string name="deck_studio_add_cards_subtitle">Choose how to add cards to this deck.</string>
+    <string name="deck_studio_add_cards_manual_title">Search manually</string>
+    <string name="deck_studio_add_cards_manual_subtitle">Find cards by name or advanced filters.</string>
+    <string name="deck_studio_add_cards_scan_title">Scan cards</string>
+    <string name="deck_studio_add_cards_scan_subtitle">Use your camera to add cards to this deck.</string>
+    <string name="deck_studio_add_cards_scan_disabled">Load a deck before scanning cards.</string>
+    <string name="deck_studio_value_title">Deck value</string>
+    <string name="deck_studio_value_mainboard">Mainboard</string>
+    <string name="deck_studio_value_sideboard">Sideboard</string>
+    <string name="deck_studio_value_accessibility">%1$s value: %2$s</string>
+    <plurals name="deck_studio_value_missing_copies">
+        <item quantity="one">%1$d copy without a price</item>
+        <item quantity="other">%1$d copies without a price</item>
+    </plurals>
     <string name="deck_studio_suggestions_tab_health">Health</string>
     <string name="deck_studio_suggestions_tab_cuts">Cuts</string>
     <string name="deck_studio_suggestions_tab_adds">Adds</string>

@@ -1,4 +1,5 @@
 package com.mmg.manahub.app.navigation
+// COMMENTS_REVIEWED: 2026-09-16
 
 import android.net.Uri
 
@@ -23,6 +24,12 @@ sealed class Screen(val route: String) {
     object CollectionMultiAddCard  : Screen("collection/multiaddcard")
 
     object CollectionScanner  : Screen("collection/scanner")
+    object DeckScanner : Screen("deck/{deckId}/scanner") {
+        fun createRoute(deckId: String): String {
+            require(deckId.isNotBlank()) { "deckId must not be blank" }
+            return "deck/${Uri.encode(deckId)}/scanner"
+        }
+    }
     object CollectionCardDetail : Screen("collection/detail/{scryfallId}?sharedTransitionKey={sharedTransitionKey}") {
         fun createRoute(scryfallId: String, sharedTransitionKey: String? = null) =
             "collection/detail/${Uri.encode(scryfallId)}" + (sharedTransitionKey?.let { "?sharedTransitionKey=${Uri.encode(it)}" } ?: "")

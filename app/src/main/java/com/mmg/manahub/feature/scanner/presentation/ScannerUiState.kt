@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.scanner.presentation
+// COMMENTS_REVIEWED: 2026-09-16
 
 import android.graphics.PointF
 import com.mmg.manahub.core.model.Card
@@ -76,6 +77,7 @@ import com.mmg.manahub.core.ui.components.MagicToastType
  *                                  `rememberRateLimitCountdownSeconds`.
  */
 data class ScannerUiState(
+    val target: ScannerTarget = ScannerTarget.Collection,
     val isFlashOn: Boolean = false,
     val hasFlash: Boolean = true,
     val isRecognitionPausedByUser: Boolean = false,

@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.di
+// COMMENTS_REVIEWED: 2026-09-16
 
 import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.cache.ManaSymbolStore
@@ -32,6 +33,8 @@ import com.mmg.manahub.feature.draft.domain.usecase.GetSetVideosUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.MakePickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.ObserveDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.StartDraftUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.AddScannedCardsToDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.CalculateDeckValueSummaryUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
@@ -201,4 +204,6 @@ fun sharedDomainKoinModule(
 
     // ── Deck use cases. ──
     single { GetDeckGameStatsUseCase(gameSessionRepository = get(), cardRepository = get()) }
+    single<AddScannedCardsToDeckUseCase> { AddScannedCardsToDeckUseCase(deckRepository = get()) }
+    single<CalculateDeckValueSummaryUseCase> { CalculateDeckValueSummaryUseCase() }
 }

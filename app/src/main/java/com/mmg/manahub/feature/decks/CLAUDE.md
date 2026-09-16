@@ -131,12 +131,22 @@ off suggestion use cases below). New engine, pure `commonMain`,
     `tribe_members` had a band but no `RoleSpec`, so it was permanently absent from `roleCounts` on
     every TRIBAL skeleton — now wired via `ArchetypeRoleClassifier.tribeMemberCount`/
     `dominantTribeKey`).
-  - **SYNERGY sections** are the deck's top `profile.tagFingerprint` keys over the alignment
-    threshold (strategy + `tribe:` keys) plus a mandatory **"Off-plan"** section (`id = "offplan"`)
-    listing every non-aligned card that depresses the subscore — `offplan` never gets a Browse button
-    (nothing to search for). `subscore` math is UNCHANGED (still `density × 100`); the pillar's
-    sub-caption reads `"aligned N / M non-lands"` so the number stays explainable without granting
-    SYNERGY extra visual authority — it remains the weakest-calibrated pillar (KDoc warning kept).
+  - **SYNERGY sections — REWRITTEN by Deck Wizard v5 (D2/D3, ADR-009).** The pillar now renders
+    **Engines first**, then the deck's tribe ONCE, then `interaction`/`standalone`/`offplan`. The old
+    loose `fingerprint:<key>` list is GONE: a TRIBAL tag groups into the single `tribe:<x>` key space
+    (no more "Human" beside "Human (tribe)"), and a tag whose key is a `RoleKey` the skeleton already
+    bands is dropped from fingerprint grouping entirely (it would restate the richer `role:<key>`
+    section — this was duplicating a label on 45% of real builds, usually `card_draw`). An **engine**
+    is `PillarResult.synergyEngines`: per axis, the real producer and payoff card lists with REAL
+    counts (`Σ quantity`), both ideals, and a state of COMPLETE / MISSING_PAYOFFS / MISSING_PRODUCERS
+    — shown as soon as the axis has ≥1 card on each side, or one side ≥ half its ideal (flagged
+    incomplete). Each side is its own browsable section (`engine:<AXIS>:producers` / `:payoffs`).
+    `AxisState.health` stays INTERNAL to scoring — the old "% healthy" caption and the LIVE badge were
+    deleted as meaningless to players; never surface a health percentage again. MILL_OPP and LOCK are
+    excluded from Engines by design (payoff-optional: they would always read "missing payoffs").
+    `subscore` math is UNCHANGED and reads the graph, never these display sections — if a scoring path
+    ever reads a section, that is a bug. The pillar's sub-caption still reads `"aligned N / M
+    non-lands"`; it remains the weakest-calibrated pillar (KDoc warning kept).
   - **`SectionSearchQuery.kt` (new, `shared/core-domain/.../engine/`) owns ALL Scryfall query
     building — the engine itself stays 100% query-syntax-free.** `fragmentFor`/`buildFor`/
     `collectionTagKeysFor` per section id: direct `function:` oracle tags where one exists, a handful
@@ -287,7 +297,8 @@ off suggestion use cases below). New engine, pure `commonMain`,
 **The durable record is `docs/deck-wizard-state.md`** (architecture contract, D1-D16 decisions,
 engine defects F1-F18, the 60-card wave's inheritance notes) — read it before touching any wizard
 code. `FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED` is `true` (Deck Wizard Commander v3 plan, Phase 8,
-2026-09-09; v4 campaign layered the Choice screen + harness v3 + telemetry on top, 2026-09-15). Only
+2026-09-09; v4 layered the Choice screen + harness v3 + telemetry on top, 2026-09-15; **v5 added the
+category vocabulary, Synergy Engines and placement-quality rules, 2026-09-15/16 — see ADR-009**). Only
 the must-know invariants live here:
 
 - **Commander/Commander Casual build through `BuildCommanderDeckUseCase`** (`shared/core-domain/
@@ -357,6 +368,29 @@ the must-know invariants live here:
   Composable directly; no card/deck names or other free text in any Crashlytics key or exception
   message (`BuildCommanderDeckUseCase`'s blocker telemetry logs format + colour-identity size, never
   `commander.name`). ≤4 custom keys per logical operation.
+- **ONE category vocabulary (v5, ADR-009).** `CategoryVocabulary.cardTagKeysFor(roleKey)` is the only
+  answer to "which `CardTag` keys mean membership in this category", read by BOTH
+  `ArchetypeRoleClassifier.tagMatcher` (classification) and `SectionSearchQuery.collectionTagKeysFor`
+  (Browse's Collection filter), so a card the analysis attributes to a category is exactly what Browse
+  finds. Section Browse must never resolve its Collection filter through
+  `CardFunctionOption.collectionTagKeys` again — that second, wider vocabulary is what made "Counters
+  Payoff" list cards the analysis ignored. Widening a membership requires citing the `TagDictionary`
+  rules that prove two keys detect the same thing. KNOWN GAP: `RoleClassifier`'s private oracle-text
+  fallback for the 5 legacy roles is visible to the analysis but not to Browse (ADR-009 debt).
+- **The wizard never over-fills a role or plants an off-plan card (v5, S7/S8/D4).**
+  `PlacementScorer.marginalGain` charges an overflow cost for pushing any non-anti role past its
+  `max`, and the build loop hard-excludes an overflowing candidate while a non-overflowing one still
+  clears the floor. A bare type-line density producer (Instant/Sorcery/Artifact/Enchantment) only
+  earns axis gain when the plan targets that axis or a payoff is already placed — otherwise it would
+  form no edge and read off-plan. When on-plan candidates run out, the builder fills from Standalone
+  (own classified role) and only then off-plan, recording both in
+  `WizardBuildResult.fallbackStandaloneIds`/`fallbackOffPlanIds`. **Every fallback build MUST reach a
+  surface that shows those ids** — the Choice phase is entered on ambiguity OR fallback, never on
+  ambiguity alone (a v5 audit found the fallback flag silently vanishing on zero-ambiguity builds).
+  `refine` is a bounded local search (worst card out, best of a shortlist in, verified by full
+  re-analysis); it must never swap in a null-gain card without flagging it as off-plan.
+- **Quality over speed on generation** — a slower build is acceptable, a worse deck is not (the user's
+  own instruction). Record runtime percentiles; never trade deck quality for latency.
 
 **The SINGLE deck create + edit surface.** Both new decks AND existing decks route here: DeckList FAB +
 empty-state, Collection/Stats/Home/CardDetail deck-open, and Home → "Build deck" all navigate to

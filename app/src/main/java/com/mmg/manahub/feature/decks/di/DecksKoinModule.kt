@@ -261,6 +261,7 @@ fun decksKoinModule(): Module = module {
             // Suggestions Tab UI Polish plan (W11 bug-fix pass, 2026-08-25) -- already a `single`
             // in SharedDomainKoinModule (shared with AdvancedSearchViewModel/AddCardViewModel).
             buildScryfallQueryUseCase = get(),
+            calculateDeckValueSummaryUseCase = get(),
         )
     }
 

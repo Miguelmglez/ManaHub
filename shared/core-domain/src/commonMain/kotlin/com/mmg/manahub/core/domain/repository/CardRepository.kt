@@ -1,5 +1,7 @@
 package com.mmg.manahub.core.domain.repository
 
+// COMMENTS_REVIEWED: 2026-09-16
+
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
@@ -21,6 +23,9 @@ interface CardRepository {
         page: Int = 1,
         bypassCache: Boolean = false,
     ): DataResult<List<Card>>
+
+    /** Fetches one fresh random card from Scryfall's complete catalog. */
+    suspend fun getRandomCard(query: String? = null): DataResult<Card> = DataResult.Error("UNSUPPORTED")
 
     /**
      * Searches Scryfall for cards matching [query]. Returns paginated results with a [hasMore] flag.

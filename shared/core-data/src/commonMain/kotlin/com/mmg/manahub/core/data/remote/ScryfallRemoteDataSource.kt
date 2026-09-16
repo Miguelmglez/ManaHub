@@ -1,5 +1,7 @@
 package com.mmg.manahub.core.data.remote
 
+// COMMENTS_REVIEWED: 2026-09-16
+
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.network.ScryfallCache
@@ -150,6 +152,14 @@ class ScryfallRemoteDataSource(
                 val cacheKey = "${query.lowercase().trim()}:$page"
                 cache.searches.getOrFetch(cacheKey, loader)
             }
+        }
+
+    /** Fetches and caches one uncached random card from Scryfall's complete catalog. */
+    suspend fun getRandomCard(query: String? = null): Result<Card> =
+        safeCall {
+            requestQueue.execute { api.getRandomCard(query) }
+                .toDomain()
+                .also { card -> cache.cards.put(card.scryfallId, card) }
         }
 
     /**

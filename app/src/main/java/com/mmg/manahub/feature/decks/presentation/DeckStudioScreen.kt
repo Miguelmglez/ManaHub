@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation
-// COMMENTS_REVIEWED: 2026-09-15
+// COMMENTS_REVIEWED: 2026-09-16
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
@@ -84,6 +84,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -112,6 +113,7 @@ import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.GroupingMode
+import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardSearchSheet
 import com.mmg.manahub.core.ui.components.CardRow
@@ -150,6 +152,7 @@ import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
 import com.mmg.manahub.feature.decks.domain.template.DiscoverySearchFilter
 import com.mmg.manahub.feature.decks.domain.template.partitionByAxis
 import com.mmg.manahub.feature.decks.domain.usecase.SimilarDeckResult
+import com.mmg.manahub.feature.decks.domain.usecase.DeckValueSummary
 import com.mmg.manahub.feature.decks.presentation.components.AddBasicLandsRow
 import com.mmg.manahub.feature.decks.presentation.components.ArchetypeResemblanceCard
 import com.mmg.manahub.feature.decks.presentation.components.BasicLandsSheet
@@ -157,8 +160,11 @@ import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
 import com.mmg.manahub.feature.decks.presentation.components.CardSectionRow
 import com.mmg.manahub.feature.decks.presentation.components.CuratedStrategyPickerSheet
 import com.mmg.manahub.feature.decks.presentation.components.DeckImportSheet
+import com.mmg.manahub.feature.decks.presentation.components.DeckAddCardsMethodSheet
+import com.mmg.manahub.feature.decks.presentation.components.DeckAddCardsMethod
 import com.mmg.manahub.feature.decks.presentation.components.DeckStatsCard
 import com.mmg.manahub.feature.decks.presentation.components.DeckSummaryCard
+import com.mmg.manahub.feature.decks.presentation.components.DeckValueCard
 import com.mmg.manahub.feature.decks.presentation.components.EditDeckSheet
 import com.mmg.manahub.feature.decks.presentation.components.FindingsList
 import com.mmg.manahub.feature.decks.presentation.components.GroupHeader
@@ -182,6 +188,29 @@ import org.koin.androidx.compose.koinViewModel
 // CardSearchSheet's own tab indices for a 2-tab (no Wishlist) sheet.
 private const val ADD_CARDS_TAB_COLLECTION = 0
 private const val ADD_CARDS_TAB_ALL_CARDS = 1
+
+internal sealed interface PendingDeckAddCardsAction {
+    data object OpenManualSearch : PendingDeckAddCardsAction
+    data class NavigateToScanner(val deckId: String) : PendingDeckAddCardsAction
+}
+
+internal fun resolvePendingDeckAddCardsAction(
+    method: DeckAddCardsMethod?,
+    methodSheetVisible: Boolean,
+    isDestinationResumed: Boolean,
+    isNavigatingToScanner: Boolean,
+    deckId: String?,
+): PendingDeckAddCardsAction? {
+    if (method == null || methodSheetVisible || !isDestinationResumed) return null
+
+    return when (method) {
+        DeckAddCardsMethod.MANUAL_SEARCH -> PendingDeckAddCardsAction.OpenManualSearch
+        DeckAddCardsMethod.SCAN_CARDS -> deckId
+            ?.takeIf { it.isNotBlank() }
+            ?.takeIf { !isNavigatingToScanner }
+            ?.let(PendingDeckAddCardsAction::NavigateToScanner)
+    }
+}
 
 /**
  * The unified "Deck Studio" editor surface (Phase 1).
@@ -241,6 +270,7 @@ fun DeckStudioScreen(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     viewModel: DeckStudioViewModel = koinViewModel(),
     onNavigateToMassiveAddCards: (List<Card>) -> Unit = {},
+    onNavigateToScanner: (deckId: String) -> Unit = {},
     ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val deckStats by viewModel.deckStatsFlow.collectAsStateWithLifecycle()
@@ -274,6 +304,9 @@ fun DeckStudioScreen(
     // showStrategySheet) was evaluated and left as plain `remember` -- none of their sheet CONTENTS
     // contain a card tap that navigates away to a full screen, so none share this failure mode.
     var showAddCardsSheet by rememberSaveable { mutableStateOf(false) }
+    var showAddCardsMethodSheet by rememberSaveable { mutableStateOf(false) }
+    var isNavigatingToScanner by rememberSaveable { mutableStateOf(false) }
+    var pendingAddCardsMethod by remember { mutableStateOf<DeckAddCardsMethod?>(null) }
     var showCommanderSearchSheet by rememberSaveable { mutableStateOf(false) }
 
     // CardSearchSheet renders in its own window ABOVE the NavHost, so it would stay on top (owning
@@ -282,6 +315,9 @@ fun DeckStudioScreen(
     // starts and remounts it on return; its results live in the VM, which outlives the unmount.
     val isDestinationResumed = LocalLifecycleOwner.current.lifecycle
         .currentStateAsState().value.isAtLeast(Lifecycle.State.RESUMED)
+    LaunchedEffect(isDestinationResumed) {
+        if (isDestinationResumed) isNavigatingToScanner = false
+    }
     // Hoisted out of CardSearchSheet so the tab survives that unmount. 0 = Collection, 1 = All
     // Cards (the sheet's own indices with no Wishlist tab); reset wherever sectionBrowseSectionId is.
     var addCardsSheetTab by rememberSaveable { mutableIntStateOf(ADD_CARDS_TAB_COLLECTION) }
@@ -309,6 +345,42 @@ fun DeckStudioScreen(
     }
     val sectionBrowseTagKeys = remember(sectionBrowseSectionId) {
         sectionBrowseSectionId?.let { SectionSearchQuery.collectionTagKeysFor(it) } ?: emptySet()
+    }
+    LaunchedEffect(pendingAddCardsMethod, showAddCardsMethodSheet, isDestinationResumed) {
+        val pendingMethod = pendingAddCardsMethod ?: return@LaunchedEffect
+        resolvePendingDeckAddCardsAction(
+            method = pendingMethod,
+            methodSheetVisible = showAddCardsMethodSheet,
+            isDestinationResumed = isDestinationResumed,
+            isNavigatingToScanner = isNavigatingToScanner,
+            deckId = uiState.deck?.id,
+        ) ?: return@LaunchedEffect
+
+        withFrameNanos { }
+
+        val action = resolvePendingDeckAddCardsAction(
+            method = pendingMethod,
+            methodSheetVisible = showAddCardsMethodSheet,
+            isDestinationResumed = isDestinationResumed,
+            isNavigatingToScanner = isNavigatingToScanner,
+            deckId = uiState.deck?.id,
+        ) ?: return@LaunchedEffect
+        pendingAddCardsMethod = null
+
+        when (action) {
+            PendingDeckAddCardsAction.OpenManualSearch -> {
+                sectionBrowseSectionId = null
+                addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
+                viewModel.clearActiveStructuredSearchFragment()
+                viewModel.showCollectionCards()
+                showAddCardsSheet = true
+            }
+
+            is PendingDeckAddCardsAction.NavigateToScanner -> {
+                isNavigatingToScanner = true
+                onNavigateToScanner(action.deckId)
+            }
+        }
     }
     var showBasicLandsSheet by remember { mutableStateOf(false) }
     var showEditDeckSheet by remember { mutableStateOf(false) }
@@ -383,6 +455,10 @@ fun DeckStudioScreen(
             // C3: the inline detail sheet sits on top of everything (incl. the commander
             // search sheet), so it must close first.
             selectedCardId != null -> { selectedCardId = null; isCardDetailInCommanderContext = false }
+            showAddCardsMethodSheet -> {
+                pendingAddCardsMethod = null
+                showAddCardsMethodSheet = false
+            }
             showAddCardsSheet -> {
                 showAddCardsSheet = false
                 sectionBrowseSectionId = null
@@ -412,7 +488,7 @@ fun DeckStudioScreen(
     // [resolveWizardNavDecision]'s KDoc). replaceConfirmed=false is safe here for the same reason --
     // [DeckWizardViewModel] still re-checks the deck's real card count at persist time.
     val handleBuildFromSeed: () -> Unit = {
-        when (resolveWizardNavDecision(WizardEntryPoint.BUILD_FROM_SEED, isCommanderFormat, hasTriggeredWizardNav)) {
+        when (resolveWizardNavDecision(WizardEntryPoint.BUILD_FROM_SEED, hasTriggeredWizardNav)) {
             WizardNavDecision.NAVIGATE_NOW -> {
                 val deckId = uiState.deck?.id
                 val format = uiState.deck?.format
@@ -430,7 +506,7 @@ fun DeckStudioScreen(
     // cards (its overflow-menu render gate below), so it ALWAYS confirms before firing -- there is
     // no more empty-deck skip branch to consider.
     val handleRebuildWithWizard: () -> Unit = {
-        when (resolveWizardNavDecision(WizardEntryPoint.REBUILD, isCommanderFormat, hasTriggeredWizardNav)) {
+        when (resolveWizardNavDecision(WizardEntryPoint.REBUILD, hasTriggeredWizardNav)) {
             WizardNavDecision.REQUIRE_CONFIRM -> {
                 viewModel.onRebuildConfirmShown()
                 showRebuildConfirm = true
@@ -488,21 +564,17 @@ fun DeckStudioScreen(
                 }
             },
             floatingActionButton = {
-                // FAB only on the Build tab.
+                // Adding cards is available only after the live deck has loaded.
                 AnimatedVisibility(
-                    visible = uiState.selectedTab == DeckStudioTab.BUILD,
+                    visible = uiState.selectedTab == DeckStudioTab.BUILD &&
+                        !uiState.isLoading && uiState.deck != null,
                     enter = fadeIn(),
                     exit = fadeOut(),
                 ) {
                     FloatingActionButton(
                         onClick = {
-                            sectionBrowseSectionId = null
-                            addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
-                            // Not clearAddCardsState() here: that would also wipe the results
-                            // showCollectionCards() populates below.
-                            viewModel.clearActiveStructuredSearchFragment()
-                            viewModel.showCollectionCards()
-                            showAddCardsSheet = true
+                            pendingAddCardsMethod = null
+                            showAddCardsMethodSheet = true
                         },
                         containerColor = mc.primaryAccent,
                         contentColor = mc.background,
@@ -515,10 +587,17 @@ fun DeckStudioScreen(
             },
         ) { padding ->
             Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-                if (uiState.isLoading || uiState.deck == null) {
+                if (uiState.isLoading) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         MagicLoadingSpinner()
                     }
+                } else if (uiState.deck == null) {
+                    FullErrorState(
+                        message = stringResource(R.string.deck_studio_create_failed),
+                        retryLabel = stringResource(R.string.action_back),
+                        onRetry = onBack,
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 } else {
                     // The Suggestions tab is HIDDEN for release behind
                 // DeckFeatureFlags.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED (UI-only; the SUGGESTIONS
@@ -562,6 +641,8 @@ fun DeckStudioScreen(
                             uiState = uiState,
                             isCommanderFormat = isCommanderFormat,
                             deckStats = deckStats,
+                            preferredCurrency = uiState.preferredCurrency,
+                            deckValueSummary = uiState.deckValueSummary,
                             playerName = playerName,
                             // External nav (full CardDetail screen) — used by the stats card.
                             onCardClick = onCardClick,
@@ -893,6 +974,14 @@ fun DeckStudioScreen(
         )
     }
 
+    if (showAddCardsMethodSheet && isDestinationResumed) {
+        DeckAddCardsMethodSheet(
+            scanEnabled = uiState.deck?.id?.isNotBlank() == true,
+            onDismiss = { showAddCardsMethodSheet = false },
+            onMethodSelected = { pendingAddCardsMethod = it },
+        )
+    }
+
     if (showAddCardsSheet && isDestinationResumed) {
         CardSearchSheet(
             query = uiState.addCardsQuery,
@@ -935,7 +1024,9 @@ fun DeckStudioScreen(
             initialCollectionTagKeys = sectionBrowseTagKeys,
             // One entry point filtering BOTH tabs: Scryfall for All Cards, the local matcher for
             // Collection. Also serves the Advanced Search sheet's own SEARCH CARDS button.
-            onAdvancedSearch = viewModel::applyStructuredSearch,
+            // sectionBrowseSectionId threaded through so a zero-hit result can be correlated back
+            // to its originating Analysis-tab category (null for the generic Advanced Search path).
+            onAdvancedSearch = { query -> viewModel.applyStructuredSearch(query, sectionBrowseSectionId) },
             onFilterCollectionByTags = viewModel::searchCollectionByTags,
             selectedTabIndex = addCardsSheetTab,
             onSelectedTabChange = { addCardsSheetTab = it },
@@ -1030,11 +1121,11 @@ private fun DeckStudioTopBar(
                     overflow = TextOverflow.Ellipsis,
                 )
                 format?.let { fmt ->
-                    Surface(shape = ChipShape, color = mc.goldMtg.copy(alpha = 0.15f)) {
+                    Surface(shape = ChipShape, color = mc.surfaceVariant) {
                         Text(
                             text = fmt.uppercase(),
                             style = ty.labelSmall,
-                            color = mc.goldMtg,
+                            color = mc.textPrimary,
                             modifier = Modifier.padding(horizontal = spacing.xs, vertical = spacing.xxs),
                         )
                     }
@@ -1078,10 +1169,10 @@ private fun DeckStudioTopBar(
                     // Deck Wizard v4 (R15): "Build from seed" was REMOVED from this overflow menu --
                     // it now renders ONLY on the empty-deck state card (EmptyDeckState below),
                     // never here, so the two entry points can no longer both appear on the same
-                    // empty Commander deck. Gated on DECK_BUILDER_V2_ENABLED && isCommanderFormat &&
-                    // !isEmptyDeck: a deck that still has cards is the ONLY case this item exists
+                    // empty Commander deck. Gated on DECK_BUILDER_V2_ENABLED && !isEmptyDeck:
+                    // a deck that still has cards is the ONLY case this item exists
                     // for, since an empty one already offers the wizard on its state card.
-                    if (FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED && isCommanderFormat && !isEmptyDeck) {
+                    if (FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED && !isEmptyDeck) {
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -1209,6 +1300,8 @@ private fun BuildTab(
     uiState: DeckStudioUiState,
     isCommanderFormat: Boolean,
     deckStats: GetDeckGameStatsUseCase.Result?,
+    preferredCurrency: PreferredCurrency,
+    deckValueSummary: DeckValueSummary,
     playerName: String,
     onCardClick: (String) -> Unit,
     onDeckCardClick: (String) -> Unit,
@@ -1291,6 +1384,14 @@ private fun BuildTab(
                 maxInCurve = maxInCurve,
                 deckCards = deckCards,
                 modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md).animateItem(),
+            )
+        }
+
+        item(key = "deck_value") {
+            DeckValueCard(
+                summary = deckValueSummary,
+                currency = preferredCurrency,
+                modifier = Modifier.padding(horizontal = spacing.lg).animateItem(),
             )
         }
 
@@ -1561,16 +1662,14 @@ internal enum class WizardNavDecision { NAVIGATE_NOW, REQUIRE_CONFIRM, NO_OP }
  * [WizardEntryPoint.BUILD_FROM_SEED] is rendered ONLY on the empty-deck state card (nothing to
  * lose) and never confirms; [WizardEntryPoint.REBUILD] is rendered ONLY in the overflow menu on a
  * non-empty deck and always confirms. Kept as one function (not two) so both entry points read
- * their rule from the same place. `hasTriggeredWizardNav`/`isCommanderFormat` still gate both, as
- * defense-in-depth against a caller that renders either item outside its intended condition.
+ * their rule from the same place. `hasTriggeredWizardNav` remains a defense-in-depth guard against
+ * a caller that renders either item outside its intended condition.
  */
 internal fun resolveWizardNavDecision(
     entryPoint: WizardEntryPoint,
-    isCommanderFormat: Boolean,
     hasTriggeredWizardNav: Boolean,
 ): WizardNavDecision = when {
     hasTriggeredWizardNav -> WizardNavDecision.NO_OP
-    !isCommanderFormat -> WizardNavDecision.NO_OP
     entryPoint == WizardEntryPoint.BUILD_FROM_SEED -> WizardNavDecision.NAVIGATE_NOW
     else -> WizardNavDecision.REQUIRE_CONFIRM
 }
@@ -1585,17 +1684,15 @@ internal data class EmptyDeckStateOptions(
 )
 
 /**
- * R14: "Build from seed" opens the Commander-only Deck Wizard, so it must never appear (nor claim
- * the primary slot) on a deck whose format the wizard doesn't support -- gate its visibility on
- * [isCommanderFormat], not just [seedEnabled]. Exactly one card is primary in every combination:
- * seed (when available) always wins, else inspirations (when enabled), else import.
+ * "Build from seed" availability is controlled by [seedEnabled]. Exactly one card is primary in
+ * every combination: seed (when available) always wins, else inspirations (when enabled), else
+ * import.
  */
 internal fun resolveEmptyDeckStateOptions(
     seedEnabled: Boolean,
-    isCommanderFormat: Boolean,
     inspirationsEnabled: Boolean,
 ): EmptyDeckStateOptions {
-    val seedAvailable = seedEnabled && isCommanderFormat
+    val seedAvailable = seedEnabled
     return EmptyDeckStateOptions(
         showSeed = seedAvailable,
         seedIsPrimary = true,
@@ -1631,7 +1728,6 @@ private fun EmptyDeckState(
     // in the Deck Wizard & Engine Rework plan, WS7.2 (2026-07-28).
     val options = resolveEmptyDeckStateOptions(
         seedEnabled = FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED,
-        isCommanderFormat = isCommanderFormat,
         inspirationsEnabled = FeatureFlags.Decks.DISCOVERIES_V2_ENABLED,
     )
 
@@ -1675,7 +1771,7 @@ private fun EmptyDeckState(
             }
         }
 
-        if (options.showSeed) {
+        if (true) {
             item(key = "empty_option_seed") {
                 EmptyStateOptionCard(
                     icon = Icons.Default.AutoAwesome,

@@ -966,7 +966,7 @@ class BuildCommanderDeckUseCase(
         if (card == null) {
             crashReporter.log("deck_wizard_basic_land_unresolved")
             crashReporter.recordException(
-                IllegalStateException("[BuildCommanderDeckUseCase] resolveBasicCard: '$name' missing from ownedCollection -- R12 says this should be unreachable (the VM boundary should have guaranteed it)"),
+                IllegalStateException("deck_wizard_basic_land_unresolved"),
             )
         }
         return card

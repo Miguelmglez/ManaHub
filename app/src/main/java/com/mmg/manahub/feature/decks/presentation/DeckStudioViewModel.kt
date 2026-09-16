@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation
-// COMMENTS_REVIEWED: 2026-09-15
+// COMMENTS_REVIEWED: 2026-09-16
 
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
@@ -21,6 +21,7 @@ import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
+import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.search.AdvancedSearchCardMatcher
@@ -52,6 +53,9 @@ import com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorEvent
 import com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorOrchestrator
 import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
+import com.mmg.manahub.feature.decks.domain.usecase.BoardValue
+import com.mmg.manahub.feature.decks.domain.usecase.CalculateDeckValueSummaryUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.DeckValueSummary
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.FindSimilarDecksUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckCardsUseCase
@@ -153,6 +157,11 @@ data class DeckStudioUiState(
     val totalCards: Int = 0,
     val manaCurve: Map<Int, Int> = emptyMap(),
     val collectionIds: Set<String> = emptySet(),
+    val preferredCurrency: PreferredCurrency = PreferredCurrency.EUR,
+    val deckValueSummary: DeckValueSummary = DeckValueSummary(
+        mainboard = BoardValue(0.0, 0, 0, true),
+        sideboard = BoardValue(0.0, 0, 0, true),
+    ),
 
     val mainboardExpanded: Boolean = true,
     val sideboardExpanded: Boolean = false,
@@ -378,6 +387,8 @@ class DeckStudioViewModel(
     // test call site that doesn't pass it) is never actually a degraded behavior -- see
     // searchScryfallStructured's own fallback.
     private val buildScryfallQueryUseCase: BuildScryfallQueryUseCase? = null,
+    private val calculateDeckValueSummaryUseCase: CalculateDeckValueSummaryUseCase =
+        CalculateDeckValueSummaryUseCase(),
 ) : ViewModel() {
 
     /**
@@ -464,6 +475,9 @@ class DeckStudioViewModel(
     /** Card data cache (scryfallId → Card) to avoid re-fetching on each rebuild. */
     private var cardCache: Map<String, Card> = emptyMap()
 
+    /** Complete mainboard + sideboard entries used for value summaries, including commander. */
+    private var currentDeckEntries: List<DeckSlotEntry> = emptyList()
+
     /** The user's collection, used to populate the "owned" search tab. */
     private var collectionCards: List<Card> = emptyList()
 
@@ -499,6 +513,16 @@ class DeckStudioViewModel(
             }
         }
         viewModelScope.launch {
+            userPreferences.preferredCurrencyFlow.distinctUntilChanged().collect { currency ->
+                _uiState.update { state ->
+                    state.copy(
+                        preferredCurrency = currency,
+                        deckValueSummary = calculateDeckValueSummaryUseCase(currentDeckEntries, currency),
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
             deckDoctorOrchestrator.events.collect { event ->
                 when (event) {
                     DeckDoctorEvent.ExternalPoolFailed -> _events.send(DeckStudioEvent.ExternalPoolFailed)
@@ -522,12 +546,12 @@ class DeckStudioViewModel(
         // Nav passes "" (not null) for an absent optional StringType arg → treat
         // blank as "create a fresh draft".
         val existingId = savedStateHandle.get<String?>("deckId")?.takeIf { it.isNotEmpty() }
+        createdFreshDraft = savedStateHandle.get<Boolean>(CREATED_FRESH_DRAFT_KEY) == true
         viewModelScope.launch {
             val crashlytics = FirebaseCrashlytics.getInstance()
             if (existingId != null) {
                 deckId = existingId
                 crashlytics.log("deck_studio_opened_existing")
-                crashlytics.setCustomKey("deck_studio_deck_id", existingId)
             } else {
                 // A failed draft creation must NOT leave `deckId` uninitialized — that
                 // would strand the screen on an infinite spinner and later throw
@@ -546,12 +570,13 @@ class DeckStudioViewModel(
                     return@launch
                 }
                 deckId = createdId
+                savedStateHandle["deckId"] = createdId
+                savedStateHandle[CREATED_FRESH_DRAFT_KEY] = true
                 // Mark this as a VM-created draft so onExitRequested may discard it if
                 // abandoned empty. Set ONLY after a successful create (the early
                 // return@launch above leaves it false), and never in the existingId branch.
                 createdFreshDraft = true
                 crashlytics.log("deck_studio_created")
-                crashlytics.setCustomKey("deck_studio_deck_id", createdId)
             }
             observeDeck()
             observeCollection()
@@ -610,7 +635,24 @@ class DeckStudioViewModel(
             .distinctUntilChanged()
             .onEach { deckWithCards ->
                 if (deckWithCards == null) {
-                    _uiState.update { it.copy(isLoading = false) }
+                    currentDeckEntries = emptyList()
+                    _uiState.update {
+                        it.copy(
+                            deck = null,
+                            cards = emptyList(),
+                            commanderCard = null,
+                            totalCards = 0,
+                            manaCurve = emptyMap(),
+                            landDeltas = emptyList(),
+                            overLimitCards = emptySet(),
+                            invalidColorIdentityCards = emptySet(),
+                            deckValueSummary = calculateDeckValueSummaryUseCase(
+                                emptyList(),
+                                it.preferredCurrency,
+                            ),
+                            isLoading = false,
+                        )
+                    }
                     return@onEach
                 }
 
@@ -677,6 +719,7 @@ class DeckStudioViewModel(
     }
 
     private fun rebuildUiState(deck: Deck, allEntries: List<DeckSlotEntry>) {
+        currentDeckEntries = allEntries
         val format = DeckFormat.entries.firstOrNull { it.name.equals(deck.format, ignoreCase = true) }
         val isCommanderFormat = format?.isCommanderFormat == true
         val commanderId = deck.commanderCardId
@@ -729,6 +772,8 @@ class DeckStudioViewModel(
                 isLoading = false,
                 totalCards = mainEntries.sumOf { it.quantity },
                 manaCurve = calculateManaCurve(allEntries),
+                preferredCurrency = s.preferredCurrency,
+                deckValueSummary = calculateDeckValueSummaryUseCase(allEntries, s.preferredCurrency),
                 landDeltas = calculateLandDeltas(
                     entries = allEntries,
                     deck = deck,
@@ -1109,6 +1154,7 @@ class DeckStudioViewModel(
     private fun refreshAnalysisAfterMutation(scryfallId: String, applyToCache: (String) -> Boolean) {
         val handled = applyToCache(scryfallId)
         if (!handled && ::deckId.isInitialized) {
+            FirebaseCrashlytics.getInstance().log("deck_studio_incremental_recompute_cache_miss")
             deckDoctorOrchestrator.loadAnalysis(deckId)
         }
     }
@@ -1360,13 +1406,21 @@ class DeckStudioViewModel(
                 when (val outcome = cardsUseCase(source = ImportSource.DeckstatsUrl(trimmed), targetDeckId = deckId)) {
                     is ImportOutcome.Success -> true
                     is ImportOutcome.Error -> {
-                        logFailure("deck_studio_import_deckstats_failed", IllegalStateException(outcome.message))
+                        logFailure(
+                            "deck_studio_import_deckstats_failed",
+                            IllegalStateException("deckstats_import_failed"),
+                        )
                         false
                     }
                 }
             } else {
                 importDeckUseCase(deckId, text)
-                    .onFailure { t -> logFailure("deck_studio_import_failed", t) }
+                    .onFailure {
+                        logFailure(
+                            "deck_studio_import_failed",
+                            IllegalStateException("deck_list_import_failed"),
+                        )
+                    }
                     .isSuccess
             }
 
@@ -1527,8 +1581,12 @@ class DeckStudioViewModel(
      *
      * Bound to `CardSearchSheet`'s `onAdvancedSearch`, so it serves both the Analysis tab's
      * "Browse for X" preset and the Advanced Search sheet's own SEARCH CTA.
+     *
+     * @param sectionId the Analysis-tab section id that opened this Browse session
+     * (`DeckStudioScreen`'s UI-local `sectionBrowseSectionId`), `null` for the generic Advanced
+     * Search sheet path. Only used to correlate a zero-hit result back to its originating category.
      */
-    fun applyStructuredSearch(query: AdvancedSearchQuery) {
+    fun applyStructuredSearch(query: AdvancedSearchQuery, sectionId: String? = null) {
         val fragment = StructuredCardSearch.scryfallFragment(query, buildScryfallQueryUseCase ?: BuildScryfallQueryUseCase())
         _uiState.update {
             it.copy(
@@ -1546,6 +1604,14 @@ class DeckStudioViewModel(
             setCustomKey("deck_studio_structured_criteria", query.criteria.size)
             setCustomKey("deck_studio_structured_collection_hits", collectionMatches.size)
             log("deck_studio_structured_search_applied")
+        }
+        // The one signal that can confirm the category-vocabulary fix actually closed the original
+        // "Browse finds cards the analysis ignores" complaint -- section id only, never the query itself.
+        if (sectionId != null && collectionMatches.isEmpty()) {
+            FirebaseCrashlytics.getInstance().apply {
+                setCustomKey("deck_analysis_section_id", sectionId)
+                log("deck_analysis_section_browse_zero_hits")
+            }
         }
     }
 
@@ -1958,7 +2024,7 @@ class DeckStudioViewModel(
 
     private fun logFailure(tag: String, t: Throwable) {
         FirebaseCrashlytics.getInstance().apply {
-            log("$tag: deckId=${if (::deckId.isInitialized) deckId else "uninitialized"}")
+            log(tag)
             // Non-PII context to triage the failure (format, deck size, active tab).
             deckFormat?.let { setCustomKey("deck_studio_format", it.name) }
             setCustomKey("deck_studio_card_count", _uiState.value.totalCards)
@@ -1968,6 +2034,8 @@ class DeckStudioViewModel(
     }
 
     private companion object {
+        const val CREATED_FRESH_DRAFT_KEY = "deckStudioCreatedFreshDraft"
+
         /** Cap on distinct combo card names resolved to full [Card]s per [loadCombos] call, so a
          * large combo result can't burst an unbounded number of concurrent Scryfall lookups. */
         const val MAX_COMBO_CARDS_TO_RESOLVE = 40

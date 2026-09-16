@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.home.presentation
 
+// COMMENTS_REVIEWED: 2026-09-16
+
 // Step ID constants are top-level in FirstStepItem.kt (same package — no import needed).
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -1390,20 +1392,10 @@ class HomeViewModel(
         fetchRandomCardJob?.cancel()
         randomCardLoadStateFlow.value = DiscoverLoadState.LOADING
         fetchRandomCardJob = viewModelScope.launch {
-            // bypassCache = true avoids the in-memory map, but Scryfall's CDN still caches the page.
-            // Taking the first N of a CDN-cached page means refresh does nothing; we must shuffle client-side.
-            val outcome = runCatching {
-                cardRepository.searchCards(
-                    DISCOVER_RANDOM_QUERY,
-                    page = 1,
-                    bypassCache = true
-                )
-            }
+            val outcome = runCatching { cardRepository.getRandomCard(CARD_OF_THE_DAY_QUERY) }
             val result = outcome.getOrNull()
             val card = (result as? com.mmg.manahub.core.model.DataResult.Success)
                 ?.data
-                ?.shuffled()
-                ?.firstOrNull()
                 ?.let { c ->
                     DiscoverCard(
                         id = c.scryfallId,
@@ -1422,7 +1414,11 @@ class HomeViewModel(
                 val error = outcome.exceptionOrNull()
                 crashlytics.setCustomKey(
                     "home_random_card_error_type",
-                    error?.let { it::class.simpleName ?: "Unknown" } ?: "EmptyResult",
+                    when {
+                        error != null -> error::class.simpleName ?: "Unknown"
+                        result is com.mmg.manahub.core.model.DataResult.Error -> "DataResultError"
+                        else -> "EmptyResult"
+                    },
                 )
                 if (error != null) recordSafeNonFatal("home_random_card_fetch", error)
                 crashlytics.log("home_random_card_fetch_failed")
@@ -2075,6 +2071,8 @@ class HomeViewModel(
          * (which reliably have art) and randomises the order.
          */
         private const val DISCOVER_RANDOM_QUERY = "-is:digital legal:commander order:random"
+
+        private const val CARD_OF_THE_DAY_QUERY = "lang:en"
 
         /** Number of random cards fetched for the Discover widget. */
         private const val DISCOVER_CARD_COUNT = 10

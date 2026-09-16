@@ -1,10 +1,11 @@
 package com.mmg.manahub.core.ui.components
 
+// COMMENTS_REVIEWED: 2026-09-06
+
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.SharedTransitionScope.OverlayClip
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -42,31 +43,24 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckSlotEntry
+import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardCornerRadius
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.ExtraSmallCardShape
+import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.core.util.PriceFormatter
 import org.jetbrains.compose.resources.painterResource
 
-/**
- * A single card row inside a deck list or search result.
- *
- * @param entry the deck slot to render.
- * @param isInCollection whether the user owns this card (shows a star).
- * @param onClick invoked when the row body is tapped (opens detail).
- * @param onRemove invoked when the close button is tapped (removes the slot).
- * @param isCommander whether this card is the deck's commander (applies a gold style).
- */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun CardRow(
@@ -79,12 +73,10 @@ fun CardRow(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     sharedTransitionKey: Any? = null,
+    preferredCurrency: PreferredCurrency? = null,
 ) {
     val card = entry.card
     if (card != null) {
-        // Delegates to the [Card]-based overload -- the single visual source of truth for a
-        // resolved slot. Only an unresolved slot (card == null) keeps its own minimal fallback
-        // below, since the [Card]-based overload requires a non-null card.
         CardRow(
             card = card,
             isInCollection = isInCollection,
@@ -96,6 +88,7 @@ fun CardRow(
             sharedTransitionScope = sharedTransitionScope,
             animatedVisibilityScope = animatedVisibilityScope,
             sharedTransitionKey = sharedTransitionKey,
+            preferredCurrency = preferredCurrency,
         )
         return
     }
@@ -139,35 +132,16 @@ fun CardRow(
             )
             if (entry.quantity > 1) {
                 Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.2f)) {
-                    Text("×${entry.quantity}", style = ty.labelMedium, color = mc.primaryAccent, modifier = Modifier.padding(horizontal = spacing.sm, vertical = 2.dp))
+                    Text("×${entry.quantity}", style = ty.labelMedium, color = mc.primaryAccent, modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs))
                 }
             }
-            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Close, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(18.dp))
+            IconButton(onClick = onRemove) {
+                Icon(Icons.Default.Close, contentDescription = "Remove card", tint = mc.textDisabled, modifier = Modifier.size(18.dp))
             }
         }
     }
 }
 
-/**
- * The [Card]-based sibling of the [DeckSlotEntry] overload above -- renders the identical visual
- * (image thumbnail, name, type line, mana cost, quantity badge, owned indicator, remove
- * affordance) but takes a raw [Card] instead of a deck-specific [DeckSlotEntry].
- *
- * @param card the card to render.
- * @param isInCollection whether the user owns this card (shows a bookmark icon).
- * @param onClick invoked when the row body is tapped.
- * @param onRemove invoked when the trailing close button is tapped; the button is hidden
- *   entirely when null (e.g. a picker preview with no remove affordance).
- * @param modifier optional [Modifier].
- * @param quantity shown as a "×N" badge when greater than 1.
- * @param selected when true, tints the row's container with the same primaryAccent selected
- *   convention used elsewhere in the app.
- * @param onAdd invoked when an increment button is tapped; showing +/- controls instead of a
- *   single remove button when non-null.
- * @param isCommander whether this card is the deck's commander (applies a gold style).
- * @param extraSupportingContent optional slot for additional content below the metadata row.
- */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun CardRow(
@@ -184,12 +158,18 @@ fun CardRow(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     sharedTransitionKey: Any? = null,
     extraSupportingContent: @Composable (() -> Unit)? = null,
+    preferredCurrency: PreferredCurrency? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
+    val resolvedPreferredCurrency = preferredCurrency ?: LocalPreferredCurrency.current
+    val formattedPrice = PriceFormatter.formatFromScryfall(
+        card.priceUsd,
+        card.priceEur,
+        resolvedPreferredCurrency,
+    ).takeUnless { it == "—" }
 
-    // Map card colors to theme colors for the visual accent
     val cardColors = remember(card.colors, isCommander) {
         if (isCommander) listOf(mc.goldMtg)
         else card.colors.map { manaColorFor(it, mc) }
@@ -219,7 +199,6 @@ fun CardRow(
             .semantics(mergeDescendants = true) {}
     ) {
         Box(Modifier.fillMaxWidth().heightIn(min = 68.dp)) {
-            // 1. Subtle art-crop background texture
             if (card.imageArtCrop != null) {
                 AsyncImage(
                     model = card.imageArtCrop,
@@ -230,7 +209,6 @@ fun CardRow(
                 )
             }
 
-            // 2. Subtle color gradient from the card's mana identity
             if (cardColors.isNotEmpty()) {
                 val gradient = remember(cardColors) {
                     Brush.horizontalGradient(
@@ -243,7 +221,6 @@ fun CardRow(
                 Box(Modifier.matchParentSize().background(gradient))
             }
 
-            // 3. Color accent bar on the left
             if (cardColors.isNotEmpty()) {
                 Box(
                     Modifier
@@ -260,7 +237,6 @@ fun CardRow(
                 )
             }
 
-            // 4. Content row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -268,7 +244,6 @@ fun CardRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(spacing.md)
             ) {
-                // Thumbnail with ExtraSmallCardShape and a subtle border
                 val layoutModifier = Modifier.size(width = 44.dp, height = 62.dp)
 
                 val finalImageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
@@ -307,7 +282,6 @@ fun CardRow(
                 Column(
                     modifier = Modifier.weight(1f).height(62.dp),
                 ) {
-                    // 1. Name Row
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.TopStart) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             CardName(
@@ -331,34 +305,33 @@ fun CardRow(
                         }
                     }
 
-                    // 2. Type Line (Mathematically centered in the 62dp height)
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                         Text(
                             card.typeLine,
                             style = ty.bodySmall,
-                            color = if (isCommander) mc.goldMtg.copy(alpha = 0.8f) else mc.textSecondary,
+                            color = if (isCommander) mc.textPrimary else mc.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                     
-                    // 3. Metadata Row + Extra Content
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.BottomStart) {
                         Column {
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                if (card.manaCost != null) {
-                                    ManaCostImages(
-                                        manaCost = card.manaCost!!,
-                                        symbolSize = 14.dp
-                                    )
-                                }
                                 Row(
+                                    modifier = Modifier.weight(1f),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.md),
                                 ) {
+                                    if (card.manaCost != null) {
+                                        ManaCostImages(
+                                            manaCost = card.manaCost!!,
+                                            symbolSize = 14.dp,
+                                        )
+                                    }
                                     SetSymbol(
                                         setCode = card.setCode,
                                         rarity = CardRarity.fromString(card.rarity),
@@ -366,8 +339,20 @@ fun CardRow(
                                     )
                                     Text(
                                         text = card.setCode.uppercase(),
-                                        style = ty.labelSmall.copy(fontSize = 10.sp),
-                                        color = if (isCommander) mc.goldMtg.copy(alpha = 0.7f) else mc.textSecondary
+                                        style = ty.labelSmall,
+                                        color = if (isCommander) mc.textPrimary else mc.textSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                                if (formattedPrice != null) {
+                                    Spacer(Modifier.width(spacing.sm))
+                                    Text(
+                                        text = formattedPrice,
+                                        style = ty.labelMedium,
+                                        color = mc.goldMtg,
+                                        maxLines = 1,
                                     )
                                 }
                             }
@@ -379,21 +364,18 @@ fun CardRow(
                     }
                 }
 
-                // Trailing: Quantity and Remove
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(spacing.xs)
                 ) {
                     if (onAdd != null) {
-                        // Increment/Decrement mode (AddCardSheet)
                         if (quantity > 0 && onRemove != null) {
                             IconButton(
                                 onClick = onRemove,
-                                modifier = Modifier.size(32.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Remove,
-                                    contentDescription = null,
+                                    contentDescription = "Decrease quantity",
                                     tint = mc.textSecondary,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -407,17 +389,15 @@ fun CardRow(
 
                         IconButton(
                             onClick = onAdd,
-                            modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
                                 Icons.Default.Add,
-                                contentDescription = null,
+                                contentDescription = "Increase quantity",
                                 tint = if (isCommander) mc.goldMtg else mc.primaryAccent,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
                     } else {
-                        // Standard mode (Deck list)
                         if (quantity > 1) {
                             Surface(
                                 shape = ChipShape,
@@ -427,18 +407,17 @@ fun CardRow(
                                     "×$quantity",
                                     style = ty.labelMedium,
                                     color = if (isCommander) mc.goldMtg else mc.secondaryAccent,
-                                    modifier = Modifier.padding(horizontal = spacing.sm, vertical = 2.dp)
+                                    modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs)
                                 )
                             }
                         }
                         if (onRemove != null) {
                             IconButton(
                                 onClick = onRemove,
-                                modifier = Modifier.size(32.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Close,
-                                    contentDescription = null,
+                                    contentDescription = "Remove card",
                                     tint = if (isCommander) mc.goldMtg else mc.textDisabled,
                                     modifier = Modifier.size(18.dp)
                                 )

@@ -1,5 +1,7 @@
 package com.mmg.manahub.core.data.repository
 
+// COMMENTS_REVIEWED: 2026-09-16
+
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
@@ -335,6 +337,36 @@ class CardRepositoryImplTest {
         val result = repository.getCardById("id-001")
 
         assertTrue(result is DataResult.Success)
+    }
+
+    @Test
+    fun `given an existing card row when getRandomCard succeeds then cached tags are preserved and the card is upserted`() = runTest {
+        val existing = TestFixtures.buildCardEntity(scryfallId = "random-1").copy(
+            tags = "[{\"k\":\"RAMP\"}]",
+            userTags = "[{\"k\":\"my_tag\",\"c\":\"CUSTOM\"}]",
+            suggestedTags = "[{\"k\":\"DRAW\",\"c\":\"AUTO\"}]",
+        )
+        coEvery { cardDao.getById("random-1") } returns existing
+        coEvery { remote.getRandomCard("lang:en") } returns Result.success(TestFixtures.buildCard("random-1"))
+        val captured = slot<CardEntity>()
+        coEvery { cardDao.upsert(capture(captured)) } returns Unit
+
+        val result = repository.getRandomCard("lang:en")
+
+        assertTrue(result is DataResult.Success)
+        assertEquals(existing.tags, captured.captured.tags)
+        assertEquals(existing.userTags, captured.captured.userTags)
+        assertEquals(existing.suggestedTags, captured.captured.suggestedTags)
+        coVerify(exactly = 1) { cardDao.upsert(any()) }
+        coVerify(exactly = 1) { remote.getRandomCard("lang:en") }
+        coVerify(exactly = 1) {
+            resolveCardStrategyTags(
+                match { it.scryfallId == "random-1" },
+                existing.tags,
+                any(),
+                any(),
+            )
+        }
     }
 
     @Test

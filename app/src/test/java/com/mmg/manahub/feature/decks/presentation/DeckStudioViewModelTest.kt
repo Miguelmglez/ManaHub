@@ -1,8 +1,10 @@
 package com.mmg.manahub.feature.decks.presentation
+// COMMENTS_REVIEWED: 2026-09-16
 
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.mmg.manahub.app.navigation.Screen
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
@@ -17,6 +19,7 @@ import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DeckSlot
 import com.mmg.manahub.core.model.DeckWithCards
+import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.ScoreWeightOverrides
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.model.UserCardWithCard
@@ -102,6 +105,7 @@ class DeckStudioViewModelTest {
     private val suggestTagsUseCase = mockk<SuggestTagsUseCase>(relaxed = true)
     private val wishlistRepository = mockk<WishlistRepository>()
     private val userPreferences = mockk<UserPreferencesDataStore>()
+    private val preferredCurrency = MutableStateFlow(PreferredCurrency.EUR)
     private val crashReporter = mockk<CrashReporter>(relaxed = true)
     private val appContext = mockk<Context>()
     // Deck Engine Unification plan D7 (Phase 4.3) — Combos tab.
@@ -138,6 +142,8 @@ class DeckStudioViewModelTest {
         every { userPreferences.observeScoreWeightOverrides() } returns flowOf(ScoreWeightOverrides.NONE)
         // playerNameFlow is referenced at VM construction time (stateIn property initializer).
         every { userPreferences.playerNameFlow } returns flowOf("")
+        preferredCurrency.value = PreferredCurrency.EUR
+        every { userPreferences.preferredCurrencyFlow } returns preferredCurrency
         // Deck Doctor Community/Archetype plan, Phase 4/5: communityEngineEnabledFlow is collected
         // in init (mirrors playerNameFlow's own construction-time collection) — default OFF so
         // these pre-existing tests keep "Decks like yours" (Motor B) unpopulated.
@@ -252,7 +258,10 @@ class DeckStudioViewModelTest {
     )
 
     /** Creates the ViewModel with real use-case instances (Phase 1 & most Phase 2 tests). */
-    private fun createVm(deckId: String? = null): DeckStudioViewModel =
+    private fun createVm(
+        deckId: String? = null,
+        savedStateHandle: SavedStateHandle? = null,
+    ): DeckStudioViewModel =
         DeckStudioViewModel(
             deckRepository = deckRepository,
             cardRepository = cardRepository,
@@ -267,10 +276,189 @@ class DeckStudioViewModelTest {
             userPreferences = userPreferences,
             crashReporter = crashReporter,
             appContext = appContext,
-            savedStateHandle = SavedStateHandle(
+            savedStateHandle = savedStateHandle ?: SavedStateHandle(
                 if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
             ),
         )
+
+    @Test
+    fun `fresh draft id is persisted in saved state after creation`() = runTest(dispatcher) {
+        val savedStateHandle = SavedStateHandle()
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+        createVm(savedStateHandle = savedStateHandle)
+        advanceUntilIdle()
+
+        assertEquals(DECK_ID, savedStateHandle.get<String>("deckId"))
+        assertEquals(true, savedStateHandle.get<Boolean>("deckStudioCreatedFreshDraft"))
+    }
+
+    @Test
+    fun `missing observed deck leaves loading and exposes no deck`() = runTest(dispatcher) {
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(null)
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+        val vm = createVm(deckId = DECK_ID)
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.isLoading)
+        assertNull(vm.uiState.value.deck)
+    }
+
+    @Test
+    fun `deck scanner route rejects a blank deck id`() {
+        val failure = runCatching { Screen.DeckScanner.createRoute(" ") }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+    }
+
+    @Test
+    fun `deck value summary includes commander separates boards and applies quantity`() =
+        runTest(dispatcher) {
+            val pricedCommander = commander.copy(priceEur = 10.0, priceUsd = 12.0)
+            val pricedMain = elfCard.copy(priceEur = 2.0, priceUsd = 3.0)
+            val pricedSideboard = removalCard.copy(priceEur = 4.0, priceUsd = 5.0)
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+                DeckWithCards(
+                    deck = Deck(
+                        id = DECK_ID,
+                        name = "Elves",
+                        format = "commander",
+                        commanderCardId = pricedCommander.scryfallId,
+                    ),
+                    mainboard = listOf(
+                        DeckSlot(pricedCommander.scryfallId, 1),
+                        DeckSlot(pricedMain.scryfallId, 3),
+                    ),
+                    sideboard = listOf(DeckSlot(pricedSideboard.scryfallId, 2)),
+                ),
+            )
+            coEvery { cardRepository.getCardById(pricedCommander.scryfallId) } returns DataResult.Success(pricedCommander)
+            coEvery { cardRepository.getCardById(pricedMain.scryfallId) } returns DataResult.Success(pricedMain)
+            coEvery { cardRepository.getCardById(pricedSideboard.scryfallId) } returns DataResult.Success(pricedSideboard)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+            val vm = createVm()
+            advanceUntilIdle()
+
+            val summary = vm.uiState.value.deckValueSummary
+            assertEquals(16.0, summary.mainboard.knownTotal, 0.001)
+            assertEquals(4, summary.mainboard.knownCopies)
+            assertEquals(0, summary.mainboard.missingPriceCopies)
+            assertEquals(8.0, summary.sideboard.knownTotal, 0.001)
+            assertEquals(2, summary.sideboard.knownCopies)
+            assertEquals(0, summary.sideboard.missingPriceCopies)
+        }
+
+    @Test
+    fun `deck value summary counts unknown prices and treats zero price as known`() =
+        runTest(dispatcher) {
+            val zeroPricedCard = elfCard.copy(priceEur = 0.0, priceUsd = 0.0)
+            val unknownPricedCard = removalCard.copy(priceEur = null, priceUsd = null)
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+                deckWithCards(
+                    slots = listOf(
+                        DeckSlot(zeroPricedCard.scryfallId, 2),
+                        DeckSlot(unknownPricedCard.scryfallId, 3),
+                        DeckSlot("unresolved-card", 4),
+                    ),
+                ),
+            )
+            coEvery { cardRepository.getCardById(zeroPricedCard.scryfallId) } returns DataResult.Success(zeroPricedCard)
+            coEvery { cardRepository.getCardById(unknownPricedCard.scryfallId) } returns DataResult.Success(unknownPricedCard)
+            coEvery { cardRepository.getCardById("unresolved-card") } returns DataResult.Error("missing")
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+            val vm = createVm()
+            advanceUntilIdle()
+
+            val mainboard = vm.uiState.value.deckValueSummary.mainboard
+            assertEquals(0.0, mainboard.knownTotal, 0.001)
+            assertEquals(2, mainboard.knownCopies)
+            assertEquals(7, mainboard.missingPriceCopies)
+            assertFalse(mainboard.isEmpty)
+        }
+
+    @Test
+    fun `changing preferred currency updates state and deck value summary`() = runTest(dispatcher) {
+        val pricedCard = elfCard.copy(priceEur = 2.0, priceUsd = 7.0)
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+            deckWithCards(slots = listOf(DeckSlot(pricedCard.scryfallId, 2))),
+        )
+        coEvery { cardRepository.getCardById(pricedCard.scryfallId) } returns DataResult.Success(pricedCard)
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+        val vm = createVm()
+        advanceUntilIdle()
+        assertEquals(PreferredCurrency.EUR, vm.uiState.value.preferredCurrency)
+        assertEquals(4.0, vm.uiState.value.deckValueSummary.mainboard.knownTotal, 0.001)
+
+        preferredCurrency.value = PreferredCurrency.USD
+        advanceUntilIdle()
+
+        assertEquals(PreferredCurrency.USD, vm.uiState.value.preferredCurrency)
+        assertEquals(14.0, vm.uiState.value.deckValueSummary.mainboard.knownTotal, 0.001)
+    }
+
+    @Test
+    fun `reactive deck emission updates deck and board value summary`() = runTest(dispatcher) {
+        val observedDeck = MutableStateFlow<DeckWithCards?>(
+            deckWithCards(slots = listOf(DeckSlot(elfCard.scryfallId, 1))),
+        )
+        val pricedElf = elfCard.copy(priceEur = 2.0, priceUsd = 3.0)
+        val pricedRemoval = removalCard.copy(priceEur = 5.0, priceUsd = 7.0)
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns observedDeck
+        coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(pricedElf)
+        coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns DataResult.Success(pricedRemoval)
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+        val vm = createVm()
+        advanceUntilIdle()
+        assertEquals(DEFAULT_DECK_NAME, vm.uiState.value.deck?.name)
+        assertEquals(2.0, vm.uiState.value.deckValueSummary.mainboard.knownTotal, 0.001)
+
+        observedDeck.value = deckWithCards(
+            slots = listOf(DeckSlot(removalCard.scryfallId, 2)),
+            deckName = "Updated deck",
+        )
+        advanceUntilIdle()
+
+        assertEquals("Updated deck", vm.uiState.value.deck?.name)
+        assertEquals(10.0, vm.uiState.value.deckValueSummary.mainboard.knownTotal, 0.001)
+        assertEquals(2, vm.uiState.value.deckValueSummary.mainboard.knownCopies)
+    }
+
+    @Test
+    fun `deck value summary reports empty and partial boards independently`() = runTest(dispatcher) {
+        val partiallyPricedCard = elfCard.copy(priceEur = 2.0, priceUsd = null)
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+            DeckWithCards(
+                deck = Deck(id = DECK_ID, name = DEFAULT_DECK_NAME, format = "casual"),
+                mainboard = listOf(
+                    DeckSlot(partiallyPricedCard.scryfallId, 2),
+                    DeckSlot(removalCard.scryfallId, 1),
+                ),
+                sideboard = emptyList(),
+            ),
+        )
+        coEvery { cardRepository.getCardById(partiallyPricedCard.scryfallId) } returns
+            DataResult.Success(partiallyPricedCard)
+        coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns
+            DataResult.Success(removalCard.copy(priceEur = null, priceUsd = null))
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+        val vm = createVm()
+        advanceUntilIdle()
+
+        val summary = vm.uiState.value.deckValueSummary
+        assertEquals(4.0, summary.mainboard.knownTotal, 0.001)
+        assertEquals(2, summary.mainboard.knownCopies)
+        assertEquals(1, summary.mainboard.missingPriceCopies)
+        assertTrue(summary.sideboard.isEmpty)
+        assertEquals(0.0, summary.sideboard.knownTotal, 0.001)
+        assertEquals(0, summary.sideboard.missingPriceCopies)
+    }
 
     /** Creates the ViewModel with a mocked [findCombosUseCase] wired (Deck Engine Unification plan
      * D7, Phase 4.3 Combos-tab tests) — every other new Phase-4-and-earlier dependency stays at its

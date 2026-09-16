@@ -1,4 +1,5 @@
 package com.mmg.manahub.app.navigation
+// COMMENTS_REVIEWED: 2026-09-16
 
 import android.content.Intent
 import android.net.Uri
@@ -586,6 +587,25 @@ fun AppNavGraph(
                     }
 
                     composable(
+                        route = Screen.DeckScanner.route,
+                        arguments = listOf(
+                            navArgument("deckId") { type = NavType.StringType },
+                        ),
+                    ) {
+                        ScannerScreen(
+                            onBack = { navController.popBackStack() },
+                            onNavigateToCardDetail = { scryfallId ->
+                                navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
+                            },
+                            onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.route) },
+                            onNavigateToDeck = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
+                            onNavigateToCommunityDecks = { cardName ->
+                                navController.navigate(Screen.CommunityDecksByCard.createRoute(cardName))
+                            },
+                        )
+                    }
+
+                    composable(
                         route = Screen.CollectionCardDetail.route,
                         arguments = listOf(
                             navArgument("scryfallId") { type = NavType.StringType },
@@ -758,6 +778,11 @@ fun AppNavGraph(
                     },
                     onNavigateToMassiveAddCards = {
                         navController.navigate(Screen.CollectionMultiAddCard.route)
+                    },
+                    onNavigateToScanner = { deckId ->
+                        navController.navigate(Screen.DeckScanner.createRoute(deckId)) {
+                            launchSingleTop = true
+                        }
                     },
                 )
             }

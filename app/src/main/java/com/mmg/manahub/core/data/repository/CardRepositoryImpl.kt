@@ -1,5 +1,7 @@
 package com.mmg.manahub.core.data.repository
 
+// COMMENTS_REVIEWED: 2026-09-16
+
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
@@ -85,6 +87,26 @@ class CardRepositoryImpl @Inject constructor(
                 if (exception is ClientRequestException && exception.response.status == HttpStatusCode.NotFound) {
                     DataResult.Error("SCRYFALL_404")
                 } else {
+                    DataResult.Error(exception?.message ?: "Unknown error")
+                }
+            }
+        }
+
+    override suspend fun getRandomCard(query: String?): DataResult<Card> =
+        withContext(ioDispatcher) {
+            val result = remote.getRandomCard(query)
+            if (result.isSuccess) {
+                val card = result.getOrThrow()
+                val (entity, existingTagsJson) = entityPreservingTags(card)
+                cardDao.upsert(entity)
+                scheduleTagResolution(card, existingTagsJson)
+                DataResult.Success(card)
+            } else {
+                val exception = result.exceptionOrNull()
+                if (exception is ClientRequestException && exception.response.status == HttpStatusCode.NotFound) {
+                    DataResult.Error("SCRYFALL_404")
+                } else {
+                    exception?.let { recordSafeNonFatal("random_card_fetch_failed", it) }
                     DataResult.Error(exception?.message ?: "Unknown error")
                 }
             }

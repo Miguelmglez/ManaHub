@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.home.presentation
 
+// COMMENTS_REVIEWED: 2026-09-16
+
 import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
@@ -203,8 +205,9 @@ class HomeViewModelTest {
 
         // Phase 3 stubs.
         coEvery { draftRepository.getDraftableSets(any()) } returns DataResult.Success(emptyList())
-        // Discover widget random-card fetch: default to an empty result.
+        // Discover row and random-card fetches default to empty results.
         coEvery { cardRepository.searchCards(any(), any(), any()) } returns DataResult.Success(emptyList())
+        coEvery { cardRepository.getRandomCard("lang:en") } returns DataResult.Error("No random card")
         // Default-random-set seeding: no sets available (falls back to the global random query).
         coEvery { scryfallRemoteDataSource.getAllSets() } returns emptyList()
         // CRITICAL (same "relaxed mock's unstubbed Flow never emits" gotcha noted below for
@@ -1530,8 +1533,7 @@ class HomeViewModelTest {
 
     @Test
     fun `RefreshRandomCard reaches LOADED and sets the random card`() = runTest(testDispatcher) {
-        coEvery { cardRepository.searchCards(any(), any(), any()) } returns
-            DataResult.Success(listOf(discoverCard("r1")))
+        coEvery { cardRepository.getRandomCard("lang:en") } returns DataResult.Success(discoverCard("r1"))
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
@@ -1542,6 +1544,7 @@ class HomeViewModelTest {
 
         assertEquals(DiscoverLoadState.LOADED, vm.state.value.randomCardLoadState)
         assertEquals("r1", vm.state.value.cardOfTheDay?.scryfallId)
+        coVerify(atLeast = 2) { cardRepository.getRandomCard("lang:en") }
     }
 
     // ── News filters (persisted, shared with NewsScreen) ──────────────────────
@@ -2731,6 +2734,7 @@ class HomeViewModelTest {
             // rate-limit budget.
             coVerify(exactly = 0) { scryfallRemoteDataSource.getAllSets() }
             coVerify(exactly = 0) { cardRepository.searchCards(any(), any(), any()) }
+            coVerify(exactly = 0) { cardRepository.getRandomCard("lang:en") }
 
             // Once the sync leaves SYNCING, the deferred fetches proceed.
             syncStateFlow.value = com.mmg.manahub.core.sync.SyncState.SUCCESS
@@ -2748,6 +2752,7 @@ class HomeViewModelTest {
 
             coVerify(atLeast = 1) { scryfallRemoteDataSource.getAllSets() }
             coVerify(atLeast = 1) { cardRepository.searchCards(any(), any(), any()) }
+            coVerify(atLeast = 1) { cardRepository.getRandomCard("lang:en") }
         }
 
     @Test
@@ -2764,5 +2769,6 @@ class HomeViewModelTest {
 
             coVerify(atLeast = 1) { scryfallRemoteDataSource.getAllSets() }
             coVerify(atLeast = 1) { cardRepository.searchCards(any(), any(), any()) }
+            coVerify(atLeast = 1) { cardRepository.getRandomCard("lang:en") }
         }
 }

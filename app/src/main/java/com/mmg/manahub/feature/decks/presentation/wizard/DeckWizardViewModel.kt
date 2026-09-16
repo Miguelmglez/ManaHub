@@ -648,7 +648,7 @@ class DeckWizardViewModel(
             ?.let { name -> DeckFormat.entries.firstOrNull { it.name == name } }
         launchedFromDeckId = savedStateHandle.get<String?>("deckId")?.takeIf { it.isNotEmpty() }
         replaceConfirmed = savedStateHandle.get<Boolean>("replaceConfirmed") ?: false
-        val resolvedFormat = requestedFormat?.takeIf { it.isCommanderFormat || it == DeckFormat.CASUAL }
+        val resolvedFormat = requestedFormat?.takeIf { it.isCommanderFormat || it.isSixtyCardConstructed }
             ?: DeckFormat.CASUAL.also {
                 if (requestedFormat != null) crashReporter.log("deck_wizard_unsupported_format_fallback_casual")
             }
@@ -742,10 +742,8 @@ class DeckWizardViewModel(
      * the resolved nav-arg format, and kept public only as a test-setup convenience for exercising
      * one format's flow from a `viewModel()` fixture built without a "format" savedState entry. */
     fun onSelectFormat(format: DeckFormat) {
-        // v1 targets Commander (+ Commander Casual) and Casual only (plan D1) — the other 6
-        // restored 60-card formats are never reachable here (init's resolvedFormat already folds
-        // them into CASUAL), but guard here too since this is the actual source of truth.
-        if (!format.isCommanderFormat && format != DeckFormat.CASUAL) return
+        // v1 targets Commander (+ Commander Casual) and all 60-card constructed formats (plan D1).
+        if (!format.isCommanderFormat && !format.isSixtyCardConstructed) return
         // Edge-case fix (Phase 6 adversarial pass): the wizard was launched to REBUILD a specific
         // existing Commander draft (launchedFromDeckId, D12) -- a rebuild launch has no legitimate
         // reason to change format at all.
@@ -2488,6 +2486,14 @@ class DeckWizardViewModel(
         }
         crashlytics.setCustomKey("deck_wizard_strategy_source", strategySource)
         crashlytics.setCustomKey("deck_wizard_refinement_swaps", result.refinementSwaps)
+
+        // D4 fired 0/180 times on the real collection -- production is the only place left to learn whether it ever does.
+        val fallbackTier = when {
+            result.fillStats.fallbackOffPlanCount > 0 -> "offplan"
+            result.fillStats.fallbackStandaloneCount > 0 -> "standalone_only"
+            else -> "none"
+        }
+        crashlytics.setCustomKey("deck_wizard_fallback_tier", fallbackTier)
     }
 
     /** W8 (telemetry) -- classifies HOW the Choice screen's ambiguity groups were resolved, over

@@ -550,7 +550,10 @@ class DeckDoctorOrchestrator(
             scoreWeightOverrides = weightOverrides,
             sideboardCount = context.sideboardCount,
         )
-        if (generation != mutationGeneration) return
+        if (generation != mutationGeneration) {
+            crashReporter.log("deck_studio_incremental_recompute_stale_discarded")
+            return
+        }
         _state.update {
             it.copy(health = withUnresolvedWarning(health, context.unresolvedCount))
         }

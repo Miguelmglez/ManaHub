@@ -412,6 +412,17 @@ broadly applicable; never duplicate between the two). → skill: `memory-protoco
 
 The goal: no agent should hit the same bug or repeat the same design mistake twice.
 
+### Agent configuration source of truth
+
+Codex loads the active roster from `.codex/agents/`; `.claude/agents/` is the aligned mirror for
+Claude-based runs. Keep the same ten roles and concise routing descriptions in both locations:
+`agent-team-orchestrator`, `android-kotlin-architect`, `kmp-web-fullstack-dev`,
+`android-edge-case-tester`, `android-security-auditor`, `android-unit-test-writer`,
+`backend-supabase-expert`, `compose-design-reviewer`, `crashlytics-ux-auditor`, and
+`mobile-game-ui-designer`. The two Kotlin owners are deliberately asymmetric: Android/pure shared
+work belongs to the architect; web-target and web-driven shared work belongs directly to the web
+developer. Reviewers and auditors supply precise implementation briefs rather than editing Kotlin.
+
 ## Security notes
 
 - HTTP logging `BODY` in debug only, `NONE` in release (`NetworkModule.kt`).
@@ -454,7 +465,7 @@ This project has a knowledge graph at graphify-out/ with god nodes, community st
 
 Rules:
 - **Mandatory for ALL agents and subagents (architect, edge-case-tester, orchestrator, explore, etc.):** before grepping or reading source files broadly to find or understand code, **orient via the graph first** — `graphify query "<question>"` / `graphify explain "<concept>"` / `graphify path "<A>" "<B>"`, or the wiki at `graphify-out/wiki/index.md`. The graph returns a scoped subgraph at a fraction of the token cost of raw search; only fall back to direct `Grep`/`Read` once the graph has pointed you at the relevant files (or when modifying/debugging specific code, where the graph lacks the detail). This keeps token consumption low across the whole agent team. **Do not revert or treat this rule as out-of-scope cleanup** — it is a standing project rule.
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists **and the CLI is available**. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. When the executable is unavailable, begin at `graphify-out/wiki/index.md`, then use `graph.json` / `manifest.json` and only then targeted source inspection; the precomputed graph remains valid and must not be regenerated merely because the command is absent.
 - A wiki exists at graphify-out/wiki/index.md — use it as the entry point for broad codebase navigation: read the index, then follow its `[[wiki-links]]` into community/god-node articles BEFORE falling back to raw source browsing or GRAPH_REPORT.md (this is the lower-token path).
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- After modifying code, run `graphify update .` to keep the graph current when the executable is available (AST-only, no API cost). If it is unavailable, report the deferred update and do not attempt to recreate the existing graph by another mechanism.

@@ -1,6 +1,8 @@
 package com.mmg.manahub.core.di
+// COMMENTS_REVIEWED: 2026-09-16
 
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.feature.decks.domain.usecase.AddScannedCardsToDeckUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import dagger.Module
@@ -21,6 +23,8 @@ import javax.inject.Singleton
  * - [AddToWishlistUseCase] → `feature.scanner.presentation.ScannerViewModel` (`@HiltViewModel`; the
  *   scanner feature is explicitly EXCLUDED from the KMP migration — CLAUDE.md).
  * - [CommitScannedCardsUseCase] → the same `ScannerViewModel`.
+ * - [AddScannedCardsToDeckUseCase] → the same `ScannerViewModel` when the scanner targets a Deck
+ *   Studio deck; this keeps the excluded scanner Hilt-owned while the write use case remains Koin-built.
  * - [AuthRepository] (batch 5) → the excluded `feature.online` lobby ViewModels
  *   (`LobbyHostViewModel`/`LobbyJoinViewModel`, `@HiltViewModel` — `feature/online` is explicitly
  *   EXCLUDED from the KMP migration). The repo itself is now natively Koin-built in
@@ -50,7 +54,7 @@ import javax.inject.Singleton
  * - The excluded online lobby ViewModels are likewise instantiated by `hiltViewModel()` only on
  *   navigation, strictly after `onCreate()`.
  *
- * This is why these three (and ONLY these three) use cases/repositories can be safely provided via this
+ * This is why these four (and ONLY these four) use cases/repositories can be safely provided via this
  * reverse bridge. One other moved type —
  * [com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase] — is needed by `CardRepositoryImpl`,
  * which IS constructed eagerly (it satisfies `ManaHubApp`'s OWN `@Inject` field `cardRepository`,
@@ -77,6 +81,11 @@ object KoinToHiltBridgeModule {
     @Provides
     @Singleton
     fun provideCommitScannedCardsUseCase(): CommitScannedCardsUseCase =
+        GlobalContext.get().get()
+
+    @Provides
+    @Singleton
+    fun provideAddScannedCardsToDeckUseCase(): AddScannedCardsToDeckUseCase =
         GlobalContext.get().get()
 
     @Provides

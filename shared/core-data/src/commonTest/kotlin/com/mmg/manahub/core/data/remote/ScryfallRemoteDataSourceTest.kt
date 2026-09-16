@@ -1,5 +1,7 @@
 package com.mmg.manahub.core.data.remote
 
+// COMMENTS_REVIEWED: 2026-09-16
+
 import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.network.ScryfallCache
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
@@ -121,6 +123,50 @@ class ScryfallRemoteDataSourceTest {
             // Both the new paginatedSearches cache AND the pre-existing per-card cards cache must
             // be populated -- individual card lookups elsewhere should benefit too.
             assertTrue(cache.cards.get("id-1") != null, "individual result cards must still populate cache.cards")
+        }
+
+    @Test
+    fun `given repeated random requests when called then each hits cards random with English q and bypasses HTTP cache`() =
+        runTest {
+            val captured = mutableListOf<HttpRequestData>()
+            val responses = listOf(cardDto("random-1"), cardDto("random-2"))
+            var callIndex = 0
+            val engine = MockEngine { request ->
+                captured += request
+                val response = responses[callIndex++]
+                respond(
+                    content = dtoJson.encodeToString(CardDto.serializer(), response),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            }
+            val client = ScryfallClient(
+                HttpClient(engine) { install(ContentNegotiation) { json(dtoJson) } },
+                baseUrl = "https://api.scryfall.com/",
+            )
+            val cache = ScryfallCache()
+            val dataSource = ScryfallRemoteDataSource(
+                api = client,
+                requestQueue = ScryfallRequestQueue(),
+                cache = cache,
+                dispatcherProvider = DispatcherProvider(),
+            )
+
+            val first = dataSource.getRandomCard("lang:en")
+            val second = dataSource.getRandomCard("lang:en")
+
+            assertEquals(
+                listOf("random-1", "random-2"),
+                listOf(first.getOrThrow().scryfallId, second.getOrThrow().scryfallId),
+            )
+            assertEquals(2, captured.size)
+            captured.forEach { request ->
+                assertEquals("/cards/random", request.url.encodedPath)
+                assertEquals("lang:en", request.url.parameters["q"])
+                assertEquals("no-cache, no-store", request.headers[HttpHeaders.CacheControl])
+            }
+            assertTrue(cache.cards.get("random-1") != null)
+            assertTrue(cache.cards.get("random-2") != null)
         }
 
     // ── W2.8 (scanner-reliability-plan.md, 2026-08-24): searchCardPrintedName / include_multilingual ──

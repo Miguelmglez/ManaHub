@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.scanner.presentation
+// COMMENTS_REVIEWED: 2026-09-16
 
 import android.Manifest
 import androidx.activity.compose.BackHandler
@@ -29,7 +30,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -63,6 +63,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -81,6 +82,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -104,6 +107,7 @@ import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardQueueSheet
 import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCtaButton
@@ -125,6 +129,7 @@ import com.mmg.manahub.feature.scanner.data.CardOcrAnalyzer
 import com.mmg.manahub.feature.scanner.data.CardRecognizer
 import com.mmg.manahub.feature.scanner.domain.ScannerZone
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
+import com.mmg.manahub.feature.scanner.presentation.components.DeckScannerQueueSheet
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.cancel
 import org.jetbrains.compose.resources.painterResource
@@ -164,7 +169,7 @@ fun ScannerScreen(
 
     // Auto-launch permission dialog on first composition
     LaunchedEffect(Unit) {
-        if (!cameraPermission.status.isGranted) {
+        if (uiState.target !is ScannerTarget.Invalid && !cameraPermission.status.isGranted) {
             cameraPermission.launchPermissionRequest()
         }
     }
@@ -176,6 +181,14 @@ fun ScannerScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
+            uiState.target is ScannerTarget.Invalid -> {
+                FullErrorState(
+                    message = uiState.error ?: stringResource(R.string.scanner_invalid_link),
+                    retryLabel = stringResource(R.string.action_back),
+                    onRetry = onBack,
+                )
+            }
+
             cameraPermission.status.isGranted -> {
                 // W3.1 (scanner-reliability-plan.md, 2026-08-24): a covering sheet/overlay is a
                 // STRONGER condition than the top-bar recognition-pause toggle — it fully stops
@@ -249,7 +262,17 @@ fun ScannerScreen(
                             selectedLanguage = uiState.selectedLanguage,
                             isFoil = uiState.selectedIsFoil,
                             preferredCurrency = preferredCurrency,
-                            onClick = { uiState.lastDetectedCard?.scryfallId?.let { viewModel.onOpenCardDetail(it, fromQueue = false) } },
+                            onClick = {
+                                val card = uiState.lastDetectedCard
+                                if (uiState.target is ScannerTarget.Deck) {
+                                    val entry = card?.let { detected ->
+                                        uiState.scanSession.entries.lastOrNull { it.card.scryfallId == detected.scryfallId }
+                                    }
+                                    if (entry != null) viewModel.onEditScannedCard(entry) else viewModel.onOpenQueue()
+                                } else {
+                                    card?.scryfallId?.let { viewModel.onOpenCardDetail(it, fromQueue = false) }
+                                }
+                            },
                             onRemove = viewModel::onRemoveLastDetectedCard,
                         )
                     }
@@ -283,32 +306,53 @@ fun ScannerScreen(
         MagicToastHost(state = toastState)
     }
 
-    // Queue bottom sheet
     if (uiState.showQueueSheet) {
-        CardQueueSheet(
-            session = uiState.scanSession,
-            preferredCurrency = preferredCurrency,
-            ownedCardIdentityKeys = uiState.ownedCardIdentityKeys,
-            isAutoDeleteOnAddEnabled = uiState.isAutoDeleteOnAddEnabled,
-            isCommitting = uiState.isCommittingQueue,
-            toastMessage = uiState.toastMessage,
-            toastType = uiState.toastType,
-            onToastDismissed = viewModel::onToastDismissed,
-            listState = queueListState,
-            onDismiss = viewModel::onCloseQueue,
-            onRemoveEntry = viewModel::onRemoveSessionCard,
-            onEditEntry = viewModel::onEditScannedCard,
-            onClearSession = viewModel::onClearSession,
-            onAddAllToCollection = viewModel::onAddAllToCollection,
-            onAddAllToWishlist = viewModel::onAddAllToWishlist,
-            onAddEntryToCollection = viewModel::onAddEntryToCollection,
-            onAddEntryToWishlist = viewModel::onAddEntryToWishlist,
-            onNavigateToCardDetail = { id -> viewModel.onOpenCardDetail(id, true) },
-            onDuplicateEntry = viewModel::onDuplicateSessionCard,
-            onToggleAutoDeleteOnAdd = viewModel::onToggleAutoDeleteOnAdd,
-            onIncrementQuantity = viewModel::onIncrementSessionCardQuantity,
-            onDecrementQuantity = viewModel::onDecrementSessionCardQuantity,
-        )
+        when (uiState.target) {
+            ScannerTarget.Collection -> CardQueueSheet(
+                session = uiState.scanSession,
+                preferredCurrency = preferredCurrency,
+                ownedCardIdentityKeys = uiState.ownedCardIdentityKeys,
+                isAutoDeleteOnAddEnabled = uiState.isAutoDeleteOnAddEnabled,
+                isCommitting = uiState.isCommittingQueue,
+                toastMessage = uiState.toastMessage,
+                toastType = uiState.toastType,
+                onToastDismissed = viewModel::onToastDismissed,
+                listState = queueListState,
+                onDismiss = viewModel::onCloseQueue,
+                onRemoveEntry = viewModel::onRemoveSessionCard,
+                onEditEntry = viewModel::onEditScannedCard,
+                onClearSession = viewModel::onClearSession,
+                onAddAllToCollection = viewModel::onAddAllToCollection,
+                onAddAllToWishlist = viewModel::onAddAllToWishlist,
+                onAddEntryToCollection = viewModel::onAddEntryToCollection,
+                onAddEntryToWishlist = viewModel::onAddEntryToWishlist,
+                onNavigateToCardDetail = { id -> viewModel.onOpenCardDetail(id, true) },
+                onDuplicateEntry = viewModel::onDuplicateSessionCard,
+                onToggleAutoDeleteOnAdd = viewModel::onToggleAutoDeleteOnAdd,
+                onIncrementQuantity = viewModel::onIncrementSessionCardQuantity,
+                onDecrementQuantity = viewModel::onDecrementSessionCardQuantity,
+            )
+            is ScannerTarget.Deck -> DeckScannerQueueSheet(
+                session = uiState.scanSession,
+                preferredCurrency = preferredCurrency,
+                isCommitting = uiState.isCommittingQueue,
+                toastMessage = uiState.toastMessage,
+                toastType = uiState.toastType,
+                onToastDismissed = viewModel::onToastDismissed,
+                listState = queueListState,
+                onDismiss = viewModel::onCloseQueue,
+                onRemoveEntry = viewModel::onRemoveSessionCard,
+                onEditEntry = viewModel::onEditScannedCard,
+                onClearSession = viewModel::onClearSession,
+                onAddEntryToDeck = viewModel::onAddEntryToDeck,
+                onAddAllToDeck = viewModel::onAddAllToDeck,
+                isAutoDeleteOnAddEnabled = uiState.isAutoDeleteOnAddEnabled,
+                onToggleAutoDeleteOnAdd = viewModel::onToggleAutoDeleteOnAdd,
+                onIncrementQuantity = viewModel::onIncrementSessionCardQuantity,
+                onDecrementQuantity = viewModel::onDecrementSessionCardQuantity,
+            )
+            ScannerTarget.Invalid -> Unit
+        }
     }
 
     // Edit sheet
@@ -829,6 +873,7 @@ private fun TopScannerControls(
     val ty = MaterialTheme.magicTypography
     var showLanguageSelector by remember { mutableStateOf(false) }
     var isSettingsExpanded by remember { mutableStateOf(false) }
+    val languageSelectorDescription = stringResource(R.string.scanner_select_language)
 
     Row(
         modifier = modifier
@@ -841,11 +886,15 @@ private fun TopScannerControls(
         IconButton(
             onClick = onBack,
             modifier = Modifier
-                .size(40.dp)
+                .minimumInteractiveComponentSize()
                 .background(mc.background.copy(alpha = 0.6f), CircleShape)
                 .border(1.dp, mc.textPrimary.copy(alpha = 0.12f), CircleShape)
         ) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = mc.textPrimary)
+            Icon(
+                Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = stringResource(R.string.action_back),
+                tint = mc.textPrimary,
+            )
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
@@ -853,7 +902,7 @@ private fun TopScannerControls(
             IconButton(
                 onClick = onToggleRecognitionPaused,
                 modifier = Modifier
-                    .size(40.dp)
+                    .minimumInteractiveComponentSize()
                     .background(
                         if (isRecognitionPausedByUser) mc.goldMtg.copy(alpha = 0.9f) else mc.background.copy(alpha = 0.6f),
                         CircleShape
@@ -862,7 +911,10 @@ private fun TopScannerControls(
             ) {
                 Icon(
                     imageVector = if (isRecognitionPausedByUser) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                    contentDescription = null,
+                    contentDescription = stringResource(
+                        if (isRecognitionPausedByUser) R.string.scanner_resume_recognition
+                        else R.string.scanner_pause_recognition,
+                    ),
                     tint = if (isRecognitionPausedByUser) mc.background else mc.textPrimary,
                 )
             }
@@ -872,11 +924,15 @@ private fun TopScannerControls(
                 IconButton(
                     onClick = onOpenQueue,
                     modifier = Modifier
-                        .size(40.dp)
+                        .minimumInteractiveComponentSize()
                         .background(mc.background.copy(alpha = 0.6f), CircleShape)
                         .border(1.dp, mc.textPrimary.copy(alpha = 0.12f), CircleShape)
                 ) {
-                    Icon(Icons.Rounded.Style, contentDescription = null, tint = mc.textPrimary)
+                    Icon(
+                        Icons.Rounded.Style,
+                        contentDescription = stringResource(R.string.scanner_queue_button_desc),
+                        tint = mc.textPrimary,
+                    )
                 }
                 if (queueCount > 0) {
                     Surface(
@@ -905,9 +961,10 @@ private fun TopScannerControls(
             IconButton(
                 onClick = { showLanguageSelector = true },
                 modifier = Modifier
-                    .size(40.dp)
+                    .minimumInteractiveComponentSize()
                     .background(mc.background.copy(alpha = 0.6f), CircleShape)
                     .border(1.dp, mc.textPrimary.copy(alpha = 0.12f), CircleShape)
+                    .semantics { contentDescription = languageSelectorDescription }
             ) {
                 Text(text = CardConstants.getFlag(selectedLanguage), style = ty.titleLarge)
             }
@@ -921,7 +978,7 @@ private fun TopScannerControls(
                 IconButton(
                     onClick = { isSettingsExpanded = !isSettingsExpanded },
                     modifier = Modifier
-                        .size(40.dp)
+                        .minimumInteractiveComponentSize()
                         .background(
                             if (isSettingsExpanded) mc.primaryAccent.copy(alpha = 0.9f) else mc.background.copy(alpha = 0.6f),
                             CircleShape
@@ -931,7 +988,7 @@ private fun TopScannerControls(
                 ) {
                     Icon(
                         Icons.Rounded.Settings,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.scanner_settings_title),
                         tint = if (isSettingsExpanded) mc.background else mc.textPrimary
                     )
                 }
@@ -946,7 +1003,7 @@ private fun TopScannerControls(
                         IconButton(
                             onClick = onToggleSound,
                             modifier = Modifier
-                                .size(40.dp)
+                                .minimumInteractiveComponentSize()
                                 .background(
                                     if (isSoundEnabled) mc.goldMtg.copy(alpha = 0.9f) else mc.background.copy(alpha = 0.6f),
                                     CircleShape
@@ -955,7 +1012,10 @@ private fun TopScannerControls(
                         ) {
                             Icon(
                                 imageVector = if (isSoundEnabled) Icons.AutoMirrored.Rounded.VolumeUp else Icons.AutoMirrored.Rounded.VolumeOff,
-                                contentDescription = null,
+                                contentDescription = stringResource(
+                                    if (isSoundEnabled) R.string.scanner_disable_sound
+                                    else R.string.scanner_enable_sound,
+                                ),
                                 tint = if (isSoundEnabled) mc.background else mc.textPrimary,
                             )
                         }
@@ -965,7 +1025,7 @@ private fun TopScannerControls(
                             IconButton(
                                 onClick = onToggleFlash,
                                 modifier = Modifier
-                                    .size(40.dp)
+                                    .minimumInteractiveComponentSize()
                                     .background(
                                         if (isFlashOn) mc.goldMtg.copy(alpha = 0.9f) else mc.background.copy(alpha = 0.6f),
                                         CircleShape
@@ -974,7 +1034,10 @@ private fun TopScannerControls(
                             ) {
                                 Icon(
                                     imageVector = if (isFlashOn) Icons.Rounded.FlashOn else Icons.Rounded.FlashOff,
-                                    contentDescription = null,
+                                    contentDescription = stringResource(
+                                        if (isFlashOn) R.string.scanner_disable_flash
+                                        else R.string.scanner_enable_flash,
+                                    ),
                                     tint = if (isFlashOn) mc.background else mc.textPrimary
                                 )
                             }
@@ -1128,12 +1191,11 @@ private fun DetectedCardOverlay(
                     onClick = onRemove,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 0.dp, end = 0.dp)
-                        .size(32.dp)
+                        .minimumInteractiveComponentSize()
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.scanner_remove_detected_card),
                         tint = mc.textSecondary,
                         modifier = Modifier.size(18.dp)
                     )
@@ -1220,37 +1282,29 @@ private fun DetectedCardOverlay(
                         Row(
                             modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.Center
                         ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                SetSymbol(
-                                    setCode = card.setCode,
-                                    rarity = CardRarity.fromString(card.rarity),
-                                    size = 14.dp,
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    text = "#${card.collectorNumber}",
-                                    style = ty.labelSmall,
-                                    color = mc.textPrimary
-                                )
-                            }
-                            Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(mc.textPrimary.copy(alpha = 0.2f)))
-                            Text(
-                                text = card.lang.uppercase(),
-                                style = ty.labelSmall,
-                                color = mc.textPrimary,
-                                modifier = Modifier.weight(1f),
-                                textAlign = TextAlign.Center
+                            SetSymbol(
+                                setCode = card.setCode,
+                                rarity = CardRarity.fromString(card.rarity),
+                                size = 14.dp,
                             )
-                            
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = "#${card.collectorNumber}",
+                                style = ty.labelSmall,
+                                color = mc.textPrimary
+                            )
                         }
                     }
                 }
+            } else if (error != null) {
+                Text(
+                    text = error,
+                    style = ty.bodySmall,
+                    color = mc.lifeNegative,
+                    textAlign = TextAlign.Center,
+                )
             } else if (isSearching) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

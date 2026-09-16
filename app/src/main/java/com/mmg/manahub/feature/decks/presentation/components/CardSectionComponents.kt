@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.components
-// COMMENTS_REVIEWED: 2026-09-15
+// COMMENTS_REVIEWED: 2026-09-16
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -51,6 +51,7 @@ import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.components.MiniProgressRing
 import com.mmg.manahub.core.ui.components.SectionHeader
 import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -300,9 +301,9 @@ fun CardSectionHeader(
  * (`DeckStudioUiState.cards`) — [CardSection]/[CardContribution][com.mmg.manahub.feature.decks
  * .domain.engine.CardContribution] carry only ids/primitives by design (never a [Card] object), so
  * this composable never resolves cards itself. A contribution whose id [resolveCard] cannot
- * resolve (e.g. an in-flight/unresolved deck slot) is silently skipped rather than crashing — this
- * pillar list must degrade gracefully on a sparse/degenerate deck (an empty Draft pillar, a
- * just-imported deck still resolving cards), not throw.
+ * resolve (e.g. an in-flight/unresolved deck slot) renders as [SectionCardUnresolvedThumbnail]
+ * rather than crashing — this pillar list must degrade gracefully on a sparse/degenerate deck (an
+ * empty Draft pillar, a just-imported deck still resolving cards), not throw.
  *
  * @param expanded hoisted per-section collapse state — the caller keys this by a composite
  *   `"${pillarId}:${section.id}"` string (see `DeckStudioScreen.kt`'s `SuggestionsTab`).
@@ -378,8 +379,13 @@ fun CardSectionRow(
                             items(renderItems, key = { "${section.id}:${it.contribution.scryfallId}" }) { item ->
                                 when (item) {
                                     is SectionRenderItem.Resolved ->
-                                        SectionCardThumbnail(card = item.card, onClick = { onCardClick(item.card.scryfallId) })
-                                    is SectionRenderItem.Unresolved -> SectionCardUnresolvedThumbnail()
+                                        SectionCardThumbnail(
+                                            card = item.card,
+                                            quantity = item.contribution.quantity,
+                                            onClick = { onCardClick(item.card.scryfallId) },
+                                        )
+                                    is SectionRenderItem.Unresolved ->
+                                        SectionCardUnresolvedThumbnail(quantity = item.contribution.quantity)
                                 }
                             }
                         }
@@ -414,11 +420,14 @@ private val SECTION_THUMBNAIL_HEIGHT = 104.dp
  * the per-card 🔗 "find decks with this card" link icon that used to stack below the art was
  * deleted outright (over-scoped per the user's direct feedback) — the thumbnail is now a single
  * tappable [Box] with no second tap target, so it can grow to fill the freed vertical space
- * (56×80dp → 72×104dp, close to `SmallCardShape`'s real card aspect ratio).
+ * (56×80dp → 72×104dp, close to `SmallCardShape`'s real card aspect ratio). [quantity] > 1 (any
+ * 60-card format) draws a "×N" badge -- [CardSection.realCount] sums contribution quantity, so one
+ * thumbnail per 4-copy contribution must say so or the header count and the row disagree.
  */
 @Composable
 private fun SectionCardThumbnail(
     card: Card,
+    quantity: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -439,12 +448,13 @@ private fun SectionCardThumbnail(
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
+        SectionThumbnailQuantityBadge(quantity = quantity, modifier = Modifier.align(Alignment.BottomEnd))
     }
 }
 
 /** Rendered in place of [SectionCardThumbnail] when a contribution can't be resolved -- not clickable, since there's no card id to navigate to. */
 @Composable
-private fun SectionCardUnresolvedThumbnail(modifier: Modifier = Modifier) {
+private fun SectionCardUnresolvedThumbnail(quantity: Int, modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
     val description = stringResource(R.string.deck_analysis_section_card_unresolved)
 
@@ -459,6 +469,36 @@ private fun SectionCardUnresolvedThumbnail(modifier: Modifier = Modifier) {
             contentDescription = description,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
+        )
+        SectionThumbnailQuantityBadge(quantity = quantity, modifier = Modifier.align(Alignment.BottomEnd))
+    }
+}
+
+/** Badge text for a thumbnail's quantity marker -- null hides the badge (the singleton-copy case, which covers every Commander section). */
+internal fun sectionThumbnailBadgeText(quantity: Int): String? =
+    if (quantity > 1) "×$quantity" else null
+
+/** Small "×N" chip anchored to a thumbnail corner -- carries [CardContribution.quantity] onto the
+ * one thumbnail [CardSectionRow] renders per contribution, so a 4-copy Standard/Modern/etc. section
+ * never shows a header count the row itself can't visually back up. */
+@Composable
+private fun SectionThumbnailQuantityBadge(quantity: Int, modifier: Modifier = Modifier) {
+    val badgeText = sectionThumbnailBadgeText(quantity) ?: return
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
+    Surface(
+        shape = ChipShape,
+        color = mc.backgroundSecondary.copy(alpha = 0.85f),
+        border = BorderStroke(1.dp, mc.textPrimary.copy(alpha = 0.3f)),
+        modifier = modifier.padding(3.dp),
+    ) {
+        Text(
+            text = badgeText,
+            style = ty.labelSmall,
+            color = mc.textPrimary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
         )
     }
 }

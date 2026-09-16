@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.scanner
+// COMMENTS_REVIEWED: 2026-09-16
 
 import android.content.Context
 import android.graphics.PointF
@@ -7,8 +8,13 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.CommitScanResult
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
+import com.mmg.manahub.core.model.CardSelectionEntry
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.feature.decks.domain.usecase.AddScannedCardsToDeckResult
+import com.mmg.manahub.feature.decks.domain.usecase.AddScannedCardsToDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.DeckBoard
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
+import com.mmg.manahub.feature.scanner.presentation.ScannerTarget
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel
 import com.mmg.manahub.feature.scanner.presentation.SoundManager
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
@@ -17,6 +23,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import androidx.lifecycle.SavedStateHandle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.emptyFlow
@@ -81,6 +88,7 @@ class ScannerViewModelTest {
     private val addToWishlist: AddToWishlistUseCase = mockk()
     private val analyticsHelper: AnalyticsHelper = mockk(relaxed = true)
     private val soundManager: SoundManager = mockk(relaxed = true)
+    private val addScannedCardsToDeck: AddScannedCardsToDeckUseCase = mockk(relaxed = true)
     private val context: Context = mockk(relaxed = true)
 
     // ── ViewModel under test ───────────────────────────────────────────────────
@@ -135,12 +143,14 @@ class ScannerViewModelTest {
         // touching FlowCollector, which happens to be harmless here but this stub keeps intent explicit.
         every { userCardRepository.observeCollection() } returns emptyFlow()
         viewModel = ScannerViewModel(
+            savedStateHandle = SavedStateHandle(),
             cardRepository = cardRepository,
             userCardRepository = userCardRepository,
             commitScannedCards = commitScannedCards,
             addToWishlist = addToWishlist,
             analyticsHelper = analyticsHelper,
             soundManager = soundManager,
+            addScannedCardsToDeck = addScannedCardsToDeck,
             context = context,
         )
     }
@@ -172,7 +182,7 @@ class ScannerViewModelTest {
         val state = viewModel.uiState.value
 
         assertNull(state.lastDetectedCard)
-        assertTrue(state.scanSession.cards.isEmpty())
+        assertTrue(state.scanSession.entries.isEmpty())
         assertFalse(state.isSearching)
         assertFalse(state.showAmbiguitySelector)
         assertFalse(state.languageMismatch)
@@ -220,9 +230,9 @@ class ScannerViewModelTest {
         // Assert — card confirmed and added after just 1 frame
         assertFalse(
             "Session should contain the card after a single high-confidence frame",
-            viewModel.uiState.value.scanSession.cards.isEmpty(),
+            viewModel.uiState.value.scanSession.entries.isEmpty(),
         )
-        assertEquals(defaultCard.scryfallId, viewModel.uiState.value.scanSession.cards.first().card.scryfallId)
+        assertEquals(defaultCard.scryfallId, viewModel.uiState.value.scanSession.entries.first().card.scryfallId)
     }
 
     @Test
@@ -234,8 +244,8 @@ class ScannerViewModelTest {
 
         // Assert — card appears in session
         val session = viewModel.uiState.value.scanSession
-        assertFalse(session.cards.isEmpty())
-        assertEquals(defaultCard.scryfallId, session.cards.first().card.scryfallId)
+        assertFalse(session.entries.isEmpty())
+        assertEquals(defaultCard.scryfallId, session.entries.first().card.scryfallId)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -249,13 +259,13 @@ class ScannerViewModelTest {
         viewModel.onRecognitionResult(identified(similarity = 1.0f))
         advanceUntilIdle()
 
-        val countAfterFirst = viewModel.uiState.value.scanSession.cards.sumOf { it.quantity }
+        val countAfterFirst = viewModel.uiState.value.scanSession.entries.sumOf { it.quantity }
 
         // Act — immediately try to add the same card again (within 800 ms window)
         viewModel.onRecognitionResult(identified(similarity = 1.0f))
         advanceUntilIdle()
 
-        val countAfterSecond = viewModel.uiState.value.scanSession.cards.sumOf { it.quantity }
+        val countAfterSecond = viewModel.uiState.value.scanSession.entries.sumOf { it.quantity }
 
         // Assert — count unchanged; second scan within 800 ms was blocked
         assertEquals(
@@ -281,7 +291,7 @@ class ScannerViewModelTest {
         // Assert — card rejected by set lock; session empty
         assertTrue(
             "Set lock mismatch: card should not be added",
-            viewModel.uiState.value.scanSession.cards.isEmpty(),
+            viewModel.uiState.value.scanSession.entries.isEmpty(),
         )
     }
 
@@ -297,7 +307,7 @@ class ScannerViewModelTest {
         // Assert — card passes the lock filter and is added
         assertFalse(
             "Set lock match: card should be added",
-            viewModel.uiState.value.scanSession.cards.isEmpty(),
+            viewModel.uiState.value.scanSession.entries.isEmpty(),
         )
     }
 
@@ -324,9 +334,9 @@ class ScannerViewModelTest {
         assertNotNull(state.lastDetectedCard)
         assertFalse(
             "A language-fallback result must still be added to the session, never silently refused",
-            state.scanSession.cards.isEmpty(),
+            state.scanSession.entries.isEmpty(),
         )
-        assertEquals(defaultCard.scryfallId, state.scanSession.cards.first().card.scryfallId)
+        assertEquals(defaultCard.scryfallId, state.scanSession.entries.first().card.scryfallId)
     }
 
     @Test
@@ -345,7 +355,7 @@ class ScannerViewModelTest {
             "A genuine localized-printing hit must never show the fallback badge",
             state.languageMismatch,
         )
-        assertFalse(state.scanSession.cards.isEmpty())
+        assertFalse(state.scanSession.entries.isEmpty())
     }
 
     @Test
@@ -358,7 +368,7 @@ class ScannerViewModelTest {
 
         // Assert
         assertFalse(viewModel.uiState.value.languageMismatch)
-        assertFalse(viewModel.uiState.value.scanSession.cards.isEmpty())
+        assertFalse(viewModel.uiState.value.scanSession.entries.isEmpty())
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -429,7 +439,7 @@ class ScannerViewModelTest {
         )
         // Card is set in bottom bar but session remains empty (user must confirm)
         assertNotNull(viewModel.uiState.value.lastDetectedCard)
-        assertTrue(viewModel.uiState.value.scanSession.cards.isEmpty())
+        assertTrue(viewModel.uiState.value.scanSession.entries.isEmpty())
     }
 
     @Test
@@ -531,13 +541,13 @@ class ScannerViewModelTest {
         // Arrange — add a card first
         repeatIdentified(3)
         advanceUntilIdle()
-        assertFalse(viewModel.uiState.value.scanSession.cards.isEmpty())
+        assertFalse(viewModel.uiState.value.scanSession.entries.isEmpty())
 
         // Act
         viewModel.onClearSession()
 
         // Assert
-        assertTrue(viewModel.uiState.value.scanSession.cards.isEmpty())
+        assertTrue(viewModel.uiState.value.scanSession.entries.isEmpty())
         assertFalse(viewModel.uiState.value.showQueueSheet)
     }
 
@@ -569,7 +579,7 @@ class ScannerViewModelTest {
         )
     }
 
-    private fun sampleScannedCard() = com.mmg.manahub.feature.scanner.presentation.ScannedCard(
+    private fun sampleScannedCard() = CardSelectionEntry(
         card = defaultCard,
         quantity = 1,
         isFoil = false,
@@ -577,6 +587,7 @@ class ScannerViewModelTest {
         condition = "NM",
         setCode = "lea",
         timestamp = 1L,
+        id = "sample-id",
     )
 
     @Test
@@ -743,7 +754,7 @@ class ScannerViewModelTest {
     fun onAddAllToCollection_calledTwiceBeforeFirstResolves_commitsOnlyOnce() = runTest {
         viewModel.onRecognitionResult(identified())
         advanceUntilIdle()
-        assertEquals(1, viewModel.uiState.value.scanSession.cards.size) // precondition
+        assertEquals(1, viewModel.uiState.value.scanSession.entries.size) // precondition
 
         coEvery { commitScannedCards(any()) } returns CommitScanResult(
             committedCopies = 1, failedEntries = 0, entrySucceeded = listOf(true),
@@ -770,7 +781,7 @@ class ScannerViewModelTest {
         viewModel.onRecognitionResult(identified(card = cardB))
         advanceUntilIdle()
 
-        val seeded = viewModel.uiState.value.scanSession.cards
+        val seeded = viewModel.uiState.value.scanSession.entries
         assertEquals(2, seeded.size) // precondition
 
         // Force both entries to share the EXACT same timestamp (burst recognition, or a
@@ -781,7 +792,7 @@ class ScannerViewModelTest {
             viewModel.onEditScannedCard(entry)
             viewModel.onUpdateScannedCard(entry.copy(timestamp = collidingTimestamp))
         }
-        val collided = viewModel.uiState.value.scanSession.cards
+        val collided = viewModel.uiState.value.scanSession.entries
         assertEquals(2, collided.size)
         assertTrue(collided.all { it.timestamp == collidingTimestamp })
         assertNotEquals(collided[0].id, collided[1].id)
@@ -794,7 +805,7 @@ class ScannerViewModelTest {
         viewModel.onAddAllToCollection()
         advanceUntilIdle()
 
-        val remaining = viewModel.uiState.value.scanSession.cards
+        val remaining = viewModel.uiState.value.scanSession.entries
         assertEquals(
             "The FAILED entry must survive -- a shared timestamp must never drop it alongside the succeeded one",
             1, remaining.size,
