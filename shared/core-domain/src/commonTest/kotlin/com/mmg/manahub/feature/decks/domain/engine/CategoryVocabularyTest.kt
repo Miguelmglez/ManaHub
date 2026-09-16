@@ -3,11 +3,6 @@ package com.mmg.manahub.feature.decks.domain.engine
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  CategoryVocabularyTest — Deck Wizard Commander v5, X0.
-//  Locks in the widened/narrowed membership decisions cited in CategoryVocabulary's own KDoc.
-// ═══════════════════════════════════════════════════════════════════════════════
-
 class CategoryVocabularyTest {
 
     @Test
@@ -20,7 +15,6 @@ class CategoryVocabularyTest {
         assertEquals(setOf("landfall_payoff", "landfall"), CategoryVocabulary.cardTagKeysFor("landfall_payoff"))
     }
 
-    /** Different detection rules (see CategoryVocabulary KDoc) -- must NOT be widened. */
     @Test
     fun tribePayoff_staysNarrow_excludesGenericTribalTag() {
         assertEquals(setOf("tribe_payoff"), CategoryVocabulary.cardTagKeysFor("tribe_payoff"))

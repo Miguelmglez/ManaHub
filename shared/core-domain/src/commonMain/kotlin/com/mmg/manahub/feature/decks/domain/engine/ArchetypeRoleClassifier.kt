@@ -303,13 +303,7 @@ object ArchetypeRoleClassifier {
 
     // ── Matcher builders ─────────────────────────────────────────────────────────
 
-    /**
-     * A card matches [key] at D11-gated confidence, against [CategoryVocabulary.cardTagKeysFor]'s
-     * FULL membership set for [key] — not just the bare key string. For most roles that set is a
-     * singleton (the key itself, unchanged behavior); a few (X0, see [CategoryVocabulary]'s own
-     * KDoc) are cited synonym widenings so a card confirmed under either key counts the same way
-     * Browse's Collection filter does, by construction (S2).
-     */
+    // Matches against CategoryVocabulary's full membership set, not the bare key (see ADR-009).
     private fun tagMatcher(key: RoleKey): (Card) -> Float = matcher@{ card ->
         val membership = CategoryVocabulary.cardTagKeysFor(key)
         val confirmed = (card.tags + card.userTags).any { it.key in membership }

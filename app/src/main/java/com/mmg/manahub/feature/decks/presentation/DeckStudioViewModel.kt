@@ -1402,25 +1402,9 @@ class DeckStudioViewModel(
         publishCollectionResults(collectionCardsMatching(query))
     }
 
-    /**
-     * [collectionCards] filtered by [DeckStudioUiState.activeCollectionQuery] +
-     * [DeckStudioUiState.activeCollectionTagFilter] via [StructuredCardSearch.matchesForCategoryBrowse],
-     * ANDed with [query] -- the shared predicate behind [onAddCardsQueryChange],
-     * [searchCollectionByTags] and [applyStructuredSearch]. With none of the three set this is
-     * exactly [collectionCards] unfiltered (byte-identical to the [showCollectionCards] fallback).
-     *
-     * Deck Wizard Commander v5, X0 (H2/S2): when [DeckStudioUiState.activeCollectionTagFilter] is
-     * non-empty (a [CategoryVocabulary]-backed section is active), category membership is decided
-     * by that tag-key set ALONE -- never widened by the structured query's own
-     * `SearchCriterion.CardFunction` criterion resolving through the SEPARATE
-     * `CardFunctionOption.collectionTagKeys` vocabulary (H2's root cause: "Counters Payoff" Browse
-     * found `plus_counters`-only cards the analysis never counted). Every other structured
-     * criterion (color identity, format legality, curve, ...) still applies as an AND. With no tag
-     * filter active (curve/mana/tribe sections, which have no tag equivalent), behavior is
-     * unchanged: the full structured query decides alone, lenient (a Scryfall-only criterion is
-     * skipped rather than failing every card, so a Scryfall-only section never renders a
-     * falsely-empty Collection tab).
-     */
+    // Shared predicate for onAddCardsQueryChange/searchCollectionByTags/applyStructuredSearch; see
+    // StructuredCardSearch.matchesForCategoryBrowse for why the tag filter and structured query
+    // don't just AND/OR naively.
     private fun collectionCardsMatching(query: String): List<Card> {
         val state = _uiState.value
         val structuredQuery = state.activeCollectionQuery

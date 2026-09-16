@@ -1270,16 +1270,7 @@ class DeckWizardViewModel(
         publishPlanSectionsCollectionResults()
     }
 
-    /**
-     * Deck Wizard Commander v5, X0 (H2/S2): [DeckWizardUiState.planSectionsTagFilter] (a
-     * [com.mmg.manahub.feature.decks.domain.engine.CategoryVocabulary]-sourced CardTag-key set) is
-     * evaluated via [StructuredCardSearch.matchesForCategoryBrowse], mirroring
-     * `DeckStudioViewModel.collectionCardsMatching`'s own contract exactly: when non-empty, it
-     * decides category membership ALONE -- never widened by the structured query's own
-     * `SearchCriterion.CardFunction` criterion (which would otherwise resolve through the SEPARATE
-     * `CardFunctionOption.collectionTagKeys` vocabulary, H2's root cause). With no tag filter
-     * active, the full structured query decides alone, unchanged from before.
-     */
+    // Mirrors DeckStudioViewModel.collectionCardsMatching's contract via the same shared helper.
     private fun publishPlanSectionsCollectionResults() {
         val state = _uiState.value
         val tagFilter = state.planSectionsTagFilter

@@ -263,20 +263,7 @@ object SectionSearchQuery {
         return SearchCriterion.OracleTerms(anyOfGroups = listOf(terms))
     }
 
-    /**
-     * Local collection filter: the [com.mmg.manahub.core.model.CardTag] keys equivalent to this
-     * section, for pre-filtering `CardSearchSheet`'s Collection tab.
-     *
-     * `role:*`/`fingerprint:*` ids: read from [CategoryVocabulary] (Deck Wizard Commander v5, X0)
-     * -- the ONE authoritative table [ArchetypeRoleClassifier.tagMatcher] also reads, so the
-     * analysis attribution and this Collection filter agree by construction (S2). See
-     * [CategoryVocabulary]'s own KDoc for the widened/narrowed-membership citations.
-     *
-     * `tribe:*` ids also return `emptySet()`: a `tribe:elf` fingerprint key is a runtime-derived
-     * label ([TribeDeriver.tribeKeys]), never a literal [com.mmg.manahub.core.model.CardTag] on
-     * any card -- the local equivalent is the same structural subtype predicate the curve/mana/
-     * legality/offplan ids already fall back to (per the plan's own instruction for those).
-     */
+    // role:/fingerprint: read CategoryVocabulary (also read by ArchetypeRoleClassifier); tribe:* stays empty (runtime label, not a CardTag).
     fun collectionTagKeysFor(sectionId: String): Set<String> = when {
         sectionId.startsWith("role:") -> tagKeyOrEmpty(sectionId.removePrefix("role:"))
         sectionId.startsWith("fingerprint:") -> tagKeyOrEmpty(sectionId.removePrefix("fingerprint:"))
