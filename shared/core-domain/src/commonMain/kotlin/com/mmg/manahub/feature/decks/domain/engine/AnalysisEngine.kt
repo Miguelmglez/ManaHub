@@ -313,16 +313,33 @@ object AnalysisEngine {
         val shown = sortFindings(findings)
 
         // Category Sections rework (W1) -- per-color land breakdown + the mana-related role
-        // buckets. "produces:X" is skipped entirely when the deck's lands produce no copies of
-        // that color (plan wording: "one per color the deck's lands ACTUALLY produce") -- unlike
-        // PLAN_ROLES, this is not a gap table, so an empty color is simply omitted rather than
-        // shown at 0. role:ramp/role:mana_fix mirror PLAN_ROLES' section shape (id/band/
-        // contributions) but live here since P1 owns mana_fix and P3 explicitly excludes it.
+        // buckets. Deck Wizard 60-card wave (v6), plan §5 Phase 3.1: an IDENTITY color is now a
+        // GAP-TABLE entry -- always emitted, even at current=0 (min=ideal=the SAME Karsten need
+        // ColorSourceShortage already computed above, max=null), so the wizard's own Browse-for-X
+        // CTA has a real section to attach to before the user has added a single source of that
+        // color. Colors OUTSIDE the identity keep the pre-v6 "only when actually produced" rule
+        // unchanged (an off-identity dual still shows its extra color, informational only, no
+        // band). Colorless is special-cased separately: no Karsten source concept exists for {C}
+        // pips (any land pays them), so `produces:C` shows ONLY once the deck actually has a {C}
+        // pip, with no band either way. role:ramp/role:mana_fix mirror PLAN_ROLES' section shape
+        // (id/band/contributions) but live here since P1 owns mana_fix and P3 explicitly excludes it.
+        val identityColors = colorIdentity.filter { it != ManaColor.C }.toSet()
+        // ManaBaseAnalyzer.pipDistribution/requiredByColor never populate ManaColor.C -- "{C}" is
+        // colourless GENERIC demand, not a colour any Karsten source table fixes (coloredPipsIn's
+        // own KDoc: "Generic/colourless/X/S -> empty") -- so colourless needs its own direct
+        // mana-cost scan for "does this deck have a real {C} pip at all", never the shared report.
+        val hasColorlessPip = mainboard.any { entry -> entry.card.manaCost?.contains("{C}") == true }
         val producesSections = ManaColor.entries.mapNotNull { color ->
             val symbol = color.symbol.first()
             val producing = mainboard.filter { BasicLandCalculator.isLand(it.card) && it.card.producedMana.contains(symbol) }
             val count = producing.sumOf { it.quantity }
-            if (count == 0) return@mapNotNull null
+            val inIdentity = color in identityColors
+            when {
+                color == ManaColor.C -> if (!hasColorlessPip) return@mapNotNull null
+                !inIdentity && count == 0 -> return@mapNotNull null
+                else -> Unit
+            }
+            val need = (manaReport.requiredByColor[color] ?: 0).takeIf { inIdentity }
             // Suggestions Tab UI Polish plan (W6, D-b): label is now a plain color name, not a raw
             // "{W}"-style token baked into the string -- the UI renders the real mana symbol
             // itself (SectionHeader's `icon` slot via a ManaSymbolImage wrapper), the way
@@ -332,9 +349,24 @@ object AnalysisEngine {
                 id = "produces:${color.symbol}",
                 label = color.displayName,
                 current = count,
+                min = need,
+                ideal = need,
                 contributions = producing.toContributions(),
             )
         }
+        // Deck Wizard 60-card wave (v6), plan §5 Phase 3.2: a dedicated, browsable "lands" section
+        // (the SAME id/band/contributions shape every other category uses) -- emitted FIRST in
+        // this pillar. `landCount` is the same authoritative count `landScore`/`karstenTarget`
+        // above already use; `skeleton.lands` is the SAME band the build engine itself targets.
+        val landsSection = CardSection(
+            id = "lands",
+            label = "Lands",
+            current = landCount,
+            min = skeleton.lands.min,
+            ideal = skeleton.lands.ideal,
+            max = skeleton.lands.max,
+            contributions = mainboard.filter { BasicLandCalculator.isLand(it.card) }.toContributions(),
+        )
         val rampBand = skeleton.roleTargets["ramp"]
         val rampSection = CardSection(
             id = "role:ramp",
@@ -364,7 +396,7 @@ object AnalysisEngine {
             current = manaDorkEntries.sumOf { it.quantity },
             contributions = manaDorkEntries.toContributions(),
         )
-        val sections = producesSections + rampSection + manaFixSection + manaRockSection + manaDorkSection
+        val sections = listOf(landsSection) + producesSections + rampSection + manaFixSection + manaRockSection + manaDorkSection
 
         return PillarResult(id = PillarId.MANA_BASE, subscore = subscore, findings = shown, sections = sections)
     }

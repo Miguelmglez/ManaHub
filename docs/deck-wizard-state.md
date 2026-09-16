@@ -954,6 +954,22 @@ was considered and deliberately deferred to the next run (the SYNERGY producer/p
 is the first consumer that can actually verify whether a new rule is correct. Full reasoning:
 ADR-009 "Amendment (R3a)".
 
+**Deck Wizard 60-card wave (v6), Phase 3 (2026-09-17) — deliberate emission changes, verified over
+the same 180-build real-collection harness (`WizardHarnessSectionVocabularyTest`, `missingLandsSection=0`,
+no new duplicate-label or fingerprint-tribal-leak failures):**
+
+| Section id shape | Label | Emitted by | Change | Reason |
+|---|---|---|---|---|
+| `produces:<identity color>` at `current=0` | `ManaColor.displayName` | MANA_BASE | **NEW — now a gap-table entry** | Was "only when actually produced" for every color (see the `produces:<color>` row above, which now applies ONLY to colors OUTSIDE the deck's identity). An identity color the deck doesn't produce yet needs a real section for the wizard's Browse-for-X CTA to attach to, same as every other PLAN_ROLES gap. `min`/`ideal` = the SAME Karsten need `ColorSourceShortage` already computes (`ManaBaseAnalyzer.requiredByColor`); `max` stays `null`. |
+| `produces:C` | "Colorless" | MANA_BASE | **NEW condition** | Colourless has no Karsten source concept (`{C}` pips are payable by any land) — shown only when the mainboard has a real `{C}` pip (a direct mana-cost scan; `ManaBaseAnalyzer.pipsByColor`/`requiredByColor` never populate `ManaColor.C` at all, by that analyzer's own design — do not read those maps for colourless). |
+| `lands` | "Lands" | MANA_BASE, emitted FIRST | **NEW section** | The land count/band gets the SAME browsable-section treatment every other category has (`SectionSearchQuery.fragmentFor("lands") = "t:land"`); `band = skeleton.lands`, `contributions` = every land entry. Collides with no existing label. |
+
+Neither change touches `subscore`/`totalScore` (verified: `evaluateManaBase`'s `subscore` is computed
+BEFORE these sections are built, from `landScore`/`colorFixScore`/`manaFixScore`/`landMixScore` only —
+`sections` is a separate, later-computed local never read back by `compose()`) — the golden/
+calibration/corpus/skeleton-differentiation suites and the harness score distribution
+(`WizardCommanderHarnessV2Test`, min/p25/median/p75/max) stayed byte-identical across this phase.
+
 ---
 
 ## 9. File map (current → target)

@@ -20,6 +20,14 @@ import org.junit.Test
 //  no TRIBAL-category card tag ever surfaces its own `fingerprint:<key>` section. Prints aggregate
 //  counts only (no card/deck names, real user data stays gitignored).
 //
+//  Deck Wizard 60-card wave (v6), plan §5 Phase 3 gate: the mana-base pillar's vocabulary now
+//  ALSO includes zero-count `produces:X` gap entries (an identity color the deck doesn't yet
+//  produce) and a NEW `lands` section -- both EXPECTED, not anomalous. Neither violates the two
+//  invariants above ("Lands" collides with no other label in `AnalysisEngine.kt`; the new sections
+//  carry no `fingerprint:` prefix), so no assertion changed -- only the `landsSectionMissing`
+//  counter below is new, proving the section actually surfaces over real corpus data rather than
+//  merely compiling.
+//
 //  ./gradlew :app:testDebugUnitTest --tests "com.mmg.manahub.feature.decks.harness.WizardHarnessSectionVocabularyTest"
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -53,6 +61,7 @@ class WizardHarnessSectionVocabularyTest {
         var analyzed = 0
         var duplicateLabelFailures = 0
         var fingerprintTribalLeaks = 0
+        var missingLandsSection = 0
         val duplicateIdPairFrequency = mutableMapOf<String, Int>()
         val useCase = CommanderMatrixV2.newBuildUseCase()
         specs.forEach { spec ->
@@ -72,13 +81,15 @@ class WizardHarnessSectionVocabularyTest {
             }
             val leaks = sections.map { it.id }.filter { id -> id.startsWith("fingerprint:") && id.removePrefix("fingerprint:") in tribalTagKeys }
             if (leaks.isNotEmpty()) fingerprintTribalLeaks++
+            if (sections.none { it.id == "lands" }) missingLandsSection++
         }
 
-        println("[wizard-harness-vocabulary] analyzed=$analyzed duplicateLabelFailures=$duplicateLabelFailures fingerprintTribalLeaks=$fingerprintTribalLeaks tribalTagKeys=${tribalTagKeys.size}")
+        println("[wizard-harness-vocabulary] analyzed=$analyzed duplicateLabelFailures=$duplicateLabelFailures fingerprintTribalLeaks=$fingerprintTribalLeaks tribalTagKeys=${tribalTagKeys.size} missingLandsSection=$missingLandsSection")
         duplicateIdPairFrequency.toList().sortedByDescending { it.second }.forEach { (idsKey, count) ->
             println("[wizard-harness-vocabulary] duplicate id set [$idsKey] occurred in $count analyses")
         }
         assertTrue("no analysis may emit two sections sharing a normalized label", duplicateLabelFailures == 0)
         assertTrue("no analysis may emit a fingerprint:<x> section for a TRIBAL card tag", fingerprintTribalLeaks == 0)
+        assertTrue("every analyzed build must emit exactly one 'lands' section", missingLandsSection == 0)
     }
 }

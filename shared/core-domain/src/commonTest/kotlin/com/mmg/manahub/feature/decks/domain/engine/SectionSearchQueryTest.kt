@@ -599,4 +599,25 @@ class SectionSearchQueryTest {
         val query = SectionSearchQuery.toAdvancedQuery("role:ramp", context)!!
         assertFalse(query.criteria.any { it is com.mmg.manahub.core.model.SearchCriterion.Format })
     }
+
+    // ── Deck Wizard 60-card wave (v6), plan §5 Phase 3.2 -- the new "lands" section ─────────────
+
+    @Test
+    fun landsSection_fragmentIsPlainLandType() {
+        assertEquals("t:land", SectionSearchQuery.fragmentFor("lands", ctx()))
+    }
+
+    @Test
+    fun landsSection_criteriaIsCardType_land() {
+        val query = SectionSearchQuery.toAdvancedQuery("lands", ctx())
+        assertNotNull(query)
+        // Mirrors tribeCriteria's own shape: the FIRST criterion (category clause) is a single
+        // CardType(setOf("land")), no exclude flag -- NOT curveCriteria's exclude=true variant.
+        assertEquals(com.mmg.manahub.core.model.SearchCriterion.CardType(setOf("land")), query.criteria.first())
+    }
+
+    @Test
+    fun landsSection_collectionTagKeysAreEmpty() {
+        assertTrue(SectionSearchQuery.collectionTagKeysFor("lands").isEmpty())
+    }
 }

@@ -103,6 +103,9 @@ object SectionSearchQuery {
         sectionId == "illegal" -> null
         sectionId == "mana_rock" -> "function:mana-rock"
         sectionId == "mana_dork" -> "function:mana-dork"
+        // Deck Wizard 60-card wave (v6), plan §5 Phase 3.2: the new "lands" section -- plain land
+        // type, no color/production filter (that is what "produces:X" is already for).
+        sectionId == "lands" -> "t:land"
         sectionId.startsWith("produces:") ->
             "t:land produces:${sectionId.removePrefix("produces:")}"
         sectionId.startsWith("mv:") -> curveFragment(sectionId.removePrefix("mv:"))
@@ -204,6 +207,8 @@ object SectionSearchQuery {
         sectionId == "illegal" -> null
         sectionId == "mana_rock" -> listOf(SearchCriterion.CardFunction(setOf("mana-rock")))
         sectionId == "mana_dork" -> listOf(SearchCriterion.CardFunction(setOf("mana-dork")))
+        // Mirrors tribeCriteria's own shape (a single CardType criterion, no exclude flag).
+        sectionId == "lands" -> listOf(SearchCriterion.CardType(setOf("land")))
         sectionId.startsWith("produces:") -> listOf(
             SearchCriterion.ManaProduction(colors = setOf(sectionId.removePrefix("produces:")), requireLand = true),
         )
@@ -333,7 +338,7 @@ object SectionSearchQuery {
             .orEmpty()
         sectionId == "mana_rock" -> setOf("mana_rock")
         sectionId == "mana_dork" -> setOf("mana_dork")
-        else -> emptySet() // tribe:*, produces:*, mv:*, legal, illegal, offplan, interaction, standalone -- structural, not tag-keyed
+        else -> emptySet() // tribe:*, produces:*, mv:*, lands, legal, illegal, offplan, interaction, standalone -- structural, not tag-keyed
     }
 
     // ── Identity / legality composition ─────────────────────────────────────────────────────
