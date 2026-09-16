@@ -138,6 +138,25 @@ class LandTargetResolverTest {
         assertEquals(genericIdeal, result)
     }
 
+    @Test
+    fun `wizard call shape -- profile null with a 60-card skeleton returns exactly skeleton lands ideal`() {
+        val skeleton = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY,
+            archetype = null,
+            posture = null,
+            themes = emptyList(),
+            identity = setOf(ManaColor.R),
+            deckFormat = DeckFormat.MODERN,
+        )
+        val result = LandTargetResolver.resolve(
+            format = DeckFormat.MODERN,
+            archetypeSkeleton = skeleton,
+            profile = null,
+            manaBaseAnalyzer = analyzer,
+        )
+        assertEquals(skeleton.lands.ideal, result)
+    }
+
     // ── band() ───────────────────────────────────────────────────────────────────
 
     @Test

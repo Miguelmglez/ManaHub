@@ -4,6 +4,7 @@ package com.mmg.manahub.feature.decks.domain.engine
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckFormat
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -11,7 +12,9 @@ import kotlin.test.assertTrue
  * Deck Wizard Commander v3 plan, Phase 2.2 gate: [PlacementScorer]'s five documented behaviors --
  * role plateau, anti-role hard filter, axis producer-before-payoff ordering, curve deficit, and the
  * D8 filler floor. Uses a minimal hand-built [CommanderPlan] rather than a real
- * [CommanderPlanResolver.resolve] call so each behavior is isolated from skeleton-resolution noise.
+ * [WizardPlanResolver.resolve] call so each behavior is isolated from skeleton-resolution noise.
+ * Deck Wizard 60-card wave (v6), plan §5 Phase 1.4: also covers [PlacementScorer.marginalGain]'s
+ * `copyIndex` consistency-credit behavior (S5).
  */
 class PlacementScorerTest {
 
@@ -138,5 +141,45 @@ class PlacementScorerTest {
             filler, PlacementScorer.PlacementState(), myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f,
         )
         assertNull(gain, "D8: a candidate with zero role gain and zero axis gain is never placed")
+    }
+
+    // ── S5 (v6, plan §5 Phase 1.4): copyIndex consistency credit ──────────────────────────────
+
+    @Test
+    fun `copy 1 of a high-power card with role gain beats copy 0 of a low-power card with the same role gain`() {
+        val myPlan = plan(roleTargets = mapOf("ramp" to RoleTarget(2, 8, 12)))
+        val strong = profile(card = card(id = "strong"), roleConfidence = mapOf("ramp" to 1f)).copy(powerNormalized = 0.9f)
+        val weak = profile(card = card(id = "weak"), roleConfidence = mapOf("ramp" to 1f)).copy(powerNormalized = 0.2f)
+
+        val gainStrongCopy1 = PlacementScorer.marginalGain(
+            strong, PlacementScorer.PlacementState(), myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f, copyIndex = 1,
+        )
+        val gainWeakCopy0 = PlacementScorer.marginalGain(
+            weak, PlacementScorer.PlacementState(), myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f, copyIndex = 0,
+        )
+        assertTrue((gainStrongCopy1 ?: 0f) > (gainWeakCopy0 ?: 0f))
+    }
+
+    @Test
+    fun `copy 1 with zero role and zero axis gain is still null -- D8 floor unaffected by copyIndex`() {
+        val myPlan = plan(roleTargets = emptyMap())
+        val filler = profile()
+        val gain = PlacementScorer.marginalGain(
+            filler, PlacementScorer.PlacementState(), myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f, copyIndex = 1,
+        )
+        assertNull(gain, "D8 filler floor applies regardless of copyIndex")
+    }
+
+    @Test
+    fun `copyIndex 0 is byte-identical to the pre-1_4 call`() {
+        val myPlan = plan(roleTargets = mapOf("ramp" to RoleTarget(2, 8, 12)))
+        val candidate = profile(roleConfidence = mapOf("ramp" to 1f))
+        val withoutCopyIndex = PlacementScorer.marginalGain(
+            candidate, PlacementScorer.PlacementState(), myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f,
+        )
+        val withCopyIndexZero = PlacementScorer.marginalGain(
+            candidate, PlacementScorer.PlacementState(), myPlan, myPlan.curveTargets, emptyMap(), pipFactor = 1f, copyIndex = 0,
+        )
+        assertEquals(withoutCopyIndex, withCopyIndexZero)
     }
 }

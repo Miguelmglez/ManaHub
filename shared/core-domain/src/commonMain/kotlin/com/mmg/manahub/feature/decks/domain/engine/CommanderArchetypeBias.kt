@@ -6,7 +6,7 @@ import com.mmg.manahub.core.model.CardTag
 /**
  * Shared commander-derived macro bias, extracted from
  * [com.mmg.manahub.feature.decks.domain.usecase.InferDeckArchetypeUseCase] (Deck Wizard Commander
- * v4, W6 Task 1 / decision E12) so [CommanderPlanResolver]'s Custom build path can reuse the exact
+ * v4, W6 Task 1 / decision E12) so [WizardPlanResolver]'s Custom build path can reuse the exact
  * same bias the Analysis engine already applies to its post-build macro resolution, instead of a
  * second hand-written copy.
  *
@@ -36,8 +36,8 @@ object CommanderArchetypeBias {
      * macro, or `null` when the commander carries no usable signal at all.
      */
     fun commanderMacroPrior(commanderTags: List<CardTag>, commanderColorIdentity: Set<ManaColor>): MacroPrior? {
-        val tagArchetype = commanderTagArchetype(commanderTags)
-        if (tagArchetype != null) return MacroPrior(tagArchetype, MACRO_AMBIGUITY_MARGIN)
+        val tagPrior = tagArchetype(commanderTags)
+        if (tagPrior != null) return MacroPrior(tagPrior, MACRO_AMBIGUITY_MARGIN)
         if (commanderColorIdentity.isEmpty()) return null
         val colorArchetype = ColorStrategyAffinity.forColors(commanderColorIdentity).firstOrNull()?.archetype ?: return null
         return MacroPrior(colorArchetype, MACRO_PRIOR_COLOR_BONUS)
@@ -45,7 +45,7 @@ object CommanderArchetypeBias {
 
     /**
      * Tag-tier ONLY (no color-identity fallback) — for a caller picking a single DISCRETE skeleton
-     * target (e.g. [CommanderPlanResolver]'s Custom build hint, F18/E12) rather than nudging an
+     * target (e.g. [WizardPlanResolver]'s Custom build hint, F18/E12) rather than nudging an
      * already-continuous score. Color identity alone is deliberately excluded here: it is "a
      * tiebreak, never a driver" (this object's own KDoc) and is far too weak a signal to justify
      * switching a build's ENTIRE target skeleton away from the generic baseline — verified by hand
@@ -55,16 +55,24 @@ object CommanderArchetypeBias {
      * continuous axis position toward that same centre — i.e. exactly the position least likely to
      * separate from its neighbours by the ambiguity margin.
      *
-     * W6b: resolves by majority vote over ALL of [commanderTags], not the first match — a
-     * commander whose tags map to more than one archetype must not depend on tag list order
-     * (`firstNotNullOfOrNull` did). A tie is broken by [ArchetypeId.name] alphabetically, which is
-     * likewise independent of input order.
+     * W6b: resolves by majority vote over ALL of [tags], not the first match — a commander (or,
+     * Deck Wizard 60-card wave v6: a pool of seed cards) whose tags map to more than one archetype
+     * must not depend on tag list order (`firstNotNullOfOrNull` did). A tie is broken by
+     * [ArchetypeId.name] alphabetically, which is likewise independent of input order.
+     *
+     * Deck Wizard 60-card wave (v6), plan §5 Phase 1.2: renamed from `commanderTagArchetype` — this
+     * function has no commander-specific logic (it always took a plain tag list) and
+     * [WizardPlanResolver]'s Sixty branch now calls it over a seed pool's tags the same way the
+     * Commander branch calls it over one card's tags.
      */
-    fun commanderTagArchetype(commanderTags: List<CardTag>): ArchetypeId? {
-        val votes = commanderTags.mapNotNull { DeckIdentitySeedTags.archetypeForTag(it) }
+    fun tagArchetype(tags: List<CardTag>): ArchetypeId? {
+        val votes = tags.mapNotNull { DeckIdentitySeedTags.archetypeForTag(it) }
         if (votes.isEmpty()) return null
         val counts = votes.groupingBy { it }.eachCount()
         val topCount = counts.values.max()
         return counts.filterValues { it == topCount }.keys.minByOrNull { it.name }
     }
+
+    @Deprecated("renamed to tagArchetype (v6, plan §5 Phase 1.2) -- no behavior change", ReplaceWith("tagArchetype(commanderTags)"))
+    fun commanderTagArchetype(commanderTags: List<CardTag>): ArchetypeId? = tagArchetype(commanderTags)
 }

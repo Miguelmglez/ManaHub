@@ -10,7 +10,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyAffinity
 import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyEntry
-import com.mmg.manahub.feature.decks.domain.engine.CommanderPlanResolver
+import com.mmg.manahub.feature.decks.domain.engine.WizardPlanResolver
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
@@ -60,9 +60,9 @@ data class RecommendationReason(val label: String)
  *
  * Signal sources, PRIMARY dominating (see each private `xScore` function for the exact math):
  * 1. **PRIMARY — the commander's own axis profile + role confidences** matched against the entry's
- *    resolved skeleton. Reuses [CommanderPlanResolver]'s own `THEME_TARGET_AXES` table (promoted to
+ *    resolved skeleton. Reuses [WizardPlanResolver]'s own `THEME_TARGET_AXES` table (promoted to
  *    `internal` this phase — see that file's own note) rather than hand-rolling a second theme→axis
- *    map, and [CommanderPlanResolver.resolve] itself for the entry's resolved
+ *    map, and [WizardPlanResolver.resolve] itself for the entry's resolved
  *    [com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton] (role bands).
  * 2. `card_strategy_tags` bridge ([ownTags]/[ownTribes]) via [DeckIdentitySeedTags] — same bridge
  *    [DeriveCommanderStrategiesUseCase] used, mapped onto SET membership against the entry instead
@@ -107,7 +107,7 @@ class RecommendCommanderStrategiesUseCase {
             .let { it.produces.keys + it.consumes.keys }
 
         // W6b: extracted to TribeDeriver.derivedLordTribe (shared verbatim with
-        // CommanderPlanResolver's Custom build path, see that function's own KDoc).
+        // WizardPlanResolver's Custom build path, see that function's own KDoc).
         val derivedTribe = TribeDeriver.derivedLordTribe(commander)
 
         val tagArchetypes = ownTags.mapNotNull { DeckIdentitySeedTags.archetypeForTag(it) }.toSet()
@@ -120,17 +120,17 @@ class RecommendCommanderStrategiesUseCase {
 
         val scored = candidates.map { entry ->
             val entryTribe = if (entry.requiresTribe) derivedTribe else null
-            val entryTribeAxis = entryTribe?.let { CommanderPlanResolver.tribeAxisKey(it) }
+            val entryTribeAxis = entryTribe?.let { WizardPlanResolver.tribeAxisKey(it) }
             val commanderAxes = if (entryTribeAxis != null) {
                 SynergyGraph.cardAxisProfile(commander, archetypeFormat, entryTribeAxis, entryTribe)
                     .let { it.produces.keys + it.consumes.keys }
             } else {
                 baseCommanderAxes
             }
-            val entryAxes = entry.themes.flatMap { CommanderPlanResolver.THEME_TARGET_AXES[it].orEmpty() }
+            val entryAxes = entry.themes.flatMap { WizardPlanResolver.THEME_TARGET_AXES[it].orEmpty() }
                 .toSet() + setOfNotNull(entryTribeAxis)
 
-            val skeleton = CommanderPlanResolver.resolve(
+            val skeleton = WizardPlanResolver.resolve(
                 format = format,
                 commander = commander,
                 pick = StrategyPick.Curated(entry, entryTribe),

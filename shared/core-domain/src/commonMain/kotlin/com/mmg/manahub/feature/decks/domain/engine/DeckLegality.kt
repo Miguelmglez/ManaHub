@@ -27,3 +27,12 @@ fun isLegalForFormat(card: Card, format: DeckFormat): Boolean {
         DeckFormat.DRAFT -> true
     }
 }
+
+/**
+ * Deck Wizard 60-card wave (v6), plan §5 Phase 1.5, S2: Vintage's restricted list — the ONLY
+ * per-format 1-copy rule today (other formats have no restricted list). [isLegalForFormat]
+ * deliberately still counts "restricted" as legal (unchanged); [CopyPolicy] is the sole reader of
+ * this predicate.
+ */
+fun isRestricted(card: Card, format: DeckFormat): Boolean =
+    format == DeckFormat.VINTAGE && card.legalityVintage.equals("restricted", ignoreCase = true)

@@ -14,7 +14,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.AxisKey
 import com.mmg.manahub.feature.decks.domain.engine.CardSection
 import com.mmg.manahub.feature.decks.domain.engine.CommanderPlan
-import com.mmg.manahub.feature.decks.domain.engine.CommanderPlanResolver
+import com.mmg.manahub.feature.decks.domain.engine.WizardPlanResolver
 import com.mmg.manahub.feature.decks.domain.engine.CurveTargets
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.EdhrecPowerResolver
@@ -194,7 +194,7 @@ class BuildCommanderDeckUseCase(
             ?: error("BuildCommanderDeckUseCase requires a Commander-shaped format, got $format")
 
         onStage(CommanderBuildStage.RESOLVING_PLAN)
-        val plan = CommanderPlanResolver.resolve(format, commander, strategyPick, identity)
+        val plan = WizardPlanResolver.resolve(format, commander, strategyPick, identity)
         val pin = when (strategyPick) {
             is StrategyPick.Curated -> strategyPick.strategy.toPin(strategyPick.tribe)
             StrategyPick.Custom -> com.mmg.manahub.feature.decks.domain.engine.StrategyPin(null, null, emptyList(), null)

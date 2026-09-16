@@ -51,6 +51,12 @@ object PlacementScorer {
      * reorder a genuine near-tie, it can never satisfy the D8 filler floor or beat a real band need. */
     const val PREFERENCE_BONUS = 0.01f
 
+    /** Deck Wizard 60-card wave (v6, S5) -- start value for the copy->=2 consistency bonus (plan
+     * §5 Phase 1.4): a Phase-6-calibrated judgment call against the 60-card harness (never the
+     * analysis fixtures, ADR-007 §4), NOT hand-fit here. `copyIndex == 0` (every Commander
+     * candidate, always -- CopyPolicy caps it at 1) is completely unaffected. */
+    const val CONSISTENCY_CREDIT = 0.06f
+
     /** [combineDiminishing]'s per-step decay: the 2nd-strongest need counts at 40% of its own value,
      * the 3rd at 16%, etc. Judgment call verified by hand against [MockCollectionRich] (W6 Task 2):
      * strong enough that a genuinely multi-purpose card still separates from a single-purpose one,
@@ -96,6 +102,7 @@ object PlacementScorer {
         curveTargets: List<CurveTargets.CurveBucketTarget>,
         axisIdeals: Map<AxisKey, SynergyGraph.AxisIdeal>,
         pipFactor: Float,
+        copyIndex: Int = 0,
     ): Float? {
         // Hard filter (plan 2.2): a card matching one of the skeleton's anti-roles is never placed
         // by the engine, regardless of how well it scores elsewhere.
@@ -114,10 +121,18 @@ object PlacementScorer {
         val powerPrior = candidate.powerNormalized.coerceIn(0f, 1f)
         val overflowPenalty = overflowCost(candidate, plan, state.roleCounts) * ROLE_OVERFLOW_WEIGHT
 
-        val weighted = (
+        val baseWeighted = (
             roleGain * ROLE_WEIGHT + axisGain * AXIS_WEIGHT + curveGain * CURVE_WEIGHT + powerPrior * POWER_WEIGHT - overflowPenalty
             ).coerceAtLeast(0f)
-        return weighted * pipFactor.coerceIn(0f, 1f)
+        // S5, plan §5 Phase 1.4: a copy k>=1 (this candidate's 2nd+ copy on the board) that still
+        // clears a real role/axis need earns a small consistency bonus on top -- see
+        // CONSISTENCY_CREDIT's own KDoc. copyIndex 0 (every pre-v6 call site) is a no-op here.
+        val consistencyBonus = if (copyIndex >= 1 && (roleGain > 0f || axisGain > 0f)) {
+            CONSISTENCY_CREDIT * candidate.powerNormalized
+        } else {
+            0f
+        }
+        return (baseWeighted + consistencyBonus) * pipFactor.coerceIn(0f, 1f)
     }
 
     /** S7 -- whether placing [candidate] on top of [roleCounts] pushes at least one non-anti role

@@ -56,6 +56,13 @@ object LandTargetResolver {
      *   `DeckStudioViewModel`); required for the 60-card branch ([ManaBaseAnalyzer.dynamicLandIdeal]
      *   reads its `roleCounts`/`avgCmc`/`nonLandCount`), ignored for Commander. `null` is safe (falls
      *   back to the skeleton/format default) for a caller that doesn't have a mainboard yet.
+     *
+     *   Deck Wizard 60-card wave (v6), plan §5 Phase 1.6: `BuildWizardDeckUseCase` calls this with
+     *   `profile = null` for every 60-card build (it has no mainboard yet during land-target
+     *   resolution, same as Commander) — the target then falls straight through to
+     *   [archetypeSkeleton]'s own `lands.ideal`, which already carries the resolved
+     *   [SixtyFormatProfile] shift ([ArchetypeSkeletonResolver.resolveWithColor]'s last layering
+     *   step). See `LandTargetResolverTest`'s own "wizard call shape" test.
      */
     fun resolve(
         format: DeckFormat,

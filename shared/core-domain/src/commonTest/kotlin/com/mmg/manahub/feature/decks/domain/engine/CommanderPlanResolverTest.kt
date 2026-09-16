@@ -10,9 +10,11 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Deck Wizard Commander v3 plan, Phase 1.1/1.3 gate.
+ * Deck Wizard Commander v3 plan, Phase 1.1/1.3 gate. Kept as-is (regression baseline, plan rule 0.3)
+ * after the Deck Wizard 60-card wave (v6) renamed the object under test to [WizardPlanResolver] --
+ * see `WizardPlanResolverTest` for the new [BuildAnchor]-based coverage.
  *
- * 1. [CommanderPlanResolver]'s resolved skeleton must be `==` the skeleton
+ * 1. [WizardPlanResolver]'s resolved skeleton must be `==` the skeleton
  *    [AnalysisEngine.evaluate] would resolve for the SAME (format, archetype, posture, themes,
  *    identity) pin — table-driven over every catalog entry available in COMMANDER/COMMANDER_CASUAL,
  *    across representative identities. [AnalysisEngine.evaluate] itself is not called directly here
@@ -76,7 +78,7 @@ class CommanderPlanResolverTest {
                 val pin = strategy.toPin(tribe)
 
                 identities.forEach { identity ->
-                    val plan = CommanderPlanResolver.resolve(
+                    val plan = WizardPlanResolver.resolve(
                         format = format,
                         commander = testCommander(identity),
                         pick = StrategyPick.Curated(strategy, tribe),
@@ -95,13 +97,13 @@ class CommanderPlanResolverTest {
 
     @Test
     fun `Custom with no commander tag signal resolves the generic baseline skeleton, never a null plan`() {
-        // testCommander() carries no tags -- CommanderArchetypeBias.commanderTagArchetype returns
+        // testCommander() carries no tags -- CommanderArchetypeBias.tagArchetype returns
         // null (F18's build hint deliberately has NO color-identity tier, see its own KDoc), so the
         // F18 build hint is byte-for-byte inert for every identity and Custom keeps its pre-F18
         // generic-baseline behavior (F2), regardless of how many colors the commander is in.
         commanderFormats.forEach { format ->
             identities.forEach { identity ->
-                val plan = CommanderPlanResolver.resolve(
+                val plan = WizardPlanResolver.resolve(
                     format = format,
                     commander = testCommander(identity),
                     pick = StrategyPick.Custom,
@@ -138,7 +140,7 @@ class CommanderPlanResolverTest {
             tags = listOf(com.mmg.manahub.core.model.CardTag.TOKENS),
         )
         commanderFormats.forEach { format ->
-            val plan = CommanderPlanResolver.resolve(
+            val plan = WizardPlanResolver.resolve(
                 format = format,
                 commander = edgarLike,
                 pick = StrategyPick.Custom,
