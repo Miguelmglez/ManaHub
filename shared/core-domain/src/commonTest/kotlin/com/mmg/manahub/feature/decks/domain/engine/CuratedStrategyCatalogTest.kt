@@ -346,4 +346,13 @@ class CuratedStrategyCatalogTest {
         // the actual structural guarantees this suite protects.
         assertTrue(CuratedStrategyCatalog.ALL.isNotEmpty())
     }
+
+    // ── Deck Wizard 60-card wave (v6), plan §5 Phase 2.3 ────────────────────────────────────────
+
+    @Test
+    fun `prison is availableIn CASUAL but not STANDARD`() {
+        val prison = CuratedStrategyCatalog.ALL.first { it.id == "prison" }
+        assertTrue(prison.availableIn(DeckFormat.CASUAL), "prison.formats = COMMANDER_CASUAL = {COMMANDER, CASUAL} (confirmed in source)")
+        assertFalse(prison.availableIn(DeckFormat.STANDARD))
+    }
 }

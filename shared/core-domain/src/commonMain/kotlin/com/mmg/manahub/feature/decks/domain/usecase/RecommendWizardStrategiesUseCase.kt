@@ -8,8 +8,10 @@ import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
+import com.mmg.manahub.feature.decks.domain.engine.BuildAnchor
 import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyAffinity
 import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyEntry
+import com.mmg.manahub.feature.decks.domain.engine.CopyPolicy
 import com.mmg.manahub.feature.decks.domain.engine.WizardPlanResolver
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
@@ -22,10 +24,12 @@ import com.mmg.manahub.feature.decks.domain.engine.SynergyGraph
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 import com.mmg.manahub.feature.decks.domain.engine.availableIn
+import com.mmg.manahub.feature.decks.domain.engine.isLegalForFormat
 import com.mmg.manahub.feature.decks.domain.template.OwnedCard
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  RecommendCommanderStrategiesUseCase — Deck Wizard Commander v3 plan, Phase 4.1.
+//  RecommendWizardStrategiesUseCase — Deck Wizard Commander v3 plan, Phase 4.1; generalized to
+//  60-card anchors in the Deck Wizard 60-card wave (v6), plan §5 Phase 2.1.
 //
 //  Replaces DeriveCommanderStrategiesUseCase (which derived a RAW candidate list of archetypes/
 //  themes/tribes for the OLD 3-axis StrategyPickerSheet — dead weight now that the STRATEGY step is
@@ -85,7 +89,31 @@ data class RecommendationReason(val label: String)
  * Never throws: every signal degrades to zero contribution when its input is empty/absent (empty
  * [ownedCollection], empty [ownTags]/[ownTribes]/[edhrecThemeNames], a colorless [identity]).
  */
-class RecommendCommanderStrategiesUseCase {
+class RecommendWizardStrategiesUseCase {
+
+    /** Deck Wizard 60-card wave (v6), plan §5 Phase 2.1: [BuildAnchor]-based entry point. The
+     * [BuildAnchor.Commander] branch is a thin delegate onto the pre-v6 [Card]-based overload
+     * below (byte-identical, unchanged body — rule 0.3); [BuildAnchor.Sixty] is scored by
+     * [invokeSixty], the same five signals generalized from one commander card to a seed pool. */
+    operator fun invoke(
+        format: DeckFormat,
+        anchor: BuildAnchor,
+        ownedCollection: List<OwnedCard> = emptyList(),
+        ownTags: List<CardTag> = emptyList(),
+        ownTribes: List<String> = emptyList(),
+        edhrecThemeNames: List<String> = emptyList(),
+    ): List<StrategyRecommendation> = when (anchor) {
+        is BuildAnchor.Commander -> invoke(
+            format = format,
+            commander = anchor.card,
+            identity = anchor.card.colorIdentity.toManaColorSet(),
+            ownedCollection = ownedCollection,
+            ownTags = ownTags,
+            ownTribes = ownTribes,
+            edhrecThemeNames = edhrecThemeNames,
+        )
+        is BuildAnchor.Sixty -> invokeSixty(format, anchor, ownedCollection, ownTags, edhrecThemeNames)
+    }
 
     operator fun invoke(
         format: DeckFormat,
@@ -154,6 +182,110 @@ class RecommendCommanderStrategiesUseCase {
                 OWNED_WEIGHT * ownedCoverage
 
             val reasons = buildReasons(entry, axisScore, roleScore, tagScore > 0.0, edhrecScore > 0.0, ownedCoverage, ownedRoleCounts, liveRoles.keys)
+            val unresolved = entry.requiresTribe && entryTribe == null
+            ScoredEntry(StrategyRecommendation(entry, total, reasons, entryTribe), unresolved)
+        }
+
+        val (resolved, unresolved) = scored.partition { !it.unresolved }
+        return (
+            resolved.sortedWith(compareByDescending<ScoredEntry> { it.recommendation.score }.thenBy { it.recommendation.strategy.id }) +
+                unresolved.sortedWith(compareByDescending<ScoredEntry> { it.recommendation.score }.thenBy { it.recommendation.strategy.id })
+            ).map { it.recommendation }
+    }
+
+    /**
+     * Deck Wizard 60-card wave (v6), plan §5 Phase 2.1: the [BuildAnchor.Sixty] scoring path — same
+     * five signal sources as the Commander [invoke] above, PRIMARY generalized from one card's own
+     * axis/role profile to the seed pool's:
+     * 1. PRIMARY — the UNION of every seed's own axis profile (produces ∪ consumes), and role
+     *    confidences SUMMED (not averaged) across seeds, so a role two seeds both touch reads as a
+     *    stronger signal than a role only one touches. Empty [BuildAnchor.Sixty.seeds] (the Colors
+     *    entry flow) leaves both naturally at zero — [baseSeedAxes]/[seedRoleConfidence] are empty,
+     *    and [axisAlignmentScore]/[roleAlignmentScore] already return `0.0` for an empty input, so
+     *    no explicit branch is needed here.
+     * 2. `ownTags`-bridge — [tagBridgeScore], reused unchanged (format-agnostic already).
+     * 3. [edhrecThemeNames] — not used for 60-card; the caller passes an empty list and
+     *    `edhrecScore` is naturally `0.0`, same math as the Commander path.
+     * 4. [ColorStrategyAffinity.curatedFor] resolved against [BuildAnchor.Sixty.identity] — the
+     *    DOMINANT signal for the Colors entry flow (empty seeds): weighted x2 there, since no
+     *    seed-derived PRIMARY signal exists yet to compete with it (documented judgment call, S1.2).
+     * 5. Owned support — [ownedRoleCountsSixty], the 60-card pool predicate
+     *    ([isLegalForFormat] + `colorIdentity ⊆ identity`, seeds excluded), each owned card
+     *    contributing [CopyPolicy.maxPlaceable] copies instead of the Commander path's flat `+1`
+     *    (an owned 4-of removal supports its role band with 4, not 1 — S2's own consistency rule
+     *    extended to this signal). The Commander path's own [ownedRoleCounts] is untouched (rule
+     *    0.3: it must stay `+1`-per-card byte-identical).
+     *
+     * [tribe] resolution reuses [WizardPlanResolver.dominantSeedTribe] (the SAME rule the Sixty
+     * build itself uses for a Custom pick's internal tribe axis) rather than a second derivation.
+     */
+    private fun invokeSixty(
+        format: DeckFormat,
+        anchor: BuildAnchor.Sixty,
+        ownedCollection: List<OwnedCard>,
+        ownTags: List<CardTag>,
+        edhrecThemeNames: List<String>,
+    ): List<StrategyRecommendation> {
+        val archetypeFormat = ArchetypeFormat.of(format) ?: return emptyList()
+        val candidates = CuratedStrategyCatalog.ALL.filter { it.availableIn(format) }
+        if (candidates.isEmpty()) return emptyList()
+
+        val seeds = anchor.seeds
+        val seedIds = seeds.map { it.scryfallId }.toSet()
+        val derivedTribe = WizardPlanResolver.dominantSeedTribe(seeds)
+
+        val baseSeedAxes = seeds.flatMap { SynergyGraph.cardAxisProfile(it, archetypeFormat).let { p -> p.produces.keys + p.consumes.keys } }.toSet()
+        val seedRoleConfidence: Map<RoleKey, Float> = buildMap {
+            seeds.forEach { seed ->
+                ArchetypeRoleClassifier.classify(seed).forEach { (role, confidence) -> this[role] = (this[role] ?: 0f) + confidence }
+            }
+        }
+
+        val tagArchetypes = ownTags.mapNotNull { DeckIdentitySeedTags.archetypeForTag(it) }.toSet()
+        val tagThemes = ownTags.mapNotNull { DeckIdentitySeedTags.themeForTag(it) }.toSet()
+        val edhrecThemes = edhrecThemeNames.mapNotNull { ThemeId.fromDisplayName(it) }.toSet()
+        val curatedForResults = ColorStrategyAffinity.curatedFor(anchor.identity, format)
+        // S1.2 (2.1): curatedFor is the ONLY color/strategy-shell signal in the Colors flow (no
+        // seeds to derive a PRIMARY signal from) -- weighted x2 there so it can meaningfully
+        // separate the ranking on its own; a documented judgment call, not derived from data.
+        val colorAffinityWeight = if (seeds.isEmpty()) 2.0 else 1.0
+
+        val ownedRoleCounts = ownedRoleCountsSixty(ownedCollection, anchor.identity, format, seedIds)
+
+        val scored = candidates.map { entry ->
+            val entryTribe = if (entry.requiresTribe) derivedTribe else null
+            val entryTribeAxis = entryTribe?.let { WizardPlanResolver.tribeAxisKey(it) }
+            val seedAxes = if (entryTribeAxis != null) {
+                seeds.flatMap { SynergyGraph.cardAxisProfile(it, archetypeFormat, entryTribeAxis, entryTribe).let { p -> p.produces.keys + p.consumes.keys } }.toSet()
+            } else {
+                baseSeedAxes
+            }
+            val entryAxes = entry.themes.flatMap { WizardPlanResolver.THEME_TARGET_AXES[it].orEmpty() }
+                .toSet() + setOfNotNull(entryTribeAxis)
+
+            val skeleton = WizardPlanResolver.resolve(
+                format = format,
+                anchor = anchor,
+                pick = StrategyPick.Curated(entry, entryTribe),
+            ).skeleton
+            val liveRoles = skeleton.roleTargets.filterKeys { it !in skeleton.antiRoles }
+
+            val axisScore = axisAlignmentScore(entryAxes, seedAxes)
+            val roleScore = roleAlignmentScore(liveRoles.keys, seedRoleConfidence)
+            val primaryScore = PRIMARY_AXIS_WEIGHT * axisScore + PRIMARY_ROLE_WEIGHT * roleScore
+
+            val tagScore = tagBridgeScore(entry, tagArchetypes, tagThemes, entryTribe, emptySet())
+            val edhrecScore = if (entry.themes.any { it in edhrecThemes }) 1.0 else 0.0
+            val colorScore = colorAffinityScoreSixty(entry.id, curatedForResults) * colorAffinityWeight
+            val ownedCoverage = ownedCoverageScore(liveRoles, ownedRoleCounts)
+
+            val total = PRIMARY_WEIGHT * primaryScore +
+                TAG_WEIGHT * tagScore +
+                EDHREC_WEIGHT * edhrecScore +
+                COLOR_WEIGHT * colorScore +
+                OWNED_WEIGHT * ownedCoverage
+
+            val reasons = buildReasonsSixty(entry, anchor.identity, axisScore, roleScore, tagScore > 0.0, colorScore > 0.0, ownedCoverage, ownedRoleCounts, liveRoles.keys)
             val unresolved = entry.requiresTribe && entryTribe == null
             ScoredEntry(StrategyRecommendation(entry, total, reasons, entryTribe), unresolved)
         }
@@ -248,6 +380,13 @@ class RecommendCommanderStrategiesUseCase {
         }.maxOfOrNull { it.weight.toDouble() } ?: 0.0
     }
 
+    /** Deck Wizard 60-card wave (v6): [entry]'s own weight from [ColorStrategyAffinity.curatedFor]
+     * (already resolved to real catalog ids) — a direct id lookup, unlike the Commander path's own
+     * [colorAffinityScore] archetype/posture/theme intersection, since `curatedFor` already did that
+     * resolution once for the whole identity. */
+    private fun colorAffinityScoreSixty(entryId: String, curatedFor: List<Pair<CuratedStrategy, Float>>): Double =
+        curatedFor.firstOrNull { it.first.id == entryId }?.second?.toDouble() ?: 0.0
+
     /** Fraction of [liveRoles] the owned pool can fill, averaged 0f..1f per role (each role clamped
      * individually so one massively-overowned role cannot mask a real gap in another). */
     private fun ownedCoverageScore(
@@ -296,6 +435,45 @@ class RecommendCommanderStrategiesUseCase {
     private fun isLegalForCommanderFormat(card: Card, format: DeckFormat): Boolean =
         if (format == DeckFormat.COMMANDER) card.legalityCommander == "legal" else card.legalityCommander != "banned"
 
+    /** Deck Wizard 60-card wave (v6), plan §5 Phase 2.1 (S2): the 60-card counterpart of
+     * [ownedRoleCounts] — same pool shape (owned, identity-legal, non-land, one printing per name)
+     * but filtered by [isLegalForFormat] (the shared legality predicate every 60-card format uses,
+     * not [isLegalForCommanderFormat]) and EXCLUDING [excludeIds] (the seeds, already counted via
+     * the PRIMARY signal above — counting them again here would double-credit them). Each card
+     * contributes [CopyPolicy.maxPlaceable] copies rather than a flat `+1`, so an owned 4-of
+     * genuinely supports its role band 4x as much as a 1-of. [ownedRoleCounts] itself is UNTOUCHED
+     * (rule 0.3: must stay `+1`-per-card byte-identical for Commander). */
+    private fun ownedRoleCountsSixty(
+        ownedCollection: List<OwnedCard>,
+        identity: Set<ManaColor>,
+        format: DeckFormat,
+        excludeIds: Set<String>,
+    ): Map<RoleKey, Int> {
+        if (ownedCollection.isEmpty()) return emptyMap()
+        val identitySymbols = identity.map { it.symbol }.toSet()
+        val ownedByName = ownedCollection
+            .filter { it.quantity > 0 }
+            .groupBy { it.card.name }
+            .mapValues { (_, owned) -> owned.sumOf { it.quantity } }
+        val pool = ownedCollection
+            .filter { it.quantity > 0 }
+            .map { it.card }
+            .distinctBy { it.name }
+            .filter { it.scryfallId !in excludeIds }
+            .filterNot { BasicLandCalculator.isLand(it) }
+            .filter { identitySymbols.containsAll(it.colorIdentity) }
+            .filter { isLegalForFormat(it, format) }
+
+        val counts = mutableMapOf<RoleKey, Int>()
+        pool.forEach { card ->
+            val copies = CopyPolicy.maxPlaceable(card, format, ownedByName[card.name])
+            ArchetypeRoleClassifier.classify(card).forEach { (role, confidence) ->
+                if (confidence > 0f) counts[role] = (counts[role] ?: 0) + copies
+            }
+        }
+        return counts
+    }
+
     private fun buildReasons(
         entry: CuratedStrategy,
         axisScore: Double,
@@ -313,6 +491,36 @@ class RecommendCommanderStrategiesUseCase {
             reasons += RecommendationReason("Your tags point to ${entry.displayName}")
         } else if (hasEdhrecMatch) {
             reasons += RecommendationReason("Popular on EDHREC for this commander")
+        }
+        if (ownedCoverage > 0.0) {
+            val ownedCount = liveRoles.sumOf { ownedRoleCounts[it] ?: 0 }
+            reasons += RecommendationReason("You own $ownedCount fitting cards")
+        }
+        return reasons.take(2)
+    }
+
+    /** Deck Wizard 60-card wave (v6): "Your cards lean <X>" for the PRIMARY (seed) signal, "Fits
+     * <colors>" for the color-affinity signal (S1.2's own reason labels, appended to the existing
+     * Commander-path vocabulary) — everything else reuses [buildReasons]' own reason text/order. */
+    private fun buildReasonsSixty(
+        entry: CuratedStrategy,
+        identity: Set<ManaColor>,
+        axisScore: Double,
+        roleScore: Double,
+        hasTagMatch: Boolean,
+        hasColorMatch: Boolean,
+        ownedCoverage: Double,
+        ownedRoleCounts: Map<RoleKey, Int>,
+        liveRoles: Set<RoleKey>,
+    ): List<RecommendationReason> {
+        val reasons = mutableListOf<RecommendationReason>()
+        if (axisScore > 0.0 || roleScore > 0.0) {
+            reasons += RecommendationReason("Your cards lean ${entry.displayName}")
+        } else if (hasTagMatch) {
+            reasons += RecommendationReason("Your tags point to ${entry.displayName}")
+        } else if (hasColorMatch) {
+            val colorsLabel = identity.sortedBy { it.symbol }.joinToString("/") { it.displayName }.ifEmpty { "Colorless" }
+            reasons += RecommendationReason("Fits $colorsLabel")
         }
         if (ownedCoverage > 0.0) {
             val ownedCount = liveRoles.sumOf { ownedRoleCounts[it] ?: 0 }
@@ -343,3 +551,11 @@ class RecommendCommanderStrategiesUseCase {
         const val RELATIVE_SPREAD_FRACTION = 0.2
     }
 }
+
+/** Deck Wizard 60-card wave (v6), plan §5 Phase 2.1: kept so every pre-v6 call site/test that names
+ * `RecommendCommanderStrategiesUseCase` (constructor calls included) compiles unchanged — removed
+ * in Phase 7. */
+typealias RecommendCommanderStrategiesUseCase = RecommendWizardStrategiesUseCase
+
+private fun List<String>.toManaColorSet(): Set<ManaColor> =
+    mapNotNull { symbol -> ManaColor.entries.firstOrNull { it.symbol == symbol } }.toSet()

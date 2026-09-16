@@ -1,7 +1,9 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
+import com.mmg.manahub.core.model.DeckFormat
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -61,10 +63,70 @@ class ColorStrategyAffinityTest {
         }
     }
 
+    // Deck Wizard 60-card wave (v6), plan §5 Phase 2.2, S9: a colorless build now resolves a REAL
+    // curated row (big_mana/artifacts/aggro/tribal/prison), never the generic FALLBACK pair --
+    // rewritten (not left alongside a new test) since the old assertion below directly contradicts
+    // S9's own decision.
     @Test
-    fun `a genuinely colorless input falls back to the conservative default`() {
-        val entries = ColorStrategyAffinity.forColors(setOf(ManaColor.C))
-        assertEquals(listOf(ArchetypeId.MIDRANGE, ArchetypeId.CONTROL), entries.map { it.archetype })
+    fun `forColors empty set and forColors C both return the new colorless row, never FALLBACK`() {
+        val viaEmpty = ColorStrategyAffinity.forColors(emptySet())
+        val viaC = ColorStrategyAffinity.forColors(setOf(ManaColor.C))
+        assertEquals(viaEmpty, viaC)
+        assertTrue(viaEmpty.isNotEmpty())
+        assertTrue(
+            viaEmpty != listOf(ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, weight = 0.6f), ColorStrategyEntry(archetype = ArchetypeId.CONTROL, weight = 0.5f)),
+            "must not be FALLBACK",
+        )
+        // S9 colorless row: big_mana 0.9, artifacts 0.85, aggro 0.7, tribal(eldrazi) 0.65, prison 0.5 -- weight-desc.
+        assertEquals(listOf(0.9f, 0.85f, 0.7f, 0.65f, 0.5f), viaEmpty.map { it.weight })
+    }
+
+    @Test
+    fun `curatedFor UW STANDARD is non-empty, de-duplicated by catalog id, weight-desc`() {
+        val results = ColorStrategyAffinity.curatedFor(setOf(ManaColor.U, ManaColor.W), DeckFormat.STANDARD)
+        assertTrue(results.isNotEmpty())
+        val ids = results.map { it.first.id }
+        assertEquals(ids.distinct(), ids, "must be de-duplicated by catalog id, keeping the max weight per id")
+        assertEquals(results.map { it.second }.sortedDescending(), results.map { it.second })
+    }
+
+    @Test
+    fun `curatedFor prefers the catalog entry whose postures contain a RAMP-posture row -- big_mana`() {
+        // TABLE[{G}] has ColorStrategyEntry(archetype=MIDRANGE, posture=RAMP, weight=0.9f) -- curatedFor
+        // must map this via nearestFor and prefer a catalog entry whose `postures` contains RAMP.
+        val results = ColorStrategyAffinity.curatedFor(setOf(ManaColor.G), DeckFormat.COMMANDER)
+        val topForRampSignal = results.firstOrNull { it.first.postures.contains(PostureId.RAMP) }
+        assertNotNull(topForRampSignal)
+        assertEquals("big_mana", topForRampSignal.first.id, "a RAMP-posture-carrying entry must resolve to the big_mana catalog id")
+    }
+
+    @Test
+    fun `curatedFor prefers a TEMPO-posture row -- tempo`() {
+        // TABLE[{U,R}] (Izzet) has ColorStrategyEntry(archetype=AGGRO, posture=TEMPO, themes=[SPELLSLINGER], weight=0.9f).
+        val results = ColorStrategyAffinity.curatedFor(setOf(ManaColor.U, ManaColor.R), DeckFormat.COMMANDER)
+        val topForTempoSignal = results.firstOrNull { it.first.postures.contains(PostureId.TEMPO) }
+        assertNotNull(topForTempoSignal)
+        assertEquals("tempo", topForTempoSignal.first.id)
+    }
+
+    @Test
+    fun `the colorless row's tribal entry carries tribe tribe colon eldrazi`() {
+        val colorless = ColorStrategyAffinity.forColors(emptySet())
+        val tribalEntry = colorless.first { it.themes.contains(ThemeId.TRIBAL) }
+        assertEquals("tribe:eldrazi", tribalEntry.tribe)
+    }
+
+    @Test
+    fun `combosFor never mixes emptySet with WUBRG keys -- a colorless-capable strategy yields emptySet as a separate combo`() {
+        // big_mana is both a real WUBRG TABLE entry (e.g. TABLE[{G}] MIDRANGE+RAMP) AND the colorless row's own top entry.
+        val combos = ColorStrategyAffinity.combosFor(ArchetypeId.MIDRANGE, null)
+        val hasColorless = combos.any { it.first.isEmpty() }
+        val hasWubrg = combos.any { it.first.isNotEmpty() }
+        assertTrue(hasColorless, "combosFor(MIDRANGE) must include the colorless emptySet() combo now that the colorless row carries big_mana/artifacts")
+        assertTrue(hasWubrg, "combosFor(MIDRANGE) must still include real WUBRG combos")
+        // "never mixed" means each Pair's `first` is either emptySet() or a non-empty WUBRG set --
+        // trivially true by construction (Set<ManaColor> per entry); the real assertion is that
+        // BOTH kinds appear as SEPARATE list entries, asserted above.
     }
 
     @Test

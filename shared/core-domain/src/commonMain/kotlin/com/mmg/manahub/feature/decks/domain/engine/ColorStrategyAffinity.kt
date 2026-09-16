@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
+import com.mmg.manahub.core.model.DeckFormat
+
 /**
  * Deck Engine Unification plan (`docs/plans/deck-engine-unification-plan.md`, D9) — Flow B's
  * (colors-first) affinity signal: given a color combination, which [ArchetypeId]/[ThemeId]
@@ -35,6 +37,11 @@ data class ColorStrategyEntry(
     /** Rough viability ranking within this color combo, 0f..1f. Curated by hand (see class KDoc) —
      * not a statistically derived score. */
     val weight: Float,
+    /** Deck Wizard 60-card wave (v6, S9): a concrete tribe pin for an entry that would otherwise
+     * need the tribe sub-picker — today only the colorless row's tribal slot (a colorless build has
+     * no commander/seed to derive a tribe from, so it is pinned to Eldrazi directly). `null` for
+     * every WUBRG entry (unchanged). */
+    val tribe: String? = null,
 ) {
     /** Display label for this entry — [posture] (the more specific ex-macro/ex-theme identity)
      * when set, else the archetype name, else the first theme's name. */
@@ -52,12 +59,48 @@ data class ColorStrategyEntry(
 
 object ColorStrategyAffinity {
 
-    /** Ranked (best-first) strategy entries for [colors] (colorless symbol ignored). Falls back to
-     * [FALLBACK] only for the genuinely-colorless combination (see class KDoc) — every real color
-     * pick (1-5 colors) has a real curated entry as of v2. */
+    /** Ranked (best-first) strategy entries for [colors] (colorless symbol ignored). Deck Wizard
+     * 60-card wave (v6, S9): `{}` and `{C}` both filter to the same empty key, which [TABLE] now
+     * carries a REAL colorless row for — [FALLBACK] is unreachable for any input this function can
+     * actually receive (kept only as a defensive default, never deleted, in case a future caller
+     * passes something this filter doesn't normalize the same way). */
     fun forColors(colors: Set<ManaColor>): List<ColorStrategyEntry> {
         val key = colors.filterTo(mutableSetOf()) { it != ManaColor.C }
         return TABLE[key] ?: FALLBACK
+    }
+
+    /**
+     * Deck Wizard 60-card wave (v6), plan §5 Phase 2.2: maps [forColors]' curated entries onto REAL
+     * [CuratedStrategy] catalog ids for [format] — [RecommendWizardStrategiesUseCase]'s Sixty-path
+     * "Fits <colors>" signal needs a picker-backed strategy, not this class's own free-form
+     * archetype/theme/posture triple. Each entry resolves via [CuratedStrategyCatalog.nearestFor]
+     * (themes-first, archetype-anchored); when [ColorStrategyEntry.posture] is set, a catalog entry
+     * sharing BOTH the entry's own archetype and that posture is preferred over the plain
+     * `nearestFor` result whenever one exists — a themes-first match would otherwise win before
+     * posture is ever consulted (e.g. a RAMP-posture MIDRANGE row with no themes would resolve to
+     * the plain "midrange" entry, never "big_mana", since "midrange" is an equally-valid themes-exact
+     * match earlier in catalog declaration order). This is what resolves a RAMP-posture row to
+     * `big_mana` and a TEMPO-posture row to `tempo` — a documented judgment call, verified by
+     * `ColorStrategyAffinityTest`. An entry with no real catalog counterpart for [format] (a
+     * null-archetype thematic row with no matching archetype-bearing entry, or a catalog id [format]
+     * does not offer at all — e.g. `prison` outside Commander/Casual) is dropped, never a lossy
+     * substitute. De-duplicated by catalog [CuratedStrategy.id] (keeping the max weight seen for
+     * that id), sorted weight-descending.
+     */
+    fun curatedFor(colors: Set<ManaColor>, format: DeckFormat): List<Pair<CuratedStrategy, Float>> {
+        val resolved = forColors(colors).mapNotNull { entry ->
+            val posturePreferred = entry.posture?.let { posture ->
+                CuratedStrategyCatalog.ALL.firstOrNull { candidate ->
+                    candidate.availableIn(format) && entry.archetype in candidate.archetypes && posture in candidate.postures
+                }
+            }
+            val resolvedStrategy = posturePreferred ?: CuratedStrategyCatalog.nearestFor(entry.archetype, entry.themes, format)
+            resolvedStrategy?.let { it to entry.weight }
+        }
+        return resolved
+            .groupBy { it.first.id }
+            .map { (_, group) -> group.maxBy { it.second } }
+            .sortedByDescending { it.second }
     }
 
     /**
@@ -316,6 +359,24 @@ object ColorStrategyAffinity {
             ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, weight = 0.6f),
             ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, posture = PostureId.RAMP, weight = 0.5f),
             ColorStrategyEntry(archetype = ArchetypeId.CONTROL, posture = PostureId.TOOLBOX, weight = 0.45f),
+        ))
+        // ── Colorless (v6, S9, NEW) -- keyed by emptySet() so both {} and {C} resolve here (see
+        //    forColors' own KDoc). Ranked by the archetype's own well-known colorless shell: ramp
+        //    into a huge Eldrazi/artifact threat is the single most iconic colorless Commander plan,
+        //    ahead of a straight artifacts-matter shell, aggressive colorless creatures, Eldrazi
+        //    tribal specifically, and stax/prison (colorless taxes -- Commander/Casual only, see
+        //    CuratedStrategyCatalog's own `prison.formats`). ─────────────────────────────────────
+        put(emptySet(), listOf(
+            ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, posture = PostureId.RAMP, weight = 0.9f),
+            ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, themes = listOf(ThemeId.ARTIFACTS), weight = 0.85f),
+            ColorStrategyEntry(archetype = ArchetypeId.AGGRO, weight = 0.7f),
+            // Eldrazi tribal has no commander/seed to derive its tribe from (a colorless BUILD, not
+            // a colorless CARD) -- pinned directly via `tribe`, S9's own escape hatch. archetype is
+            // real (not null) so this resolves through nearestFor to the "tribal" catalog id, same
+            // as every other row here -- see curatedFor's own KDoc for why a null archetype instead
+            // would drop this entry entirely.
+            ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, themes = listOf(ThemeId.TRIBAL), tribe = "tribe:eldrazi", weight = 0.65f),
+            ColorStrategyEntry(archetype = ArchetypeId.PRISON, weight = 0.5f),
         ))
     }
 }
