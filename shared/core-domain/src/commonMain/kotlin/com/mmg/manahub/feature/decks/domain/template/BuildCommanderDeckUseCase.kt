@@ -783,11 +783,14 @@ class BuildCommanderDeckUseCase(
             val stateWithoutVictim = boardWithoutVictim.fold(PlacementScorer.PlacementState()) { acc, entry ->
                 candidateProfiles[entry.card]?.let { fold(acc, it) } ?: acc
             }
+            // A null gain is PlacementScorer's own off-plan definition (no role gain, no axis
+            // gain) -- dropped here rather than sentinel-scored, so a thin pool can never swap
+            // in a fresh off-plan card without it landing in fallbackOffPlanIds first.
             val shortlist = remainingCandidates
                 .mapNotNull { candidate ->
                     val profile = candidateProfiles[candidate] ?: return@mapNotNull null
                     val gain = PlacementScorer.marginalGain(profile, stateWithoutVictim, plan, curveTargetsNow, axisIdealsNow, pipFactor = 1f)
-                    candidate to (gain ?: -1f)
+                    gain?.let { candidate to it }
                 }
                 .sortedByDescending { it.second }
                 .take(REFINE_TRIAL_SAMPLE)

@@ -12,6 +12,7 @@ import com.mmg.manahub.feature.decks.domain.engine.availableIn
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.NeutralPowerResolver
+import com.mmg.manahub.feature.decks.domain.engine.PlacementScorer
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.StrategyPick
 import com.mmg.manahub.feature.decks.domain.engine.analysisv3.MockCollectionRich
@@ -322,6 +323,66 @@ class BuildCommanderDeckUseCaseTest {
             "a mainboard this thin must surface a DeckTooSmall finding, not hide the shortfall: $findings",
         )
         assertTrue(outcome.result.analysis.totalScore < 90, "a genuinely gappy thin-collection build must not score as if it were complete, got ${outcome.result.analysis.totalScore}")
+    }
+
+    private fun manaBaseTestLand(name: String, symbol: String): Card = card(
+        id = "refine-land-$name",
+        name = name,
+        typeLine = "Basic Land — $name",
+        cmc = 0.0,
+        colors = emptyList(),
+        colorIdentity = listOf(symbol),
+        producedMana = symbol,
+    )
+
+    @Test
+    fun `refine never swaps a flagged fallback off-plan card for a fresh, unflagged off-plan card`() = runTest {
+        // Reproduces the exhausted-pool scenario directly at the draft level (buildWithGroups' own
+        // placement loop never happens to leave an improving off-plan-for-off-plan swap on the
+        // table naturally). A land base fixed at 2 Swamp starves a triple-black-pip victim of
+        // sources (ColorSourceShortage); the SAME land base fully supports a colorless replacement.
+        // Both candidates are zero-role, zero-axis (off-plan by the engine's own definition) --
+        // refine's shortlist must never let a null marginal gain in as a sentinel score, or the
+        // shortage-clearing swap goes through unflagged.
+        val useCase = newUseCase()
+        val commander = card(id = "cmd-refine-test", name = "Test Commander", typeLine = "Legendary Creature — Human", cmc = 3.0, colors = listOf("W", "B"), colorIdentity = listOf("W", "B"))
+        val identity = setOf(ManaColor.W, ManaColor.B)
+        val seedDraft = useCase.buildWithGroups(DeckFormat.COMMANDER, commander, StrategyPick.Custom, identity, ownedCollection = listOf(OwnedCard(commander, 1)))
+
+        val victim = card(id = "victim-triple-black", name = "Triple Black Victim", typeLine = "Creature — Horror", cmc = 3.0, colors = listOf("B"), colorIdentity = listOf("B"), manaCost = "{B}{B}{B}")
+        val replacement = card(id = "replacement-colorless", name = "Colorless Replacement", typeLine = "Artifact Creature — Golem", cmc = 3.0, colors = emptyList(), colorIdentity = emptyList(), manaCost = "{3}")
+        val zeroProfile = { c: Card ->
+            PlacementScorer.CandidateProfile(
+                card = c,
+                roleConfidence = emptyMap(),
+                axisProfile = com.mmg.manahub.feature.decks.domain.engine.SynergyGraph.CardAxisProfile(c.scryfallId, 1, emptyMap(), emptyMap(), emptyMap()),
+                mvBucketId = PlacementScorer.mvBucketId(c),
+                powerNormalized = 0.5f,
+            )
+        }
+        val lands = listOf(
+            com.mmg.manahub.feature.decks.domain.engine.DeckEntry(manaBaseTestLand("Plains", "W"), 10, true, false),
+            com.mmg.manahub.feature.decks.domain.engine.DeckEntry(manaBaseTestLand("Swamp", "B"), 2, true, false),
+        )
+
+        val patchedDraft = seedDraft.copy(
+            placedNonLand = listOf(com.mmg.manahub.feature.decks.domain.engine.DeckEntry(victim, 1, true, false)),
+            remainingCandidates = listOf(replacement),
+            candidateProfiles = seedDraft.candidateProfiles + (victim to zeroProfile(victim)) + (replacement to zeroProfile(replacement)),
+            manualLand = lands,
+            remainingLandSlots = 0,
+            landTarget = 12,
+            fallbackOffPlanIds = listOf(victim.scryfallId),
+        )
+
+        val outcome = useCase.finalize(patchedDraft, resolutions = emptyMap(), fillLands = true)
+        val result = outcome.result
+        val placedIds = result.entries.map { it.card.scryfallId }.toSet()
+
+        assertTrue(replacement.scryfallId !in placedIds || replacement.scryfallId in result.fallbackOffPlanIds, "a swap-in replacement with zero role/axis signal must be flagged, never a silent unflagged off-plan card")
+        if (victim.scryfallId !in placedIds) {
+            assertTrue(replacement.scryfallId in result.fallbackOffPlanIds, "if refine swapped the victim out, its replacement must inherit the fallback off-plan flag")
+        }
     }
 
     @Test
