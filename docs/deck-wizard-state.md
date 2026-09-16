@@ -5,13 +5,27 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-15 (v4 campaign, Run 15/W8 — harness v3, telemetry, cleanup and docs; the
-campaign is now closed except F18/Edgar, which awaits a user decision (§8). See
+**Last updated:** 2026-09-16 (v5 campaign, Run R2 — category vocabulary unification (X0, shipped)
+plus an F18 recalibration attempt per the user's own decision, STOPPED and reported rather than
+forced; see ADR-009 and §6/§8 below). Previously: 2026-09-15 (v4 campaign, Run 15/W8 — harness v3,
+telemetry, cleanup and docs; the campaign closed except F18/Edgar, which awaited a user decision. See
 `docs/plans/deck-wizard-commander-v4-progress.md` for the full per-item log, gitignored). Commits
 `16ed41b2`..`c1a712e1` on `feature/deck-wizard` (this run), on top of `0ed707fe`..`d52eba32` (Run 14).
 **Owning plan (v3, shipped):** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the
 AI-planning-doc rule now that the campaign has shipped; this file is the durable record that
 survives. **v4 (active):** `docs/plans/deck-wizard-commander-v4-plan.md` (gitignored).
+
+## v5 — Run R2 (2026-09-16): category vocabulary (X0) + F18 recalibration attempt
+
+Two commits (`f8310560` code+tests, `6842d875` comment cleanup) plus this doc + ADR-009. `X0`
+introduced `CategoryVocabulary` as the single table `ArchetypeRoleClassifier.tagMatcher` and
+`SectionSearchQuery.collectionTagKeysFor` both read, and `StructuredCardSearch.matchesForCategoryBrowse`
+to stop a `CardFunction`-backed section's Collection filter from resolving through the separate,
+sometimes-wider `CardFunctionOption.collectionTagKeys` vocabulary — the reported "Counters Payoff
+shows nothing but Browse finds cards" defect. Full per-key membership citations, before/after numbers,
+and the F18 recalibration diagnosis (attempted per the user's D1 decision, STOPPED per the campaign's
+own stop clause — no calibration constant changed) are in ADR-009. `MockCollectionRichReconstructionTest`'s
+macro-reconstruction test remains the one known, documented, unforced red test.
 
 ## v4 — Run 15 (2026-09-15): W8 — harness v3, telemetry, cleanup and docs
 
@@ -581,7 +595,7 @@ Acceptance bands in force: see plan §5 until P7 replaces them here.
 | — | `EvaluateDeckUseCase` emits a gamification event on every call | `emitProgression` flag | **done P0 (2026-09-08)** |
 | — | `BuildCommanderDeckUseCase.persist()` is 4 sequential non-transactional writes -- a cancellation mid-write (reachable via Studio's "Rebuild with the Wizard" CTA, D12 rebuild-in-place) can leave an existing draft with cards replaced but a stale pin | `DeckRepository.persistCommanderBuild` (new) is ONE Room `@Transaction` via `DeckDao.persistCommanderBuild` on Android; commonMain default keeps the 4-call fallback for `WebDeckRepository` | **closed P8 (Run 12)** — instrumented Room tests (happy path + genuine FK-violation rollback) added mirroring the existing `replaceAllCardsWithSource` proof; `isWritingCommanderDeck` kept as defense-in-depth for the ViewModel's own in-memory state, not because the DB can land half-written any more |
 | F17 | Colorless-identity commander (e.g. "Page, Loose Leaf") builds a `DeckTooSmall` BLOCKER — `BasicLandCalculator`/`BasicLandDistribution` has no colourless "Wastes" slot at all, so Stage B of `fillLandsV2` allocates zero basics for an empty identity | `BasicLandDistribution.wastes` (new field, folded into `total`/`toMap()`'s `"C"` key) + `BasicLandCalculator.allocate` returns an all-Wastes distribution when `commanderIdentity` is explicitly empty (distinct from `null` = no constraint) + `BuildCommanderDeckUseCase.materializeBasics`/`nameToColor` place Wastes like any other basic. Coloured-identity behaviour byte-identical (verified by the full pre-existing `LandFillV2Test` suite + a new colourless-identity case). | **CLOSED P8 (Run 12)** — land fill itself is fixed (`land_target`/`mana_sources` harness metrics green for "Page, Loose Leaf"). The harness's colourless-commander exclusion STAYS, re-diagnosed to a DIFFERENT, genuine cause: this real collection owns only 59 colourless nonland cards total, well under Commander's ~62-card nonland target once lands are correctly filled — a real MTG color-identity constraint (colourless commander ⇒ colourless cards + Wastes only) colliding with real collection sparsity, not an engine defect, and unfixable without a Scryfall backstop D7 forbids. → memory: `feedback_colourless_commander_deck_size_vs_land_fill`. |
-| F18 | `CommanderPlanResolver.resolve`'s `StrategyPick.Custom` branch always targets the archetype-null generic BELL-shaped baseline skeleton regardless of the commander's own aggression signal, so a fast/cheap/tribal-aggressive Custom build (Edgar Markov) reads MIDRANGE post-build instead of AGGRO | `CommanderArchetypeBias.commanderTagArchetype` (new, tag-tier ONLY — the color-identity tier was tried and reverted, it regressed a real fixture) gives Custom's INTERNAL skeleton a bounded build hint; persisted `StrategyPin` stays Custom/null (E12). `CommanderPlanResolverTest`'s assertion rewritten per the plan's own instruction | **W6b (2026-09-15) — audited and made production-honest, residual CONFIRMED genuine, not closed.** W6's own "build-hint CLOSED" claim rested on a FABRICATED test input: `Fixture01EdgarMarkov`'s commander carried a hand-added `CardTag.AGGRO`, but `"aggro"` is a `TagDictionary` MANUAL-PICK-ONLY entry (`plain(...)`, no detection rule) — production never assigns it (ADR-007 §4 violation). Replaced with `CardTag.TOKENS`, which a real Edgar Markov DOES earn in production (`TagDictionary`'s `"tokens"` rule: `allOf("create","token")`, confidence 0.95 clears `SuggestTagsUseCase.DEFAULT_AUTO_THRESHOLD` 0.90 against Edgar's own oracle text) and which reverse-maps to `ArchetypeId.AGGRO` the same as the fabricated tag did — the tag-tier bias itself was legitimate, just proven on the wrong input. Also: (1) `CommanderArchetypeBias.commanderTagArchetype` was order-dependent (`firstNotNullOfOrNull`) — rewritten as a majority vote over all commander tags, alphabetical tie-break; (2) a Custom build's INTERNAL tribe target was `null` even for a tribal-lord commander (`pin.tribe` only exists for Curated) — added `CommanderPlan.internalTribe` (`TribeDeriver.derivedLordTribe`, the SAME derivation `RecommendCommanderStrategiesUseCase` already used, now extracted and shared) and wired it into `BuildCommanderDeckUseCase`'s placement-time `dominantTribeAxis`/`dominantTribeKey` + `SynergyGraph.axisIdeals`'s new optional tribe-ideal param — before this wiring the plan's tribe axis was a no-op at placement time. **Net result:** `MockCollectionRichReconstructionTest`'s Custom-macro case is GREEN for Meren/Karlov/Urza; Edgar is a genuine near-miss, margin 0.035 vs the 0.08 `MACRO_AMBIGUITY_MARGIN` needed (was already red pre-W6b for the SAME reason under the fabricated tag — confirmed by re-running at HEAD `460db325` before any W6b change). Closing it further requires touching Deck Analysis Engine v3 calibration (prototype weights/anchors), explicitly out of scope for this campaign (ADR-007 §4, golden/corpus/calibration must stay byte-identical) — reported honestly per the campaign's own "never tune a fixture/threshold to reach green" rule rather than forced. Harness v2 (180 specs) confirms 180/180 HARD metrics still pass and the score distribution is UNCHANGED by this work (min 76/p25 85/median 87/p75 89/max 95, same as post-W6). |
+| F18 | `CommanderPlanResolver.resolve`'s `StrategyPick.Custom` branch always targets the archetype-null generic BELL-shaped baseline skeleton regardless of the commander's own aggression signal, so a fast/cheap/tribal-aggressive Custom build (Edgar Markov) reads MIDRANGE post-build instead of AGGRO | `CommanderArchetypeBias.commanderTagArchetype` (new, tag-tier ONLY — the color-identity tier was tried and reverted, it regressed a real fixture) gives Custom's INTERNAL skeleton a bounded build hint; persisted `StrategyPin` stays Custom/null (E12). `CommanderPlanResolverTest`'s assertion rewritten per the plan's own instruction | **v5 R2 (2026-09-16) — recalibration attempted per user decision, STOPPED and reported, not forced. See ADR-009.** W6b (2026-09-15) had already confirmed the residual genuine (margin 0.035 vs 0.08) and traced it to the calibration layer. The v5 campaign's own X0 workstream (category-vocabulary unification, `CategoryVocabulary`) was verified via an isolated `git worktree` comparison to have ZERO effect on this failure (byte-identical failure message before/after). A fresh diagnosis (post-X0) measured Edgar's own axes (`clock=0.577 interaction=0.197 inevitability=0.636 linearity=0.446` against AGGRO's Commander prototype `0.85/0.20/0.15/0.55`) and found the `inevitability` axis is the dominant mismatch (0.486 of the total distance) — and, via the SAME self-consistency method `InferDeckArchetypeUseCase`'s own `clock`/`interaction` anchors were derived by, that AGGRO's OWN `ArchetypeData` Commander band, run through the inevitability formula, lands at ≈0.54 (not 0.15); MIDRANGE's own band lands even further off (≈0.95 vs its own 0.45). This is a real, citable inconsistency in the `inevitability` axis's anchor derivation (anchored on COMBO alone, never cross-checked against the other 4 macros) — but a fix requires redesigning that axis's per-macro weighting, not a single constant, and cannot be safely scoped and re-verified against the full 22-fixture corpus within this run without risking exactly the regression ADR-007 §4 forbids. Meren is now ALSO measured red (margin 0.068 < 0.08) at this same diagnosis pass. No calibration constant/anchor/weight/prototype value was changed. `MockCollectionRichReconstructionTest`'s macro-reconstruction test remains red, unmodified, for the same reason. `CommanderPlanResolverTest`'s D6 assertion untouched. No fixture data touched. Harness v2 (180 specs, real collection) confirms 180/180 HARD metrics pass, score distribution 77/85/87/90/95 (min/p25/median/p75/max) — unchanged from the post-W6b baseline. |
 
 Known engine debt deliberately NOT touched by this campaign (see ADR-007 "Known debt"): SYNERGY P4
 calibration, PRISON never resolving, 60-card CONTROL inevitability ceiling, `DRAFT` has no skeleton,
@@ -620,24 +634,21 @@ Things that differ from Commander and are NOT solved by this campaign:
 
 ## 8. Open items
 
-- **v4 campaign CLOSED except one residual decision (2026-09-15).** W0-W8 are all done: Choice
-  screen (W7), harness v3 + telemetry + cleanup + docs (W8). The only thing standing between this
-  campaign and a clean close is F18/Edgar below — everything else in this section is either a
-  pre-existing (non-blocking) gap the campaign never claimed to close, or genuinely deferred to the
-  60-card wave (§7).
-- **F18/Edgar residual — awaiting the user's decision.** A Custom build for Edgar Markov (tribal
-  Vampires, fast/cheap/aggressive) resolves macro MIDRANGE (38.9% prototype-distance score) instead
-  of AGGRO (32.4%), margin 0.035 against the `MACRO_AMBIGUITY_MARGIN` 0.08 needed for a decisive
-  call — a genuine near-miss, not a masked bug (§6's F18 entry has the full mechanism trace: W6b's
-  majority-vote tag bias + internal-tribe wiring are real fixes, proven on 3 of 4 reconstruction
-  fixtures; Edgar's is the one honest residual). Closing it needs a Deck Analysis Engine v3
-  calibration-layer change (prototype weights/anchors) — explicitly out of this campaign's scope
-  (ADR-007 §4: golden/corpus/calibration must stay byte-identical). `MockCollectionRichReconstructionTest
+- **v4 campaign closed; v5 Run R2 shipped X0 (category vocabulary) and attempted F18 recalibration
+  per the user's own decision (D1), STOPPED per the campaign's own stop clause rather than forced —
+  see ADR-009.** Everything else in this section is either a pre-existing (non-blocking) gap no
+  campaign has claimed to close, or genuinely deferred to the 60-card wave (§7).
+- **F18/Edgar (and now Meren) residual — recalibration attempted, remains open.** See §6's F18 row
+  and `docs/adr/ADR-009-deck-analysis-category-vocabulary-and-recalibration.md` for the full
+  diagnosis: the `inevitability` axis's anchor derivation is self-inconsistent across macros (a real,
+  cited engine finding), but closing it needs a redesign of that axis's per-macro weighting, re-
+  verified against the full corpus — out of this run's safe scope. `MockCollectionRichReconstructionTest
   > Custom build resolves the fixture's own expected macro` is the ONE test carrying this forward as
   a documented, unforced failure — do not weaken it, do not re-fabricate its fixture input, do not
-  mark it `@Ignore`d without the user's own written say-so. Two ways forward, both requiring a human
-  decision: accept the residual (update the test's own docstring to say "3 of 4" instead of implying
-  all 4 pass) or open a calibration-scoped follow-up campaign.
+  mark it `@Ignore`d without the user's own written say-so. Ways forward, all requiring a human
+  decision: accept the residual as documented; open a dedicated `inevitability`-axis redesign
+  workstream with full corpus re-verification; or relax `MACRO_AMBIGUITY_MARGIN` (not attempted here
+  — a global threshold change, not a per-deck fix, with its own corpus-wide re-verification cost).
 - **`Migration53To54Test` (Room v54) has never executed on a device** — no emulator was available
   during v3 or v4. Needs a device/emulator run before this migration can be considered proven, not
   just written.
@@ -959,3 +970,11 @@ Things that differ from Commander and are NOT solved by this campaign:
      are the 4 pre-existing ones documented at the top of this campaign (3 `SectionSearchQueryTest`
      + 1 `DeckWizardViewModelTest` taxonomy-toggle case) — confirmed still red at the pre-campaign
      base commit, not a regression.
+- 2026-09-16 — v5 Run R2: `CategoryVocabulary` (X0) unifies the analysis classifier and Browse's
+  Collection filter onto one CardTag-key table per role, fixing the "section shows nothing, Browse
+  finds cards" defect for `counters_payoff`/`landfall_payoff` (widened, cited) and several other
+  categories (narrowed to match the classifier). F18 recalibration was attempted per the user's own
+  decision and STOPPED per the campaign's stop clause after a real, cited diagnosis (the
+  `inevitability` axis's anchor derivation is self-inconsistent across macros) — no calibration
+  constant changed, `MockCollectionRichReconstructionTest`'s macro test remains the one documented
+  red test. Full detail: `docs/adr/ADR-009-deck-analysis-category-vocabulary-and-recalibration.md`.
