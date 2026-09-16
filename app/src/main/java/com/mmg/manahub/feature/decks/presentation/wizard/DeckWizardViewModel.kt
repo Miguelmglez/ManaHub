@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
-// COMMENTS_REVIEWED: 2026-09-08
+// COMMENTS_REVIEWED: 2026-09-16
 
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
@@ -2123,12 +2123,20 @@ class DeckWizardViewModel(
             return
         }
 
-        if (draft.ambiguityGroups.isEmpty()) {
+        val hasFallback = draft.fallbackStandaloneIds.isNotEmpty() || draft.fallbackOffPlanIds.isNotEmpty()
+        if (draft.ambiguityGroups.isEmpty() && !hasFallback) {
             pendingFinalize = PendingFinalize(state, format, commander, strategyPick, manualAdds, draft, resolutions = emptyMap())
             finalizeCommanderDraft(state, format, commander, strategyPick, manualAdds, draft, resolutions = emptyMap())
         } else {
             crashlytics.log("deck_wizard_choice_shown")
             crashlytics.setCustomKey("deck_wizard_choice_group_count_bucket", countBucket(draft.ambiguityGroups.size))
+            // A build with fallback placements but no ambiguity still surfaces CHOICE so
+            // FallbackFlagCard's honesty promise applies to every fallback-touched build, not
+            // only the ones that also happened to hit a near-tie.
+            crashlytics.setCustomKey(
+                "deck_wizard_choice_shown_reason",
+                if (draft.ambiguityGroups.isNotEmpty()) "ambiguity" else "fallback_only",
+            )
             _uiState.update {
                 it.copy(
                     phase = WizardPhase.CHOICE,

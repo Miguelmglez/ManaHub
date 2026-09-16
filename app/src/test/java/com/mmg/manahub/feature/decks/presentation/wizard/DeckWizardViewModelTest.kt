@@ -179,11 +179,15 @@ class DeckWizardViewModelTest {
         ambiguityGroups: List<AmbiguityGroup> = emptyList(),
         tentativeByRole: Map<RoleKey, List<String>> = emptyMap(),
         candidatesById: Map<String, Card> = emptyMap(),
+        fallbackStandaloneIds: List<String> = emptyList(),
+        fallbackOffPlanIds: List<String> = emptyList(),
     ): CommanderDraftBuild {
         val draft = mockk<CommanderDraftBuild>(relaxed = true)
         every { draft.ambiguityGroups } returns ambiguityGroups
         every { draft.tentativeByRole } returns tentativeByRole
         every { draft.candidatesById } returns candidatesById
+        every { draft.fallbackStandaloneIds } returns fallbackStandaloneIds
+        every { draft.fallbackOffPlanIds } returns fallbackOffPlanIds
         return draft
     }
 
@@ -2597,6 +2601,41 @@ class DeckWizardViewModelTest {
         }
         assertNull(vm.uiState.value.commanderDraftBuild)
         coVerify(exactly = 1) { buildCommanderDeckUseCase.finalize(any(), emptyMap(), any(), any()) }
+    }
+
+    @Test
+    fun `a build with fallback ids and zero ambiguity groups still lands on CHOICE, not a silent direct persist`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val fallbackDraft = commanderDraft(
+            candidatesById = mapOf("standalone-1" to choiceAltA, "offplan-1" to choiceAltB),
+            fallbackStandaloneIds = listOf("standalone-1"),
+            fallbackOffPlanIds = listOf("offplan-1"),
+        )
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns fallbackDraft
+        val vm = viewModel()
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        assertEquals(WizardPhase.CHOICE, vm.uiState.value.phase)
+        assertEquals(fallbackDraft, vm.uiState.value.commanderDraftBuild)
+        coVerify(exactly = 0) { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any()) }
+
+        // The only way out of this phase-with-zero-groups build is "Let the wizard finish" --
+        // it must still finalize exactly once, with no resolutions (nothing was ever selectable).
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
+        vm.events.test {
+            vm.onFinishChoices()
+            advanceUntilIdle()
+            val event = awaitItem()
+            assertTrue(event is DeckWizardEvent.OpenDeckStudio)
+        }
+        coVerify(exactly = 1) { buildCommanderDeckUseCase.finalize(fallbackDraft, emptyMap(), any(), any()) }
+        coVerify(exactly = 1) { deckRepository.persistCommanderBuild(any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
