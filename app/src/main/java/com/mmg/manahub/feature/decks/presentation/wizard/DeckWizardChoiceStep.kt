@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
-// COMMENTS_REVIEWED: 2026-09-15
+// COMMENTS_REVIEWED: 2026-09-16
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -138,6 +138,11 @@ internal fun ChoiceStepContent(
                     }
                 }
             }
+            if (draft.fallbackStandaloneIds.isNotEmpty() || draft.fallbackOffPlanIds.isNotEmpty()) {
+                item(key = "choice_fallback_flag") {
+                    FallbackFlagCard(draft = draft, onCardClick = onCardClick)
+                }
+            }
             items(draft.ambiguityGroups, key = { it.sectionId }) { group ->
                 val selected = uiState.choiceSelections[group.sectionId] ?: draft.tentativeByRole[group.sectionId].orEmpty()
                 ChoiceSectionCard(
@@ -156,6 +161,89 @@ internal fun ChoiceStepContent(
             enabled = true,
             onClick = onFinish,
         )
+    }
+}
+
+/** Deck Wizard Commander v5 (D4): a read-only, honest flag for slots the wizard could only fill
+ * once no on-plan candidate remained -- Standalone (own role, off-skeleton) shown first, off-plan
+ * (the genuine last resort) after. Never interactive: there is nothing to choose here, only to see. */
+@Composable
+private fun FallbackFlagCard(draft: CommanderDraftBuild, onCardClick: (String) -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    val standaloneCards = remember(draft) { draft.fallbackStandaloneIds.mapNotNull { id -> draft.candidatesById[id]?.let { id to it } } }
+    val offPlanCards = remember(draft) { draft.fallbackOffPlanIds.mapNotNull { id -> draft.candidatesById[id]?.let { id to it } } }
+
+    Surface(shape = CardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(spacing.md)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                Icon(imageVector = Icons.Default.Info, contentDescription = null, tint = mc.secondaryAccent, modifier = Modifier.size(20.dp))
+                Text(
+                    text = stringResource(R.string.deck_wizard_choice_fallback_title),
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
+                )
+            }
+            if (standaloneCards.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.deck_wizard_choice_fallback_standalone_subtitle, standaloneCards.size),
+                    style = ty.bodySmall,
+                    color = mc.textSecondary,
+                    modifier = Modifier.padding(top = spacing.xs, bottom = spacing.sm),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                    standaloneCards.forEach { (id, card) -> FallbackFlagRow(card = card, onCardClick = { onCardClick(id) }) }
+                }
+            }
+            if (offPlanCards.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.deck_wizard_choice_fallback_offplan_subtitle, offPlanCards.size),
+                    style = ty.bodySmall,
+                    color = mc.textSecondary,
+                    modifier = Modifier.padding(top = spacing.sm, bottom = spacing.sm),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                    offPlanCards.forEach { (id, card) -> FallbackFlagRow(card = card, onCardClick = { onCardClick(id) }) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FallbackFlagRow(card: Card, onCardClick: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Surface(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClick = onCardClick),
+        color = mc.surface,
+    ) {
+        Row(
+            modifier = Modifier.padding(spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.md),
+        ) {
+            AsyncImage(
+                model = card.imageArtCrop ?: card.imageNormal,
+                contentDescription = null,
+                placeholder = painterResource(Res.drawable.mtg_card_back),
+                error = painterResource(Res.drawable.mtg_card_back),
+                fallback = painterResource(Res.drawable.mtg_card_back),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(width = 44.dp, height = 62.dp).clip(CardShape),
+            )
+            CardName(
+                name = card.name,
+                style = ty.bodyMedium,
+                color = mc.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 

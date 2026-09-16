@@ -1339,6 +1339,10 @@
     <string name="deck_wizard_choice_cap_reached">You can choose up to %1$d — deselect one first</string>
     <string name="deck_wizard_choice_view_details">View details for %1$s</string>
     <string name="deck_wizard_choice_sections_progress">%1$d of %2$d sections decided</string>
+    <!-- Deck Wizard Commander v5 (D4): the fallback-fill flag on the Choice screen. -->
+    <string name="deck_wizard_choice_fallback_title">Not enough on-plan cards in your collection</string>
+    <string name="deck_wizard_choice_fallback_standalone_subtitle">These %1$d cards fill the gap — each is individually strong, just not part of your deck\'s plan.</string>
+    <string name="deck_wizard_choice_fallback_offplan_subtitle">These %1$d cards fill the gap as a last resort — your collection had nothing better left.</string>
     <string name="deck_wizard_name_suffix_deck">%1$s Deck</string>
     <string name="deck_wizard_name_default">New %1$s Deck</string>
 
