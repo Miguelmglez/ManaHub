@@ -2671,10 +2671,12 @@ private fun SuggestionsTab(
                     }
                     item(key = "synergy_packages_content") {
                         SynergyPackagesSection(
-                            graph = analysis.debugSynergyGraph,
+                            engines = expanded.synergyEngines,
+                            sections = expanded.sections,
                             notApplicable = expanded.notApplicable,
                             resolveCard = { id -> cardById[id]?.card },
                             onCardClick = onCardClick,
+                            onBrowseSection = { section -> onBrowseSection(section, expanded.id) },
                             modifier = Modifier.padding(top = spacing.xs, bottom = spacing.md).animateItem(),
                         )
                     }
@@ -2692,8 +2694,15 @@ private fun SuggestionsTab(
                 // "${pillarId}:${section.id}" string -- omitted from the LazyColumn scope (not
                 // just visually hidden) when collapsed so scroll position stays sane, mirroring
                 // CollectionScreen.kt's own CollectionGroupHeader precedent.
-                if (expanded.sections.isNotEmpty()) {
-                    items(expanded.sections, key = { "pillar_section_${expanded.id}_${it.id}" }) { section ->
+                // SYNERGY's engine:<axis>:producers/payoffs sections are rendered above as paired
+                // engine cards, not a second time here.
+                val genericSections = if (expanded.id == PillarId.SYNERGY) {
+                    expanded.sections.filterNot { it.id.startsWith("engine:") }
+                } else {
+                    expanded.sections
+                }
+                if (genericSections.isNotEmpty()) {
+                    items(genericSections, key = { "pillar_section_${expanded.id}_${it.id}" }) { section ->
                         val sectionKey = "${expanded.id}:${section.id}"
                         if (collapsedCategorySections[sectionKey] != true) {
                             val browseFragment = remember(section.id, sectionQueryContext) {

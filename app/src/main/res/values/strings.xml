@@ -862,18 +862,36 @@
          (PillarResult.notApplicable) — SYNERGY on a zero-edge deck. Never renders as "0". -->
     <string name="deck_analysis_pillar_not_applicable_badge">N/A</string>
 
-    <!-- Deck Analysis Engine v3, Phase 5 (UI): the synergy-package section list inside the SYNERGY
-         pillar detail — one card per live axis, producers -> payoffs, ArchetypeResemblanceComponents/
-         SynergyAxisComponents.kt. -->
-    <string name="deck_analysis_synergy_packages_header">Synergy packages</string>
+    <!-- SYNERGY "Engines": one card per producer -> payoff pair, real counts, an incomplete badge,
+         Browse on each side. SynergyAxisComponents.kt. -->
+    <string name="deck_analysis_synergy_packages_header">Engines</string>
     <string name="deck_analysis_synergy_not_applicable_title">No detectable synergy plan</string>
     <string name="deck_analysis_synergy_not_applicable_body">This deck has no producer→payoff pairs the engine can detect. That doesn\'t mean it\'s poorly built — a straightforward removal-and-card-advantage plan can legitimately have no synergy graph at all — it just means this pillar has nothing to measure, so it\'s excluded from your score instead of scored as zero.</string>
-    <string name="deck_analysis_synergy_no_live_packages">No live synergy package yet — a package needs both producers and payoffs to count.</string>
-    <string name="deck_analysis_axis_package_header">%1$s package</string>
+    <string name="deck_analysis_synergy_no_live_packages">No engine yet — an engine needs a producer or payoff side with real numbers in the deck.</string>
+    <string name="deck_analysis_engine_title">%1$s engine</string>
+    <string name="deck_analysis_engine_counts">%1$d producers → %2$d payoffs</string>
+    <string name="deck_analysis_engine_missing_payoffs">Missing payoffs</string>
+    <string name="deck_analysis_engine_missing_producers">Missing producers</string>
     <string name="deck_analysis_axis_producers_label">Producers</string>
     <string name="deck_analysis_axis_payoffs_label">Payoffs</string>
-    <string name="deck_analysis_axis_live_badge">LIVE</string>
-    <string name="deck_analysis_axis_health_caption">%1$d producers → %2$d payoffs · %3$d%% healthy</string>
+
+    <!-- One plain-language sentence per axis describing the producer -> payoff loop. -->
+    <string name="deck_analysis_engine_sentence_life">Cards that gain life fuel cards that reward gaining life.</string>
+    <string name="deck_analysis_engine_sentence_death">Cards that sacrifice or kill your own creatures fuel cards that reward creatures dying.</string>
+    <string name="deck_analysis_engine_sentence_tokens">Cards that make tokens fuel cards that reward having lots of creatures or counters.</string>
+    <string name="deck_analysis_engine_sentence_counters">Cards that add +1/+1 counters fuel cards that reward having counters.</string>
+    <string name="deck_analysis_engine_sentence_landfall">Extra land drops fuel cards that trigger when a land enters the battlefield.</string>
+    <string name="deck_analysis_engine_sentence_graveyard">Cards that fill your graveyard fuel cards that recur from it or reward it being full.</string>
+    <string name="deck_analysis_engine_sentence_etb">Cards that blink or return creatures fuel cards that trigger when a creature enters.</string>
+    <string name="deck_analysis_engine_sentence_spells">Instants and sorceries fuel cards that reward casting them.</string>
+    <string name="deck_analysis_engine_sentence_artifacts">Artifacts fuel cards that reward controlling them.</string>
+    <string name="deck_analysis_engine_sentence_enchantments">Enchantments fuel cards that reward controlling them.</string>
+    <string name="deck_analysis_engine_sentence_attached">Equipment and Auras fuel cards that reward attacking or blocking with an equipped or enchanted creature.</string>
+    <string name="deck_analysis_engine_sentence_attack">Cards that give haste or evasion fuel cards that reward attacking.</string>
+    <string name="deck_analysis_engine_sentence_planeswalkers">Planeswalkers fuel cards that add counters to them.</string>
+    <string name="deck_analysis_engine_sentence_group">Cards that share a benefit with every player fuel cards that reward everyone drawing cards or gaining life together.</string>
+    <string name="deck_analysis_engine_sentence_engine">Counterspells and protection spells hold your plan together long enough for your finishers to close the game.</string>
+    <string name="deck_analysis_engine_sentence_generic">Producers on this axis fuel the payoffs that reward it.</string>
 
     <!-- Deck Analysis Engine v3, Phase 5 (UI): per-AxisKey English fallback labels — a presentation-
          layer mirror of AnalysisEngine's own private AXIS_LABELS map (core-domain stays string-free

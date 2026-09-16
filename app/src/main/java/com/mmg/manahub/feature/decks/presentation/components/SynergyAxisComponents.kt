@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.components
+// COMMENTS_REVIEWED: 2026-09-16
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -27,53 +28,39 @@ import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.components.EmptyState
-import com.mmg.manahub.core.ui.components.MiniProgressRing
 import com.mmg.manahub.core.ui.components.SectionHeader
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.decks.domain.engine.AxisCardBreakdown
 import com.mmg.manahub.feature.decks.domain.engine.AxisKey
-import com.mmg.manahub.feature.decks.domain.engine.AxisState
 import com.mmg.manahub.feature.decks.domain.engine.CardSection
-import com.mmg.manahub.feature.decks.domain.engine.DeckSynergyGraph
-import kotlin.math.roundToInt
+import com.mmg.manahub.feature.decks.domain.engine.SynergyEngine
+import com.mmg.manahub.feature.decks.domain.engine.SynergyEngineState
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  Deck Analysis Engine v3, Phase 5 (UI) — "Synergy packages": one card per LIVE axis, showing the
-//  actual producer cards feeding the actual payoff cards on that axis. This is the plan's own
-//  "highest user-visible value" surface ("you have 9 token generators and 0 payoffs" is real,
-//  actionable deckbuilding advice the engine could not give before this model existed) — reads
-//  [DeckAnalysis.debugSynergyGraph] (populated on the real Analysis tab pass as of this phase, see
-//  that field's own updated KDoc) directly; never re-derives producer/payoff membership from cards
-//  itself (that classification lives in [com.mmg.manahub.feature.decks.domain.engine.SynergyGraph],
-//  which already computed it into [DeckSynergyGraph.axisBreakdown]).
-//
-//  Reuses [CardSectionRow] (`CardSectionComponents.kt`) for the actual card rows — a "producers"
-//  and a "payoffs" [CardSection] are built ad hoc here (never added to
-//  [com.mmg.manahub.feature.decks.domain.engine.PillarResult.sections] — these are graph-derived,
-//  display-only groupings distinct from that pillar's own fingerprint/interaction/standalone/
-//  offplan sections, which keep rendering unchanged below this block).
+//  "Engines" (Deck Wizard Commander v5, D2/D3) — one card per producer -> payoff pair the deck
+//  actually has, ordered per D2 ahead of the deck's tribe and the interaction/standalone/off-plan
+//  split (rendered separately by DeckStudioScreen's generic CardSectionRow list). Real counts and
+//  Browse come from the SAME engine:<axis>:producers/payoffs CardSections AnalysisEngine emits --
+//  never re-derived here, so this view and the generic section list can never disagree.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Renders the whole synergy-package list for the SYNERGY pillar detail. Handles the 3 states the
- * gate calls for explicitly:
- *  - [notApplicable] (P4 has literally zero graph edges) — an honest "no detectable synergy plan"
- *    explanation, never an empty list and never implying a score of 0.
- *  - a graph with edges but no axis clearing the live threshold — a lighter, non-alarming note
- *    (this deck has *some* graph signal, just nothing dominant enough to call a "package" yet).
- *  - one or more live axes — one [SynergyAxisCard] each, in [DeckSynergyGraph.axes] declaration
- *    order (mirrors the engine's own display-order convention).
+ * Renders the SYNERGY pillar's Engines list. Handles the 3 states the gate calls for:
+ *  - [notApplicable] (P4 has literally zero graph edges) — an honest "no detectable synergy plan".
+ *  - engines that exist but none clears the D3 visibility rule — a lighter explanatory note.
+ *  - one or more engines — one [SynergyEngineCard] each, in [engines]' own order.
  */
 @Composable
 fun SynergyPackagesSection(
-    graph: DeckSynergyGraph?,
+    engines: List<SynergyEngine>,
+    sections: List<CardSection>,
     notApplicable: Boolean,
     resolveCard: (String) -> Card?,
     onCardClick: (String) -> Unit,
+    onBrowseSection: (CardSection) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -95,8 +82,7 @@ fun SynergyPackagesSection(
         return
     }
 
-    val liveAxes = graph?.axes.orEmpty().filter { it.isLive }
-    if (liveAxes.isEmpty()) {
+    if (engines.isEmpty()) {
         Text(
             text = stringResource(R.string.deck_analysis_synergy_no_live_packages),
             style = MaterialTheme.magicTypography.bodySmall,
@@ -106,39 +92,41 @@ fun SynergyPackagesSection(
         return
     }
 
-    // Per-axis outer expand/collapse — owned here (not hoisted to the caller) so the SYNERGY
-    // pillar detail integration stays a one-line call; every axis starts expanded (the plan's own
-    // framing: this is the highest-value surface in the redesign, it should not default-hide).
     val expandedAxes = remember { mutableStateMapOf<AxisKey, Boolean>() }
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-        liveAxes.forEach { axisState ->
-            val breakdown = graph?.axisBreakdown?.get(axisState.axis) ?: AxisCardBreakdown(emptyList(), emptyList())
-            SynergyAxisCard(
-                axisState = axisState,
-                breakdown = breakdown,
+        engines.forEach { engine ->
+            val producerSection = sections.firstOrNull { it.id == "engine:${engine.axis}:producers" }
+                ?: CardSection(id = "engine:${engine.axis}:producers", label = engine.label, current = engine.producers.sumOf { it.quantity }, contributions = engine.producers)
+            val payoffSection = sections.firstOrNull { it.id == "engine:${engine.axis}:payoffs" }
+                ?: CardSection(id = "engine:${engine.axis}:payoffs", label = engine.label, current = engine.payoffs.sumOf { it.quantity }, contributions = engine.payoffs)
+            SynergyEngineCard(
+                engine = engine,
+                producerSection = producerSection,
+                payoffSection = payoffSection,
                 resolveCard = resolveCard,
                 onCardClick = onCardClick,
-                expanded = expandedAxes[axisState.axis] ?: true,
-                onToggleExpanded = { expandedAxes[axisState.axis] = !(expandedAxes[axisState.axis] ?: true) },
+                onBrowseProducers = { onBrowseSection(producerSection) },
+                onBrowsePayoffs = { onBrowseSection(payoffSection) },
+                expanded = expandedAxes[engine.axis] ?: true,
+                onToggleExpanded = { expandedAxes[engine.axis] = !(expandedAxes[engine.axis] ?: true) },
             )
         }
     }
 }
 
-/**
- * One live axis's package card: a header (axis label, LIVE badge, health ring), a plain-English
- * producer/payoff/health caption, and — while [expanded] — the actual producer cards feeding the
- * actual payoff cards, with a directional arrow between the two rows so the producer -> payoff
- * relationship (the entire point of this model) is visually unambiguous rather than just two
- * unlabeled card rows stacked on top of each other.
- */
+/** One axis' engine card: title, a plain-language sentence, real "N producers -> M payoffs"
+ * counts, an incomplete badge when [SynergyEngine.state] isn't [SynergyEngineState.COMPLETE], then
+ * the producers row, a directional arrow, and the payoffs row -- both with Browse. */
 @Composable
-private fun SynergyAxisCard(
-    axisState: AxisState,
-    breakdown: AxisCardBreakdown,
+private fun SynergyEngineCard(
+    engine: SynergyEngine,
+    producerSection: CardSection,
+    payoffSection: CardSection,
     resolveCard: (String) -> Card?,
     onCardClick: (String) -> Unit,
+    onBrowseProducers: () -> Unit,
+    onBrowsePayoffs: () -> Unit,
     expanded: Boolean,
     onToggleExpanded: () -> Unit,
     modifier: Modifier = Modifier,
@@ -146,11 +134,8 @@ private fun SynergyAxisCard(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    // qualityColor is `internal` in HealthComponents.kt (same package) — the same good/mid/low ramp
-    // every other health-driven color in this feature already uses.
-    val healthColor = mc.qualityColor(axisState.health)
-    var producersExpanded by remember(axisState.axis) { mutableStateOf(true) }
-    var payoffsExpanded by remember(axisState.axis) { mutableStateOf(true) }
+    var producersExpanded by remember(engine.axis) { mutableStateOf(true) }
+    var payoffsExpanded by remember(engine.axis) { mutableStateOf(true) }
 
     Surface(
         shape = CardShape,
@@ -160,61 +145,51 @@ private fun SynergyAxisCard(
     ) {
         Column(modifier = Modifier.padding(spacing.sm)) {
             SectionHeader(
-                title = stringResource(R.string.deck_analysis_axis_package_header, axisState.axis.axisDisplayLabel()),
+                title = stringResource(R.string.deck_analysis_engine_title, engine.axis.axisDisplayLabel()),
                 expanded = expanded,
                 onToggle = onToggleExpanded,
                 titleColor = mc.textPrimary,
                 trailing = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                        modifier = Modifier.padding(end = spacing.xs),
-                    ) {
-                        Surface(shape = ChipShape, color = mc.lifePositive.copy(alpha = 0.15f)) {
+                    if (engine.state != SynergyEngineState.COMPLETE) {
+                        val badgeText = if (engine.state == SynergyEngineState.MISSING_PAYOFFS) {
+                            stringResource(R.string.deck_analysis_engine_missing_payoffs)
+                        } else {
+                            stringResource(R.string.deck_analysis_engine_missing_producers)
+                        }
+                        Surface(shape = ChipShape, color = mc.goldMtg.copy(alpha = 0.15f)) {
                             Text(
-                                text = stringResource(R.string.deck_analysis_axis_live_badge),
+                                text = badgeText,
                                 style = ty.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = mc.lifePositive,
+                                color = mc.goldMtg,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             )
                         }
-                        // contentDescription left null -- the caption Text right below already
-                        // states the same producer/payoff/health numbers accessibly; a second
-                        // announcement here would just double-read the same info.
-                        MiniProgressRing(value = axisState.health, color = healthColor)
                     }
                 },
             )
             Text(
-                text = stringResource(
-                    R.string.deck_analysis_axis_health_caption,
-                    axisState.producerCopies,
-                    axisState.payoffCopies,
-                    (axisState.health * 100).roundToInt(),
-                ),
+                text = axisEngineSentence(engine.axis),
+                style = ty.bodySmall,
+                color = mc.textSecondary,
+                modifier = Modifier.padding(top = spacing.xxs, bottom = spacing.xs),
+            )
+            Text(
+                text = stringResource(R.string.deck_analysis_engine_counts, producerSection.realCount, payoffSection.realCount),
                 style = ty.labelSmall,
                 color = mc.textSecondary,
                 modifier = Modifier.padding(bottom = spacing.xs),
             )
 
             if (expanded) {
-                val producersLabel = stringResource(R.string.deck_analysis_axis_producers_label)
                 CardSectionRow(
-                    section = CardSection(
-                        id = "axis:${axisState.axis}:producers",
-                        label = producersLabel,
-                        current = breakdown.producers.sumOf { it.quantity },
-                        contributions = breakdown.producers,
-                    ),
+                    section = producerSection.copy(label = stringResource(R.string.deck_analysis_axis_producers_label)),
                     resolveCard = resolveCard,
                     onCardClick = onCardClick,
-                    onBrowse = null,
+                    onBrowse = onBrowseProducers,
                     expanded = producersExpanded,
                     onToggleExpanded = { producersExpanded = !producersExpanded },
                 )
 
-                // Directional divider — makes the producer -> payoff relationship legible instead
-                // of two unlabeled card rows stacked on top of each other (the model's whole point).
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xxs),
                     horizontalArrangement = Arrangement.Center,
@@ -227,21 +202,35 @@ private fun SynergyAxisCard(
                     )
                 }
 
-                val payoffsLabel = stringResource(R.string.deck_analysis_axis_payoffs_label)
                 CardSectionRow(
-                    section = CardSection(
-                        id = "axis:${axisState.axis}:payoffs",
-                        label = payoffsLabel,
-                        current = breakdown.payoffs.sumOf { it.quantity },
-                        contributions = breakdown.payoffs,
-                    ),
+                    section = payoffSection.copy(label = stringResource(R.string.deck_analysis_axis_payoffs_label)),
                     resolveCard = resolveCard,
                     onCardClick = onCardClick,
-                    onBrowse = null,
+                    onBrowse = onBrowsePayoffs,
                     expanded = payoffsExpanded,
                     onToggleExpanded = { payoffsExpanded = !payoffsExpanded },
                 )
             }
         }
     }
+}
+
+@Composable
+private fun axisEngineSentence(axis: AxisKey): String = when (axis) {
+    "LIFE" -> stringResource(R.string.deck_analysis_engine_sentence_life)
+    "DEATH" -> stringResource(R.string.deck_analysis_engine_sentence_death)
+    "TOKENS" -> stringResource(R.string.deck_analysis_engine_sentence_tokens)
+    "COUNTERS" -> stringResource(R.string.deck_analysis_engine_sentence_counters)
+    "LANDFALL" -> stringResource(R.string.deck_analysis_engine_sentence_landfall)
+    "GRAVEYARD" -> stringResource(R.string.deck_analysis_engine_sentence_graveyard)
+    "ETB" -> stringResource(R.string.deck_analysis_engine_sentence_etb)
+    "SPELLS" -> stringResource(R.string.deck_analysis_engine_sentence_spells)
+    "ARTIFACTS" -> stringResource(R.string.deck_analysis_engine_sentence_artifacts)
+    "ENCHANTMENTS" -> stringResource(R.string.deck_analysis_engine_sentence_enchantments)
+    "ATTACHED" -> stringResource(R.string.deck_analysis_engine_sentence_attached)
+    "ATTACK" -> stringResource(R.string.deck_analysis_engine_sentence_attack)
+    "PLANESWALKERS" -> stringResource(R.string.deck_analysis_engine_sentence_planeswalkers)
+    "GROUP" -> stringResource(R.string.deck_analysis_engine_sentence_group)
+    "ENGINE" -> stringResource(R.string.deck_analysis_engine_sentence_engine)
+    else -> stringResource(R.string.deck_analysis_engine_sentence_generic)
 }
