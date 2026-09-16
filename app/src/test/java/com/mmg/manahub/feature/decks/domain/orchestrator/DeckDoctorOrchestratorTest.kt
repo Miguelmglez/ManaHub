@@ -9,12 +9,14 @@ import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckSlot
 import com.mmg.manahub.core.model.DeckWithCards
 import com.mmg.manahub.core.model.ScoreWeightOverrides
+import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.card
 import com.mmg.manahub.feature.decks.domain.engine.fixedPower
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -27,6 +29,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -276,5 +279,78 @@ class DeckDoctorOrchestratorTest {
         coVerify(exactly = 1) {
             evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
+    }
+
+    @Test
+    fun `a stale in-flight recompute can never overwrite a newer mutation's Health or clear the dirty flag out from under it`() = runTest(dispatcher) {
+        stubDeck()
+        val orchestrator = createOrchestrator(this)
+        orchestrator.loadAnalysis(DECK_ID)
+        advanceUntilIdle()
+
+        // Mutation A's own evaluate call finishes its computation, then -- while still inside the
+        // SAME synchronous execution, exactly like a Dispatchers.Default computation that has
+        // already returned before a concurrent cancel() from another thread lands -- mutation B is
+        // applied and cancels A's OWN (currently running) Job. Cancelling a Job mid-execution does
+        // not interrupt it; it only prevents its NEXT suspension. A's own resumption right after
+        // this point (publishing its result) is exactly what the generation guard must catch.
+        var mutationBApplied = false
+        var healthA: com.mmg.manahub.feature.decks.domain.usecase.DeckHealth? = null
+        var healthB: com.mmg.manahub.feature.decks.domain.usecase.DeckHealth? = null
+        coEvery {
+            evaluateDeckUseCase.invoke(
+                match<List<DeckEntry>> { list -> list.firstOrNull { it.card.scryfallId == landCard.scryfallId }?.quantity == 10 },
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
+            )
+        } coAnswers {
+            val staleResult = callOriginal()
+            healthA = staleResult
+            if (!mutationBApplied) {
+                mutationBApplied = true
+                // B is driven to full completion (debounce + evaluate + publish) HERE, still
+                // inside A's own synchronous stack frame -- A only resumes and tries to publish
+                // its own (now stale) result after B has already won the race.
+                orchestrator.onAddCard(landCard.scryfallId)
+                dispatcher.scheduler.advanceTimeBy(200)
+                dispatcher.scheduler.runCurrent()
+                healthB = orchestrator.state.value.health
+            }
+            staleResult
+        }
+
+        // Mutation A: debounces, then evaluates -- landing B synchronously inside the stub above.
+        orchestrator.onAddCard(spellCard.scryfallId)
+        advanceUntilIdle()
+
+        assertNotNull("A's own evaluate must have run", healthA)
+        assertNotNull("B's own evaluate must have run and published before A resumed", healthB)
+        assertNotEquals("A and B must have computed genuinely different Health (different land counts)", healthA, healthB)
+        // B's own, newer evaluation must be the FINAL published state -- A's stale one (computed
+        // against land=10, before B landed) must never win even though it resumes and publishes
+        // AFTER B did.
+        assertEquals(
+            "A's late, stale publish must never overwrite B's already-published, newer Health",
+            healthB,
+            orchestrator.state.value.health,
+        )
+        coVerify(exactly = 3) {
+            // 1: loadAnalysis's own initial pass. 2: A, evaluated against land=10 (stale, dropped).
+            // 3: B, evaluated against land=11 (published).
+            evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        }
+
+        // Nothing is genuinely pending any more -- confirm it still recomputes correctly when
+        // something real IS left pending after cancelPendingRecompute.
+        orchestrator.onAddCard(spellCard.scryfallId)
+        orchestrator.cancelPendingRecompute()
+        orchestrator.recomputeNowIfDirty()
+        advanceUntilIdle()
+
+        assertEquals(4, orchestrator.cachedMainboardQuantity(spellCard.scryfallId))
+        assertNotEquals(
+            "a genuinely pending mutation left by cancelPendingRecompute must still recompute on return",
+            healthB,
+            orchestrator.state.value.health,
+        )
     }
 }

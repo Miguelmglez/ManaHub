@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.orchestrator
-// COMMENTS_REVIEWED: 2026-09-15
+// COMMENTS_REVIEWED: 2026-09-16
 
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.repository.DeckRepository
@@ -207,6 +207,12 @@ class DeckDoctorOrchestrator(
     /** True from the moment a mutation is applied to [analysisCache] until [performRecompute] publishes Health for it -- lets a host that cancelled the pending recompute run it immediately on return, see [recomputeNowIfDirty]. */
     private var recomputeDirty: Boolean = false
 
+    /** Bumped on every [recomputeIncremental] mutation (and reset at [loadAnalysis]/[invalidate]) --
+     * [performRecompute] snapshots this at launch and re-checks it before publishing, so a job left
+     * running past its own cancel() (cooperative cancellation is not guaranteed mid-evaluate) can
+     * never overwrite a NEWER mutation's result or clear [recomputeDirty] out from under it. */
+    private var mutationGeneration: Int = 0
+
     /**
      * Workstream 8.4 -- bumped once per [loadAnalysis] call, BEFORE its coroutine is launched.
      * [recomputeCommunityInternal] captures the generation value active at that moment
@@ -264,6 +270,7 @@ class DeckDoctorOrchestrator(
         analysisJob?.cancel()
         recomputeJob?.cancel()
         recomputeDirty = false
+        mutationGeneration++
         // Workstream 8.4 -- this pass's own identity, captured BEFORE launch so every stage-emitting
         // sub-job it spawns ([recomputeCommunityInternal]) can tell whether it is still the CURRENT
         // pass by the time it actually gets to update [DeckDoctorState.stage].
@@ -515,16 +522,17 @@ class DeckDoctorOrchestrator(
     private fun recomputeIncremental() {
         val context = analysisCache ?: return
         recomputeDirty = true
+        val generation = ++mutationGeneration
         // Coalesce rapid taps into one recompute -- cancel-and-relaunch keeps only the last call.
         recomputeJob?.cancel()
         recomputeJob = scope.launch {
             delay(RECOMPUTE_DEBOUNCE_MS)
-            performRecompute(context)
+            performRecompute(context, generation)
         }
     }
 
-    /** Evaluates [context] and publishes Health, clearing [recomputeDirty] -- shared by the debounced [recomputeIncremental] and the immediate [recomputeNowIfDirty]. */
-    private suspend fun performRecompute(context: AnalysisCache) {
+    /** Evaluates [context] and publishes Health, clearing [recomputeDirty] -- shared by the debounced [recomputeIncremental] and the immediate [recomputeNowIfDirty]. [generation] is the [mutationGeneration] snapshot at launch time; a mismatch on completion means a newer mutation landed while this evaluation was in flight, so its result is stale and must not publish or clear the dirty flag a newer generation still owns. */
+    private suspend fun performRecompute(context: AnalysisCache, generation: Int) {
         val mainboard = context.workingMainboard
         val weightOverrides = weightsProvider()
         val weights = weightOverrides.toScoreWeights()
@@ -542,6 +550,7 @@ class DeckDoctorOrchestrator(
             scoreWeightOverrides = weightOverrides,
             sideboardCount = context.sideboardCount,
         )
+        if (generation != mutationGeneration) return
         _state.update {
             it.copy(health = withUnresolvedWarning(health, context.unresolvedCount))
         }
@@ -552,8 +561,9 @@ class DeckDoctorOrchestrator(
     fun recomputeNowIfDirty() {
         if (!recomputeDirty) return
         val context = analysisCache ?: return
+        val generation = mutationGeneration
         recomputeJob?.cancel()
-        recomputeJob = scope.launch { performRecompute(context) }
+        recomputeJob = scope.launch { performRecompute(context, generation) }
     }
 
     /**
@@ -629,6 +639,7 @@ class DeckDoctorOrchestrator(
             communityJob?.cancel()
             recomputeJob?.cancel()
             recomputeDirty = false
+            mutationGeneration++
             analysisCache = null
             _state.update { it.copy(isLoaded = false, stage = null, completedStages = emptyList()) }
         }
