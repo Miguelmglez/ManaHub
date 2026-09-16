@@ -5,7 +5,13 @@ where it stands. Written for the next campaign (60-card formats) to start from c
 archaeology. Keep it concise: decisions, contracts, numbers, open items. Execution logs belong in the
 gitignored progress tracker, not here.
 
-**Last updated:** 2026-09-16 (v5 campaign, Run R3a — category detection cleanup: TRIBAL card tags fold
+**Last updated:** 2026-09-16 (v5 campaign, Run R4 — placement quality (X5): role-overflow cost + hard
+overflow gate (S7, fixes "Ramp 14/8"), axis-gain density-producer gate + Standalone/off-plan fallback
+tiers flagged on the Choice screen (S8/D4/H9, fixes over-eager "Off-plan"), refine's fixed 8-swap loop
+replaced by a bounded local search. Real-collection harness: 180/180 HARD (incl. 2 new: no avoidable
+role overflow, no avoidable off-plan), score min/p25/median 78/85/88 (was 77/84/87, p75/max unchanged at
+90/96), determinism 180/180, variety median Jaccard 0.646 (was 0.65). See §3/§8 below. Previously:
+2026-09-16 (v5 campaign, Run R3a — category detection cleanup: TRIBAL card tags fold
 into the `tribe:` key space, one label spelling everywhere, section-emission audit over corpus + real
 collection, counters-payoff detection deliberately left unchanged; see ADR-009 Amendment (R3a) and §8.1
 below). Previously: 2026-09-16 (v5 campaign, Run R2b — `inevitability` axis re-derived per the user's own
@@ -19,6 +25,65 @@ telemetry, cleanup and docs; the campaign closed except F18/Edgar, which awaited
 **Owning plan (v3, shipped):** `docs/plans/deck-wizard-commander-plan.md` — DELETED per the
 AI-planning-doc rule now that the campaign has shipped; this file is the durable record that
 survives. **v4 (active):** `docs/plans/deck-wizard-commander-v4-plan.md` (gitignored).
+
+## v5 — Run R4 (2026-09-16): placement quality — no overflow, no avoidable off-plan (X5)
+
+User reports (2026-09-15): a wizard build put 14 cards in an 8-ideal Ramp band, and too many
+wizard-chosen cards landed in "Off-plan" despite the wizard choosing 100% of the deck. Both traced
+to the SAME placement-loop gap: `PlacementScorer.roleGain` gave no credit past a role's `max` but
+also no COST, so a card picked for one need that also happened to tag `ramp` kept incrementing ramp
+with nothing to stop it (H1); and `axisGain` credited SPELLS/ARTIFACTS/ENCHANTMENTS type-line
+density unconditionally, so a bare Instant with no real synergy could still clear the D8 filler
+floor and read as "chosen for a reason" while ending up off-plan in the final analysis (H9).
+
+Fixes (`PlacementScorer.kt`, `BuildCommanderDeckUseCase.kt`):
+- **Overflow cost + gate (S7).** `marginalGain` now subtracts a normalised overflow cost — the
+  worst-offending matched role's `(current - max + 1) / max`, weighted at `ROLE_WEIGHT` (0.40, the
+  SAME scale as that role's own positive credit — a role's overflow is the negative mirror of its
+  own under-ideal credit, not a separately tuned constant). The placement loop additionally
+  HARD-excludes an overflowing candidate whenever a non-overflowing candidate still clears the
+  filler floor that iteration, so overflow only ever wins as a genuine last resort, never against a
+  clean alternative.
+- **Axis density gate (H9/S8).** `axisGain`'s SPELLS/ARTIFACTS/ENCHANTMENTS type-line-density credit
+  (no dedicated role backing it — `SynergyGraph.DENSITY_PRODUCER_AXES`, promoted `internal`) now
+  counts only when the plan targets that axis or a payoff for it is already placed — mirroring
+  `AnalysisEngine`'s own final-analysis off-plan test (no role AND no edge) at placement time. This
+  closes the actual leak: it was the ONLY way a genuinely off-plan card could clear the D8 floor.
+- **D4 fallback tiers.** Once the main loop has no more skeleton/axis-relevant candidate (the D8
+  floor structurally fails for everything left, by construction of the gate above), remaining slots
+  fill with the best Standalone card (any classified role, even one the skeleton never targets — the
+  same "not off-plan" reading `AnalysisEngine`'s residual classification uses) ordered by EDHREC
+  power, then true off-plan cards (no role, no edge) as the last resort. Both tiers are recorded as
+  `fallbackStandaloneIds`/`fallbackOffPlanIds` on `CommanderDraftBuild`/`WizardBuildResult` and shown
+  on the Choice screen as a dedicated, non-interactive, honestly-labelled section — never silently
+  absorbed. Counts only reach telemetry (`WizardFillStats.fallbackStandaloneCount`/
+  `fallbackOffPlanCount`).
+- **Local-search refine.** The old `refine()` (≤8 swaps, always against `remainingCandidates
+  .firstOrNull()`) is now a bounded local search (≤20 swaps): each round retargets the WORST current
+  wizard-placed card (off-plan first, then role overflow, then lowest EDHREC power), shortlists the
+  top 4 remaining candidates by `marginalGain` against the board without that victim, and keeps
+  whichever verified full re-analysis raises `totalScore` the most — stopping at a local optimum or
+  the cap. Manual adds/commander untouched, unchanged from before.
+
+Two builder-behavior tests updated to match the new, INTENDED contract (not analysis/fixture
+changes): `WizardHarnessMockCollectionThinSegmentTest` (an exhausted collection now fills via
+flagged fallback instead of declaring a bigger gap — this is exactly what D4 asks for) and
+`BuildCommanderDeckUseCaseTest`'s preference/D8 test (moved off the deliberately-exhausted
+`MockCollectionThin` fixture, which now legitimately fallback-fills, onto `MockCollectionRich`,
+where the main loop alone fills every slot — isolating what that test actually checks: preference
+never lets a floor-failing card jump the D8 floor).
+
+Real-collection harness (`testdata/wizard-harness/`, gitignored, 180 specs): 180/180 pass every HARD
+metric including the 2 new ones (`no_avoidable_role_overflow`, `no_avoidable_offplan` — computed as
+"every wizard-placed card past a role's max, or in the final off-plan section, is accounted for by a
+flagged fallback pick"). Score min/p25/median/p75/max: 78/85/88/90/96 (was 77/84/87/90/96 — a small,
+expected improvement, not a regression). Runtime ms min/median/max: 92/121/339. Choice determinism
+180/180 (176 with real ambiguity groups). Variety median Jaccard 0.6456 (baseline 0.65, unchanged
+within noise). Fallback placements across all 180 real-collection builds: 0 standalone, 0 off-plan —
+this specific harness collection is rich enough that fallback never had to trigger; the mechanism is
+exercised by the `MockCollectionThin` unit test instead. Shared `decks.*` jvmTest: 580 tests, 1
+failure (Edgar/F18, the accepted pre-existing baseline — unchanged by this run); golden/corpus/
+calibration/skeleton suites untouched (no analysis-side file changed). No fixture diff.
 
 ## v5 — Run R2 (2026-09-16): category vocabulary (X0) + F18 recalibration attempt
 
@@ -477,18 +542,35 @@ Build target   = CommanderPlanResolver(format, commander, StrategyPick, identity
                  == exactly what AnalysisEngine.evaluate resolves for the same pin
 
 Placement      = PlacementScorer.marginalGain: role gain (P3 bands, ideal-weighted, 0 at max,
-                 negative for anti-roles) · axis gain (P4 producers/payoffs toward axis ideals)
-                 · curve gain (P2 band + shape) · power tie-break · pip feasibility
-                 · optional community prior (≤ ×1.15, owned cards, flag-gated)
-                 Filler floor: no role gain and no axis gain ⇒ not placed ⇒ gap.
+                 negative for anti-roles) · axis gain (P4 producers/payoffs toward axis ideals,
+                 v5 R4: a bare type-line density producer — SPELLS/ARTIFACTS/ENCHANTMENTS with no
+                 dedicated role backing it — counts only if the plan targets the axis or a payoff
+                 is already placed) · curve gain (P2 band + shape) · power tie-break · pip
+                 feasibility · optional community prior (≤ ×1.15, owned cards, flag-gated) − role
+                 overflow cost (v5 R4, S7: a candidate pushing a non-anti role past its own `max`
+                 is charged at ROLE_WEIGHT, the same scale as that role's own positive credit).
+                 Filler floor: no role gain and no axis gain ⇒ not placed by the main loop.
+                 Overflow gate (v5 R4): the main loop hard-excludes an overflowing candidate
+                 whenever ANY non-overflowing candidate still clears the filler floor that
+                 iteration — overflow only wins when it is genuinely the only option left.
+                 D4 fallback (v5 R4): once the main loop has no more skeleton/axis-relevant
+                 candidate, remaining slots fill with the best Standalone card (any classified
+                 role, even off-skeleton) by EDHREC power, then true off-plan cards (no role, no
+                 axis edge) as the last resort — both tiers recorded on `CommanderDraftBuild`/
+                 `WizardBuildResult` (`fallbackStandaloneIds`/`fallbackOffPlanIds`) and flagged,
+                 never silently absorbed, on the Choice screen.
 
 Lands          = LandTargetResolver (shared with Studio) → owned non-basics in identity
                  (LAND_MIX cap, Karsten-safe) → basics (mainboard + commander pips, Phyrexian = 0)
                  → bounded Karsten rebalance via ManaBaseAnalyzer.
 
 Verification   = DeckAnalysisPipeline.analyze (the ONE analysis entry point, shared by
-                 DeckDoctorOrchestrator, the wizard and the harness) → refine ≤ 8 swaps while
-                 totalScore strictly increases → DeckAnalysis stored in the result.
+                 DeckDoctorOrchestrator, the wizard and the harness) → refine: bounded local search
+                 (v5 R4, ≤ 20 swaps) retargeting the worst wizard-placed card each round (off-plan
+                 first, then role overflow, then lowest EDHREC power), trialing the top few
+                 remaining candidates by marginalGain and keeping whichever verified re-analysis
+                 raises totalScore the most, until no improving swap remains → DeckAnalysis stored
+                 in the result.
 
 Persistence    = one atomic write: cards (source WIZARD for engine-placed + commander, USER for
                  manual adds), commanderCardId/coverCardId, name, pin (archetype, posture, themes,
@@ -1098,3 +1180,14 @@ ADR-009 "Amendment (R3a)".
   regressions), Meren now resolves correctly, Edgar stays red (honestly reported, not forced). Kept
   per the user's own gate (accuracy up, revert-if-not was the standing instruction). Full derivation
   and numbers: ADR-009 "Amendment (R2b)".
+- 2026-09-16 — v5 Run R4: placement quality (X5, S7/S8/H1/H9/D4). Role-overflow cost (weighted at
+  ROLE_WEIGHT, the same scale as that role's own positive credit) plus a hard exclusion whenever a
+  non-overflowing candidate still clears the D8 floor — fixes "Ramp 14/8". `axisGain`'s bare
+  type-line-density credit (SPELLS/ARTIFACTS/ENCHANTMENTS) now requires the axis be targeted or its
+  payoff already placed — the actual leak that let a genuinely off-plan card clear the placement
+  floor. D4 fallback: Standalone (any classified role) then true off-plan as the last resort once the
+  main loop is exhausted, both flagged on the Choice screen and counted in telemetry, never silently
+  absorbed. `refine()` replaced with a bounded (≤20) local search retargeting the worst current card
+  each round instead of a fixed 8-swap/first-candidate loop. Real-collection harness: 180/180 HARD
+  (incl. 2 new metrics), score +1 across min/p25/median, determinism/variety unchanged within noise.
+  No fixture diff; no analysis-side file touched.
