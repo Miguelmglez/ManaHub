@@ -65,6 +65,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -1595,4 +1596,50 @@ class DeckWizardViewModelTest {
 
     // (12) The existing Commander test suite (above this section) stays green -- verified by the
     // gate run, not re-asserted here.
+
+    // ── Gate 5 audits (compose-design-reviewer + android-edge-case-tester) -- P1 regression tests ──
+
+    @Test
+    fun `onAddSeed collapses two printings of the same name into ONE entry, capped by name across printings`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        val printingA = card(id = "bolt-a", name = "Lightning Bolt", colorIdentity = emptyList())
+        val printingB = card(id = "bolt-b", name = "Lightning Bolt", colorIdentity = emptyList())
+
+        repeat(4) { vm.onAddSeed(printingA) }
+        assertEquals(1, vm.uiState.value.seeds.size)
+        assertEquals(4, vm.uiState.value.seeds.first().quantity)
+
+        // Adding a DIFFERENT printing of the SAME name must increment printing A's entry (or be
+        // rejected at the cap) -- never create a second WizardSeed for "Lightning Bolt".
+        vm.events.test {
+            vm.onAddSeed(printingB)
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+        }
+        assertEquals(1, vm.uiState.value.seeds.size)
+        assertEquals(4, vm.uiState.value.seeds.sumOf { it.quantity })
+        verify { appContext.getString(R.string.deck_wizard_seed_copy_cap, 4) }
+    }
+
+    @Test
+    fun `combo-seed resolution is cancelled when the flow is switched before it completes`() = runTest(dispatcher) {
+        val basaltMonolith = card(id = "basalt-1", name = "Basalt Monolith")
+        // Never resolves within this test's own virtual-time window -- runCurrent() below lets the
+        // resolution START (and suspend here) without letting runTest's scheduler fast-forward
+        // through the delay the way advanceUntilIdle() would.
+        coEvery { searchCardsUseCase("Basalt Monolith", any()) } coAnswers {
+            delay(5_000)
+            DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(cards = listOf(basaltMonolith), hasMore = false, totalCards = 1))
+        }
+
+        val vm = viewModel(mapOf("format" to "CASUAL", "seeds" to "Basalt Monolith"))
+        runCurrent() // profile loads; resolveComboSeeds launches and suspends inside its own network lookup
+        vm.onSelectEntryFlow(WizardEntryFlow.COLORS) // switches flow BEFORE the combo card resolves
+        advanceUntilIdle()
+
+        assertTrue(
+            "a card resolved by an already-cancelled combo-seed job must never be added",
+            vm.uiState.value.seeds.isEmpty(),
+        )
+    }
 }

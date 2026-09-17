@@ -63,6 +63,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -427,17 +428,26 @@ internal fun CommanderPickStepContent(
 internal fun WizardCandidateTile(card: Card, isOwned: Boolean, onClick: () -> Unit, seedQuantity: Int? = null) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    // Gate 5 audit (design P2c): the visible "xN" quantity badge below was never announced to
+    // TalkBack (only the card image's own name was) -- fold it into ONE merged description on the
+    // tile's root instead.
+    val tileDescription = if (seedQuantity != null && seedQuantity > 0) {
+        stringResource(R.string.deck_wizard_seed_tile_quantity_a11y, card.name, seedQuantity)
+    } else {
+        card.name
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(63f / 88f)
             .clip(CardShape)
             .background(mc.surfaceVariant)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = tileDescription },
     ) {
         AsyncImage(
             model = card.imageNormal,
-            contentDescription = card.name,
+            contentDescription = null,
             placeholder = painterResource(Res.drawable.mtg_card_back),
             error = painterResource(Res.drawable.mtg_card_back),
             fallback = painterResource(Res.drawable.mtg_card_back),

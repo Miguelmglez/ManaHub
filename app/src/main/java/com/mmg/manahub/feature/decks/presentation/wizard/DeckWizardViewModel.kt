@@ -448,6 +448,12 @@ class DeckWizardViewModel(
     private var planAnalysisJob: Job? = null
     private var planSectionsSearchJob: Job? = null
 
+    /** Gate 5 audit (edge-case P1): [resolveComboSeeds] (launched from `init`) was NOT held in a
+     * Job, so [cancelDirectionSearchJobs] could never cancel it -- a combo hand-off still resolving
+     * when the user switched to a different entry flow could inject a seed into that NEW flow after
+     * the fact. Cancelled alongside every other direction-scoped search job now. */
+    private var comboSeedResolveJob: Job? = null
+
     /** Set only once [onGenerate] has actually created the deck row -- lets [onCancelGeneration]
      * clean up a partial build instead of orphaning an empty draft. */
     private var pendingDeckId: String? = null
@@ -591,7 +597,12 @@ class DeckWizardViewModel(
                             isLoadingProfile = false,
                         )
                     }
-                    if (seedsArg.isNotEmpty()) resolveComboSeeds(seedsArg)
+                    // Gate 5 audit (edge-case P1): held in its own Job (was a bare suspend call)
+                    // so cancelDirectionSearchJobs can actually cancel it -- see comboSeedResolveJob's
+                    // own KDoc.
+                    if (seedsArg.isNotEmpty()) {
+                        comboSeedResolveJob = viewModelScope.launch { resolveComboSeeds(seedsArg) }
+                    }
                 }.onFailure { t ->
                     logFailure("deck_wizard_profile_load_failed", t)
                     _uiState.update { it.copy(isLoadingProfile = false) }
@@ -613,6 +624,7 @@ class DeckWizardViewModel(
         commanderStrategyJob?.cancel()
         planAnalysisJob?.cancel()
         planSectionsSearchJob?.cancel()
+        comboSeedResolveJob?.cancel()
     }
 
     // ── COMMANDER_PICK ────────────────────────────────────────────────────────
@@ -1193,10 +1205,16 @@ class DeckWizardViewModel(
         val state = _uiState.value
         val tagFilter = state.planSectionsTagFilter
         val structuredQuery = state.planSectionsStructuredQuery
-        val matches = state.ownedCards.filter { card ->
-            StructuredCardSearch.matchesForCategoryBrowse(card, structuredQuery, tagFilter) &&
-                (state.planSectionsQuery.isBlank() || card.name.contains(state.planSectionsQuery, ignoreCase = true))
-        }
+        val matches = state.ownedCards
+            .filter { card ->
+                StructuredCardSearch.matchesForCategoryBrowse(card, structuredQuery, tagFilter) &&
+                    (state.planSectionsQuery.isBlank() || card.name.contains(state.planSectionsQuery, ignoreCase = true))
+            }
+            // Gate 5 audit (edge-case P1): one PRINTING per name, mirroring seedPickLocalCandidates
+            // (DeckWizardSixtySteps.kt) -- two different printings of the same card name must never
+            // both appear here, or onAddSeed's own per-name copy cap (below) becomes bypassable by
+            // adding "the same card" via its second printing.
+            .distinctBy { it.name }
         _uiState.update { it.copy(planSectionsCollectionResults = matches) }
     }
 
@@ -1303,9 +1321,26 @@ class DeckWizardViewModel(
                 return
             }
         }
-        val existing = state.seeds.firstOrNull { it.card.scryfallId == card.scryfallId }
+        // Gate 5 audit (edge-case P1): a non-basic card is keyed by NAME here, not scryfallId --
+        // two different printings of the same card must collapse into ONE seed entry (mirrors the
+        // Commander branch's own isDuplicateByName rule above), or the per-name copy cap below is
+        // trivially bypassable by adding a second printing of a card already at its cap. Basics are
+        // exempt (same precedent as the Commander branch): CopyPolicy.maxSeedCopies is unlimited for
+        // them anyway, so keying by scryfallId there is harmless and preserves any existing
+        // multi-printing-basics behavior.
+        val isBasic = BasicLandCalculator.isBasicLand(card)
+        val existing = if (isBasic) {
+            state.seeds.firstOrNull { it.card.scryfallId == card.scryfallId }
+        } else {
+            state.seeds.firstOrNull { it.card.name.equals(card.name, ignoreCase = false) }
+        }
+        val existingCopiesByName = if (isBasic) {
+            existing?.quantity ?: 0
+        } else {
+            state.seeds.filter { it.card.name.equals(card.name, ignoreCase = false) }.sumOf { it.quantity }
+        }
         val maxCopies = CopyPolicy.maxSeedCopies(card, format)
-        if (existing != null && existing.quantity >= maxCopies) {
+        if (existingCopiesByName >= maxCopies) {
             crashReporter.log("deck_wizard_seed_copy_cap_reached")
             viewModelScope.launch {
                 _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_seed_copy_cap, maxCopies)))
@@ -1320,7 +1355,10 @@ class DeckWizardViewModel(
             return
         }
         val updatedSeeds = if (existing != null) {
-            state.seeds.map { seed -> if (seed.card.scryfallId == card.scryfallId) seed.copy(quantity = seed.quantity + 1) else seed }
+            // Increments the EXISTING entry's own printing (e.g. printing A already seeded), never
+            // the newly-tapped [card] (printing B) -- a second WizardSeed for the same name must
+            // never be created.
+            state.seeds.map { seed -> if (seed.card.scryfallId == existing.card.scryfallId) seed.copy(quantity = seed.quantity + 1) else seed }
         } else {
             state.seeds + WizardSeed(card, 1)
         }

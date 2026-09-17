@@ -29,7 +29,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -190,7 +193,17 @@ internal fun ColorToggleChip(
             content = content,
         )
     } else {
-        Surface(onClick = onClick, shape = shape, color = background, border = border, modifier = sizeModifier, content = content)
+        Surface(
+            onClick = onClick,
+            shape = shape,
+            color = background,
+            border = border,
+            // Gate 5 audit (design P2c): TalkBack never announced picked/unpicked on this chip --
+            // Role.Checkbox + the `selected` semantics property give it the same
+            // announcement CardDetailSheet's own toggle affordances already have.
+            modifier = sizeModifier.semantics { this.selected = selected; role = Role.Checkbox },
+            content = content,
+        )
     }
 }
 

@@ -39,6 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.AdvancedSearchQuery
@@ -197,12 +199,15 @@ internal fun SeedPickStepContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                 ) {
+                    val seedSearchPlaceholder = stringResource(R.string.card_queue_search_placeholder)
                     OutlinedTextField(
                         value = uiState.seedPickQuery,
                         onValueChange = onQueryChange,
-                        modifier = Modifier.weight(1f),
+                        // Gate 5 audit (design P2a): placeholder text alone isn't exposed as a field
+                        // name to TalkBack -- give it one directly, mirroring DeckCardQueueSheet.kt.
+                        modifier = Modifier.weight(1f).semantics { contentDescription = seedSearchPlaceholder },
                         singleLine = true,
-                        placeholder = { Text(stringResource(R.string.card_queue_search_placeholder), style = ty.bodyMedium, color = mc.textDisabled) },
+                        placeholder = { Text(seedSearchPlaceholder, style = ty.bodyMedium, color = mc.textDisabled) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary) },
                         shape = CardShape,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -290,11 +295,15 @@ internal fun SeedPickStepContent(
         }
 
         if (uiState.seedCopies > 0) {
+            // Gate 5 audit (design P1): the visible "N cards added" text alone doesn't tell TalkBack
+            // that tapping this pill opens the seed queue list.
+            val pillDescription = stringResource(R.string.deck_wizard_seeds_added_pill_a11y, uiState.seedCopies)
             Surface(
                 onClick = onToggleSeedQueue,
                 shape = ChipShape,
                 color = mc.primaryAccent.copy(alpha = 0.14f),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.xs).heightIn(min = 48.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.xs).heightIn(min = 48.dp)
+                    .semantics { contentDescription = pillDescription },
             ) {
                 Box(Modifier.fillMaxWidth().padding(spacing.sm), contentAlignment = Alignment.Center) {
                     Text(
@@ -563,12 +572,15 @@ internal fun StrategyPickStepContent(
                     }
                 }
                 item(key = "search") {
+                    val strategySearchPlaceholder = stringResource(R.string.deck_wizard_strategy_search_hint)
                     OutlinedTextField(
                         value = uiState.strategyPickQuery,
                         onValueChange = onQueryChange,
-                        modifier = Modifier.fillMaxWidth(),
+                        // Gate 5 audit (design P2a): placeholder text alone isn't exposed as a field
+                        // name to TalkBack -- give it one directly, mirroring DeckCardQueueSheet.kt.
+                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = strategySearchPlaceholder },
                         singleLine = true,
-                        placeholder = { Text(stringResource(R.string.deck_wizard_strategy_search_hint), style = ty.bodyMedium, color = mc.textDisabled) },
+                        placeholder = { Text(strategySearchPlaceholder, style = ty.bodyMedium, color = mc.textDisabled) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary) },
                         shape = CardShape,
                         colors = OutlinedTextFieldDefaults.colors(

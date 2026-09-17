@@ -296,8 +296,7 @@ private fun DeckWizardTopBar(uiState: DeckWizardUiState, onBack: () -> Unit) {
     }
 }
 
-/** A lightweight "Step N of M" segmented progress bar (design spec: 4-segment `WizardStepIndicator`,
- * shown only for steps 1-4 — Generating/Result replace the whole body). */
+/** A lightweight "Step N of M" segmented progress bar -- segment count varies by anchor/entry flow (S20: Commander 4, Cards 5, Colors/Strategy 4 each, see [stepPhasesFor]), shown only while a real step is on screen (GENERATING/CHOICE replace the whole body instead). */
 @Composable
 private fun WizardStepIndicator(stepIndex: Int, stepCount: Int, modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
@@ -430,9 +429,12 @@ private fun ReviewStepContent(
             Surface(shape = SmallCardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(spacing.lg), verticalArrangement = Arrangement.spacedBy(spacing.md)) {
                     ReviewRow(stringResource(R.string.deck_wizard_review_format), uiState.selectedFormat?.displayName ?: "—")
+                    // Gate 5 audit (edge-case P2): engineIdentity (colorIdentity minus the UI-only
+                    // ManaColor.C sentinel), same as STRATEGY_PICK's own combo commit -- a {C} pick
+                    // renders empty here, which ReviewColorsRow already reads as "Colorless".
                     ReviewColorsRow(
                         label = stringResource(R.string.deck_wizard_review_colors),
-                        colors = uiState.colorIdentity,
+                        colors = uiState.engineIdentity,
                     )
                 }
             }
