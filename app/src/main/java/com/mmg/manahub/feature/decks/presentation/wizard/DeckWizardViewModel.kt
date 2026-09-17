@@ -8,9 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.common.CrashReporter
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.domain.repository.CardSlotWrite
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
@@ -45,31 +43,25 @@ import com.mmg.manahub.feature.decks.domain.engine.PostureId
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.StrategyPick
-import com.mmg.manahub.feature.decks.domain.engine.StrategyProfile
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 import com.mmg.manahub.feature.decks.domain.engine.WizardPreferenceStore
 import com.mmg.manahub.feature.decks.domain.engine.isLegalForFormat
 import com.mmg.manahub.feature.decks.domain.engine.nearestFor
 import com.mmg.manahub.feature.decks.domain.engine.toPin
-import com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase
-import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
+import com.mmg.manahub.feature.decks.domain.template.BuildWizardDeckUseCase
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfile
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
 import com.mmg.manahub.feature.decks.domain.template.CollectionTribeSignal
 import com.mmg.manahub.feature.decks.domain.template.CommanderDraftBuild
-import com.mmg.manahub.feature.decks.domain.template.DeckWizardSpec
 import com.mmg.manahub.feature.decks.domain.template.ManualAdd
 import com.mmg.manahub.feature.decks.domain.template.OwnedCard
-import com.mmg.manahub.feature.decks.domain.template.TemplateBuildProgress
-import com.mmg.manahub.feature.decks.domain.template.TemplateBuildResult
-import com.mmg.manahub.feature.decks.domain.template.TemplateCardSuggestion
 import com.mmg.manahub.feature.decks.domain.template.WizardBuildResult
+import com.mmg.manahub.feature.decks.domain.template.WizardDraftBuild
 import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
-import com.mmg.manahub.feature.decks.domain.usecase.RankOwnedCardsForProfileUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.RecommendWizardStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.StrategyRecommendation
-import com.mmg.manahub.feature.decks.domain.usecase.SuggestStrategiesForSeedsUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -303,10 +295,13 @@ data class DeckWizardUiState(
     /** The engine's pre-land, pre-persist draft — held in memory only while [WizardPhase.CHOICE] is
      * showing (never persisted, never surviving process death by design). `null` outside that phase. */
     val commanderDraftBuild: CommanderDraftBuild? = null,
-    /** Per-role selections made so far on the Choice screen: [RoleKey] -> the user's FINAL chosen
-     * ids for that role (tentative ∪ alternatives). A role ABSENT from this map has not been touched
-     * by the user -- the UI still displays its tentative defaults as pre-selected. */
-    val choiceSelections: Map<RoleKey, List<String>> = emptyMap(),
+    /** Per-role selections made so far on the Choice screen: [RoleKey] -> id -> selected COPY count
+     * (Deck Wizard 60-card wave v6, plan §5 Phase 5.4, S6: a 60-card row can hold more than one
+     * copy of the same id, unlike Commander's always-1 world). A role ABSENT from this map has not
+     * been touched by the user -- the UI still displays its tentative defaults (see
+     * [tentativeCopies]) as pre-selected. An id present with a count of 0 never happens by
+     * construction -- [DeckWizardViewModel.onChangeChoiceQuantity] drops the key entirely instead. */
+    val choiceSelections: Map<RoleKey, Map<String, Int>> = emptyMap(),
 ) {
     /** Casual + 3-or-more colors: a non-blocking hint, never a hard gate (D9). */
     val showColorDisciplineHint: Boolean
@@ -372,55 +367,53 @@ private fun DeckWizardUiState.resetDirectionScratchState(): DeckWizardUiState = 
 )
 
 /**
- * Deck Builder v2 (`docs/plans/deck-builder-v2-plan.md` §3.4) — drives the wizard spec through
- * [BuildDeckFromTemplateUseCase] and writes the result into a FRESH deck this ViewModel creates
- * itself (unlike [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel], which may open
- * an EXISTING deck — the wizard's whole purpose is a single guided build, so it always starts a new
- * draft and hands off to Deck Studio only once the build succeeds).
- *
- * The deck is created lazily, on [onGenerate] — NOT on init — so backing out of the wizard before
- * generating never orphans a draft (no discard-if-empty machinery needed here, unlike Deck Studio).
+ * Deck Builder v2 (`docs/plans/deck-builder-v2-plan.md` §3.4); generalized to every format by the
+ * Deck Wizard 60-card wave (v6, plan §5 Phase 5.4, S14) — drives the wizard spec through
+ * [BuildWizardDeckUseCase]. A Commander build creates a FRESH deck lazily, on [onGenerate] — NOT
+ * on init — so backing out of the wizard before generating never orphans a draft (no
+ * discard-if-empty machinery needed here, unlike Deck Studio). A 60-card build NEVER creates a
+ * deck: it always writes into the caller's own [launchedFromDeckId] (Deck Studio's own "Build from
+ * seed"/"Rebuild with the Wizard", R13/S15 — both always launch with a real `deckId`), and hands
+ * off to Deck Studio only once the build succeeds.
  */
 class DeckWizardViewModel(
     private val deckRepository: DeckRepository,
     private val userCardRepository: UserCardRepository,
     private val collectionProfileUseCase: CollectionProfileUseCase,
-    private val buildDeckFromTemplateUseCase: BuildDeckFromTemplateUseCase,
     private val searchCardsUseCase: SearchCardsUseCase,
+    // Deck Wizard Commander v3 plan, Phase 4.1 -- the STRATEGY step's edhrec-theme fetch for a
+    // Commander anchor ONLY (the 60-card anchors never carry EDHREC data, see
+    // recommendCommanderStrategies' own KDoc). Deck Wizard 60-card wave v6 (plan §5 Phase 5.4):
+    // verified this remains its ONLY production consumer before keeping it.
     private val communityAggregateRepository: CommunityAggregateRepository,
     private val crashReporter: CrashReporter,
     private val appContext: Context,
     savedStateHandle: SavedStateHandle,
-    // Deck Engine Unification plan (§5 Phase 3) — appended last so no existing positional-arg-free
-    // call site needs to change. Deck Wizard 60-card wave v6 (plan §5 Phase 5.4, run C): these two
-    // pure use cases lose their last production call site in this run (5.1/5.2) -- kept as
-    // constructor params (Koin binding removal is run C's own scope) but genuinely unused by this
-    // class's body from here on.
-    private val suggestStrategiesForSeedsUseCase: SuggestStrategiesForSeedsUseCase = SuggestStrategiesForSeedsUseCase(),
-    private val rankOwnedCardsForProfileUseCase: RankOwnedCardsForProfileUseCase = RankOwnedCardsForProfileUseCase(),
-    private val userPreferences: UserPreferencesDataStore? = null,
     // Deck Wizard & Engine Rework plan, Workstream 2 — the STRATEGY step's source 1
     // (`card_strategy_tags` payload). Required (like every other repository above), appended last
     // for the same positional-arg-free-call-site reason as the pure use cases below.
     private val cardStrategyTagsRepository: CardStrategyTagsRepository,
     // Deck Wizard Commander v3 plan, Phase 4.1 -- replaces the retired DeriveCommanderStrategiesUseCase.
-    // Deck Wizard 60-card wave v6 (plan §5 Phase 2.1): this is `RecommendWizardStrategiesUseCase`
-    // under its kept typealias -- the SAME instance now also scores every 60-card anchor.
-    private val recommendCommanderStrategiesUseCase: RecommendCommanderStrategiesUseCase = RecommendCommanderStrategiesUseCase(),
+    // Deck Wizard 60-card wave v6 (plan §5 Phase 2.1): the SAME instance now also scores every
+    // 60-card anchor; typed by its real concrete name since run C (plan §5 Phase 5.4, per memory
+    // `feedback_koin_single_concrete_type_mismatch` -- a Koin consumer's param type must be the
+    // exact concrete name a bare `single { }` registers under).
+    private val recommendCommanderStrategiesUseCase: RecommendWizardStrategiesUseCase = RecommendWizardStrategiesUseCase(),
     // Deck Wizard Commander v3 plan, Phase 5 (D2) -- the SINGLE analysis entry point PLAN_SECTIONS
     // scores against; the SAME shared singleton DeckDoctorOrchestrator/the harness use (never a
     // second instance). Required (no default, like every other repository param above): it has its
     // own non-trivial dependency graph (EvaluateDeckUseCase/InferDeckIdentityUseCase), so there is
     // no cheap fake default the way the pure use cases above get one.
     private val deckAnalysisPipeline: DeckAnalysisPipeline,
-    // Deck Wizard Commander v3 plan, Phase 6 -- the headline gap this run closes: onGenerate now
-    // dispatches Commander/Commander Casual specs here instead of BuildDeckFromTemplateUseCase.
-    // Defaulted from the two deps already required above so no pre-existing test construction site
-    // needs to change unless it wants to inject a fake/spy.
-    private val buildCommanderDeckUseCase: BuildCommanderDeckUseCase = BuildCommanderDeckUseCase(deckAnalysisPipeline, crashReporter),
-    // Deck Wizard v4, W0.2 (G10/E10) -- lets generateCommanderDeck pre-warm real, cached basic-land
+    // Deck Wizard Commander v3 plan, Phase 6; generalized to every format by the 60-card wave (v6,
+    // plan §5 Phase 5.4) -- onGenerate's ONE build path now, replacing the deleted
+    // BuildDeckFromTemplateUseCase/generateCasualDeck entirely. Defaulted from the two deps already
+    // required above so no pre-existing test construction site needs to change unless it wants to
+    // inject a fake/spy.
+    private val buildWizardDeckUseCase: BuildWizardDeckUseCase = BuildWizardDeckUseCase(deckAnalysisPipeline, crashReporter),
+    // Deck Wizard v4, W0.2 (G10/E10) -- lets generateWizardDeck pre-warm real, cached basic-land
     // Card objects the same way DeckStudioViewModel.applyLandSuggestions already does, so
-    // BuildCommanderDeckUseCase.materializeBasics never silently drops a colour the user's real
+    // BuildWizardDeckUseCase.materializeBasics never silently drops a colour the user's real
     // collection happens to own zero copies of. Appended last, required (no default: CardRepository
     // has no cheap fake, matches every other repository param above).
     private val cardRepository: CardRepository,
@@ -459,27 +452,28 @@ class DeckWizardViewModel(
      * clean up a partial build instead of orphaning an empty draft. */
     private var pendingDeckId: String? = null
 
-    /** Deck Wizard Commander v3 plan (Phase 6, D12): the deckId nav arg (Screen.DeckWizard
-     * .createRoute) when the wizard was launched from an existing Deck Studio draft (Studio's
-     * "Rebuild with the Wizard" CTA). Consumed by [generateCommanderDeck] (fills THIS deck instead
-     * of creating a new one). Read once, at init. */
+    /** Deck Wizard Commander v3 plan (Phase 6, D12); every 60-card build ALSO relies on this since
+     * the wave-v6 generalization (R13/S14): the deckId nav arg (Screen.DeckWizard.createRoute) when
+     * the wizard was launched from an existing Deck Studio draft (Studio's "Build from seed"/
+     * "Rebuild with the Wizard" CTAs). Consumed by [generateWizardDeck] (fills THIS deck instead of
+     * creating a new one -- the ONLY path for a 60-card anchor). Read once, at init. */
     private var launchedFromDeckId: String? = null
 
     /** Deck Wizard v4 (R15) structural guard: the `replaceConfirmed` nav arg (Screen.DeckWizard
      * .createRoute) -- true only when the caller already showed a replace-confirmation dialog for
      * [launchedFromDeckId] (Deck Studio's "Rebuild with the Wizard" confirm path). Read once, at
      * init; re-checked against the deck's REAL card count at persist time in
-     * [generateCommanderDeck], not trusted as a launch-time snapshot, since the deck can gain cards
+     * [generateWizardDeck], not trusted as a launch-time snapshot, since the deck can gain cards
      * while the wizard is open. */
     private var replaceConfirmed: Boolean = false
 
     /** Edge-case fix (Phase 6 adversarial pass), kept as defense-in-depth after Phase 8 JOB 2 made
-     * `buildCommanderDeckUseCase.persist` a single Room `@Transaction`
+     * `buildWizardDeckUseCase.persist` a single Room `@Transaction`
      * ([com.mmg.manahub.core.data.local.dao.DeckDao.persistWizardBuild]): true while that write
      * is in flight. */
     private var isWritingCommanderDeck = false
 
-    /** W7 Fix 2: the exact args of the last [finalizeCommanderDraft] attempt, so
+    /** W7 Fix 2: the exact args of the last [finalizeWizardDraft] attempt, so
      * [onRetryGeneration] can re-run the SAME finalize/persist call after a failure instead of
      * sending the user back to REVIEW. */
     private var pendingFinalize: PendingFinalize? = null
@@ -490,13 +484,14 @@ class DeckWizardViewModel(
     private val autoFilledChoiceRoles = mutableSetOf<RoleKey>()
 
     /** W8 (telemetry, `deck_wizard_generate_duration_ms_bucket`) -- wall-clock from
-     * [generateCommanderDeck]'s entry to [finalizeCommanderDraft]'s successful persist. */
+     * [generateWizardDeck]'s entry to [finalizeWizardDraft]'s successful persist. */
     private var commanderGenerationStartAtMs: Long? = null
 
     private data class PendingFinalize(
         val state: DeckWizardUiState,
         val format: DeckFormat,
-        val commander: Card,
+        // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4: null for every 60-card anchor.
+        val commander: Card?,
         val strategyPick: StrategyPick,
         val manualAdds: List<ManualAdd>,
         val draft: CommanderDraftBuild,
@@ -1158,7 +1153,14 @@ class DeckWizardViewModel(
             }.onFailure { t -> logFailure("deck_wizard_plan_analysis_failed", t) }.getOrNull()
             val excludeIds = (listOfNotNull(commander?.scryfallId) + state.seeds.map { it.card.scryfallId }).toSet()
             val availability = analysis?.let {
-                computeOwnedAvailabilityBySection(it.pillars.flatMap { pillar -> pillar.sections }, cardSnapshot, excludeIds, state.engineIdentity, format)
+                computeOwnedAvailabilityBySection(
+                    sections = it.pillars.flatMap { pillar -> pillar.sections },
+                    ownedCards = cardSnapshot,
+                    excludeIds = excludeIds,
+                    identity = commander?.colorIdentity?.toManaColorSet() ?: state.engineIdentity,
+                    format = format,
+                    ownedQuantityByName = state.ownedQuantityByName,
+                )
             }.orEmpty()
             _uiState.update { it.copy(planAnalysis = analysis, isAnalyzingPlan = false, ownedAvailabilityBySection = availability) }
         }
@@ -1487,27 +1489,23 @@ class DeckWizardViewModel(
                 buildError = null,
             )
         }
-        // Deck Wizard Commander v3 plan, Phase 6 -- the headline wire: a Commander-shaped format
-        // (D1/D2) now builds through BuildCommanderDeckUseCase (the v3 placement engine, Phase 2)
-        // instead of the legacy BuildDeckFromTemplateUseCase/Motor A pipeline below, which stays the
-        // ONLY build path for the other 60-card formats until run C (plan §5 Phase 5.4) wires
-        // BuildWizardDeckUseCase's Sixty anchor into `onGenerate` for every format.
-        generateJob = viewModelScope.launch {
-            if (format.isCommanderFormat) {
-                generateCommanderDeck(state, format)
-            } else {
-                generateCasualDeck(state, format)
-            }
-        }
+        // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4: ONE build path for every format now --
+        // generateCasualDeck/BuildDeckFromTemplateUseCase are gone; the Sixty-anchor branch that
+        // used to fork here is what generateWizardDeck's own anchor resolution replaces.
+        generateJob = viewModelScope.launch { generateWizardDeck(state, format) }
     }
 
-    /** The Commander/Commander Casual build path (Deck Wizard Commander v3 plan, Phase 6; split into
-     * a build-then-finalize pair in W7 Task B). Runs [buildCommanderDeckUseCase]'s placement loop
-     * only -- a build with at least one ambiguity group hands the in-memory draft to
-     * [WizardPhase.CHOICE] instead of finalizing immediately (R10); a zero-group build calls
-     * [finalizeCommanderDraft] straight away.
+    /** Deck Wizard 60-card wave (v6), plan §5 Phase 5.4: the ONE build path for every format
+     * (generalizes the pre-v6 Commander-only `generateCommanderDeck`) -- runs
+     * [buildWizardDeckUseCase]'s placement loop only; a build with at least one ambiguity group OR
+     * a fallback placement hands the in-memory draft to [WizardPhase.CHOICE] instead of finalizing
+     * immediately (R10/v5 D4), a clean build calls [finalizeWizardDraft] straight away. The anchor
+     * is [BuildAnchor.Commander] for a Commander-shaped [format] (the ONLY case with a non-null
+     * [DeckWizardUiState.selectedCommander]) or [BuildAnchor.Sixty] otherwise (identity = the
+     * picked colors, `{}` for a colorless build; seeds = every current [DeckWizardUiState.seeds]
+     * card).
      */
-    private suspend fun generateCommanderDeck(state: DeckWizardUiState, format: DeckFormat) {
+    private suspend fun generateWizardDeck(state: DeckWizardUiState, format: DeckFormat) {
         val crashlytics = FirebaseCrashlytics.getInstance()
         crashlytics.log("deck_wizard_generate_started")
         crashlytics.setCustomKey("deck_wizard_format", format.name)
@@ -1519,13 +1517,18 @@ class DeckWizardViewModel(
         autoFilledChoiceRoles.clear()
 
         val commander = state.selectedCommander
-        if (commander == null) {
+        if (format.isCommanderFormat && commander == null) {
             crashlytics.log("deck_wizard_generate_failed_no_commander")
-            crashReporter.recordException(IllegalStateException("[DeckWizardViewModel] generateCommanderDeck reached REVIEW with no selectedCommander"))
+            crashReporter.recordException(IllegalStateException("[DeckWizardViewModel] generateWizardDeck reached REVIEW with no selectedCommander"))
             _uiState.update { it.copy(buildError = appContext.getString(R.string.deck_wizard_build_error)) }
             return
         }
-        val identity = commander.colorIdentity.toManaColorSet()
+        val identity = commander?.colorIdentity?.toManaColorSet() ?: state.engineIdentity
+        val anchor: BuildAnchor = if (commander != null) {
+            BuildAnchor.Commander(commander)
+        } else {
+            BuildAnchor.Sixty(identity, state.seeds.map { it.card })
+        }
         val strategyPick = resolveStrategyPick(state)
 
         var ownedCollection = collectionSnapshot
@@ -1535,11 +1538,10 @@ class DeckWizardViewModel(
         val manualAdds = resolveManualAdds(state)
 
         val draft = runCatching {
-            buildCommanderDeckUseCase.buildWithGroups(
+            buildWizardDeckUseCase.buildWithGroups(
                 format = format,
-                commander = commander,
+                anchor = anchor,
                 strategyPick = strategyPick,
-                identity = identity,
                 ownedCollection = ownedCollection,
                 manualAdds = manualAdds,
                 includeNonBasicLands = state.includeNonBasicLands,
@@ -1564,7 +1566,7 @@ class DeckWizardViewModel(
         val hasFallback = draft.fallbackStandaloneIds.isNotEmpty() || draft.fallbackOffPlanIds.isNotEmpty()
         if (draft.ambiguityGroups.isEmpty() && !hasFallback) {
             pendingFinalize = PendingFinalize(state, format, commander, strategyPick, manualAdds, draft, resolutions = emptyMap())
-            finalizeCommanderDraft(state, format, commander, strategyPick, manualAdds, draft, resolutions = emptyMap())
+            finalizeWizardDraft(state, format, commander, strategyPick, manualAdds, draft, resolutions = emptyMap())
         } else {
             crashlytics.log("deck_wizard_choice_shown")
             crashlytics.setCustomKey("deck_wizard_choice_group_count_bucket", countBucket(draft.ambiguityGroups.size))
@@ -1583,7 +1585,7 @@ class DeckWizardViewModel(
     }
 
     /** D4/D6: re-resolves the [StrategyPick] the build engine wants from the STRATEGY step's
-     * persisted pin fields -- shared by [generateCommanderDeck] and [onFinishChoices] so both read
+     * persisted pin fields -- shared by [generateWizardDeck] and [onFinishChoices] so both read
      * the SAME strategy a Choice-screen build was actually run against. */
     private fun resolveStrategyPick(state: DeckWizardUiState): StrategyPick =
         state.selectedCuratedStrategyId
@@ -1591,29 +1593,36 @@ class DeckWizardViewModel(
             ?.let { strategy -> StrategyPick.Curated(strategy, state.selectedTribeKey) }
             ?: StrategyPick.Custom
 
-    /** Shared by [generateCommanderDeck] and [onFinishChoices]. */
+    /** Shared by [generateWizardDeck] and [onFinishChoices]. */
     private fun resolveManualAdds(state: DeckWizardUiState): List<ManualAdd> =
         state.seeds.map { seed ->
             ManualAdd(card = seed.card, isOwned = cardSnapshot.any { it.scryfallId == seed.card.scryfallId }, quantity = seed.quantity)
         }
 
     /**
-     * W7 Task B (E11) — completes and persists a [CommanderDraftBuild] exactly ONCE: applies
-     * [resolutions], runs land fill/verify/refine, then writes atomically into [launchedFromDeckId]
-     * when the wizard was launched from an existing draft, or a freshly created deck otherwise (D12).
+     * W7 Task B (E11); generalized to every anchor by Deck Wizard 60-card wave (v6, plan §5 Phase
+     * 5.4) — completes and persists a [WizardDraftBuild] exactly ONCE: applies [resolutions], runs
+     * land fill/verify/refine, then writes atomically into [launchedFromDeckId] when the wizard was
+     * launched from an existing draft, or a freshly created deck otherwise (D12).
+     *
+     * [commander] is `null` for every 60-card anchor (S14/R13): 60-card NEVER writes
+     * `commanderCardId`/`coverCardId` and NEVER creates a fresh deck -- [launchedFromDeckId] is
+     * ALWAYS present for a 60-card build (Studio's own "Build from seed"/"Rebuild with the Wizard"
+     * both always pass a real `deckId`, S15) — the `?: run { createDeck() }` branch below stays
+     * reachable ONLY for Commander, exactly as before this generalization.
      */
-    private suspend fun finalizeCommanderDraft(
+    private suspend fun finalizeWizardDraft(
         state: DeckWizardUiState,
         format: DeckFormat,
-        commander: Card,
+        commander: Card?,
         strategyPick: StrategyPick,
         manualAdds: List<ManualAdd>,
-        draft: CommanderDraftBuild,
+        draft: WizardDraftBuild,
         resolutions: Map<RoleKey, List<String>>,
     ) {
         val crashlytics = FirebaseCrashlytics.getInstance()
         val outcome = runCatching {
-            buildCommanderDeckUseCase.finalize(
+            buildWizardDeckUseCase.finalize(
                 draft = draft,
                 resolutions = resolutions,
                 fillLands = true,
@@ -1655,16 +1664,25 @@ class DeckWizardViewModel(
 
         isWritingCommanderDeck = true
         val writeOutcome = runCatching {
-            val deckId = launchedFromDeckId ?: run {
-                val newId = deckRepository.createDeck(name = commander.name, description = "Draft", format = format.name)
-                pendingDeckId = newId
-                newId
+            val deckId = if (format.isCommanderFormat) {
+                launchedFromDeckId ?: run {
+                    val newId = deckRepository.createDeck(name = commander?.name ?: format.displayName, description = "Draft", format = format.name)
+                    pendingDeckId = newId
+                    newId
+                }
+            } else {
+                // R13/S14: a 60-card build is ALWAYS launched from an existing Studio draft -- never
+                // creates one of its own.
+                checkNotNull(launchedFromDeckId) { "[DeckWizardViewModel] 60-card generation reached finalize with no launchedFromDeckId" }
             }
-            val current = deckRepository.observeDeckWithCards(deckId).first()?.deck
-            if (current != null) {
-                deckRepository.updateDeck(current.copy(commanderCardId = commander.scryfallId, coverCardId = commander.scryfallId))
+            if (format.isCommanderFormat && commander != null) {
+                val current = deckRepository.observeDeckWithCards(deckId).first()?.deck
+                if (current != null) {
+                    deckRepository.updateDeck(current.copy(commanderCardId = commander.scryfallId, coverCardId = commander.scryfallId))
+                }
             }
-            buildCommanderDeckUseCase.persist(deckRepository, deckId, commander, manualIds, outcome)
+            val anchor: BuildAnchor = if (commander != null) BuildAnchor.Commander(commander) else BuildAnchor.Sixty(state.engineIdentity, state.seeds.map { it.card })
+            buildWizardDeckUseCase.persist(deckRepository, deckId, anchor, manualIds, outcome)
             deckId
         }.getOrElse { t ->
             isWritingCommanderDeck = false
@@ -1685,7 +1703,9 @@ class DeckWizardViewModel(
         }
 
         crashlytics.log("deck_wizard_generate_succeeded")
-        crashlytics.setCustomKey("deck_wizard_template_source", "COMMANDER_V3_ENGINE")
+        // Deck Wizard 60-card wave (v6), plan §7: value renamed -- this key now logs for every
+        // format, not just Commander.
+        crashlytics.setCustomKey("deck_wizard_template_source", "WIZARD_V3_ENGINE")
         crashlytics.setCustomKey(
             "deck_wizard_choice_resolution_mode",
             classifyChoiceResolutionMode(draft, resolutions),
@@ -1698,7 +1718,7 @@ class DeckWizardViewModel(
             crashlytics.setCustomKey("deck_wizard_generate_duration_ms_bucket", durationBucket(System.currentTimeMillis() - startedAt))
         }
         commanderGenerationStartAtMs = null
-        logCommanderBuildTelemetry(state, strategyPick, draft.ownedCollection.size, outcome.result)
+        logWizardBuildTelemetry(state, strategyPick, draft.ownedCollection.size, outcome.result, draft)
         _uiState.update {
             it.copy(
                 createdDeckId = writeOutcome,
@@ -1709,60 +1729,95 @@ class DeckWizardViewModel(
         _events.send(DeckWizardEvent.OpenDeckStudio(writeOutcome))
     }
 
-    // ── Choice (W7 Task B, R10) ──────────────────────────────────────────────────
+    // ── Choice (W7 Task B, R10; quantity-aware since Deck Wizard 60-card wave v6, plan §5 Phase 5.4, S6) ──
 
-    /** Toggles [cardId] in [role]'s selection, respecting the ambiguity group's remaining slots as a
-     * hard cap. */
-    fun onToggleChoiceCard(role: RoleKey, cardId: String) {
+    /**
+     * Changes [cardId]'s selected COPY count within [role] by [delta] (a UI row calls this once per
+     * tap -- Commander's boolean row derives the sign from its own current selection, a 60-card
+     * row's +/- stepper passes it directly, see `DeckWizardChoiceStep.kt`'s own row wiring).
+     * Adding is blocked (existing cap toast) when the section's total selected copies would reach
+     * [AmbiguityGroup.remainingSlots], OR [cardId]'s own remaining headroom
+     * ([WizardDraftBuild.candidateMaxCopies] plus however many of its OWN tentative copies it may
+     * always keep, per that field's own KDoc) is exhausted. Removing decrements; the id drops out
+     * of the map entirely at 0 (never a stray zero entry -- keeps `Map.values.sum()` the single
+     * source of truth for "copies selected so far").
+     */
+    fun onChangeChoiceQuantity(role: RoleKey, cardId: String, delta: Int) {
         val state = _uiState.value
         val draft = state.commanderDraftBuild ?: return
         val group = draft.ambiguityGroups.firstOrNull { it.sectionId == role } ?: return
-        val tentative = draft.tentativeByRole[role].orEmpty()
+        val tentative = draft.tentativeCopies(role)
         val current = state.choiceSelections[role] ?: tentative
-        val isAdding = cardId !in current
-        if (isAdding && current.size >= group.remainingSlots) {
-            viewModelScope.launch {
-                _events.send(
-                    DeckWizardEvent.ShowToast(
-                        appContext.getString(R.string.deck_wizard_choice_cap_reached, group.remainingSlots),
-                        MagicToastType.INFO,
-                    )
-                )
+        val currentForId = current[cardId] ?: 0
+        when {
+            delta > 0 -> {
+                val cap = (draft.candidateMaxCopies[cardId] ?: 0) + (tentative[cardId] ?: 0)
+                if (current.values.sum() >= group.remainingSlots || currentForId >= cap) {
+                    viewModelScope.launch {
+                        _events.send(
+                            DeckWizardEvent.ShowToast(
+                                appContext.getString(R.string.deck_wizard_choice_cap_reached, group.remainingSlots),
+                                MagicToastType.INFO,
+                            )
+                        )
+                    }
+                    return // cap reached -- ignore the tap
+                }
+                manuallyToggledChoiceRoles += role
+                _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to (current + (cardId to currentForId + 1)))) }
             }
-            return // cap reached -- ignore the tap
+            delta < 0 -> {
+                if (currentForId <= 0) return
+                manuallyToggledChoiceRoles += role
+                val updated = if (currentForId <= 1) current - cardId else current + (cardId to currentForId - 1)
+                _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to updated)) }
+            }
         }
-        val updated = if (isAdding) current + cardId else current - cardId
-        manuallyToggledChoiceRoles += role
-        _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to updated)) }
     }
 
-    /** "Choose the remaining N for me" (per-section) — fills whichever of [role]'s slots the user
-     * has not yet decided with the engine's own tentative defaults. */
+    /** "Choose the remaining N for me" (per-section) — fills whichever of [role]'s remaining COPIES
+     * the user has not yet decided with the engine's own tentative defaults, in tentative order. */
     fun onAutoFillChoiceSection(role: RoleKey) {
         val state = _uiState.value
         val draft = state.commanderDraftBuild ?: return
         val group = draft.ambiguityGroups.firstOrNull { it.sectionId == role } ?: return
-        val tentative = draft.tentativeByRole[role].orEmpty()
-        val current = state.choiceSelections[role] ?: tentative
-        val missing = group.remainingSlots - current.size
+        val tentative = draft.tentativeCopies(role)
+        val current = (state.choiceSelections[role] ?: tentative).toMutableMap()
+        val startTotal = current.values.sum()
+        var missing = group.remainingSlots - startTotal
         if (missing <= 0) return
-        val fill = tentative.filter { it !in current }.take(missing)
-        if (fill.isEmpty()) return
+        for (id in draft.tentativeByRole[role].orEmpty().distinct()) {
+            if (missing <= 0) break
+            val cap = (draft.candidateMaxCopies[id] ?: 0) + (tentative[id] ?: 0)
+            val have = current[id] ?: 0
+            val add = minOf((cap - have).coerceAtLeast(0), missing)
+            if (add > 0) {
+                current[id] = have + add
+                missing -= add
+            }
+        }
+        if (current.values.sum() == startTotal) return
         autoFilledChoiceRoles += role
-        _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to (current + fill))) }
+        _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to current)) }
     }
 
     /** Global "Let the wizard finish" — resolves every section the user has already decided exactly
      * as chosen, and every untouched section with the engine's own tentative defaults, then persists
-     * ONCE via [finalizeCommanderDraft]. */
+     * ONCE via [finalizeWizardDraft]. [commander] is `null` for a 60-card build (finalize's own
+     * contract, see its KDoc). */
     fun onFinishChoices() {
         val state = _uiState.value
         if (state.phase != WizardPhase.CHOICE) return
         val draft = state.commanderDraftBuild ?: return
         val format = state.selectedFormat ?: return
-        val commander = state.selectedCommander ?: return
+        val commander = state.selectedCommander
         val strategyPick = resolveStrategyPick(state)
         val manualAdds = resolveManualAdds(state)
+        // S6/Phase-1 finalize contract: the map expands into ONE id per selected copy (a repeated
+        // id means multiple copies of that same card in the role's swappable slots).
+        val resolutions: Map<RoleKey, List<String>> = state.choiceSelections.mapValues { (_, counts) ->
+            counts.flatMap { (id, count) -> List(count) { id } }
+        }
         _uiState.update {
             it.copy(
                 phase = WizardPhase.GENERATING,
@@ -1771,9 +1826,9 @@ class DeckWizardViewModel(
                 buildError = null,
             )
         }
-        pendingFinalize = PendingFinalize(state, format, commander, strategyPick, manualAdds, draft, resolutions = state.choiceSelections)
+        pendingFinalize = PendingFinalize(state, format, commander, strategyPick, manualAdds, draft, resolutions = resolutions)
         generateJob = viewModelScope.launch {
-            finalizeCommanderDraft(state, format, commander, strategyPick, manualAdds, draft, resolutions = state.choiceSelections)
+            finalizeWizardDraft(state, format, commander, strategyPick, manualAdds, draft, resolutions = resolutions)
         }
     }
 
@@ -1813,13 +1868,15 @@ class DeckWizardViewModel(
         return ownedCollection + fetched
     }
 
-    /** Deck Wizard Commander v3 plan, Phase 7.3 -- self-evaluation telemetry for a completed
-     * Commander build. */
-    private fun logCommanderBuildTelemetry(
+    /** Deck Wizard Commander v3 plan, Phase 7.3; generalized to every anchor by the 60-card wave
+     * (v6, plan §7) -- self-evaluation telemetry for a completed wizard build. [draft] supplies the
+     * fields that are per-BUILD, not per-final-result (anchor kind, resolved identity). */
+    private fun logWizardBuildTelemetry(
         state: DeckWizardUiState,
         strategyPick: StrategyPick,
         poolSize: Int,
         result: WizardBuildResult,
+        draft: WizardDraftBuild,
     ) {
         val crashlytics = FirebaseCrashlytics.getInstance()
         val analysis = result.analysis
@@ -1827,6 +1884,15 @@ class DeckWizardViewModel(
         val weakestPillar = analysis.pillars.filterNot { it.notApplicable }.minByOrNull { it.subscore }?.id ?: PillarId.PLAN_ROLES
         crashlytics.setCustomKey("deck_wizard_weakest_pillar", weakestPillar.name)
         crashlytics.setCustomKey("deck_wizard_gap_count_bucket", countBucket(result.gapSections.size))
+        // Deck Wizard 60-card wave (v6), plan §7 -- new keys, every anchor.
+        crashlytics.setCustomKey(
+            "deck_wizard_anchor",
+            if (draft.anchor is BuildAnchor.Commander) "commander" else state.entryFlow.name.lowercase(),
+        )
+        crashlytics.setCustomKey("deck_wizard_seed_copies_bucket", seedCopiesBucket(state.seedCopies))
+        crashlytics.setCustomKey("deck_wizard_four_of_count_bucket", fourOfCountBucket(result.fillStats.fourOfCount))
+        crashlytics.setCustomKey("deck_wizard_distinct_names_bucket", distinctNamesBucket(result.fillStats.distinctNames))
+        crashlytics.setCustomKey("deck_wizard_colorless_build", draft.identity.isEmpty())
 
         val nonLand = result.entries.filterNot { BasicLandCalculator.isLand(it.card) }
         val wizardPlacedNonLand = nonLand.filterNot { it.card.scryfallId == state.selectedCommander?.scryfallId }
@@ -1915,148 +1981,37 @@ class DeckWizardViewModel(
         else -> "250+"
     }
 
-    /**
-     * The legacy Casual build path (Motor A / [BuildDeckFromTemplateUseCase]) -- kept until run C
-     * (Deck Wizard 60-card wave v6, plan §5 Phase 5.4) unifies generation onto
-     * `BuildWizardDeckUseCase`'s `Sixty` anchor for every non-Commander format. This run (5.1/5.2)
-     * only had to keep it COMPILING against the new unified ENTRY/SEED_PICK/STRATEGY/PLAN_SECTIONS
-     * front end -- several pre-v6 Casual-only state fields it used to read (`fillLands`,
-     * `useCommunityData`, `includeOutsideCollection`, `selectedThemeHint`/`selectedDirectionTheme`,
-     * `buildStage`/`completedStages`, `WizardPhase.RESULT`/`buildResult`) were deleted along with
-     * the Casual-only DIRECTION/IDENTITY/MANUAL_ADDS/RESULT screens they backed (S1's UI
-     * unification) -- this function now reads a literal DEFAULT for each (documented per call site
-     * below) instead, per this run's own "may read defaults, but do NOT add new state for it" scope
-     * rule. The one BEHAVIORAL consequence: Casual's build always fills basic lands now (previously
-     * user-togglable, default was already `true`), never blends in community trends (previously an
-     * opt-in toggle gated by a global flag), and shows a generic "Validating…" spinner instead of a
-     * per-stage checklist during GENERATING (see [DeckWizardUiState.commanderBuildStage]'s own KDoc)
-     * -- all three are restored/superseded once run C deletes this function entirely.
-     */
-    private suspend fun generateCasualDeck(state: DeckWizardUiState, format: DeckFormat) {
-        run {
-            val crashlytics = FirebaseCrashlytics.getInstance()
-            crashlytics.log("deck_wizard_generate_started")
-            crashlytics.setCustomKey("deck_wizard_format", format.name)
-            crashlytics.setCustomKey("deck_wizard_seed_count", state.seeds.size)
-            crashlytics.setCustomKey("deck_wizard_entry_flow", state.entryFlow.name)
-            // deck_wizard_use_community_data literal false -- see this function's own class-level KDoc.
-            crashlytics.setCustomKey("deck_wizard_use_community_data", false)
-
-            // Casual now also visits the SHARED STRATEGY step (S1) -- no more Direction/Identity-
-            // theme split to reconcile, one StrategyProfile shape for every non-Commander anchor.
-            val colorIdentity = state.engineIdentity
-            val strategyProfile = StrategyProfile(
-                archetype = state.selectedArchetype,
-                themes = state.selectedStrategyThemes,
-                tribe = state.selectedTribeKey,
-                colors = colorIdentity,
-            )
-            val spec = DeckWizardSpec(
-                format = format,
-                commander = state.selectedCommander,
-                strategyProfile = strategyProfile,
-                colorIdentity = colorIdentity,
-                seeds = state.seeds.map { it.card },
-                fillLands = true, // literal default -- see this function's own class-level KDoc.
-                useCommunityData = false, // literal default -- see this function's own class-level KDoc.
-                includeOutsideCollection = false, // literal default -- see this function's own class-level KDoc.
-            )
-
-            val outcome: Pair<TemplateBuildResult?, String?> = runCatching {
-                var finalResult: TemplateBuildResult? = null
-                var failure: String? = null
-                buildDeckFromTemplateUseCase(spec, collectionSnapshot).collect { progress ->
-                    when (progress) {
-                        // The pre-v6 per-stage progress checklist read this into buildStage/
-                        // completedStages, both deleted with the Casual-only GENERATING checklist
-                        // UI -- see this function's own class-level KDoc.
-                        is TemplateBuildProgress.Stage -> Unit
-                        is TemplateBuildProgress.Complete -> finalResult = progress.result
-                        is TemplateBuildProgress.Failed -> failure = progress.message
-                    }
-                }
-                finalResult to failure
-            }.getOrElse { t ->
-                if (t is kotlinx.coroutines.CancellationException) throw t
-                logFailure("deck_wizard_generate_crashed", t)
-                null to appContext.getString(R.string.deck_wizard_build_error)
-            }
-
-            val (result, failureMessage) = outcome
-            if (result == null) {
-                crashlytics.log("deck_wizard_generate_failed")
-                _uiState.update { it.copy(buildError = failureMessage ?: appContext.getString(R.string.deck_wizard_build_error)) }
-                return
-            }
-
-            val writeOutcome = runCatching { writeResultIntoNewDeck(spec, result) }
-                .getOrElse { t ->
-                    logFailure("deck_wizard_write_failed", t)
-                    _uiState.update { it.copy(buildError = appContext.getString(R.string.deck_wizard_build_error)) }
-                    return
-                }
-
-            crashlytics.log("deck_wizard_generate_succeeded")
-            crashlytics.setCustomKey("deck_wizard_template_source", result.templateSource.name)
-            // S13: every format opens Deck Studio directly after persist now -- WizardPhase.RESULT
-            // and DeckWizardUiState.buildResult were deleted along with the Result screen (this is a
-            // direct, necessary consequence of 5.1's own WizardPhase.RESULT deletion, not a
-            // Casual-specific decision).
-            _uiState.update { it.copy(createdDeckId = writeOutcome) }
-            _events.send(DeckWizardEvent.OpenDeckStudio(writeOutcome))
-        }
+    /** Deck Wizard 60-card wave (v6), plan §7 -- bucket edges given explicitly by the plan. */
+    private fun seedCopiesBucket(count: Int): String = when {
+        count <= 0 -> "0"
+        count <= 4 -> "1-4"
+        count <= 12 -> "5-12"
+        count <= 24 -> "13-24"
+        else -> "25+"
     }
 
-    /** Creates the fresh deck, writes commander/cover (Commander only) AND the commander's
-     * qty-1 mainboard entry, every [TemplateBuildResult.deckCards] entry, and the archetype/theme/
-     * tribe override + strategy lock. */
-    private suspend fun writeResultIntoNewDeck(spec: DeckWizardSpec, result: TemplateBuildResult): String {
-        val name = wizardDeckName(spec)
-        val deckId = deckRepository.createDeck(name = name, description = "Draft", format = spec.format.name)
-        pendingDeckId = deckId
-
-        val commander = spec.commander
-        if (spec.format.isCommanderFormat && commander != null) {
-            val created = deckRepository.observeDeckWithCards(deckId).first()?.deck
-            if (created != null) {
-                deckRepository.updateDeck(
-                    created.copy(commanderCardId = commander.scryfallId, coverCardId = commander.scryfallId)
-                )
-            }
-        }
-
-        val slots = buildList {
-            if (spec.format.isCommanderFormat && commander != null) {
-                add(CardSlotWrite(commander.scryfallId, 1, false, DeckCardSource.WIZARD))
-            }
-            result.deckCards.forEach { entry ->
-                add(CardSlotWrite(entry.card.scryfallId, entry.quantity, entry.isSideboard, DeckCardSource.WIZARD))
-            }
-        }
-        deckRepository.replaceAllCardsWithSource(deckId, slots)
-        deckRepository.updateArchetypeOverride(deckId, result.archetypeOverride, result.themesOverride)
-        deckRepository.updateTribeOverride(deckId, spec.strategyProfile.tribe)
-        deckRepository.updateStrategyLocked(deckId, true)
-        return deckId
+    /** Deck Wizard 60-card wave (v6), plan §7 -- bucket edges given explicitly by the plan. */
+    private fun fourOfCountBucket(count: Int): String = when {
+        count <= 0 -> "0"
+        count <= 2 -> "1-2"
+        count <= 5 -> "3-5"
+        else -> "6+"
     }
 
-    private fun wizardDeckName(spec: DeckWizardSpec): String {
-        val commander = spec.commander.takeIf { spec.format.isCommanderFormat }
-        val profile = spec.strategyProfile
-        val archetypeName = profile.archetype?.displayName
-        val themeName = profile.themes.firstOrNull()?.displayName
-        return when {
-            commander != null -> commander.name
-            archetypeName != null ->
-                String.format(appContext.getString(R.string.deck_wizard_name_suffix_deck), archetypeName)
-            themeName != null ->
-                String.format(appContext.getString(R.string.deck_wizard_name_suffix_deck), themeName)
-            else -> String.format(appContext.getString(R.string.deck_wizard_name_default), spec.format.displayName)
-        }
+    /** Deck Wizard 60-card wave (v6), plan §7 -- the plan named this key without bucket edges (unlike
+     * [seedCopiesBucket]/[fourOfCountBucket] above); these are a judgment call sized to a real deck's
+     * distinct-name range (60-card ~15-60, Commander ~35-99), not a plan-specified table. */
+    private fun distinctNamesBucket(count: Int): String = when {
+        count < 20 -> "<20"
+        count < 40 -> "20-39"
+        count < 60 -> "40-59"
+        count < 80 -> "60-79"
+        else -> "80+"
     }
 
-    /** Best-effort deletes a dangling partially-created deck (a build that got as far as
-     * [writeResultIntoNewDeck]'s `createDeck()` call but failed/was cancelled before finishing). */
+    /** Best-effort deletes a dangling partially-created deck (a Commander build that got as far as
+     * [finalizeWizardDraft]'s own `createDeck()` call but failed/was cancelled before finishing --
+     * 60-card never creates one, see that function's own KDoc). */
     private fun cleanupPendingDeck() {
         val orphanId = pendingDeckId ?: return
         pendingDeckId = null
@@ -2094,46 +2049,11 @@ class DeckWizardViewModel(
             FirebaseCrashlytics.getInstance().log("deck_wizard_finalize_retry_resumed")
             _uiState.update { it.copy(buildError = null, phase = WizardPhase.GENERATING) }
             generateJob = viewModelScope.launch {
-                finalizeCommanderDraft(retry.state, retry.format, retry.commander, retry.strategyPick, retry.manualAdds, retry.draft, retry.resolutions)
+                finalizeWizardDraft(retry.state, retry.format, retry.commander, retry.strategyPick, retry.manualAdds, retry.draft, retry.resolutions)
             }
             return
         }
         _uiState.update { it.copy(buildError = null, phase = WizardPhase.REVIEW) }
-    }
-
-    // ── Result (dead-code-adjacent -- ResultContent's own screen is gone with WizardPhase.RESULT;
-    //    kept per this run's explicit "generation functions stay until run C" scope) ─────────────
-
-    /** In-flight guard for [onAddCommunitySuggestion] -- a rapid double-tap would otherwise fire
-     * `addCardToDeck` twice before the first call's success removes the row. */
-    private val pendingSuggestionAdds = mutableSetOf<String>()
-
-    /** Writes one community-picked (unowned, D8) suggestion into the created deck. Deck Wizard
-     * 60-card wave (v6): the Result-screen list this used to prune ([DeckWizardUiState.buildResult])
-     * was deleted with [WizardPhase.RESULT] (S13) -- the repository write + toast stay (this
-     * function is otherwise unreachable now that every format opens Deck Studio directly), per this
-     * run's "may read defaults, but do NOT add new state for it" scope rule. */
-    fun onAddCommunitySuggestion(categoryId: String, suggestion: TemplateCardSuggestion) {
-        val deckId = _uiState.value.createdDeckId ?: return
-        val cardId = suggestion.card.scryfallId
-        if (!pendingSuggestionAdds.add(cardId)) return
-        viewModelScope.launch {
-            runCatching {
-                deckRepository.addCardToDeck(deckId, cardId, suggestion.suggestedCopies, false, DeckCardSource.WIZARD)
-            }.onSuccess {
-                _events.send(
-                    DeckWizardEvent.ShowToast(
-                        String.format(appContext.getString(R.string.deck_wizard_suggestion_added), suggestion.card.name)
-                    )
-                )
-            }.onFailure { t -> logFailure("deck_wizard_add_community_suggestion_failed", t) }
-            pendingSuggestionAdds.remove(cardId)
-        }
-    }
-
-    fun onOpenDeckStudio() {
-        val deckId = _uiState.value.createdDeckId ?: return
-        viewModelScope.launch { _events.send(DeckWizardEvent.OpenDeckStudio(deckId)) }
     }
 
     private fun logFailure(tag: String, t: Throwable) {
@@ -2169,7 +2089,7 @@ class DeckWizardViewModel(
 /**
  * Deck Wizard Commander v3 plan (Phase 5, 5.1) — a cheap, self-contained reproduction of "which
  * [CardSection]s would this owned candidate count toward", NOT a re-exposure of
- * [com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase]'s own private
+ * [com.mmg.manahub.feature.decks.domain.template.BuildWizardDeckUseCase]'s own private
  * candidate-pool machinery.
  *
  * [sections] is every [com.mmg.manahub.feature.decks.domain.engine.PillarResult.sections] for the
@@ -2183,6 +2103,11 @@ internal fun computeOwnedAvailabilityBySection(
     excludeIds: Set<String>,
     identity: Set<ManaColor>,
     format: DeckFormat,
+    // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4: owned COPIES per card name -- the count
+    // this hint reports is now "how many copies of this card the build could actually place"
+    // (CopyPolicy.maxPlaceable), not "1 per distinct owned card". `null`/absent name = ownership-
+    // exempt (matches CopyPolicy.maxPlaceable's own `owned: Int?` contract).
+    ownedQuantityByName: Map<String, Int> = emptyMap(),
 ): Map<String, Int> {
     val sectionIds = sections.map { it.id }.toSet()
     val identitySymbols = identity.map { it.symbol }.toSet()
@@ -2216,10 +2141,21 @@ internal fun computeOwnedAvailabilityBySection(
             val fingerprintId = "fingerprint:$key"
             if (fingerprintId in sectionIds) matched += fingerprintId
         }
-        matched.forEach { id -> counts[id] = (counts[id] ?: 0) + 1 }
+        if (matched.isEmpty()) return@forEach
+        val placeable = CopyPolicy.maxPlaceable(card, format, ownedQuantityByName[card.name])
+            .let { if (it == Int.MAX_VALUE) 1 else it } // a basic land's own "unlimited" reads as one real owned copy for this hint
+        matched.forEach { id -> counts[id] = (counts[id] ?: 0) + placeable }
     }
     return counts
 }
 
 private fun List<String>.toManaColorSet(): Set<ManaColor> =
     mapNotNull { symbol -> ManaColor.entries.firstOrNull { it.symbol == symbol } }.toSet()
+
+/** Deck Wizard 60-card wave (v6), plan §5 Phase 5.4 (S6): [role]'s tentative slots as id -> copy
+ * count (a repeated id in [WizardDraftBuild.tentativeByRole] means multiple tentative copies of
+ * that same card -- see that field's own KDoc). This is the Choice screen's "current selection"
+ * baseline before the user touches a section -- shared by [DeckWizardViewModel] (the state
+ * transition logic) and `DeckWizardChoiceStep.kt` (rendering, same package). */
+internal fun WizardDraftBuild.tentativeCopies(role: RoleKey): Map<String, Int> =
+    tentativeByRole[role].orEmpty().groupingBy { it }.eachCount()

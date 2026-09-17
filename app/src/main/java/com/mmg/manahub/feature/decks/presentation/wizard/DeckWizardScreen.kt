@@ -27,9 +27,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -48,32 +45,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
-import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardRow
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
-import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
-import org.jetbrains.compose.resources.painterResource
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -233,9 +223,15 @@ fun DeckWizardScreen(
                             onFilterByTags = viewModel::searchPlanSectionsCollectionByTags,
                             onScryfallSearch = viewModel::searchPlanSectionsScryfall,
                             onAddCard = viewModel::onAddSeed,
-                            onRemoveCard = viewModel::onRemoveSeed,
+                            // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4: onRemoveSeedCopy
+                            // (decrement) replaces onRemoveSeed (full remove) -- equivalent for
+                            // Commander (every seed is always quantity 1, so decrementing IS
+                            // removing there), and the S6-correct "Your cards" row behavior for a
+                            // 60-card multi-copy seed.
+                            onRemoveCard = viewModel::onRemoveSeedCopy,
                             onClearSearchState = viewModel::clearPlanSectionsSearchState,
                             onCardClick = onCardClick,
+                            onShowSeedDetail = viewModel::onShowSeedDetail,
                             onNext = viewModel::onNextFromPlanSections,
                         )
                         WizardPhase.REVIEW -> ReviewStepContent(
@@ -253,10 +249,9 @@ fun DeckWizardScreen(
                         // phase entirely (see WizardPhase.CHOICE's own KDoc).
                         WizardPhase.CHOICE -> ChoiceStepContent(
                             uiState = uiState,
-                            onToggleCard = viewModel::onToggleChoiceCard,
+                            onChangeQuantity = viewModel::onChangeChoiceQuantity,
                             onAutoFillSection = viewModel::onAutoFillChoiceSection,
                             onFinish = viewModel::onFinishChoices,
-                            onCardClick = onCardClick,
                         )
                     }
                 }
@@ -360,6 +355,13 @@ internal fun WizardStickyButton(
 //  Step 4 — Review & Generate
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/**
+ * Deck Wizard 60-card wave (v6), plan §5 Phase 5.4 (S12): Format, Colors, Strategy card, "Your
+ * cards (N)", "Include non-basic lands" (default OFF, every format now), expectation copy + the
+ * owned-copies note -- ONE layout for every anchor. The `fillLands`/"Use community data" toggles
+ * are gone for every format (S2: the engine is collection-only everywhere now, no Scryfall
+ * backstop to blend or skip).
+ */
 @Composable
 private fun ReviewStepContent(
     uiState: DeckWizardUiState,
@@ -400,49 +402,27 @@ private fun ReviewStepContent(
                 }
             }
 
-            // Deck Wizard Commander v3 plan (Phase 6, 6.2): the STRATEGY step's own pick, resolved
-            // to its display name + description (Custom = the same fallback copy the Strategy step
-            // itself shows) -- byte-identical to the pin generateCommanderDeck re-resolves for the
-            // real build (D4), never a re-derivation.
-            if (isCommander) {
-                val strategy = uiState.selectedCuratedStrategyId?.let { CuratedStrategyCatalog.byId(it) }
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                    ReviewSectionLabel(stringResource(R.string.deck_wizard_review_strategy_section))
-                    Surface(shape = SmallCardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(spacing.md)) {
-                            Text(
-                                text = strategy?.displayName ?: stringResource(R.string.deck_wizard_strategy_custom_title),
-                                style = ty.titleMedium,
-                                color = mc.textPrimary,
-                            )
-                            Text(
-                                text = strategy?.description ?: stringResource(R.string.deck_wizard_strategy_custom_description),
-                                style = ty.bodySmall,
-                                color = mc.textSecondary,
-                                modifier = Modifier.padding(top = spacing.xxs),
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (uiState.seeds.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                    ReviewSectionLabel(
-                        if (isCommander) {
-                            stringResource(R.string.deck_wizard_review_manual_adds_count, uiState.seeds.size)
-                        } else {
-                            stringResource(R.string.deck_wizard_review_seeds)
-                        }
-                    )
-                    // A nested-scroll horizontal LazyRow inside the outer verticalScroll Column is
-                    // safe here (different axis) -- same reasoning as the task's guidance for this
-                    // screen; each tile keyed by scryfallId (unique, no duplicate-copy collision
-                    // since seeds are deduped by id upstream in the ViewModel). Deck Wizard 60-card
-                    // wave (v6): a per-seed quantity badge (S6) is run C's own Review rewrite (plan
-                    // §5 Phase 5.4) -- this run only had to keep the strip compiling.
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                        items(uiState.seeds, key = { it.card.scryfallId }) { seed -> ReviewSeedCardTile(seed.card) }
+            // Deck Wizard Commander v3 plan (Phase 6, 6.2); generalized to every anchor by the
+            // 60-card wave (S12: "Strategy card" for every format) -- the STRATEGY/COLOR_PICK/
+            // STRATEGY_PICK step's own pick, resolved to its display name + description (Custom =
+            // the same fallback copy the Strategy step itself shows) -- byte-identical to the pin
+            // generateWizardDeck re-resolves for the real build (D4), never a re-derivation.
+            val strategy = uiState.selectedCuratedStrategyId?.let { CuratedStrategyCatalog.byId(it) }
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                ReviewSectionLabel(stringResource(R.string.deck_wizard_review_strategy_section))
+                Surface(shape = SmallCardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(spacing.md)) {
+                        Text(
+                            text = strategy?.displayName ?: stringResource(R.string.deck_wizard_strategy_custom_title),
+                            style = ty.titleMedium,
+                            color = mc.textPrimary,
+                        )
+                        Text(
+                            text = strategy?.description ?: stringResource(R.string.deck_wizard_strategy_custom_description),
+                            style = ty.bodySmall,
+                            color = mc.textSecondary,
+                            modifier = Modifier.padding(top = spacing.xxs),
+                        )
                     }
                 }
             }
@@ -450,22 +430,6 @@ private fun ReviewStepContent(
             Surface(shape = SmallCardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(spacing.lg), verticalArrangement = Arrangement.spacedBy(spacing.md)) {
                     ReviewRow(stringResource(R.string.deck_wizard_review_format), uiState.selectedFormat?.displayName ?: "—")
-                    // Commander already has its own dedicated Commander/Strategy sections above --
-                    // this generic Direction chip is Casual-only from here on (it used to redundantly
-                    // repeat the commander's name for Commander builds).
-                    if (!isCommander) {
-                        // Deck Wizard 60-card wave (v6): the pre-v6 Casual-only Direction-theme pick
-                        // is gone -- every non-Commander anchor now picks its theme via the SAME
-                        // shared STRATEGY step Commander uses, so this reads selectedStrategyThemes
-                        // (S1/S7) instead.
-                        ReviewChipRow(
-                            label = stringResource(R.string.deck_wizard_review_direction),
-                            chipText = uiState.selectedArchetype?.displayName
-                                ?: uiState.selectedStrategyThemes.firstOrNull()?.displayName
-                                ?: uiState.selectedTribeLabel
-                                ?: stringResource(R.string.deck_wizard_review_direction_none),
-                        )
-                    }
                     ReviewColorsRow(
                         label = stringResource(R.string.deck_wizard_review_colors),
                         colors = uiState.colorIdentity,
@@ -473,57 +437,80 @@ private fun ReviewStepContent(
                 }
             }
 
-            // Deck Wizard 60-card wave (v6): the Casual-only all-or-nothing land-fill toggle and the
-            // community-data toggle were DELETED along with their backing state
-            // (fillLands/useCommunityData/communityEngineAvailable, S1's UI unification) --
-            // generateCasualDeck now always fills lands and never blends community data (see that
-            // function's own class-level KDoc); run C's S12 Review rewrite is the real replacement.
-            // Commander keeps its own "Include non-basic lands" switch (basics are unconditional for
-            // Commander per R12).
-            if (isCommander) {
-                Surface(
-                    onClick = onToggleIncludeNonBasicLands,
-                    shape = SmallCardShape,
-                    color = mc.surface,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(spacing.md).fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.deck_wizard_include_nonbasic_lands_title), style = ty.bodyMedium, color = mc.textPrimary)
-                            Text(stringResource(R.string.deck_wizard_include_nonbasic_lands_subtitle), style = ty.labelSmall, color = mc.textSecondary)
+            // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4 (S12): "Your cards (N)" -- a plain
+            // vertical Column of read-only CardRows (≤60 rows, acceptable inside the existing outer
+            // verticalScroll), replacing the pre-v6 horizontal thumbnail strip for every anchor.
+            if (uiState.seeds.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                    ReviewSectionLabel(stringResource(R.string.deck_wizard_review_your_cards, uiState.seeds.size))
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                        uiState.seeds.forEach { seed ->
+                            CardRow(
+                                card = seed.card,
+                                isInCollection = (uiState.ownedQuantityByName[seed.card.name] ?: 0) > 0,
+                                quantity = seed.quantity,
+                                onClick = { /* review-only, no detail sheet here */ },
+                                onRemove = null,
+                            )
                         }
-                        Switch(
-                            checked = uiState.includeNonBasicLands,
-                            onCheckedChange = { onToggleIncludeNonBasicLands() },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = mc.onAccent,
-                                checkedTrackColor = mc.primaryAccent,
-                                uncheckedThumbColor = mc.textDisabled,
-                                uncheckedTrackColor = mc.surfaceVariant,
-                            ),
-                        )
                     }
                 }
             }
 
+            // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4 (S12): "Include non-basic lands" is
+            // no longer Commander-exclusive -- the engine's own includeNonBasicLands param already
+            // applied to every anchor (BuildWizardDeckUseCase.fillLandsV2's Stage A gate), the UI
+            // just never offered it for 60-card until now. The Casual-only all-or-nothing land-fill
+            // toggle and the community-data toggle stay DELETED for every format (S2/S12).
+            Surface(
+                onClick = onToggleIncludeNonBasicLands,
+                shape = SmallCardShape,
+                color = mc.surface,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(spacing.md).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.deck_wizard_include_nonbasic_lands_title), style = ty.bodyMedium, color = mc.textPrimary)
+                        Text(stringResource(R.string.deck_wizard_include_nonbasic_lands_subtitle), style = ty.labelSmall, color = mc.textSecondary)
+                    }
+                    Switch(
+                        checked = uiState.includeNonBasicLands,
+                        onCheckedChange = { onToggleIncludeNonBasicLands() },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = mc.onAccent,
+                            checkedTrackColor = mc.primaryAccent,
+                            uncheckedThumbColor = mc.textDisabled,
+                            uncheckedTrackColor = mc.surfaceVariant,
+                        ),
+                    )
+                }
+            }
+
             Surface(shape = CardShape, color = mc.goldMtg.copy(alpha = 0.10f), modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(spacing.md), verticalAlignment = Alignment.Top) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.goldMtg, modifier = Modifier.size(20.dp))
+                Column(Modifier.padding(spacing.md)) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.goldMtg, modifier = Modifier.size(20.dp))
+                        // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4 (S12): ONE expectation
+                        // copy for every anchor now -- the pre-v6 Casual-only variant
+                        // (deck_wizard_expectation_copy, "deeper build... compare community-known
+                        // decks") described a Scryfall-backstop/community-blend build that no
+                        // longer exists (S2). This copy was already generic ("Built only from your
+                        // collection…"), not Commander-specific text.
+                        Text(
+                            text = stringResource(R.string.deck_wizard_commander_expectation_copy),
+                            style = ty.bodySmall,
+                            color = mc.textSecondary,
+                            modifier = Modifier.padding(start = spacing.sm),
+                        )
+                    }
                     Text(
-                        // Deck Wizard Commander v3 plan (Phase 6, 6.2): Commander gets its own
-                        // honest expectation copy (D7/D8 -- collection-only, gaps reported not
-                        // filled with weak cards); Casual keeps the original "deeper build" copy.
-                        text = if (isCommander) {
-                            stringResource(R.string.deck_wizard_commander_expectation_copy)
-                        } else {
-                            stringResource(R.string.deck_wizard_expectation_copy)
-                        },
+                        text = stringResource(R.string.deck_wizard_review_owned_copies_note),
                         style = ty.bodySmall,
                         color = mc.textSecondary,
-                        modifier = Modifier.padding(start = spacing.sm),
+                        modifier = Modifier.padding(top = spacing.xs),
                     )
                 }
             }
@@ -552,26 +539,12 @@ private fun ReviewSectionLabel(text: String) {
     Text(text = text, style = MaterialTheme.magicTypography.labelLarge, color = MaterialTheme.magicColors.textSecondary)
 }
 
-/** One seed card as a compact image tile for the Review step's horizontal seed-cards strip. */
-@Composable
-private fun ReviewSeedCardTile(card: Card) {
-    val mc = MaterialTheme.magicColors
-    AsyncImage(
-        model = card.imageNormal,
-        contentDescription = card.name,
-        placeholder = painterResource(Res.drawable.mtg_card_back),
-        error = painterResource(Res.drawable.mtg_card_back),
-        fallback = painterResource(Res.drawable.mtg_card_back),
-        contentScale = ContentScale.Crop,
-        modifier = Modifier
-            .size(width = 72.dp, height = 100.dp)
-            .clip(SmallCardShape)
-            .background(mc.surfaceVariant),
-    )
-}
-
 /** A [ReviewRow] variant that renders its value as a tonal chip -- used for the Direction/
- * archetype pick, which is a single discrete choice rather than free-form text. */
+ * archetype pick, which is a single discrete choice rather than free-form text. Deck Wizard
+ * 60-card wave (v6), plan §5 Phase 5.4: no current call site (the Strategy card replaced the
+ * generic Direction chip for every anchor, S12) -- kept as a small, still-generically-useful Review
+ * row shape rather than deleted outright; Phase 7's own deletion pass owns removing it if it stays
+ * unused. */
 @Composable
 private fun ReviewChipRow(label: String, chipText: String) {
     val mc = MaterialTheme.magicColors

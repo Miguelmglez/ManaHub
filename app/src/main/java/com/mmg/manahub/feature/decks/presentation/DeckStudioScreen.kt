@@ -480,8 +480,16 @@ fun DeckStudioScreen(
     val isCommanderFormat = uiState.deck?.format
         ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
         ?.isCommanderFormat == true
-    // Deck Wizard v4 (R15): "Build from seed" is gated to isCommanderFormat at its render site
-    // (the empty-deck state card, its ONLY render site now that the overflow duplicate is gone)
+    // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4 (S15): every non-Draft format can build/
+    // rebuild through the wizard now, not just Commander -- Draft has no wizard build path
+    // (WizardPhase.ENTRY itself rejects it via DeckWizardEvent.Exit). Separate from
+    // [isCommanderFormat] above, which stays Commander-only for BuildTab's own commander-card
+    // section (a genuinely different concern that happens to share a call site).
+    val wizardAvailableForFormat = uiState.deck?.format
+        ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
+        ?.let { it != DeckFormat.DRAFT } ?: false
+    // Deck Wizard v4 (R15): "Build from seed" is gated to wizardAvailableForFormat at its render
+    // site (the empty-deck state card, its ONLY render site now that the overflow duplicate is gone)
     // -- this guard is defense-in-depth, mirroring the codebase's "never trust the UI-only disabled
     // state" precedent (onSelectFormat/onToggleUseCommunityData). It never confirms: it is only
     // ever reachable while the deck is empty, so there is nothing to lose (see
@@ -540,7 +548,7 @@ fun DeckStudioScreen(
                     onMassiveAdd = {onNavigateToMassiveAddCards(emptyList())},
                     shareEnabled = !uiState.isEmptyDeck,
                     onDeleteDeck = { showDeleteDialog = true },
-                    isCommanderFormat = isCommanderFormat,
+                    wizardAvailable = wizardAvailableForFormat,
                     // R15: "Rebuild with the Wizard" only renders for a non-empty deck.
                     isEmptyDeck = uiState.isEmptyDeck,
                     onRebuildWithWizard = handleRebuildWithWizard,
@@ -640,6 +648,7 @@ fun DeckStudioScreen(
                         DeckStudioTab.BUILD -> BuildTab(
                             uiState = uiState,
                             isCommanderFormat = isCommanderFormat,
+                            wizardAvailable = wizardAvailableForFormat,
                             deckStats = deckStats,
                             preferredCurrency = uiState.preferredCurrency,
                             deckValueSummary = uiState.deckValueSummary,
@@ -1087,10 +1096,11 @@ private fun DeckStudioTopBar(
     shareEnabled: Boolean,
     onMassiveAdd: ()->Unit,
     onDeleteDeck: () -> Unit,
-    // Deck Wizard Commander v3 plan (Phase 6, item 4): Commander-only "regenerate this draft
-    // through the wizard" entry point, gated by the SAME DECK_BUILDER_V2_ENABLED flag the empty-deck
-    // state card's "Build from seed" option uses.
-    isCommanderFormat: Boolean = false,
+    // Deck Wizard Commander v3 plan (Phase 6, item 4); Deck Wizard 60-card wave (v6), plan §5
+    // Phase 5.4 (S15): "regenerate this draft through the wizard" entry point, gated by the SAME
+    // DECK_BUILDER_V2_ENABLED flag the empty-deck state card's "Build from seed" option uses, PLUS
+    // this format actually having a wizard build path (every format except Draft, since v6).
+    wizardAvailable: Boolean = false,
     // Deck Wizard v4 (R15): "Rebuild with the Wizard" only renders here when the deck already has
     // cards -- an empty deck's ONLY wizard entry point is the empty-deck state card's own "Build
     // from seed" option (never this overflow menu, see the deleted item below).
@@ -1169,10 +1179,10 @@ private fun DeckStudioTopBar(
                     // Deck Wizard v4 (R15): "Build from seed" was REMOVED from this overflow menu --
                     // it now renders ONLY on the empty-deck state card (EmptyDeckState below),
                     // never here, so the two entry points can no longer both appear on the same
-                    // empty Commander deck. Gated on DECK_BUILDER_V2_ENABLED && !isEmptyDeck:
-                    // a deck that still has cards is the ONLY case this item exists
-                    // for, since an empty one already offers the wizard on its state card.
-                    if (FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED && !isEmptyDeck) {
+                    // empty deck. Gated on DECK_BUILDER_V2_ENABLED && !isEmptyDeck && wizardAvailable:
+                    // a deck that still has cards, in a format the wizard can build (every format
+                    // but Draft since the 60-card wave), is the ONLY case this item exists for.
+                    if (FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED && !isEmptyDeck && wizardAvailable) {
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -1299,6 +1309,10 @@ private val FabClearance = 120.dp
 private fun BuildTab(
     uiState: DeckStudioUiState,
     isCommanderFormat: Boolean,
+    // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4 (S15): forwarded to EmptyDeckState only --
+    // a SEPARATE concern from [isCommanderFormat] above, which stays Commander-only for this
+    // function's own commander-card section.
+    wizardAvailable: Boolean,
     deckStats: GetDeckGameStatsUseCase.Result?,
     preferredCurrency: PreferredCurrency,
     deckValueSummary: DeckValueSummary,
@@ -1350,7 +1364,7 @@ private fun BuildTab(
             }
         } else if (uiState.isEmptyDeck) {
             EmptyDeckState(
-                isCommanderFormat = isCommanderFormat,
+                wizardAvailable = wizardAvailable,
                 onBuildFromSeed = onBuildFromSeed,
                 onBrowseInspirations = onBrowseInspirations,
                 onImportDeck = onImportDeck,
@@ -1711,7 +1725,10 @@ internal fun resolveEmptyDeckStateOptions(
  */
 @Composable
 private fun EmptyDeckState(
-    isCommanderFormat: Boolean,
+    // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4 (S15): renamed from `isCommanderFormat` --
+    // this now gates "Build from seed" for every wizard-supported format (all but Draft), not just
+    // Commander.
+    wizardAvailable: Boolean,
     onBuildFromSeed: () -> Unit,
     onBrowseInspirations: () -> Unit,
     onImportDeck: () -> Unit,
@@ -1727,7 +1744,7 @@ private fun EmptyDeckState(
     // (DECK_STUDIO_BUILD_FROM_SEED_ENABLED / DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED) was RETIRED
     // in the Deck Wizard & Engine Rework plan, WS7.2 (2026-07-28).
     val options = resolveEmptyDeckStateOptions(
-        seedEnabled = FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED,
+        seedEnabled = FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED && wizardAvailable,
         inspirationsEnabled = FeatureFlags.Decks.DISCOVERIES_V2_ENABLED,
     )
 

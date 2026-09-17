@@ -25,14 +25,14 @@ import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckCardsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckArchetypeUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.RankOwnedCardsForProfileUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.RecommendWizardStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestStrategiesForSeedsUseCase
-import com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
+import com.mmg.manahub.feature.decks.domain.template.BuildWizardDeckUseCase
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
 import com.mmg.manahub.feature.decks.domain.template.DeckTemplateResolver
 import com.mmg.manahub.feature.decks.domain.template.DiscoverSynergiesV2UseCase
@@ -137,9 +137,12 @@ fun decksKoinModule(): Module = module {
     // built from the same EvaluateDeckUseCase/InferDeckIdentityUseCase/CrashReporter singletons
     // above, consumed by DeckDoctorOrchestrator today and by the Commander builder in a later phase.
     single { DeckAnalysisPipeline(evaluateDeckUseCase = get(), inferDeckIdentityUseCase = get(), crashReporter = get()) }
-    // Deck Wizard Commander v3 plan (Phase 2/6): the placement engine BuildDeckFromTemplateUseCase's
-    // Commander branch is retiring toward -- consumes the SAME DeckAnalysisPipeline singleton above.
-    single { BuildCommanderDeckUseCase(deckAnalysisPipeline = get(), crashReporter = get()) }
+    // Deck Wizard Commander v3 plan (Phase 2/6); generalized to every format by the Deck Wizard
+    // 60-card wave (v6, plan §5 Phase 5.4) -- the ONE build engine for every anchor now, consuming
+    // the SAME DeckAnalysisPipeline singleton above. Bound under BuildWizardDeckUseCase (not the
+    // kept BuildCommanderDeckUseCase typealias) so DeckWizardViewModel's own `buildWizardDeckUseCase`
+    // param type resolves correctly -- see feedback_koin_single_concrete_type_mismatch.
+    single { BuildWizardDeckUseCase(deckAnalysisPipeline = get(), crashReporter = get()) }
     // Deck Wizard v4, W7 Task B (E8) -- shares the app's own "user_prefs" DataStore file (never a
     // second preferences file) via the SAME internal accessor UserPreferencesDataStore uses. Bound
     // to the interface type (feedback_koin_single_concrete_type_mismatch): every consumer's
@@ -192,10 +195,13 @@ fun decksKoinModule(): Module = module {
     // always supplies a real instance; see each class's own KDoc).
     single { SuggestStrategiesForSeedsUseCase() }
     single { RankOwnedCardsForProfileUseCase() }
-    // Deck Wizard Commander v3 plan, Phase 4.1 — the STRATEGY step's ranking use case. Pure/
-    // dependency-free, same registration convention as the two above. Replaces the retired
-    // DeriveCommanderStrategiesUseCase.
-    single { RecommendCommanderStrategiesUseCase() }
+    // Deck Wizard Commander v3 plan, Phase 4.1; generalized to every 60-card anchor by the Deck
+    // Wizard 60-card wave (v6, plan §5 Phase 5.4) — the STRATEGY/COLOR_PICK/STRATEGY_PICK ranking
+    // use case, still pure/dependency-free. Bound under RecommendWizardStrategiesUseCase (not the
+    // kept RecommendCommanderStrategiesUseCase typealias) so DeckWizardViewModel's own
+    // `recommendCommanderStrategiesUseCase` param type resolves correctly -- see
+    // feedback_koin_single_concrete_type_mismatch. Replaces the retired DeriveCommanderStrategiesUseCase.
+    single { RecommendWizardStrategiesUseCase() }
     // Deck Engine Unification plan (D1, live-wired in §5 Phase 3.5): build = the Doctor's own Motor A
     // loop, so BuildDeckFromTemplateUseCase shares the SAME SuggestAddsFromCollectionUseCase
     // singleton DeckDoctorOrchestrator uses. Motor B (community) is NOW wired live -- the wizard's
@@ -265,23 +271,20 @@ fun decksKoinModule(): Module = module {
         )
     }
 
-    // DeckWizardViewModel: Deck Builder v2 wizard (docs/plans/deck-builder-v2-plan.md §3.4). Always
-    // creates its own fresh draft (no `deckId` nav arg, unlike DeckStudioViewModel) -- the optional
-    // strategyHint/themeHint/colors args are the Discoveries v2 "Build this" hand-off (D11).
+    // DeckWizardViewModel: Deck Builder v2 wizard (docs/plans/deck-builder-v2-plan.md §3.4), every
+    // format since the Deck Wizard 60-card wave (v6, plan §5 Phase 5.4). A Commander build creates
+    // its own fresh draft; a 60-card build always writes into the `deckId` nav arg (R13/S14) -- the
+    // optional strategyHint/themeHint/colors args are the Discoveries v2 "Build this" hand-off (D11).
     viewModel {
         DeckWizardViewModel(
             deckRepository = get(),
             userCardRepository = get(),
             collectionProfileUseCase = get(),
-            buildDeckFromTemplateUseCase = get(),
             searchCardsUseCase = get(),
             communityAggregateRepository = get(),
             crashReporter = get(),
             appContext = get(),
             savedStateHandle = get(),
-            suggestStrategiesForSeedsUseCase = get(),
-            rankOwnedCardsForProfileUseCase = get(),
-            userPreferences = get(),
             // Deck Wizard & Engine Rework plan, Workstream 2 -- STRATEGY step's source 1 +
             // derivation ranking.
             cardStrategyTagsRepository = get(),
@@ -289,10 +292,10 @@ fun decksKoinModule(): Module = module {
             // Deck Wizard Commander v3 plan, Phase 5 (D2) -- the SAME shared DeckAnalysisPipeline
             // singleton DeckDoctorOrchestrator/the harness already resolve, never a second instance.
             deckAnalysisPipeline = get(),
-            // Deck Wizard Commander v3 plan, Phase 6 -- the Commander build path (onGenerate's
-            // format dispatch), replacing BuildDeckFromTemplateUseCase for isCommanderFormat specs.
-            buildCommanderDeckUseCase = get(),
-            // Deck Wizard v4, W0.2 -- pre-warms real basic-land Card objects before a Commander build.
+            // Deck Wizard Commander v3 plan, Phase 6; generalized to every format by the 60-card
+            // wave -- onGenerate's ONE build path now.
+            buildWizardDeckUseCase = get(),
+            // Deck Wizard v4, W0.2 -- pre-warms real basic-land Card objects before a build.
             cardRepository = get(),
             // Deck Wizard v4, W7 Task B (E4/E8) -- biases placement toward previously-chosen Choice
             // picks and records freshly-made ones.

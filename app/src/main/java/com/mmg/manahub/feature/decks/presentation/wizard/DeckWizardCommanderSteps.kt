@@ -104,6 +104,7 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.CardSection
+import com.mmg.manahub.feature.decks.domain.engine.CopyPolicy
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.PillarId
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
@@ -116,6 +117,7 @@ import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
 import com.mmg.manahub.feature.decks.presentation.components.CardFlipPortrait
 import com.mmg.manahub.feature.decks.presentation.components.CardSectionRow
 import com.mmg.manahub.feature.decks.presentation.components.PillarTile
+import com.mmg.manahub.feature.decks.presentation.components.SeedSelectionUi
 import com.mmg.manahub.feature.decks.presentation.components.TribeOption
 import com.mmg.manahub.feature.decks.presentation.components.TribePickerSection
 import com.mmg.manahub.feature.decks.presentation.components.label
@@ -909,6 +911,9 @@ internal fun PlanSectionsStepContent(
     onRemoveCard: (Card) -> Unit,
     onClearSearchState: () -> Unit,
     onCardClick: (String) -> Unit,
+    // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4: opens/closes the "Your cards" section's own
+    // inline CardDetailSheet for a 60-card seed (Commander rows keep navigating via onCardClick).
+    onShowSeedDetail: (Card?) -> Unit,
     onNext: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -1054,18 +1059,32 @@ internal fun PlanSectionsStepContent(
                             modifier = Modifier.padding(top = spacing.sm, bottom = spacing.xxs),
                         )
                     }
-                    // Deck Wizard 60-card wave (v6): a quantity-aware "Your cards" row (S6, per plan
-                    // §5 Phase 5.4) is run C's job -- this run only had to keep the list compiling
-                    // against the renamed `seeds: List<WizardSeed>` shape, so `onRemove` still fully
-                    // removes the seed regardless of quantity (byte-identical to before for
-                    // Commander, whose seeds are always quantity 1 anyway).
+                    // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4 (S6): Commander rows are
+                    // unchanged (a full navigate + a full remove -- quantity is always 1 there, so
+                    // remove and decrement coincide); a 60-card row gets the +/- stepper, an
+                    // addEnabled cap at CopyPolicy.maxSeedCopies, and its own inline detail sheet
+                    // instead of navigating away.
                     items(uiState.seeds, key = { "planadded_${it.card.scryfallId}" }) { seed ->
-                        CardRow(
-                            card = seed.card,
-                            isInCollection = true,
-                            onClick = { onCardClick(seed.card.scryfallId) },
-                            onRemove = { onRemoveCard(seed.card) },
-                        )
+                        if (format.isCommanderFormat) {
+                            CardRow(
+                                card = seed.card,
+                                isInCollection = true,
+                                onClick = { onCardClick(seed.card.scryfallId) },
+                                onRemove = { onRemoveCard(seed.card) },
+                            )
+                        } else {
+                            val maxCopies = remember(seed.card, format) { CopyPolicy.maxSeedCopies(seed.card, format) }
+                            CardRow(
+                                card = seed.card,
+                                isInCollection = (uiState.ownedQuantityByName[seed.card.name] ?: 0) > 0,
+                                quantity = seed.quantity,
+                                onClick = { onAddCard(seed.card) },
+                                onAdd = { onAddCard(seed.card) },
+                                onRemove = { onRemoveCard(seed.card) },
+                                addEnabled = seed.quantity < maxCopies,
+                                onImageClick = { onShowSeedDetail(seed.card) },
+                            )
+                        }
                     }
                 }
             }
@@ -1082,9 +1101,13 @@ internal fun PlanSectionsStepContent(
             (listOfNotNull(uiState.selectedCommander?.scryfallId) + uiState.seeds.map { it.card.scryfallId }).toSet()
         }
         val ownedIds = remember(uiState.ownedCards) { uiState.ownedCards.map { it.scryfallId }.toSet() }
+        val seedQuantityById = remember(uiState.seeds) { uiState.seeds.associate { it.card.scryfallId to it.quantity } }
+        // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4: a 60-card seed's real quantity (not
+        // just a 0/1 "is it already added" flag) -- Commander seeds are always quantity 1, so this
+        // is byte-identical there.
         fun toRow(card: Card) = AddCardRow(
             card = card,
-            quantityInDeck = if (card.scryfallId in existingIds) 1 else 0,
+            quantityInDeck = seedQuantityById[card.scryfallId] ?: (if (card.scryfallId in existingIds) 1 else 0),
             isOwned = card.scryfallId in ownedIds,
         )
         CardSearchSheet(
@@ -1114,5 +1137,44 @@ internal fun PlanSectionsStepContent(
                 onClearSearchState()
             },
         )
+    }
+
+    // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4: "Your cards"' own inline detail sheet for a
+    // 60-card seed -- mirrors SeedPickStepContent's own [uiState.seedDetailCard] block verbatim
+    // (same field, opened from a different step).
+    if (!format.isCommanderFormat) {
+        uiState.seedDetailCard?.let { card ->
+            val existingQuantity = uiState.seeds.firstOrNull { it.card.scryfallId == card.scryfallId }?.quantity ?: 0
+            val maxQuantity = CopyPolicy.maxSeedCopies(card, format)
+            val ownedIds = remember(uiState.ownedCards) { uiState.ownedCards.map { it.scryfallId }.toSet() }
+            CardDetailSheet(
+                deckCard = DeckSlotEntry(
+                    scryfallId = card.scryfallId,
+                    quantity = existingQuantity,
+                    isSideboard = false,
+                    card = card,
+                    source = DeckCardSource.USER,
+                ),
+                displayCard = card,
+                isLoadingDetail = false,
+                isCommander = false,
+                isCommanderSelectionContext = false,
+                tags = card.tags + card.userTags,
+                onAdd = {},
+                onRemove = {},
+                onDelete = {},
+                onChooseAsCommander = {},
+                onRemoveCommander = {},
+                onDismiss = { onShowSeedDetail(null) },
+                seedSelection = SeedSelectionUi(
+                    quantity = existingQuantity,
+                    maxQuantity = maxQuantity,
+                    isOwned = card.scryfallId in ownedIds,
+                    ownedQuantity = uiState.ownedQuantityByName[card.name] ?: 0,
+                    onAdd = { onAddCard(card) },
+                    onRemove = { onRemoveCard(card) },
+                ),
+            )
+        }
     }
 }

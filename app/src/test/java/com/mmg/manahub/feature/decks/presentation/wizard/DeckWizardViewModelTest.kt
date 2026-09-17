@@ -6,7 +6,6 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.common.CrashReporter
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
@@ -24,6 +23,7 @@ import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
+import com.mmg.manahub.feature.decks.domain.engine.BuildAnchor
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
@@ -35,20 +35,10 @@ import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.WizardPreferenceStore
 import com.mmg.manahub.feature.decks.domain.template.AmbiguityGroup
 import com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase
-import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
-import com.mmg.manahub.feature.decks.domain.template.BuildStage
 import com.mmg.manahub.feature.decks.domain.template.CommanderBuildOutcome
 import com.mmg.manahub.feature.decks.domain.template.CommanderDraftBuild
-import com.mmg.manahub.feature.decks.domain.template.CategorySuggestions
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
-import com.mmg.manahub.feature.decks.domain.template.DeckTemplateArchetypeInfo
-import com.mmg.manahub.feature.decks.domain.template.DeckWizardSpec
 import com.mmg.manahub.feature.decks.domain.template.OwnedCard
-import com.mmg.manahub.feature.decks.domain.template.SuggestionCategory
-import com.mmg.manahub.feature.decks.domain.template.TemplateBuildProgress
-import com.mmg.manahub.feature.decks.domain.template.TemplateBuildResult
-import com.mmg.manahub.feature.decks.domain.template.TemplateCardSuggestion
-import com.mmg.manahub.feature.decks.domain.template.TemplateSource
 import com.mmg.manahub.feature.decks.domain.template.WizardBuildResult
 import com.mmg.manahub.feature.decks.domain.template.WizardFillStats
 import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
@@ -96,7 +86,6 @@ class DeckWizardViewModelTest {
 
     private val deckRepository = mockk<DeckRepository>(relaxed = true)
     private val userCardRepository = mockk<UserCardRepository>()
-    private val buildDeckFromTemplateUseCase = mockk<BuildDeckFromTemplateUseCase>()
     private val searchCardsUseCase = mockk<SearchCardsUseCase>()
     private val communityAggregateRepository = mockk<CommunityAggregateRepository>()
     // Deck Wizard & Engine Rework plan, Workstream 2.2 -- STRATEGY step's source 1. Non-relaxed
@@ -139,24 +128,9 @@ class DeckWizardViewModelTest {
         tags = listOf(CardTag.TRIBAL),
     )
 
-    private fun buildResult(deckCards: List<DeckEntry> = emptyList()) = TemplateBuildResult(
-        deckCards = deckCards,
-        communitySuggestions = emptyList(),
-        report = emptyList(),
-        templateSource = TemplateSource.SYNTHETIC,
-        // Deck Analysis Engine v3 removed ArchetypeId.GENERIC -- a null archetype is the new
-        // "no macro pin" state.
-        archetypeInfo = DeckTemplateArchetypeInfo(archetype = null, themes = emptyList()),
-        archetypeOverride = null,
-        themesOverride = emptyList(),
-        colorConsistencyWarning = false,
-        gamePlan = null,
-    )
-
     /** Deck Wizard Commander v3 plan, Phase 6 -- a minimal, valid [CommanderBuildOutcome] fixture
-     * for stubbing [buildCommanderDeckUseCase] in a Commander-format `onGenerate()` test. [entries]
-     * defaults to just the commander's own qty-1 mainboard slot (mirrors [buildResult]'s
-     * empty-deckCards convention above). */
+     * for stubbing [buildCommanderDeckUseCase] in an `onGenerate()` test. [entries] defaults to
+     * just the commander's own qty-1 mainboard slot. */
     private fun commanderOutcome(entries: List<DeckEntry> = listOf(DeckEntry(card = commander, quantity = 1, isOwned = true, isSideboard = false))) =
         CommanderBuildOutcome(
             result = WizardBuildResult(
@@ -175,12 +149,23 @@ class DeckWizardViewModelTest {
      * (mockk's own contract) -- a test overrides only what it actually inspects: [ambiguityGroups]
      * (empty by default -- the zero-group path is what most existing tests exercise, matching the
      * pre-W7 single-shot build they were written against), [tentativeByRole], [candidatesById]. */
+    /** Deck Wizard 60-card wave (v6), plan §5 Phase 5.4: [candidateMaxCopies] defaults every id in
+     * [candidatesById] to 1 -- the REAL Commander invariant (every candidate's own `maxPlaceable`
+     * is exactly 1, see [WizardDraftBuild.candidateMaxCopies]'s own KDoc) for an ALREADY-PLACED
+     * tentative id, whose real headroom is 0 (see [onChangeChoiceQuantity]'s own cap formula, which
+     * adds the id's tentative-copy count back on top) -- so a genuinely tentative id defaults to 0
+     * here, and every non-tentative (alternative) id defaults to 1. A test that needs a different
+     * shape (e.g. the multi-copy 60-card Choice tests run C2 adds) overrides this explicitly. */
     private fun commanderDraft(
         ambiguityGroups: List<AmbiguityGroup> = emptyList(),
         tentativeByRole: Map<RoleKey, List<String>> = emptyMap(),
         candidatesById: Map<String, Card> = emptyMap(),
         fallbackStandaloneIds: List<String> = emptyList(),
         fallbackOffPlanIds: List<String> = emptyList(),
+        placedNonLand: List<DeckEntry> = emptyList(),
+        candidateMaxCopies: Map<String, Int> = candidatesById.keys.associateWith { id ->
+            if (tentativeByRole.values.any { id in it }) 0 else 1
+        },
     ): CommanderDraftBuild {
         val draft = mockk<CommanderDraftBuild>(relaxed = true)
         every { draft.ambiguityGroups } returns ambiguityGroups
@@ -188,43 +173,25 @@ class DeckWizardViewModelTest {
         every { draft.candidatesById } returns candidatesById
         every { draft.fallbackStandaloneIds } returns fallbackStandaloneIds
         every { draft.fallbackOffPlanIds } returns fallbackOffPlanIds
+        every { draft.placedNonLand } returns placedNonLand
+        every { draft.candidateMaxCopies } returns candidateMaxCopies
         return draft
     }
 
-    private val suggestionCard = card(id = "sugg-1", name = "Suggested Spell")
-
-    /** [buildResult] with an empty [TemplateBuildResult.deckCards] (so [writeResultIntoNewDeck]
-     * never calls `addCardToDeck` itself) plus one view-only community suggestion, isolating the
-     * `addCardToDeck` call count to whatever [DeckWizardViewModel.onAddCommunitySuggestion] fires. */
-    private fun suggestionResult() = buildResult().copy(
-        communitySuggestions = listOf(
-            CategorySuggestions(
-                category = SuggestionCategory.OTHER,
-                suggestions = listOf(TemplateCardSuggestion(card = suggestionCard, weight = 1f, suggestedCopies = 1)),
-            )
-        )
-    )
-
     private fun viewModel(
         savedState: Map<String, Any?> = emptyMap(),
-        userPreferences: UserPreferencesDataStore? = null,
     ) = DeckWizardViewModel(
         deckRepository = deckRepository,
         userCardRepository = userCardRepository,
         collectionProfileUseCase = collectionProfileUseCase,
-        buildDeckFromTemplateUseCase = buildDeckFromTemplateUseCase,
         searchCardsUseCase = searchCardsUseCase,
         communityAggregateRepository = communityAggregateRepository,
         crashReporter = crashReporter,
         appContext = appContext,
         savedStateHandle = SavedStateHandle(savedState),
-        // Deck Engine Unification plan (§5 Phase 3) -- both new use cases are pure/dependency-free,
-        // so tests run them REAL (no stubbing burden, mirrors this file's own CollectionProfileUseCase
-        // precedent) unless a test needs to isolate a specific ranking/coherence outcome.
-        userPreferences = userPreferences,
         cardStrategyTagsRepository = cardStrategyTagsRepository,
         deckAnalysisPipeline = deckAnalysisPipeline,
-        buildCommanderDeckUseCase = buildCommanderDeckUseCase,
+        buildWizardDeckUseCase = buildCommanderDeckUseCase,
         cardRepository = cardRepository,
         wizardPreferenceStore = wizardPreferenceStore,
     )
@@ -755,7 +722,7 @@ class DeckWizardViewModelTest {
     fun `a build with ambiguity groups lands on CHOICE and persists nothing yet`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns twoGroupChoiceDraft()
         val vm = viewModel(mapOf("format" to "COMMANDER"))
         advanceUntilIdle()
@@ -774,7 +741,7 @@ class DeckWizardViewModelTest {
     fun `a zero-group build skips CHOICE and finalizes with empty resolutions, straight to opening Deck Studio`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns commanderDraft()
         coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
         val vm = viewModel(mapOf("format" to "COMMANDER"))
@@ -801,7 +768,7 @@ class DeckWizardViewModelTest {
             fallbackOffPlanIds = listOf("offplan-1"),
         )
         coEvery {
-            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns fallbackDraft
         val vm = viewModel(mapOf("format" to "COMMANDER"))
         advanceUntilIdle()
@@ -841,7 +808,7 @@ class DeckWizardViewModelTest {
             candidatesById = manyAlternativeCards + mapOf("tent-1" to choiceTentative1, "tent-2" to choiceTentative2),
         )
         coEvery {
-            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns bigDraft
         val draftSlot = slot<CommanderDraftBuild>()
         coEvery { buildCommanderDeckUseCase.finalize(capture(draftSlot), any(), any(), any()) } returns commanderOutcome()
@@ -858,9 +825,9 @@ class DeckWizardViewModelTest {
 
         // "Choose the remaining N for me" -- deselect one tentative default, then auto-fill: the
         // replacement must come from the engine's own tentative set, never the 15-alternative pool.
-        vm.onToggleChoiceCard("removal_spot", "tent-2")
+        vm.onChangeChoiceQuantity("removal_spot", "tent-2", -1)
         vm.onAutoFillChoiceSection("removal_spot")
-        assertEquals(listOf("tent-1", "tent-2"), vm.uiState.value.choiceSelections["removal_spot"])
+        assertEquals(mapOf("tent-1" to 1, "tent-2" to 1), vm.uiState.value.choiceSelections["removal_spot"])
 
         // "Let the wizard finish" -- resolves cleanly even though the group's real pool is far
         // beyond the display cap, and the draft handed to finalize is the SAME unmodified one.
@@ -877,7 +844,7 @@ class DeckWizardViewModelTest {
     fun `onToggleChoiceCard enforces the remainingSlots cap and a deselect frees the slot`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns twoGroupChoiceDraft()
         val vm = viewModel(mapOf("format" to "COMMANDER"))
         advanceUntilIdle()
@@ -887,24 +854,24 @@ class DeckWizardViewModelTest {
 
         // Untouched -- the effective selection is the tentative default, which already occupies the
         // section's ONE slot; the cap must be respected against that IMPLICIT default too.
-        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        vm.onChangeChoiceQuantity("removal_spot", "alt-a", 1)
         assertNull("selecting an alternative while the tentative default still occupies the only slot must be a no-op", vm.uiState.value.choiceSelections["removal_spot"])
 
         // Deselect the default first -- frees the slot.
-        vm.onToggleChoiceCard("removal_spot", "tent-1")
-        assertEquals(emptyList<String>(), vm.uiState.value.choiceSelections["removal_spot"])
+        vm.onChangeChoiceQuantity("removal_spot", "tent-1", -1)
+        assertEquals(emptyMap<String, Int>(), vm.uiState.value.choiceSelections["removal_spot"])
 
         // Now the alternative can be selected.
-        vm.onToggleChoiceCard("removal_spot", "alt-a")
-        assertEquals(listOf("alt-a"), vm.uiState.value.choiceSelections["removal_spot"])
+        vm.onChangeChoiceQuantity("removal_spot", "alt-a", 1)
+        assertEquals(mapOf("alt-a" to 1), vm.uiState.value.choiceSelections["removal_spot"])
 
         // A second alternative cannot be added on top of a full section.
-        vm.onToggleChoiceCard("removal_spot", "alt-b")
-        assertEquals(listOf("alt-a"), vm.uiState.value.choiceSelections["removal_spot"])
+        vm.onChangeChoiceQuantity("removal_spot", "alt-b", 1)
+        assertEquals(mapOf("alt-a" to 1), vm.uiState.value.choiceSelections["removal_spot"])
 
         // Deselecting the chosen alternative frees the slot again.
-        vm.onToggleChoiceCard("removal_spot", "alt-a")
-        assertEquals(emptyList<String>(), vm.uiState.value.choiceSelections["removal_spot"])
+        vm.onChangeChoiceQuantity("removal_spot", "alt-a", -1)
+        assertEquals(emptyMap<String, Int>(), vm.uiState.value.choiceSelections["removal_spot"])
     }
 
     // W7 Fix 3 (E8) -- superseded the pre-fix `onToggleChoiceCard records a preference ONLY for an
@@ -919,7 +886,7 @@ class DeckWizardViewModelTest {
     fun `W7 Fix 3 -- selecting then deselecting an alternative before finishing records nothing`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns twoGroupChoiceDraft()
         coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
         val vm = viewModel(mapOf("format" to "COMMANDER"))
@@ -928,10 +895,10 @@ class DeckWizardViewModelTest {
         vm.onGenerate()
         advanceUntilIdle()
 
-        vm.onToggleChoiceCard("removal_spot", "tent-1") // deselect the kept default
-        vm.onToggleChoiceCard("removal_spot", "alt-a") // actively choose an alternative
-        vm.onToggleChoiceCard("removal_spot", "alt-a") // then reverse the choice
-        vm.onToggleChoiceCard("removal_spot", "tent-1") // back to the kept default
+        vm.onChangeChoiceQuantity("removal_spot", "tent-1", -1) // deselect the kept default
+        vm.onChangeChoiceQuantity("removal_spot", "alt-a", 1) // actively choose an alternative
+        vm.onChangeChoiceQuantity("removal_spot", "alt-a", -1) // then reverse the choice
+        vm.onChangeChoiceQuantity("removal_spot", "tent-1", 1) // back to the kept default
         vm.onFinishChoices()
         advanceUntilIdle()
 
@@ -942,7 +909,7 @@ class DeckWizardViewModelTest {
     fun `W7 Fix 3 -- selecting an alternative then abandoning Choice records nothing`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns twoGroupChoiceDraft()
         val vm = viewModel(mapOf("format" to "COMMANDER"))
         advanceUntilIdle()
@@ -950,8 +917,8 @@ class DeckWizardViewModelTest {
         vm.onGenerate()
         advanceUntilIdle()
 
-        vm.onToggleChoiceCard("removal_spot", "tent-1")
-        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        vm.onChangeChoiceQuantity("removal_spot", "tent-1", -1)
+        vm.onChangeChoiceQuantity("removal_spot", "alt-a", 1)
         vm.onBackPressed() // abandons Choice -- see onAbandonChoice's own KDoc
         advanceUntilIdle()
 
@@ -962,7 +929,7 @@ class DeckWizardViewModelTest {
     fun `W7 Fix 3 -- a failed persist records nothing`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns twoGroupChoiceDraft()
         coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
         coEvery {
@@ -974,8 +941,8 @@ class DeckWizardViewModelTest {
         vm.onGenerate()
         advanceUntilIdle()
 
-        vm.onToggleChoiceCard("removal_spot", "tent-1")
-        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        vm.onChangeChoiceQuantity("removal_spot", "tent-1", -1)
+        vm.onChangeChoiceQuantity("removal_spot", "alt-a", 1)
         vm.onFinishChoices()
         advanceUntilIdle()
 
@@ -987,7 +954,7 @@ class DeckWizardViewModelTest {
     fun `W7 Fix 3 -- a successful resolution records exactly the user-chosen alternatives, never tentative defaults`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns twoGroupChoiceDraft()
         coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
         val vm = viewModel(mapOf("format" to "COMMANDER"))
@@ -997,8 +964,8 @@ class DeckWizardViewModelTest {
         advanceUntilIdle()
 
         // "removal_spot" -- the user swaps the default for an alternative (genuine pick).
-        vm.onToggleChoiceCard("removal_spot", "tent-1")
-        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        vm.onChangeChoiceQuantity("removal_spot", "tent-1", -1)
+        vm.onChangeChoiceQuantity("removal_spot", "alt-a", 1)
         // "card_draw" is left untouched -- resolved by the engine's own tentative default, never a
         // preference (mirrors "Choose the remaining N for me"/"Let the wizard finish" defaults).
         vm.onFinishChoices()
@@ -1013,7 +980,7 @@ class DeckWizardViewModelTest {
     fun `onAutoFillChoiceSection fills only the section's still-unselected slots with tentative defaults`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns twoGroupChoiceDraft()
         val vm = viewModel(mapOf("format" to "COMMANDER"))
         advanceUntilIdle()
@@ -1027,16 +994,16 @@ class DeckWizardViewModelTest {
         assertNull(vm.uiState.value.choiceSelections["removal_spot"])
 
         // Deselect the default, leaving a real gap -- auto-fill puts it right back.
-        vm.onToggleChoiceCard("removal_spot", "tent-1")
+        vm.onChangeChoiceQuantity("removal_spot", "tent-1", -1)
         vm.onAutoFillChoiceSection("removal_spot")
-        assertEquals(listOf("tent-1"), vm.uiState.value.choiceSelections["removal_spot"])
+        assertEquals(mapOf("tent-1" to 1), vm.uiState.value.choiceSelections["removal_spot"])
     }
 
     @Test
     fun `onFinishChoices honours a decided section exactly, defaults an undecided one, and persists ONCE`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns twoGroupChoiceDraft()
         val resolutionsSlot = slot<Map<RoleKey, List<String>>>()
         coEvery {
@@ -1049,8 +1016,8 @@ class DeckWizardViewModelTest {
         advanceUntilIdle()
 
         // The user decides "removal_spot" (swaps its default for alt-a) and never touches "card_draw".
-        vm.onToggleChoiceCard("removal_spot", "tent-1")
-        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        vm.onChangeChoiceQuantity("removal_spot", "tent-1", -1)
+        vm.onChangeChoiceQuantity("removal_spot", "alt-a", 1)
 
         // W7 Task D (plan 7.5): never lands on WizardPhase.RESULT -- fires OpenDeckStudio directly.
         vm.events.test {
@@ -1069,7 +1036,7 @@ class DeckWizardViewModelTest {
     fun `W7 Fix 2 -- retrying after a finalize failure re-runs finalize with the SAME resolved draft, never a fresh buildWithGroups`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns twoGroupChoiceDraft()
         var finalizeCallCount = 0
         val resolutionsSeen = mutableListOf<Map<RoleKey, List<String>>>()
@@ -1085,13 +1052,13 @@ class DeckWizardViewModelTest {
         advanceUntilIdle()
 
         // The user resolves "removal_spot" before the finalize step fails.
-        vm.onToggleChoiceCard("removal_spot", "tent-1")
-        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        vm.onChangeChoiceQuantity("removal_spot", "tent-1", -1)
+        vm.onChangeChoiceQuantity("removal_spot", "alt-a", 1)
         vm.onFinishChoices()
         advanceUntilIdle()
 
         assertEquals("TPL", vm.uiState.value.buildError)
-        coVerify(exactly = 1) { buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 1) { buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any()) }
 
         vm.events.test {
             vm.onRetryGeneration()
@@ -1102,7 +1069,7 @@ class DeckWizardViewModelTest {
 
         // Still only ONE buildWithGroups call across the whole failure-then-retry cycle -- the
         // retry reused the already-resolved draft instead of re-walking from REVIEW.
-        coVerify(exactly = 1) { buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 1) { buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any()) }
         coVerify(exactly = 2) { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) }
         // Both the failed attempt and the successful retry carried the user's ORIGINAL selection.
         assertEquals(listOf(listOf("alt-a"), listOf("alt-a")), resolutionsSeen.map { it["removal_spot"] })
@@ -1113,7 +1080,7 @@ class DeckWizardViewModelTest {
     fun `W7 Fix 2 -- retrying after a persist failure deletes the orphan and re-persists the SAME resolved draft`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns twoGroupChoiceDraft()
         coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
         var persistCallCount = 0
@@ -1129,8 +1096,8 @@ class DeckWizardViewModelTest {
         vm.onGenerate()
         advanceUntilIdle()
 
-        vm.onToggleChoiceCard("removal_spot", "tent-1")
-        vm.onToggleChoiceCard("removal_spot", "alt-a")
+        vm.onChangeChoiceQuantity("removal_spot", "tent-1", -1)
+        vm.onChangeChoiceQuantity("removal_spot", "alt-a", 1)
         vm.onFinishChoices()
         advanceUntilIdle()
 
@@ -1147,7 +1114,7 @@ class DeckWizardViewModelTest {
         // The orphan from the failed write is cleaned up, buildWithGroups never re-runs, and the
         // retry's persist call carries the same user-chosen alternative.
         coVerify(exactly = 1) { deckRepository.deleteDeck("wizard-deck-1") }
-        coVerify(exactly = 1) { buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 1) { buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any()) }
         coVerify(exactly = 2) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any()) }
         assertNull(vm.uiState.value.buildError)
     }
@@ -1156,7 +1123,7 @@ class DeckWizardViewModelTest {
     fun `abandoning the Choice screen via back writes nothing and returns to REVIEW`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         coEvery {
-            buildCommanderDeckUseCase.buildWithGroups(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns twoGroupChoiceDraft()
         val vm = viewModel(mapOf("format" to "COMMANDER"))
         advanceUntilIdle()
@@ -1166,7 +1133,7 @@ class DeckWizardViewModelTest {
         assertEquals(WizardPhase.CHOICE, vm.uiState.value.phase)
 
         // Make a selection, THEN abandon -- the in-memory selection must not leak into a later build.
-        vm.onToggleChoiceCard("removal_spot", "tent-1")
+        vm.onChangeChoiceQuantity("removal_spot", "tent-1", -1)
         val shouldPopWizard = vm.onBackPressed()
 
         assertFalse("abandoning Choice unwinds internally -- the wizard itself must stay open", shouldPopWizard)
