@@ -806,6 +806,13 @@ class DeckWizardViewModel(
                 is DataResult.Success -> res.data.cards
                 is DataResult.Error -> {
                     crashReporter.log("deck_wizard_seed_search_failed")
+                    // res.message is a raw Ktor exception message (CardRepositoryImpl's safeCall
+                    // does no sanitization) -- for an HTTP error it commonly embeds the full
+                    // request URL, which includes this search's own free-text query. Never forward
+                    // it verbatim (CLAUDE.md: no raw free-text queries in telemetry) -- length only.
+                    crashReporter.recordException(
+                        RuntimeException("[DeckWizard] deck_wizard_seed_search_failed: message_length=${res.message.length}"),
+                    )
                     _uiState.update { it.copy(seedPickSearchError = true) }
                     emptyList()
                 }
@@ -1789,6 +1796,7 @@ class DeckWizardViewModel(
             delta > 0 -> {
                 val cap = (draft.candidateMaxCopies[cardId] ?: 0) + (tentative[cardId] ?: 0)
                 if (current.values.sum() >= group.remainingSlots || currentForId >= cap) {
+                    crashReporter.log("deck_wizard_choice_copy_cap_reached")
                     viewModelScope.launch {
                         _events.send(
                             DeckWizardEvent.ShowToast(
