@@ -115,6 +115,10 @@ class WizardSixtyHarnessV1Test {
                     "land_target=${!m.landTargetOk}(${m.landCount})",
             )
         }
+        // Phase 6.3 (CONSISTENCY_CREDIT calibration): one parseable line per spec, mirrors
+        // WizardHarnessSixtyMockSegmentsTest's own CALIB line -- the sweep pools both harnesses'
+        // data (plan §5 Phase 6.3, ADR-007 §4: only 6.1+6.2 may calibrate the constant).
+        metrics.filterNot { it.buildFailed }.forEach { m -> println("[wizard-harness-sixty-v1-calib] macro=${m.resolvedMacro} score=${m.totalScore} fourOfCount=${m.fourOfCount} label=${m.label}") }
     }
 
     private fun assertHardMetrics(metrics: List<V3SixtyBuildMetrics>, excludedLabels: Set<String>) {

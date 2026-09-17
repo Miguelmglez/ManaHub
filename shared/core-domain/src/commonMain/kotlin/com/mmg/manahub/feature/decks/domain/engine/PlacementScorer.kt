@@ -51,10 +51,40 @@ object PlacementScorer {
      * reorder a genuine near-tie, it can never satisfy the D8 filler floor or beat a real band need. */
     const val PREFERENCE_BONUS = 0.01f
 
-    /** Deck Wizard 60-card wave (v6, S5) -- start value for the copy->=2 consistency bonus (plan
-     * §5 Phase 1.4): a Phase-6-calibrated judgment call against the 60-card harness (never the
-     * analysis fixtures, ADR-007 §4), NOT hand-fit here. `copyIndex == 0` (every Commander
-     * candidate, always -- CopyPolicy caps it at 1) is completely unaffected. */
+    /**
+     * Deck Wizard 60-card wave (v6, S5) -- the copy->=2 consistency bonus (plan §5 Phase 1.4).
+     * `copyIndex == 0` (every Commander candidate, always -- CopyPolicy caps it at 1) is completely
+     * unaffected.
+     *
+     * Phase 6.3 CALIBRATION RESULT (2026-09-17): swept `{0.0, 0.03, 0.06, 0.10}` against ONLY the
+     * Phase 6.1 (`WizardHarnessSixtyMockSegmentsTest`, 22 specs) + 6.2 (`WizardSixtyHarnessV1Test`,
+     * 68 real-collection specs) harness data — 90 pooled specs total, never the analysis-fixture
+     * corpus (ADR-007 §4). Target: the smallest value clearing BOTH (a) `fourOfCount` median >= 4 for
+     * AGGRO/MIDRANGE-macro specs, AND (b) overall score median dropping <= 1 point vs the `0.0`
+     * baseline.
+     *
+     * | CONSISTENCY_CREDIT | pooled score median | AGGRO/MIDRANGE fourOfCount median (n=55) |
+     * |---|---|---|
+     * | 0.0  | 79 | 0 |
+     * | 0.03 | 79 | 0 |
+     * | 0.06 | 79 | 0 |
+     * | 0.10 | 79 | 0 |
+     *
+     * Condition (b) holds trivially at every candidate (the pooled score median never moves off 79).
+     * Condition (a) is NOT reachable at any tested value: 45/55 pooled AGGRO/MIDRANGE specs place
+     * ZERO cards at exactly 4 copies regardless of the bonus (verified this is not dead code — a
+     * label-by-label diff between the `0.0` and `0.10` runs shows 17/90 specs' score/fourOfCount DO
+     * move, just never enough to shift the pooled median past 0). Root cause: at every candidate
+     * magnitude tried, this bonus stays far below [ROLE_WEIGHT]/[AXIS_WEIGHT] (0.40 each) — the
+     * placement loop keeps preferring a genuinely different, still-needed card over a repeat copy for
+     * the great majority of AGGRO/MIDRANGE specs in this harness, which is the loop's OWN D8
+     * differentiation pressure working as designed, not a defect this bonus is meant to override.
+     *
+     * Per the plan's own explicit fallback ("if no candidate value satisfies both conditions, keep
+     * the existing default and honestly document the trade-off"): kept at the pre-Phase-6 default,
+     * `0.06f`, rather than forced. Full sweep data + methodology:
+     * `docs/deck-wizard-state.md` §5.
+     */
     const val CONSISTENCY_CREDIT = 0.06f
 
     /** [combineDiminishing]'s per-step decay: the 2nd-strongest need counts at 40% of its own value,

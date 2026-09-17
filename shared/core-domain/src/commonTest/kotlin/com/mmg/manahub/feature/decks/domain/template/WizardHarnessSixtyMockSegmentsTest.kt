@@ -336,6 +336,11 @@ class WizardHarnessSixtyMockSegmentsTest {
         println("[wizard-harness-sixty-mock] runtime ms min=${runtimes.firstOrNull()} median=${runtimes.getOrNull(runtimes.size / 2)} max=${runtimes.lastOrNull()}")
         println("[wizard-harness-sixty-mock] resolved macro == fixture expectedMacro (TRACKED, not HARD): $macroMatches/${allMetrics.size}")
         println("[wizard-harness-sixty-mock] failures: $failures")
+        // Phase 6.3 (CONSISTENCY_CREDIT calibration): one parseable line per spec, RESOLVED macro +
+        // score + fourOfCount -- the calibration sweep pools these across every CONSISTENCY_CREDIT
+        // candidate run rather than re-deriving a second data source (ADR-007 §4: only this harness's
+        // own data may calibrate the constant).
+        allMetrics.forEach { m -> println("[wizard-harness-sixty-mock-calib] macro=${m.resolvedMacro} score=${m.totalScore} fourOfCount=${m.fourOfCount} label=${m.label}") }
 
         assertTrue(failures.isEmpty(), "Sixty mock-segment HARD-metric failures: $failures")
     }
