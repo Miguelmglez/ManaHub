@@ -2,8 +2,10 @@ package com.mmg.manahub.feature.decks.presentation
 
 // COMMENTS_REVIEWED: 2026-09-16
 
+import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.feature.decks.presentation.components.DeckAddCardsMethod
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -74,6 +76,34 @@ class DeckStudioScreenLogicTest {
                     primaryCount,
                 )
             }
+        }
+    }
+
+    // -- isWizardAvailableForFormat (Deck Wizard 60-card wave v6, plan §5 Phase 5.4, S15) --------
+
+    @Test
+    fun `STANDARD is wizard-available -- Build from seed navigates immediately`() {
+        assertTrue(isWizardAvailableForFormat(DeckFormat.STANDARD))
+        assertEquals(
+            WizardNavDecision.NAVIGATE_NOW,
+            resolveWizardNavDecision(WizardEntryPoint.BUILD_FROM_SEED, hasTriggeredWizardNav = false),
+        )
+    }
+
+    @Test
+    fun `DRAFT is NOT wizard-available -- the wizard has no build path for it`() {
+        assertFalse(isWizardAvailableForFormat(DeckFormat.DRAFT))
+    }
+
+    @Test
+    fun `a null (not-yet-resolved) format is NOT wizard-available`() {
+        assertFalse(isWizardAvailableForFormat(null))
+    }
+
+    @Test
+    fun `every non-Draft format is wizard-available`() {
+        for (format in DeckFormat.entries) {
+            assertEquals(format.name, format != DeckFormat.DRAFT, isWizardAvailableForFormat(format))
         }
     }
 

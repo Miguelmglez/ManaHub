@@ -485,9 +485,11 @@ fun DeckStudioScreen(
     // (WizardPhase.ENTRY itself rejects it via DeckWizardEvent.Exit). Separate from
     // [isCommanderFormat] above, which stays Commander-only for BuildTab's own commander-card
     // section (a genuinely different concern that happens to share a call site).
-    val wizardAvailableForFormat = uiState.deck?.format
-        ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
-        ?.let { it != DeckFormat.DRAFT } ?: false
+    // Extracted to isWizardAvailableForFormat (below) so run C2's DeckStudioScreenLogicTest can
+    // cover the format gate as a plain JVM unit test -- zero behavior change.
+    val wizardAvailableForFormat = isWizardAvailableForFormat(
+        uiState.deck?.format?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
+    )
     // Deck Wizard v4 (R15): "Build from seed" is gated to wizardAvailableForFormat at its render
     // site (the empty-deck state card, its ONLY render site now that the overflow duplicate is gone)
     // -- this guard is defense-in-depth, mirroring the codebase's "never trust the UI-only disabled
@@ -1687,6 +1689,14 @@ internal fun resolveWizardNavDecision(
     entryPoint == WizardEntryPoint.BUILD_FROM_SEED -> WizardNavDecision.NAVIGATE_NOW
     else -> WizardNavDecision.REQUIRE_CONFIRM
 }
+
+/**
+ * Deck Wizard 60-card wave (v6), plan §5 Phase 5.4 (S15): whether [format] has a real wizard build
+ * path -- every format except [DeckFormat.DRAFT] (the wizard's own `WizardPhase.ENTRY` init check
+ * rejects Draft with `DeckWizardEvent.Exit`, so this gate must agree). `null` (format not yet
+ * resolved) reads as unavailable, same as the pre-extraction inline expression.
+ */
+internal fun isWizardAvailableForFormat(format: DeckFormat?): Boolean = format != null && format != DeckFormat.DRAFT
 
 /** Which [EmptyStateOptionCard]s [EmptyDeckState] renders, and which one is primary. */
 internal data class EmptyDeckStateOptions(

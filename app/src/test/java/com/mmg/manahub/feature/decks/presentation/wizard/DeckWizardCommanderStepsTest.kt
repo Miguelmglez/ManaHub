@@ -173,6 +173,34 @@ class DeckWizardCommanderStepsTest {
         assertEquals(listOf(SearchCriterion.CommanderEligible), locked)
     }
 
+    // ── seedLockedCriteria (Deck Wizard 60-card wave v6, plan §5 Phase 5.2/5.4) ──────────────────
+
+    @Test
+    fun `STANDARD locks a strict Format legality clause`() {
+        val locked = seedLockedCriteria(DeckFormat.STANDARD)
+
+        assertEquals(listOf(SearchCriterion.Format(listOf("standard"), legal = true)), locked)
+    }
+
+    @Test
+    fun `PAUPER locks its OWN Format legality clause`() {
+        val locked = seedLockedCriteria(DeckFormat.PAUPER)
+
+        assertEquals(listOf(SearchCriterion.Format(listOf("pauper"), legal = true)), locked)
+    }
+
+    @Test
+    fun `CASUAL locks nothing -- no legality restriction (S3, S11)`() {
+        val locked = seedLockedCriteria(DeckFormat.CASUAL)
+
+        assertTrue(locked.isEmpty())
+    }
+
+    @Test
+    fun `a null format (not yet resolved) locks nothing`() {
+        assertTrue(seedLockedCriteria(null).isEmpty())
+    }
+
     // ── computeOwnedAvailabilityBySection (Deck Wizard Commander v3 plan, Phase 5, 5.1) ─────────
     // Every classification signal below is the REAL engine (ArchetypeRoleClassifier/PlacementScorer/
     // TribeDeriver/BasicLandCalculator) -- no mocking, per the campaign's own "attribution comes only

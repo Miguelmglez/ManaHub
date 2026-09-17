@@ -12,6 +12,7 @@ import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
@@ -19,6 +20,7 @@ import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DeckWithCards
+import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.DeckCardSource
@@ -41,6 +43,7 @@ import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
 import com.mmg.manahub.feature.decks.domain.template.OwnedCard
 import com.mmg.manahub.feature.decks.domain.template.WizardBuildResult
 import com.mmg.manahub.feature.decks.domain.template.WizardFillStats
+import com.mmg.manahub.feature.decks.domain.template.ManualAdd
 import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import io.mockk.coEvery
@@ -51,6 +54,7 @@ import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.spyk
 import io.mockk.unmockkStatic
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -58,6 +62,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -1144,4 +1149,450 @@ class DeckWizardViewModelTest {
         coVerify(exactly = 0) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any()) }
         coVerify(exactly = 0) { deckRepository.createDeck(any(), any(), any()) }
     }
+
+    // ── Deck Wizard 60-card wave (v6), plan §5 Phase 5.4, run C2 -- new test coverage per plan §6 ──
+
+    // (1) STANDARD nav arg lands on ENTRY -- DRAFT/missing arg already covered above.
+    @Test
+    fun `a STANDARD format nav arg preselects the format and lands on ENTRY`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        assertEquals(DeckFormat.STANDARD, vm.uiState.value.selectedFormat)
+        assertEquals(WizardPhase.ENTRY, vm.uiState.value.phase)
+    }
+
+    // (2) CARDS flow chain, forward and back.
+    @Test
+    fun `CARDS flow chain -- ENTRY to REVIEW forward, onBackPressed mirrors it exactly`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        assertEquals(WizardPhase.ENTRY, vm.uiState.value.phase)
+
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        assertEquals(WizardPhase.SEED_PICK, vm.uiState.value.phase)
+
+        vm.onAddSeed(card(id = "seed-1", name = "Seed One", colorIdentity = emptyList()))
+        vm.onNextFromSeedPick()
+        advanceUntilIdle()
+        assertEquals(WizardPhase.STRATEGY, vm.uiState.value.phase)
+
+        vm.onNextFromStrategy()
+        advanceUntilIdle()
+        assertEquals(WizardPhase.PLAN_SECTIONS, vm.uiState.value.phase)
+
+        vm.onNextFromPlanSections()
+        assertEquals(WizardPhase.REVIEW, vm.uiState.value.phase)
+
+        assertFalse(vm.onBackPressed())
+        assertEquals(WizardPhase.PLAN_SECTIONS, vm.uiState.value.phase)
+        assertFalse(vm.onBackPressed())
+        assertEquals(WizardPhase.STRATEGY, vm.uiState.value.phase)
+        assertFalse(vm.onBackPressed())
+        assertEquals(WizardPhase.SEED_PICK, vm.uiState.value.phase)
+        assertFalse(vm.onBackPressed())
+        assertEquals(WizardPhase.ENTRY, vm.uiState.value.phase)
+        assertTrue(vm.onBackPressed())
+    }
+
+    // (3) COLORS flow chain, forward and back.
+    @Test
+    fun `COLORS flow chain -- ENTRY to REVIEW forward, onBackPressed mirrors it exactly`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+
+        vm.onSelectEntryFlow(WizardEntryFlow.COLORS)
+        assertEquals(WizardPhase.COLOR_PICK, vm.uiState.value.phase)
+
+        vm.onToggleColorFlowColor(ManaColor.U)
+        advanceTimeBy(200)
+        advanceUntilIdle()
+        vm.onSelectCustomStrategy()
+
+        vm.onNextFromColorPick()
+        assertEquals(WizardPhase.PLAN_SECTIONS, vm.uiState.value.phase)
+
+        vm.onNextFromPlanSections()
+        assertEquals(WizardPhase.REVIEW, vm.uiState.value.phase)
+
+        assertFalse(vm.onBackPressed())
+        assertEquals(WizardPhase.PLAN_SECTIONS, vm.uiState.value.phase)
+        assertFalse(vm.onBackPressed())
+        assertEquals(WizardPhase.COLOR_PICK, vm.uiState.value.phase)
+        assertFalse(vm.onBackPressed())
+        assertEquals(WizardPhase.ENTRY, vm.uiState.value.phase)
+        assertTrue(vm.onBackPressed())
+    }
+
+    // (3) STRATEGY flow chain, forward and back.
+    @Test
+    fun `STRATEGY flow chain -- ENTRY to REVIEW forward, onBackPressed mirrors it exactly`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+
+        vm.onSelectEntryFlow(WizardEntryFlow.STRATEGY)
+        advanceUntilIdle()
+        assertEquals(WizardPhase.STRATEGY_PICK, vm.uiState.value.phase)
+
+        val strategy = CuratedStrategyCatalog.ALL.first { it.availableIn(DeckFormat.STANDARD) && !it.requiresTribe }
+        vm.onSelectStrategyPickEntry(strategy)
+        vm.onSelectStrategyPickCombo(strategy, ColorComboSuggestion(setOf(ManaColor.U), 1f))
+
+        vm.onNextFromStrategyPick()
+        assertEquals(WizardPhase.PLAN_SECTIONS, vm.uiState.value.phase)
+
+        vm.onNextFromPlanSections()
+        assertEquals(WizardPhase.REVIEW, vm.uiState.value.phase)
+
+        assertFalse(vm.onBackPressed())
+        assertEquals(WizardPhase.PLAN_SECTIONS, vm.uiState.value.phase)
+        assertFalse(vm.onBackPressed())
+        assertEquals(WizardPhase.STRATEGY_PICK, vm.uiState.value.phase)
+        assertFalse(vm.onBackPressed())
+        assertEquals(WizardPhase.ENTRY, vm.uiState.value.phase)
+        assertTrue(vm.onBackPressed())
+    }
+
+    // (4) onAddSeed copy-cap rules.
+    @Test
+    fun `onAddSeed increments a seed's quantity up to 4, rejects the 5th with the copy-cap toast`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        val seed = card(id = "seed-1", name = "Seed One", colorIdentity = emptyList())
+        repeat(4) { vm.onAddSeed(seed) }
+        assertEquals(4, vm.uiState.value.seeds.first().quantity)
+
+        vm.events.test {
+            vm.onAddSeed(seed)
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+        }
+        assertEquals(4, vm.uiState.value.seeds.first().quantity)
+        verify { appContext.getString(R.string.deck_wizard_seed_copy_cap, 4) }
+    }
+
+    @Test
+    fun `a Vintage-restricted card is capped at 1 copy, the 2nd rejected with the copy-cap toast`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "VINTAGE"))
+        advanceUntilIdle()
+        val restricted = card(id = "sol-1", name = "Sol Ring", colorIdentity = emptyList(), legalityVintage = "restricted")
+        vm.onAddSeed(restricted)
+        assertEquals(1, vm.uiState.value.seeds.first().quantity)
+
+        vm.events.test {
+            vm.onAddSeed(restricted)
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+        }
+        assertEquals(1, vm.uiState.value.seeds.first().quantity)
+        verify { appContext.getString(R.string.deck_wizard_seed_copy_cap, 1) }
+    }
+
+    @Test
+    fun `an illegal card is rejected in STANDARD, accepted in CASUAL`() = runTest(dispatcher) {
+        val illegalCard = card(id = "illegal-1", name = "Not Standard Legal", colorIdentity = emptyList(), legalityStandard = "not_legal")
+
+        val standardVm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        standardVm.events.test {
+            standardVm.onAddSeed(illegalCard)
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+        }
+        assertTrue(standardVm.uiState.value.seeds.isEmpty())
+        verify { appContext.getString(R.string.deck_wizard_manual_add_rejected) }
+
+        val casualVm = viewModel(mapOf("format" to "CASUAL"))
+        advanceUntilIdle()
+        casualVm.onAddSeed(illegalCard)
+        assertEquals(listOf(illegalCard), casualVm.uiState.value.seeds.map { it.card })
+    }
+
+    // (5) Seed cap: 60 total copies for a 60-card format, Commander cap 99.
+    @Test
+    fun `seed cap -- 60 total copies for a 60-card format, the 61st rejected with the seed-cap toast`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        val cards = (1..15).map { i -> card(id = "seed-$i", name = "Seed $i", colorIdentity = emptyList()) }
+        cards.forEach { c -> repeat(4) { vm.onAddSeed(c) } }
+        assertEquals(60, vm.uiState.value.seedCopies)
+
+        val extra = card(id = "seed-extra", name = "Seed Extra", colorIdentity = emptyList())
+        vm.events.test {
+            vm.onAddSeed(extra)
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+        }
+        assertEquals(60, vm.uiState.value.seedCopies)
+        verify { appContext.getString(R.string.deck_wizard_seed_cap_reached, 60) }
+    }
+
+    @Test
+    fun `Commander seed cap is 99, silently ignoring further manual adds`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        advanceUntilIdle()
+
+        val cards = (1..99).map { i -> card(id = "cmd-seed-$i", name = "Commander Seed $i", colorIdentity = listOf("G")) }
+        cards.forEach { vm.onAddSeed(it) }
+        assertEquals(99, vm.uiState.value.seeds.size)
+
+        vm.onAddSeed(card(id = "cmd-seed-extra", name = "Commander Seed Extra", colorIdentity = listOf("G")))
+        assertEquals(99, vm.uiState.value.seeds.size)
+    }
+
+    // (6) Colorless chip exclusivity + identity {} reaches the build engine.
+    @Test
+    fun `the colorless chip clears WUBRG and vice versa`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.COLORS)
+
+        vm.onToggleColorFlowColor(ManaColor.U)
+        assertEquals(setOf(ManaColor.U), vm.uiState.value.colorIdentity)
+
+        vm.onToggleColorFlowColor(ManaColor.C)
+        assertEquals(setOf(ManaColor.C), vm.uiState.value.colorIdentity)
+
+        vm.onToggleColorFlowColor(ManaColor.W)
+        assertEquals(setOf(ManaColor.W), vm.uiState.value.colorIdentity)
+    }
+
+    @Test
+    fun `a colorless build passes identity {} to the build engine`() = runTest(dispatcher) {
+        val anchorSlot = slot<BuildAnchor>()
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), capture(anchorSlot), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome(entries = emptyList())
+
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.COLORS)
+        vm.onToggleColorFlowColor(ManaColor.C)
+        advanceTimeBy(200)
+        advanceUntilIdle()
+        vm.onSelectCustomStrategy()
+        vm.onNextFromColorPick()
+        vm.onNextFromPlanSections()
+
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        val anchor = anchorSlot.captured as BuildAnchor.Sixty
+        assertEquals(emptySet<ManaColor>(), anchor.identity)
+    }
+
+    // (7) SEED_PICK's idle grid excludes illegal owned cards.
+    @Test
+    fun `SEED_PICK idle grid excludes illegal owned cards for PAUPER`() {
+        val legalCommon = card(id = "legal-1", name = "Legal Common", legalityPauper = "legal")
+        val illegalRare = card(id = "illegal-1", name = "Illegal Rare", legalityPauper = "not_legal")
+        val state = DeckWizardUiState(selectedFormat = DeckFormat.PAUPER, ownedCards = listOf(legalCommon, illegalRare))
+
+        assertEquals(listOf(legalCommon), seedPickLocalCandidates(state))
+    }
+
+    // (8) Seed search locks the format's own legality clause.
+    @Test
+    fun `SEED_PICK search locks Format(pauper) into the built query`() {
+        val locked = seedLockedCriteria(DeckFormat.PAUPER)
+        val state = DeckWizardUiState(selectedFormat = DeckFormat.PAUPER, seedPickQuery = "Lightning Bolt")
+
+        val query = buildSeedPickSearchQuery(state, locked)
+
+        assertTrue(query?.criteria?.any { it is SearchCriterion.Format && it.format == listOf("pauper") } == true)
+    }
+
+    // (9) recomputeStrategyRecommendations preselects #1, fires on onNextFromSeedPick and on every
+    //     color toggle (debounced 150ms).
+    @Test
+    fun `recomputeStrategyRecommendations preselects #1 on onNextFromSeedPick`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        vm.onAddSeed(card(id = "seed-1", name = "Seed One", colorIdentity = emptyList()))
+
+        vm.onNextFromSeedPick()
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.strategyRecommendations.isNotEmpty())
+        assertEquals(vm.uiState.value.strategyRecommendations.first().strategy.id, vm.uiState.value.selectedCuratedStrategyId)
+    }
+
+    @Test
+    fun `recomputeStrategyRecommendations re-ranks on every color toggle, debounced 150ms`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.COLORS)
+        assertTrue(vm.uiState.value.strategyRecommendations.isEmpty())
+
+        vm.onToggleColorFlowColor(ManaColor.U)
+        // Before the debounce elapses, nothing has landed yet.
+        assertTrue(vm.uiState.value.strategyRecommendations.isEmpty())
+
+        advanceTimeBy(200)
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.strategyRecommendations.isNotEmpty())
+        assertEquals(vm.uiState.value.strategyRecommendations.first().strategy.id, vm.uiState.value.selectedCuratedStrategyId)
+    }
+
+    // (10) 60-card generate: BuildAnchor.Sixty, ManualAdd.quantity, basics pre-warmed, never writes
+    //      commanderCardId, persists into launchedFromDeckId, emits OpenDeckStudio.
+    @Test
+    fun `60-card generate builds a BuildAnchor Sixty with real seed quantities, never writes commanderCardId, persists into launchedFromDeckId`() = runTest(dispatcher) {
+        val manualAddsSlot = slot<List<ManualAdd>>()
+        val anchorSlot = slot<BuildAnchor>()
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), capture(anchorSlot), any(), any(), capture(manualAddsSlot), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome(entries = emptyList())
+
+        val vm = viewModel(mapOf("format" to "STANDARD", "deckId" to "existing-deck-1"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        val seedA = card(id = "seed-a", name = "Seed A", colorIdentity = listOf("U"))
+        val seedB = card(id = "seed-b", name = "Seed B", colorIdentity = listOf("U"))
+        vm.onAddSeed(seedA)
+        vm.onAddSeed(seedB)
+        vm.onAddSeed(seedB) // a 2nd copy of seedB
+        vm.onNextFromSeedPick()
+        advanceUntilIdle()
+        vm.onNextFromStrategy()
+        advanceUntilIdle()
+        vm.onNextFromPlanSections()
+
+        vm.events.test {
+            vm.onGenerate()
+            advanceUntilIdle()
+            assertTrue(awaitItem() is DeckWizardEvent.OpenDeckStudio)
+        }
+
+        val anchor = anchorSlot.captured as BuildAnchor.Sixty
+        assertEquals(setOf(ManaColor.U), anchor.identity)
+        assertEquals(setOf(seedA, seedB), anchor.seeds.toSet())
+
+        val manualAdds = manualAddsSlot.captured
+        assertEquals(1, manualAdds.first { it.card.scryfallId == seedA.scryfallId }.quantity)
+        assertEquals(2, manualAdds.first { it.card.scryfallId == seedB.scryfallId }.quantity)
+
+        coVerify(exactly = 0) { deckRepository.updateDeck(any()) }
+        coVerify(exactly = 1) { deckRepository.persistWizardBuild(eq("existing-deck-1"), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.createDeck(any(), any(), any()) }
+    }
+
+    @Test
+    fun `a colorless 60-card build pre-warms Wastes via the card repository`() = runTest(dispatcher) {
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome(entries = emptyList())
+        val wastes = card(id = "wastes-1", name = "Wastes", typeLine = "Basic Land", colorIdentity = emptyList())
+        coEvery { cardRepository.searchCardByName("Wastes") } returns DataResult.Success(wastes)
+
+        val vm = viewModel(mapOf("format" to "STANDARD", "deckId" to "existing-deck-2"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.COLORS)
+        vm.onToggleColorFlowColor(ManaColor.C)
+        advanceTimeBy(200)
+        advanceUntilIdle()
+        vm.onSelectCustomStrategy()
+        vm.onNextFromColorPick()
+        vm.onNextFromPlanSections()
+
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { cardRepository.searchCardByName("Wastes") }
+    }
+
+    // (11) Choice quantity: + blocked at candidateMaxCopies and at the section cap, - frees;
+    //      onFinishChoices expands the map to repeated ids.
+    @Test
+    fun `Choice quantity -- plus is blocked at candidateMaxCopies, minus frees a copy`() = runTest(dispatcher) {
+        val multiCard = card(id = "multi-1", name = "Multi Copy Card", colorIdentity = emptyList())
+        val draft = commanderDraft(
+            ambiguityGroups = listOf(AmbiguityGroup(sectionId = "removal_spot", candidateIds = listOf("multi-1"), remainingSlots = 3)),
+            candidatesById = mapOf("multi-1" to multiCard),
+            candidateMaxCopies = mapOf("multi-1" to 2),
+        )
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
+        } returns draft
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        vm.onChangeChoiceQuantity("removal_spot", "multi-1", 1)
+        assertEquals(mapOf("multi-1" to 1), vm.uiState.value.choiceSelections["removal_spot"])
+
+        vm.onChangeChoiceQuantity("removal_spot", "multi-1", 1)
+        assertEquals(mapOf("multi-1" to 2), vm.uiState.value.choiceSelections["removal_spot"])
+
+        // Blocked at candidateMaxCopies (2), even though remainingSlots (3) would allow one more.
+        vm.onChangeChoiceQuantity("removal_spot", "multi-1", 1)
+        assertEquals(mapOf("multi-1" to 2), vm.uiState.value.choiceSelections["removal_spot"])
+
+        vm.onChangeChoiceQuantity("removal_spot", "multi-1", -1)
+        assertEquals(mapOf("multi-1" to 1), vm.uiState.value.choiceSelections["removal_spot"])
+    }
+
+    @Test
+    fun `Choice quantity -- plus is blocked once the section's remainingSlots is reached`() = runTest(dispatcher) {
+        val cardA = card(id = "a-1", name = "Card A", colorIdentity = emptyList())
+        val cardB = card(id = "b-1", name = "Card B", colorIdentity = emptyList())
+        val draft = commanderDraft(
+            ambiguityGroups = listOf(AmbiguityGroup(sectionId = "removal_spot", candidateIds = listOf("a-1", "b-1"), remainingSlots = 1)),
+            candidatesById = mapOf("a-1" to cardA, "b-1" to cardB),
+            candidateMaxCopies = mapOf("a-1" to 1, "b-1" to 1),
+        )
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
+        } returns draft
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        vm.onChangeChoiceQuantity("removal_spot", "a-1", 1)
+        assertEquals(mapOf("a-1" to 1), vm.uiState.value.choiceSelections["removal_spot"])
+
+        vm.onChangeChoiceQuantity("removal_spot", "b-1", 1)
+        assertEquals("the section is full -- b-1 must NOT be added", mapOf("a-1" to 1), vm.uiState.value.choiceSelections["removal_spot"])
+    }
+
+    @Test
+    fun `onFinishChoices expands the copy-count map into a repeated-id list for finalize`() = runTest(dispatcher) {
+        val multiCard = card(id = "multi-1", name = "Multi Copy Card", colorIdentity = emptyList())
+        val draft = commanderDraft(
+            ambiguityGroups = listOf(AmbiguityGroup(sectionId = "removal_spot", candidateIds = listOf("multi-1"), remainingSlots = 3)),
+            candidatesById = mapOf("multi-1" to multiCard),
+            candidateMaxCopies = mapOf("multi-1" to 3),
+        )
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
+        } returns draft
+        val resolutionsSlot = slot<Map<RoleKey, List<String>>>()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), capture(resolutionsSlot), any(), any()) } returns commanderOutcome()
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        vm.onChangeChoiceQuantity("removal_spot", "multi-1", 1)
+        vm.onChangeChoiceQuantity("removal_spot", "multi-1", 1)
+        vm.onChangeChoiceQuantity("removal_spot", "multi-1", 1)
+        vm.onFinishChoices()
+        advanceUntilIdle()
+
+        assertEquals(listOf("multi-1", "multi-1", "multi-1"), resolutionsSlot.captured["removal_spot"])
+    }
+
+    // (12) The existing Commander test suite (above this section) stays green -- verified by the
+    // gate run, not re-asserted here.
 }
