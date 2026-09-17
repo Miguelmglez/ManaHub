@@ -7,7 +7,7 @@ import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeData
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
-import com.mmg.manahub.feature.decks.domain.engine.CommanderPlan
+import com.mmg.manahub.feature.decks.domain.engine.WizardPlan
 import com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.Finding
@@ -24,7 +24,7 @@ import kotlin.math.round
 //  Replaces HarnessMetricsCalculator's Motor-A-era HARD set (coherence-cuts-v2/coherence-swaps/
 //  coherence-adds, all scored against the retired DeckScorer/SuggestCutsUseCase pipeline) with the
 //  plan §5 metric set, scored purely against WizardBuildResult + DeckAnalysis — the SAME objects
-//  BuildCommanderDeckUseCase and DeckAnalysisPipeline produce. No Motor A import anywhere in this
+//  BuildWizardDeckUseCase and DeckAnalysisPipeline produce. No Motor A import anywhere in this
 //  file (F12's own complaint).
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -108,14 +108,14 @@ object HarnessMetricsV2Calculator {
         V2BuildMetrics(label = label, commanderName = commanderName, strategySource = strategySource, buildFailed = true, failureMessage = message)
 
     /**
-     * @param outcome the build's own [WizardBuildResult] + resolved [CommanderPlan].
+     * @param outcome the build's own [WizardBuildResult] + resolved [WizardPlan].
      * @param secondRunEntries the SAME spec built again — for [V2BuildMetrics.determinismOk].
      * @param roundTripAnalysis [outcome]'s own mainboard re-analyzed a second time through the
      *        SAME [com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline] call — the
      *        caller nulls `debugSynergyGraph` on both sides before comparing (pure-function
      *        determinism, not a persistence round trip — see the harness test's own KDoc for why a
      *        real Room round trip is out of this JVM-only harness's reach and already covered by
-     *        `BuildCommanderDeckPersistenceRoundTripTest`).
+     *        `BuildWizardDeckPersistenceRoundTripTest`).
      * @param manualAdds the spec's manual adds (empty for every real-collection/mock-rich spec this
      *        phase — kept in the signature so a future manual-add matrix slots in for free).
      * @param identity the commander's colour identity.
@@ -166,7 +166,7 @@ object HarnessMetricsV2Calculator {
         } ?: true
 
         // ── commander_once ──────────────────────────────────────────────────
-        // BuildCommanderDeckUseCase always constructs the commander DeckEntry as entries' FIRST
+        // BuildWizardDeckUseCase always constructs the commander DeckEntry as entries' FIRST
         // element (fullMainboard = listOf(commanderEntry) + placedNonLand + landEntries).
         val commanderScryfallId = outcome.result.entries.firstOrNull()?.card?.scryfallId
         val commanderOnceOk = commanderScryfallId != null &&
@@ -216,7 +216,7 @@ object HarnessMetricsV2Calculator {
         // own LAND_MIX cap on non-basics is a deliberate design constraint -- "don't drown a build
         // in utility lands past the archetype's basics ratio" -- not a defect; flagging every
         // capped-out build here would be a harness false positive, not a real wizard bug). Both
-        // conditions recompute the SAME nonBasicCap math [BuildCommanderDeckUseCase.fillLandsV2]
+        // conditions recompute the SAME nonBasicCap math [BuildWizardDeckUseCase.fillLandsV2]
         // uses internally, since that budget is private to the build loop.
         val shortageColors = analysis.pillars.flatMap { it.findings }
             .mapNotNull { f -> when (f) { is Finding.ColorSourceShortage -> f.color; is Finding.UnfixedSplash -> f.color; else -> null } }

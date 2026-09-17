@@ -12,7 +12,7 @@ import org.junit.Test
 //
 //  The Commander-only successor to the legacy WizardQualityMatrixTest.runCommanderSegment (F12:
 //  that class scored the RETIRED Motor A/DeckScorer engine). This class drives EVERY eligible owned
-//  commander through BuildCommanderDeckUseCase (the NEW engine, D1) twice -- top recommendation and
+//  commander through BuildWizardDeckUseCase (the NEW engine, D1) twice -- top recommendation and
 //  Custom -- and asserts the plan §5 HARD metric set via HarnessMetricsV2Calculator.
 //
 //  Casual's own WizardQualityMatrixTest segments (casual/seeds/entryflow) are DELIBERATELY left

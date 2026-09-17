@@ -4,7 +4,7 @@ package com.mmg.manahub.feature.decks.harness
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
-import com.mmg.manahub.feature.decks.domain.engine.CommanderPlan
+import com.mmg.manahub.feature.decks.domain.engine.WizardPlan
 import com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.Finding
@@ -81,7 +81,7 @@ object HarnessMetricsV3SixtyCalculator {
     ): V3SixtyBuildMetrics {
         val result = outcome.result
         val analysis = result.analysis
-        val plan: CommanderPlan = outcome.plan
+        val plan: WizardPlan = outcome.plan
         val entries = result.entries
         val nonLand = entries.filterNot { BasicLandCalculator.isLand(it.card) }
         val lands = entries.filter { BasicLandCalculator.isLand(it.card) }

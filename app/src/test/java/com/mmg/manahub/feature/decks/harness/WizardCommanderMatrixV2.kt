@@ -11,18 +11,18 @@ import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.NeutralPowerResolver
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.StrategyPick
-import com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase
+import com.mmg.manahub.feature.decks.domain.template.BuildWizardDeckUseCase
 import com.mmg.manahub.feature.decks.domain.template.OwnedCard
 import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.RecommendWizardStrategiesUseCase
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Deck Wizard Commander v3 plan, Phase 7.1 — the real-collection segment of harness v2.
 //
-//  Builds every eligible owned commander through BuildCommanderDeckUseCase (the NEW engine, D1)
-//  twice per commander -- once with the top RecommendCommanderStrategiesUseCase pick, once as
+//  Builds every eligible owned commander through BuildWizardDeckUseCase (the NEW engine, D1)
+//  twice per commander -- once with the top RecommendWizardStrategiesUseCase pick, once as
 //  Custom -- and scores each build with HarnessMetricsV2Calculator. Zero Motor A / DeckScorer.fit
 //  usage anywhere in the BUILD path (DeckScorer/RoleClassifier below back only DeckAnalysisPipeline
 //  -> EvaluateDeckUseCase, the v3 scoring engine's own legacy-profile input, not a build decision).
@@ -47,18 +47,18 @@ object CommanderMatrixV2 {
         HarnessCrashReporter,
     )
 
-    internal fun newBuildUseCase(): BuildCommanderDeckUseCase = BuildCommanderDeckUseCase(newPipeline(), HarnessCrashReporter)
+    internal fun newBuildUseCase(): BuildWizardDeckUseCase = BuildWizardDeckUseCase(newPipeline(), HarnessCrashReporter)
 
     /** Every eligible owned commander x {top recommendation, Custom} — plan §7.1's real-collection
      * segment. A commander with an empty/fully-unresolved recommendation list falls back to Custom
      * for BOTH specs (rare; noted, not hidden — see the label suffix). */
     fun specs(fixtures: HarnessFixtures): List<CommanderSpecV2> {
-        val recommender = RecommendCommanderStrategiesUseCase()
+        val recommender = RecommendWizardStrategiesUseCase()
         val owned = ownedPool(fixtures)
         val candidates = fixtures.commanderCandidates
             .filter { HarnessMetricsCalculator.isLegal(it, DeckFormat.COMMANDER) }
             // F17 IS fixed: a purely colorless commander (e.g. "Page, Loose Leaf") now gets a proper
-            // Wastes fill (BasicLandCalculator.allocate + BuildCommanderDeckUseCase.materializeBasics)
+            // Wastes fill (BasicLandCalculator.allocate + BuildWizardDeckUseCase.materializeBasics)
             // -- land_target/mana_sources are green. What remains excluded here is a DIFFERENT,
             // genuine limitation, not an engine defect: real MTG color-identity rules mean a
             // colourless commander deck can ONLY contain colourless cards (+ Wastes) -- this real

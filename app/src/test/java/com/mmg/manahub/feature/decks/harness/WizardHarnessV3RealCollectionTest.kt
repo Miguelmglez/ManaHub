@@ -20,7 +20,7 @@ import org.junit.Test
 //
 //  Choice determinism (HARD): finalizing a build with the engine's OWN tentative picks, made
 //  explicit, must equal leaving them implicit (the single-shot path) — a real regression guard on
-//  top of BuildCommanderDeckUseCase.invoke()'s "byte-identical by construction" comment.
+//  top of BuildWizardDeckUseCase.invoke()'s "byte-identical by construction" comment.
 //
 //  Variety (TRACKED): median card-overlap between two different deckIds over a deterministic
 //  sample of the real matrix, with a documented alert threshold (see W6c's measured 0.65 baseline
@@ -117,7 +117,7 @@ class WizardHarnessV3RealCollectionTest {
         // (W6b's pre-fix finding, ~0.88-1.00) would cross this before the median hits 1.0 outright.
         assertTrue(
             "variety alert: median overlap $median exceeds the 0.85 threshold -- NEAR_TIE_BAND may have " +
-                "regressed toward exact-tie-only (see BuildCommanderDeckUseCaseTest's near-tie guard test)",
+                "regressed toward exact-tie-only (see BuildWizardDeckUseCaseTest's near-tie guard test)",
             median <= 0.85,
         )
     }
