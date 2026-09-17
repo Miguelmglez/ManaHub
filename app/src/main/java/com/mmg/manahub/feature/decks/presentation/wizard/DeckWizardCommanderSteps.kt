@@ -106,7 +106,6 @@ import com.mmg.manahub.feature.decks.domain.engine.CardSection
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.PillarId
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
-import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.SectionQueryContext
 import com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
@@ -369,7 +368,7 @@ internal fun CommanderPickStepContent(
                         )
                     }
                     else -> items(candidatesToShow, key = { "cmdcand_${it.scryfallId}" }) { card ->
-                        CommanderCandidateTile(card = card, isOwned = card.scryfallId in ownedIds, onClick = { inspectionCard = card })
+                        WizardCandidateTile(card = card, isOwned = card.scryfallId in ownedIds, onClick = { inspectionCard = card })
                     }
                 }
             }
@@ -414,15 +413,17 @@ internal fun CommanderPickStepContent(
     }
 }
 
-/** A simple, tap-to-open card image grid tile for the COMMANDER_PICK candidate grid -- unlike
- * [WizardCardImageTile] (Direction step's seed/commander tiles), this has ONE action only (tap
- * opens the shared [CardDetailSheet]), so it does not need that tile's separate magnifier badge.
- * [isOwned] renders the same [Icons.Rounded.CollectionsBookmark] badge language [CardRow] uses for
- * an owned card (Deck Wizard Commander v4 plan, W2.1, G2) -- Scryfall results otherwise carry no
- * visual signal of what the user already has. */
+/** A simple, tap-to-open card image grid tile for the COMMANDER_PICK/SEED_PICK candidate grids
+ * (renamed from `CommanderCandidateTile`, Deck Wizard 60-card wave v6, plan §5 Phase 5.2, so
+ * SEED_PICK can reuse the SAME tile) -- tap opens the shared [CardDetailSheet]. [isOwned] renders
+ * the same [Icons.Rounded.CollectionsBookmark] badge language [CardRow] uses for an owned card
+ * (Deck Wizard Commander v4 plan, W2.1, G2) -- Scryfall results otherwise carry no visual signal of
+ * what the user already has. [seedQuantity] (> 0) overlays a small quantity badge for a card
+ * already picked as a seed -- `null`/`0` for COMMANDER_PICK, which never has this concept. */
 @Composable
-private fun CommanderCandidateTile(card: Card, isOwned: Boolean, onClick: () -> Unit) {
+internal fun WizardCandidateTile(card: Card, isOwned: Boolean, onClick: () -> Unit, seedQuantity: Int? = null) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -454,15 +455,30 @@ private fun CommanderCandidateTile(card: Card, isOwned: Boolean, onClick: () -> 
                 )
             }
         }
+        if (seedQuantity != null && seedQuantity > 0) {
+            Surface(
+                modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp),
+                color = mc.primaryAccent,
+                shape = CircleShape,
+            ) {
+                Text(
+                    text = "×$seedQuantity",
+                    style = ty.labelSmall,
+                    color = mc.onAccent,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+        }
     }
 }
 
-/** The D-A "include outside your collection" toggle row -- shared visual shape between
- * COMMANDER_PICK (2.1), MANUAL_ADDS (2.3), and (Workstream 3) Flow A's own seed search. Internal
- * (not `private`) so [CardsFlowDirectionContent] in `DeckWizardDirectionIdentity.kt` can reuse it
- * too, per the plan's own "reuse WS2.1's D-A toggle/pattern, don't reinvent it" instruction. */
+/** Deck Wizard 60-card wave (v6): orphaned by the deletion of the Casual-only "include outside your
+ * collection" toggle field ([DeckWizardUiState] no longer carries it) and its two callers
+ * (`ManualAddsStepContent` here, `CardsFlowDirectionContent` in the deleted
+ * `DeckWizardDirectionIdentity.kt`) -- kept ONE more phase for reference rather than deleted
+ * mid-rewrite; not called from anywhere any more. Delete alongside the rest of Phase 7's cleanup. */
 @Composable
-internal fun OutsideCollectionToggleRow(checked: Boolean, onToggle: () -> Unit) {
+private fun OutsideCollectionToggleRow(checked: Boolean, onToggle: () -> Unit) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
@@ -494,7 +510,7 @@ internal fun OutsideCollectionToggleRow(checked: Boolean, onToggle: () -> Unit) 
 internal const val CUSTOM_STRATEGY_ID = "__custom__"
 
 /** Deck Wizard Commander v4 plan (W3, E3): the STRATEGY step's own split of
- * [DeckWizardUiState.commanderStrategyRecommendations] into "Recommended" (score-threshold + hard
+ * [DeckWizardUiState.strategyRecommendations] into "Recommended" (score-threshold + hard
  * cap of 5) and collapsed "Partial fit" (the rest of the format's catalog, collapsed by default) --
  * delegates entirely to [RecommendCommanderStrategiesUseCase.splitRecommended], the use case's own
  * threshold/cap logic (never a UI-local `take(N)`). A plain (non-`@Composable`) function so it stays
@@ -503,7 +519,7 @@ internal fun strategyRecommendedSplit(recommendations: List<StrategyRecommendati
     RecommendCommanderStrategiesUseCase().splitRecommended(recommendations)
 
 /**
- * The single-select STRATEGY list (D4): [DeckWizardUiState.commanderStrategyRecommendations] split
+ * The single-select STRATEGY list (D4): [DeckWizardUiState.strategyRecommendations] split
  * into "Recommended" (score-threshold + hard cap of 5, E3) and collapsed "Partial fit", plus
  * "Custom" always offered last. The #1 recommendation is preselected by the ViewModel the moment
  * the list loads ([DeckWizardViewModel.recommendCommanderStrategies]) and Next is ALWAYS enabled
@@ -528,8 +544,8 @@ internal fun StrategyStepContent(
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     var otherPlansExpanded by remember { mutableStateOf(false) }
-    val (recommended, other) = remember(uiState.commanderStrategyRecommendations) {
-        strategyRecommendedSplit(uiState.commanderStrategyRecommendations)
+    val (recommended, other) = remember(uiState.strategyRecommendations) {
+        strategyRecommendedSplit(uiState.strategyRecommendations)
     }
     val commanderName = uiState.selectedCommander?.name.orEmpty()
     val pendingTribeStrategy = uiState.pendingTribeStrategy
@@ -561,8 +577,16 @@ internal fun StrategyStepContent(
             ) {
                 item(key = "header") {
                     Column {
+                        // Deck Wizard 60-card wave (v6): STRATEGY is now shared by every anchor, not
+                        // just Commander (S1/S7) -- a non-Commander build has no commanderName, so
+                        // this falls back to the plain, commander-less title (run B, plan §5 Phase
+                        // 5.3, replaces this with a proper cards-count subtitle).
                         Text(
-                            stringResource(R.string.deck_wizard_strategy_step_title_for, commanderName),
+                            text = if (commanderName.isNotEmpty()) {
+                                stringResource(R.string.deck_wizard_strategy_step_title_for, commanderName)
+                            } else {
+                                stringResource(R.string.deck_wizard_strategy_step_title)
+                            },
                             style = ty.titleLarge,
                             color = mc.textPrimary,
                         )
@@ -775,9 +799,10 @@ private fun StrategyRecommendationRow(recommendation: StrategyRecommendation, is
     }
 }
 
-// ── PLAN_SECTIONS (Deck Wizard Commander v3 plan, Phase 5, R4) — Commander-only replacement for
-//    MANUAL_ADDS on the SAME WizardPhase.MANUAL_ADDS phase; Casual keeps ManualAddsStepContent
-//    below untouched. ────────────────────────────────────────────────────────────────────────────
+// ── PLAN_SECTIONS (Deck Wizard Commander v3 plan, Phase 5, R4; generalized to every anchor by the
+//    60-card wave v6, plan §5 Phase 5.1, S1) — the ONE engine-attributed browse/add step now; the
+//    pre-v6 Casual-only ManualAddsStepContent was deleted along with the DIRECTION/IDENTITY step
+//    machinery it depended on. ─────────────────────────────────────────────────────────────────
 
 /** Pillar display order for the PLAN_SECTIONS step (plan 5.2) -- LEGALITY is never shown here (it
  * carries no section a manual add can meaningfully target: `legal`/`illegal` have no Browse action
@@ -880,7 +905,7 @@ internal fun PlanSectionsStepContent(
 
     fun resolveCard(scryfallId: String): Card? =
         uiState.selectedCommander?.takeIf { it.scryfallId == scryfallId }
-            ?: uiState.seedCards.firstOrNull { it.scryfallId == scryfallId }
+            ?: uiState.seeds.firstOrNull { it.card.scryfallId == scryfallId }?.card
 
     val analysis = uiState.planAnalysis
     val pillars = remember(analysis) {
@@ -971,7 +996,7 @@ internal fun PlanSectionsStepContent(
                         )
                     }
                 }
-                if (uiState.seedCards.isNotEmpty()) {
+                if (uiState.seeds.isNotEmpty()) {
                     item(key = "manual_adds_header") {
                         // Same labelMedium/primaryAccent/uppercase treatment as the pillar headers
                         // above (see StrategySectionHeader for the shared convention this file uses
@@ -985,17 +1010,17 @@ internal fun PlanSectionsStepContent(
                             modifier = Modifier.padding(top = spacing.sm, bottom = spacing.xxs),
                         )
                     }
-                    items(uiState.seedCards, key = { "planadded_${it.scryfallId}" }) { card ->
-                        // Tappable, unlike the dead onClick={} elsewhere in this file's legacy
-                        // ManualAddsStepContent -- this step already threads onCardClick through for
-                        // the search sheet, so wire the same navigation here instead of rendering a
-                        // clickable Surface (CardRow uses Surface(onClick=...), real ripple) that does
-                        // nothing on tap.
+                    // Deck Wizard 60-card wave (v6): a quantity-aware "Your cards" row (S6, per plan
+                    // §5 Phase 5.4) is run C's job -- this run only had to keep the list compiling
+                    // against the renamed `seeds: List<WizardSeed>` shape, so `onRemove` still fully
+                    // removes the seed regardless of quantity (byte-identical to before for
+                    // Commander, whose seeds are always quantity 1 anyway).
+                    items(uiState.seeds, key = { "planadded_${it.card.scryfallId}" }) { seed ->
                         CardRow(
-                            card = card,
+                            card = seed.card,
                             isInCollection = true,
-                            onClick = { onCardClick(card.scryfallId) },
-                            onRemove = { onRemoveCard(card) },
+                            onClick = { onCardClick(seed.card.scryfallId) },
+                            onRemove = { onRemoveCard(seed.card) },
                         )
                     }
                 }
@@ -1009,8 +1034,8 @@ internal fun PlanSectionsStepContent(
     }
 
     if (showSearchSheet && isDestinationResumed) {
-        val existingIds = remember(uiState.selectedCommander, uiState.seedCards) {
-            (listOfNotNull(uiState.selectedCommander?.scryfallId) + uiState.seedCards.map { it.scryfallId }).toSet()
+        val existingIds = remember(uiState.selectedCommander, uiState.seeds) {
+            (listOfNotNull(uiState.selectedCommander?.scryfallId) + uiState.seeds.map { it.card.scryfallId }).toSet()
         }
         val ownedIds = remember(uiState.ownedCards) { uiState.ownedCards.map { it.scryfallId }.toSet() }
         fun toRow(card: Card) = AddCardRow(
@@ -1047,183 +1072,3 @@ internal fun PlanSectionsStepContent(
         )
     }
 }
-
-// ── 2.3 — MANUAL_ADDS (SHARED, WS3 mounts this same composable for the Casual flows) ─────────
-
-private data class ManualAddsRoleSection(val key: RoleKey, val label: String, val filled: Int, val target: Int)
-
-/** Groups [seedCards] by their best-matching role (per [ArchetypeRoleClassifier.classify], among
- * only the keys [skeleton] actually assigns a non-zero ideal band to) and returns one section per
- * such role, target-descending -- "seeds-only counts" per plan 2.3 (a card whose best role isn't in
- * [skeleton] at all contributes to no section, but is still a real seed; this is a display grouping,
- * never an enforcement gate). */
-private fun buildRoleSections(skeleton: ResolvedArchetypeSkeleton, seedCards: List<Card>): List<ManualAddsRoleSection> {
-    val wantedKeys = skeleton.roleTargets.filterValues { it.ideal > 0 }.keys
-    val filledByRole = mutableMapOf<RoleKey, Int>()
-    seedCards.forEach { card ->
-        val scores = ArchetypeRoleClassifier.classify(card).filterKeys { it in wantedKeys }
-        val bestKey = scores.maxByOrNull { it.value }?.key ?: return@forEach
-        filledByRole[bestKey] = (filledByRole[bestKey] ?: 0) + 1
-    }
-    return skeleton.roleTargets.entries
-        .filter { it.value.ideal > 0 }
-        .sortedByDescending { it.value.ideal }
-        .map { (key, target) -> ManualAddsRoleSection(key, ArchetypeRoleClassifier.label(key), filledByRole[key] ?: 0, target.ideal) }
-}
-
-/**
- * Skeleton-guided, fully skippable card search + add step (plan 2.3). Built SHARED for reuse: every
- * parameter this composable reads off [uiState] is format-agnostic (skeleton/seeds/color identity/
- * search state), so a future Casual caller (Workstream 3) can mount it unchanged once its own VM
- * paths populate the same [DeckWizardUiState] fields.
- *
- * Hard-filters candidates by [DeckWizardUiState.colorIdentity] subset (`cardIdentity ⊆
- * commanderIdentity`, colorless always included per the empty-list-vacuous-`all{}` rule) --
- * Workstream 9 note: this reads whatever is CURRENTLY in [DeckWizardUiState.colorIdentity] at call
- * time; if a future workstream makes color identity multi-sourced/derived differently, this filter
- * point is the one to revisit.
- */
-@Composable
-internal fun ManualAddsStepContent(
-    uiState: DeckWizardUiState,
-    onQueryChange: (String) -> Unit,
-    onToggleIncludeOutsideCollection: () -> Unit,
-    onSelectRoleFilter: (String?) -> Unit,
-    onAddSeed: (Card) -> Unit,
-    onRemoveSeed: (Card) -> Unit,
-    onNext: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    val skeleton = uiState.manualAddsSkeleton
-
-    val roleSections = remember(skeleton, uiState.seedCards) {
-        skeleton?.let { buildRoleSections(it, uiState.seedCards) }.orEmpty()
-    }
-
-    val identitySymbols = remember(uiState.colorIdentity) { uiState.colorIdentity.map { it.symbol }.toSet() }
-    val query = uiState.manualAddsQuery.trim()
-    val seededIds = remember(uiState.seedCards) { uiState.seedCards.map { it.scryfallId }.toSet() }
-
-    val localCandidates = remember(uiState.ownedCards, seededIds, identitySymbols, query, uiState.manualAddsRoleFilter) {
-        uiState.ownedCards
-            .filterNot { it.scryfallId in seededIds }
-            .filter { card -> card.colorIdentity.all { it in identitySymbols } }
-            .filter { card -> query.isEmpty() || card.name.contains(query, ignoreCase = true) }
-            .filter { card ->
-                val roleFilter = uiState.manualAddsRoleFilter ?: return@filter true
-                (ArchetypeRoleClassifier.classify(card)[roleFilter] ?: 0f) > 0f
-            }
-            .take(MANUAL_ADDS_RESULT_CAP)
-    }
-    val showOutsideResults = uiState.includeOutsideCollection && query.length >= 2
-    val candidatesToShow = if (showOutsideResults) uiState.manualAddsSearchResults else localCandidates
-
-    Column(Modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.md),
-            verticalArrangement = Arrangement.spacedBy(spacing.lg),
-        ) {
-            item(key = "header") {
-                Column {
-                    Text(stringResource(R.string.deck_wizard_manual_adds_title), style = ty.titleLarge, color = mc.textPrimary)
-                    Text(
-                        stringResource(R.string.deck_wizard_manual_adds_subtitle),
-                        style = ty.bodyMedium,
-                        color = mc.textSecondary,
-                        modifier = Modifier.padding(top = spacing.xxs),
-                    )
-                }
-            }
-
-            if (roleSections.isNotEmpty()) {
-                item(key = "role_sections") {
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                        roleSections.forEach { section ->
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(section.label, style = ty.bodyMedium, color = mc.textSecondary)
-                                Text(
-                                    stringResource(R.string.deck_wizard_manual_adds_role_progress, section.filled, section.target),
-                                    style = ty.labelMedium,
-                                    color = mc.textPrimary,
-                                )
-                            }
-                        }
-                    }
-                }
-                item(key = "role_filters") {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.xs), verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                        roleSections.forEach { section ->
-                            DirectionChip(
-                                label = section.label,
-                                selected = uiState.manualAddsRoleFilter == section.key,
-                                onClick = { onSelectRoleFilter(section.key) },
-                            )
-                        }
-                    }
-                }
-            }
-
-            item(key = "outside_toggle") {
-                OutsideCollectionToggleRow(checked = uiState.includeOutsideCollection, onToggle = onToggleIncludeOutsideCollection)
-            }
-            item(key = "search") {
-                OutlinedTextField(
-                    value = uiState.manualAddsQuery,
-                    onValueChange = onQueryChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    placeholder = { Text(stringResource(R.string.deck_wizard_manual_adds_search_hint), style = ty.bodyMedium, color = mc.textDisabled) },
-                    leadingIcon = {
-                        if (uiState.isSearchingManualAdds) {
-                            MagicLoadingSpinner(size = MagicLoadingSize.XSmall)
-                        } else {
-                            Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary)
-                        }
-                    },
-                    shape = CardShape,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = mc.primaryAccent,
-                        unfocusedBorderColor = mc.surfaceVariant,
-                        focusedTextColor = mc.textPrimary,
-                        unfocusedTextColor = mc.textPrimary,
-                        cursorColor = mc.primaryAccent,
-                    ),
-                )
-            }
-
-            if (candidatesToShow.isEmpty()) {
-                item(key = "empty") {
-                    Text(stringResource(R.string.deck_wizard_manual_adds_empty), style = ty.bodySmall, color = mc.textSecondary)
-                }
-            } else {
-                items(candidatesToShow, key = { "manualcand_${it.scryfallId}" }) { card ->
-                    CardRow(card = card, isInCollection = !showOutsideResults, onClick = { onAddSeed(card) }, onRemove = null)
-                }
-            }
-
-            if (uiState.seedCards.isNotEmpty()) {
-                item(key = "added_header") {
-                    Text(
-                        stringResource(R.string.deck_wizard_manual_adds_added_title),
-                        style = ty.labelLarge,
-                        color = mc.primaryAccent,
-                        modifier = Modifier.padding(top = spacing.xs),
-                    )
-                }
-                items(uiState.seedCards, key = { "manualadded_${it.scryfallId}" }) { card ->
-                    CardRow(card = card, isInCollection = true, onClick = {}, onRemove = { onRemoveSeed(card) })
-                }
-            }
-        }
-        WizardStickyButton(
-            label = stringResource(R.string.deck_wizard_next),
-            enabled = true,
-            onClick = onNext,
-        )
-    }
-}
-
-private const val MANUAL_ADDS_RESULT_CAP = 40

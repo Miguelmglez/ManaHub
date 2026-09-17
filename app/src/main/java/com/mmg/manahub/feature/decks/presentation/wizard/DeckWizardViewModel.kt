@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
-// COMMENTS_REVIEWED: 2026-09-16
+// COMMENTS_REVIEWED: 2026-09-17
 
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
@@ -25,34 +25,35 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
+import com.mmg.manahub.feature.decks.domain.engine.BuildAnchor
 import com.mmg.manahub.feature.decks.domain.engine.CardSection
-import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyAffinity
-import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyEntry
+import com.mmg.manahub.feature.decks.domain.engine.CopyPolicy
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
+import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
-import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.PillarId
 import com.mmg.manahub.feature.decks.domain.engine.PlacementScorer
 import com.mmg.manahub.feature.decks.domain.engine.PostureId
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
+import com.mmg.manahub.feature.decks.domain.engine.StrategyPick
 import com.mmg.manahub.feature.decks.domain.engine.StrategyProfile
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 import com.mmg.manahub.feature.decks.domain.engine.WizardPreferenceStore
+import com.mmg.manahub.feature.decks.domain.engine.isLegalForFormat
+import com.mmg.manahub.feature.decks.domain.engine.nearestFor
 import com.mmg.manahub.feature.decks.domain.engine.toPin
-import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
-import com.mmg.manahub.feature.decks.domain.engine.StrategyPick
 import com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
-import com.mmg.manahub.feature.decks.domain.template.CategorySuggestions
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfile
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
 import com.mmg.manahub.feature.decks.domain.template.CollectionTribeSignal
@@ -68,8 +69,6 @@ import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.RankOwnedCardsForProfileUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.StrategyRecommendation
-import com.mmg.manahub.feature.decks.domain.usecase.SeedStrategyCandidate
-import com.mmg.manahub.feature.decks.domain.usecase.SeedStrategySuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestStrategiesForSeedsUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -84,41 +83,40 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * The wizard's internal phases (plan §3.4; [ENTRY] added by the Deck Engine Unification plan §5
- * Phase 3.1) — ONE screen, ONE ViewModel, no per-step nav destination (mirrors the Playtest
- * mulligan/battle-phase-in-one-screen precedent).
- *
- * Deck Wizard v4 (R13): there is no FORMAT phase — the wizard never renders its own format step.
- * The format arrives as a required nav arg ([DeckWizardViewModel]'s `init`) and picks the starting
- * phase directly: Commander formats start at [COMMANDER_PICK] (`COMMANDER_PICK → STRATEGY →
- * MANUAL_ADDS → REVIEW`), Casual starts at [ENTRY] (`ENTRY → DIRECTION → MANUAL_ADDS → REVIEW`).
- * [IDENTITY] stays unreachable dead code for every flow (see [DeckWizardViewModel
- * .onNextFromDirection]'s KDoc).
- *
- * W7 (Choice flow, R10/R11): [CHOICE] is Commander-only, inserted between [GENERATING] and
- * [RESULT] whenever [BuildCommanderDeckUseCase.buildWithGroups] surfaces at least one
- * [com.mmg.manahub.feature.decks.domain.template.AmbiguityGroup] — the SAME "replaces the whole
- * body, no step indicator" treatment [GENERATING]/[RESULT] already get (see [stepPhasesFor] in
- * `DeckWizardScreen.kt`, unchanged by this addition). A zero-group build skips [CHOICE] entirely
- * and finalizes straight to [RESULT], same as before this run.
+ * The wizard's internal phases (Deck Wizard 60-card wave v6, plan §5 Phase 5.1, S20). ONE build
+ * engine, ONE step language for every format now (S1): [ENTRY] is the flow chooser (Casual-family
+ * and every 60-card format visit it; Commander skips straight to [COMMANDER_PICK], the mandatory
+ * first seed). [SEED_PICK]/[COLOR_PICK]/[STRATEGY_PICK] are the three "Start from …" flows'
+ * respective first step ([WizardEntryFlow.CARDS]/`.COLORS`/`.STRATEGY`). [STRATEGY] is shared by
+ * every anchor (Commander AND every 60-card flow). [PLAN_SECTIONS] (renamed from `MANUAL_ADDS`)
+ * is the engine-attributed browse/add step, also shared by every anchor now that the legacy
+ * skeleton-guided Casual `MANUAL_ADDS` step is gone. `DIRECTION`/`IDENTITY`/`RESULT` are DELETED —
+ * every format now opens Deck Studio directly after persist (S13), never a Result screen.
  */
-enum class WizardPhase { ENTRY, COMMANDER_PICK, STRATEGY, MANUAL_ADDS, DIRECTION, IDENTITY, REVIEW, GENERATING, CHOICE, RESULT }
+enum class WizardPhase { ENTRY, COMMANDER_PICK, SEED_PICK, COLOR_PICK, STRATEGY_PICK, STRATEGY, PLAN_SECTIONS, REVIEW, GENERATING, CHOICE }
 
 /**
  * Deck Engine Unification plan (§5 Phase 3.1) — the three ways a build can start. [CARDS] is the
  * ORIGINAL wizard flow (commander/seed picker, unchanged) and is the ONLY flow [DeckFormat.COMMANDER]
  * ever uses (the commander itself is the mandatory first seed — plan: "Commander = cards-flow variant
  * with a mandatory commander slot as seed #1"), so [WizardPhase.ENTRY] is skipped entirely for
- * Commander builds. [COLORS] and [STRATEGY] are Casual-only and both reuse [WizardPhase.DIRECTION] —
- * that phase's content composable dispatches on this field rather than adding two more phases.
+ * Commander builds. [COLORS] and [STRATEGY] land on [WizardPhase.COLOR_PICK]/[WizardPhase.STRATEGY_PICK]
+ * respectively (60-card wave v6 — the pre-v6 shared `DIRECTION` phase these used to dispatch on is
+ * gone).
  */
 enum class WizardEntryFlow { CARDS, COLORS, STRATEGY }
 
-/** A rankable color-combination pick for Flow C (strategy-first) — the curated
- * [ColorStrategyAffinity.combosFor] weight blended with how strong the user's OWN collection already
- * is in those colors ([CollectionProfile.colorShares]), so a taxonomy pick favors combos the user can
- * actually build today over a purely abstract ranking. */
+/** A rankable color-combination pick for the STRATEGY_PICK flow — the curated
+ * [com.mmg.manahub.feature.decks.domain.engine.ColorStrategyAffinity.combosFor] weight blended with
+ * how strong the user's OWN collection already is in those colors ([CollectionProfile.colorShares]),
+ * so a taxonomy pick favors combos the user can actually build today over a purely abstract ranking. */
 data class ColorComboSuggestion(val colors: Set<ManaColor>, val score: Float)
+
+/** One picked seed card and how many copies of it (Deck Wizard 60-card wave v6, plan §5 Phase 5.1,
+ * S3/S4) — replaces the pre-v6 `List<Card>` shape now that copies are a first-class engine concept.
+ * Commander seeds are always quantity 1 (dedupe-by-name, never incremented — see
+ * [DeckWizardViewModel.onAddSeed]'s Commander branch). */
+data class WizardSeed(val card: Card, val quantity: Int)
 
 /** One-shot side effects, delivered via a buffered [Channel] (never a nullable [MutableStateFlow]
  * — see the project-wide "one-shot events" convention documented on every other feature VM). */
@@ -130,6 +128,12 @@ sealed interface DeckWizardEvent {
 
     /** The Result screen's "Open in Deck Studio" CTA — the caller navigates + pops the wizard. */
     data class OpenDeckStudio(val deckId: String) : DeckWizardEvent
+
+    /** Deck Wizard 60-card wave (v6), plan §5 Phase 5.1: a missing/unsupported format nav arg
+     * (Draft, or a corrupted deep link) — the screen pops the wizard via its own `onBack` callback
+     * instead of silently building a Casual deck the old fallback used to (S1: every format now
+     * has a real build path except Draft, so a genuine fallback is never warranted). */
+    data object Exit : DeckWizardEvent
 }
 
 data class DeckWizardUiState(
@@ -142,19 +146,25 @@ data class DeckWizardUiState(
     val selectedFormat: DeckFormat? = null,
 
     // ── Entry chooser (Deck Engine Unification plan §5 Phase 3.1) ────────────────
-    /** Casual only — Commander always forces [WizardEntryFlow.CARDS] and skips [WizardPhase.ENTRY]
-     * entirely (see that enum's KDoc), so this default is only ever OBSERVED for Casual. */
+    /** Casual/60-card only — Commander always forces [WizardEntryFlow.CARDS] and skips
+     * [WizardPhase.ENTRY] entirely (see that enum's KDoc), so this default is only ever OBSERVED
+     * for a non-Commander format. */
     val entryFlow: WizardEntryFlow = WizardEntryFlow.CARDS,
 
-    // ── Step 2 — Direction ────────────────────────────────────────────────────
+    // ── Collection snapshot ───────────────────────────────────────────────────
     val isLoadingProfile: Boolean = true,
     val collectionProfile: CollectionProfile? = null,
     /** Deck Wizard & Engine Rework plan, Workstream 2.3 -- the full owned-card snapshot (unlike
-     * [collectionProfile], which only surfaces DERIVED top-N signals), exposed for MANUAL_ADDS'
-     * search-over-the-collection surface. Populated once, alongside [collectionProfile], from the
-     * SAME `init` collection load -- the VM's private `cardSnapshot` is otherwise never exposed to
-     * the UI layer. */
+     * [collectionProfile], which only surfaces DERIVED top-N signals). Populated once, alongside
+     * [collectionProfile], from the SAME `init` collection load. */
     val ownedCards: List<Card> = emptyList(),
+    /** Deck Wizard 60-card wave (v6), plan §5 Phase 5.2: total owned quantity by [Card.name] (summed
+     * across every printing) -- SEED_PICK's own [com.mmg.manahub.feature.decks.presentation
+     * .components.CardDetailSheet] "You own %1$d" caption needs a real copy count, which
+     * [ownedCards] alone (one entry per distinct PRINTING, not exploded by [Card.name]) cannot give. */
+    val ownedQuantityByName: Map<String, Int> = emptyMap(),
+
+    // ── COMMANDER_PICK (Commander only) ──────────────────────────────────────
     val selectedCommander: Card? = null,
     val commanderQuery: String = "",
     val commanderSearchResults: List<Card> = emptyList(),
@@ -164,314 +174,186 @@ data class DeckWizardUiState(
      * .InlineErrorState] instead of silently falling through to the "no results" empty state. Cleared
      * at the start of every new search attempt. */
     val commanderSearchError: Boolean = false,
-    /** Flow A (cards-first, plan §5 3.2) — recomputed from [seedCards] (+ [selectedCommander]) on
-     * every seed add/remove. `null` while no seed is picked yet (nothing to rank). */
-    val seedStrategySuggestion: SeedStrategySuggestion? = null,
-    /** Flow B (colors-first, plan §5 3.3) — [ColorStrategyAffinity.forColors] for the CURRENT
-     * [colorIdentity] pick; empty until at least one color is toggled on. */
-    val colorAffinityEntries: List<ColorStrategyEntry> = emptyList(),
-    val selectedColorAffinityEntry: ColorStrategyEntry? = null,
-    /** Flow C (strategy-first, plan §5 3.4) — the taxonomy browser's free-text filter and the color
-     * combos ranked once an archetype/theme is picked. */
-    val taxonomyQuery: String = "",
-    val colorComboSuggestions: List<ColorComboSuggestion> = emptyList(),
-    /** Flow B/C shared (plan §5 3.3/3.4) — owned cards ranked against the just-picked profile,
-     * rendered as a check/uncheck list that writes into [seedCards] via the SAME add/remove handlers
-     * Flow A's seed picker uses (RC5 — the user always controls which exact cards seed the build). */
-    val suggestedSeedCards: List<Card> = emptyList(),
-    /** Deck Wizard & Engine Rework plan, Workstream 3.1 — Flow A only. Colors derived from the union
-     * of currently picked [seedCards]' own [Card.colorIdentity], recomputed from scratch on every
-     * seed add/remove ([DeckWizardViewModel.recomputeSeedLockedColors]). The UI renders every color
-     * in this set as pre-selected AND visually locked (cannot be deselected) inside [colorIdentity] —
-     * removing the seed that contributed a color immediately unlocks it (it stays picked as an
-     * ordinary, now-deselectable choice until the user removes it explicitly;
-     * [DeckWizardViewModel.onToggleCardsFlowColor] is a no-op while a color is still locked). Always
-     * a subset of [colorIdentity] by construction. Harmless (and unused by the UI) for Commander/Flow
-     * B/C, whose own MANUAL_ADDS/suggested-seed adds always stay within an already-resolved
-     * [colorIdentity] anyway. */
-    val lockedColors: Set<ManaColor> = emptySet(),
-    /** Deck Engine Unification plan (D2): the Direction step's picked [ArchetypeId], resolved from
-     * a tapped collection-lean [CardTag] chip via [DeckIdentitySeedTags.archetypeForTag]. Mutually
-     * exclusive with [selectedDirectionTheme] and the tribe pick -- selecting one clears the
-     * others, since all three represent the SAME "one Direction pick" slot in
-     * [com.mmg.manahub.feature.decks.domain.template.DeckWizardSpec.strategyProfile]. */
-    val selectedArchetype: ArchetypeId? = null,
-    /** The Direction step's picked [ThemeId] -- resolved from a tapped chip whose [CardTag] has no
-     * [ArchetypeId] equivalent but does resolve to a theme via [DeckIdentitySeedTags.themeForTag]
-     * (e.g. `plus_counters` -> PLUS1_COUNTERS, `spellslinger` -> SPELLSLINGER). Same "one Direction
-     * pick" slot as [selectedArchetype]. */
-    val selectedDirectionTheme: ThemeId? = null,
-    /** Edge-case audit (Wizard Quality Campaign final gate, 2026-07-19): the raw
-     * [com.mmg.manahub.feature.decks.domain.template.CollectionTribeSignal.tribeKey] (e.g.
-     * `"tribe:elf"`) of the picked tribe Direction chip -- threaded into
-     * [StrategyProfile.tribe]. [selectedTribeLabel] stays the pluralized DISPLAY string (e.g.
-     * "Elves") for the Review-screen echo; this is the stable machine key the build actually
-     * consumes. Same "one Direction pick" slot as [selectedArchetype]/[selectedDirectionTheme] --
-     * selecting a tribe clears both of those, and vice versa. */
-    val selectedTribeKey: String? = null,
-    val selectedTribeLabel: String? = null,
-    val showSeedPicker: Boolean = false,
-    val seedCards: List<Card> = emptyList(),
-    val seedQuery: String = "",
-    val seedSearchResults: List<Card> = emptyList(),
-    val isSearchingSeeds: Boolean = false,
-
-    // ── Commander flow (Deck Wizard & Engine Rework plan, Workstream 2) ──────────
-    /** COMMANDER_PICK step (2.1) -- color-identity filter row (D-G local-collection candidates OR,
-     * behind [includeOutsideCollection], a Scryfall `is:commander` search). Reuses
-     * [selectedCommander]/[commanderQuery]/[commanderSearchResults]/[isSearchingCommander] above --
-     * this is the SAME one-commander pick, now reached via its own dedicated step instead of being
-     * embedded inside the old Flow-A Direction step (which Commander no longer visits). */
-    /** COMMANDER_PICK's OWN color-identity filter row was DELETED (Deck Wizard Commander v3 plan,
-     * Phase 3.2, D7/R2) -- this field has no remaining UI producer ([onToggleCommanderColorFilter]
-     * is unused dead code kept only because [onCommanderQueryChange]'s Casual-Direction-flow body
-     * still reads it; see that function's KDoc). Always [emptySet] in practice from now on. */
-    val commanderColorFilter: Set<ManaColor> = emptySet(),
-    /** D-A -- ONE shared toggle for MANUAL_ADDS' card search (and, unchanged, the Casual Direction
-     * flow's own embedded commander search): default collection-only, opt-in to a live Scryfall
-     * search. Deck Wizard Commander v4 plan (W2.1, G2/R2): COMMANDER_PICK's OWN outside-collection
-     * toggle stays deleted — unowned commanders are reachable through search text or a filter
-     * ([commanderStructuredQuery] below), which now goes straight to Scryfall with no tab of its
-     * own. This flag stays session-level (not per-step) -- excluded from [resetDirectionScratchState]. */
-    val includeOutsideCollection: Boolean = false,
     /** Deck Wizard Commander v4 plan (W2.1, G2/R2): the structured query applied via COMMANDER_PICK's
-     * search-bar Tune icon ([com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet], locked
-     * to [SearchCriterion.CommanderEligible] +, for a strict Commander build,
-     * `Format(commander, legal)`). `null` while the user has added no filter on top of the locked
-     * criteria — combined with a blank [commanderQuery] that is the step's IDLE state, showing the
-     * local owned-eligible grid ([DeckWizardUiState.collectionProfile].commanderCandidates) instead
-     * of live Scryfall results ([commanderSearchResults]). No more Collection/All-cards tabs (v3's
-     * `CommanderResultTab` was deleted) -- one query, one Scryfall-backed result list. */
+     * search-bar Tune icon. `null` while the user has added no filter on top of the locked criteria. */
     val commanderStructuredQuery: AdvancedSearchQuery? = null,
 
-    /** STRATEGY step (Deck Wizard Commander v3 plan, Phase 4) -- the ranked recommendation list
-     * from [RecommendCommanderStrategiesUseCase], sorted best-first; the UI splits it via
-     * [RecommendCommanderStrategiesUseCase.splitRecommended] (v4 W3/E3: score threshold + hard cap
-     * of 5) into "Recommended" and collapsed "Partial fit" (Custom is a UI-level sentinel, always
-     * offered separately -- see [DeckWizardCommanderSteps.CUSTOM_STRATEGY_ID]). Replaces the old
-     * `DeriveCommanderStrategiesUseCase` candidate-union list + the 3-axis `StrategyPickerSheet`
-     * this step used to mount. */
-    val commanderStrategyRecommendations: List<StrategyRecommendation> = emptyList(),
+    /** Deck Wizard & Engine Rework plan, Workstream 3.1 -- colors derived from the union of currently
+     * picked [seeds]' own [Card.colorIdentity], recomputed from scratch on every seed add/remove
+     * ([DeckWizardViewModel.recomputeSeedLockedColors]). The UI renders every color in this set as
+     * pre-selected AND visually locked (cannot be deselected) inside [colorIdentity] -- removing the
+     * seed that contributed a color immediately unlocks it. Always a subset of [colorIdentity] by
+     * construction. */
+    val lockedColors: Set<ManaColor> = emptySet(),
+    /** The wizard's ONE "Direction/Strategy pick" slot -- shared by every anchor (Commander AND
+     * every 60-card flow) since the STRATEGY step is now common ground (S1/S7). */
+    val selectedArchetype: ArchetypeId? = null,
+    val selectedTribeKey: String? = null,
+    val selectedTribeLabel: String? = null,
+
+    // ── Seeds (SEED_PICK / PLAN_SECTIONS "Start from cards", S3/S4) ───────────
+    /** Deck Wizard 60-card wave (v6), plan §5 Phase 5.1: replaces the pre-v6 `List<Card>` — a copy
+     * is a first-class engine concept now (S2/S4). Commander entries are always quantity 1. */
+    val seeds: List<WizardSeed> = emptyList(),
+    /** SEED_PICK's own name-filter search bar text. */
+    val seedPickQuery: String = "",
+    /** SEED_PICK's own [com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet] result, on
+     * top of [DeckWizardSixtySteps.seedLockedCriteria]'s locked format-legality criterion. */
+    val seedPickStructuredQuery: AdvancedSearchQuery? = null,
+    val seedPickResults: List<Card> = emptyList(),
+    val isSearchingSeedPick: Boolean = false,
+    /** True when [DeckWizardViewModel]'s own SEED_PICK Scryfall search failed -- mirrors
+     * [commanderSearchError]'s contract. */
+    val seedPickSearchError: Boolean = false,
+    /** SEED_PICK's sticky "N cards added" pill -> opens the seed queue sheet. */
+    val showSeedQueue: Boolean = false,
+    /** The seed currently open in [com.mmg.manahub.feature.decks.presentation.components
+     * .CardDetailSheet] from SEED_PICK (tile tap or queue-sheet image tap) — `null` when the sheet
+     * is closed. */
+    val seedDetailCard: Card? = null,
+
+    // ── STRATEGY (shared by every anchor, S7) ─────────────────────────────────
+    /** Deck Wizard Commander v3 plan, Phase 4.1 -- the ranked recommendation list from
+     * [RecommendCommanderStrategiesUseCase] (rename of `commanderStrategyRecommendations`, 60-card
+     * wave v6 plan §5 Phase 5.2 -- Commander AND every 60-card anchor share this ONE field now),
+     * sorted best-first; the UI splits it via [RecommendCommanderStrategiesUseCase.splitRecommended]
+     * into "Recommended" and collapsed "Partial fit" (Custom is a UI-level sentinel, always offered
+     * separately). */
+    val strategyRecommendations: List<StrategyRecommendation> = emptyList(),
     val isLoadingCommanderStrategies: Boolean = false,
     /** The currently-selected catalog entry's id, or `null` for Custom (D6) -- drives the STRATEGY
-     * step's single-select highlight. Distinct from [selectedArchetype]/[selectedStrategyThemes]/
-     * [selectedTribeKey], which stay the ACTUAL pin fields the rest of the wizard (skeleton preview,
-     * build) reads -- this id is a display-only pointer back into
-     * [commanderStrategyRecommendations], since a (archetype, themes) pair alone cannot always be
-     * mapped back to exactly one catalog id. */
+     * step's single-select highlight. */
     val selectedCuratedStrategyId: String? = null,
+    /** Deck Wizard 60-card wave (v6), plan §5 Phase 5.1: distinguishes "the user explicitly tapped
+     * Custom" from "nothing picked yet" -- both read as `selectedCuratedStrategyId == null`, which
+     * is ambiguous for COLOR_PICK/STRATEGY_PICK's own Next-enable gate (run B, plan §5 Phase 5.3). */
+    val isCustomStrategyChosen: Boolean = false,
     /** The STRATEGY step's own tribe sub-picker (shown when the user taps a `requiresTribe` entry
      * with no tribe the recommender could derive on its own) -- the entry awaiting a tribe pick, or
      * `null` when the sub-picker is closed. */
     val pendingTribeStrategy: CuratedStrategy? = null,
     /** [pendingTribeStrategy]'s own candidate list -- the collection's dominant tribes within the
-     * selected commander's identity (reuses [CollectionProfileUseCase.dominantTribes] over an
-     * identity-filtered slice of [ownedCards], per the plan's "reuse whatever the app already
-     * computes for dominant tribes in identity" instruction -- no new dominant-tribe computation). */
+     * current identity. */
     val commanderTribePickerCandidates: List<CollectionTribeSignal> = emptyList(),
-    /** The STRATEGY step's OWN theme pick(s) -- up to [com.mmg.manahub.feature.decks.domain.engine
-     * .StrategyCatalog.MAX_THEMES]. Kept SEPARATE from [selectedDirectionTheme] (Casual's existing
-     * single-theme Direction/Identity slot) deliberately: unifying them would force
-     * [selectedDirectionTheme] to become a `List<ThemeId>` and ripple through every Casual
-     * Direction/Identity call site this workstream must leave byte-identical (see
-     * [DeckWizardViewModel.onGenerate]'s Commander branch for where this feeds the build spec).
-     * [selectedArchetype]/[selectedTribeKey]/[selectedTribeLabel] ARE shared with Casual's existing
-     * one-slot fields (both flows use the SAME "one Direction/Strategy pick" contract) -- only the
-     * theme axis needed its own field, since it is the only axis where the two flows' cardinality
-     * differs (Casual: 1 theme; Commander STRATEGY: up to 2). */
+    /** The STRATEGY step's OWN theme pick(s) -- up to
+     * [com.mmg.manahub.feature.decks.domain.engine.StrategyCatalog.MAX_THEMES]. */
     val selectedStrategyThemes: List<ThemeId> = emptyList(),
     /** Deck Wizard Commander v3 plan (Phase 0 F3 gap, closed in Phase 5): [CuratedStrategy.toPin]'s
-     * posture, previously computed by [selectCommanderStrategy] and immediately discarded -- there
-     * was no field to store it in. Mirrors [selectedArchetype]/[selectedStrategyThemes]/
-     * [selectedTribeKey]'s "one Strategy pick" contract; forwarded to
-     * [com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline.analyze]'s
-     * `postureOverride` so [planAnalysis] scores the SAME plan the engine will score at generation
-     * time (once Phase 6 wires generation). */
+     * posture, forwarded to [DeckAnalysisPipeline.analyze]'s `postureOverride` so [planAnalysis]
+     * scores the SAME plan the engine will score at generation time. */
     val selectedPosture: PostureId? = null,
+    /** STRATEGY_PICK's own free-text taxonomy filter (rename of pre-v6 `taxonomyQuery`, run B wires
+     * its UI -- plan §5 Phase 5.3) and its inline color-combo ranking (rename of pre-v6
+     * `colorComboSuggestions`, [DeckWizardViewModel.recomputeColorComboSuggestions] retargets it). */
+    val strategyPickQuery: String = "",
+    val strategyPickCombos: List<ColorComboSuggestion> = emptyList(),
 
-    /** PLAN_SECTIONS step (Deck Wizard Commander v3 plan, Phase 5, R4 -- Commander only; Casual
-     * still mounts [manualAddsSkeleton]/[MANUAL_ADDS]). The ONLY analysis engine call this step
-     * ever makes -- attribution comes from here, never a wizard-side classifier (see the
-     * campaign's own D2/§2 "no third vocabulary" rule). `null` while no build has been analyzed
-     * yet (before the first recompute lands) or the pipeline degraded (see
-     * [DeckWizardViewModel.recomputePlanAnalysis]'s KDoc). */
+    // ── PLAN_SECTIONS (shared by every anchor since the Casual `MANUAL_ADDS` step was deleted) ───
+    /** The ONLY analysis engine call this step ever makes -- attribution comes from here, never a
+     * wizard-side classifier. `null` while no build has been analyzed yet (before the first
+     * recompute lands) or the pipeline degraded. */
     val planAnalysis: DeckAnalysis? = null,
-    /** True while a debounced [planAnalysis] recompute is in flight. Only meaningful together with
-     * [planAnalysis] == null (the loading-vs-error distinction the UI needs) -- a `true` with a
-     * non-null [planAnalysis] just means a newer recompute is already running, the UI keeps
-     * showing the last-good result. */
+    /** True while a debounced [planAnalysis] recompute is in flight. */
     val isAnalyzingPlan: Boolean = false,
     /** [CardSection.id] -> count of owned, identity-legal, format-legal candidates (excluding the
-     * commander and any card already in [seedCards], deduped by name) that the SAME classification
-     * signal used to BUILD that section's own id would credit -- the "N in your collection" hint.
-     * Absent key (not zero) for a section with no sensible availability signal (`offplan`/
-     * `standalone`/`interaction`/`legal`/`illegal`) -- see
-     * [DeckWizardViewModel.computeOwnedAvailabilityBySection]'s KDoc for exactly how each section id
-     * shape is matched. This is a CHEAP REPRODUCTION of the same signals [ArchetypeRoleClassifier]/
-     * [PlacementScorer]/[TribeDeriver] already expose -- never a re-exposure of
-     * [com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase]'s own private
-     * candidate-pool machinery (same precedent as Phase 4's `ownedRoleCounts`, see the progress
-     * tracker's Run 6 log). */
+     * commander/every seed) that the SAME classification signal used to BUILD that section's own id
+     * would credit -- the "N in your collection" hint. */
     val ownedAvailabilityBySection: Map<String, Int> = emptyMap(),
-    /** PLAN_SECTIONS' "Browse for &lt;Category&gt;" sheet -- mirrors [manualAddsQuery]/
-     * [manualAddsSearchResults]'s shape but as its OWN state (a different tab/context from
-     * [manualAddsQuery], which stays Casual/MANUAL_ADDS-only): the plain search-bar text. */
+    /** PLAN_SECTIONS' "Browse for &lt;Category&gt;" sheet -- the plain search-bar text. */
     val planSectionsQuery: String = "",
     /** The structured query currently APPLIED via the browse sheet's Advanced Search sheet (Tune
-     * icon or a section's own "Browse for X" preset) -- `null` means nothing is filtering the two
-     * result tabs beyond [planSectionsQuery]'s plain name filter. */
+     * icon or a section's own "Browse for X" preset). */
     val planSectionsStructuredQuery: AdvancedSearchQuery? = null,
     /** [com.mmg.manahub.core.model.CardTag] keys applied via [planSectionsStructuredQuery]'s
-     * accompanying collection-tag preset (`SectionSearchQuery.collectionTagKeysFor`) -- a DIFFERENT
-     * key space from the structured criteria above, ANDed together (mirrors
-     * `DeckStudioUiState.activeCollectionTagFilter`'s own contract). */
+     * accompanying collection-tag preset, ANDed together. */
     val planSectionsTagFilter: Set<String> = emptySet(),
     /** Collection tab results -- local, lenient [StructuredCardSearch.collectionMatches] over
-     * [ownedCards], filtered by [planSectionsStructuredQuery] + [planSectionsTagFilter] +
-     * [planSectionsQuery]'s plain name filter. */
+     * [ownedCards]. */
     val planSectionsCollectionResults: List<Card> = emptyList(),
-    /** All-cards tab results -- a real Scryfall search combining [planSectionsQuery] +
-     * [planSectionsStructuredQuery]'s Scryfall fragment (mirrors
-     * [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.searchScryfallDirect]'s own
-     * combination rule). */
+    /** All-cards tab results -- a real Scryfall search. */
     val planSectionsScryfallResults: List<Card> = emptyList(),
     val isSearchingPlanSectionsScryfall: Boolean = false,
 
-    /** MANUAL_ADDS step (2.3, SHARED -- WS3 mounts this same composable/state shape for the Casual
-     * flows; Commander formats now mount [DeckWizardCommanderSteps.PlanSectionsStepContent] on this
-     * SAME [WizardPhase.MANUAL_ADDS] phase instead, see [DeckWizardScreen]'s phase dispatch --
-     * [manualAddsSkeleton]/[manualAddsRoleFilter] below stay Casual-only from Phase 5 onward, still
-     * computed for Commander too since [DeckWizardViewModel.onNextFromStrategy] is shared, but never
-     * read by the Commander UI). Resolved once on entering the step, from the picked archetype/
-     * themes + [colorIdentity]'s size ([DeckWizardViewModel.onNextFromStrategy]). */
-    val manualAddsSkeleton: ResolvedArchetypeSkeleton? = null,
-    /** Single-select role-key filter chip (tap toggles) -- narrows the search list to cards
-     * [com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier.classify] scores > 0 for
-     * this key. `null` = no filter. */
-    val manualAddsRoleFilter: String? = null,
-    val manualAddsQuery: String = "",
-    val manualAddsSearchResults: List<Card> = emptyList(),
-    val isSearchingManualAdds: Boolean = false,
-
-    // ── Step 3 — Identity ─────────────────────────────────────────────────────
+    // ── Colors identity (COLOR_PICK writes it; SEED_PICK/PLAN_SECTIONS derive it from seeds) ─────
     val colorIdentity: Set<ManaColor> = emptySet(),
-    val availableThemeTags: List<String> = emptyList(),
-    val isLoadingThemeTags: Boolean = false,
-    val selectedThemeHint: String? = null,
 
-    // ── Step 4 — Review ────────────────────────────────────────────────────────
-    /** Casual-only (D7's escape hatch, legacy [BuildDeckFromTemplateUseCase] all-or-nothing land
-     * fill). Kept separate from [includeNonBasicLands] deliberately (Deck Wizard Commander v4,
-     * W5.2): the two toggles have different defaults and different meanings, and sharing one field
-     * would have silently flipped Casual's default the moment Commander's got renamed. */
-    val fillLands: Boolean = true,
+    // ── Review ─────────────────────────────────────────────────────────────────
     /** Commander-only (R8/E10, Deck Wizard Commander v4 W5.2) — gates ONLY Stage A (owned
-     * non-basic lands) of [com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase]'s
-     * land fill; basics (Stage B) always run regardless, per R12. Default OFF: G10 found the OLD
-     * all-or-nothing toggle under-filling real builds. */
+     * non-basic lands) of the wizard's land fill; basics (Stage B) always run regardless, per R12. */
     val includeNonBasicLands: Boolean = false,
-    /** Deck Engine Unification plan (§5 Phase 3.5) — the shared source step. Motor B only ever
-     * re-ranks OWNED cards by community popularity (never pulls in unowned cards), so this is a
-     * plain on/off "also use community trends" toggle rather than a 3-way collection/community/both
-     * selector (see [DeckWizardSpec.useCommunityData]'s KDoc). Hidden entirely in the UI when
-     * [communityEngineAvailable] is false (the GLOBAL `communityEngineEnabledFlow` feature flag is
-     * off) — the per-build toggle can never turn on a capability the global flag has disabled.
-     */
-    val communityEngineAvailable: Boolean = false,
-    val useCommunityData: Boolean = false,
 
     // ── Generation ─────────────────────────────────────────────────────────────
-    val buildStage: com.mmg.manahub.feature.decks.domain.template.BuildStage? = null,
-    val completedStages: List<com.mmg.manahub.feature.decks.domain.template.BuildStage> = emptyList(),
-    /** Deck Wizard Commander v3 plan, Phase 6 (6.3) — the Commander build path's OWN staged-progress
-     * track ([com.mmg.manahub.feature.decks.domain.template.CommanderBuildStage], a SEPARATE enum
-     * from [buildStage]'s -- see that enum's own KDoc for why). `null`/empty for every Casual build,
-     * which keeps using [buildStage]/[completedStages] unchanged. */
+    /** Deck Wizard Commander v3 plan, Phase 6 (6.3) — the wizard's OWN staged-progress track
+     * ([com.mmg.manahub.feature.decks.domain.template.CommanderBuildStage]). Every format uses this
+     * ONE track now (the legacy Casual `BuildStage`/`completedStages` pair was deleted in the
+     * 60-card wave's UI unification -- `generateCasualDeck` no longer surfaces per-stage progress,
+     * only a generic "Validating…" spinner, until run C unifies generation itself). */
     val commanderBuildStage: com.mmg.manahub.feature.decks.domain.template.CommanderBuildStage? = null,
     val commanderCompletedStages: List<com.mmg.manahub.feature.decks.domain.template.CommanderBuildStage> = emptyList(),
     val buildError: String? = null,
 
-    // ── Result (Casual only -- W7 Task D retired the Commander Result screen, plan 7.5;
-    //    Commander now fires DeckWizardEvent.OpenDeckStudio directly from finalizeCommanderDraft) ──
-    val buildResult: TemplateBuildResult? = null,
     val createdDeckId: String? = null,
 
     // ── Choice (W7 Task B, Commander only) ────────────────────────────────────
     /** The engine's pre-land, pre-persist draft — held in memory only while [WizardPhase.CHOICE] is
-     * showing (never persisted, never surviving process death by design — see
-     * [DeckWizardViewModel.onFinishChoices]'s own KDoc). `null` outside that phase. */
+     * showing (never persisted, never surviving process death by design). `null` outside that phase. */
     val commanderDraftBuild: CommanderDraftBuild? = null,
     /** Per-role selections made so far on the Choice screen: [RoleKey] -> the user's FINAL chosen
-     * ids for that role (tentative ∪ alternatives — see [BuildCommanderDeckUseCase.finalize]'s own
-     * KDoc for the exact contract). A role ABSENT from this map has not been touched by the user —
-     * the UI still displays its tentative defaults as pre-selected, and finalizing with this map
-     * as-is keeps that role's engine defaults untouched. */
+     * ids for that role (tentative ∪ alternatives). A role ABSENT from this map has not been touched
+     * by the user -- the UI still displays its tentative defaults as pre-selected. */
     val choiceSelections: Map<RoleKey, List<String>> = emptyMap(),
 ) {
     /** Casual + 3-or-more colors: a non-blocking hint, never a hard gate (D9). */
     val showColorDisciplineHint: Boolean
         get() = selectedFormat?.isSixtyCardConstructed == true && colorIdentity.count { it != ManaColor.C } > 2
+
+    /** Deck Wizard 60-card wave (v6), plan §5 Phase 5.1, §10: [colorIdentity] can carry the UI-only
+     * [ManaColor.C] sentinel (the "Colorless" chip, run B) — this is the ONE boundary helper that
+     * strips it before the identity ever reaches the engine (an empty result IS the engine's own
+     * "colorless build" signal, never a UI-only marker leaking through). */
+    val engineIdentity: Set<ManaColor> get() = colorIdentity - ManaColor.C
+
+    /** Deck Wizard 60-card wave (v6), plan §5 Phase 5.1, S4: total seed COPIES so far. */
+    val seedCopies: Int get() = seeds.sumOf { it.quantity }
+
+    /** Deck Wizard 60-card wave (v6), plan §5 Phase 5.1, S4: the seed-copy ceiling -- the format's
+     * own deck size minus the commander's own slot (99 for Commander, the full [DeckFormat
+     * .targetDeckSize] for every 60-card format). Replaces the pre-v6 flat `MAX_SEED_CARDS = 8`. */
+    val seedCap: Int
+        get() = (selectedFormat?.targetDeckSize ?: 60) - (if (selectedFormat?.isCommanderFormat == true) 1 else 0)
 }
 
 /**
  * QA fix (Deck Engine Unification plan RUN 3b, edge-case audit 2026-07-20): [WizardPhase.ENTRY] is
  * reachable via normal back-navigation at ANY point after the user has already populated state in a
- * flow ([DeckWizardViewModel.onBackPressed] routes DIRECTION→ENTRY) — so a user can pick a
- * Direction (commander, archetype, colors, seeds...), back out, and pick a DIFFERENT entry flow
- * without that state ever being cleared. Deck Wizard v4 (R13): format itself can no longer change
- * mid-session (it is fixed at init from the nav arg), but the entry-flow reset below still matters
- * for Casual's own A/B/C flow switch. Without this reset, stale scratch state from an ABANDONED flow
- * rode into the build: a stale [DeckWizardUiState.selectedArchetype] survived into
- * [StrategyProfile] via `onGenerate`, and a stale [DeckWizardUiState.selectedCommander] survived
- * into [DeckWizardViewModel.wizardDeckName] and (pre-fix) [BuildDeckFromTemplateUseCase]'s seed-tag
- * inference.
- *
- * Every field here represents "one Direction/Identity/Review-step attempt" scratch state, NOT a
- * session-level preference — [DeckWizardUiState.useCommunityData]/[DeckWizardUiState.fillLands]/
- * [DeckWizardUiState.includeNonBasicLands] are deliberately excluded (legitimate across a
- * format/flow switch). [DeckWizardUiState.entryFlow]
- * is also excluded: both call sites ([DeckWizardViewModel.onSelectFormat]/[DeckWizardViewModel
- * .onSelectEntryFlow]) set it themselves right after calling this, to the value that call is
- * actually selecting.
+ * flow -- so a user can pick seeds/colors/a strategy, back out, and pick a DIFFERENT entry flow
+ * without that state ever being cleared. Every field here represents "one entry-flow attempt"
+ * scratch state, NOT a session-level preference.
  */
 private fun DeckWizardUiState.resetDirectionScratchState(): DeckWizardUiState = copy(
-    selectedCommander = null,
-    commanderQuery = "",
-    commanderSearchResults = emptyList(),
-    isSearchingCommander = false,
-    commanderSearchError = false,
-    seedStrategySuggestion = null,
-    colorAffinityEntries = emptyList(),
-    selectedColorAffinityEntry = null,
-    taxonomyQuery = "",
-    colorComboSuggestions = emptyList(),
-    suggestedSeedCards = emptyList(),
+    seeds = emptyList(),
+    seedPickQuery = "",
+    seedPickStructuredQuery = null,
+    seedPickResults = emptyList(),
+    isSearchingSeedPick = false,
+    seedPickSearchError = false,
+    showSeedQueue = false,
+    seedDetailCard = null,
     lockedColors = emptySet(),
+    colorIdentity = emptySet(),
     selectedArchetype = null,
-    selectedDirectionTheme = null,
     selectedTribeKey = null,
     selectedTribeLabel = null,
-    showSeedPicker = false,
-    seedCards = emptyList(),
-    seedQuery = "",
-    seedSearchResults = emptyList(),
-    isSearchingSeeds = false,
-    colorIdentity = emptySet(),
-    availableThemeTags = emptyList(),
-    isLoadingThemeTags = false,
-    selectedThemeHint = null,
-    // Deck Wizard & Engine Rework plan, Workstream 2 -- "one Commander-flow attempt" scratch state,
-    // same rationale as every other field above. [includeOutsideCollection] is deliberately EXCLUDED
-    // (session-level, see its own KDoc).
-    commanderColorFilter = emptySet(),
-    commanderStructuredQuery = null,
-    commanderStrategyRecommendations = emptyList(),
+    strategyRecommendations = emptyList(),
     isLoadingCommanderStrategies = false,
     selectedCuratedStrategyId = null,
+    isCustomStrategyChosen = false,
     pendingTribeStrategy = null,
     commanderTribePickerCandidates = emptyList(),
     selectedStrategyThemes = emptyList(),
     selectedPosture = null,
+    strategyPickQuery = "",
+    strategyPickCombos = emptyList(),
     planAnalysis = null,
     isAnalyzingPlan = false,
     ownedAvailabilityBySection = emptyMap(),
@@ -481,11 +363,6 @@ private fun DeckWizardUiState.resetDirectionScratchState(): DeckWizardUiState = 
     planSectionsCollectionResults = emptyList(),
     planSectionsScryfallResults = emptyList(),
     isSearchingPlanSectionsScryfall = false,
-    manualAddsSkeleton = null,
-    manualAddsRoleFilter = null,
-    manualAddsQuery = "",
-    manualAddsSearchResults = emptyList(),
-    isSearchingManualAdds = false,
 )
 
 /**
@@ -509,9 +386,10 @@ class DeckWizardViewModel(
     private val appContext: Context,
     savedStateHandle: SavedStateHandle,
     // Deck Engine Unification plan (§5 Phase 3) — appended last so no existing positional-arg-free
-    // call site needs to change. Pure, dependency-free use cases (no defaults needed in production;
-    // Koin always supplies real instances) plus the ONE stateful dependency (the global community
-    // feature flag) the Review step's source toggle needs to know whether to render at all.
+    // call site needs to change. Deck Wizard 60-card wave v6 (plan §5 Phase 5.4, run C): these two
+    // pure use cases lose their last production call site in this run (5.1/5.2) -- kept as
+    // constructor params (Koin binding removal is run C's own scope) but genuinely unused by this
+    // class's body from here on.
     private val suggestStrategiesForSeedsUseCase: SuggestStrategiesForSeedsUseCase = SuggestStrategiesForSeedsUseCase(),
     private val rankOwnedCardsForProfileUseCase: RankOwnedCardsForProfileUseCase = RankOwnedCardsForProfileUseCase(),
     private val userPreferences: UserPreferencesDataStore? = null,
@@ -520,6 +398,8 @@ class DeckWizardViewModel(
     // for the same positional-arg-free-call-site reason as the pure use cases below.
     private val cardStrategyTagsRepository: CardStrategyTagsRepository,
     // Deck Wizard Commander v3 plan, Phase 4.1 -- replaces the retired DeriveCommanderStrategiesUseCase.
+    // Deck Wizard 60-card wave v6 (plan §5 Phase 2.1): this is `RecommendWizardStrategiesUseCase`
+    // under its kept typealias -- the SAME instance now also scores every 60-card anchor.
     private val recommendCommanderStrategiesUseCase: RecommendCommanderStrategiesUseCase = RecommendCommanderStrategiesUseCase(),
     // Deck Wizard Commander v3 plan, Phase 5 (D2) -- the SINGLE analysis entry point PLAN_SECTIONS
     // scores against; the SAME shared singleton DeckDoctorOrchestrator/the harness use (never a
@@ -563,11 +443,9 @@ class DeckWizardViewModel(
     private var cardSnapshot: List<Card> = emptyList()
 
     private var commanderSearchJob: Job? = null
-    private var seedSearchJob: Job? = null
-    private var themeTagsJob: Job? = null
+    private var seedPickSearchJob: Job? = null
     private var generateJob: Job? = null
     private var commanderStrategyJob: Job? = null
-    private var manualAddsSearchJob: Job? = null
     private var planAnalysisJob: Job? = null
     private var planSectionsSearchJob: Job? = null
 
@@ -578,9 +456,7 @@ class DeckWizardViewModel(
     /** Deck Wizard Commander v3 plan (Phase 6, D12): the deckId nav arg (Screen.DeckWizard
      * .createRoute) when the wizard was launched from an existing Deck Studio draft (Studio's
      * "Rebuild with the Wizard" CTA). Consumed by [generateCommanderDeck] (fills THIS deck instead
-     * of creating a new one) and by [onSelectFormat] (a rebuild launch cannot switch away from
-     * Commander). [generateCasualDeck] does NOT honor it -- a rebuild launch is always Commander,
-     * see [onSelectFormat]'s own guard. Read once, at init. */
+     * of creating a new one). Read once, at init. */
     private var launchedFromDeckId: String? = null
 
     /** Deck Wizard v4 (R15) structural guard: the `replaceConfirmed` nav arg (Screen.DeckWizard
@@ -594,34 +470,21 @@ class DeckWizardViewModel(
     /** Edge-case fix (Phase 6 adversarial pass), kept as defense-in-depth after Phase 8 JOB 2 made
      * `buildCommanderDeckUseCase.persist` a single Room `@Transaction`
      * ([com.mmg.manahub.core.data.local.dao.DeckDao.persistWizardBuild]): true while that write
-     * is in flight. The DB itself can no longer land half-written (a cancelled/failed transaction
-     * rolls back atomically), but a coroutine cancellation racing the `withContext(ioDispatcher)`
-     * call could still leave THIS ViewModel's own in-memory state (`_uiState`, `generateJob`)
-     * inconsistent with what actually got committed -- [onCancelGeneration] stays a no-op once this
-     * is true, reset the moment the write finishes (success or failure). */
+     * is in flight. */
     private var isWritingCommanderDeck = false
 
     /** W7 Fix 2: the exact args of the last [finalizeCommanderDraft] attempt, so
      * [onRetryGeneration] can re-run the SAME finalize/persist call after a failure instead of
-     * sending the user back to REVIEW -- which would re-run [generateCommanderDeck] from scratch
-     * and silently overwrite [DeckWizardUiState.commanderDraftBuild]/`choiceSelections` (the
-     * user's Choice-screen picks). Set right before every [finalizeCommanderDraft] call site;
-     * cleared only on that call's eventual success. A failure BEFORE a draft exists (the
-     * [buildCommanderDeckUseCase.buildWithGroups] step) leaves this null, so Retry still falls
-     * back to re-walking from REVIEW in that case -- there is nothing to resume. */
+     * sending the user back to REVIEW. */
     private var pendingFinalize: PendingFinalize? = null
 
     /** W8 (telemetry, `deck_wizard_choice_resolution_mode`) -- which roles the user MANUALLY toggled
-     * a card for vs. AUTO-filled via "Choose the remaining N for me", reset at the top of every fresh
-     * [generateCommanderDeck] call (a resumed retry via [pendingFinalize] must NOT reset these, since
-     * it re-runs the SAME resolutions, not a new Choice-screen pass). */
+     * a card for vs. AUTO-filled via "Choose the remaining N for me". */
     private val manuallyToggledChoiceRoles = mutableSetOf<RoleKey>()
     private val autoFilledChoiceRoles = mutableSetOf<RoleKey>()
 
     /** W8 (telemetry, `deck_wizard_generate_duration_ms_bucket`) -- wall-clock from
-     * [generateCommanderDeck]'s entry to [finalizeCommanderDraft]'s successful persist, Choice-screen
-     * think time included (matches the crashlytics-ux-auditor's own spec: "generateCommanderDeck
-     * entry to finalizeCommanderDraft success"). */
+     * [generateCommanderDeck]'s entry to [finalizeCommanderDraft]'s successful persist. */
     private var commanderGenerationStartAtMs: Long? = null
 
     private data class PendingFinalize(
@@ -635,270 +498,130 @@ class DeckWizardViewModel(
     )
 
     init {
-        // Deck Wizard v4 (R13): "format" is now a REQUIRED nav arg (Screen.DeckWizard.createRoute)
-        // -- the wizard never renders its own format step, ever. A format the wizard has no
-        // dedicated build path for (any 60-card format besides Casual -- reachable only via a
-        // Discoveries/combo hand-off from a non-Commander draft) falls back to the same permissive
-        // Casual pipeline those hand-offs already used before this arg existed; a missing/malformed
-        // arg (a corrupted deep link) falls back the same way. Reuses onSelectFormat/onNextFromFormat
-        // rather than duplicating their phase transition logic. Resolved FIRST, before the
-        // Discoveries hand-off block below -- onSelectFormat calls resetDirectionScratchState(),
-        // which would otherwise wipe an archetype/theme/tribe/colors prefill applied before it.
+        // Deck Wizard 60-card wave (v6), plan §5 Phase 5.1: "format" is a REQUIRED nav arg
+        // (Screen.DeckWizard.createRoute) -- the wizard never renders its own format step, ever.
+        // A format the wizard has no build path for (Draft, or a corrupted deep link) exits
+        // immediately (DeckWizardEvent.Exit) instead of the pre-v6 "silently fall back to Casual"
+        // behavior (S1: every non-Draft format has a real build path now).
         val requestedFormat = savedStateHandle.get<String?>("format")?.takeIf { it.isNotEmpty() }
             ?.let { name -> DeckFormat.entries.firstOrNull { it.name == name } }
         launchedFromDeckId = savedStateHandle.get<String?>("deckId")?.takeIf { it.isNotEmpty() }
         replaceConfirmed = savedStateHandle.get<Boolean>("replaceConfirmed") ?: false
         val resolvedFormat = requestedFormat?.takeIf { it.isCommanderFormat || it.isSixtyCardConstructed }
-            ?: DeckFormat.CASUAL.also {
-                if (requestedFormat != null) crashReporter.log("deck_wizard_unsupported_format_fallback_casual")
-            }
-        onSelectFormat(resolvedFormat)
-        onNextFromFormat()
 
-        // Discoveries v2 "Build this" hand-off (D11) — optional, all blank by default. Deck Engine
-        // Unification (D2): nav args carry the unified taxonomy directly (raw ArchetypeId/ThemeId
-        // enum names + a tribe key) instead of the old SeedStrategy-name/free-text-theme pair.
-        val archetypeArg = savedStateHandle.get<String?>("archetype")?.takeIf { it.isNotEmpty() }
-        val themeArg = savedStateHandle.get<String?>("theme")?.takeIf { it.isNotEmpty() }
-        val tribeArg = savedStateHandle.get<String?>("tribe")?.takeIf { it.isNotEmpty() }
-        val colorsArg = savedStateHandle.get<String?>("colors")?.takeIf { it.isNotEmpty() }
-        // Deck Engine Unification plan D7 (4.3): a Commander Spellbook combo's card names --
-        // percent-decoded by Navigation before this reads it, `|`-joined (NOT `,` -- many real
-        // MTG card names contain a literal comma, e.g. "Urza, Lord High Artificer"; see
-        // Screen.DeckWizard.createRoute's KDoc). Forces Flow A (cards-first): a combo hand-off IS
-        // a card-first pick by construction.
-        val seedsArg = savedStateHandle.get<String?>("seeds")?.takeIf { it.isNotEmpty() }
-            ?.split("|")
-            ?.map { it.trim() }
-            ?.filter { it.isNotEmpty() }
-            .orEmpty()
-        if (archetypeArg != null || themeArg != null || tribeArg != null || colorsArg != null) {
-            _uiState.update {
-                it.copy(
-                    selectedArchetype = archetypeArg?.let { name -> ArchetypeId.entries.firstOrNull { a -> a.name == name } },
-                    selectedDirectionTheme = themeArg?.let { name -> ThemeId.entries.firstOrNull { t -> t.name == name } },
-                    selectedTribeKey = tribeArg,
-                    selectedTribeLabel = tribeArg?.let { key -> key.removePrefix("tribe:").replaceFirstChar(Char::uppercase) },
-                    colorIdentity = colorsArg?.let(::parseColorString).orEmpty(),
+        if (resolvedFormat == null) {
+            crashReporter.log("deck_wizard_unsupported_format")
+            crashReporter.recordException(
+                IllegalStateException("[DeckWizardViewModel] unsupported/missing format nav arg: $requestedFormat")
+            )
+            viewModelScope.launch {
+                _events.send(
+                    DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_unsupported_format_toast), MagicToastType.ERROR)
                 )
+                _events.send(DeckWizardEvent.Exit)
             }
-        }
-        if (seedsArg.isNotEmpty()) {
-            _uiState.update { it.copy(entryFlow = WizardEntryFlow.CARDS) }
-        }
-
-        viewModelScope.launch {
-            runCatching {
-                val collection = userCardRepository.observeCollection().first()
-                collectionSnapshot = collection
-                cardSnapshot = collection.map { it.card }
-                collectionProfileUseCase(cardSnapshot)
-            }.onSuccess { profile ->
-                _uiState.update { it.copy(collectionProfile = profile, ownedCards = cardSnapshot, isLoadingProfile = false) }
-                // QA fix (RUN 3b follow-up): collectionSnapshot only lands here, asynchronously --
-                // if the user already picked a Flow B color-affinity entry or a Flow C color combo
-                // WHILE this load was still in flight, onSelectColorAffinityEntry/onSelectColorCombo
-                // ranked against a still-empty snapshot and silently produced an empty
-                // suggestedSeedCards list (no crash, but the user's own owned cards never showed up
-                // as suggestions). Re-rank against whichever pick is CURRENTLY active now that the
-                // real snapshot is in, so a fast tap during the loading window still ends up correct.
-                recomputeActiveSuggestedSeeds()
-                if (seedsArg.isNotEmpty()) resolveComboSeeds(seedsArg)
-            }.onFailure { t ->
-                logFailure("deck_wizard_profile_load_failed", t)
-                _uiState.update { it.copy(isLoadingProfile = false) }
+        } else {
+            _uiState.update { it.copy(selectedFormat = resolvedFormat) }
+            if (resolvedFormat.isCommanderFormat) {
+                logStep("commander_pick")
+                _uiState.update { it.copy(phase = WizardPhase.COMMANDER_PICK, entryFlow = WizardEntryFlow.CARDS) }
+            } else {
+                logStep("entry")
+                _uiState.update { it.copy(phase = WizardPhase.ENTRY) }
             }
-        }
 
-        // Deck Engine Unification plan (§5 Phase 3.5) — the Review step's community-source toggle
-        // only ever RENDERS when the global flag is on; a fetch failure degrades to "unavailable"
-        // (never blocks the wizard, mirrors every other best-effort community-data read in this VM).
-        viewModelScope.launch {
-            val available = runCatching { userPreferences?.communityEngineEnabledFlow?.first() ?: false }.getOrDefault(false)
-            _uiState.update { it.copy(communityEngineAvailable = available) }
+            // Discoveries v2 "Build this" hand-off (D11) — optional, all blank by default. Deck
+            // Engine Unification (D2): nav args carry the unified taxonomy directly (raw
+            // ArchetypeId/ThemeId enum names + a tribe key) instead of the old SeedStrategy-name/
+            // free-text-theme pair.
+            val archetypeArg = savedStateHandle.get<String?>("archetype")?.takeIf { it.isNotEmpty() }
+            val themeArg = savedStateHandle.get<String?>("theme")?.takeIf { it.isNotEmpty() }
+            val tribeArg = savedStateHandle.get<String?>("tribe")?.takeIf { it.isNotEmpty() }
+            val colorsArg = savedStateHandle.get<String?>("colors")?.takeIf { it.isNotEmpty() }
+            // Deck Engine Unification plan D7 (4.3): a Commander Spellbook combo's card names --
+            // percent-decoded by Navigation before this reads it, `|`-joined (NOT `,` -- many real
+            // MTG card names contain a literal comma, e.g. "Urza, Lord High Artificer"; see
+            // Screen.DeckWizard.createRoute's KDoc). Forces the CARDS flow: a combo hand-off IS a
+            // card-first pick by construction.
+            val seedsArg = savedStateHandle.get<String?>("seeds")?.takeIf { it.isNotEmpty() }
+                ?.split("|")
+                ?.map { it.trim() }
+                ?.filter { it.isNotEmpty() }
+                .orEmpty()
+
+            // Deck Wizard 60-card wave (v6), plan §5 Phase 5.1: pre-fill routes to the matching NEW
+            // first step (SEED_PICK / COLOR_PICK / STRATEGY_PICK) — the pre-v6 shared DIRECTION
+            // phase these hand-offs used to dispatch on is gone.
+            when {
+                seedsArg.isNotEmpty() -> _uiState.update { it.copy(entryFlow = WizardEntryFlow.CARDS, phase = WizardPhase.SEED_PICK) }
+                colorsArg != null -> _uiState.update {
+                    it.copy(entryFlow = WizardEntryFlow.COLORS, phase = WizardPhase.COLOR_PICK, colorIdentity = parseColorString(colorsArg))
+                }
+                archetypeArg != null || themeArg != null || tribeArg != null -> {
+                    _uiState.update { it.copy(entryFlow = WizardEntryFlow.STRATEGY, phase = WizardPhase.STRATEGY_PICK) }
+                    val archetype = archetypeArg?.let { name -> ArchetypeId.entries.firstOrNull { a -> a.name == name } }
+                    val theme = themeArg?.let { name -> ThemeId.entries.firstOrNull { t -> t.name == name } }
+                    val nearest = archetype?.let { a -> CuratedStrategyCatalog.nearestFor(a, listOfNotNull(theme), resolvedFormat) }
+                    if (nearest != null) {
+                        selectCommanderStrategy(nearest, tribeArg)
+                    } else if (tribeArg != null) {
+                        _uiState.update {
+                            it.copy(selectedTribeKey = tribeArg, selectedTribeLabel = tribeArg.removePrefix("tribe:").replaceFirstChar(Char::uppercase))
+                        }
+                    }
+                }
+            }
+
+            viewModelScope.launch {
+                runCatching {
+                    val collection = userCardRepository.observeCollection().first()
+                    collectionSnapshot = collection
+                    cardSnapshot = collection.map { it.card }
+                    collectionProfileUseCase(cardSnapshot)
+                }.onSuccess { profile ->
+                    val ownedQuantityByName = collectionSnapshot
+                        .groupBy { it.card.name }
+                        .mapValues { (_, entries) -> entries.sumOf { entry -> entry.userCard.quantity } }
+                    _uiState.update {
+                        it.copy(
+                            collectionProfile = profile,
+                            ownedCards = cardSnapshot,
+                            ownedQuantityByName = ownedQuantityByName,
+                            isLoadingProfile = false,
+                        )
+                    }
+                    if (seedsArg.isNotEmpty()) resolveComboSeeds(seedsArg)
+                }.onFailure { t ->
+                    logFailure("deck_wizard_profile_load_failed", t)
+                    _uiState.update { it.copy(isLoadingProfile = false) }
+                }
+            }
         }
     }
 
     private fun parseColorString(raw: String): Set<ManaColor> =
         raw.mapNotNull { ch -> ManaColor.entries.firstOrNull { it.symbol == ch.toString() } }.toSet()
 
-    /** QA fix (RUN 3b): cancels any in-flight commander/seed search or theme-tag fetch BEFORE a
-     * format/entry-flow switch wipes the state those coroutines write into -- without this, a
-     * debounced search from the ABANDONED flow could land after the reset and silently repopulate
-     * `commanderSearchResults`/`seedSearchResults`/`availableThemeTags` for the NEW flow. */
+    /** QA fix (RUN 3b): cancels any in-flight commander/seed search or strategy-recommendation fetch
+     * BEFORE a format/entry-flow switch wipes the state those coroutines write into -- without this,
+     * a debounced search from the ABANDONED flow could land after the reset and silently repopulate
+     * stale results for the NEW flow. */
     private fun cancelDirectionSearchJobs() {
         commanderSearchJob?.cancel()
-        seedSearchJob?.cancel()
-        themeTagsJob?.cancel()
+        seedPickSearchJob?.cancel()
         commanderStrategyJob?.cancel()
-        manualAddsSearchJob?.cancel()
         planAnalysisJob?.cancel()
         planSectionsSearchJob?.cancel()
     }
 
-    // ── Format (Deck Wizard v4, R13) ─────────────────────────────────────────
-
-    /** No longer reachable from the UI (there is no format step) -- called once from `init` with
-     * the resolved nav-arg format, and kept public only as a test-setup convenience for exercising
-     * one format's flow from a `viewModel()` fixture built without a "format" savedState entry. */
-    fun onSelectFormat(format: DeckFormat) {
-        // v1 targets Commander (+ Commander Casual) and all 60-card constructed formats (plan D1).
-        if (!format.isCommanderFormat && !format.isSixtyCardConstructed) return
-        // Edge-case fix (Phase 6 adversarial pass): the wizard was launched to REBUILD a specific
-        // existing Commander draft (launchedFromDeckId, D12) -- a rebuild launch has no legitimate
-        // reason to change format at all.
-        if (launchedFromDeckId != null && !format.isCommanderFormat) return
-        // QA fix (RUN 3b): an ACTUAL format change wipes every per-flow scratch field and resets the
-        // entry chooser to CARDS, so a stale commander/archetype/colors pick from the abandoned
-        // format can never leak into a build under the new one. A re-tap of the CURRENTLY selected
-        // format is a pure no-op-ish write (never wipes state the user hasn't actually left).
-        if (_uiState.value.selectedFormat == format) {
-            _uiState.update { it.copy(selectedFormat = format) }
-            return
-        }
-        cancelDirectionSearchJobs()
-        _uiState.update { it.resetDirectionScratchState().copy(selectedFormat = format, entryFlow = WizardEntryFlow.CARDS) }
-    }
-
-    // ── Step 2 — Direction ───────────────────────────────────────────────────
+    // ── COMMANDER_PICK ────────────────────────────────────────────────────────
 
     /**
-     * Deck Engine Unification plan (D2): resolves a collection-lean STRATEGY [CardTag] chip tap
-     * onto the unified taxonomy via [DeckIdentitySeedTags.archetypeForTag]/`.themeForTag` --
-     * replaces the old `SeedStrategy.forTag` + raw-tagHint-fallback split
-     * (`onSelectStrategyDirection`/`onSelectTagHintDirection`, Wizard Quality Campaign B1) with ONE
-     * handler. [CollectionLeanSection] only renders a chip whose tag resolves to one or the other
-     * (never a dead tap -- see that composable's KDoc), so the `else` branch below is defensive
-     * only and never observed in practice.
+     * Deck Wizard 60-card wave (v6), plan §5 Phase 5.1/5.2: the anchor's mandatory first pick
+     * (Commander) resolving its color identity + kicking off strategy recommendation. Every field
+     * this used to also clear ([availableThemeTags]/[selectedThemeHint], the pre-v6 Identity-step
+     * theme picker) was deleted with that step in this run.
      */
-    fun onSelectDirectionTag(tag: CardTag) {
-        val archetype = DeckIdentitySeedTags.archetypeForTag(tag)
-        val theme = DeckIdentitySeedTags.themeForTag(tag)
-        _uiState.update { state ->
-            when {
-                archetype != null -> state.copy(
-                    selectedArchetype = if (state.selectedArchetype == archetype) null else archetype,
-                    selectedDirectionTheme = null,
-                    selectedTribeKey = null,
-                    selectedTribeLabel = null,
-                )
-                theme != null -> state.copy(
-                    selectedDirectionTheme = if (state.selectedDirectionTheme == theme) null else theme,
-                    selectedArchetype = null,
-                    selectedTribeKey = null,
-                    selectedTribeLabel = null,
-                )
-                else -> state
-            }
-        }
-    }
-
-    /** Edge-case audit (Wizard Quality Campaign final gate, 2026-07-19): the tribe Direction chip's
-     * fix for the same "dead chip" bug class B1 fixed for the strategy/tag chips -- previously this
-     * only toggled [DeckWizardUiState.selectedTribeLabel] for Review-screen display with no effect
-     * on the build. Carries [CollectionTribeSignal.tribeKey] (the stable `tribe:<subtype>` key, not
-     * the pluralized display label) into [StrategyProfile.tribe] via [onGenerate]. Same "one
-     * Direction pick" slot as archetype/theme -- clears both. */
-    fun onSelectTribeDirection(tribe: CollectionTribeSignal) {
-        _uiState.update {
-            it.copy(
-                selectedTribeKey = if (it.selectedTribeKey == tribe.tribeKey) null else tribe.tribeKey,
-                selectedTribeLabel = if (it.selectedTribeKey == tribe.tribeKey) null else tribe.displayLabel,
-                selectedArchetype = null,
-                selectedDirectionTheme = null,
-            )
-        }
-    }
-
-    /**
-     * Deck Wizard & Engine Rework plan, Workstream 2.1 (D-A) — outside-collection search is OPT-IN
-     * ([DeckWizardUiState.includeOutsideCollection], default off): with it off, no network call
-     * fires at all and [DeckWizardUiState.commanderSearchResults] stays empty (the COMMANDER_PICK
-     * step renders the local-collection candidate list instead, computed in the UI layer from
-     * [DeckWizardUiState.collectionProfile] — no VM state needed for that path, it's a pure filter
-     * of already-loaded data). With it on, the query is a real Scryfall search restricted to
-     * `is:commander` (D-G — this is exactly the Scryfall-side equivalent of [CommanderEligibility]'s
-     * local-collection rule) plus an `id<=` color-identity clause from
-     * [DeckWizardUiState.commanderColorFilter].
-     */
-    fun onCommanderQueryChange(query: String) {
-        _uiState.update { it.copy(commanderQuery = query) }
-        commanderSearchJob?.cancel()
-        val includeOutside = _uiState.value.includeOutsideCollection
-        if (!includeOutside || query.trim().length < SEARCH_MIN_LENGTH) {
-            _uiState.update { it.copy(commanderSearchResults = emptyList(), isSearchingCommander = false) }
-            return
-        }
-        commanderSearchJob = viewModelScope.launch {
-            delay(SEARCH_DEBOUNCE_MS)
-            _uiState.update { it.copy(isSearchingCommander = true) }
-            val colorFilter = _uiState.value.commanderColorFilter
-            val results = when (val res = searchCardsUseCase(commanderSearchQuery(query.trim(), colorFilter))) {
-                is DataResult.Success -> res.data.cards
-                is DataResult.Error -> {
-                    crashReporter.log("deck_wizard_commander_search_failed")
-                    emptyList()
-                }
-            }
-            _uiState.update { it.copy(commanderSearchResults = results, isSearchingCommander = false) }
-        }
-    }
-
-    /** `is:commander` + an optional `id<=` color-identity clause + the free-text name — routed
-     * through [searchCardsUseCase] -> [com.mmg.manahub.core.domain.repository.CardRepository
-     * .searchCardsPaginated], which is ALREADY wrapped in `ScryfallRequestQueue.execute { }` at the
-     * remote-data-source layer (verified: `ScryfallRemoteDataSource.searchCardsPaginated`) — no
-     * second wrapping needed here. */
-    private fun commanderSearchQuery(name: String, colors: Set<ManaColor>): String {
-        val identityClause = if (colors.isNotEmpty()) " id<=${colors.joinToString("") { it.symbol }}" else ""
-        return "is:commander$identityClause $name"
-    }
-
-    /** Deck Wizard Commander v3 plan (Phase 3.2, D7/R2): COMMANDER_PICK no longer renders this row
-     * (deleted along with the outside-collection toggle) -- kept only because
-     * [onCommanderQueryChange]'s body still reads [DeckWizardUiState.commanderColorFilter] for the
-     * Casual Direction flow's own (color-filter-less) embedded commander search, where this
-     * function has never been wired either. Effectively dead; not deleted to avoid a needless
-     * ripple into that field's other read site. */
-    fun onToggleCommanderColorFilter(code: String) {
-        _uiState.update { state ->
-            if (code == "All") {
-                state.copy(commanderColorFilter = emptySet())
-            } else {
-                val color = ManaColor.entries.firstOrNull { it.symbol == code } ?: return@update state
-                val updated = if (color in state.commanderColorFilter) state.commanderColorFilter - color else state.commanderColorFilter + color
-                state.copy(commanderColorFilter = updated)
-            }
-        }
-        if (_uiState.value.commanderQuery.trim().length >= SEARCH_MIN_LENGTH) {
-            onCommanderQueryChange(_uiState.value.commanderQuery)
-        }
-    }
-
-    /** D-A's single shared "include outside your collection" toggle (COMMANDER_PICK + MANUAL_ADDS +,
-     * as of Workstream 3.1, Flow A's own seed search). Turning it OFF clears any in-flight
-     * outside-collection results immediately (rather than leaving a stale list the user can no
-     * longer explain the presence of). */
-    fun onToggleIncludeOutsideCollection() {
-        _uiState.update { it.copy(includeOutsideCollection = !it.includeOutsideCollection) }
-        if (!_uiState.value.includeOutsideCollection) {
-            commanderSearchJob?.cancel()
-            manualAddsSearchJob?.cancel()
-            seedSearchJob?.cancel()
-            _uiState.update {
-                it.copy(
-                    commanderSearchResults = emptyList(),
-                    isSearchingCommander = false,
-                    commanderSearchError = false,
-                    manualAddsSearchResults = emptyList(),
-                    isSearchingManualAdds = false,
-                    seedSearchResults = emptyList(),
-                    isSearchingSeeds = false,
-                )
-            }
-        }
-    }
-
     fun onSelectCommander(card: Card) {
         commanderSearchJob?.cancel()
         _uiState.update {
@@ -909,13 +632,9 @@ class DeckWizardViewModel(
                 commanderSearchResults = emptyList(),
                 commanderSearchError = false,
                 commanderStructuredQuery = null,
-                availableThemeTags = emptyList(),
-                selectedThemeHint = null,
             )
         }
-        loadThemeTags(card)
-        recomputeSeedStrategySuggestion()
-        recommendCommanderStrategies(card)
+        recomputeStrategyRecommendations()
     }
 
     fun onClearCommander() {
@@ -923,23 +642,20 @@ class DeckWizardViewModel(
             it.copy(
                 selectedCommander = null,
                 colorIdentity = emptySet(),
-                availableThemeTags = emptyList(),
-                selectedThemeHint = null,
-                commanderStrategyRecommendations = emptyList(),
+                strategyRecommendations = emptyList(),
                 selectedCuratedStrategyId = null,
+                isCustomStrategyChosen = false,
                 pendingTribeStrategy = null,
                 commanderTribePickerCandidates = emptyList(),
             )
         }
-        recomputeSeedStrategySuggestion()
     }
 
     /**
      * Deck Wizard Commander v4 plan (W2.1, G2/R2): COMMANDER_PICK's own name-filter search bar --
      * feeds the SAME unified idle/search pipeline as [applyCommanderStructuredSearch]
      * ([triggerCommanderPickSearch]), debounced like every other incremental search field in this
-     * VM. Distinct from [onCommanderQueryChange], which stays the Casual Direction flow's own
-     * outside-collection commander search, unchanged by this campaign.
+     * VM.
      */
     fun onCommanderNameFilterChange(query: String) {
         _uiState.update { it.copy(commanderQuery = query) }
@@ -970,8 +686,7 @@ class DeckWizardViewModel(
     /** Deck Wizard Commander v4 plan (W2.2, G2): the zero-results empty state's own "clear filters"
      * affordance -- clears BOTH the plain search text and the structured query, mirroring
      * `CollectionScreen.kt`'s documented "a zero-result state can be caused by either one alone"
-     * rule (that screen's plain `onClearFilters` deliberately does NOT clear search text; this one
-     * does, because it is reached only from a state that could be caused by either). */
+     * rule. */
     fun onClearCommanderSearchAndFilters() {
         _uiState.update { it.copy(commanderQuery = "", commanderStructuredQuery = null) }
         triggerCommanderPickSearch(debounce = false)
@@ -986,8 +701,6 @@ class DeckWizardViewModel(
      * criteria, any user-added structured criteria, and the plain name text into ONE
      * [AdvancedSearchQuery], rendered to a Scryfall fragment via the SAME [StructuredCardSearch]
      * helper every other structured-search caller in this VM uses -- no second query-building path.
-     * [searchCardsUseCase] is already wrapped in `ScryfallRequestQueue.execute { }` at the remote
-     * data-source layer, so no second wrap is needed here.
      */
     private fun triggerCommanderPickSearch(debounce: Boolean) {
         commanderSearchJob?.cancel()
@@ -1018,17 +731,138 @@ class DeckWizardViewModel(
         }
     }
 
+    /** COMMANDER_PICK's "Next" — requires a commander. */
+    fun onNextFromCommanderPick() {
+        val commander = _uiState.value.selectedCommander
+        if (commander == null) {
+            crashReporter.log("deck_wizard_step_commander_pick_blocked_no_commander")
+            viewModelScope.launch {
+                _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_commander_required)))
+            }
+            return
+        }
+        logStep("strategy")
+        _uiState.update { it.copy(phase = WizardPhase.STRATEGY) }
+    }
+
+    // ── SEED_PICK ("Start from cards", Deck Wizard 60-card wave v6, plan §5 Phase 5.2) ───────────
+
+    /** SEED_PICK's own name-filter search bar text. */
+    fun onSeedPickQueryChange(query: String) {
+        _uiState.update { it.copy(seedPickQuery = query) }
+        triggerSeedPickSearch(debounce = true)
+    }
+
+    /** The Tune icon's [com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet] result for
+     * SEED_PICK, locked to [DeckWizardSixtySteps.seedLockedCriteria] (D14, mirrors
+     * [applyCommanderStructuredSearch]). */
+    fun applySeedPickStructuredSearch(query: AdvancedSearchQuery) {
+        _uiState.update { it.copy(seedPickStructuredQuery = query.takeIf { q -> !q.isEmpty() }) }
+        triggerSeedPickSearch(debounce = false)
+    }
+
+    fun onClearSeedPickFilters() {
+        _uiState.update { it.copy(seedPickStructuredQuery = null) }
+        triggerSeedPickSearch(debounce = false)
+    }
+
+    fun onClearSeedPickSearchAndFilters() {
+        _uiState.update { it.copy(seedPickQuery = "", seedPickStructuredQuery = null) }
+        triggerSeedPickSearch(debounce = false)
+    }
+
+    /** Mirrors [triggerCommanderPickSearch]'s exact idle/search dispatch, for SEED_PICK's own
+     * format-legality-locked query ([DeckWizardSixtySteps.seedLockedCriteria]). */
+    private fun triggerSeedPickSearch(debounce: Boolean) {
+        seedPickSearchJob?.cancel()
+        val state = _uiState.value
+        val format = state.selectedFormat ?: return
+        val lockedCriteria = seedLockedCriteria(format)
+        val effectiveQuery = buildSeedPickSearchQuery(state, lockedCriteria)
+        if (effectiveQuery == null) {
+            _uiState.update { it.copy(seedPickResults = emptyList(), isSearchingSeedPick = false, seedPickSearchError = false) }
+            return
+        }
+        val fragment = StructuredCardSearch.scryfallFragment(effectiveQuery)
+        if (fragment == null) {
+            _uiState.update { it.copy(seedPickResults = emptyList(), isSearchingSeedPick = false, seedPickSearchError = false) }
+            return
+        }
+        seedPickSearchJob = viewModelScope.launch {
+            if (debounce) delay(SEARCH_DEBOUNCE_MS)
+            _uiState.update { it.copy(isSearchingSeedPick = true, seedPickSearchError = false) }
+            val results = when (val res = searchCardsUseCase(fragment)) {
+                is DataResult.Success -> res.data.cards
+                is DataResult.Error -> {
+                    crashReporter.log("deck_wizard_seed_search_failed")
+                    _uiState.update { it.copy(seedPickSearchError = true) }
+                    emptyList()
+                }
+            }
+            _uiState.update { it.copy(seedPickResults = results, isSearchingSeedPick = false) }
+        }
+    }
+
+    /** SEED_PICK's toggle for the seed queue sheet (the "N cards added" sticky pill). */
+    fun onToggleSeedQueue() = _uiState.update { it.copy(showSeedQueue = !it.showSeedQueue) }
+
+    /** Opens/closes [com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet] in
+     * seed-selection mode from SEED_PICK (tile tap, or the seed-queue sheet's image tap). */
+    fun onShowSeedDetail(card: Card?) = _uiState.update { it.copy(seedDetailCard = card) }
+
+    /** SEED_PICK's "Next" -- requires at least one seed (S3/S4). */
+    fun onNextFromSeedPick() {
+        if (_uiState.value.seeds.isEmpty()) {
+            crashReporter.log("deck_wizard_step_seed_pick_blocked_no_seeds")
+            viewModelScope.launch {
+                _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_seeds_required)))
+            }
+            return
+        }
+        logStep("strategy")
+        recomputeStrategyRecommendations()
+        _uiState.update { it.copy(phase = WizardPhase.STRATEGY) }
+    }
+
+    // ── STRATEGY (shared by every anchor, S7) ─────────────────────────────────
+
+    /**
+     * Deck Wizard 60-card wave (v6), plan §5 Phase 5.2 (rename of the pre-v6 `recommendCommanderStrategies`
+     * call site): the ONE entry point every "Next" into STRATEGY calls now. Commander delegates
+     * unchanged onto [recommendCommanderStrategies] (byte-identical, rule 0.3). Every 60-card anchor
+     * builds a [BuildAnchor.Sixty] from the CURRENT seeds/identity and scores it via
+     * [RecommendCommanderStrategiesUseCase]'s anchor overload (Phase 2) -- `ownTags`/`ownTribes`/
+     * `edhrecThemeNames` stay empty for now; the seeds' own `card_strategy_tags` fetch + EDHREC
+     * enrichment is run B's full 5-signal wiring (plan §5 Phase 5.3).
+     */
+    private fun recomputeStrategyRecommendations() {
+        val state = _uiState.value
+        val format = state.selectedFormat ?: return
+        if (format.isCommanderFormat) {
+            val commander = state.selectedCommander ?: return
+            recommendCommanderStrategies(commander)
+            return
+        }
+        commanderStrategyJob?.cancel()
+        commanderStrategyJob = viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingCommanderStrategies = true) }
+            val anchor = BuildAnchor.Sixty(identity = state.engineIdentity, seeds = state.seeds.map { it.card })
+            val recommendations = recommendCommanderStrategiesUseCase(
+                format = format,
+                anchor = anchor,
+                ownedCollection = cardSnapshot.map { OwnedCard(it, 1) },
+            )
+            _uiState.update { it.copy(strategyRecommendations = recommendations, isLoadingCommanderStrategies = false) }
+            val topPick = recommendations.firstOrNull()
+            if (topPick != null) selectCommanderStrategy(topPick.strategy, topPick.tribe) else selectCommanderStrategy(null, null)
+        }
+    }
+
     /**
      * Deck Wizard Commander v3 plan, Phase 4.1 — ranks [com.mmg.manahub.feature.decks.domain.engine
-     * .CuratedStrategyCatalog.ALL] for [commander] via [RecommendCommanderStrategiesUseCase]:
-     * the commander's own `card_strategy_tags` row, the EDHREC per-commander aggregate's theme tags
-     * (the SAME fetch [loadThemeTags] already makes — issued again here rather than shared with that
-     * function's result, since [loadThemeTags] feeds the now Commander-unreachable Identity-step
-     * theme picker and keeping the two call sites independent avoids coupling an old,
-     * soon-superseded consumer to a new one), [ColorStrategyAffinity], and owned-role coverage over
-     * [cardSnapshot]. Best-effort throughout — ANY failure degrades the corresponding signal to zero
-     * contribution, never blocks the step (the use case itself never throws). Preselects the #1
-     * recommendation on arrival (product default, plan §8) via [selectCommanderStrategy].
+     * .CuratedStrategyCatalog.ALL] for [commander] via [RecommendCommanderStrategiesUseCase]. Never
+     * throws: every signal degrades to zero contribution when its input is empty/absent. Preselects
+     * the #1 recommendation on arrival via [selectCommanderStrategy].
      */
     private fun recommendCommanderStrategies(commander: Card) {
         commanderStrategyJob?.cancel()
@@ -1052,45 +886,28 @@ class DeckWizardViewModel(
                 ownTribes = source1?.tribes.orEmpty(),
                 edhrecThemeNames = edhrecThemeNames,
             )
-            _uiState.update { it.copy(commanderStrategyRecommendations = recommendations, isLoadingCommanderStrategies = false) }
+            _uiState.update { it.copy(strategyRecommendations = recommendations, isLoadingCommanderStrategies = false) }
             val topPick = recommendations.firstOrNull()
             if (topPick != null) selectCommanderStrategy(topPick.strategy, topPick.tribe) else selectCommanderStrategy(null, null)
         }
     }
 
-    /** COMMANDER_PICK's "Next" — requires a commander (same guard/toast precedent as the old
-     * Commander-direction check, [onNextFromDirection]'s Commander branch, which this replaces). */
-    fun onNextFromCommanderPick() {
-        val commander = _uiState.value.selectedCommander
-        if (commander == null) {
-            crashReporter.log("deck_wizard_step_commander_pick_blocked_no_commander")
-            viewModelScope.launch {
-                _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_commander_required)))
-            }
-            return
-        }
-        logStep("strategy")
-        _uiState.update { it.copy(phase = WizardPhase.STRATEGY) }
-    }
-
-    // ── STRATEGY step (Deck Wizard Commander v3 plan, Phase 4.2) ─────────────────
-
     /** Writes [strategy]/[tribe]'s pin into the shared archetype/themes/tribe fields (D4:
      * `CuratedStrategy.toPin`, the SAME function Deck Studio's own strategy picker uses) plus the
      * STRATEGY step's own [DeckWizardUiState.selectedCuratedStrategyId] display pointer.
-     * `strategy == null` is Custom (D6): every pin field clears. */
-    private fun selectCommanderStrategy(strategy: CuratedStrategy?, tribe: String?) {
+     * `strategy == null` is Custom (D6): every pin field clears. [isExplicitCustom] is true ONLY
+     * for [onSelectCustomStrategy]'s own deliberate tap -- see [DeckWizardUiState
+     * .isCustomStrategyChosen]'s own KDoc for why a `null` recommendation fallback must NOT set it. */
+    private fun selectCommanderStrategy(strategy: CuratedStrategy?, tribe: String?, isExplicitCustom: Boolean = false) {
         val pin = strategy?.toPin(tribe)
         _uiState.update {
             it.copy(
                 selectedCuratedStrategyId = strategy?.id,
+                isCustomStrategyChosen = isExplicitCustom,
                 selectedArchetype = pin?.archetype,
                 selectedStrategyThemes = pin?.themes.orEmpty(),
                 selectedTribeKey = pin?.tribe,
                 selectedTribeLabel = pin?.tribe?.let { key -> key.removePrefix("tribe:").replaceFirstChar(Char::uppercase) },
-                // Phase 5 fix (F3 gap, closed): `pin.posture` used to be computed here and dropped
-                // on the floor -- there was no field to store it in, so PLAN_SECTIONS' analysis
-                // could never reflect a Voltron/Ramp/Tempo/Toolbox/Group Hug posture pick.
                 selectedPosture = pin?.posture,
             )
         }
@@ -1101,7 +918,7 @@ class DeckWizardViewModel(
      * [StrategyRecommendation.tribe]) applies immediately; one it could NOT resolve opens the tribe
      * sub-picker instead ([onRequestTribeForStrategy]) rather than applying with a `null` tribe. */
     fun onSelectCommanderStrategy(strategy: CuratedStrategy) {
-        val recommendation = _uiState.value.commanderStrategyRecommendations.firstOrNull { it.strategy.id == strategy.id }
+        val recommendation = _uiState.value.strategyRecommendations.firstOrNull { it.strategy.id == strategy.id }
         val tribe = recommendation?.tribe
         if (strategy.requiresTribe && tribe == null) {
             onRequestTribeForStrategy(strategy)
@@ -1111,11 +928,11 @@ class DeckWizardViewModel(
     }
 
     /** D6: Custom is always separately offered, regardless of what the recommender returned. */
-    fun onSelectCustomStrategy() = selectCommanderStrategy(null, null)
+    fun onSelectCustomStrategy() = selectCommanderStrategy(null, null, isExplicitCustom = true)
 
     /** Opens the tribe sub-picker for [strategy], seeded with the collection's dominant tribes
-     * within the selected commander's identity — reuses [CollectionProfileUseCase.dominantTribes]
-     * over an identity-filtered slice of [cardSnapshot] (no new dominant-tribe computation). */
+     * within the current identity — reuses [CollectionProfileUseCase.dominantTribes] over an
+     * identity-filtered slice of [cardSnapshot] (no new dominant-tribe computation). */
     fun onRequestTribeForStrategy(strategy: CuratedStrategy) {
         val identitySymbols = _uiState.value.colorIdentity.map { it.symbol }.toSet()
         viewModelScope.launch {
@@ -1137,70 +954,63 @@ class DeckWizardViewModel(
         _uiState.update { it.copy(pendingTribeStrategy = null, commanderTribePickerCandidates = emptyList()) }
     }
 
+    /** STRATEGY_PICK's own free-text taxonomy filter (run B wires its UI, plan §5 Phase 5.3). */
+    fun onStrategyPickQueryChange(query: String) = _uiState.update { it.copy(strategyPickQuery = query) }
+
+    /** [com.mmg.manahub.feature.decks.domain.engine.ColorStrategyAffinity.combosFor] (curated
+     * ranking) blended with how strong the user's OWN collection already is in each candidate combo
+     * ([CollectionProfile.colorShares]) -- a taxonomy pick favors color combos the user can actually
+     * build today, not a purely abstract ranking. Retargeted (60-card wave v6) to
+     * [DeckWizardUiState.strategyPickCombos]; wired to a real caller in run B (plan §5 Phase 5.3). */
+    private fun recomputeColorComboSuggestions(archetype: ArchetypeId?, theme: ThemeId?) {
+        val shareByColor = _uiState.value.collectionProfile?.colorShares?.associate { it.color to it.share }.orEmpty()
+        val combos = com.mmg.manahub.feature.decks.domain.engine.ColorStrategyAffinity.combosFor(archetype, theme)
+            .map { (colors, weight) ->
+                val avgShare = if (colors.isEmpty()) 0f else colors.map { shareByColor[it] ?: 0f }.average().toFloat()
+                ColorComboSuggestion(colors, weight * (0.5f + avgShare))
+            }
+            .sortedByDescending { it.score }
+        _uiState.update { it.copy(strategyPickCombos = combos) }
+    }
+
     /**
-     * STRATEGY's "Next" (2.4) — ALWAYS enabled (no gate): an untouched pick already means GENERIC
-     * ("Balanced"), which is a valid, complete Commander plan (unlike D-B's Casual Flow A rule,
-     * which requires a real pick — Commander keeps its short escape hatch, see [WizardPhase]'s and
-     * [DeckWizardUiState.commanderStrategyCandidates]' own KDoc). Resolves the skeleton ONCE here
-     * (not lazily in the MANUAL_ADDS composable) so that step's role sections/filter chips render
-     * immediately on entry.
+     * STRATEGY's "Next" (2.4/5.1) — shared by Commander AND every 60-card entry flow now that
+     * STRATEGY is one step reused across anchors (S1). ALWAYS enabled: an untouched pick already
+     * means GENERIC ("Balanced"), a valid, complete plan for every anchor. The pre-v6 skeleton
+     * preview this used to compute for the deleted Casual `MANUAL_ADDS` step is gone --
+     * PLAN_SECTIONS derives everything it needs from [recomputePlanAnalysis] instead.
      */
     fun onNextFromStrategy() {
-        val state = _uiState.value
-        // Deck Analysis Engine v3: ArchetypeId.GENERIC no longer exists -- an unpinned selection is
-        // `null` directly (see BuildDeckFromTemplateUseCase.resolveArchetypeSkeleton's own compat
-        // note for the same substitution).
-        val archetype = state.selectedArchetype
-        val themes = state.selectedStrategyThemes
-        // Fix 5 (edge-case audit, 2026-07-28): mirrors BuildDeckFromTemplateUseCase
-        // .resolveArchetypeSkeleton's own GENERIC-with-no-themes gate -- the REAL build never
-        // resolves a skeleton for a GENERIC ("Balanced") pick with no themes (Motor A scores with
-        // zero theme bonus in that case), so this UI-only preview must not either. Without this
-        // gate, a Commander player picking "Balanced" would see a MANUAL_ADDS role chip reflecting
-        // an archetype-flavored skeleton the real build never actually applies.
-        val skeleton = if (archetype == null && themes.isEmpty()) {
-            null
-        } else {
-            ArchetypeSkeletonResolver.resolveWithColor(
-                format = ArchetypeFormat.COMMANDER,
-                archetype = archetype,
-                themes = themes,
-                identity = state.colorIdentity,
-            )
-        }
-        logStep("manual_adds")
-        _uiState.update { it.copy(phase = WizardPhase.MANUAL_ADDS, manualAddsSkeleton = skeleton) }
-        // Deck Wizard Commander v3 plan (Phase 5, 5.1) -- PLAN_SECTIONS needs a real DeckAnalysis
-        // the moment it's entered (commander + no manual adds yet is still a real, analyzable plan).
+        logStep("plan_sections")
+        _uiState.update { it.copy(phase = WizardPhase.PLAN_SECTIONS) }
         recomputePlanAnalysis()
     }
 
-    // ── PLAN_SECTIONS step (Deck Wizard Commander v3 plan, Phase 5, R4 -- Commander only) ─────────
+    // ── COLOR_PICK / STRATEGY_PICK (run B wires their UI, plan §5 Phase 5.3) ─────────────────────
+
+    /** COLOR_PICK's own color toggle (60-card wave v6, plan §5 Phase 5.3 wires the UI) — a plain
+     * WUBRG chip toggle; the colorless `C` chip's exclusive-clear behavior is that phase's own UI
+     * concern ([DeckWizardUiState.engineIdentity] is what strips `C` before it ever reaches the
+     * engine). Re-ranks [strategyRecommendations] on every toggle. */
+    fun onToggleColorPickColor(color: ManaColor) {
+        _uiState.update { state ->
+            val updated = if (color in state.colorIdentity) state.colorIdentity - color else state.colorIdentity + color
+            state.copy(colorIdentity = updated)
+        }
+        recomputeStrategyRecommendations()
+    }
+
+    // ── PLAN_SECTIONS (shared by every anchor since MANUAL_ADDS/Casual was deleted) ───────────────
 
     /**
-     * The ONLY analysis call this step makes -- debounced (so a burst of manual add/remove taps
-     * doesn't fire one [com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline.analyze]
-     * per tap) and off the main thread by construction (a `suspend` call inside [viewModelScope],
-     * same idiom every other async VM function in this file already uses -- this codebase has no
-     * separate injected-dispatcher convention for ViewModels, see
-     * `feedback_koin_named_dispatcher_pattern`'s scope: that pattern is for Koin-provided
-     * repositories/use cases, not ViewModel-internal coroutine launches).
+     * The ONLY analysis call this step makes -- debounced and off the main thread by construction.
+     * [mainboard] mirrors EXACTLY what the wizard's own build engine passes to `analyze` for a REAL
+     * build: the commander (if any) as its own [DeckEntry] first, then every [DeckWizardUiState
+     * .seeds] entry at its real quantity -- so [DeckWizardUiState.planAnalysis] is exactly the
+     * object the real build's own verify pass will produce, never an approximation.
      *
-     * [mainboard] mirrors EXACTLY what [com.mmg.manahub.feature.decks.domain.template
-     * .BuildCommanderDeckUseCase] itself passes to `analyze` for a REAL build (verified against its
-     * `fullMainboard` construction, Phase 2/2.5): the commander as its own [DeckEntry] first, then
-     * every [DeckWizardUiState.seedCards] manual add -- so [DeckWizardUiState.planAnalysis] is
-     * exactly the object the real build's own verify pass will produce once Phase 6 wires
-     * generation, never an approximation.
-     *
-     * `emitProgression = false` (same reason [com.mmg.manahub.feature.decks.domain.template
-     * .BuildCommanderDeckUseCase] passes it): this fires on every manual-add change, and must never
-     * spam the Deck Doctor exploration quest.
-     *
-     * A thrown exception (the pipeline's own internal `runCatching` around its v3 half can still let
-     * a seed-inference or pin-fold exception through -- see [DeckAnalysisPipeline]'s own KDoc, which
-     * does not claim full exception-safety) degrades to `planAnalysis = null` -- the step's empty/
-     * error state, never a VM crash.
+     * A thrown exception degrades to `planAnalysis = null` -- the step's empty/error state, never a
+     * VM crash.
      */
     private fun recomputePlanAnalysis() {
         planAnalysisJob?.cancel()
@@ -1212,8 +1022,15 @@ class DeckWizardViewModel(
             val format = state.selectedFormat ?: DeckFormat.COMMANDER
             val mainboard = buildList {
                 commander?.let { add(DeckEntry(card = it, quantity = 1, isOwned = true, isSideboard = false)) }
-                state.seedCards.forEach { card ->
-                    add(DeckEntry(card = card, quantity = 1, isOwned = cardSnapshot.any { owned -> owned.scryfallId == card.scryfallId }, isSideboard = false))
+                state.seeds.forEach { seed ->
+                    add(
+                        DeckEntry(
+                            card = seed.card,
+                            quantity = seed.quantity,
+                            isOwned = cardSnapshot.any { owned -> owned.scryfallId == seed.card.scryfallId },
+                            isSideboard = false,
+                        )
+                    )
                 }
             }
             val analysis = runCatching {
@@ -1228,29 +1045,24 @@ class DeckWizardViewModel(
                     emitProgression = false,
                 ).analysis
             }.onFailure { t -> logFailure("deck_wizard_plan_analysis_failed", t) }.getOrNull()
-            val excludeIds = (listOfNotNull(commander?.scryfallId) + state.seedCards.map { it.scryfallId }).toSet()
+            val excludeIds = (listOfNotNull(commander?.scryfallId) + state.seeds.map { it.card.scryfallId }).toSet()
             val availability = analysis?.let {
-                computeOwnedAvailabilityBySection(it.pillars.flatMap { pillar -> pillar.sections }, cardSnapshot, excludeIds, state.colorIdentity, format)
+                computeOwnedAvailabilityBySection(it.pillars.flatMap { pillar -> pillar.sections }, cardSnapshot, excludeIds, state.engineIdentity, format)
             }.orEmpty()
             _uiState.update { it.copy(planAnalysis = analysis, isAnalyzingPlan = false, ownedAvailabilityBySection = availability) }
         }
     }
 
     /** PLAN_SECTIONS' "Browse for &lt;Category&gt;" sheet -- plain search-bar text, updates the
-     * Collection tab only (mirrors [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
-     * .onAddCardsQueryChange]'s own split between a live local re-filter and a separate, explicit
-     * Scryfall fetch trigger, [searchPlanSectionsScryfall]). */
+     * Collection tab only. */
     fun onPlanSectionsQueryChange(query: String) {
         _uiState.update { it.copy(planSectionsQuery = query) }
         publishPlanSectionsCollectionResults()
     }
 
     /** The Tune icon's [com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet] result, OR a
-     * section's own "Browse for X" preset (Phase 5, 5.2) -- filters BOTH result tabs from one
-     * [AdvancedSearchQuery] via the shared [StructuredCardSearch] helper (Phase 3.3), same "one
-     * applyStructuredSearch -> Scryfall + local matcher" contract [applyCommanderStructuredSearch]/
-     * [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.applyStructuredSearch] already
-     * use. */
+     * section's own "Browse for X" preset -- filters BOTH result tabs from one [AdvancedSearchQuery]
+     * via the shared [StructuredCardSearch] helper. */
     fun applyPlanSectionsStructuredSearch(query: AdvancedSearchQuery) {
         _uiState.update { it.copy(planSectionsStructuredQuery = query.takeIf { q -> !q.isEmpty() }) }
         publishPlanSectionsCollectionResults()
@@ -1258,17 +1070,12 @@ class DeckWizardViewModel(
     }
 
     /** The Analysis-tab-style category [com.mmg.manahub.core.model.CardTag] pre-filter for the
-     * Collection tab ([com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery
-     * .collectionTagKeysFor]) -- a DIFFERENT key space from [applyPlanSectionsStructuredSearch]'s
-     * criteria, UNIONed with it (mirrors `DeckStudioViewModel.searchCollectionByTags` -- Deck Wizard
-     * v4 W4.2b/G14). Empty [keys] is a no-op filter, never a falsely-empty tab (many sections have
-     * no tag-key equivalent). */
+     * Collection tab. */
     fun searchPlanSectionsCollectionByTags(keys: Set<String>) {
         _uiState.update { it.copy(planSectionsTagFilter = keys) }
         publishPlanSectionsCollectionResults()
     }
 
-    // Mirrors DeckStudioViewModel.collectionCardsMatching's contract via the same shared helper.
     private fun publishPlanSectionsCollectionResults() {
         val state = _uiState.value
         val tagFilter = state.planSectionsTagFilter
@@ -1281,8 +1088,7 @@ class DeckWizardViewModel(
     }
 
     /** The All-cards tab's real Scryfall search -- [query] (typed free text) combined with
-     * [DeckWizardUiState.planSectionsStructuredQuery]'s own Scryfall fragment, same combination
-     * rule as [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.searchScryfallDirect]. */
+     * [DeckWizardUiState.planSectionsStructuredQuery]'s own Scryfall fragment. */
     fun searchPlanSectionsScryfall(query: String) {
         _uiState.update { it.copy(planSectionsQuery = query) }
         val fragment = _uiState.value.planSectionsStructuredQuery?.let { StructuredCardSearch.scryfallFragment(it) }
@@ -1305,8 +1111,7 @@ class DeckWizardViewModel(
         }
     }
 
-    /** Resets every PLAN_SECTIONS browse-sheet field -- called on the sheet's `onDismiss`, mirrors
-     * [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.clearActiveStructuredSearchFragment]. */
+    /** Resets every PLAN_SECTIONS browse-sheet field -- called on the sheet's `onDismiss`. */
     fun clearPlanSectionsSearchState() {
         planSectionsSearchJob?.cancel()
         _uiState.update {
@@ -1321,690 +1126,228 @@ class DeckWizardViewModel(
         }
     }
 
-    // ── MANUAL_ADDS step (Deck Wizard & Engine Rework plan, Workstream 2.3 — SHARED, WS3 reuses) ──
-
-    /** Same D-A/outside-collection contract as [onCommanderQueryChange], over the collection instead
-     * of a commander candidate pool; the resulting [Card]s are hard-filtered by [colorIdentity]
-     * subset (colorless always included) by the CALLER (the composable), same as the local-only
-     * collection-search branch — this function only fills [DeckWizardUiState.manualAddsSearchResults]
-     * for the outside-collection branch, mirroring [onCommanderQueryChange]'s own split. */
-    fun onManualAddsQueryChange(query: String) {
-        _uiState.update { it.copy(manualAddsQuery = query) }
-        manualAddsSearchJob?.cancel()
-        val includeOutside = _uiState.value.includeOutsideCollection
-        if (!includeOutside || query.trim().length < SEARCH_MIN_LENGTH) {
-            _uiState.update { it.copy(manualAddsSearchResults = emptyList(), isSearchingManualAdds = false) }
-            return
-        }
-        manualAddsSearchJob = viewModelScope.launch {
-            delay(SEARCH_DEBOUNCE_MS)
-            _uiState.update { it.copy(isSearchingManualAdds = true) }
-            val colors = _uiState.value.colorIdentity
-            val results = when (val res = searchCardsUseCase(manualAddsSearchQuery(query.trim(), colors))) {
-                is DataResult.Success -> res.data.cards
-                is DataResult.Error -> {
-                    crashReporter.log("deck_wizard_manual_adds_search_failed")
-                    emptyList()
-                }
-            }
-            _uiState.update { it.copy(manualAddsSearchResults = results, isSearchingManualAdds = false) }
-        }
-    }
-
-    /** Free-text name + an `id<=` color-identity clause — no role/theme `otag:` encoding here (that
-     * query-quality backstop is Workstream 4's scope, not this one). Same
-     * `ScryfallRequestQueue`-wrapped [searchCardsUseCase] path as [commanderSearchQuery]. */
-    private fun manualAddsSearchQuery(name: String, colors: Set<ManaColor>): String {
-        val identityClause = if (colors.isNotEmpty()) " id<=${colors.joinToString("") { it.symbol }}" else ""
-        return "$name$identityClause"
-    }
-
-    /** Single-select role-key filter chip (toggle) over [DeckWizardUiState.manualAddsSkeleton]'s role
-     * keys — see that field's KDoc. */
-    fun onSelectManualAddsRoleFilter(roleKey: String?) =
-        _uiState.update { it.copy(manualAddsRoleFilter = if (it.manualAddsRoleFilter == roleKey) null else roleKey) }
-
-    /** MANUAL_ADDS is fully skippable (2.3) — no gate, ever. */
-    fun onNextFromManualAdds() {
+    /** PLAN_SECTIONS is fully skippable -- no gate, ever. Shared by every anchor now that the
+     * legacy Casual `MANUAL_ADDS` step (with its own separate "Next") is deleted. */
+    fun onNextFromPlanSections() {
         logStep("review")
         _uiState.update { it.copy(phase = WizardPhase.REVIEW) }
     }
 
-    /** Best-effort commander-aggregate theme-tag fetch (Identity step's theme picker, plan §3.4
-     * Step 3). ANY failure (Worker down, obscure commander) leaves [DeckWizardUiState
-     * .availableThemeTags] empty — never blocks the wizard, mirrors every other community-data
-     * fetch in this codebase ("degraded, never dead"). */
-    private fun loadThemeTags(commander: Card) {
-        themeTagsJob?.cancel()
-        themeTagsJob = viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingThemeTags = true) }
-            val tags = runCatching {
-                val result = communityAggregateRepository.getCommanderAggregate(commander.name)
-                (result as? DataResult.Success)?.data?.themeTags?.map { it.name }.orEmpty()
-            }.onFailure { crashReporter.log("deck_wizard_theme_tags_fetch_failed") }.getOrDefault(emptyList())
-            _uiState.update { it.copy(availableThemeTags = tags, isLoadingThemeTags = false) }
-        }
-    }
+    // ── Review ─────────────────────────────────────────────────────────────────
 
-    fun onToggleSeedPicker() = _uiState.update { it.copy(showSeedPicker = !it.showSeedPicker) }
+    /** Commander-only (W5.2). Gates ONLY Stage A (owned non-basic lands) of the wizard's land fill;
+     * basics (Stage B) always run regardless, per R12. */
+    fun onToggleIncludeNonBasicLands() = _uiState.update { it.copy(includeNonBasicLands = !it.includeNonBasicLands) }
+
+    // ── Seeds (SEED_PICK / PLAN_SECTIONS "Start from cards", S2/S3/S4) ────────────────────────────
 
     /**
-     * Deck Wizard & Engine Rework plan, Workstream 3.1 (D-A) — same shared "include outside your
-     * collection" contract as [onCommanderQueryChange]/[onManualAddsQueryChange]: OFF (default) means
-     * no network call at all, and the composable renders a LOCAL candidate list filtered from
-     * [DeckWizardUiState.ownedCards] instead (minus the legendary-only restriction commander search
-     * applies — any owned card is a valid seed). ON fires this SAME debounced, unrestricted Scryfall
-     * search as before this workstream.
-     */
-    fun onSeedQueryChange(query: String) {
-        _uiState.update { it.copy(seedQuery = query) }
-        seedSearchJob?.cancel()
-        val includeOutside = _uiState.value.includeOutsideCollection
-        if (!includeOutside || query.trim().length < SEARCH_MIN_LENGTH) {
-            _uiState.update { it.copy(seedSearchResults = emptyList(), isSearchingSeeds = false) }
-            return
-        }
-        seedSearchJob = viewModelScope.launch {
-            delay(SEARCH_DEBOUNCE_MS)
-            _uiState.update { it.copy(isSearchingSeeds = true) }
-            val results = when (val res = searchCardsUseCase(query.trim())) {
-                is DataResult.Success -> res.data.cards
-                is DataResult.Error -> {
-                    crashReporter.log("deck_wizard_card_search_failed")
-                    emptyList()
-                }
-            }
-            _uiState.update { it.copy(seedSearchResults = results, isSearchingSeeds = false) }
-        }
-    }
-
-    /**
-     * Deck Wizard Commander v3 plan (Phase 5, 5.1/R5) -- for a Commander format, a manual add is
-     * ALWAYS kept (D7), but must still be identity-legal and format-legal (a color-identity/legality
-     * violation is not "off-plan", it's a rules violation the wizard must never write) and deduped
-     * BY NAME (not just [Card.scryfallId] -- two different printings of the same card would
-     * otherwise both slip into [DeckWizardUiState.seedCards], violating the singleton rule
-     * `feature/decks/CLAUDE.md`'s Phase 4 construction-validation block documents; basics are
-     * exempt, same rule [BasicLandCalculator.isBasicLand] already encodes elsewhere in this engine).
-     * Casual's own [onAddSeed] behavior (scryfallId-only dedupe, no identity/legality gate) stays
-     * byte-identical -- this whole block is gated on [DeckFormat.isCommanderFormat].
+     * Deck Wizard 60-card wave (v6), plan §5 Phase 5.2: adds one copy of [card] as a seed.
+     * Commander: dedupe-by-name (basics exempt), identity + format-legality gate
+     * ([isCommanderManualAddValid], D7/R5), quantity never above 1, total cap [DeckWizardUiState
+     * .seedCap] (99). 60-card (every entry flow): legality via [isLegalForFormat] (Casual/Commander
+     * Casual permissive), a color-identity check ONLY outside the CARDS flow (S19 -- CARDS flow
+     * seeds DEFINE the identity instead), a per-card copy cap [CopyPolicy.maxSeedCopies] (toast
+     * `deck_wizard_seed_copy_cap`), and the total copy cap [DeckWizardUiState.seedCap] (toast
+     * `deck_wizard_seed_cap_reached`).
      */
     fun onAddSeed(card: Card) {
         val state = _uiState.value
-        val isCommander = state.selectedFormat?.isCommanderFormat == true
-        if (isCommander && !isCommanderManualAddValid(card, state)) {
+        val format = state.selectedFormat ?: return
+
+        if (format.isCommanderFormat) {
+            if (!isCommanderManualAddValid(card, state)) {
+                viewModelScope.launch {
+                    _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_manual_add_rejected)))
+                }
+                return
+            }
+            val current = state.seeds
+            val isDuplicateByName = !BasicLandCalculator.isBasicLand(card) &&
+                current.any { it.card.name.equals(card.name, ignoreCase = false) }
+            if (current.any { it.card.scryfallId == card.scryfallId } || isDuplicateByName || current.size >= state.seedCap) return
+            _uiState.update { it.copy(seeds = current + WizardSeed(card, 1)) }
+            recomputeSeedLockedColors()
+            if (state.phase == WizardPhase.PLAN_SECTIONS) recomputePlanAnalysis()
+            return
+        }
+
+        if (!isLegalForFormat(card, format)) {
             viewModelScope.launch {
                 _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_manual_add_rejected)))
             }
             return
         }
-        val current = state.seedCards
-        val isDuplicateByName = isCommander &&
-            !BasicLandCalculator.isBasicLand(card) &&
-            current.any { it.name.equals(card.name, ignoreCase = false) }
-        if (current.any { it.scryfallId == card.scryfallId } || isDuplicateByName || current.size >= MAX_SEED_CARDS) return
-        _uiState.update { it.copy(seedCards = current + card) }
-        recomputeSeedLockedColors()
-        recomputeSeedStrategySuggestion()
-        if (isCommander) recomputePlanAnalysis()
+        // S19: seeds are never color-rejected in the CARDS flow (they DEFINE the identity via
+        // recomputeSeedLockedColors below) -- COLORS/STRATEGY flows already picked the identity, so
+        // a seed outside it is a real rules violation there.
+        if (state.entryFlow != WizardEntryFlow.CARDS) {
+            val identitySymbols = state.engineIdentity.map { it.symbol }.toSet()
+            if (!card.colorIdentity.all { it in identitySymbols }) {
+                viewModelScope.launch {
+                    _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_manual_add_rejected)))
+                }
+                return
+            }
+        }
+        val existing = state.seeds.firstOrNull { it.card.scryfallId == card.scryfallId }
+        val maxCopies = CopyPolicy.maxSeedCopies(card, format)
+        if (existing != null && existing.quantity >= maxCopies) {
+            crashReporter.log("deck_wizard_seed_copy_cap_reached")
+            viewModelScope.launch {
+                _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_seed_copy_cap, maxCopies)))
+            }
+            return
+        }
+        if (state.seedCopies >= state.seedCap) {
+            crashReporter.log("deck_wizard_seed_cap_reached")
+            viewModelScope.launch {
+                _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_seed_cap_reached, state.seedCap)))
+            }
+            return
+        }
+        val updatedSeeds = if (existing != null) {
+            state.seeds.map { seed -> if (seed.card.scryfallId == card.scryfallId) seed.copy(quantity = seed.quantity + 1) else seed }
+        } else {
+            state.seeds + WizardSeed(card, 1)
+        }
+        _uiState.update { it.copy(seeds = updatedSeeds) }
+        if (state.entryFlow == WizardEntryFlow.CARDS) recomputeSeedLockedColors()
+        if (state.phase == WizardPhase.PLAN_SECTIONS) recomputePlanAnalysis()
     }
 
     /** Color identity ⊆ [DeckWizardUiState.colorIdentity] + format legality
      * ([DeckFormat.COMMANDER] requires `legal`, [DeckFormat.COMMANDER_CASUAL] only excludes
-     * `banned`) -- the SAME rule [com.mmg.manahub.feature.decks.domain.template
-     * .BuildCommanderDeckUseCase.isLegalForCommanderFormat] applies to engine-placed candidates, so
-     * a manual add can never be a card the build itself would refuse to place for a rules reason. */
+     * `banned`) -- the SAME rule the wizard's own build engine applies to engine-placed candidates,
+     * so a manual add can never be a card the build itself would refuse to place for a rules reason. */
     private fun isCommanderManualAddValid(card: Card, state: DeckWizardUiState): Boolean {
         val identitySymbols = state.colorIdentity.map { it.symbol }.toSet()
         if (!card.colorIdentity.all { it in identitySymbols }) return false
         return if (state.selectedFormat == DeckFormat.COMMANDER) card.legalityCommander == "legal" else card.legalityCommander != "banned"
     }
 
-    fun onRemoveSeed(card: Card) {
-        val isCommander = _uiState.value.selectedFormat?.isCommanderFormat == true
-        _uiState.update { state ->
-            val remaining = state.seedCards.filterNot { s -> s.scryfallId == card.scryfallId }
-            if (remaining.isEmpty() && !isCommander) {
-                // Fix 6 (edge-case audit, 2026-07-28): removing the LAST seed must also clear any
-                // strategy pick that was justified by it -- otherwise the visible strategy-candidate
-                // list recomputes to empty (recomputeSeedStrategySuggestion below, nothing left to
-                // rank), yet `hasStrategyPick` in onNextFromDirection stays true from the stale
-                // selection, silently advancing to MANUAL_ADDS on a plan the user can no longer see
-                // or reconsider. `lockedColors`/`colorIdentity` are deliberately NOT reset here --
-                // recomputeSeedLockedColors' own contract is additive-only ("removing a seed unlocks
-                // its color, but the color itself stays picked until manually deselected"); only the
-                // ARCHETYPE/THEME/TRIBE pick is unjustified by an empty seed list, not the colors.
-                //
-                // Deck Wizard Commander v3 plan (Phase 6, Run 7 follow-up finding): this rule is
-                // CASUAL-ONLY (`!isCommander` above). For Commander, the strategy pick is an explicit
-                // user choice made on its OWN step (STRATEGY), never inferred from manual adds --
-                // removing the last Plan Sections manual add must never silently clear it.
-                state.copy(
-                    seedCards = remaining,
-                    selectedArchetype = null,
-                    selectedDirectionTheme = null,
-                    selectedTribeKey = null,
-                    selectedTribeLabel = null,
-                )
-            } else {
-                state.copy(seedCards = remaining)
-            }
+    /** Removes ONE copy of [card] (decrements; removes the entry entirely at 0). Used by the seed
+     * queue sheet's `-` stepper and [com.mmg.manahub.feature.decks.presentation.components
+     * .CardDetailSheet]'s seed-selection mode. */
+    fun onRemoveSeedCopy(card: Card) {
+        val state = _uiState.value
+        val existing = state.seeds.firstOrNull { it.card.scryfallId == card.scryfallId } ?: return
+        val updated = if (existing.quantity <= 1) {
+            state.seeds.filterNot { it.card.scryfallId == card.scryfallId }
+        } else {
+            state.seeds.map { seed -> if (seed.card.scryfallId == card.scryfallId) seed.copy(quantity = seed.quantity - 1) else seed }
         }
-        recomputeSeedLockedColors()
-        recomputeSeedStrategySuggestion()
-        if (isCommander) recomputePlanAnalysis()
+        _uiState.update { it.copy(seeds = updated) }
+        if (state.selectedFormat?.isCommanderFormat == true || state.entryFlow == WizardEntryFlow.CARDS) recomputeSeedLockedColors()
+        if (state.phase == WizardPhase.PLAN_SECTIONS) recomputePlanAnalysis()
+    }
+
+    /** Removes EVERY copy of [card] (the seed queue sheet's trash icon, and PLAN_SECTIONS' own
+     * "Your cards" row remove for Commander, whose seeds are always quantity 1 so this is
+     * equivalent to [onRemoveSeedCopy] there). */
+    fun onRemoveSeed(card: Card) {
+        val state = _uiState.value
+        val remaining = state.seeds.filterNot { it.card.scryfallId == card.scryfallId }
+        _uiState.update { it.copy(seeds = remaining) }
+        if (state.selectedFormat?.isCommanderFormat == true || state.entryFlow == WizardEntryFlow.CARDS) recomputeSeedLockedColors()
+        if (state.phase == WizardPhase.PLAN_SECTIONS) recomputePlanAnalysis()
     }
 
     /**
      * Deck Wizard & Engine Rework plan, Workstream 3.1 — recomputes [DeckWizardUiState.lockedColors]
-     * from scratch as the union of every currently picked [DeckWizardUiState.seedCards]' own
+     * from scratch as the union of every currently picked [DeckWizardUiState.seeds]' own
      * [Card.colorIdentity], then folds it INTO [DeckWizardUiState.colorIdentity] (never replaces —
      * an explicit color the user already toggled on survives untouched, union not overwrite).
      * Recomputing from scratch (rather than incrementally adding/removing per seed) is what makes
-     * "removing a seed unlocks its color" correct by construction: a color only remains locked while
-     * SOME currently-picked seed still needs it.
-     *
-     * Called from every [seedCards] mutation ([onAddSeed]/[onRemoveSeed]/[resolveComboSeeds]) — safe
-     * to call unconditionally regardless of which flow/format is adding the seed: MANUAL_ADDS'
-     * (Commander AND Casual, Workstream 2.3) candidates are already hard-filtered to
-     * `card.colorIdentity ⊆ colorIdentity`, and Flow B/C's suggested-seed toggles rank only cards
-     * already within the picked [DeckWizardUiState.colorIdentity] ([RankOwnedCardsForProfileUseCase]),
-     * so in every path except Flow A's own seed picker this union is a guaranteed no-op.
+     * "removing a seed unlocks its color" correct by construction.
      */
     private fun recomputeSeedLockedColors() {
         _uiState.update { state ->
-            val locked = state.seedCards.flatMap { it.colorIdentity }.toManaColorSet()
+            val locked = state.seeds.flatMap { it.card.colorIdentity }.toManaColorSet()
             state.copy(lockedColors = locked, colorIdentity = state.colorIdentity + locked)
         }
     }
 
     /**
-     * Flow A's own color picker (Workstream 3.1) — toggles a color in/out of
-     * [DeckWizardUiState.colorIdentity]. A no-op while [color] is in [DeckWizardUiState.lockedColors]
-     * (cannot deselect a color a currently-picked seed's identity requires) — the UI never renders a
-     * clickable affordance for a locked chip either ([com.mmg.manahub.feature.decks.presentation.wizard
-     * .ColorToggleChip]'s `readOnly` param), this is the defensive VM-side backstop, same "never
-     * trust the UI-only disabled state" precedent as every other gate in this class. Re-ranks
-     * [seedStrategySuggestion] afterward since [SeedStrategyCandidate.misfitColors] depends on the
-     * currently selected colors.
-     */
-    fun onToggleCardsFlowColor(color: ManaColor) {
-        val state = _uiState.value
-        if (color in state.lockedColors) return
-        val updated = if (color in state.colorIdentity) state.colorIdentity - color else state.colorIdentity + color
-        _uiState.update { it.copy(colorIdentity = updated) }
-        recomputeSeedStrategySuggestion()
-    }
-
-    /** Flow A (cards-first, plan §5 3.2) — re-ranks [SuggestStrategiesForSeedsUseCase] over the
-     * current seeds PLUS the commander when one is picked (plan: "Commander = cards-flow variant
-     * with a mandatory commander slot as seed #1" — its identity tags count toward strategy fit and
-     * seed coherence exactly like any other seed). `null` while nothing is picked yet. Workstream
-     * 3.1 also threads the CURRENT [DeckWizardUiState.colorIdentity] pick so candidates carry
-     * up-to-date [SeedStrategyCandidate.misfitColors]. */
-    private fun recomputeSeedStrategySuggestion() {
-        val state = _uiState.value
-        val seedsForRanking = listOfNotNull(state.selectedCommander) + state.seedCards
-        val suggestion = if (seedsForRanking.isEmpty()) null else suggestStrategiesForSeedsUseCase(seedsForRanking, state.colorIdentity)
-        if (suggestion != null && !suggestion.isCoherent) {
-            crashReporter.log("deck_wizard_seed_coherence_low")
-            crashReporter.setCustomKey("deck_wizard_seed_coherence_score", suggestion.coherenceScore.toString())
-            crashReporter.setCustomKey("deck_wizard_seed_count", seedsForRanking.size.toString())
-        }
-        _uiState.update { it.copy(seedStrategySuggestion = suggestion) }
-    }
-
-    /**
      * Deck Engine Unification plan D7 (4.3) — resolves a combo's component card NAMES (from the
-     * synergy browser's "Use as seed" hand-off) into actual [Card]s and pre-populates
-     * [DeckWizardUiState.seedCards], mirroring [onAddSeed]'s exact dedupe/[MAX_SEED_CARDS] cap so
-     * a combo hand-off can never behave differently from a manual pick.
+     * synergy browser's "Use as seed" hand-off) into actual [Card]s and adds them via [onAddSeed]
+     * (60-card wave v6, plan §5 Phase 5.1: rewritten to reuse the ONE seed-add validation/dedupe/cap
+     * path rather than re-implementing it) -- a combo hand-off can never behave differently from a
+     * manual pick this way.
      *
      * Resolution order per name: (1) [collectionSnapshot] first (owned, no network -- most combo
-     * pieces the user already has), (2) a [searchCardsUseCase] lookup for names not owned (a combo
-     * missing exactly one card is the WHOLE POINT of "almost there" -- that piece is by definition
-     * not owned, so skipping network resolution would silently drop it). Best-effort: a name that
-     * resolves to nothing (typo-adjacent Spellbook naming drift, or the search itself failing) is
-     * silently skipped rather than blocking the rest -- the user still gets whatever DID resolve
-     * and can search-add the rest manually.
+     * pieces the user already has), (2) a [searchCardsUseCase] lookup for names not owned. Best-
+     * effort: a name that resolves to nothing is silently skipped rather than blocking the rest.
      */
     private suspend fun resolveComboSeeds(names: List<String>) {
         val ownedByLowerName = collectionSnapshot.associateBy { it.card.name.lowercase() }
-        val resolved = mutableListOf<Card>()
         for (name in names) {
-            if (resolved.size >= MAX_SEED_CARDS) break
+            if (_uiState.value.seedCopies >= _uiState.value.seedCap) break
             val owned = ownedByLowerName[name.lowercase()]?.card
-            if (owned != null) {
-                resolved += owned
-                continue
-            }
-            val found = runCatching {
+            val resolved = owned ?: runCatching {
                 when (val res = searchCardsUseCase(name)) {
                     is DataResult.Success -> res.data.cards.firstOrNull { it.name.equals(name, ignoreCase = true) }
                     is DataResult.Error -> null
                 }
             }.getOrNull()
-            if (found != null) resolved += found
+            if (resolved != null) onAddSeed(resolved)
         }
-        if (resolved.isEmpty()) return
-        val current = _uiState.value.seedCards
-        val merged = (current + resolved).distinctBy { it.scryfallId }.take(MAX_SEED_CARDS)
-        _uiState.update { it.copy(seedCards = merged) }
-        recomputeSeedLockedColors()
-        recomputeSeedStrategySuggestion()
-    }
-
-    /**
-     * Flow A's ranked "Suggested strategies" list tap handler — resolves a [SeedStrategyCandidate]
-     * onto the SAME one-slot Direction pick [onSelectDirectionTag]/[onSelectTribeDirection] already
-     * write (archetype/theme/tribe are mutually exclusive), so [onGenerate] needs no awareness this
-     * pick came from ranking rather than a quick-pick chip. Tapping the CURRENTLY selected candidate
-     * again clears the pick (toggle, same UX as every other Direction chip in this screen).
-     */
-    fun onSelectSeedStrategyCandidate(candidate: SeedStrategyCandidate) {
-        val profile = candidate.profile
-        val state = _uiState.value
-        val hasPick = profile.archetype != null || profile.themes.isNotEmpty() || profile.tribe != null
-        val alreadySelected = hasPick &&
-            state.selectedArchetype == profile.archetype &&
-            state.selectedDirectionTheme == profile.themes.firstOrNull() &&
-            state.selectedTribeKey == profile.tribe
-        _uiState.update {
-            if (alreadySelected) {
-                it.copy(selectedArchetype = null, selectedDirectionTheme = null, selectedTribeKey = null, selectedTribeLabel = null)
-            } else {
-                it.copy(
-                    selectedArchetype = profile.archetype,
-                    selectedDirectionTheme = profile.themes.firstOrNull(),
-                    selectedTribeKey = profile.tribe,
-                    selectedTribeLabel = profile.tribe?.let { key -> key.removePrefix("tribe:").replaceFirstChar(Char::uppercase) },
-                )
-            }
-        }
-    }
-
-    // ── Entry chooser (Deck Engine Unification plan §5 Phase 3.1) ────────────────
-
-    /** Casual only — Commander never reaches [WizardPhase.ENTRY] (see [WizardEntryFlow]'s KDoc).
-     *
-     * QA fix (RUN 3b): ENTRY is reachable via back-navigation from DIRECTION after the previously
-     * active flow has already populated its own scratch state (e.g. Strategy flow's archetype +
-     * colors) -- switching to a DIFFERENT flow resets that scratch state (see
-     * [resetDirectionScratchState]'s KDoc) so it can never render as a stale pre-filled pick in the
-     * newly chosen flow, or ride silently into the build. Re-tapping the flow the user is ALREADY
-     * in is a no-op-ish transition (never wipes state on the screen they haven't left). */
-    fun onSelectEntryFlow(flow: WizardEntryFlow) {
-        logStep("direction_${flow.name.lowercase()}")
-        if (_uiState.value.entryFlow == flow) {
-            _uiState.update { it.copy(entryFlow = flow, phase = WizardPhase.DIRECTION) }
-            return
-        }
-        cancelDirectionSearchJobs()
-        _uiState.update { it.resetDirectionScratchState().copy(entryFlow = flow, phase = WizardPhase.DIRECTION) }
-    }
-
-    // ── Flow B — colors-first (plan §5 3.3) ───────────────────────────────────────
-
-    fun onToggleColorFlowColor(color: ManaColor) {
-        _uiState.update { state ->
-            val updated = if (color in state.colorIdentity) state.colorIdentity - color else state.colorIdentity + color
-            state.copy(
-                colorIdentity = updated,
-                colorAffinityEntries = if (updated.isEmpty()) emptyList() else ColorStrategyAffinity.forColors(updated),
-                selectedColorAffinityEntry = null,
-                selectedArchetype = null,
-                selectedDirectionTheme = null,
-                suggestedSeedCards = emptyList(),
-            )
-        }
-    }
-
-    /** Picks one [ColorStrategyEntry] from the current [DeckWizardUiState.colorAffinityEntries] list
-     * (writes the SAME archetype/theme Direction-pick fields as every other flow), then ranks the
-     * user's owned collection against the resulting [StrategyProfile] as a suggested-seed
-     * check/uncheck list (RC5). Tapping the same entry again clears the pick. */
-    fun onSelectColorAffinityEntry(entry: ColorStrategyEntry) {
-        val state = _uiState.value
-        val alreadySelected = state.selectedColorAffinityEntry == entry
-        if (alreadySelected) {
-            _uiState.update {
-                it.copy(selectedColorAffinityEntry = null, selectedArchetype = null, selectedDirectionTheme = null, suggestedSeedCards = emptyList())
-            }
-            return
-        }
-        _uiState.update {
-            it.copy(
-                selectedColorAffinityEntry = entry,
-                selectedArchetype = entry.archetype,
-                selectedDirectionTheme = entry.themes.firstOrNull(),
-                selectedTribeKey = null,
-                selectedTribeLabel = null,
-            )
-        }
-        val suggested = rankOwnedCardsForProfileUseCase(entry.toStrategyProfile(state.colorIdentity), cardSnapshot)
-        _uiState.update { it.copy(suggestedSeedCards = suggested) }
-    }
-
-    // ── Flow C — strategy-first (plan §5 3.4) ─────────────────────────────────────
-
-    fun onTaxonomyQueryChange(query: String) = _uiState.update { it.copy(taxonomyQuery = query) }
-
-    fun onSelectTaxonomyArchetype(archetype: ArchetypeId) {
-        val alreadySelected = _uiState.value.selectedArchetype == archetype
-        _uiState.update {
-            it.copy(
-                selectedArchetype = if (alreadySelected) null else archetype,
-                selectedDirectionTheme = null,
-                selectedTribeKey = null,
-                selectedTribeLabel = null,
-                colorComboSuggestions = emptyList(),
-                suggestedSeedCards = emptyList(),
-                // QA fix (edge-case audit follow-up, RUN 3b): a color-combo pick is DOWNSTREAM of
-                // the archetype/theme pick -- it stops being valid the instant the upstream pick
-                // changes (select-different or deselect), so it must be invalidated here too.
-                // Without this, a combo picked for a since-abandoned archetype/theme rode into the
-                // build alongside the newly picked one (e.g. Boros {R,W} colors surviving a switch
-                // to Ramp, an archetype whose curated combos are green-leaning).
-                colorIdentity = emptySet(),
-            )
-        }
-        if (!alreadySelected) recomputeColorComboSuggestions(archetype = archetype, theme = null)
-    }
-
-    fun onSelectTaxonomyTheme(theme: ThemeId) {
-        val alreadySelected = _uiState.value.selectedDirectionTheme == theme
-        _uiState.update {
-            it.copy(
-                selectedDirectionTheme = if (alreadySelected) null else theme,
-                selectedArchetype = null,
-                selectedTribeKey = null,
-                selectedTribeLabel = null,
-                colorComboSuggestions = emptyList(),
-                suggestedSeedCards = emptyList(),
-                // Same downstream-invalidation rule as onSelectTaxonomyArchetype -- see its comment.
-                colorIdentity = emptySet(),
-            )
-        }
-        if (!alreadySelected) recomputeColorComboSuggestions(archetype = null, theme = theme)
-    }
-
-    /** [ColorStrategyAffinity.combosFor] (curated ranking) blended with how strong the user's OWN
-     * collection already is in each candidate combo ([CollectionProfile.colorShares]) -- a taxonomy
-     * pick favors color combos the user can actually build today, not a purely abstract ranking. */
-    private fun recomputeColorComboSuggestions(archetype: ArchetypeId?, theme: ThemeId?) {
-        val shareByColor = _uiState.value.collectionProfile?.colorShares?.associate { it.color to it.share }.orEmpty()
-        val combos = ColorStrategyAffinity.combosFor(archetype, theme)
-            .map { (colors, weight) ->
-                val avgShare = if (colors.isEmpty()) 0f else colors.map { shareByColor[it] ?: 0f }.average().toFloat()
-                ColorComboSuggestion(colors, weight * (0.5f + avgShare))
-            }
-            .sortedByDescending { it.score }
-        _uiState.update { it.copy(colorComboSuggestions = combos) }
-    }
-
-    /** Picks one [ColorComboSuggestion] (writes [DeckWizardUiState.colorIdentity]), then ranks
-     * suggested seeds against the now-complete [StrategyProfile] (archetype/theme + these colors),
-     * same as Flow B. Tapping the same combo again clears the color pick. */
-    fun onSelectColorCombo(combo: ColorComboSuggestion) {
-        val state = _uiState.value
-        val alreadySelected = state.colorIdentity == combo.colors
-        val colors = if (alreadySelected) emptySet() else combo.colors
-        _uiState.update { it.copy(colorIdentity = colors) }
-        if (alreadySelected) {
-            _uiState.update { it.copy(suggestedSeedCards = emptyList()) }
-            return
-        }
-        val profile = StrategyProfile(archetype = state.selectedArchetype, themes = listOfNotNull(state.selectedDirectionTheme), colors = colors)
-        val suggested = rankOwnedCardsForProfileUseCase(profile, cardSnapshot)
-        _uiState.update { it.copy(suggestedSeedCards = suggested) }
-    }
-
-    /** QA fix (RUN 3b follow-up) -- see the call site in `init` for the race this closes. Re-derives
-     * the SAME [StrategyProfile] [onSelectColorAffinityEntry] (Flow B)/[onSelectColorCombo] (Flow C)
-     * would have ranked against, from whichever pick is CURRENTLY active, and re-ranks
-     * [collectionSnapshot] now that it has actually loaded. A no-op when nothing is picked yet (the
-     * common case -- this only ever does real work when the user picked during the loading window). */
-    private fun recomputeActiveSuggestedSeeds() {
-        val state = _uiState.value
-        val affinityEntry = state.selectedColorAffinityEntry
-        val profile = when {
-            affinityEntry != null -> affinityEntry.toStrategyProfile(state.colorIdentity)
-            state.entryFlow == WizardEntryFlow.STRATEGY &&
-                state.colorIdentity.isNotEmpty() &&
-                (state.selectedArchetype != null || state.selectedDirectionTheme != null) ->
-                StrategyProfile(
-                    archetype = state.selectedArchetype,
-                    themes = listOfNotNull(state.selectedDirectionTheme),
-                    colors = state.colorIdentity,
-                )
-            else -> null
-        } ?: return
-        val suggested = rankOwnedCardsForProfileUseCase(profile, cardSnapshot)
-        _uiState.update { it.copy(suggestedSeedCards = suggested) }
-    }
-
-    // ── Flow B/C shared — suggested-seed check/uncheck (plan §5 3.3/3.4) ─────────
-
-    /** Toggles a [DeckWizardUiState.suggestedSeedCards] entry into/out of [DeckWizardUiState
-     * .seedCards] via the SAME [onAddSeed]/[onRemoveSeed] handlers Flow A's seed picker uses (RC5 —
-     * one seed-selection mechanism, three ways to arrive at it). */
-    fun onToggleSuggestedSeed(card: Card) {
-        val isSeeded = _uiState.value.seedCards.any { it.scryfallId == card.scryfallId }
-        if (isSeeded) onRemoveSeed(card) else onAddSeed(card)
-    }
-
-    // ── Step 3 — Identity ─────────────────────────────────────────────────────
-
-    /** No-op for Commander (colors are read-only, derived from the commander). */
-    fun onToggleColor(color: ManaColor) {
-        val state = _uiState.value
-        if (state.selectedFormat?.isCommanderFormat == true) return
-        _uiState.update {
-            it.copy(colorIdentity = if (color in it.colorIdentity) it.colorIdentity - color else it.colorIdentity + color)
-        }
-    }
-
-    fun onSelectThemeHint(theme: String?) =
-        _uiState.update { it.copy(selectedThemeHint = if (it.selectedThemeHint == theme) null else theme) }
-
-    // ── Step 4 — Review ───────────────────────────────────────────────────────
-
-    fun onToggleFillLands() = _uiState.update { it.copy(fillLands = !it.fillLands) }
-
-    /** Commander-only (W5.2). Casual keeps [onToggleFillLands]/[DeckWizardUiState.fillLands]. */
-    fun onToggleIncludeNonBasicLands() = _uiState.update { it.copy(includeNonBasicLands = !it.includeNonBasicLands) }
-
-    /** Deck Engine Unification plan (§5 Phase 3.5) — no-op when [DeckWizardUiState
-     * .communityEngineAvailable] is false (the UI never renders the toggle in that case either; this
-     * guard is the actual source of truth, mirrors [onSelectFormat]'s "never trust the UI-only
-     * disabled state" precedent). */
-    fun onToggleUseCommunityData() {
-        if (!_uiState.value.communityEngineAvailable) return
-        _uiState.update { it.copy(useCommunityData = !it.useCommunityData) }
     }
 
     // ── Navigation between phases ────────────────────────────────────────────
 
     /**
-     * Picks the wizard's starting phase for the format [onSelectFormat] just resolved -- Commander
-     * routes straight to [WizardPhase.COMMANDER_PICK] (forcing [WizardEntryFlow.CARDS]; the
-     * commander IS the mandatory first pick, so [WizardPhase.ENTRY] has nothing to offer), Casual
-     * routes through the entry chooser. Deck Wizard v4 (R13): called ONCE from `init`, never from
-     * the UI -- there is no format step to advance FROM any more.
+     * Deck Wizard 60-card wave (v6), plan §5 Phase 5.1 -- ENTRY's flow picker. Resets the shared
+     * seed/color/strategy scratch state ([resetDirectionScratchState]) and lands on the flow's own
+     * first step ([WizardPhase.SEED_PICK]/`.COLOR_PICK`/`.STRATEGY_PICK`). Re-tapping the flow the
+     * user is ALREADY in is a no-op-ish transition (never wipes state on the screen they haven't
+     * left) -- same precedent as the pre-v6 handler.
      */
-    fun onNextFromFormat() {
-        val format = _uiState.value.selectedFormat ?: return
-        if (format.isCommanderFormat) {
-            logStep("commander_pick")
-            _uiState.update { it.copy(phase = WizardPhase.COMMANDER_PICK, entryFlow = WizardEntryFlow.CARDS) }
-        } else {
-            logStep("entry")
-            _uiState.update { it.copy(phase = WizardPhase.ENTRY) }
+    fun onSelectEntryFlow(flow: WizardEntryFlow) {
+        logStep("entry_${flow.name.lowercase()}")
+        val targetPhase = when (flow) {
+            WizardEntryFlow.CARDS -> WizardPhase.SEED_PICK
+            WizardEntryFlow.COLORS -> WizardPhase.COLOR_PICK
+            WizardEntryFlow.STRATEGY -> WizardPhase.STRATEGY_PICK
         }
-    }
-
-    /**
-     * Deck Wizard & Engine Rework plan, Workstream 3 — as of this workstream, EVERY Casual flow
-     * (A/B/C) requires both a real strategy pick (archetype/theme/tribe — D-B's "no GENERIC escape"
-     * rule, generalized from Flow A alone to all three flows) AND a non-empty color set before
-     * advancing, and lands on the SAME shared [WizardPhase.MANUAL_ADDS] step Commander uses (never
-     * [WizardPhase.IDENTITY], which is now unreachable dead code for Casual — see [WizardPhase]'s own
-     * KDoc precedent for Commander's DIRECTION/IDENTITY). This mirrors
-     * [onNextFromStrategy]'s skeleton-resolution + phase transition exactly.
-     */
-    fun onNextFromDirection() {
-        val state = _uiState.value
-        if (state.selectedFormat?.isCommanderFormat == true && state.selectedCommander == null) {
-            // Unreachable post-Workstream-2 (Commander never visits DIRECTION anymore) -- defensive
-            // dead branch only, kept for the same reason WS2 left its own dead branches in place.
-            crashReporter.log("deck_wizard_step_direction_blocked_no_commander")
-            viewModelScope.launch {
-                _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_commander_required)))
-            }
+        if (_uiState.value.entryFlow == flow) {
+            _uiState.update { it.copy(entryFlow = flow, phase = targetPhase) }
             return
         }
-
-        val hasStrategyPick = state.selectedArchetype != null || state.selectedDirectionTheme != null || state.selectedTribeKey != null
-
-        // Deck Engine Unification plan (§5 Phase 3.3/3.4) -- Flow B/C's own sticky-button `enabled`
-        // gate mirrors this (design review RUN 3b), but the VM guard is the actual source of truth
-        // (same "never trust the UI-only disabled state" precedent as the Commander check above and
-        // onToggleUseCommunityData's KDoc).
-        if (state.entryFlow == WizardEntryFlow.COLORS) {
-            if (state.colorIdentity.isEmpty()) {
-                crashReporter.log("deck_wizard_step_direction_blocked_no_colors")
-                viewModelScope.launch {
-                    _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_colors_required)))
-                }
-                return
-            }
-            // Workstream 3 -- unifies Flow B with Flow A/C: colors alone aren't a real plan yet.
-            if (!hasStrategyPick) {
-                crashReporter.log("deck_wizard_step_direction_blocked_no_strategy")
-                viewModelScope.launch {
-                    _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_strategy_required)))
-                }
-                return
-            }
-        }
-        if (state.entryFlow == WizardEntryFlow.STRATEGY) {
-            if (!hasStrategyPick) {
-                crashReporter.log("deck_wizard_step_direction_blocked_no_strategy")
-                viewModelScope.launch {
-                    _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_strategy_required)))
-                }
-                return
-            }
-            // Edge-case audit follow-up (android-edge-case-tester, RUN 3b QA fix): Flow C's own
-            // design is "pick strategy -> pick matching colors" -- BOTH steps expected, not just the
-            // first. An archetype/theme pick with zero colors chosen (e.g. tapping "Next" right
-            // after onSelectTaxonomyArchetype resets colorIdentity to emptySet(), without ever
-            // tapping a combo chip) would otherwise sail through to a fully colorless build under a
-            // color-hungry archetype (RAMP, etc) -- spec.colorIdentity = emptySet() is the LEGITIMATE
-            // "Colorless" filter state per analyzeCollection's D9 comment in
-            // BuildDeckFromTemplateUseCase, so this would silently construct a deck that's
-            // structurally incoherent with the picked archetype instead of erroring or nudging the
-            // user. Reuses the SAME colors-required toast the COLORS-flow guard above uses -- the
-            // underlying problem (no colors picked) is identical.
-            if (state.colorIdentity.isEmpty()) {
-                crashReporter.log("deck_wizard_step_direction_blocked_no_colors_for_strategy")
-                viewModelScope.launch {
-                    _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_colors_required)))
-                }
-                return
-            }
-        }
-        // Workstream 3.1 (D-B, generalized to Flow A): a seed-first build now ALSO requires a real
-        // strategy pick + a color set before advancing -- no GENERIC escape for Casual (Commander
-        // keeps its own short escape hatch in the STRATEGY step, see onNextFromStrategy's KDoc).
-        // colorIdentity is populated well before this point via recomputeSeedLockedColors (every seed
-        // add/remove) plus any manual onToggleCardsFlowColor pick -- there is no separate "prefill at
-        // Next time" step to run anymore.
-        if (state.entryFlow == WizardEntryFlow.CARDS && state.selectedFormat?.isCommanderFormat != true) {
-            if (!hasStrategyPick) {
-                crashReporter.log("deck_wizard_step_direction_blocked_no_strategy_for_cards")
-                viewModelScope.launch {
-                    _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_strategy_required)))
-                }
-                return
-            }
-            if (state.colorIdentity.isEmpty()) {
-                crashReporter.log("deck_wizard_step_direction_blocked_no_colors_for_cards")
-                viewModelScope.launch {
-                    _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_colors_required)))
-                }
-                return
-            }
-        }
-
-        // Workstream 3 -- every Casual flow now resolves the SAME shared MANUAL_ADDS skeleton
-        // Commander's STRATEGY step resolves (mirrors onNextFromStrategy exactly) and lands on that
-        // step, never IDENTITY/REVIEW directly.
-        // Deck Analysis Engine v3: ArchetypeId.GENERIC no longer exists -- an unpinned selection is
-        // `null` directly (see onNextFromStrategy's own compat note for the same substitution).
-        val direction = state.selectedArchetype
-        val directionThemes = listOfNotNull(state.selectedDirectionTheme)
-        // Fix 5 (edge-case audit, 2026-07-28): same GENERIC-with-no-themes gate as
-        // onNextFromStrategy -- mirrors BuildDeckFromTemplateUseCase.resolveArchetypeSkeleton so
-        // this UI-only preview never shows a role chip the real build wouldn't apply. In practice
-        // Casual's own mandatory-strategy gate (D-B, just above / onNextFromDirection's earlier
-        // guards) already requires a real pick before reaching this line for every entry flow that
-        // enforces it -- this gate is defense-in-depth for any current/future path that reaches here
-        // without a pick.
-        val skeleton = if (direction == null && directionThemes.isEmpty()) {
-            null
-        } else {
-            ArchetypeSkeletonResolver.resolveWithColor(
-                format = ArchetypeFormat.SIXTY,
-                archetype = direction,
-                themes = directionThemes,
-                identity = state.colorIdentity,
-            )
-        }
-        logStep("manual_adds")
-        _uiState.update { it.copy(phase = WizardPhase.MANUAL_ADDS, manualAddsSkeleton = skeleton) }
+        cancelDirectionSearchJobs()
+        _uiState.update { it.resetDirectionScratchState().copy(entryFlow = flow, phase = targetPhase) }
     }
 
-    fun onNextFromIdentity() {
-        logStep("review")
-        _uiState.update { it.copy(phase = WizardPhase.REVIEW) }
-    }
-
-    /** Back navigation between steps 1-4 (+ the new [WizardPhase.ENTRY], plan §5 Phase 3.1). Returns
-     * `true` when the caller should pop the whole wizard screen instead (already at step 1, or
-     * Result — nothing left for the VM to unwind). */
+    /** Back navigation between the wizard's steps (Deck Wizard 60-card wave v6, plan §5 Phase 5.1).
+     * Returns `true` when the caller should pop the whole wizard screen instead. */
     fun onBackPressed(): Boolean {
         val state = _uiState.value
         return when (state.phase) {
-            // Deck Wizard v4 (R13): there is no FORMAT step to route back to any more -- ENTRY
-            // (Casual) and COMMANDER_PICK (Commander) are both genuinely the FIRST step of their
-            // respective flows now, so back from either exits the wizard.
             WizardPhase.ENTRY -> true
             WizardPhase.COMMANDER_PICK -> true
-            WizardPhase.STRATEGY -> { _uiState.update { it.copy(phase = WizardPhase.COMMANDER_PICK) }; false }
-            // Workstream 3 -- MANUAL_ADDS is now shared by BOTH Commander (from STRATEGY) and every
-            // Casual flow (from DIRECTION, see onNextFromDirection). Format-aware back target.
-            WizardPhase.MANUAL_ADDS -> {
-                val target = if (state.selectedFormat?.isCommanderFormat == true) WizardPhase.STRATEGY else WizardPhase.DIRECTION
+            WizardPhase.SEED_PICK, WizardPhase.COLOR_PICK, WizardPhase.STRATEGY_PICK -> {
+                _uiState.update { it.copy(phase = WizardPhase.ENTRY) }
+                false
+            }
+            WizardPhase.STRATEGY -> {
+                val target = if (state.selectedFormat?.isCommanderFormat == true) WizardPhase.COMMANDER_PICK else WizardPhase.SEED_PICK
                 _uiState.update { it.copy(phase = target) }
                 false
             }
-            // Commander never reaches DIRECTION/IDENTITY anymore (it routes through COMMANDER_PICK/
-            // STRATEGY/MANUAL_ADDS above) -- this branch is Casual-only, always targets ENTRY.
-            WizardPhase.DIRECTION -> { _uiState.update { it.copy(phase = WizardPhase.ENTRY) }; false }
-            // Workstream 3 -- IDENTITY is now unreachable dead code for EVERY flow (Commander since
-            // WS2, Casual since this workstream: onNextFromDirection never routes here anymore).
-            // Kept, not deleted, matching this file's established "defensive dead code, harmless to
-            // leave" precedent (see WizardPhase's own KDoc for Commander's DIRECTION/IDENTITY).
-            WizardPhase.IDENTITY -> { _uiState.update { it.copy(phase = WizardPhase.DIRECTION) }; false }
-            // Workstream 3 -- EVERY flow (Commander AND all three Casual flows) now reaches REVIEW
-            // from MANUAL_ADDS; the old per-flow branching (Commander vs. Flow A's IDENTITY vs.
-            // Flow B/C's DIRECTION) collapses to one target.
-            WizardPhase.REVIEW -> { _uiState.update { it.copy(phase = WizardPhase.MANUAL_ADDS) }; false }
+            WizardPhase.PLAN_SECTIONS -> {
+                val target = when {
+                    state.selectedFormat?.isCommanderFormat == true -> WizardPhase.STRATEGY
+                    state.entryFlow == WizardEntryFlow.CARDS -> WizardPhase.STRATEGY
+                    state.entryFlow == WizardEntryFlow.COLORS -> WizardPhase.COLOR_PICK
+                    else -> WizardPhase.STRATEGY_PICK
+                }
+                _uiState.update { it.copy(phase = target) }
+                false
+            }
+            WizardPhase.REVIEW -> { _uiState.update { it.copy(phase = WizardPhase.PLAN_SECTIONS) }; false }
             WizardPhase.GENERATING -> { onCancelGeneration(); false }
             // W7 Task B (R10): abandoning Choice writes nothing -- see onAbandonChoice's own KDoc.
             WizardPhase.CHOICE -> { onAbandonChoice(); false }
-            WizardPhase.RESULT -> true
         }
     }
 
@@ -2015,7 +1358,7 @@ class DeckWizardViewModel(
         // Re-entrancy guard: the state write to GENERATING below is synchronous, so a second
         // invocation from a double-tap (before Compose recomposes the Review CTA away) reads the
         // already-updated phase here and returns instead of launching a second build / clobbering
-        // `generateJob`. See feedback_deck_wizard_reentrancy_and_orphan_cleanup memory.
+        // `generateJob`.
         if (state.phase != WizardPhase.REVIEW || state.selectedFormat == null) return
         logStep("generating")
         val format = state.selectedFormat
@@ -2024,8 +1367,6 @@ class DeckWizardViewModel(
         _uiState.update {
             it.copy(
                 phase = WizardPhase.GENERATING,
-                buildStage = null,
-                completedStages = emptyList(),
                 commanderBuildStage = null,
                 commanderCompletedStages = emptyList(),
                 buildError = null,
@@ -2034,8 +1375,8 @@ class DeckWizardViewModel(
         // Deck Wizard Commander v3 plan, Phase 6 -- the headline wire: a Commander-shaped format
         // (D1/D2) now builds through BuildCommanderDeckUseCase (the v3 placement engine, Phase 2)
         // instead of the legacy BuildDeckFromTemplateUseCase/Motor A pipeline below, which stays the
-        // ONLY build path for Casual (D7's escape hatch -- Casual is explicitly out of this
-        // campaign's scope).
+        // ONLY build path for the other 60-card formats until run C (plan §5 Phase 5.4) wires
+        // BuildWizardDeckUseCase's Sixty anchor into `onGenerate` for every format.
         generateJob = viewModelScope.launch {
             if (format.isCommanderFormat) {
                 generateCommanderDeck(state, format)
@@ -2047,20 +1388,15 @@ class DeckWizardViewModel(
 
     /** The Commander/Commander Casual build path (Deck Wizard Commander v3 plan, Phase 6; split into
      * a build-then-finalize pair in W7 Task B). Runs [buildCommanderDeckUseCase]'s placement loop
-     * only (D1: the SAME objective [com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline]
-     * verifies) -- a build with at least one [com.mmg.manahub.feature.decks.domain.template
-     * .AmbiguityGroup] hands the in-memory draft to [WizardPhase.CHOICE] instead of finalizing
-     * immediately (R10); a zero-group build calls [finalizeCommanderDraft] straight away, exactly
-     * as the old single-shot path did (byte-identical by construction -- see
-     * [BuildCommanderDeckUseCase.invoke]'s own KDoc). Nothing is persisted by this function itself;
-     * see [finalizeCommanderDraft]'s KDoc for the write path (E11: persist happens exactly once,
-     * whichever branch reaches it).
+     * only -- a build with at least one ambiguity group hands the in-memory draft to
+     * [WizardPhase.CHOICE] instead of finalizing immediately (R10); a zero-group build calls
+     * [finalizeCommanderDraft] straight away.
      */
     private suspend fun generateCommanderDeck(state: DeckWizardUiState, format: DeckFormat) {
         val crashlytics = FirebaseCrashlytics.getInstance()
         crashlytics.log("deck_wizard_generate_started")
         crashlytics.setCustomKey("deck_wizard_format", format.name)
-        crashlytics.setCustomKey("deck_wizard_seed_count", state.seedCards.size)
+        crashlytics.setCustomKey("deck_wizard_seed_count", state.seeds.size)
         crashlytics.setCustomKey("deck_wizard_entry_flow", state.entryFlow.name)
         crashlytics.setCustomKey("deck_wizard_land_mode", if (state.includeNonBasicLands) "non_basic_included" else "basics_only")
         commanderGenerationStartAtMs = System.currentTimeMillis()
@@ -2075,23 +1411,12 @@ class DeckWizardViewModel(
             return
         }
         val identity = commander.colorIdentity.toManaColorSet()
-        // D4: the STRATEGY step only persists the EXPANDED pin fields
-        // (selectedArchetype/selectedStrategyThemes/selectedTribeKey) plus a display-only catalog id
-        // pointer (selectedCuratedStrategyId) -- re-resolve the StrategyPick the build engine wants
-        // from that id (null id = Custom, D6).
         val strategyPick = resolveStrategyPick(state)
 
         var ownedCollection = collectionSnapshot
             .groupBy { it.card.scryfallId }
             .map { (_, entries) -> OwnedCard(entries.first().card, entries.sumOf { entry -> entry.userCard.quantity }) }
-        // R12/E13 (Deck Wizard Commander v4, W5.3): basics are an unconditional, ownership-exempt
-        // resource -- this guarantee now runs UNCONDITIONALLY, never gated on the (Commander-only)
-        // includeNonBasicLands toggle, because [finalizeCommanderDraft] always fills lands for
-        // Commander. Mirrors DeckStudioViewModel.applyLandSuggestions' own fetch-if-missing.
         ownedCollection = guaranteeBasicsAvailable(ownedCollection, identity)
-        // PLAN_SECTIONS' manual adds share DeckWizardUiState.seedCards with Flow A's seed picker --
-        // see onAddSeed/isCommanderManualAddValid, which already gates identity/legality for a
-        // Commander spec before a card can land in this list.
         val manualAdds = resolveManualAdds(state)
 
         val draft = runCatching {
@@ -2128,9 +1453,6 @@ class DeckWizardViewModel(
         } else {
             crashlytics.log("deck_wizard_choice_shown")
             crashlytics.setCustomKey("deck_wizard_choice_group_count_bucket", countBucket(draft.ambiguityGroups.size))
-            // A build with fallback placements but no ambiguity still surfaces CHOICE so
-            // FallbackFlagCard's honesty promise applies to every fallback-touched build, not
-            // only the ones that also happened to hit a near-tie.
             crashlytics.setCustomKey(
                 "deck_wizard_choice_shown_reason",
                 if (draft.ambiguityGroups.isNotEmpty()) "ambiguity" else "fallback_only",
@@ -2154,24 +1476,16 @@ class DeckWizardViewModel(
             ?.let { strategy -> StrategyPick.Curated(strategy, state.selectedTribeKey) }
             ?: StrategyPick.Custom
 
-    /** Shared by [generateCommanderDeck] and [onFinishChoices] -- see [generateCommanderDeck]'s own
-     * comment on `manualAdds` for the identity/legality gating this list already went through. */
+    /** Shared by [generateCommanderDeck] and [onFinishChoices]. */
     private fun resolveManualAdds(state: DeckWizardUiState): List<ManualAdd> =
-        state.seedCards.map { card -> ManualAdd(card = card, isOwned = cardSnapshot.any { it.scryfallId == card.scryfallId }) }
+        state.seeds.map { seed ->
+            ManualAdd(card = seed.card, isOwned = cardSnapshot.any { it.scryfallId == seed.card.scryfallId }, quantity = seed.quantity)
+        }
 
     /**
      * W7 Task B (E11) — completes and persists a [CommanderDraftBuild] exactly ONCE: applies
-     * [resolutions] (empty = every tentative default stands, byte-identical to the old single-shot
-     * build), runs land fill/verify/refine, then writes atomically into [launchedFromDeckId] when
-     * the wizard was launched from an existing draft, or a freshly created deck otherwise (D12).
-     * Called from either [generateCommanderDeck] directly (zero ambiguity groups) or
-     * [onFinishChoices] (the user resolved, or explicitly finished, the Choice screen) — never both
-     * for the same build, so persistence still happens exactly once per generation.
-     *
-     * A cancellation before the write below runs leaves an existing [launchedFromDeckId] draft
-     * completely untouched (nothing has been written to it yet); a fresh deck created by this
-     * function is tracked via [pendingDeckId] so [onCancelGeneration]/[onRetryGeneration] can clean
-     * it up the same way the Casual path already does.
+     * [resolutions], runs land fill/verify/refine, then writes atomically into [launchedFromDeckId]
+     * when the wizard was launched from an existing draft, or a freshly created deck otherwise (D12).
      */
     private suspend fun finalizeCommanderDraft(
         state: DeckWizardUiState,
@@ -2187,8 +1501,6 @@ class DeckWizardViewModel(
             buildCommanderDeckUseCase.finalize(
                 draft = draft,
                 resolutions = resolutions,
-                // R12: basics are unconditional for Commander -- the land engine always runs;
-                // includeNonBasicLands (default OFF, W5.2) gates ONLY Stage A's owned non-basics.
                 fillLands = true,
                 onStage = { stage ->
                     _uiState.update { s ->
@@ -2208,17 +1520,8 @@ class DeckWizardViewModel(
 
         val manualIds = manualAdds.map { it.card.scryfallId }.toSet()
 
-        // R15 structural guard: re-read the launched deck's REAL card count right before the write
-        // (not the launch-time snapshot -- the deck can gain cards while the wizard is open, e.g.
-        // a manual add from another tab, or the user backgrounding and returning). Every wizard
-        // entry point can reach this function, confirmed or not (Discoveries/combo hand-offs never
-        // showed a confirm dialog at all) -- this is the ONE place a silent replace is refused,
-        // independent of which UI path forgot to ask. A fresh deck (launchedFromDeckId == null) is
-        // never at risk here (BuildCommanderDeckUseCase.persist only just created it below).
         if (launchedFromDeckId != null && !replaceConfirmed) {
             val existing = deckRepository.observeDeckWithCards(launchedFromDeckId!!).first()
-            // Same "has anything to lose" definition DeckStudioViewModel.isEmptyDeck uses: a
-            // commander pick alone counts, even with zero mainboard cards.
             val hasCardsToLose = existing != null &&
                 (existing.mainboard.sumOf { it.quantity } > 0 || existing.deck.commanderCardId != null)
             if (hasCardsToLose) {
@@ -2235,18 +1538,8 @@ class DeckWizardViewModel(
             }
         }
 
-        // Edge-case fix (Phase 6 adversarial pass): once the write actually starts, it MUST run to
-        // completion -- for a rebuild-in-place (launchedFromDeckId != null) this is mutating the
-        // user's own pre-existing draft. persist() is now ONE Room transaction (Phase 8 JOB 2), so
-        // the DB itself cannot land half-written; isWritingCommanderDeck stays as defense-in-depth
-        // for this ViewModel's OWN state (see its KDoc) and gates onCancelGeneration below so Cancel
-        // becomes a no-op once this point is reached. CancellationException is explicitly rethrown
-        // (never swallowed into a spurious buildError) rather than caught by the generic getOrElse
-        // below, matching the build step's own convention right above this block.
         isWritingCommanderDeck = true
         val writeOutcome = runCatching {
-            // D12: fill the launched-from draft when one exists, else create a fresh one -- see this
-            // function's own KDoc for the cancellation-safety argument each branch relies on.
             val deckId = launchedFromDeckId ?: run {
                 val newId = deckRepository.createDeck(name = commander.name, description = "Draft", format = format.name)
                 pendingDeckId = newId
@@ -2268,10 +1561,6 @@ class DeckWizardViewModel(
         isWritingCommanderDeck = false
         pendingFinalize = null // W7 Fix 2: only clear the resumable attempt on real success.
 
-        // W7 Fix 3 (E8): record a preference ONLY now -- for exactly the alternatives present in
-        // the FINAL resolution that persisted successfully, never a tentative default (kept,
-        // auto-filled via "Choose the remaining N for me", or defaulted by "Let the wizard
-        // finish"). A tap the user later reversed or abandoned never reaches this point at all.
         val genuineAlternatives = resolutions.flatMap { (role, ids) ->
             val tentative = draft.tentativeByRole[role].orEmpty()
             ids.filterNot { it in tentative }
@@ -2302,28 +1591,13 @@ class DeckWizardViewModel(
                 choiceSelections = emptyMap(),
             )
         }
-        // W7 Task D (plan 7.5) -- the Commander Result screen is retired: Deck Studio's Build tab
-        // (R11, Task C) is the hand-off now, not an intermediate summary screen. The Choice screen
-        // already gave the user their one chance to review/decide the build's close calls, so there
-        // is nothing left for a separate Result step to show. Casual is UNCHANGED -- it still routes
-        // through WizardPhase.RESULT/ResultContent (generateCasualDeck, untouched by this run).
         _events.send(DeckWizardEvent.OpenDeckStudio(writeOutcome))
     }
 
     // ── Choice (W7 Task B, R10) ──────────────────────────────────────────────────
 
-    /** Toggles [cardId] in [role]'s selection, respecting [com.mmg.manahub.feature.decks.domain
-     * .template.AmbiguityGroup.remainingSlots] as a hard cap (an already-full section ignores a tap
-     * on a not-yet-selected id; deselecting always frees a slot). A role absent from
-     * [DeckWizardUiState.choiceSelections] displays -- and behaves as if pre-selected with -- its
-     * own [CommanderDraftBuild.tentativeByRole] defaults (see that field's own KDoc).
-     * W7 Fix 3: this function no longer records a [WizardPreferenceStore] preference itself --
-     * a tap the user later reverses, or makes before abandoning Choice, must never become a
-     * preference (E8's "actively chosen" contract means chosen AND KEPT through to a successful
-     * build). See [finalizeCommanderDraft]'s own recording block for where this now happens.
-     * W7 fix 4.1 (design review P0): a blocked tap (cap already reached) surfaces a
-     * [DeckWizardEvent.ShowToast] explaining why, since a disabled row alone gives no feedback.
-     */
+    /** Toggles [cardId] in [role]'s selection, respecting the ambiguity group's remaining slots as a
+     * hard cap. */
     fun onToggleChoiceCard(role: RoleKey, cardId: String) {
         val state = _uiState.value
         val draft = state.commanderDraftBuild ?: return
@@ -2348,8 +1622,7 @@ class DeckWizardViewModel(
     }
 
     /** "Choose the remaining N for me" (per-section) — fills whichever of [role]'s slots the user
-     * has not yet decided with the engine's own tentative defaults, leaving any already-made
-     * selection (a kept default or a chosen alternative) untouched. */
+     * has not yet decided with the engine's own tentative defaults. */
     fun onAutoFillChoiceSection(role: RoleKey) {
         val state = _uiState.value
         val draft = state.commanderDraftBuild ?: return
@@ -2364,13 +1637,9 @@ class DeckWizardViewModel(
         _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to (current + fill))) }
     }
 
-    /** Global "Let the wizard finish" — the Choice screen's ONE finish action (R10): resolves every
-     * section the user has already decided exactly as chosen, and every untouched section with the
-     * engine's own tentative defaults (an absent [DeckWizardUiState.choiceSelections] entry — see
-     * [BuildCommanderDeckUseCase.finalize]'s own KDoc), then persists ONCE via
-     * [finalizeCommanderDraft] (E11). Re-entrancy-guarded the same way [onGenerate] is (a
-     * synchronous phase check before the async work starts).
-     */
+    /** Global "Let the wizard finish" — resolves every section the user has already decided exactly
+     * as chosen, and every untouched section with the engine's own tentative defaults, then persists
+     * ONCE via [finalizeCommanderDraft]. */
     fun onFinishChoices() {
         val state = _uiState.value
         if (state.phase != WizardPhase.CHOICE) return
@@ -2394,12 +1663,7 @@ class DeckWizardViewModel(
     }
 
     /** Abandoning the Choice screen (UI/system back) writes NOTHING — the in-memory draft is simply
-     * dropped, matching every other pre-persist wizard step's back semantics (R10: abandonment must
-     * leave the repository untouched, byte-identical). Process death mid-Choice has the same effect
-     * by construction: [DeckWizardUiState.commanderDraftBuild] is plain in-memory VM state, never
-     * SavedStateHandle-backed, so it is simply gone on process restore — there is nothing to clean
-     * up because nothing was ever written.
-     */
+     * dropped. */
     private fun onAbandonChoice() {
         FirebaseCrashlytics.getInstance().log("deck_wizard_choice_abandoned")
         _uiState.update {
@@ -2414,20 +1678,9 @@ class DeckWizardViewModel(
     }
 
     /**
-     * R12/E13 (Deck Wizard Commander v4, W5.3 -- originally W0.2/G10/E10's symptom fix, now
-     * documented as the RULE it stands in for): basic lands are an unconditional, unlimited
-     * resource the wizard may always place, regardless of collection ownership. Synthesizes
-     * [OwnedCard] entries for whichever WUBRG basics (or Wastes, for a colourless identity)
-     * [ownedCollection] has zero real [com.mmg.manahub.core.model.Card] object for, fetched via
-     * [cardRepository] exactly as [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
-     * .applyLandSuggestions] already does for the same reason. This is the ONE authoritative
-     * boundary guarantee that makes [com.mmg.manahub.feature.decks.domain.template
-     * .BuildCommanderDeckUseCase.resolveBasicCard]'s `null` case unreachable in production --
-     * called UNCONDITIONALLY (never gated on any land toggle), because R12 says basics are always
-     * available whether or not the "Include non-basic lands" toggle is on. A fetch failure
-     * (offline, unstubbed test double) is swallowed: the caller then simply sees the SAME gap it
-     * would have seen before this fix, never a crash (and the use case's own defensive breadcrumb
-     * fires as a second observability layer if that gap ever reaches the engine).
+     * R12/E13: basic lands are an unconditional, unlimited resource the wizard may always place,
+     * regardless of collection ownership. Synthesizes [OwnedCard] entries for whichever WUBRG basics
+     * (or Wastes, for a colourless identity) [ownedCollection] has zero real [Card] object for.
      */
     private suspend fun guaranteeBasicsAvailable(ownedCollection: List<OwnedCard>, identity: Set<ManaColor>): List<OwnedCard> {
         val neededNames = if (identity.isEmpty()) {
@@ -2445,15 +1698,8 @@ class DeckWizardViewModel(
         return ownedCollection + fetched
     }
 
-    /**
-     * Deck Wizard Commander v3 plan, Phase 7.3 -- self-evaluation telemetry for a completed
-     * Commander build (D15: "production quality must be observable"). `deck_wizard_blocker_after_
-     * build` is NOT logged here -- [buildCommanderDeckUseCase] itself already records it as a
-     * non-fatal the instant a BLOCKER survives verify+refine (see that class's own
-     * `deck_wizard_blocker_after_build` log line), so this function only covers the ADDITIONAL
-     * TRACKED buckets the harness's own TRACKED metrics mirror (score/pillar/gap/offplan/pool-size/
-     * strategy-source/refinement-swaps). All values are ints/enum names/small buckets -- no PII.
-     */
+    /** Deck Wizard Commander v3 plan, Phase 7.3 -- self-evaluation telemetry for a completed
+     * Commander build. */
     private fun logCommanderBuildTelemetry(
         state: DeckWizardUiState,
         strategyPick: StrategyPick,
@@ -2479,7 +1725,7 @@ class DeckWizardViewModel(
         crashlytics.setCustomKey("deck_wizard_manual_adds_count", result.fillStats.placedManual)
         crashlytics.setCustomKey("deck_wizard_pool_size_bucket", poolSizeBucket(poolSize))
 
-        val topRecommendationId = state.commanderStrategyRecommendations.firstOrNull()?.strategy?.id
+        val topRecommendationId = state.strategyRecommendations.firstOrNull()?.strategy?.id
         val strategySource = when (strategyPick) {
             StrategyPick.Custom -> "custom"
             is StrategyPick.Curated -> if (strategyPick.strategy.id == topRecommendationId) "recommended" else "other"
@@ -2487,7 +1733,6 @@ class DeckWizardViewModel(
         crashlytics.setCustomKey("deck_wizard_strategy_source", strategySource)
         crashlytics.setCustomKey("deck_wizard_refinement_swaps", result.refinementSwaps)
 
-        // D4 fired 0/180 times on the real collection -- production is the only place left to learn whether it ever does.
         val fallbackTier = when {
             result.fillStats.fallbackOffPlanCount > 0 -> "offplan"
             result.fillStats.fallbackStandaloneCount > 0 -> "standalone_only"
@@ -2496,12 +1741,7 @@ class DeckWizardViewModel(
         crashlytics.setCustomKey("deck_wizard_fallback_tier", fallbackTier)
     }
 
-    /** W8 (telemetry) -- classifies HOW the Choice screen's ambiguity groups were resolved, over
-     * [manuallyToggledChoiceRoles]/[autoFilledChoiceRoles] (a role can appear in both, e.g. an
-     * auto-fill followed by a manual tweak -- that still counts as manual, the stronger signal). A
-     * group present in neither set was resolved purely via "Let the wizard finish" (its
-     * [CommanderDraftBuild.tentativeByRole] default, never touched). Zero groups (nothing to
-     * resolve) reads as `wizard_finish_all`, matching a direct zero-ambiguity build. */
+    /** W8 (telemetry) -- classifies HOW the Choice screen's ambiguity groups were resolved. */
     private fun classifyChoiceResolutionMode(draft: CommanderDraftBuild, resolutions: Map<RoleKey, List<String>>): String {
         val groups = draft.ambiguityGroups
         if (groups.isEmpty()) return "wizard_finish_all"
@@ -2522,8 +1762,6 @@ class DeckWizardViewModel(
         }
     }
 
-    /** W8 (telemetry) -- new bucket domain (wall-clock duration), distinct from [countBucket]/
-     * [scoreBucket]'s count/score domains per the auditor's own spec. */
     private fun durationBucket(durationMs: Long): String = when {
         durationMs < 2_000L -> "<2s"
         durationMs < 5_000L -> "2-5s"
@@ -2562,75 +1800,51 @@ class DeckWizardViewModel(
         else -> "250+"
     }
 
-    /** The legacy Casual build path (Motor A / [BuildDeckFromTemplateUseCase]) -- byte-identical to
-     * this function's body before Phase 6's Commander dispatch was introduced in [onGenerate]. */
+    /**
+     * The legacy Casual build path (Motor A / [BuildDeckFromTemplateUseCase]) -- kept until run C
+     * (Deck Wizard 60-card wave v6, plan §5 Phase 5.4) unifies generation onto
+     * `BuildWizardDeckUseCase`'s `Sixty` anchor for every non-Commander format. This run (5.1/5.2)
+     * only had to keep it COMPILING against the new unified ENTRY/SEED_PICK/STRATEGY/PLAN_SECTIONS
+     * front end -- several pre-v6 Casual-only state fields it used to read (`fillLands`,
+     * `useCommunityData`, `includeOutsideCollection`, `selectedThemeHint`/`selectedDirectionTheme`,
+     * `buildStage`/`completedStages`, `WizardPhase.RESULT`/`buildResult`) were deleted along with
+     * the Casual-only DIRECTION/IDENTITY/MANUAL_ADDS/RESULT screens they backed (S1's UI
+     * unification) -- this function now reads a literal DEFAULT for each (documented per call site
+     * below) instead, per this run's own "may read defaults, but do NOT add new state for it" scope
+     * rule. The one BEHAVIORAL consequence: Casual's build always fills basic lands now (previously
+     * user-togglable, default was already `true`), never blends in community trends (previously an
+     * opt-in toggle gated by a global flag), and shows a generic "Validating…" spinner instead of a
+     * per-stage checklist during GENERATING (see [DeckWizardUiState.commanderBuildStage]'s own KDoc)
+     * -- all three are restored/superseded once run C deletes this function entirely.
+     */
     private suspend fun generateCasualDeck(state: DeckWizardUiState, format: DeckFormat) {
         run {
             val crashlytics = FirebaseCrashlytics.getInstance()
             crashlytics.log("deck_wizard_generate_started")
             crashlytics.setCustomKey("deck_wizard_format", format.name)
-            crashlytics.setCustomKey("deck_wizard_seed_count", state.seedCards.size)
-            // Wizard Quality Campaign telemetry: tracks which Direction-step chip (archetype /
-            // theme / tribe / none) actually drove this build, to confirm the taxonomy chip slots
-            // land real hint data (see the "dead chip" fix in this campaign).
-            // WS2: Commander's theme pick lives in selectedStrategyThemes, not
-            // selectedDirectionTheme (Casual-only) -- checked too so a theme-only Commander pick
-            // (no archetype/tribe) is never mis-reported as "none".
-            val directionType = when {
-                state.selectedArchetype != null -> "archetype"
-                state.selectedDirectionTheme != null || state.selectedStrategyThemes.isNotEmpty() -> "theme"
-                state.selectedTribeKey != null -> "tribe"
-                else -> "none"
-            }
-            crashlytics.setCustomKey("deck_wizard_direction_type", directionType)
-            // Deck Engine Unification plan (§5 Phase 3) telemetry: which entry flow actually built
-            // this deck, and whether the community-source toggle was on (Motor B live-wired).
+            crashlytics.setCustomKey("deck_wizard_seed_count", state.seeds.size)
             crashlytics.setCustomKey("deck_wizard_entry_flow", state.entryFlow.name)
-            crashlytics.setCustomKey("deck_wizard_use_community_data", state.useCommunityData)
+            // deck_wizard_use_community_data literal false -- see this function's own class-level KDoc.
+            crashlytics.setCustomKey("deck_wizard_use_community_data", false)
 
-            val colorIdentity = if (format.isCommanderFormat) {
-                state.selectedCommander?.colorIdentity?.toManaColorSet() ?: state.colorIdentity
-            } else {
-                state.colorIdentity
-            }
-            // Deck Wizard & Engine Rework plan, Workstream 2.4 -- Commander's strategyProfile now
-            // comes from the STRATEGY step's OWN theme field (up to 2, via the shared picker),
-            // completely independent of Casual's Direction-theme + Identity-EDHREC-theme-hint pair
-            // below (which stays byte-identical to before this workstream -- Commander never visits
-            // either of those steps anymore, so `state.selectedDirectionTheme`/`selectedThemeHint`
-            // are always their initial empty/null values for a Commander build here).
-            val strategyProfile = if (format.isCommanderFormat) {
-                StrategyProfile(
-                    archetype = state.selectedArchetype,
-                    themes = state.selectedStrategyThemes,
-                    tribe = state.selectedTribeKey,
-                    colors = colorIdentity,
-                )
-            } else {
-                // Deck Engine Unification (D2): the Direction step's own theme pick and the Identity
-                // step's SEPARATE EDHREC theme picker are two independent slots (mirrors the
-                // pre-unification strategyHint/tagHint + themeHint split) -- both fold into the same
-                // StrategyProfile.themes list, capped at 2 (ArchetypeSkeletonResolver's own cap).
-                val identityTheme = ThemeId.fromDisplayName(state.selectedThemeHint)
-                StrategyProfile(
-                    archetype = state.selectedArchetype,
-                    themes = listOfNotNull(state.selectedDirectionTheme, identityTheme).distinct().take(2),
-                    tribe = state.selectedTribeKey,
-                    colors = colorIdentity,
-                )
-            }
+            // Casual now also visits the SHARED STRATEGY step (S1) -- no more Direction/Identity-
+            // theme split to reconcile, one StrategyProfile shape for every non-Commander anchor.
+            val colorIdentity = state.engineIdentity
+            val strategyProfile = StrategyProfile(
+                archetype = state.selectedArchetype,
+                themes = state.selectedStrategyThemes,
+                tribe = state.selectedTribeKey,
+                colors = colorIdentity,
+            )
             val spec = DeckWizardSpec(
                 format = format,
                 commander = state.selectedCommander,
                 strategyProfile = strategyProfile,
                 colorIdentity = colorIdentity,
-                seeds = state.seedCards,
-                fillLands = state.fillLands,
-                useCommunityData = state.useCommunityData,
-                // Deck Wizard & Engine Rework plan, Workstream 4.1: the SAME session-level toggle
-                // that already gates the wizard's own search call sites now also gates
-                // BuildDeckFromTemplateUseCase's Scryfall backstop fill phase.
-                includeOutsideCollection = state.includeOutsideCollection,
+                seeds = state.seeds.map { it.card },
+                fillLands = true, // literal default -- see this function's own class-level KDoc.
+                useCommunityData = false, // literal default -- see this function's own class-level KDoc.
+                includeOutsideCollection = false, // literal default -- see this function's own class-level KDoc.
             )
 
             val outcome: Pair<TemplateBuildResult?, String?> = runCatching {
@@ -2638,12 +1852,10 @@ class DeckWizardViewModel(
                 var failure: String? = null
                 buildDeckFromTemplateUseCase(spec, collectionSnapshot).collect { progress ->
                     when (progress) {
-                        is TemplateBuildProgress.Stage -> _uiState.update { s ->
-                            s.copy(
-                                completedStages = s.buildStage?.let { s.completedStages + it } ?: s.completedStages,
-                                buildStage = progress.stage,
-                            )
-                        }
+                        // The pre-v6 per-stage progress checklist read this into buildStage/
+                        // completedStages, both deleted with the Casual-only GENERATING checklist
+                        // UI -- see this function's own class-level KDoc.
+                        is TemplateBuildProgress.Stage -> Unit
                         is TemplateBuildProgress.Complete -> finalResult = progress.result
                         is TemplateBuildProgress.Failed -> failure = progress.message
                     }
@@ -2671,31 +1883,18 @@ class DeckWizardViewModel(
 
             crashlytics.log("deck_wizard_generate_succeeded")
             crashlytics.setCustomKey("deck_wizard_template_source", result.templateSource.name)
-            _uiState.update {
-                it.copy(phase = WizardPhase.RESULT, buildResult = result, createdDeckId = writeOutcome)
-            }
+            // S13: every format opens Deck Studio directly after persist now -- WizardPhase.RESULT
+            // and DeckWizardUiState.buildResult were deleted along with the Result screen (this is a
+            // direct, necessary consequence of 5.1's own WizardPhase.RESULT deletion, not a
+            // Casual-specific decision).
+            _uiState.update { it.copy(createdDeckId = writeOutcome) }
+            _events.send(DeckWizardEvent.OpenDeckStudio(writeOutcome))
         }
     }
 
     /** Creates the fresh deck, writes commander/cover (Commander only) AND the commander's
-     * qty-1 mainboard entry (BUG-1 fix, Deck Engine Unification plan §0.1 — see below), every
-     * [TemplateBuildResult.deckCards] entry, and the archetype/theme/tribe override + strategy
-     * lock — mirrors [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
-     * .generateFromSeeds]'s write-through convention (one repo call per card copy; a mid-write
-     * cancellation leaves a partial but valid deck).
-     *
-     * BUG-1: the wizard previously wrote ONLY [com.mmg.manahub.core.model.Deck.commanderCardId] --
-     * [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.rebuildUiState] resolves the
-     * commander from the deck's ENTRIES (`allEntries.find { it.scryfallId == commanderId }`), and
-     * [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.setCommander] (the convention
-     * owner) ALSO inserts a qty-1 mainboard row when one is absent. Without that row the commander
-     * was invisible in the built deck. [BuildDeckFromTemplateUseCase.mainboardTargetSize] already
-     * reserves `targetDeckSize - 1` for the commander, so this row brings the total to exactly 100.
-     *
-     * D4 (hard no-cut guarantee): every placed card — commander included — writes
-     * `source = DeckCardSource.WIZARD`, and the deck is marked `strategyLocked = true`. Both gates
-     * are CONSUMED starting Phase 2 (RUN 2); this write only persists the provenance/lock.
-     */
+     * qty-1 mainboard entry, every [TemplateBuildResult.deckCards] entry, and the archetype/theme/
+     * tribe override + strategy lock. */
     private suspend fun writeResultIntoNewDeck(spec: DeckWizardSpec, result: TemplateBuildResult): String {
         val name = wizardDeckName(spec)
         val deckId = deckRepository.createDeck(name = name, description = "Draft", format = spec.format.name)
@@ -2711,12 +1910,6 @@ class DeckWizardViewModel(
             }
         }
 
-        // Deck Wizard Commander v3 plan (Phase 6, D12): ONE atomic write for the commander (BUG-1's
-        // qty-1 mainboard row, still folded in here) plus every result.deckCards entry, instead of
-        // the old clearDeck-free per-card addCardToDeck loop -- this is a freshly-created empty deck
-        // so there is nothing to preserve on a mid-write failure, but the write itself is now a
-        // single Room transaction rather than N independent ones (see DeckRepositoryImpl
-        // .replaceAllCardsWithSource's KDoc).
         val slots = buildList {
             if (spec.format.isCommanderFormat && commander != null) {
                 add(CardSlotWrite(commander.scryfallId, 1, false, DeckCardSource.WIZARD))
@@ -2733,9 +1926,6 @@ class DeckWizardViewModel(
     }
 
     private fun wizardDeckName(spec: DeckWizardSpec): String {
-        // Defense in depth (RUN 3b): gate on format even though onSelectFormat's reset (above)
-        // already makes a non-null commander on a non-Commander spec unreachable via normal UI
-        // flow -- this function shouldn't silently trust an out-of-band-constructed spec.
         val commander = spec.commander.takeIf { spec.format.isCommanderFormat }
         val profile = spec.strategyProfile
         val archetypeName = profile.archetype?.displayName
@@ -2751,15 +1941,7 @@ class DeckWizardViewModel(
     }
 
     /** Best-effort deletes a dangling partially-created deck (a build that got as far as
-     * [writeResultIntoNewDeck]'s `createDeck()` call but failed/was cancelled before finishing).
-     * Nulls [pendingDeckId] FIRST so a concurrent second call is a no-op, then fires the delete on
-     * [viewModelScope] (fire-and-forget — neither caller needs to await it).
-     *
-     * MUST be called from both [onCancelGeneration] AND [onRetryGeneration] — a partial-write
-     * failure leaves [pendingDeckId] set (see [writeResultIntoNewDeck]'s KDoc), and "Retry" is the
-     * more natural CTA on the error screen than "Back"/Cancel. Before this fix, Retry skipped
-     * cleanup entirely: each failure-then-retry cycle created a brand-new deck and overwrote
-     * [pendingDeckId], permanently orphaning the previous partial draft in the user's deck list. */
+     * [writeResultIntoNewDeck]'s `createDeck()` call but failed/was cancelled before finishing). */
     private fun cleanupPendingDeck() {
         val orphanId = pendingDeckId ?: return
         pendingDeckId = null
@@ -2770,12 +1952,8 @@ class DeckWizardViewModel(
     }
 
     /** Cancels an in-flight build. Best-effort deletes a partially-created deck so backing out of
-     * generation never leaves an orphaned draft (the wizard's equivalent of Deck Studio's
-     * discard-if-empty contract — simpler here since the wizard ALWAYS starts a fresh deck). */
+     * generation never leaves an orphaned draft. */
     fun onCancelGeneration() {
-        // Edge-case fix (Phase 6 adversarial pass): once the write has started there is no safe
-        // rollback (see isWritingCommanderDeck's KDoc) -- ignore Cancel and let the write finish;
-        // it will land on RESULT or a real buildError on its own.
         if (isWritingCommanderDeck) return
         generateJob?.cancel()
         cleanupPendingDeck()
@@ -2783,8 +1961,6 @@ class DeckWizardViewModel(
         _uiState.update {
             it.copy(
                 phase = WizardPhase.REVIEW,
-                buildStage = null,
-                completedStages = emptyList(),
                 commanderBuildStage = null,
                 commanderCompletedStages = emptyList(),
                 buildError = null,
@@ -2795,13 +1971,7 @@ class DeckWizardViewModel(
     }
 
     /** W7 Fix 2: retries generation after a [DeckWizardUiState.buildError] without re-walking the
-     * steps. When the failure happened during [finalizeCommanderDraft] (a [pendingFinalize] attempt
-     * exists -- the placement loop already produced a resolved [CommanderDraftBuild]), re-run that
-     * SAME finalize/persist call with the SAME draft and resolutions, so the user's Choice-screen
-     * picks survive the retry. [cleanupPendingDeck] runs first regardless (a failed persist can
-     * have already created a partial deck to discard before the retry creates -- or reuses -- one).
-     * Only a failure BEFORE any draft exists (no [pendingFinalize]) falls back to the old
-     * re-walk-from-REVIEW behavior, since there is nothing resolved yet to resume. */
+     * steps, resuming the SAME finalize/persist call when a [pendingFinalize] attempt exists. */
     fun onRetryGeneration() {
         cleanupPendingDeck()
         val retry = pendingFinalize
@@ -2816,37 +1986,26 @@ class DeckWizardViewModel(
         _uiState.update { it.copy(buildError = null, phase = WizardPhase.REVIEW) }
     }
 
-    // ── Result ────────────────────────────────────────────────────────────────
+    // ── Result (dead-code-adjacent -- ResultContent's own screen is gone with WizardPhase.RESULT;
+    //    kept per this run's explicit "generation functions stay until run C" scope) ─────────────
 
-    /** In-flight guard for [onAddCommunitySuggestion] -- a rapid double-tap on the same suggestion's
-     * "Add" icon (no disabled/in-flight UI state exists yet) would otherwise fire `addCardToDeck`
-     * twice before the first call's success removes the row, silently doubling the added quantity.
-     * Mirrors this codebase's established atomic double-tap-guard convention (see
-     * `feedback_trades_negotiation_atomic_events` memory): a plain mutable set keyed by the card id,
-     * `add()` returns `false` when already present. */
+    /** In-flight guard for [onAddCommunitySuggestion] -- a rapid double-tap would otherwise fire
+     * `addCardToDeck` twice before the first call's success removes the row. */
     private val pendingSuggestionAdds = mutableSetOf<String>()
 
-    /** Writes one community-picked (unowned, D8) suggestion into the created deck, then removes it
-     * from the view-only list so it is never shown as "addable" twice. */
+    /** Writes one community-picked (unowned, D8) suggestion into the created deck. Deck Wizard
+     * 60-card wave (v6): the Result-screen list this used to prune ([DeckWizardUiState.buildResult])
+     * was deleted with [WizardPhase.RESULT] (S13) -- the repository write + toast stay (this
+     * function is otherwise unreachable now that every format opens Deck Studio directly), per this
+     * run's "may read defaults, but do NOT add new state for it" scope rule. */
     fun onAddCommunitySuggestion(categoryId: String, suggestion: TemplateCardSuggestion) {
         val deckId = _uiState.value.createdDeckId ?: return
         val cardId = suggestion.card.scryfallId
         if (!pendingSuggestionAdds.add(cardId)) return
         viewModelScope.launch {
             runCatching {
-                // D4: still part of the guided wizard build (Result screen, pre-handoff to Studio)
-                // -- WIZARD provenance, same as every other card this flow placed.
                 deckRepository.addCardToDeck(deckId, cardId, suggestion.suggestedCopies, false, DeckCardSource.WIZARD)
             }.onSuccess {
-                _uiState.update { s ->
-                    val result = s.buildResult ?: return@update s
-                    val updatedCommunity = result.communitySuggestions.mapNotNull { cat ->
-                        if (cat.category.id != categoryId) return@mapNotNull cat
-                        val remaining = cat.suggestions.filterNot { it.card.scryfallId == cardId }
-                        if (remaining.isEmpty()) null else cat.copy(suggestions = remaining)
-                    }
-                    s.copy(buildResult = result.copy(communitySuggestions = updatedCommunity))
-                }
                 _events.send(
                     DeckWizardEvent.ShowToast(
                         String.format(appContext.getString(R.string.deck_wizard_suggestion_added), suggestion.card.name)
@@ -2868,8 +2027,7 @@ class DeckWizardViewModel(
     }
 
     /** Breadcrumb for the step being ENTERED (not exited) -- tells us where users progress to, and
-     * by omission, where they stop. Plan-mandated `deck_wizard_step_*` events for this multi-step,
-     * abandonable flow (see the class KDoc). */
+     * by omission, where they stop. */
     private fun logStep(step: String) {
         crashReporter.log("deck_wizard_step_$step")
     }
@@ -2877,7 +2035,6 @@ class DeckWizardViewModel(
     private companion object {
         const val SEARCH_MIN_LENGTH = 2
         const val SEARCH_DEBOUNCE_MS = 400L
-        const val MAX_SEED_CARDS = 8
         const val TRIBE_PICKER_CANDIDATE_LIMIT = 8
         const val PLAN_ANALYSIS_DEBOUNCE_MS = 300L
         /** W0.2: a generous synthetic owned quantity for a fetched-not-owned basic land -- basics
@@ -2890,24 +2047,12 @@ class DeckWizardViewModel(
  * Deck Wizard Commander v3 plan (Phase 5, 5.1) — a cheap, self-contained reproduction of "which
  * [CardSection]s would this owned candidate count toward", NOT a re-exposure of
  * [com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase]'s own private
- * candidate-pool machinery (that carries pip/curve/power scoring this hint has no use for — same
- * precedent as Phase 4's `RecommendCommanderStrategiesUseCase` rejecting that same shortcut for its
- * own owned-role-coverage signal, see the progress tracker's Run 6 log).
+ * candidate-pool machinery.
  *
  * [sections] is every [com.mmg.manahub.feature.decks.domain.engine.PillarResult.sections] for the
- * CURRENT [DeckAnalysis] (PLAN_ROLES/MANA_BASE/
- * CURVE/SYNERGY combined — LEGALITY's `legal`/`illegal` never match anything below). [ownedCards]
- * is the full collection snapshot; [excludeIds] removes the commander and every already-manually-
- * added card (no point telling the user "1 in your collection" for a card they already added).
- * [identity]/[format] gate legality the SAME way [DeckWizardViewModel.isCommanderManualAddValid]
- * does for a real add, so this hint never counts a card the user could not actually add.
- *
- * A candidate can match MULTIPLE section ids (e.g. a 2-mana token generator counts toward
- * `role:token_generator`, `mv:2`, and `fingerprint:tokens` all at once) — every match increments
- * its own counter independently, mirroring how [CardSection.contributions] already lets one real
- * card appear in more than one section. A section id with no matching signal below (`offplan`/
- * `standalone`/`interaction`/`legal`/`illegal`, or a `role:*`/`fingerprint:*` id this candidate pool
- * genuinely has zero owned support for) is simply ABSENT from the result map, never present at 0.
+ * CURRENT [DeckAnalysis]. [ownedCards] is the full collection snapshot; [excludeIds] removes the
+ * commander and every already-manually-added card. [identity]/[format] gate legality the SAME way
+ * [DeckWizardViewModel.isCommanderManualAddValid] does for a real add.
  */
 internal fun computeOwnedAvailabilityBySection(
     sections: List<CardSection>,

@@ -77,18 +77,22 @@ import org.jetbrains.compose.resources.painterResource
 import org.koin.androidx.compose.koinViewModel
 
 /**
- * Steps shown by [WizardStepIndicator]; GENERATING/RESULT replace the whole body instead.
- * Deck Wizard v4 (R13): the format is chosen at deck creation and arrives via a REQUIRED nav arg
- * (`Screen.DeckWizard.createRoute`) -- there is no format step for ANY flow any more. Commander
- * runs `COMMANDER_PICK → STRATEGY → MANUAL_ADDS → REVIEW`; every Casual flow (A/B/C) runs
- * `ENTRY → DIRECTION → MANUAL_ADDS → REVIEW` ([WizardPhase.IDENTITY] stays unreachable dead code
- * for every flow, see [DeckWizardViewModel.onNextFromDirection]'s KDoc).
+ * Steps shown by [WizardStepIndicator]; GENERATING/CHOICE replace the whole body instead.
+ * Deck Wizard 60-card wave (v6), plan §5 Phase 5.1, S20: ONE build engine, ONE step language for
+ * every format now. Commander: `COMMANDER_PICK → STRATEGY → PLAN_SECTIONS → REVIEW` (4). Cards:
+ * `ENTRY → SEED_PICK → STRATEGY → PLAN_SECTIONS → REVIEW` (5). Colors:
+ * `ENTRY → COLOR_PICK → PLAN_SECTIONS → REVIEW` (4). Strategy:
+ * `ENTRY → STRATEGY_PICK → PLAN_SECTIONS → REVIEW` (4).
  */
 private fun stepPhasesFor(uiState: DeckWizardUiState): List<WizardPhase> {
     if (uiState.selectedFormat?.isCommanderFormat == true) {
-        return listOf(WizardPhase.COMMANDER_PICK, WizardPhase.STRATEGY, WizardPhase.MANUAL_ADDS, WizardPhase.REVIEW)
+        return listOf(WizardPhase.COMMANDER_PICK, WizardPhase.STRATEGY, WizardPhase.PLAN_SECTIONS, WizardPhase.REVIEW)
     }
-    return listOf(WizardPhase.ENTRY, WizardPhase.DIRECTION, WizardPhase.MANUAL_ADDS, WizardPhase.REVIEW)
+    return when (uiState.entryFlow) {
+        WizardEntryFlow.CARDS -> listOf(WizardPhase.ENTRY, WizardPhase.SEED_PICK, WizardPhase.STRATEGY, WizardPhase.PLAN_SECTIONS, WizardPhase.REVIEW)
+        WizardEntryFlow.COLORS -> listOf(WizardPhase.ENTRY, WizardPhase.COLOR_PICK, WizardPhase.PLAN_SECTIONS, WizardPhase.REVIEW)
+        WizardEntryFlow.STRATEGY -> listOf(WizardPhase.ENTRY, WizardPhase.STRATEGY_PICK, WizardPhase.PLAN_SECTIONS, WizardPhase.REVIEW)
+    }
 }
 
 /**
@@ -125,6 +129,9 @@ fun DeckWizardScreen(
             when (event) {
                 is DeckWizardEvent.ShowToast -> toastState.show(event.message, event.type)
                 is DeckWizardEvent.OpenDeckStudio -> onOpenDeckStudio(event.deckId)
+                // Deck Wizard 60-card wave (v6), plan §5 Phase 5.1: an unsupported/missing format
+                // nav arg -- the toast already fired from the VM, this just pops the screen.
+                is DeckWizardEvent.Exit -> onBack()
             }
         }
     }
@@ -173,6 +180,25 @@ fun DeckWizardScreen(
                             onClearSearchAndFilters = viewModel::onClearCommanderSearchAndFilters,
                             onNext = viewModel::onNextFromCommanderPick,
                         )
+                        WizardPhase.SEED_PICK -> SeedPickStepContent(
+                            uiState = uiState,
+                            onQueryChange = viewModel::onSeedPickQueryChange,
+                            onApplyStructuredSearch = viewModel::applySeedPickStructuredSearch,
+                            onClearFilters = viewModel::onClearSeedPickFilters,
+                            onClearSearchAndFilters = viewModel::onClearSeedPickSearchAndFilters,
+                            onAddSeed = viewModel::onAddSeed,
+                            onRemoveSeedCopy = viewModel::onRemoveSeedCopy,
+                            onRemoveSeed = viewModel::onRemoveSeed,
+                            onToggleSeedQueue = viewModel::onToggleSeedQueue,
+                            onShowSeedDetail = viewModel::onShowSeedDetail,
+                            onNext = viewModel::onNextFromSeedPick,
+                        )
+                        // Deck Wizard 60-card wave (v6), plan §5 Phase 5.1: minimal placeholders --
+                        // run B (plan §5 Phase 5.3) wires ColorPickStepContent's/StrategyPickStepContent's
+                        // real onNext handlers; Next stays disabled on both until then (see those
+                        // composables' own KDoc).
+                        WizardPhase.COLOR_PICK -> ColorPickStepContent(uiState = uiState, onNext = {})
+                        WizardPhase.STRATEGY_PICK -> StrategyPickStepContent(uiState = uiState, onNext = {})
                         WizardPhase.STRATEGY -> StrategyStepContent(
                             uiState = uiState,
                             onSelectStrategy = viewModel::onSelectCommanderStrategy,
@@ -182,68 +208,25 @@ fun DeckWizardScreen(
                             onCancelTribePick = viewModel::onCancelTribePickForStrategy,
                             onNext = viewModel::onNextFromStrategy,
                         )
-                        WizardPhase.MANUAL_ADDS -> if (uiState.selectedFormat?.isCommanderFormat == true) {
-                            // Deck Wizard Commander v3 plan (Phase 5, R4): Commander mounts the
-                            // engine-attributed Plan Sections step on this SAME phase instead of the
-                            // old skeleton-guided free search -- Casual keeps ManualAddsStepContent
-                            // below, byte-identical.
-                            PlanSectionsStepContent(
-                                uiState = uiState,
-                                onQueryChange = viewModel::onPlanSectionsQueryChange,
-                                onApplyStructuredSearch = viewModel::applyPlanSectionsStructuredSearch,
-                                onFilterByTags = viewModel::searchPlanSectionsCollectionByTags,
-                                onScryfallSearch = viewModel::searchPlanSectionsScryfall,
-                                onAddCard = viewModel::onAddSeed,
-                                onRemoveCard = viewModel::onRemoveSeed,
-                                onClearSearchState = viewModel::clearPlanSectionsSearchState,
-                                onCardClick = onCardClick,
-                                onNext = viewModel::onNextFromManualAdds,
-                            )
-                        } else {
-                            ManualAddsStepContent(
-                                uiState = uiState,
-                                onQueryChange = viewModel::onManualAddsQueryChange,
-                                onToggleIncludeOutsideCollection = viewModel::onToggleIncludeOutsideCollection,
-                                onSelectRoleFilter = viewModel::onSelectManualAddsRoleFilter,
-                                onAddSeed = viewModel::onAddSeed,
-                                onRemoveSeed = viewModel::onRemoveSeed,
-                                onNext = viewModel::onNextFromManualAdds,
-                            )
-                        }
-                        WizardPhase.DIRECTION -> DirectionStepContent(
+                        // Deck Wizard 60-card wave (v6), plan §5 Phase 5.1 (S1): ONE PLAN_SECTIONS
+                        // screen for every anchor now -- the pre-v6 Casual-only ManualAddsStepContent
+                        // branch was deleted along with the DIRECTION/IDENTITY step machinery it
+                        // depended on.
+                        WizardPhase.PLAN_SECTIONS -> PlanSectionsStepContent(
                             uiState = uiState,
-                            onSelectDirectionTag = viewModel::onSelectDirectionTag,
-                            onSelectTribe = viewModel::onSelectTribeDirection,
-                            onCommanderQueryChange = viewModel::onCommanderQueryChange,
-                            onSelectCommander = viewModel::onSelectCommander,
-                            onClearCommander = viewModel::onClearCommander,
-                            onToggleSeedPicker = viewModel::onToggleSeedPicker,
-                            onToggleIncludeOutsideCollection = viewModel::onToggleIncludeOutsideCollection,
-                            onSeedQueryChange = viewModel::onSeedQueryChange,
-                            onAddSeed = viewModel::onAddSeed,
-                            onRemoveSeed = viewModel::onRemoveSeed,
-                            onSelectSeedStrategyCandidate = viewModel::onSelectSeedStrategyCandidate,
-                            onToggleCardsFlowColor = viewModel::onToggleCardsFlowColor,
-                            onToggleColorFlowColor = viewModel::onToggleColorFlowColor,
-                            onSelectColorAffinityEntry = viewModel::onSelectColorAffinityEntry,
-                            onTaxonomyQueryChange = viewModel::onTaxonomyQueryChange,
-                            onSelectTaxonomyArchetype = viewModel::onSelectTaxonomyArchetype,
-                            onSelectTaxonomyTheme = viewModel::onSelectTaxonomyTheme,
-                            onSelectColorCombo = viewModel::onSelectColorCombo,
-                            onToggleSuggestedSeed = viewModel::onToggleSuggestedSeed,
-                            onNext = viewModel::onNextFromDirection,
-                        )
-                        WizardPhase.IDENTITY -> IdentityStepContent(
-                            uiState = uiState,
-                            onToggleColor = viewModel::onToggleColor,
-                            onSelectTheme = viewModel::onSelectThemeHint,
-                            onNext = viewModel::onNextFromIdentity,
+                            onQueryChange = viewModel::onPlanSectionsQueryChange,
+                            onApplyStructuredSearch = viewModel::applyPlanSectionsStructuredSearch,
+                            onFilterByTags = viewModel::searchPlanSectionsCollectionByTags,
+                            onScryfallSearch = viewModel::searchPlanSectionsScryfall,
+                            onAddCard = viewModel::onAddSeed,
+                            onRemoveCard = viewModel::onRemoveSeed,
+                            onClearSearchState = viewModel::clearPlanSectionsSearchState,
+                            onCardClick = onCardClick,
+                            onNext = viewModel::onNextFromPlanSections,
                         )
                         WizardPhase.REVIEW -> ReviewStepContent(
                             uiState = uiState,
-                            onToggleFillLands = viewModel::onToggleFillLands,
                             onToggleIncludeNonBasicLands = viewModel::onToggleIncludeNonBasicLands,
-                            onToggleUseCommunityData = viewModel::onToggleUseCommunityData,
                             onGenerate = viewModel::onGenerate,
                         )
                         WizardPhase.GENERATING -> GeneratingContent(
@@ -260,16 +243,6 @@ fun DeckWizardScreen(
                             onAutoFillSection = viewModel::onAutoFillChoiceSection,
                             onFinish = viewModel::onFinishChoices,
                             onCardClick = onCardClick,
-                        )
-                        // W7 Task D (plan 7.5): Commander never reaches RESULT any more --
-                        // finalizeCommanderDraft fires DeckWizardEvent.OpenDeckStudio directly once
-                        // the write succeeds (see that function's own KDoc). RESULT is Casual-only now.
-                        WizardPhase.RESULT -> ResultContent(
-                            uiState = uiState,
-                            onAddSuggestion = viewModel::onAddCommunitySuggestion,
-                            onCardClick = onCardClick,
-                            onOpenDeckStudio = viewModel::onOpenDeckStudio,
-                            onBack = handleBack,
                         )
                     }
                 }
@@ -376,9 +349,7 @@ internal fun WizardStickyButton(
 @Composable
 private fun ReviewStepContent(
     uiState: DeckWizardUiState,
-    onToggleFillLands: () -> Unit,
     onToggleIncludeNonBasicLands: () -> Unit,
-    onToggleUseCommunityData: () -> Unit,
     onGenerate: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -441,11 +412,11 @@ private fun ReviewStepContent(
                 }
             }
 
-            if (uiState.seedCards.isNotEmpty()) {
+            if (uiState.seeds.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
                     ReviewSectionLabel(
                         if (isCommander) {
-                            stringResource(R.string.deck_wizard_review_manual_adds_count, uiState.seedCards.size)
+                            stringResource(R.string.deck_wizard_review_manual_adds_count, uiState.seeds.size)
                         } else {
                             stringResource(R.string.deck_wizard_review_seeds)
                         }
@@ -453,9 +424,11 @@ private fun ReviewStepContent(
                     // A nested-scroll horizontal LazyRow inside the outer verticalScroll Column is
                     // safe here (different axis) -- same reasoning as the task's guidance for this
                     // screen; each tile keyed by scryfallId (unique, no duplicate-copy collision
-                    // since seed cards are deduped by id upstream in the ViewModel).
+                    // since seeds are deduped by id upstream in the ViewModel). Deck Wizard 60-card
+                    // wave (v6): a per-seed quantity badge (S6) is run C's own Review rewrite (plan
+                    // §5 Phase 5.4) -- this run only had to keep the strip compiling.
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                        items(uiState.seedCards, key = { it.scryfallId }) { card -> ReviewSeedCardTile(card) }
+                        items(uiState.seeds, key = { it.card.scryfallId }) { seed -> ReviewSeedCardTile(seed.card) }
                     }
                 }
             }
@@ -467,10 +440,14 @@ private fun ReviewStepContent(
                     // this generic Direction chip is Casual-only from here on (it used to redundantly
                     // repeat the commander's name for Commander builds).
                     if (!isCommander) {
+                        // Deck Wizard 60-card wave (v6): the pre-v6 Casual-only Direction-theme pick
+                        // is gone -- every non-Commander anchor now picks its theme via the SAME
+                        // shared STRATEGY step Commander uses, so this reads selectedStrategyThemes
+                        // (S1/S7) instead.
                         ReviewChipRow(
                             label = stringResource(R.string.deck_wizard_review_direction),
                             chipText = uiState.selectedArchetype?.displayName
-                                ?: uiState.selectedDirectionTheme?.displayName
+                                ?: uiState.selectedStrategyThemes.firstOrNull()?.displayName
                                 ?: uiState.selectedTribeLabel
                                 ?: stringResource(R.string.deck_wizard_review_direction_none),
                         )
@@ -482,38 +459,14 @@ private fun ReviewStepContent(
                 }
             }
 
-            // Casual-only (W5.2): the legacy all-or-nothing land-fill toggle for Motor A/
-            // BuildDeckFromTemplateUseCase. Commander gets its own "Include non-basic lands" switch
-            // below (basics are unconditional for Commander per R12 -- there is nothing left for a
-            // Commander-facing all-or-nothing toggle to gate).
-            if (!isCommander) {
-                Surface(
-                    onClick = onToggleFillLands,
-                    shape = SmallCardShape,
-                    color = mc.surface,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(spacing.md).fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.deck_wizard_fill_lands_title), style = ty.bodyMedium, color = mc.textPrimary)
-                            Text(stringResource(R.string.deck_wizard_fill_lands_subtitle), style = ty.labelSmall, color = mc.textSecondary)
-                        }
-                        Switch(
-                            checked = uiState.fillLands,
-                            onCheckedChange = { onToggleFillLands() },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = mc.onAccent,
-                                checkedTrackColor = mc.primaryAccent,
-                                uncheckedThumbColor = mc.textDisabled,
-                                uncheckedTrackColor = mc.surfaceVariant,
-                            ),
-                        )
-                    }
-                }
-            } else {
+            // Deck Wizard 60-card wave (v6): the Casual-only all-or-nothing land-fill toggle and the
+            // community-data toggle were DELETED along with their backing state
+            // (fillLands/useCommunityData/communityEngineAvailable, S1's UI unification) --
+            // generateCasualDeck now always fills lands and never blends community data (see that
+            // function's own class-level KDoc); run C's S12 Review rewrite is the real replacement.
+            // Commander keeps its own "Include non-basic lands" switch (basics are unconditional for
+            // Commander per R12).
+            if (isCommander) {
                 Surface(
                     onClick = onToggleIncludeNonBasicLands,
                     shape = SmallCardShape,
@@ -531,41 +484,6 @@ private fun ReviewStepContent(
                         Switch(
                             checked = uiState.includeNonBasicLands,
                             onCheckedChange = { onToggleIncludeNonBasicLands() },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = mc.onAccent,
-                                checkedTrackColor = mc.primaryAccent,
-                                uncheckedThumbColor = mc.textDisabled,
-                                uncheckedTrackColor = mc.surfaceVariant,
-                            ),
-                        )
-                    }
-                }
-            }
-
-            // Deck Engine Unification plan (§5 Phase 3.5) — the shared source step, Casual-only
-            // since W5.1 (G9): community decklists are unvalidated, so Commander's review step never
-            // shows this toggle (its whole placement-prior plumbing was deleted). Hidden entirely
-            // when the global community-engine flag is off (never a disabled-but-visible toggle for
-            // a capability the user can't actually use — mirrors the Coming Soon format cards'
-            // "never advertise something inert" convention).
-            if (!isCommander && uiState.communityEngineAvailable) {
-                Surface(
-                    onClick = onToggleUseCommunityData,
-                    shape = SmallCardShape,
-                    color = mc.surface,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(spacing.md).fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.deck_wizard_use_community_data_title), style = ty.bodyMedium, color = mc.textPrimary)
-                            Text(stringResource(R.string.deck_wizard_use_community_data_subtitle), style = ty.labelSmall, color = mc.textSecondary)
-                        }
-                        Switch(
-                            checked = uiState.useCommunityData,
-                            onCheckedChange = { onToggleUseCommunityData() },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = mc.onAccent,
                                 checkedTrackColor = mc.primaryAccent,

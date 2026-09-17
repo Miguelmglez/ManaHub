@@ -1177,6 +1177,21 @@
     <string name="deck_wizard_entry_colors_subtitle">Pick colors first, then choose from the strategies that fit them best.</string>
     <string name="deck_wizard_entry_strategy_title">Start from strategy</string>
     <string name="deck_wizard_entry_strategy_subtitle">Browse every archetype and theme, then pick the colors that fit it.</string>
+    <!-- SEED_PICK ("Start from cards", Deck Wizard 60-card wave v6, plan §5 Phase 5.2) -->
+    <string name="deck_wizard_seed_pick_title">Pick your cards</string>
+    <string name="deck_wizard_seed_pick_subtitle">Search your collection or beyond — we\'ll suggest a strategy that fits them.</string>
+    <string name="deck_wizard_seed_pick_idle_header">Cards in your collection</string>
+    <string name="deck_wizard_seed_pick_empty">No cards match — try a different name or filter.</string>
+    <string name="deck_wizard_seeds_added_pill">%1$d cards added</string>
+    <string name="deck_wizard_seed_queue_title">Your cards (%1$d)</string>
+    <string name="deck_wizard_seed_queue_empty_title">No cards added yet</string>
+    <string name="deck_wizard_seed_queue_empty_subtitle">Search above and tap Add to deck.</string>
+    <string name="deck_wizard_seed_copy_cap">Up to %1$d copies of a card</string>
+    <string name="deck_wizard_seed_cap_reached">Your deck can hold %1$d cards</string>
+    <string name="deck_wizard_seeds_required">Add at least one card to continue.</string>
+    <string name="deck_wizard_strategy_subtitle_seeds">for your %1$d cards</string>
+    <string name="deck_wizard_colorless_chip">Colorless</string>
+    <string name="deck_wizard_unsupported_format_toast">The wizard can\'t build this format yet.</string>
     <!-- Step 2 — Direction -->
     <string name="deck_wizard_direction_title">Pick a direction</string>
     <string name="deck_wizard_direction_subtitle">Start from your commander, your collection\'s strengths, or a few seed cards.</string>

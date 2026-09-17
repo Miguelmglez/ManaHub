@@ -182,8 +182,12 @@ object SectionSearchQuery {
 
     /** [SearchCriterion] mirror of [legalityClause] — same format→Scryfall-format-name mapping,
      * same null cases. [SearchCriterion.Format]'s `f:<x>` rendering is a confirmed live alias of
-     * `legal:<x>` (both return identical result sets on Scryfall). */
-    private fun legalityCriterion(format: DeckFormat): SearchCriterion? {
+     * `legal:<x>` (both return identical result sets on Scryfall). Promoted from `private` to
+     * `public` (Deck Wizard 60-card wave v6, plan §5 Phase 5.2) — `internal` would not be visible
+     * across the `:shared:core-domain` -> `:app` module boundary; SEED_PICK's own
+     * `seedLockedCriteria` (`app/.../DeckWizardSixtySteps.kt`) reuses this ONE format→Scryfall
+     * legality mapping rather than a second, wizard-local copy. */
+    fun legalityCriterion(format: DeckFormat): SearchCriterion? {
         val scryfallFormat = when (format) {
             DeckFormat.STANDARD -> "standard"
             DeckFormat.PIONEER -> "pioneer"
