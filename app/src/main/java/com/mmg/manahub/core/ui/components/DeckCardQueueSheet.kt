@@ -38,6 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
@@ -170,7 +172,9 @@ fun DeckCardQueueSheet(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     enabled = !isBusy,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.sm),
+                    // Placeholder text alone isn't exposed as a field name to TalkBack; give it one directly.
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.sm)
+                        .semantics { contentDescription = searchPlaceholder },
                     placeholder = { Text(searchPlaceholder, style = ty.bodyMedium, color = mc.textDisabled) },
                     leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = mc.textDisabled) },
                     shape = ButtonShape,

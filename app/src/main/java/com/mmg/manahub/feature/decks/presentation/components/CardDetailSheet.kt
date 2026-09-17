@@ -70,6 +70,7 @@ import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.MagicColors
+import com.mmg.manahub.core.ui.theme.MagicTypography
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -115,7 +116,8 @@ import org.jetbrains.compose.resources.painterResource
  * @param seedSelection non-null puts the sheet in Deck Wizard seed-pick mode (case 3) instead of
  *   the regular deck-card mode (case 4) — ignored when [isCommander] or
  *   [isCommanderSelectionContext] is true.
- * @param readOnly hides case 4's +/- stepper and remove-all button (a card viewed, not edited).
+ * @param readOnly hides case 4's +/- stepper and remove-all button (a card viewed, not edited);
+ *   wins over [seedSelection] too — case 3 then renders its caption only, no CTA/stepper.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -284,41 +286,36 @@ internal fun CardDetailSheet(
                     }
 
                     // Case 3: Deck Wizard seed pick — CTA at 0, else the stepper + an owned/in-deck caption.
+                    // readOnly wins over seedSelection (review-only card view, e.g. Studio Analysis): caption only, no controls.
                     seedSelection != null -> {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.sm),
                             verticalArrangement = Arrangement.spacedBy(spacing.sm),
                         ) {
-                            if (seedSelection.quantity <= 0) {
-                                MagicCtaButton(
-                                    onClick = seedSelection.onAdd,
-                                    text = stringResource(R.string.deck_wizard_add_to_deck),
-                                    style = MagicCtaStyle.Filled,
-                                    color = MagicCtaColor.Primary,
-                                    icon = {
-                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            } else {
-                                Text(
-                                    text = stringResource(R.string.deck_wizard_seed_in_deck, seedSelection.quantity) +
-                                        " · " +
-                                        if (seedSelection.isOwned) {
-                                            stringResource(R.string.deck_wizard_seed_owned, seedSelection.ownedQuantity)
-                                        } else {
-                                            stringResource(R.string.deck_wizard_seed_not_owned)
+                            when {
+                                readOnly -> SeedSelectionCaption(seedSelection, ty, mc)
+                                seedSelection.quantity <= 0 -> {
+                                    MagicCtaButton(
+                                        onClick = seedSelection.onAdd,
+                                        text = stringResource(R.string.deck_wizard_add_to_deck),
+                                        style = MagicCtaStyle.Filled,
+                                        color = MagicCtaColor.Primary,
+                                        icon = {
+                                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
                                         },
-                                    style = ty.labelMedium,
-                                    color = mc.textSecondary,
-                                )
-                                QuantityStepperRow(
-                                    quantity = seedSelection.quantity,
-                                    onRemove = seedSelection.onRemove,
-                                    removeEnabled = true,
-                                    onAdd = seedSelection.onAdd,
-                                    addEnabled = seedSelection.quantity < seedSelection.maxQuantity,
-                                )
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
+                                else -> {
+                                    SeedSelectionCaption(seedSelection, ty, mc)
+                                    QuantityStepperRow(
+                                        quantity = seedSelection.quantity,
+                                        onRemove = seedSelection.onRemove,
+                                        removeEnabled = true,
+                                        onAdd = seedSelection.onAdd,
+                                        addEnabled = seedSelection.quantity < seedSelection.maxQuantity,
+                                    )
+                                }
                             }
                         }
                     }
@@ -395,6 +392,22 @@ internal data class SeedSelectionUi(
     val onAdd: () -> Unit,
     val onRemove: () -> Unit,
 )
+
+/** The "In deck: N · owned/not owned" caption, shared by the interactive and [readOnly] seed-selection renders. */
+@Composable
+private fun SeedSelectionCaption(seedSelection: SeedSelectionUi, ty: MagicTypography, mc: MagicColors) {
+    Text(
+        text = stringResource(R.string.deck_wizard_seed_in_deck, seedSelection.quantity) +
+            " · " +
+            if (seedSelection.isOwned) {
+                stringResource(R.string.deck_wizard_seed_owned, seedSelection.ownedQuantity)
+            } else {
+                stringResource(R.string.deck_wizard_seed_not_owned)
+            },
+        style = ty.labelMedium,
+        color = mc.textSecondary,
+    )
+}
 
 /** The +/- quantity stepper shared by [CardDetailSheet]'s regular and seed-selection action areas. */
 @Composable
