@@ -1321,6 +1321,14 @@
     <string name="deck_wizard_strategy_step_title_for">Pick a strategy for %1$s</string>
     <string name="deck_wizard_strategy_recommended_header">Recommended for %1$s</string>
     <string name="deck_wizard_strategy_recommended_empty">%1$s doesn\'t clearly push toward one of these plans — try Partial fit below, or go Custom.</string>
+    <!-- Deck Wizard 60-card wave (v6), plan §5 Phase 5.3: StrategyRecommendationList's fallback copy
+         for a non-Commander/non-Cards context (COLOR_PICK) with no natural "for <name>" phrase. -->
+    <string name="deck_wizard_strategy_recommended_header_generic">Recommended for you</string>
+    <string name="deck_wizard_strategy_recommended_empty_generic">Nothing here clearly fits yet — try Partial fit below, or go Custom.</string>
+    <string name="deck_wizard_strategy_partial_fit_subtitle_generic">These can work, but nothing here pushes you toward them.</string>
+    <!-- The Cards flow's own "Recommended for X"/"partial fit" context label; pairs with the
+         existing deck_wizard_strategy_subtitle_seeds ("for your %1$d cards") for the step subtitle. -->
+    <string name="deck_wizard_strategy_context_seeds">your %1$d cards</string>
     <string name="deck_wizard_strategy_partial_fit_expand">Partial fit</string>
     <string name="deck_wizard_strategy_partial_fit_collapse">Hide partial fit</string>
     <string name="deck_wizard_strategy_partial_fit_subtitle">These can work, but %1$s doesn\'t push you toward them.</string>
@@ -1337,11 +1345,13 @@
     <string name="deck_wizard_manual_adds_added_title">Added</string>
     <!-- Plan sections step (Commander only, replaces Manual adds — Deck Wizard Commander v3 plan, Phase 5) -->
     <string name="deck_wizard_plan_sections_title">Fill in your plan</string>
-    <string name="deck_wizard_plan_sections_subtitle">We\'ll build the rest from your collection — add specific cards here, or skip this step entirely.</string>
+    <!-- Deck Wizard 60-card wave (v6), plan §8 "Rename in place": generalized now that PLAN_SECTIONS
+         is shared by every anchor, not just Commander manual adds. -->
+    <string name="deck_wizard_plan_sections_subtitle">We\'ll build the rest from your collection — add cards to any category, or skip this step.</string>
     <string name="deck_wizard_plan_sections_error">We couldn\'t analyze your plan right now. You can still continue.</string>
     <string name="deck_wizard_plan_sections_kept_outside_plan">Kept — outside the plan</string>
     <string name="deck_wizard_plan_sections_owned_hint">%1$d in your collection</string>
-    <string name="deck_wizard_plan_sections_added_title">Your manual adds</string>
+    <string name="deck_wizard_plan_sections_added_title">Your cards</string>
     <string name="deck_wizard_manual_add_rejected">That card doesn\'t fit this deck\'s color identity or format legality.</string>
     <!-- Step 4 — Review -->
     <string name="deck_wizard_review_title">Review &amp; generate</string>

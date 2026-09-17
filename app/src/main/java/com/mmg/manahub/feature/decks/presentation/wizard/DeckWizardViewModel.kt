@@ -247,6 +247,11 @@ data class DeckWizardUiState(
      * `colorComboSuggestions`, [DeckWizardViewModel.recomputeColorComboSuggestions] retargets it). */
     val strategyPickQuery: String = "",
     val strategyPickCombos: List<ColorComboSuggestion> = emptyList(),
+    /** Deck Wizard 60-card wave (v6), plan §5 Phase 5.3: the catalog row currently PENDING in
+     * STRATEGY_PICK -- which row's [InlineColorComboSection] is expanded, before a combo is
+     * actually chosen (see [DeckWizardViewModel.onSelectStrategyPickEntry]'s own KDoc for why this
+     * is a separate field from [selectedCuratedStrategyId]). */
+    val expandedStrategyPickId: String? = null,
 
     // ── PLAN_SECTIONS (shared by every anchor since the Casual `MANUAL_ADDS` step was deleted) ───
     /** The ONLY analysis engine call this step ever makes -- attribution comes from here, never a
@@ -354,6 +359,7 @@ private fun DeckWizardUiState.resetDirectionScratchState(): DeckWizardUiState = 
     selectedPosture = null,
     strategyPickQuery = "",
     strategyPickCombos = emptyList(),
+    expandedStrategyPickId = null,
     planAnalysis = null,
     isAnalyzingPlan = false,
     ownedAvailabilityBySection = emptyMap(),
@@ -827,15 +833,22 @@ class DeckWizardViewModel(
     // ── STRATEGY (shared by every anchor, S7) ─────────────────────────────────
 
     /**
-     * Deck Wizard 60-card wave (v6), plan §5 Phase 5.2 (rename of the pre-v6 `recommendCommanderStrategies`
-     * call site): the ONE entry point every "Next" into STRATEGY calls now. Commander delegates
-     * unchanged onto [recommendCommanderStrategies] (byte-identical, rule 0.3). Every 60-card anchor
-     * builds a [BuildAnchor.Sixty] from the CURRENT seeds/identity and scores it via
-     * [RecommendCommanderStrategiesUseCase]'s anchor overload (Phase 2) -- `ownTags`/`ownTribes`/
-     * `edhrecThemeNames` stay empty for now; the seeds' own `card_strategy_tags` fetch + EDHREC
-     * enrichment is run B's full 5-signal wiring (plan §5 Phase 5.3).
+     * Deck Wizard 60-card wave (v6), plan §5 Phase 5.3: the ONE entry point every "Next into
+     * STRATEGY" / color-chip toggle / STRATEGY_PICK entry calls now, with the full 5-signal wiring.
+     * Commander delegates unchanged onto [recommendCommanderStrategies] (byte-identical, rule 0.3).
+     * Every 60-card anchor:
+     * - CARDS flow: `Sixty(engineIdentity, seeds.map { it.card })`.
+     * - COLORS flow: `Sixty(engineIdentity, seeds = emptyList())` -- empty until ≥1 color chip is
+     *   picked (no anchor call at all otherwise, see the early-return below).
+     * - STRATEGY flow: `Sixty(identity = emptySet(), seeds = emptyList())` -- an empty identity
+     *   zeroes the color-affinity signal, so owned support alone ranks the catalog (plan's own
+     *   "ranked by owned support only" instruction for STRATEGY_PICK).
+     * `ownTags`/`ownTribes` come from up to [MAX_SEED_TAGS_FETCH] seeds' own `card_strategy_tags`
+     * (first N by quantity desc, existing best-effort repository call, union of every found tag/
+     * tribe) -- `edhrecThemeNames` stays empty for every 60-card anchor (no EDHREC data exists for
+     * seeds/colors/strategy picks, only for a specific commander).
      */
-    private fun recomputeStrategyRecommendations() {
+    private fun recomputeStrategyRecommendations(debounceMs: Long = 0L) {
         val state = _uiState.value
         val format = state.selectedFormat ?: return
         if (format.isCommanderFormat) {
@@ -843,14 +856,34 @@ class DeckWizardViewModel(
             recommendCommanderStrategies(commander)
             return
         }
+        if (state.entryFlow == WizardEntryFlow.COLORS && state.colorIdentity.isEmpty()) {
+            commanderStrategyJob?.cancel()
+            _uiState.update { it.copy(strategyRecommendations = emptyList(), isLoadingCommanderStrategies = false) }
+            return
+        }
         commanderStrategyJob?.cancel()
         commanderStrategyJob = viewModelScope.launch {
+            if (debounceMs > 0) delay(debounceMs)
             _uiState.update { it.copy(isLoadingCommanderStrategies = true) }
-            val anchor = BuildAnchor.Sixty(identity = state.engineIdentity, seeds = state.seeds.map { it.card })
+            val identity = if (state.entryFlow == WizardEntryFlow.STRATEGY) emptySet() else state.engineIdentity
+            val seedsForAnchor = if (state.entryFlow == WizardEntryFlow.CARDS) state.seeds.map { it.card } else emptyList()
+            val anchor = BuildAnchor.Sixty(identity = identity, seeds = seedsForAnchor)
+
+            val topSeeds = state.seeds.sortedByDescending { it.quantity }.take(MAX_SEED_TAGS_FETCH).map { it.card }
+            val tagResults = topSeeds.map { seed ->
+                runCatching { cardStrategyTagsRepository.getStrategyTags(seed.oracleId) }
+                    .onFailure { crashReporter.log("deck_wizard_seed_strategy_tags_fetch_failed") }
+                    .getOrNull() as? CardStrategyTagsResult.Found
+            }
+            val ownTags = tagResults.flatMap { it?.tags.orEmpty() }.distinct()
+            val ownTribes = tagResults.flatMap { it?.tribes.orEmpty() }.distinct()
+
             val recommendations = recommendCommanderStrategiesUseCase(
                 format = format,
                 anchor = anchor,
                 ownedCollection = cardSnapshot.map { OwnedCard(it, 1) },
+                ownTags = ownTags,
+                ownTribes = ownTribes,
             )
             _uiState.update { it.copy(strategyRecommendations = recommendations, isLoadingCommanderStrategies = false) }
             val topPick = recommendations.firstOrNull()
@@ -974,30 +1007,108 @@ class DeckWizardViewModel(
     }
 
     /**
-     * STRATEGY's "Next" (2.4/5.1) — shared by Commander AND every 60-card entry flow now that
-     * STRATEGY is one step reused across anchors (S1). ALWAYS enabled: an untouched pick already
-     * means GENERIC ("Balanced"), a valid, complete plan for every anchor. The pre-v6 skeleton
-     * preview this used to compute for the deleted Casual `MANUAL_ADDS` step is gone --
-     * PLAN_SECTIONS derives everything it needs from [recomputePlanAnalysis] instead.
+     * Deck Wizard 60-card wave (v6), plan §5 Phase 5.3: the ONE shared entry into PLAN_SECTIONS --
+     * Commander ([onNextFromStrategy]), Cards ([onNextFromStrategy], same STRATEGY step), Colors
+     * ([onNextFromColorPick]), Strategy ([onNextFromStrategyPick]) all funnel here.
      */
-    fun onNextFromStrategy() {
+    private fun enterPlanSections() {
         logStep("plan_sections")
         _uiState.update { it.copy(phase = WizardPhase.PLAN_SECTIONS) }
         recomputePlanAnalysis()
     }
 
-    // ── COLOR_PICK / STRATEGY_PICK (run B wires their UI, plan §5 Phase 5.3) ─────────────────────
+    /**
+     * STRATEGY's "Next" (2.4/5.1) — shared by Commander AND the Cards flow now that STRATEGY is one
+     * step reused across both anchors (S1). ALWAYS enabled: an untouched pick already means GENERIC
+     * ("Balanced"), a valid, complete plan for every anchor.
+     */
+    fun onNextFromStrategy() = enterPlanSections()
 
-    /** COLOR_PICK's own color toggle (60-card wave v6, plan §5 Phase 5.3 wires the UI) — a plain
-     * WUBRG chip toggle; the colorless `C` chip's exclusive-clear behavior is that phase's own UI
-     * concern ([DeckWizardUiState.engineIdentity] is what strips `C` before it ever reaches the
-     * engine). Re-ranks [strategyRecommendations] on every toggle. */
-    fun onToggleColorPickColor(color: ManaColor) {
+    // ── COLOR_PICK (run B, plan §5 Phase 5.3) ─────────────────────────────────────────────────────
+
+    /** COLOR_PICK's own color toggle -- a plain WUBRG chip toggle, plus the exclusive Colorless (`C`)
+     * chip: picking `C` clears every WUBRG color (`colorIdentity = {C}`); picking any WUBRG color
+     * clears `C` (S9). `C` is a UI-only sentinel -- [DeckWizardUiState.engineIdentity] strips it
+     * before the identity ever reaches the engine (an empty result IS the real "colorless build"
+     * signal). Re-ranks [strategyRecommendations], debounced [COLOR_PICK_STRATEGY_DEBOUNCE_MS] so a
+     * burst of chip taps doesn't fire one recompute per tap. */
+    fun onToggleColorFlowColor(color: ManaColor) {
         _uiState.update { state ->
-            val updated = if (color in state.colorIdentity) state.colorIdentity - color else state.colorIdentity + color
+            val updated = if (color == ManaColor.C) {
+                if (ManaColor.C in state.colorIdentity) emptySet() else setOf(ManaColor.C)
+            } else {
+                val withoutColorless = state.colorIdentity - ManaColor.C
+                if (color in withoutColorless) withoutColorless - color else withoutColorless + color
+            }
             state.copy(colorIdentity = updated)
         }
-        recomputeStrategyRecommendations()
+        recomputeStrategyRecommendations(debounceMs = COLOR_PICK_STRATEGY_DEBOUNCE_MS)
+    }
+
+    /** COLOR_PICK's "Next" -- requires a color AND a strategy pick (S1.2's own Next-enable rule);
+     * [DeckWizardUiState.isCustomStrategyChosen] resolves the "Custom vs. nothing picked yet"
+     * ambiguity a bare `selectedCuratedStrategyId == null` check cannot. */
+    fun onNextFromColorPick() {
+        val state = _uiState.value
+        if (state.colorIdentity.isEmpty() || (state.selectedCuratedStrategyId == null && !state.isCustomStrategyChosen)) {
+            crashReporter.log("deck_wizard_step_color_pick_blocked_no_strategy")
+            viewModelScope.launch {
+                _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_strategy_required)))
+            }
+            return
+        }
+        enterPlanSections()
+    }
+
+    // ── STRATEGY_PICK (run B, plan §5 Phase 5.3) ──────────────────────────────────────────────────
+
+    /**
+     * STRATEGY_PICK's own catalog-row tap -- mirrors the deleted pre-v6 Flow C's "pick strategy,
+     * then pick matching colors" two-step (this time against the curated catalog, not raw taxonomy):
+     * tapping a row marks it as PENDING ([DeckWizardUiState.expandedStrategyPickId], which row's
+     * [InlineColorComboSection] is expanded) and ranks its color combos via the existing
+     * [recomputeColorComboSuggestions] (retargeted, unchanged body) -- it does NOT yet commit
+     * [DeckWizardUiState.colorIdentity]/the strategy pin, that happens in
+     * [onSelectStrategyPickCombo]. Re-tapping the already-pending row collapses it.
+     *
+     * [DeckWizardUiState.selectedCuratedStrategyId] is deliberately left untouched by this function
+     * (only set once a combo is actually chosen) -- a colorless combo pick sets `colorIdentity =
+     * emptySet()`, which would be indistinguishable from "nothing chosen yet" if this function set
+     * `selectedCuratedStrategyId` on the FIRST tap instead of the combo tap.
+     */
+    fun onSelectStrategyPickEntry(strategy: CuratedStrategy) {
+        val state = _uiState.value
+        if (state.expandedStrategyPickId == strategy.id) {
+            _uiState.update { it.copy(expandedStrategyPickId = null, strategyPickCombos = emptyList()) }
+            return
+        }
+        _uiState.update { it.copy(expandedStrategyPickId = strategy.id, strategyPickCombos = emptyList()) }
+        recomputeColorComboSuggestions(strategy.archetypes.firstOrNull(), strategy.themes.firstOrNull())
+    }
+
+    /** STRATEGY_PICK's own combo pick -- commits [DeckWizardUiState.colorIdentity] AND finalizes the
+     * strategy pin (or opens the existing tribe sub-picker first, for a `requiresTribe` entry, same
+     * as every other strategy-pick surface). */
+    fun onSelectStrategyPickCombo(strategy: CuratedStrategy, combo: ColorComboSuggestion) {
+        _uiState.update { it.copy(colorIdentity = combo.colors) }
+        if (strategy.requiresTribe) {
+            onRequestTribeForStrategy(strategy)
+        } else {
+            selectCommanderStrategy(strategy, null)
+        }
+    }
+
+    /** STRATEGY_PICK's "Next" -- requires a fully committed strategy (see [onSelectStrategyPickEntry]'s
+     * own KDoc for why [DeckWizardUiState.selectedCuratedStrategyId] alone is the right signal here). */
+    fun onNextFromStrategyPick() {
+        if (_uiState.value.selectedCuratedStrategyId == null) {
+            crashReporter.log("deck_wizard_step_strategy_pick_blocked_no_strategy")
+            viewModelScope.launch {
+                _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_strategy_required)))
+            }
+            return
+        }
+        enterPlanSections()
     }
 
     // ── PLAN_SECTIONS (shared by every anchor since MANUAL_ADDS/Casual was deleted) ───────────────
@@ -1316,6 +1427,10 @@ class DeckWizardViewModel(
         }
         cancelDirectionSearchJobs()
         _uiState.update { it.resetDirectionScratchState().copy(entryFlow = flow, phase = targetPhase) }
+        // Deck Wizard 60-card wave (v6), plan §5 Phase 5.3: STRATEGY_PICK ranks the WHOLE catalog
+        // by owned support ONCE on entry (an empty identity/seeds anchor) -- unlike COLOR_PICK
+        // (nothing to rank before a color is picked) or SEED_PICK (ranks on its own "Next").
+        if (flow == WizardEntryFlow.STRATEGY) recomputeStrategyRecommendations()
     }
 
     /** Back navigation between the wizard's steps (Deck Wizard 60-card wave v6, plan §5 Phase 5.1).
@@ -2037,6 +2152,14 @@ class DeckWizardViewModel(
         const val SEARCH_DEBOUNCE_MS = 400L
         const val TRIBE_PICKER_CANDIDATE_LIMIT = 8
         const val PLAN_ANALYSIS_DEBOUNCE_MS = 300L
+        /** Deck Wizard 60-card wave (v6), plan §5 Phase 5.3: COLOR_PICK's own chip-toggle debounce
+         * for [recomputeStrategyRecommendations] -- a burst of chip taps fires ONE recompute, not
+         * one per tap. */
+        const val COLOR_PICK_STRATEGY_DEBOUNCE_MS = 150L
+        /** Deck Wizard 60-card wave (v6), plan §5 Phase 5.3: the seeds' own `card_strategy_tags`
+         * fetch inside [recomputeStrategyRecommendations] is capped to keep it cheap -- the first N
+         * seeds by quantity desc, not every seed. */
+        const val MAX_SEED_TAGS_FETCH = 10
         /** W0.2: a generous synthetic owned quantity for a fetched-not-owned basic land -- basics
          * are effectively unlimited, this only needs to exceed any realistic land-fill target. */
         const val BASIC_LAND_SYNTHETIC_QUANTITY = 40

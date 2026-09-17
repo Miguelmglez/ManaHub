@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -136,12 +137,16 @@ private fun EntryFlowCard(
  * Deck Wizard 60-card wave (v6, plan §5 Phase 5.1): relocated here from the deleted
  * `DeckWizardDirectionIdentity.kt` (that file's whole DIRECTION/IDENTITY step machinery was
  * dismantled by S1's UI unification) since run B's `ColorPickStepContent` (plan §5 Phase 5.3)
- * still needs this exact chip — body unchanged.
+ * still needs this exact chip — body unchanged for the WUBRG case.
  *
  * @param lockedDescriptionRes the accessibility copy for the [readOnly] (locked) state differs by
  *   WHY the color is locked: Commander's identity ("fixed by commander") vs. a seed-locked color
  *   ([DeckWizardUiState.lockedColors]). Defaults to the original Commander string so every
  *   pre-existing call site is unaffected.
+ * @param label Deck Wizard 60-card wave (v6), plan §5 Phase 5.3, S9: COLOR_PICK's 6th "Colorless"
+ *   chip has no natural WUBRG mana-symbol icon that reads clearly on its own, so the plan calls for
+ *   a text label instead -- `null` (every pre-v6 call site) keeps the original icon-only circle;
+ *   non-null widens the chip to a [ChipShape] pill sized to the text, still ≥ 48dp square.
  */
 @Composable
 internal fun ColorToggleChip(
@@ -150,13 +155,25 @@ internal fun ColorToggleChip(
     readOnly: Boolean,
     onClick: () -> Unit,
     lockedDescriptionRes: Int = R.string.deck_wizard_color_fixed_by_commander,
+    label: String? = null,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     val border = if (selected) BorderStroke(1.5.dp, mc.primaryAccent) else BorderStroke(0.5.dp, mc.surfaceVariant)
     val background = if (selected) mc.primaryAccent.copy(alpha = 0.18f) else mc.surface
+    val shape = if (label != null) ChipShape else CircleShape
+    val sizeModifier = if (label != null) {
+        Modifier.heightIn(min = 48.dp).widthIn(min = 48.dp)
+    } else {
+        Modifier.size(48.dp)
+    }
     val content: @Composable () -> Unit = {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            ManaSymbolImage(token = color.symbol, size = 24.dp)
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(horizontal = if (label != null) 12.dp else 0.dp)) {
+            if (label != null) {
+                Text(label, style = ty.labelMedium, color = if (selected) mc.primaryAccent else mc.textSecondary)
+            } else {
+                ManaSymbolImage(token = color.symbol, size = 24.dp)
+            }
         }
     }
     // Read-only (Commander -- colors are derived from the commander, not user-editable; OR a
@@ -166,16 +183,14 @@ internal fun ColorToggleChip(
     if (readOnly) {
         val fixedColorDescription = stringResource(lockedDescriptionRes, color.displayName)
         Surface(
-            shape = CircleShape,
+            shape = shape,
             color = background,
             border = border,
-            modifier = Modifier
-                .size(48.dp)
-                .semantics { contentDescription = fixedColorDescription },
+            modifier = sizeModifier.semantics { contentDescription = fixedColorDescription },
             content = content,
         )
     } else {
-        Surface(onClick = onClick, shape = CircleShape, color = background, border = border, modifier = Modifier.size(48.dp), content = content)
+        Surface(onClick = onClick, shape = shape, color = background, border = border, modifier = sizeModifier, content = content)
     }
 }
 

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -519,16 +520,123 @@ internal fun strategyRecommendedSplit(recommendations: List<StrategyRecommendati
     RecommendCommanderStrategiesUseCase().splitRecommended(recommendations)
 
 /**
- * The single-select STRATEGY list (D4): [DeckWizardUiState.strategyRecommendations] split
- * into "Recommended" (score-threshold + hard cap of 5, E3) and collapsed "Partial fit", plus
- * "Custom" always offered last. The #1 recommendation is preselected by the ViewModel the moment
- * the list loads ([DeckWizardViewModel.recommendCommanderStrategies]) and Next is ALWAYS enabled
- * (plan §4/§8 defaults) -- this step never blocks progress the way the old picker's tribe-required
- * gate could.
+ * Deck Wizard 60-card wave (v6), plan §5 Phase 5.3: the single-select strategy list (D4) --
+ * [recommendations] split into "Recommended" (score-threshold + hard cap of 5, E3) and collapsed
+ * "Partial fit", plus "Custom" (only when [showCustom]) always offered last. Extracted from
+ * [StrategyStepContent] (list items only -- header/subtitle/sticky button stay in each step) so
+ * [ColorPickStepContent] (`DeckWizardSixtySteps.kt`) can reuse it verbatim.
+ *
+ * [contextLabel] is the already-resolved "for %1$s" substitution (a commander's name, "your N
+ * cards", or blank) -- blank falls back to the `_generic` string variants (COLOR_PICK has no
+ * natural "for X" phrase). [otherPlansExpanded]/[onToggleOtherPlansExpanded] are hoisted (not
+ * `remember`ed here) so each calling step owns its own toggle state.
  *
  * A [CuratedStrategy.requiresTribe] entry the recommender could not resolve a concrete tribe for
  * opens the shared [TribePickerSection] tribe sub-picker (same component Deck Studio's own
  * [CuratedStrategyPickerSheet] uses) instead of applying with no tribe.
+ */
+internal fun LazyListScope.StrategyRecommendationList(
+    recommendations: List<StrategyRecommendation>,
+    selectedId: String?,
+    onSelectStrategy: (CuratedStrategy) -> Unit,
+    onSelectCustom: () -> Unit,
+    onRequestTribe: (CuratedStrategy) -> Unit,
+    contextLabel: String,
+    otherPlansExpanded: Boolean,
+    onToggleOtherPlansExpanded: () -> Unit,
+    showCustom: Boolean = true,
+) {
+    val (recommended, other) = strategyRecommendedSplit(recommendations)
+    fun onRowClick(recommendation: StrategyRecommendation) {
+        if (recommendation.strategy.requiresTribe && recommendation.tribe == null) {
+            onRequestTribe(recommendation.strategy)
+        } else {
+            onSelectStrategy(recommendation.strategy)
+        }
+    }
+
+    // compose-design-reviewer P2 findings (Commander v4): the header now renders unconditionally
+    // (previously it was skipped along with the whole branch when Recommended was empty, so the
+    // "why empty" text dropped in with none of the section chrome every other block uses); the
+    // empty-explanation text no longer requires `other` to be non-empty either.
+    item(key = "recommended_header") {
+        StrategySectionHeader(
+            if (contextLabel.isNotEmpty()) stringResource(R.string.deck_wizard_strategy_recommended_header, contextLabel)
+            else stringResource(R.string.deck_wizard_strategy_recommended_header_generic)
+        )
+    }
+    if (recommended.isNotEmpty()) {
+        items(recommended, key = { "rec_${it.strategy.id}" }) { recommendation ->
+            StrategyRecommendationRow(
+                recommendation = recommendation,
+                isSelected = selectedId == recommendation.strategy.id,
+                onClick = { onRowClick(recommendation) },
+            )
+        }
+    } else {
+        item(key = "recommended_empty") {
+            Text(
+                text = if (contextLabel.isNotEmpty()) stringResource(R.string.deck_wizard_strategy_recommended_empty, contextLabel)
+                    else stringResource(R.string.deck_wizard_strategy_recommended_empty_generic),
+                style = MaterialTheme.magicTypography.bodyMedium,
+                color = MaterialTheme.magicColors.textSecondary,
+                modifier = Modifier.padding(vertical = MaterialTheme.spacing.sm),
+            )
+        }
+    }
+    if (other.isNotEmpty()) {
+        item(key = "partial_fit_toggle") {
+            PartialFitToggle(
+                expanded = otherPlansExpanded,
+                subtitle = if (!otherPlansExpanded) {
+                    if (contextLabel.isNotEmpty()) stringResource(R.string.deck_wizard_strategy_partial_fit_subtitle, contextLabel)
+                    else stringResource(R.string.deck_wizard_strategy_partial_fit_subtitle_generic)
+                } else null,
+                onToggle = onToggleOtherPlansExpanded,
+            )
+        }
+        if (otherPlansExpanded) {
+            items(other, key = { "other_${it.strategy.id}" }) { recommendation ->
+                StrategyRecommendationRow(
+                    recommendation = recommendation,
+                    isSelected = selectedId == recommendation.strategy.id,
+                    onClick = { onRowClick(recommendation) },
+                )
+            }
+        }
+    }
+    if (showCustom) {
+        item(key = "custom_header") {
+            StrategySectionHeader(stringResource(R.string.deck_wizard_strategy_custom_header))
+        }
+        item(key = "custom") {
+            val mc = MaterialTheme.magicColors
+            MagicSelectionItem(
+                title = stringResource(R.string.deck_wizard_strategy_custom_title),
+                description = stringResource(R.string.deck_wizard_strategy_custom_description),
+                isSelected = selectedId == null,
+                accentColor = mc.goldMtg,
+                icon = {
+                    Box(
+                        modifier = Modifier.size(40.dp).clip(CircleShape).background(mc.goldMtg.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.goldMtg)
+                    }
+                },
+                onClick = onSelectCustom,
+            )
+        }
+    }
+}
+
+/**
+ * The single-select STRATEGY step, shared by Commander AND the Cards flow (S1/S7) -- header +
+ * subtitle here, the list itself is [StrategyRecommendationList]. Subtitle: Commander "for
+ * <commander name>" (unchanged); Cards "for your N cards" (`deck_wizard_strategy_subtitle_seeds`,
+ * N = [DeckWizardUiState.seedCopies]). The #1 recommendation is preselected by the ViewModel the
+ * moment the list loads and Next is ALWAYS enabled (plan §4/§8 defaults) -- this step never blocks
+ * progress the way the old picker's tribe-required gate could.
  */
 @Composable
 internal fun StrategyStepContent(
@@ -544,14 +652,16 @@ internal fun StrategyStepContent(
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     var otherPlansExpanded by remember { mutableStateOf(false) }
-    val (recommended, other) = remember(uiState.strategyRecommendations) {
-        strategyRecommendedSplit(uiState.strategyRecommendations)
-    }
+    val isCommander = uiState.selectedFormat?.isCommanderFormat == true
     val commanderName = uiState.selectedCommander?.name.orEmpty()
     val pendingTribeStrategy = uiState.pendingTribeStrategy
     val tribeOptions = remember(uiState.commanderTribePickerCandidates) {
         uiState.commanderTribePickerCandidates.map { TribeOption(key = it.tribeKey, label = it.displayLabel) }
     }
+    // Deck Wizard 60-card wave (v6): STRATEGY is now shared by every anchor, not just Commander
+    // (S1/S7) -- the Cards flow's own "for your N cards" context replaces the commander's name for
+    // BOTH the title and the Recommended-list's "for X" phrasing.
+    val contextLabel = if (isCommander) commanderName else stringResource(R.string.deck_wizard_strategy_context_seeds, uiState.seedCopies)
 
     Column(Modifier.fillMaxSize()) {
         if (pendingTribeStrategy != null) {
@@ -577,12 +687,8 @@ internal fun StrategyStepContent(
             ) {
                 item(key = "header") {
                     Column {
-                        // Deck Wizard 60-card wave (v6): STRATEGY is now shared by every anchor, not
-                        // just Commander (S1/S7) -- a non-Commander build has no commanderName, so
-                        // this falls back to the plain, commander-less title (run B, plan §5 Phase
-                        // 5.3, replaces this with a proper cards-count subtitle).
                         Text(
-                            text = if (commanderName.isNotEmpty()) {
+                            text = if (isCommander) {
                                 stringResource(R.string.deck_wizard_strategy_step_title_for, commanderName)
                             } else {
                                 stringResource(R.string.deck_wizard_strategy_step_title)
@@ -591,7 +697,11 @@ internal fun StrategyStepContent(
                             color = mc.textPrimary,
                         )
                         Text(
-                            stringResource(R.string.deck_wizard_strategy_step_subtitle),
+                            text = if (isCommander) {
+                                stringResource(R.string.deck_wizard_strategy_step_subtitle)
+                            } else {
+                                stringResource(R.string.deck_wizard_strategy_subtitle_seeds, uiState.seedCopies)
+                            },
                             style = ty.bodyMedium,
                             color = mc.textSecondary,
                             modifier = Modifier.padding(top = spacing.xxs),
@@ -606,83 +716,17 @@ internal fun StrategyStepContent(
                         }
                     }
                 } else {
-                    // compose-design-reviewer P2 findings: the header now renders unconditionally
-                    // (previously it was skipped along with the whole branch when Recommended was
-                    // empty, so the "why empty" text dropped in with none of the section chrome
-                    // every other block in this list uses); the empty-explanation text no longer
-                    // requires `other` to be non-empty either (a theoretical fully-empty catalog
-                    // would otherwise explain nothing).
-                    item(key = "recommended_header") {
-                        StrategySectionHeader(stringResource(R.string.deck_wizard_strategy_recommended_header, commanderName))
-                    }
-                    if (recommended.isNotEmpty()) {
-                        items(recommended, key = { "rec_${it.strategy.id}" }) { recommendation ->
-                            StrategyRecommendationRow(
-                                recommendation = recommendation,
-                                isSelected = uiState.selectedCuratedStrategyId == recommendation.strategy.id,
-                                onClick = {
-                                    if (recommendation.strategy.requiresTribe && recommendation.tribe == null) {
-                                        onRequestTribe(recommendation.strategy)
-                                    } else {
-                                        onSelectStrategy(recommendation.strategy)
-                                    }
-                                },
-                            )
-                        }
-                    } else {
-                        item(key = "recommended_empty") {
-                            Text(
-                                text = stringResource(R.string.deck_wizard_strategy_recommended_empty, commanderName),
-                                style = ty.bodyMedium,
-                                color = mc.textSecondary,
-                                modifier = Modifier.padding(vertical = spacing.sm),
-                            )
-                        }
-                    }
-                    if (other.isNotEmpty()) {
-                        item(key = "partial_fit_toggle") {
-                            PartialFitToggle(
-                                expanded = otherPlansExpanded,
-                                subtitle = if (!otherPlansExpanded) stringResource(R.string.deck_wizard_strategy_partial_fit_subtitle, commanderName) else null,
-                                onToggle = { otherPlansExpanded = !otherPlansExpanded },
-                            )
-                        }
-                        if (otherPlansExpanded) {
-                            items(other, key = { "other_${it.strategy.id}" }) { recommendation ->
-                                StrategyRecommendationRow(
-                                    recommendation = recommendation,
-                                    isSelected = uiState.selectedCuratedStrategyId == recommendation.strategy.id,
-                                    onClick = {
-                                        if (recommendation.strategy.requiresTribe && recommendation.tribe == null) {
-                                            onRequestTribe(recommendation.strategy)
-                                        } else {
-                                            onSelectStrategy(recommendation.strategy)
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                    }
-                    item(key = "custom_header") {
-                        StrategySectionHeader(stringResource(R.string.deck_wizard_strategy_custom_header))
-                    }
-                    item(key = "custom") {
-                        MagicSelectionItem(
-                            title = stringResource(R.string.deck_wizard_strategy_custom_title),
-                            description = stringResource(R.string.deck_wizard_strategy_custom_description),
-                            isSelected = uiState.selectedCuratedStrategyId == null,
-                            accentColor = mc.goldMtg,
-                            icon = {
-                                Box(
-                                    modifier = Modifier.size(40.dp).clip(CircleShape).background(mc.goldMtg.copy(alpha = 0.15f)),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.goldMtg)
-                                }
-                            },
-                            onClick = onSelectCustom,
-                        )
-                    }
+                    StrategyRecommendationList(
+                        recommendations = uiState.strategyRecommendations,
+                        selectedId = uiState.selectedCuratedStrategyId,
+                        onSelectStrategy = onSelectStrategy,
+                        onSelectCustom = onSelectCustom,
+                        onRequestTribe = onRequestTribe,
+                        contextLabel = contextLabel,
+                        otherPlansExpanded = otherPlansExpanded,
+                        onToggleOtherPlansExpanded = { otherPlansExpanded = !otherPlansExpanded },
+                        showCustom = true,
+                    )
                 }
             }
         }
@@ -762,7 +806,7 @@ private fun PartialFitToggle(expanded: Boolean, subtitle: String?, onToggle: () 
  * `Surface`/`InputChip`, per CLAUDE.md's tag-chip rule).
  */
 @Composable
-private fun StrategyRecommendationRow(recommendation: StrategyRecommendation, isSelected: Boolean, onClick: () -> Unit) {
+internal fun StrategyRecommendationRow(recommendation: StrategyRecommendation, isSelected: Boolean, onClick: () -> Unit) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing

@@ -193,12 +193,26 @@ fun DeckWizardScreen(
                             onShowSeedDetail = viewModel::onShowSeedDetail,
                             onNext = viewModel::onNextFromSeedPick,
                         )
-                        // Deck Wizard 60-card wave (v6), plan §5 Phase 5.1: minimal placeholders --
-                        // run B (plan §5 Phase 5.3) wires ColorPickStepContent's/StrategyPickStepContent's
-                        // real onNext handlers; Next stays disabled on both until then (see those
-                        // composables' own KDoc).
-                        WizardPhase.COLOR_PICK -> ColorPickStepContent(uiState = uiState, onNext = {})
-                        WizardPhase.STRATEGY_PICK -> StrategyPickStepContent(uiState = uiState, onNext = {})
+                        WizardPhase.COLOR_PICK -> ColorPickStepContent(
+                            uiState = uiState,
+                            onToggleColor = viewModel::onToggleColorFlowColor,
+                            onSelectStrategy = viewModel::onSelectCommanderStrategy,
+                            onSelectCustom = viewModel::onSelectCustomStrategy,
+                            onRequestTribe = viewModel::onRequestTribeForStrategy,
+                            onPickTribe = viewModel::onPickTribeForStrategy,
+                            onCancelTribePick = viewModel::onCancelTribePickForStrategy,
+                            onNext = viewModel::onNextFromColorPick,
+                        )
+                        WizardPhase.STRATEGY_PICK -> StrategyPickStepContent(
+                            uiState = uiState,
+                            onQueryChange = viewModel::onStrategyPickQueryChange,
+                            onSelectEntry = viewModel::onSelectStrategyPickEntry,
+                            onSelectCombo = viewModel::onSelectStrategyPickCombo,
+                            onRequestTribe = viewModel::onRequestTribeForStrategy,
+                            onPickTribe = viewModel::onPickTribeForStrategy,
+                            onCancelTribePick = viewModel::onCancelTribePickForStrategy,
+                            onNext = viewModel::onNextFromStrategyPick,
+                        )
                         WizardPhase.STRATEGY -> StrategyStepContent(
                             uiState = uiState,
                             onSelectStrategy = viewModel::onSelectCommanderStrategy,
