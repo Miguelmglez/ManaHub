@@ -711,6 +711,7 @@ class BuildWizardDeckUseCase(
                 ownedCollection = draft.ownedCollection,
                 usedNames = (placedNonLand.map { it.card.name } + draft.manualLand.map { it.card.name }).toMutableSet(),
                 archetypeFormat = draft.archetypeFormat,
+                format = draft.format,
                 includeNonBasicLands = draft.includeNonBasicLands,
                 deckId = draft.deckId,
             )
@@ -1092,6 +1093,7 @@ class BuildWizardDeckUseCase(
         ownedCollection: List<OwnedCard>,
         usedNames: MutableSet<String>,
         archetypeFormat: ArchetypeFormat,
+        format: DeckFormat,
         includeNonBasicLands: Boolean,
         deckId: String,
     ): List<DeckEntry> {
@@ -1110,9 +1112,17 @@ class BuildWizardDeckUseCase(
                 .let { kotlin.math.round(it).toInt() }
                 .coerceIn(0, remainingLandSlots)
 
+            // Deck Wizard 60-card wave (v6), Phase 6.2 fix: a rotating 60-card format (Standard/
+            // Pioneer) must never receive an owned non-basic land that isn't legal there -- this
+            // filter was missing entirely, so an opted-in includeNonBasicLands=true build could place
+            // e.g. a Legacy-only dual into a Standard deck, tripping AnalysisEngine's own
+            // Finding.IllegalCard BLOCKER post-build. Caught by the Phase 6.2 real-collection Sixty
+            // harness (0/17 Standard specs passed before this fix, legality pillar's own predicate
+            // reused -- never a second one).
             val ownedNonBasics = ownedCollection.map { it.card }
                 .filter { BasicLandCalculator.isLand(it) && !BasicLandCalculator.isBasicLand(it) }
                 .filter { identitySymbols.containsAll(it.colorIdentity) }
+                .filter { isLegalForFormat(it, format) }
                 .filter { it.name !in usedNames }
                 .distinctBy { it.name }
 
