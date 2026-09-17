@@ -1415,6 +1415,17 @@
     <string name="deck_wizard_name_suffix_deck">%1$s Deck</string>
     <string name="deck_wizard_name_default">New %1$s Deck</string>
 
+    <!-- Deck Wizard 60-card wave v6 P4: CardDetailSheet seed-selection mode (plan 4.2). -->
+    <string name="deck_wizard_add_to_deck">Add to deck</string>
+    <string name="deck_wizard_seed_in_deck">In deck: %1$d</string>
+    <string name="deck_wizard_seed_owned">You own %1$d</string>
+    <string name="deck_wizard_seed_not_owned">Not in your collection</string>
+
+    <!-- CardQueueSheet (Deck Wizard 60-card wave v6 P4, plan 4.3) — generic, extracted from the
+         scanner's own DeckScannerQueueSheet. -->
+    <string name="card_queue_search_placeholder">Filter cards</string>
+    <string name="card_queue_clear_all">Remove all</string>
+
     <!-- Score reasons -->
     <string name="deck_reason_synergy">Synergy</string>
     <string name="deck_reason_fills_gap">Fills: %1$s</string>

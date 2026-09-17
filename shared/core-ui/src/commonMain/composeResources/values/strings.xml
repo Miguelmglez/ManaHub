@@ -10,4 +10,6 @@
     <string name="deckbuilder_ideal_curve">Ideal curve</string>
     <string name="addcard_language_sheet_title">Select Language</string>
     <string name="addcard_condition_sheet_title">Select Condition</string>
+    <!-- CardRow onImageClick (Deck Wizard 60-card wave v6 P4): the thumbnail's a11y label when it opens a detail sheet. -->
+    <string name="card_row_view_card_a11y">View card</string>
 </resources>

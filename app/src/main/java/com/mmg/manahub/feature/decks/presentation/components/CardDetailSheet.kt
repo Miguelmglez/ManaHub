@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.components
-// COMMENTS_REVIEWED: 2026-09-10
+// COMMENTS_REVIEWED: 2026-09-17
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -83,11 +83,14 @@ import org.jetbrains.compose.resources.painterResource
  * (image flip + tags + +/-/delete + commander actions) instead of navigating away.
  * Stateless: every state field is a parameter and every action is a callback.
  *
- * The action area branches on three cases:
+ * The action area branches on four cases:
  *  1. [isCommanderSelectionContext] — the "Choose Commander" search flow (golden CTA /
  *     status badge), no +/- counter.
  *  2. [isCommander] (outside the selection flow) — the current commander, status badge only.
- *  3. A regular deck card — the +/- quantity counter plus the remove-all button.
+ *  3. [seedSelection] non-null (Deck Wizard "Start from cards" seed pick, v6 P4) — an "Add to
+ *     deck" CTA at quantity 0, else the same +/- stepper Case 4 uses plus an owned/in-deck caption.
+ *  4. A regular deck card — the +/- quantity counter plus the remove-all button, both hidden when
+ *     [readOnly].
  *
  * @param deckCard the slot backing every callback (identity/quantity/onAdd/onRemove/onDelete/
  *   onChooseAsCommander ALWAYS operate on `deckCard.card`'s original scryfallId — never the
@@ -109,6 +112,10 @@ import org.jetbrains.compose.resources.painterResource
  * @param onChooseAsCommander assign the resolved [Card] as commander.
  * @param onRemoveCommander clear the current commander.
  * @param onDismiss close the sheet.
+ * @param seedSelection non-null puts the sheet in Deck Wizard seed-pick mode (case 3) instead of
+ *   the regular deck-card mode (case 4) — ignored when [isCommander] or
+ *   [isCommanderSelectionContext] is true.
+ * @param readOnly hides case 4's +/- stepper and remove-all button (a card viewed, not edited).
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -125,6 +132,8 @@ internal fun CardDetailSheet(
     onChooseAsCommander: (Card) -> Unit,
     onRemoveCommander: () -> Unit,
     onDismiss: () -> Unit,
+    seedSelection: SeedSelectionUi? = null,
+    readOnly: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -274,7 +283,47 @@ internal fun CardDetailSheet(
                         }
                     }
 
-                    // Case 3: regular deck card — +/- quantity counter.
+                    // Case 3: Deck Wizard seed pick — CTA at 0, else the stepper + an owned/in-deck caption.
+                    seedSelection != null -> {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.sm),
+                            verticalArrangement = Arrangement.spacedBy(spacing.sm),
+                        ) {
+                            if (seedSelection.quantity <= 0) {
+                                MagicCtaButton(
+                                    onClick = seedSelection.onAdd,
+                                    text = stringResource(R.string.deck_wizard_add_to_deck),
+                                    style = MagicCtaStyle.Filled,
+                                    color = MagicCtaColor.Primary,
+                                    icon = {
+                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            } else {
+                                Text(
+                                    text = stringResource(R.string.deck_wizard_seed_in_deck, seedSelection.quantity) +
+                                        " · " +
+                                        if (seedSelection.isOwned) {
+                                            stringResource(R.string.deck_wizard_seed_owned, seedSelection.ownedQuantity)
+                                        } else {
+                                            stringResource(R.string.deck_wizard_seed_not_owned)
+                                        },
+                                    style = ty.labelMedium,
+                                    color = mc.textSecondary,
+                                )
+                                QuantityStepperRow(
+                                    quantity = seedSelection.quantity,
+                                    onRemove = seedSelection.onRemove,
+                                    removeEnabled = true,
+                                    onAdd = seedSelection.onAdd,
+                                    addEnabled = seedSelection.quantity < seedSelection.maxQuantity,
+                                )
+                            }
+                        }
+                    }
+
+                    // Case 4: regular deck card — +/- quantity counter, hidden when readOnly.
                     else -> {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.sm),
@@ -294,56 +343,14 @@ internal fun CardDetailSheet(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-                            
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(spacing.xs)
-                            ) {
-                                MagicCtaButton(
-                                    onClick = onRemove,
-                                    enabled = deckCard.quantity > 0,
-                                    style = MagicCtaStyle.Outlined,
-                                    color = MagicCtaColor.Primary,
-                                    icon = {
-                                        Icon(
-                                            Icons.Default.Remove,
-                                            contentDescription = stringResource(R.string.action_remove),
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    },
-                                    contentPadding = PaddingValues(spacing.sm),
-                                    modifier = Modifier.size(48.dp)
-                                )
 
-                                Surface(
-                                    shape = ChipShape,
-                                    color = mc.surfaceVariant.copy(alpha = 0.3f),
-                                    border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
-                                    modifier = Modifier.height(48.dp).width(56.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = deckCard.quantity.toString(),
-                                            style = ty.titleLarge,
-                                            color = mc.textPrimary,
-                                            fontWeight = FontWeight.ExtraBold,
-                                        )
-                                    }
-                                }
-
-                                MagicCtaButton(
-                                    onClick = onAdd,
-                                    style = MagicCtaStyle.Filled,
-                                    color = MagicCtaColor.Primary,
-                                    icon = {
-                                        Icon(
-                                            Icons.Default.Add,
-                                            contentDescription = stringResource(R.string.action_add),
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    },
-                                    contentPadding = PaddingValues(spacing.sm),
-                                    modifier = Modifier.size(48.dp)
+                            if (!readOnly) {
+                                QuantityStepperRow(
+                                    quantity = deckCard.quantity,
+                                    onRemove = onRemove,
+                                    removeEnabled = deckCard.quantity > 0,
+                                    onAdd = onAdd,
+                                    addEnabled = true,
                                 )
                             }
                         }
@@ -351,8 +358,8 @@ internal fun CardDetailSheet(
                 }
             }
 
-            // Delete / remove-all — hidden in pure commander-selection context.
-            if (!isCommanderSelectionContext) {
+            // Delete / remove-all — hidden in commander-selection context, seed-pick mode, and readOnly.
+            if (!isCommanderSelectionContext && seedSelection == null && !readOnly) {
                 item {
                     MagicCtaButton(
                         onClick = onDelete,
@@ -373,6 +380,85 @@ internal fun CardDetailSheet(
                 }
             }
         }
+    }
+}
+
+/**
+ * A resolved seed for [CardDetailSheet]'s seed-selection mode (Deck Wizard "Start from cards",
+ * v6 P4) — 60-card seed picking, never used in a commander context.
+ */
+internal data class SeedSelectionUi(
+    val quantity: Int,
+    val maxQuantity: Int,
+    val isOwned: Boolean,
+    val ownedQuantity: Int,
+    val onAdd: () -> Unit,
+    val onRemove: () -> Unit,
+)
+
+/** The +/- quantity stepper shared by [CardDetailSheet]'s regular and seed-selection action areas. */
+@Composable
+private fun QuantityStepperRow(
+    quantity: Int,
+    onRemove: () -> Unit,
+    removeEnabled: Boolean,
+    onAdd: () -> Unit,
+    addEnabled: Boolean,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+    ) {
+        MagicCtaButton(
+            onClick = onRemove,
+            enabled = removeEnabled,
+            style = MagicCtaStyle.Outlined,
+            color = MagicCtaColor.Primary,
+            icon = {
+                Icon(
+                    Icons.Default.Remove,
+                    contentDescription = stringResource(R.string.action_remove),
+                    modifier = Modifier.size(20.dp)
+                )
+            },
+            contentPadding = PaddingValues(spacing.sm),
+            modifier = Modifier.size(48.dp)
+        )
+
+        Surface(
+            shape = ChipShape,
+            color = mc.surfaceVariant.copy(alpha = 0.3f),
+            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
+            modifier = Modifier.height(48.dp).width(56.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = quantity.toString(),
+                    style = ty.titleLarge,
+                    color = mc.textPrimary,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+            }
+        }
+
+        MagicCtaButton(
+            onClick = onAdd,
+            enabled = addEnabled,
+            style = MagicCtaStyle.Filled,
+            color = MagicCtaColor.Primary,
+            icon = {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = stringResource(R.string.action_add),
+                    modifier = Modifier.size(20.dp)
+                )
+            },
+            contentPadding = PaddingValues(spacing.sm),
+            modifier = Modifier.size(48.dp)
+        )
     }
 }
 

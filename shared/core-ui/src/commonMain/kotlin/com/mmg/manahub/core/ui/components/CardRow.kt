@@ -10,6 +10,7 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -40,6 +42,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,6 +53,7 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.card_row_view_card_a11y
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardCornerRadius
 import com.mmg.manahub.core.ui.theme.CardShape
@@ -60,6 +66,7 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.PriceFormatter
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -74,6 +81,7 @@ fun CardRow(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     sharedTransitionKey: Any? = null,
     preferredCurrency: PreferredCurrency? = null,
+    onImageClick: (() -> Unit)? = null,
 ) {
     val card = entry.card
     if (card != null) {
@@ -89,6 +97,7 @@ fun CardRow(
             animatedVisibilityScope = animatedVisibilityScope,
             sharedTransitionKey = sharedTransitionKey,
             preferredCurrency = preferredCurrency,
+            onImageClick = onImageClick,
         )
         return
     }
@@ -159,6 +168,8 @@ fun CardRow(
     sharedTransitionKey: Any? = null,
     extraSupportingContent: @Composable (() -> Unit)? = null,
     preferredCurrency: PreferredCurrency? = null,
+    onImageClick: (() -> Unit)? = null,
+    addEnabled: Boolean = true,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -269,15 +280,35 @@ fun CardRow(
                         .border(1.dp, mc.surfaceVariant.copy(alpha = 0.8f), ExtraSmallCardShape)
                 }
 
-                AsyncImage(
-                    model = card.imageNormal,
-                    contentDescription = null,
-                    placeholder = painterResource(Res.drawable.mtg_card_back),
-                    error = painterResource(Res.drawable.mtg_card_back),
-                    fallback = painterResource(Res.drawable.mtg_card_back),
-                    modifier = finalImageModifier,
-                    contentScale = ContentScale.Crop
-                )
+                val cardThumbnail = @Composable {
+                    AsyncImage(
+                        model = card.imageNormal,
+                        contentDescription = null,
+                        placeholder = painterResource(Res.drawable.mtg_card_back),
+                        error = painterResource(Res.drawable.mtg_card_back),
+                        fallback = painterResource(Res.drawable.mtg_card_back),
+                        modifier = finalImageModifier,
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                if (onImageClick != null) {
+                    val viewCardDescription = stringResource(Res.string.card_row_view_card_a11y)
+                    Box(
+                        // 44x62 visual stays put; minimumInteractiveComponentSize only pads the touch target to 48dp.
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .clickable(onClick = onImageClick)
+                            .semantics {
+                                role = Role.Button
+                                contentDescription = viewCardDescription
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        cardThumbnail()
+                    }
+                } else {
+                    cardThumbnail()
+                }
 
                 Column(
                     modifier = Modifier.weight(1f).height(62.dp),
@@ -389,11 +420,16 @@ fun CardRow(
 
                         IconButton(
                             onClick = onAdd,
+                            enabled = addEnabled,
                         ) {
                             Icon(
                                 Icons.Default.Add,
                                 contentDescription = "Increase quantity",
-                                tint = if (isCommander) mc.goldMtg else mc.primaryAccent,
+                                tint = when {
+                                    !addEnabled -> mc.textDisabled
+                                    isCommander -> mc.goldMtg
+                                    else -> mc.primaryAccent
+                                },
                                 modifier = Modifier.size(16.dp)
                             )
                         }
