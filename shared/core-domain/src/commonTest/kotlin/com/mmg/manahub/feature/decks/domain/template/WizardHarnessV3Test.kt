@@ -32,20 +32,20 @@ private object V3TestCrashReporter : CrashReporter {
 /**
  * Deck Wizard Commander v4 plan, W8 (8.1) — harness v3's commonTest segments: legality (R7/E9)
  * and land-mode (R8/R12). Self-contained synthetic fixtures, no gitignored real-collection data
- * needed (mirrors [BuildCommanderDeckUseCaseTest]'s own scope note) — runs everywhere `commonTest`
+ * needed (mirrors [BuildWizardDeckUseCaseTest]'s own scope note) — runs everywhere `commonTest`
  * runs, including wasmJs. The real-collection choice-determinism (HARD) and variety (TRACKED)
  * segments live in `app/src/test/.../harness/WizardHarnessV3RealCollectionTest.kt` since they need
  * the gitignored matrix.
  */
 class WizardHarnessV3Test {
 
-    private fun newUseCase(): BuildCommanderDeckUseCase {
+    private fun newUseCase(): BuildWizardDeckUseCase {
         val pipeline = DeckAnalysisPipeline(
             EvaluateDeckUseCase(DeckScorer(RoleClassifier(), NeutralPowerResolver), ProgressionEventBus()),
             InferDeckIdentityUseCase(),
             V3TestCrashReporter,
         )
-        return BuildCommanderDeckUseCase(pipeline, V3TestCrashReporter)
+        return BuildWizardDeckUseCase(pipeline, V3TestCrashReporter)
     }
 
     private fun roleTagFor(key: String): CardTag = CardTag(key, TagCategory.ROLE)
@@ -219,7 +219,7 @@ class WizardHarnessV3Test {
     fun `lands -- zero OWNED basics (but the basic-land resource exists) still yields a full deck`() = runTest {
         val useCase = newUseCase()
         val commander = greenCommander("cmd-v3-land-zero-basics")
-        // R12: basics are ownership-EXEMPT -- BuildCommanderDeckUseCase.resolveBasicCard only needs
+        // R12: basics are ownership-EXEMPT -- BuildWizardDeckUseCase.resolveBasicCard only needs
         // the Card OBJECT to exist in ownedCollection, never a positive owned quantity. Mirrors
         // DeckWizardViewModel.guaranteeBasicsAvailable's own contract at the VM boundary (W0.2).
         val owned = greenFillers(30) + listOf(OwnedCard(basicLand("Forest", "G"), 0))

@@ -39,7 +39,7 @@ private object RoundTripCrashReporter : CrashReporter {
  * A tiny in-memory [DeckRepository] that actually STORES what it is written -- unlike
  * `DeckRepositoryReplaceAllCardsWithSourceTest`'s `FakeAtomicityDeckRepository`, whose
  * `observeDeckWithCards` always returns null (fine for an atomicity-only test, useless for a
- * read-back one). Only the methods [BuildCommanderDeckUseCase.persist] actually calls are
+ * read-back one). Only the methods [BuildWizardDeckUseCase.persist] actually calls are
  * implemented for real; everything else is `error("unused")` -- if a future change makes
  * `persist` call something else, this test fails loudly instead of silently reading stale state.
  */
@@ -83,7 +83,7 @@ private class InMemoryRoundTripDeckRepository(private val cardsById: Map<String,
         deck = deck.copy(strategyLocked = locked)
     }
 
-    /** Reconstructs the SAME [DeckEntry] shape [BuildCommanderDeckUseCase.invoke] produced, but
+    /** Reconstructs the SAME [DeckEntry] shape [BuildWizardDeckUseCase.invoke] produced, but
      * purely from what actually got persisted -- the read side of this round-trip test. */
     fun readBackMainboard(): List<DeckEntry> = mainboard.values.map { slot ->
         DeckEntry(card = cardsById.getValue(slot.scryfallId), quantity = slot.quantity, isOwned = true, isSideboard = false)
@@ -95,16 +95,16 @@ private class InMemoryRoundTripDeckRepository(private val cardsById: Map<String,
 /**
  * Deck Wizard Commander v3 plan, Phase 6 (item 7): the literal "build, persist, re-analyze FROM
  * PERSISTENCE, compare" proof the campaign asked for -- unlike
- * `BuildCommanderDeckUseCaseTest`'s own "round-trip identity" test (Phase 2, Run 3), which
+ * `BuildWizardDeckUseCaseTest`'s own "round-trip identity" test (Phase 2, Run 3), which
  * re-analyzes `outcome.result.entries` directly and never touches [DeckRepository] at all, this
- * test goes through [BuildCommanderDeckUseCase.persist] into a real (in-memory) repository, reads
+ * test goes through [BuildWizardDeckUseCase.persist] into a real (in-memory) repository, reads
  * the mainboard AND the pin back out exactly as [com.mmg.manahub.feature.decks.presentation.wizard
  * .DeckWizardViewModel]'s own generation path would (via `observeDeckWithCards`), and only THEN
  * re-runs [DeckAnalysisPipeline.analyze] -- closing the one gap Run 3's own report flagged
  * (`round_trip_identity (new path)` was proven only against the in-memory outcome, never against
  * what actually lands in the repository).
  */
-class BuildCommanderDeckPersistenceRoundTripTest {
+class BuildWizardDeckPersistenceRoundTripTest {
 
     private fun newPipeline() = DeckAnalysisPipeline(
         EvaluateDeckUseCase(DeckScorer(RoleClassifier(), NeutralPowerResolver), ProgressionEventBus()),
@@ -115,7 +115,7 @@ class BuildCommanderDeckPersistenceRoundTripTest {
     @Test
     fun `round_trip_identity -- re-analyzing the PERSISTED deck matches the outcome the wizard returned`() = runTest {
         val pipeline = newPipeline()
-        val useCase = BuildCommanderDeckUseCase(pipeline, RoundTripCrashReporter)
+        val useCase = BuildWizardDeckUseCase(pipeline, RoundTripCrashReporter)
 
         val commander = MockCollectionRich.targetFixtures.first().mainboard
             .first { it.card.typeLine.contains("Legendary", ignoreCase = true) }.card

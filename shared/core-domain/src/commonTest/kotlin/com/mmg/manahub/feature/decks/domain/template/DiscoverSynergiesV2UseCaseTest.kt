@@ -16,7 +16,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** Deck Builder v2, Phase 5 (plan §3.5) -- [DiscoverSynergiesV2UseCase] clustering, thresholds,
- * and color coherence. Mirrors [BuildDeckFromTemplateUseCaseTest]'s fixture conventions. */
+ * and color coherence. Mirrors [the deleted Motor A test suite]'s fixture conventions. */
 class DiscoverSynergiesV2UseCaseTest {
 
     private val dispatcher = StandardTestDispatcher()

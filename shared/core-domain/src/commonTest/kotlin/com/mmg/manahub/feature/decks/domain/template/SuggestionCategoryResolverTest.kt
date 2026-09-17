@@ -121,6 +121,6 @@ class SuggestionCategoryResolverTest {
     }
 
     // DeckProfile-context tribe preference (step 3, deck-aware branch) is covered end-to-end by
-    // BuildDeckFromTemplateUseCaseTest's tribal-seed scenario -- exercising it here would need to
+    // the deleted Motor A test suite's tribal-seed scenario -- exercising it here would need to
     // hand-build a DeckProfile.tagFingerprint, which duplicates DeckScorer.profile's own coverage.
 }

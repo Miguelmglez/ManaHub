@@ -37,7 +37,7 @@ sealed class DiscoveryClusterKey {
  * @param members the cluster's owned cards, ranked by [DeckScorer.fit] against a profile seeded
  *   with the cluster's own identity (never Room/collection insertion order — fixes root-cause
  *   1.2.7). Also doubles as the "Build this" seed-candidate list (D11) — the wizard pre-fills
- *   [com.mmg.manahub.feature.decks.domain.template.DeckWizardSpec.seeds] from this list, capped
+ *   [the deleted Motor A wizard spec.seeds] from this list, capped
  *   by the wizard the same way [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
  *   .startFromDiscovery] already caps the old handoff.
  * @param archetype the [ArchetypeId] to pre-fill the wizard with (Deck Engine Unification plan D2)
@@ -49,7 +49,7 @@ sealed class DiscoveryClusterKey {
  *   [DiscoveryClusterKey.Strategy] cluster via [DeckIdentitySeedTags.themeForTag]; always `null` for
  *   a tribe cluster (the tribe itself carries the identity, see [tribe]).
  * @param tribe the raw `tribe:<subtype>` key, set ONLY for a [DiscoveryClusterKey.Tribe] cluster —
- *   carried straight onto [DeckWizardSpec.strategyProfile]'s `tribe` field.
+ *   carried straight onto [the deleted Motor A wizard spec.strategyProfile]'s `tribe` field.
  */
 data class DeckDiscoveryV2(
     val key: DiscoveryClusterKey,
@@ -244,7 +244,7 @@ class DiscoverSynergiesV2UseCase(
     }
 
     /** A colorless card always passes; a colored card must be a SUBSET of [dominantColors]
-     * (mirrors [BuildDeckFromTemplateUseCase.analyzeCollection]'s Casual color-filter convention). */
+     * (mirrors [the deleted Motor A wizard build use case.analyzeCollection]'s Casual color-filter convention). */
     private fun isColorCoherent(card: Card, dominantColors: Set<ManaColor>): Boolean {
         if (dominantColors.isEmpty()) return true
         val cardColors = card.colorIdentity.mapNotNull { symbol -> ManaColor.entries.firstOrNull { it.symbol == symbol } }

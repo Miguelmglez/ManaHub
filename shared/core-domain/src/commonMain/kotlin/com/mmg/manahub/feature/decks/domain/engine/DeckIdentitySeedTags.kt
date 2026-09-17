@@ -7,7 +7,7 @@ import com.mmg.manahub.core.model.TagCategory
  * Wizard Quality Campaign Wave 4 (Task 1) — the SINGLE shared mapping from the archetype layer's
  * [ArchetypeId] / [ThemeId] vocabulary onto the [CardTag] seed vocabulary
  * [DeckScorer.profile] consumes for its identity fingerprint. Two independent consumers:
- *  - [com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase.recomputeProfile]
+ *  - [the deleted Motor A wizard build use case.recomputeProfile]
  *    (build-time, from the resolved
  *    [com.mmg.manahub.feature.decks.domain.template.DeckTemplateArchetypeInfo] the wizard just
  *    built for the in-progress deck).
@@ -18,7 +18,7 @@ import com.mmg.manahub.core.model.TagCategory
  *    .updateArchetypeOverride]/`.updateTribeOverride`, both by the wizard on build and by Deck
  *    Studio's "Deck plan" chip afterward for archetype/themes).
  *
- * Before Wave 4, `BuildDeckFromTemplateUseCase` had a PRIVATE `themeSeedTags` copy of (half of) this
+ * Before Wave 4, `the deleted Motor A wizard build use case` had a PRIVATE `themeSeedTags` copy of (half of) this
  * table and the Doctor had no equivalent fold-in at all — a deck with a pinned identity could have
  * the SAME card rank above the wizard's category-fill floor while it was being built (explicit hint
  * tags contributed) and below the Doctor's floor once the deck existed (inference-only tags) — the
@@ -78,10 +78,6 @@ object DeckIdentitySeedTags {
     fun forArchetype(archetype: ArchetypeId?, themes: List<ThemeId>, tribe: String? = null): List<CardTag> =
         (archetypeSeedTags(archetype) + themeSeedTags(themes) + tribeSeedTag(tribe)).distinct()
 
-    /** Convenience overload taking a [StrategyProfile] directly. */
-    fun forProfile(profile: StrategyProfile): List<CardTag> =
-        forArchetype(profile.archetype, profile.themes, profile.tribe)
-
     /**
      * Reverse lookup: which [ArchetypeId] (if any) does [tag] represent? Used by the wizard's
      * Direction-step chip taps (a collection-lean [CardTag] resolves onto the new taxonomy instead
@@ -134,7 +130,7 @@ object DeckIdentitySeedTags {
      *
      * The 10 pre-unification entries (REANIMATOR/SELF_MILL/ARISTOCRATS/TOKENS/STAX/LIFEGAIN/
      * TRIBAL/ENCHANTRESS/MILL/BLINK) keep their EXACT original single-tag mapping (a coarse
-     * [CardTag.GRAVEYARD] for the graveyard-family themes) -- `BuildDeckFromTemplateUseCaseTest`'s
+     * [CardTag.GRAVEYARD] for the graveyard-family themes) -- `the deleted Motor A test suite`'s
      * "a GRAVEYARD-hint deck's persisted archetype pin folds the same GRAVEYARD seed tag" test
      * depends on this exact tag surviving; a more "precise" per-theme tag (e.g. a dedicated
      * `reanimator` STRATEGY tag) is a real future improvement but is deliberately NOT made in this

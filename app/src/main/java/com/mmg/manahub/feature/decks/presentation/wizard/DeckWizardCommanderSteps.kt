@@ -112,7 +112,7 @@ import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.SectionQueryContext
 import com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
-import com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.RecommendWizardStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.StrategyRecommendation
 import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
 import com.mmg.manahub.feature.decks.presentation.components.CardFlipPortrait
@@ -485,35 +485,10 @@ internal fun WizardCandidateTile(card: Card, isOwned: Boolean, onClick: () -> Un
     }
 }
 
-/** Deck Wizard 60-card wave (v6): orphaned by the deletion of the Casual-only "include outside your
- * collection" toggle field ([DeckWizardUiState] no longer carries it) and its two callers
- * (`ManualAddsStepContent` here, `CardsFlowDirectionContent` in the deleted
- * `DeckWizardDirectionIdentity.kt`) -- kept ONE more phase for reference rather than deleted
- * mid-rewrite; not called from anywhere any more. Delete alongside the rest of Phase 7's cleanup. */
-@Composable
-private fun OutsideCollectionToggleRow(checked: Boolean, onToggle: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    Surface(onClick = onToggle, shape = CardShape, color = mc.surface, modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(spacing.md).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.deck_wizard_include_outside_collection_title), style = ty.bodyMedium, color = mc.textPrimary)
-                Text(stringResource(R.string.deck_wizard_include_outside_collection_subtitle), style = ty.labelSmall, color = mc.textSecondary)
-            }
-            Switch(
-                checked = checked,
-                onCheckedChange = { onToggle() },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = mc.onAccent,
-                    checkedTrackColor = mc.primaryAccent,
-                    uncheckedThumbColor = mc.textDisabled,
-                    uncheckedTrackColor = mc.surfaceVariant,
-                ),
-            )
-        }
-    }
-}
+// Deck Wizard 60-card wave (v6, plan §5 Phase 7.1): `OutsideCollectionToggleRow` (the Casual-only
+// "include outside your collection" toggle row) deleted here -- orphaned since Phase 5.1 deleted
+// its backing field and both callers (`ManualAddsStepContent` here, `CardsFlowDirectionContent` in
+// the deleted `DeckWizardDirectionIdentity.kt`).
 
 // ── 2.2 — STRATEGY (Deck Wizard Commander v3 plan, Phase 4.2) ──────────────────
 
@@ -525,11 +500,11 @@ internal const val CUSTOM_STRATEGY_ID = "__custom__"
 /** Deck Wizard Commander v4 plan (W3, E3): the STRATEGY step's own split of
  * [DeckWizardUiState.strategyRecommendations] into "Recommended" (score-threshold + hard
  * cap of 5) and collapsed "Partial fit" (the rest of the format's catalog, collapsed by default) --
- * delegates entirely to [RecommendCommanderStrategiesUseCase.splitRecommended], the use case's own
+ * delegates entirely to [RecommendWizardStrategiesUseCase.splitRecommended], the use case's own
  * threshold/cap logic (never a UI-local `take(N)`). A plain (non-`@Composable`) function so it stays
  * unit-testable without a Compose UI test. */
 internal fun strategyRecommendedSplit(recommendations: List<StrategyRecommendation>): Pair<List<StrategyRecommendation>, List<StrategyRecommendation>> =
-    RecommendCommanderStrategiesUseCase().splitRecommended(recommendations)
+    RecommendWizardStrategiesUseCase().splitRecommended(recommendations)
 
 /**
  * Deck Wizard 60-card wave (v6), plan §5 Phase 5.3: the single-select strategy list (D4) --

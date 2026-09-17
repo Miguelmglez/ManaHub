@@ -78,8 +78,8 @@ data class RecommendationReason(val label: String)
  * 5. **Owned support** — the fraction of the entry's resolved skeleton's live (non-anti) role bands
  *    the [ownedCollection] can actually fill in [identity], via the SAME [ArchetypeRoleClassifier]
  *    every candidate profile in [com.mmg.manahub.feature.decks.domain.template
- *    .BuildCommanderDeckUseCase] is built from — this file adds a small additive, PRIVATE
- *    aggregation (`ownedRoleCounts`) rather than exposing `BuildCommanderDeckUseCase`'s own
+ *    .BuildWizardDeckUseCase] is built from — this file adds a small additive, PRIVATE
+ *    aggregation (`ownedRoleCounts`) rather than exposing `BuildWizardDeckUseCase`'s own
  *    `CandidateProfile`/pool-construction publicly; that class's candidate pool is Commander-slot
  *    scoring machinery (pip feasibility, curve buckets, community prior) this use case has no need
  *    for, so promoting the whole thing would be a much larger, unrelated surface change for a
@@ -307,7 +307,7 @@ class RecommendWizardStrategiesUseCase {
      * 1. **[ABSOLUTE_MIN_SCORE]** — excludes candidates whose score is pure generic noise (no
      *    commander-specific axis/role/tag/EDHREC/owned-coverage signal at all, only
      *    [colorAffinityScore]'s color-pair prior). Calibrated from the real corpus, not guessed:
-     *    over the 7 fixture commanders in `RecommendCommanderStrategiesUseCaseTest`, a commander
+     *    over the 7 fixture commanders in `RecommendWizardStrategiesUseCaseTest`, a commander
      *    with literally zero non-color signal (Urza with no owned collection, no `card_strategy_tags`,
      *    no EDHREC data) tops out at 0.9 (`COLOR_WEIGHT * colorAffinityScore` alone) — every fixture
      *    with ANY real signal clears 1.0 by a wide margin (Omnath's weakest real match is 1.5). This
@@ -404,7 +404,7 @@ class RecommendWizardStrategiesUseCase {
     /** Owned, identity-legal, non-land, non-commander pool -> per-[RoleKey] classified count.
      * Computed ONCE per [invoke] call and reused across every catalog entry's [ownedCoverageScore]
      * (mirrors the "compute the candidate pool once" discipline
-     * [com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase] uses for its own
+     * [com.mmg.manahub.feature.decks.domain.template.BuildWizardDeckUseCase] uses for its own
      * candidate pool, without depending on that class's private types). */
     private fun ownedRoleCounts(
         ownedCollection: List<OwnedCard>,
@@ -551,11 +551,6 @@ class RecommendWizardStrategiesUseCase {
         const val RELATIVE_SPREAD_FRACTION = 0.2
     }
 }
-
-/** Deck Wizard 60-card wave (v6), plan §5 Phase 2.1: kept so every pre-v6 call site/test that names
- * `RecommendCommanderStrategiesUseCase` (constructor calls included) compiles unchanged — removed
- * in Phase 7. */
-typealias RecommendCommanderStrategiesUseCase = RecommendWizardStrategiesUseCase
 
 private fun List<String>.toManaColorSet(): Set<ManaColor> =
     mapNotNull { symbol -> ManaColor.entries.firstOrNull { it.symbol == symbol } }.toSet()

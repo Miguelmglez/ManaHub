@@ -33,13 +33,13 @@ import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.decks.domain.template.CommanderBuildStage
+import com.mmg.manahub.feature.decks.domain.template.WizardBuildStage
 import com.mmg.manahub.feature.decks.presentation.components.label
 
 // Deck Wizard 60-card wave (v6), plan §5 Phase 5.1: this file's own `Result` section
 // (`ResultContent`/`ResultSourceBadge`/`GapWarningRow`/`ReportChip`/`WizardOwnedCardRow`/
 // `WizardCommunitySuggestionRow`) and the `BuildStage.label()` extension were DELETED --
-// `WizardPhase.RESULT` no longer exists (S13: every format opens Deck Studio directly after
+// `the deleted RESULT phase` no longer exists (S13: every format opens Deck Studio directly after
 // persist) and the Casual-only `BuildStage`/`completedStages` progress pair it displayed went
 // with the Casual DIRECTION/IDENTITY/MANUAL_ADDS screens (S1's UI unification). Only
 // [GeneratingContent] (shared by every anchor) survives in this file.
@@ -133,15 +133,15 @@ internal fun GeneratingContent(
 }
 
 @Composable
-private fun CommanderBuildStage.label(): String = stringResource(
+private fun WizardBuildStage.label(): String = stringResource(
     when (this) {
-        CommanderBuildStage.RESOLVING_PLAN -> R.string.deck_wizard_commander_stage_resolving_plan
-        CommanderBuildStage.PLACING_MANUAL_ADDS -> R.string.deck_wizard_commander_stage_placing_manual_adds
-        CommanderBuildStage.PLACING_CARDS -> R.string.deck_wizard_commander_stage_placing_cards
-        CommanderBuildStage.FILLING_LANDS -> R.string.deck_wizard_stage_filling_lands
-        CommanderBuildStage.VERIFYING_AND_REFINING -> R.string.deck_wizard_commander_stage_verifying
-        CommanderBuildStage.WRITING_DECK -> R.string.deck_wizard_commander_stage_writing_deck
-        CommanderBuildStage.DONE -> R.string.deck_wizard_stage_done
+        WizardBuildStage.RESOLVING_PLAN -> R.string.deck_wizard_commander_stage_resolving_plan
+        WizardBuildStage.PLACING_MANUAL_ADDS -> R.string.deck_wizard_commander_stage_placing_manual_adds
+        WizardBuildStage.PLACING_CARDS -> R.string.deck_wizard_commander_stage_placing_cards
+        WizardBuildStage.FILLING_LANDS -> R.string.deck_wizard_stage_filling_lands
+        WizardBuildStage.VERIFYING_AND_REFINING -> R.string.deck_wizard_commander_stage_verifying
+        WizardBuildStage.WRITING_DECK -> R.string.deck_wizard_commander_stage_writing_deck
+        WizardBuildStage.DONE -> R.string.deck_wizard_stage_done
     }
 )
 

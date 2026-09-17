@@ -35,19 +35,19 @@ private object TestCrashReporter : CrashReporter {
 }
 
 /**
- * Deck Wizard Commander v3 plan, Phase 2 gate: [BuildCommanderDeckUseCase] over the committed
+ * Deck Wizard Commander v3 plan, Phase 2 gate: [BuildWizardDeckUseCase] over the committed
  * [MockCollectionRich]/[MockCollectionThin] fixtures (Phase 0.3) — no gitignored real-collection
  * data needed, so this suite runs everywhere `commonTest` runs.
  */
-class BuildCommanderDeckUseCaseTest {
+class BuildWizardDeckUseCaseTest {
 
-    private fun newUseCase(): BuildCommanderDeckUseCase {
+    private fun newUseCase(): BuildWizardDeckUseCase {
         val pipeline = DeckAnalysisPipeline(
             EvaluateDeckUseCase(DeckScorer(RoleClassifier(), NeutralPowerResolver), ProgressionEventBus()),
             InferDeckIdentityUseCase(),
             TestCrashReporter,
         )
-        return BuildCommanderDeckUseCase(pipeline, TestCrashReporter)
+        return BuildWizardDeckUseCase(pipeline, TestCrashReporter)
     }
 
     private fun ownedFrom(vararg pools: List<com.mmg.manahub.feature.decks.domain.engine.analysisv3.MockCollectionCard>): List<OwnedCard> =
@@ -156,7 +156,7 @@ class BuildCommanderDeckUseCaseTest {
         val deckB = build("neartie-deck-B")
         assertTrue(
             nonLandIds(deckA) != nonLandIds(deckB),
-            "two DIFFERENT deckIds over near-tied (not exactly tied) candidates must diverge -- this is exactly what NEAR_TIE_BAND (${BuildCommanderDeckUseCase.NEAR_TIE_BAND}) protects; regressing to an exact-float tie-break always places the highest-confidence fillers first regardless of deckId",
+            "two DIFFERENT deckIds over near-tied (not exactly tied) candidates must diverge -- this is exactly what NEAR_TIE_BAND (${BuildWizardDeckUseCase.NEAR_TIE_BAND}) protects; regressing to an exact-float tie-break always places the highest-confidence fillers first regardless of deckId",
         )
     }
 
@@ -510,7 +510,7 @@ class BuildCommanderDeckUseCaseTest {
      * hand must still reach a full 100-card deck with a correct, non-degenerate basic-land spread,
      * and never report a `ColorSourceShortage`/`UnfixedSplash` for an OWNERSHIP reason.
      *
-     * [BuildCommanderDeckUseCase] is pure `commonMain` with NO `CardRepository` (D7/R5 -- see this
+     * [BuildWizardDeckUseCase] is pure `commonMain` with NO `CardRepository` (D7/R5 -- see this
      * file's own header comment) -- it cannot itself fetch a real [Card] the collection has never
      * seen. The production guarantee that a real basic-land [Card] object always exists in
      * `ownedCollection` by the time this use case runs is [com.mmg.manahub.feature.decks

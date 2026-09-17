@@ -29,7 +29,7 @@ import kotlin.test.assertTrue
  * corpus fixture commanders (no gitignored real-collection data needed).
  *
  * Deck Wizard 60-card wave (v6), plan §5 Phase 2.1: renamed from
- * `RecommendCommanderStrategiesUseCaseTest`; every call site now goes through the
+ * `RecommendWizardStrategiesUseCaseTest`; every call site now goes through the
  * [BuildAnchor]-based `invoke` overload (`BuildAnchor.Commander(commander)`, identity derived
  * internally from `commander.colorIdentity` — every one of these calls already passed exactly
  * that as its own `identity` argument, so this is a mechanical, behavior-preserving rewrite, not a

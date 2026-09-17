@@ -29,21 +29,21 @@ private object FinalizeTestCrashReporter : CrashReporter {
 }
 
 /**
- * W7 Task 0 (7.0) — [BuildCommanderDeckUseCase.buildWithGroups]/[BuildCommanderDeckUseCase.finalize]
- * over the SAME genuine-scarcity scenario [BuildCommanderDeckUseCaseTest] already uses for
+ * W7 Task 0 (7.0) — [BuildWizardDeckUseCase.buildWithGroups]/[BuildWizardDeckUseCase.finalize]
+ * over the SAME genuine-scarcity scenario [BuildWizardDeckUseCaseTest] already uses for
  * ambiguity coverage (55 off-plan manual adds crowd two competing roles below their combined
  * ideal) — reused here rather than re-derived, so this suite exercises the real ambiguity path,
  * not a hand-picked toy case.
  */
-class BuildCommanderDeckUseCaseFinalizeTest {
+class BuildWizardDeckUseCaseFinalizeTest {
 
-    private fun newUseCase(): BuildCommanderDeckUseCase {
+    private fun newUseCase(): BuildWizardDeckUseCase {
         val pipeline = DeckAnalysisPipeline(
             EvaluateDeckUseCase(DeckScorer(RoleClassifier(), NeutralPowerResolver), ProgressionEventBus()),
             InferDeckIdentityUseCase(),
             FinalizeTestCrashReporter,
         )
-        return BuildCommanderDeckUseCase(pipeline, FinalizeTestCrashReporter)
+        return BuildWizardDeckUseCase(pipeline, FinalizeTestCrashReporter)
     }
 
     private fun roleTagFor(key: String): CardTag = CardTag(key, TagCategory.ROLE)

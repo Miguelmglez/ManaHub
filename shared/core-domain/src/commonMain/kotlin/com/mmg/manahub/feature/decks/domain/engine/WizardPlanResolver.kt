@@ -85,11 +85,6 @@ data class WizardPlan(
     val internalTribe: String? = null,
 )
 
-/** Deck Wizard 60-card wave (v6), Phase 1.2: kept so every pre-v6 call site/test that names
- * `CommanderPlan` (the persisted-and-tested type from Phases 1-5 of the Commander campaign)
- * compiles unchanged — removed in Phase 7 once every reference is migrated to [WizardPlan]. */
-typealias CommanderPlan = WizardPlan
-
 object WizardPlanResolver {
 
     /**
@@ -170,7 +165,7 @@ object WizardPlanResolver {
 
         // F18 (W6b): a Custom pick has no persisted tribe (pin.tribe stays null, per F18's own
         // KDoc above), but its INTERNAL axis target may still credit the commander's own tribe —
-        // same TribeDeriver.derivedLordTribe RecommendCommanderStrategiesUseCase already uses for
+        // same TribeDeriver.derivedLordTribe RecommendWizardStrategiesUseCase already uses for
         // its Tribal recommendation, so both call sites resolve the SAME tribe for the SAME
         // commander. A Curated pick's tribe already comes from pin.tribe; this is Custom-only.
         val internalTribe = pin.tribe ?: when (pick) {
@@ -276,7 +271,7 @@ object WizardPlanResolver {
      * `dominantTribeAxis` derivation exactly (`TRIBE_AXIS_PREFIX + key.removePrefix(TRIBE_PREFIX)`).
      *
      * Phase 4 (Deck Wizard Commander v3): promoted from `private` to `internal` — module-visible so
-     * [com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase] can derive
+     * [com.mmg.manahub.feature.decks.domain.usecase.RecommendWizardStrategiesUseCase] can derive
      * the SAME tribe axis key for a curated Tribal pick's scoring, without a second implementation. */
     internal fun tribeAxisKey(tribe: String): AxisKey = "TRIBE:${tribe.removePrefix(TribeDeriver.TRIBE_PREFIX)}"
 
@@ -294,7 +289,7 @@ object WizardPlanResolver {
      * this table only widens [WizardPlan.targetAxes] beyond those two sources.
      *
      * Phase 4 (Deck Wizard Commander v3): promoted from `private` to `internal` — module-visible so
-     * [com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase] can score a
+     * [com.mmg.manahub.feature.decks.domain.usecase.RecommendWizardStrategiesUseCase] can score a
      * catalog entry's theme-axis alignment against the commander's own axis profile without a second
      * hand-written copy of this table (per that use case's own KDoc — see its "signal (a)" note).
      */

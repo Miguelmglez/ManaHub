@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 /**
  * Deck Wizard & Engine Rework plan, Workstream 6 ("One land engine") — [LandTargetResolver] is the
  * single shared "how many lands should this deck have" computation now called by BOTH
- * `BuildDeckFromTemplateUseCase` (the wizard, at build time) and `DeckStudioViewModel`
+ * `the deleted Motor A wizard build use case` (the wizard, at build time) and `DeckStudioViewModel`
  * (`calculateLandDeltas`, Studio's basic-land suggestion). This suite pins down the behavioral
  * split it consolidates: Commander/other non-60-card formats use the resolved archetype skeleton's
  * own land ideal (falling back to the generic per-format default); 60-card constructed formats use

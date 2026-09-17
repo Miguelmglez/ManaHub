@@ -33,17 +33,17 @@ private object LandFillTestCrashReporter : CrashReporter {
  * nonland candidates), so [com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer]'s pip
  * intensity comes exclusively from the commander's own cost -- this isolates land-fill behaviour
  * from [PlacementScorer]'s placement loop, which is already covered by
- * [BuildCommanderDeckUseCaseTest]/`PlacementScorerTest`.
+ * [BuildWizardDeckUseCaseTest]/`PlacementScorerTest`.
  */
 class LandFillV2Test {
 
-    private fun newUseCase(): BuildCommanderDeckUseCase {
+    private fun newUseCase(): BuildWizardDeckUseCase {
         val pipeline = DeckAnalysisPipeline(
             EvaluateDeckUseCase(DeckScorer(RoleClassifier(), NeutralPowerResolver), ProgressionEventBus()),
             InferDeckIdentityUseCase(),
             LandFillTestCrashReporter,
         )
-        return BuildCommanderDeckUseCase(pipeline, LandFillTestCrashReporter)
+        return BuildWizardDeckUseCase(pipeline, LandFillTestCrashReporter)
     }
 
     private fun basic(name: String, symbol: String, id: String): OwnedCard =

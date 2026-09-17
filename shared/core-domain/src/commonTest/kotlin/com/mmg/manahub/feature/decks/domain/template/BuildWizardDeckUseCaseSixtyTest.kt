@@ -36,7 +36,7 @@ private object SixtyTestCrashReporter : CrashReporter {
 /**
  * Deck Wizard 60-card wave (v6), plan §5 Phase 1.3 gate + test spec §6: [BuildWizardDeckUseCase]'s
  * new [BuildAnchor.Sixty] branch over [MockCollectionRich] + fixture14's own seeds — same fixtures
- * `BuildCommanderDeckUseCaseTest` already uses, so this suite runs everywhere `commonTest` runs.
+ * `BuildWizardDeckUseCaseTest` already uses, so this suite runs everywhere `commonTest` runs.
  *
  * Deviation from the original test spec's literal (c)/(f) shapes, documented once here rather than
  * per-test: `finalize`'s `resolutions` parameter stayed `Map<RoleKey, List<String>>` (unchanged from
@@ -194,7 +194,7 @@ class BuildWizardDeckUseCaseSixtyTest {
     @Test
     fun `(f) finalize can move two tentative copies onto the same alternative id`() = runTest {
         val useCase = newUseCase()
-        // A deliberately SCARCE scenario (mirrors BuildCommanderDeckUseCaseFinalizeTest
+        // A deliberately SCARCE scenario (mirrors BuildWizardDeckUseCaseFinalizeTest
         // .scarcityOwned's proven shape exactly, scaled to a 60-card nonLandTarget): 30 off-plan
         // manual adds crowd out most of the non-land slots, leaving only a handful for 30
         // same-role removal_spot fillers -- genuine multi-way ties over too few remaining slots,

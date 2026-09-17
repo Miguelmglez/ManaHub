@@ -44,6 +44,20 @@ import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
  * .analysisv3.MockCollectionCard], …) — callers map their own type into this one. */
 data class OwnedCard(val card: Card, val quantity: Int)
 
+/**
+ * One manually-added card (D7/1.2): the ONLY way an unowned card can enter a build (R5 — no
+ * Scryfall backstop). Always kept by the placement engine, even off-plan.
+ *
+ * @property isOwned `false` for a card added via the Advanced Search "All cards" tab that the user
+ *           does not own — persisted honestly (see [com.mmg.manahub.core.model.DeckCardSource],
+ *           though provenance itself is `USER` regardless of ownership — D13).
+ * @property quantity Deck Wizard 60-card wave (v6, plan §5 Phase 1.3): appended, defaulted to 1 so
+ *           every pre-v6 call site compiles unchanged (Commander seeds are always exactly 1 copy).
+ *           [BuildWizardDeckUseCase] clamps this to [com.mmg.manahub.feature.decks.domain.engine
+ *           .CopyPolicy.maxSeedCopies] (legality only, never owned-clamped — S3) before placing it.
+ */
+data class ManualAdd(val card: Card, val isOwned: Boolean, val quantity: Int = 1)
+
 /** [BuildWizardDeckUseCase]'s terminal result before persistence — see [WizardBuildResult] for
  * the shape this class produces; this wrapper adds the resolved [plan] and [pin] so a caller (the
  * write path, a test) does not need to re-resolve them. */
@@ -129,15 +143,6 @@ data class WizardDraftBuild(
     val fallbackOffPlanIds: List<String> = emptyList(),
 )
 
-/** Deck Wizard 60-card wave (v6), plan §5 Phase 1.3: kept so every pre-v6 call site/test that
- * names `CommanderDraftBuild` compiles unchanged — removed in Phase 7. */
-typealias CommanderDraftBuild = WizardDraftBuild
-
-/** Deck Wizard 60-card wave (v6), plan §5 Phase 1.3: kept so every pre-v6 call site/test that
- * names `BuildCommanderDeckUseCase` (constructor calls included -- a typealias supports those too)
- * compiles unchanged — removed in Phase 7. */
-typealias BuildCommanderDeckUseCase = BuildWizardDeckUseCase
-
 class BuildWizardDeckUseCase(
     private val deckAnalysisPipeline: DeckAnalysisPipeline,
     private val crashReporter: CrashReporter,
@@ -175,7 +180,7 @@ class BuildWizardDeckUseCase(
         manualAdds: List<ManualAdd> = emptyList(),
         fillLands: Boolean = true,
         includeNonBasicLands: Boolean = false,
-        onStage: (CommanderBuildStage) -> Unit = {},
+        onStage: (WizardBuildStage) -> Unit = {},
         deckId: String = "",
         preferenceStore: WizardPreferenceStore? = null,
     ): WizardBuildOutcome {
@@ -212,7 +217,7 @@ class BuildWizardDeckUseCase(
         ownedCollection: List<OwnedCard>,
         manualAdds: List<ManualAdd> = emptyList(),
         includeNonBasicLands: Boolean = false,
-        onStage: (CommanderBuildStage) -> Unit = {},
+        onStage: (WizardBuildStage) -> Unit = {},
         deckId: String = "",
         preferenceStore: WizardPreferenceStore? = null,
     ): WizardDraftBuild = buildWithGroups(
@@ -252,7 +257,7 @@ class BuildWizardDeckUseCase(
         ownedCollection: List<OwnedCard>,
         manualAdds: List<ManualAdd> = emptyList(),
         includeNonBasicLands: Boolean = false,
-        onStage: (CommanderBuildStage) -> Unit = {},
+        onStage: (WizardBuildStage) -> Unit = {},
         deckId: String = "",
         preferenceStore: WizardPreferenceStore? = null,
     ): WizardDraftBuild {
@@ -268,7 +273,7 @@ class BuildWizardDeckUseCase(
             ?: error("BuildWizardDeckUseCase requires a format with an archetype skeleton, got $format")
         val commander = anchor.commanderOrNull
 
-        onStage(CommanderBuildStage.RESOLVING_PLAN)
+        onStage(WizardBuildStage.RESOLVING_PLAN)
         val plan = WizardPlanResolver.resolve(format, anchor, strategyPick)
         val pin = when (strategyPick) {
             is StrategyPick.Curated -> strategyPick.strategy.toPin(strategyPick.tribe)
@@ -353,7 +358,7 @@ class BuildWizardDeckUseCase(
 
         // ── Seed placement state with manual non-land adds (placed FIRST, D7/R5 — never dropped
         //    even off-plan; their contribution still counts toward remaining gain for the loop) ──
-        onStage(CommanderBuildStage.PLACING_MANUAL_ADDS)
+        onStage(WizardBuildStage.PLACING_MANUAL_ADDS)
         var state = PlacementScorer.PlacementState()
         // v6 (S2): a LinkedHashMap keyed by scryfallId -- ONE entry per card, `quantity` = copies,
         // preserving first-placement order (manual adds first, then the main loop/fallback tiers)
@@ -383,7 +388,7 @@ class BuildWizardDeckUseCase(
         }
 
         // ── The loop (2.3, S2/S5) ───────────────────────────────────────────────────────────────
-        onStage(CommanderBuildStage.PLACING_CARDS)
+        onStage(WizardBuildStage.PLACING_CARDS)
         val preferredIds = preferenceStore?.preferredCardIds()?.toSet() ?: emptySet()
         val remainingCandidates = candidateCards.toMutableList()
         var iterations = 0
@@ -632,7 +637,7 @@ class BuildWizardDeckUseCase(
         draft: WizardDraftBuild,
         resolutions: Map<RoleKey, List<String>> = emptyMap(),
         fillLands: Boolean = true,
-        onStage: (CommanderBuildStage) -> Unit = {},
+        onStage: (WizardBuildStage) -> Unit = {},
     ): WizardBuildOutcome {
         val groupsByRole = draft.ambiguityGroups.associateBy { it.sectionId }
         val placedNonLandMap = LinkedHashMap<String, DeckEntry>()
@@ -697,7 +702,7 @@ class BuildWizardDeckUseCase(
         val placedNonLand = placedNonLandMap.values.toList()
 
         // ── Land fill v2 (2.4) ──────────────────────────────────────────────────────────────────
-        onStage(CommanderBuildStage.FILLING_LANDS)
+        onStage(WizardBuildStage.FILLING_LANDS)
         val landEntries = mutableListOf<DeckEntry>()
         landEntries += draft.manualLand
         if (fillLands && draft.remainingLandSlots > 0) {
@@ -721,7 +726,7 @@ class BuildWizardDeckUseCase(
         val fullMainboard = listOfNotNull(commanderEntry) + placedNonLand + landEntries
 
         // ── Verify + refine (2.5) ───────────────────────────────────────────────────────────────
-        onStage(CommanderBuildStage.VERIFYING_AND_REFINING)
+        onStage(WizardBuildStage.VERIFYING_AND_REFINING)
         var health = analyze(fullMainboard, draft.format, draft.commander, draft.pin)
         var analysis = health?.analysis
         if (analysis == null || hasBlocker(analysis)) {
@@ -797,7 +802,7 @@ class BuildWizardDeckUseCase(
             fallbackStandaloneIds = finalFallbackStandaloneIds,
             fallbackOffPlanIds = finalFallbackOffPlanIds,
         )
-        onStage(CommanderBuildStage.DONE)
+        onStage(WizardBuildStage.DONE)
         return WizardBuildOutcome(result, draft.plan, draft.pin)
     }
 

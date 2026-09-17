@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 /**
  * Deck Wizard Commander v3 plan, Phase 2.2 gate: [PlacementScorer]'s five documented behaviors --
  * role plateau, anti-role hard filter, axis producer-before-payoff ordering, curve deficit, and the
- * D8 filler floor. Uses a minimal hand-built [CommanderPlan] rather than a real
+ * D8 filler floor. Uses a minimal hand-built [WizardPlan] rather than a real
  * [WizardPlanResolver.resolve] call so each behavior is isolated from skeleton-resolution noise.
  * Deck Wizard 60-card wave (v6), plan §5 Phase 1.4: also covers [PlacementScorer.marginalGain]'s
  * `copyIndex` consistency-credit behavior (S5).
@@ -24,7 +24,7 @@ class PlacementScorerTest {
         roleTargets: Map<RoleKey, RoleTarget>,
         antiRoles: Set<RoleKey> = emptySet(),
         targetAxes: Set<AxisKey> = emptySet(),
-    ): CommanderPlan {
+    ): WizardPlan {
         val skeleton = ArchetypeSkeletonResolver.resolveWithColor(
             format = ArchetypeFormat.COMMANDER,
             archetype = null,
@@ -37,7 +37,7 @@ class PlacementScorerTest {
             roleTargets = skeleton.roleTargets + roleTargets,
             antiRoles = skeleton.antiRoles + antiRoles,
         )
-        return CommanderPlan(
+        return WizardPlan(
             skeleton = patchedSkeleton,
             targetAxes = targetAxes,
             curveTargets = CurveTargets.forSkeleton(patchedSkeleton, nonLandCount = 60),

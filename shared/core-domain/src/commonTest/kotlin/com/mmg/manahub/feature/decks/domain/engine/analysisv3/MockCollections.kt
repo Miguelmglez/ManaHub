@@ -13,7 +13,7 @@ import com.mmg.manahub.feature.decks.domain.engine.card
  * `testdata/wizard-harness/` collection export.
  *
  * Both expose a plain [MockCollectionCard] list ("the card pool + quantities") — no engine types
- * beyond [Card]/[DeckEntry], so a future `BuildCommanderDeckUseCase` test can feed either straight
+ * beyond [Card]/[DeckEntry], so a future `BuildWizardDeckUseCase` test can feed either straight
  * into a candidate pool without any adaptation layer.
  */
 data class MockCollectionCard(val card: Card, val quantity: Int)

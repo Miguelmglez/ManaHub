@@ -32,7 +32,7 @@ import kotlin.test.assertTrue
 //  Deck Wizard Commander v3 plan, Phase 7.1 — harness v2, MockCollectionRich/Thin segments.
 //
 //  Lives in shared/core-domain's commonTest (not app/src/test) because MockCollectionRich/Thin
-//  already do (BuildCommanderDeckUseCaseTest/MockCollectionRichReconstructionTest precedent) --
+//  already do (BuildWizardDeckUseCaseTest/MockCollectionRichReconstructionTest precedent) --
 //  KMP commonTest is not exported cross-module to :app's test source set (no testFixtures wiring
 //  exists in this project, feedback_commonmain_repo_cannot_take_app_module_room_dao's sibling
 //  constraint), so app/src/test's WizardCommanderHarnessV2Test (the real-collection segment) and
@@ -53,7 +53,7 @@ private fun newPipeline(): DeckAnalysisPipeline = DeckAnalysisPipeline(
     MockHarnessCrashReporter,
 )
 
-private fun newUseCase(): BuildCommanderDeckUseCase = BuildCommanderDeckUseCase(newPipeline(), MockHarnessCrashReporter)
+private fun newUseCase(): BuildWizardDeckUseCase = BuildWizardDeckUseCase(newPipeline(), MockHarnessCrashReporter)
 
 private fun List<String>.toManaColors(): Set<ManaColor> =
     mapNotNull { symbol -> ManaColor.entries.firstOrNull { it.symbol == symbol } }.toSet()
@@ -288,7 +288,7 @@ class WizardHarnessMockCollectionThinSegmentTest {
         // never place) may now reach the deck as a genuine last-resort fallback -- proxied here the
         // same way the D8 floor itself reads it (no role confidence, no axis produce/consume edge).
         // F18 (W6b): a Custom build's floor includes the commander's OWN derived tribe axis
-        // (TribeDeriver.derivedLordTribe, same as BuildCommanderDeckUseCase's own dominantTribeAxis
+        // (TribeDeriver.derivedLordTribe, same as BuildWizardDeckUseCase's own dominantTribeAxis
         // for this StrategyPick) -- this mock's Edgar Markov commander legitimately credits its
         // Vampire subtype cards via TRIBE:vampire now, so the mirror check below must apply the
         // SAME substitution or it misreads a real, floor-clearing tribal placement as filler.

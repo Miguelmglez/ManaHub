@@ -49,7 +49,7 @@ import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.template.AmbiguityGroup
-import com.mmg.manahub.feature.decks.domain.template.CommanderDraftBuild
+import com.mmg.manahub.feature.decks.domain.template.WizardDraftBuild
 import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
 
 /** Deck Wizard v4, W7 Task B (R10) — capped alternatives shown per ambiguous section (E4). Verified
@@ -79,12 +79,12 @@ private data class ChoiceDetailSelection(val role: RoleKey?, val cardId: String)
 
 /**
  * The Choice screen (plan 7.1-7.4; quantity-aware since Deck Wizard 60-card wave v6, plan §5 Phase
- * 5.4, S6): one section per [CommanderDraftBuild.ambiguityGroups], showing the engine's own
+ * 5.4, S6): one section per [WizardDraftBuild.ambiguityGroups], showing the engine's own
  * tentative picks (pre-selected, always visible — never hidden by the [Card]-count cap below) plus
  * its top alternatives ordered by marginal gain (already the order
  * [BuildWizardDeckUseCase.buildWithGroups] hands back — see [AmbiguityGroup.candidateIds]'s own
  * KDoc), capped at [CHOICE_ALTERNATIVES_CAP] for display only. Zero scoring/classification logic of
- * this file's own — every candidate id resolves through [CommanderDraftBuild.candidatesById].
+ * this file's own — every candidate id resolves through [WizardDraftBuild.candidatesById].
  *
  * Every row is a shared [CardRow] (S6): Commander renders a `selected` boolean toggle, a 60-card
  * anchor a +/- quantity stepper. Tapping a row's image opens an inline, read-only
@@ -206,7 +206,7 @@ internal fun ChoiceStepContent(
  * (the genuine last resort) after. Never interactive beyond opening a card's own detail: there is
  * nothing to choose here, only to see. */
 @Composable
-private fun FallbackFlagCard(draft: CommanderDraftBuild, onOpenDetail: (String) -> Unit) {
+private fun FallbackFlagCard(draft: WizardDraftBuild, onOpenDetail: (String) -> Unit) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
@@ -291,7 +291,7 @@ private fun FallbackFlagCardList(cards: List<Pair<String, Card>>, onOpenDetail: 
 @Composable
 private fun ChoiceSectionCard(
     group: AmbiguityGroup,
-    draft: CommanderDraftBuild,
+    draft: WizardDraftBuild,
     isCommanderFormat: Boolean,
     current: Map<String, Int>,
     tentative: Map<String, Int>,

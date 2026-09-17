@@ -51,10 +51,6 @@ data class ColorStrategyEntry(
             ?: themes.firstOrNull()?.displayName
             ?: "Balanced"
 
-    /** Resolves this entry into a pickable [StrategyProfile] (colors filled in by the caller, which
-     * knows the color combo this entry came from). */
-    fun toStrategyProfile(colors: Set<ManaColor>): StrategyProfile =
-        StrategyProfile(archetype = archetype, themes = themes, colors = colors)
 }
 
 object ColorStrategyAffinity {

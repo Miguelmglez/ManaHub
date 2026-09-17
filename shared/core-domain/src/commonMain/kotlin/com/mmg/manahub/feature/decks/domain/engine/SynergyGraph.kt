@@ -473,7 +473,7 @@ object SynergyGraph {
      * axes are deliberately excluded here BY DEFAULT (their ideal is a fixed constant independent
      * of format, see [TRIBE_PRODUCER_IDEAL]/[TRIBE_PAYOFF_IDEAL], not part of this per-format
      * table) -- pass [dominantTribeAxis] to add that ONE dynamic axis's ideal to the returned map
-     * (W6b: [com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase]'s placement
+     * (W6b: [com.mmg.manahub.feature.decks.domain.template.BuildWizardDeckUseCase]'s placement
      * loop needs it so [PlacementScorer.axisGain]'s `axisIdeals[axis]` lookup does not silently
      * miss the deck's own tribe axis, mirroring [build]'s own inline TRIBE-ideal computation
      * exactly so placement-time and grading-time never disagree on what that axis's ideal is).

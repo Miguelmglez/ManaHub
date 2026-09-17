@@ -1199,50 +1199,32 @@
     <string name="deck_wizard_colorless_chip">Colorless</string>
     <string name="deck_wizard_unsupported_format_toast">The wizard can\'t build this format yet.</string>
     <!-- Step 2 — Direction -->
-    <string name="deck_wizard_direction_title">Pick a direction</string>
-    <string name="deck_wizard_direction_subtitle">Start from your commander, your collection\'s strengths, or a few seed cards.</string>
     <string name="deck_wizard_commander_section_title">Commander</string>
     <string name="deck_wizard_commander_search_hint">Search for a commander…</string>
     <string name="deck_wizard_commander_required">Pick a commander to continue.</string>
     <string name="deck_wizard_change_commander">Change commander</string>
-    <string name="deck_wizard_direction_leans_title">Your collection leans…</string>
-    <string name="deck_wizard_direction_leans_empty">Add more cards to your collection to see suggested directions.</string>
-    <string name="deck_wizard_direction_chip_strategy">%1$s · %2$d</string>
-    <string name="deck_wizard_direction_chip_tribe">%1$d %2$s</string>
     <string name="deck_wizard_seed_picker_toggle">Add seed cards (optional)</string>
-    <string name="deck_wizard_suggested_strategies_title">Suggested strategies</string>
-    <string name="deck_wizard_suggested_strategies_hint">Add a seed card above to see strategy suggestions.</string>
-    <string name="deck_wizard_suggested_strategies_empty">None of your seeds line up with a known strategy yet — you can still continue without one.</string>
     <string name="deck_wizard_seed_coherence_warning">These seed cards don\'t share much in common — the build may end up unfocused. Consider trimming to cards with a clearer shared theme.</string>
     <string name="deck_wizard_zoom_card">Zoom %1$s</string>
     <!-- Flow A — Workstream 3.1 color selector (locked-by-seed colors + coherence hints) -->
-    <string name="deck_wizard_seed_colors_title">Colors</string>
-    <string name="deck_wizard_color_locked_by_seeds">%1$s, locked by a seed card</string>
     <string name="deck_wizard_misfit_hint_title">Better without:</string>
     <!-- Flow B — colors-first (Deck Engine Unification plan §5 Phase 3.3) -->
     <string name="deck_wizard_colors_flow_title">Pick your colors</string>
     <string name="deck_wizard_colors_flow_subtitle">We\'ll show the strategies that work best in these colors.</string>
     <string name="deck_wizard_colors_flow_pick_hint">Pick at least one color to see viable strategies.</string>
-    <string name="deck_wizard_colors_flow_no_matches">No known strategies fit this color combination yet — you can still continue without one.</string>
     <string name="deck_wizard_colors_required">Pick at least one color to continue.</string>
-    <string name="deck_wizard_viable_strategies_title">Viable strategies</string>
     <!-- Flow C — strategy-first (Deck Engine Unification plan §5 Phase 3.4) -->
     <string name="deck_wizard_strategy_required">Pick an archetype or theme to continue.</string>
     <string name="deck_wizard_strategy_flow_title">Pick a strategy</string>
     <string name="deck_wizard_strategy_flow_subtitle">Browse every archetype and theme, then we\'ll rank the colors that fit it best.</string>
     <string name="deck_wizard_strategy_search_hint">Search archetypes and themes…</string>
     <string name="deck_wizard_strategy_search_empty">No archetype or theme matches that search.</string>
-    <string name="deck_wizard_archetypes_title">Archetypes</string>
-    <string name="deck_wizard_themes_title">Themes</string>
     <string name="deck_wizard_color_combos_title">Best color combos for this strategy</string>
     <string name="deck_wizard_color_combos_empty">No curated color combo for this pick yet — you can still set colors on the next step.</string>
     <!-- Flow B/C shared — suggested seeds -->
     <string name="deck_wizard_suggested_seeds_title">Suggested seeds from your collection</string>
     <string name="deck_wizard_suggested_seeds_subtitle">Tap to include a card as a starting seed (optional).</string>
     <!-- Step 3 — Identity -->
-    <string name="deck_wizard_identity_title">Set your identity</string>
-    <string name="deck_wizard_identity_subtitle_commander">Colors are set by your commander.</string>
-    <string name="deck_wizard_identity_subtitle_casual">Pick the colors this deck should play.</string>
     <string name="deck_wizard_color_discipline_hint">3+ colors can hurt consistency unless your collection has strong fixing. Consider narrowing to 2.</string>
     <string name="deck_wizard_theme_picker_title">Theme (optional)</string>
     <string name="deck_wizard_color_fixed_by_commander">%1$s, fixed by commander</string>
@@ -1319,8 +1301,6 @@
     <string name="deck_wizard_commander_active_filters">%1$d active filter(s)</string>
     <string name="deck_wizard_commander_clear_filters">Clear filters</string>
     <string name="deck_wizard_commander_owned_badge">In your collection</string>
-    <string name="deck_wizard_include_outside_collection_title">Include cards outside your collection</string>
-    <string name="deck_wizard_include_outside_collection_subtitle">Search Scryfall too, not just what you own</string>
     <string name="deck_wizard_strategy_step_title">Pick a strategy</string>
     <string name="deck_wizard_strategy_step_subtitle">These are the game plans your commander supports best.</string>
     <!-- Deck Wizard Commander v3 plan (Phase 4.2) -->
@@ -1363,10 +1343,7 @@
     <string name="deck_wizard_review_title">Review &amp; generate</string>
     <string name="deck_wizard_review_commander_section">Commander</string>
     <string name="deck_wizard_review_format">Format</string>
-    <string name="deck_wizard_review_direction">Direction</string>
-    <string name="deck_wizard_review_direction_none">Not set</string>
     <string name="deck_wizard_review_colors">Colors</string>
-    <string name="deck_wizard_review_seeds">Seed cards</string>
     <!-- Deck Wizard Commander v3 plan (Phase 6, 6.2) -->
     <string name="deck_wizard_review_strategy_section">Strategy</string>
     <string name="deck_wizard_review_manual_adds_count">Manual adds (%1$d)</string>
@@ -1374,14 +1351,9 @@
     <string name="deck_wizard_review_your_cards">Your cards (%1$d)</string>
     <string name="deck_wizard_review_owned_copies_note">The wizard adds at most the copies you own of each card.</string>
     <string name="deck_wizard_commander_expectation_copy">Built only from your collection — any gaps are reported, never filled with weak cards.</string>
-    <string name="deck_wizard_fill_lands_title">Fill basic lands automatically</string>
-    <string name="deck_wizard_fill_lands_subtitle">Color-weighted from the final mana curve</string>
     <!-- Deck Wizard Commander v4 plan (W5.2, G10/R8) -->
     <string name="deck_wizard_include_nonbasic_lands_title">Include non-basic lands</string>
     <string name="deck_wizard_include_nonbasic_lands_subtitle">On: draws your owned dual/utility lands, balanced against basics. Off: basics only.</string>
-    <string name="deck_wizard_use_community_data_title">Also use community trends</string>
-    <string name="deck_wizard_use_community_data_subtitle">Prioritize your owned cards that are popular in similar decks</string>
-    <string name="deck_wizard_expectation_copy">This is a deeper build — we compare community-known decks against your collection, so it can take a little longer than the old builder.</string>
     <string name="deck_wizard_generate_cta">Generate deck</string>
     <!-- Generating -->
     <string name="deck_wizard_stage_validating">Checking your setup…</string>
@@ -1414,10 +1386,7 @@
     <string name="deck_wizard_gaps_title">Couldn\'t fill from your collection</string>
     <string name="deck_wizard_gap_row_with_colors">Missing %1$d %2$s in %3$s</string>
     <string name="deck_wizard_gap_row_no_colors">Missing %1$d %2$s</string>
-    <string name="deck_wizard_result_report_title">Category fill</string>
     <string name="deck_wizard_report_chip">%1$s %2$d/%3$d</string>
-    <string name="deck_wizard_result_from_collection">From your collection</string>
-    <string name="deck_wizard_result_community_picks">Community picks to look for</string>
     <string name="deck_wizard_suggested_copies">Suggested: %1$d copies</string>
     <string name="deck_wizard_source_community">Built from community data</string>
     <string name="deck_wizard_source_synthetic">Built from your deck archetype</string>
@@ -1446,8 +1415,6 @@
     <string name="deck_wizard_choice_fallback_title">Not enough on-plan cards in your collection</string>
     <string name="deck_wizard_choice_fallback_standalone_subtitle">These %1$d cards fill the gap — each is individually strong, just not part of your deck\'s plan.</string>
     <string name="deck_wizard_choice_fallback_offplan_subtitle">These %1$d cards fill the gap as a last resort — your collection had nothing better left.</string>
-    <string name="deck_wizard_name_suffix_deck">%1$s Deck</string>
-    <string name="deck_wizard_name_default">New %1$s Deck</string>
 
     <!-- Deck Wizard 60-card wave v6 P4: CardDetailSheet seed-selection mode (plan 4.2). -->
     <string name="deck_wizard_add_to_deck">Add to deck</string>

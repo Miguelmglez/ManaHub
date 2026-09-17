@@ -71,7 +71,7 @@ object BasicLandCalculator {
      * `'W'`) as full coloured demand, which is the exact F9 bug (Phyrexian pips are always payable
      * with 2 life, so [com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer] correctly
      * counts them as ZERO demand). Callers that already have a correctly-parsed pip map -- e.g.
-     * `BuildCommanderDeckUseCase` via [com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
+     * `BuildWizardDeckUseCase` via [com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
      * .pipDistribution] over the mainboard PLUS the commander's own [Card.manaCost] (D10: "commander
      * pips included") -- pass it here instead. [pipsByColor] keys are the same `"W"/"U"/"B"/"R"/"G"`
      * strings [calculate]'s own `colorWeights` map uses; missing keys default to 0. Existing

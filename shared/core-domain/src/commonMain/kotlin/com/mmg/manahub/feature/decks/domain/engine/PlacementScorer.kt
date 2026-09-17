@@ -122,13 +122,13 @@ object PlacementScorer {
     )
 
     /** [curveTargets] must already carry [CurveTargets.CurveBucketTarget.targetCount] (i.e. built
-     * with a real `nonLandCount`, unlike [CommanderPlan.curveTargets] itself -- see
-     * `BuildCommanderDeckUseCase`'s own note on why it re-derives this list with the resolved
+     * with a real `nonLandCount`, unlike [WizardPlan.curveTargets] itself -- see
+     * `BuildWizardDeckUseCase`'s own note on why it re-derives this list with the resolved
      * non-land target rather than trusting the plan's fraction-only list). */
     fun marginalGain(
         candidate: CandidateProfile,
         state: PlacementState,
-        plan: CommanderPlan,
+        plan: WizardPlan,
         curveTargets: List<CurveTargets.CurveBucketTarget>,
         axisIdeals: Map<AxisKey, SynergyGraph.AxisIdeal>,
         pipFactor: Float,
@@ -171,7 +171,7 @@ object PlacementScorer {
      * non-overflowing option exist THIS iteration) that a single-candidate score cannot carry on
      * its own -- the caller (the placement loop) hard-excludes an overflowing candidate whenever
      * this is true for it AND a non-overflowing alternative clears the D8 floor. */
-    fun causesRoleOverflow(candidate: CandidateProfile, plan: CommanderPlan, roleCounts: Map<RoleKey, Int>): Boolean =
+    fun causesRoleOverflow(candidate: CandidateProfile, plan: WizardPlan, roleCounts: Map<RoleKey, Int>): Boolean =
         candidate.roleConfidence.any { (role, confidence) ->
             confidence > 0f && role !in plan.skeleton.antiRoles &&
                 plan.skeleton.roleTargets[role]?.let { (roleCounts[role] ?: 0) >= it.max } == true
@@ -182,7 +182,7 @@ object PlacementScorer {
      * overflowing role is already the whole problem, a second one does not make placing the card
      * twice as bad). `(current - max + 1)` counts the copy THIS placement would itself add;
      * dividing by `max` keeps it on the same `[0,1]` scale [roleGain]'s own fraction uses. */
-    private fun overflowCost(candidate: CandidateProfile, plan: CommanderPlan, roleCounts: Map<RoleKey, Int>): Float {
+    private fun overflowCost(candidate: CandidateProfile, plan: WizardPlan, roleCounts: Map<RoleKey, Int>): Float {
         val costs = candidate.roleConfidence.mapNotNull { (role, confidence) ->
             if (confidence <= 0f || role in plan.skeleton.antiRoles) return@mapNotNull null
             val target = plan.skeleton.roleTargets[role] ?: return@mapNotNull null
@@ -236,7 +236,7 @@ object PlacementScorer {
      * [combineDiminishing] rather than summing (G11(c): a card in three under-ideal bands no longer
      * collects all three full gaps while occupying one slot).
      */
-    private fun roleGain(candidate: CandidateProfile, plan: CommanderPlan, roleCounts: Map<RoleKey, Int>): Float {
+    private fun roleGain(candidate: CandidateProfile, plan: WizardPlan, roleCounts: Map<RoleKey, Int>): Float {
         val contributions = candidate.roleConfidence.mapNotNull { (role, confidence) ->
             if (confidence <= 0f) return@mapNotNull null
             val target = plan.skeleton.roleTargets[role] ?: return@mapNotNull null
@@ -256,13 +256,13 @@ object PlacementScorer {
      * same normalisation rationale): mirrors [SynergyGraph]'s own `health = min(1,
      * producer/producerIdeal) * min(1, payoff/payoffIdeal)` multiplicative shape -- a payoff's gain
      * is scaled by how filled the SAME axis's producer side already is (`producerFillRatio`), so the
-     * loop cannot stack payoffs onto an axis with zero producers. Axes in [CommanderPlan.targetAxes]
+     * loop cannot stack payoffs onto an axis with zero producers. Axes in [WizardPlan.targetAxes]
      * count at full weight; any other axis the card happens to touch counts at half weight. Every
      * produce/consume edge the card touches combines via [combineDiminishing], never a raw sum.
      */
     private fun axisGain(
         candidate: CandidateProfile,
-        plan: CommanderPlan,
+        plan: WizardPlan,
         axisIdeals: Map<AxisKey, SynergyGraph.AxisIdeal>,
         producerCounts: Map<AxisKey, Int>,
         payoffCounts: Map<AxisKey, Int>,
@@ -353,7 +353,7 @@ object PlacementScorer {
         // No REAL land base exists yet during the non-land placement loop (plan §3: lands are
         // filled AFTER placement, D10). W6 Task 2 (G11d) feeds this an ESTIMATED manabase (an even
         // split of the deck's own land target across its identity colours) instead of the previous
-        // permanently-inert emptyMap()/0 -- see BuildCommanderDeckUseCase's own call site KDoc --
+        // permanently-inert emptyMap()/0 -- see BuildWizardDeckUseCase's own call site KDoc --
         // so the shortage term is live throughout the whole loop rather than always neutral. Still
         // skipped entirely (neutral 1f) when a caller genuinely has no land plan yet (totalLands<=0,
         // e.g. a test exercising this function in isolation).

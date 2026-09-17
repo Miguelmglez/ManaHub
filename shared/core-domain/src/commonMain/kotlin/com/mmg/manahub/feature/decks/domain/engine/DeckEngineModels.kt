@@ -121,29 +121,10 @@ enum class SeedStrategy(
     }
 }
 
-/**
- * Deck Engine Unification plan (D2): [SeedStrategy] is DORMANT on the wizard path (no new
- * consumer -- see [DeckIdentitySeedTags]'s class KDoc) but stays a convenient shorthand for test
- * fixtures (the harness's 9-strategy coverage matrix) that want "one of the 9 classic strategies"
- * without hand-building a [StrategyProfile]. Fixed allowlist mirroring the (now-deleted)
- * `DeckTemplateResolver.mapStrategyToArchetype` 1:1 exactly -- AGGRO/CONTROL/COMBO/MIDRANGE map onto
- * their identically-named [ArchetypeId]; TOKENS/GRAVEYARD/LIFEGAIN/TRIBAL map onto `null`
- * (unpinned -- Deck Analysis Engine v3 removed `ArchetypeId.GENERIC`) + a theme (never guess an
- * unmapped combination). `RAMP` moved to [PostureId] -- [StrategyProfile] does not model posture
- * (out of Phase 3a's scope), so this mechanically maps onto `ArchetypeId.MIDRANGE` (RAMP's own
- * default macro overlay per spec §2/§3), a documented compat substitution.
- */
-fun SeedStrategy.toStrategyProfile(): StrategyProfile = when (this) {
-    SeedStrategy.AGGRO -> StrategyProfile(archetype = ArchetypeId.AGGRO)
-    SeedStrategy.CONTROL -> StrategyProfile(archetype = ArchetypeId.CONTROL)
-    SeedStrategy.COMBO -> StrategyProfile(archetype = ArchetypeId.COMBO)
-    SeedStrategy.MIDRANGE -> StrategyProfile(archetype = ArchetypeId.MIDRANGE)
-    SeedStrategy.RAMP -> StrategyProfile(archetype = ArchetypeId.MIDRANGE)
-    SeedStrategy.TOKENS -> StrategyProfile(archetype = null, themes = listOf(ThemeId.TOKENS))
-    SeedStrategy.GRAVEYARD -> StrategyProfile(archetype = null, themes = listOf(ThemeId.REANIMATOR))
-    SeedStrategy.LIFEGAIN -> StrategyProfile(archetype = null, themes = listOf(ThemeId.LIFEGAIN))
-    SeedStrategy.TRIBAL -> StrategyProfile(archetype = null, themes = listOf(ThemeId.TRIBAL))
-}
+// Deck Wizard 60-card wave (v6, plan §5 Phase 7.1): SeedStrategy.toStrategyProfile() (and
+// StrategyProfile.kt itself) were deleted here -- their only consumers were the deleted Motor A
+// wizard path and the deleted HarnessMatrixRunner.kt spec matrix (SeedStrategy itself SURVIVES,
+// still used by InferDeckIdentityUseCase/ArchetypeModels/DeckScoreModel).
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Suggestion + deck entries

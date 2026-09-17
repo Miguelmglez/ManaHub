@@ -10,9 +10,11 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Deck Wizard Commander v3 plan, Phase 1.1/1.3 gate. Kept as-is (regression baseline, plan rule 0.3)
- * after the Deck Wizard 60-card wave (v6) renamed the object under test to [WizardPlanResolver] --
- * see `WizardPlanResolverTest` for the new [BuildAnchor]-based coverage.
+ * Deck Wizard Commander v3 plan, Phase 1.1/1.3 gate. Deck Wizard 60-card wave (v6, plan §5 Phase
+ * 7.1): renamed from `CommanderPlanResolverTest` (the object under test itself was renamed to
+ * [WizardPlanResolver] back in Phase 1.2) -- kept as-is otherwise (regression baseline, plan rule
+ * 0.3), still exercising the legacy 4-arg `resolve(format, commander, pick, identity)` delegate
+ * overload specifically; see `WizardPlanResolverTest` for the new [BuildAnchor]-based coverage.
  *
  * 1. [WizardPlanResolver]'s resolved skeleton must be `==` the skeleton
  *    [AnalysisEngine.evaluate] would resolve for the SAME (format, archetype, posture, themes,
@@ -28,7 +30,7 @@ import kotlin.test.assertTrue
  * 2. [CuratedStrategy.toPin] round-trips through persisted raw-string form back to [nearestFor]
  *    resolving the SAME catalog id, for every Commander-available entry (1.3).
  */
-class CommanderPlanResolverTest {
+class WizardPlanResolverLegacyDelegateTest {
 
     private val identities: List<Set<ManaColor>> = listOf(
         setOf(ManaColor.G), // mono

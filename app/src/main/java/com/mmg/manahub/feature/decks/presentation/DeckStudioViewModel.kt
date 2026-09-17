@@ -814,7 +814,7 @@ class DeckStudioViewModel(
      *
      * WS6 (One land engine, `docs/plans/deck-wizard-rework-plan.md`): the TOTAL land target now
      * comes from [LandTargetResolver] (via [resolveStudioLandTarget]) -- the SAME resolver
-     * [com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase] uses at build
+     * [the deleted Motor A wizard build use case] uses at build
      * time -- instead of [BasicLandCalculator]'s convenience overload that hardcodes
      * [DeckFormat.targetLandCount] (archetype-blind, `dynamicLandIdeal`-blind). [deckScorer] is
      * `null` at every existing test call site (a nullable-defaulted, appended-last constructor
@@ -883,7 +883,7 @@ class DeckStudioViewModel(
 
     /**
      * WS6 (One land engine): resolves the land target the SAME way
-     * [com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase] does at build
+     * [the deleted Motor A wizard build use case] does at build
      * time -- [LandTargetResolver.resolve] over a resolved [ArchetypeSkeletonResolver] skeleton (or
      * `null` for the GENERIC-with-no-themes case) plus a [DeckScorer.profile] snapshot of the
      * mainboard.

@@ -129,7 +129,7 @@ interface DeckRepository {
      * into the wizard VM (Phase 6): that is also when a cancelled build's "leave the draft
      * untouched" guarantee actually matters end-to-end, and hardening it then avoids touching
      * `androidMain`'s DAO twice. Callers on the Commander build path today (Phase 2's
-     * `BuildCommanderDeckUseCase`) are not yet wired into any real wizard flow (Phase 3-6), so this
+     * `BuildWizardDeckUseCase`) are not yet wired into any real wizard flow (Phase 3-6), so this
      * default is exercised only by this phase's own tests until then.
      *
      * @param slots (scryfallId, quantity, isSideboard, source) — the sideboard flag exists for API

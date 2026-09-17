@@ -10,7 +10,6 @@ import com.mmg.manahub.feature.decks.domain.engine.card
 import com.mmg.manahub.feature.decks.domain.engine.fixedPower
 import com.mmg.manahub.feature.decks.domain.usecase.AddOrigin
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
-import com.mmg.manahub.feature.decks.domain.usecase.CommunityAddSuggestion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -63,26 +62,8 @@ class SuggestionGroupingTest {
     }
 
     @Test
-    fun `groupCommunityAddSuggestions buckets Motor B suggestions by the same resolver`() {
-        val tokenCard = card(id = "tok-2", name = "Tok2", tags = listOf(CardTag.TOKENS))
-        val suggestion = CommunityAddSuggestion(
-            card = tokenCard,
-            inclusionPct = 0.5f,
-            synergy = 0.5f,
-            ownedInCollection = false,
-            fillsGapRoles = emptySet(),
-        )
-
-        val grouped = SuggestionGrouping.groupCommunityAddSuggestions(listOf(suggestion))
-
-        assertEquals(1, grouped.size)
-        assertEquals("tokens", grouped.first().first.id)
-    }
-
-    @Test
     fun `an empty input groups to an empty list, never a crash`() {
         assertTrue(SuggestionGrouping.groupDeckEntries(emptyList()).isEmpty())
         assertTrue(SuggestionGrouping.groupAddSuggestions(emptyList()).isEmpty())
-        assertTrue(SuggestionGrouping.groupCommunityAddSuggestions(emptyList()).isEmpty())
     }
 }

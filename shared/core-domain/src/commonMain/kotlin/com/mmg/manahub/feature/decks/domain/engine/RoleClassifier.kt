@@ -413,7 +413,7 @@ object TribeDeriver {
      * also fires on non-tribal phrasing, e.g. Urza's "for each artifact you control"); requiring
      * the subtype intersection filters that false-positive class out. `minOrNull()` is the
      * deterministic tie-break when more than one tribe qualifies (W6b: shared by
-     * [CommanderPlanResolver]'s Custom build path and [RecommendCommanderStrategiesUseCase] — the
+     * [CommanderPlanResolver]'s Custom build path and [RecommendWizardStrategiesUseCase] — the
      * SAME derivation, extracted here so neither call site can drift from the other).
      */
     fun derivedLordTribe(card: Card): String? =

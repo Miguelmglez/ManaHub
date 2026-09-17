@@ -83,7 +83,7 @@ import org.junit.Test
  * - Deck Analysis Category Sections rework (W0, D3/D5): the old Motor A add-pipeline / budget /
  *   cut-suggestion tests (Phase 2) were DELETED end-to-end here, along with
  *   `suggestCutsUseCase`/`suggestAddsFromCollectionUseCase` (`SuggestAddsFromCollectionUseCase`
- *   itself survives as a class -- it is still used by `BuildDeckFromTemplateUseCase`, the Deck
+ *   itself survives as a class -- it is still used by `the deleted Motor A wizard build use case`, the Deck
  *   Wizard's own build engine -- only `DeckDoctorOrchestrator`'s/`DeckStudioViewModel`'s USE of it
  *   is gone).
  * - [FirebaseCrashlytics] is always static-mocked because [logFailure] is called outside

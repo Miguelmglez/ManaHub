@@ -411,7 +411,7 @@ class DeckScorer(
         if (profile.colorIdentity.isEmpty()) {
             // Edge-case audit Fix 2: an EMPTY deck identity is ambiguous by format. For COMMANDER
             // and every 60-card constructed format (`DeckFormat.isSixtyCardConstructed`) it is a
-            // REAL, explicit "colorless required" constraint -- BuildDeckFromTemplateUseCase
+            // REAL, explicit "colorless required" constraint -- the deleted Motor A wizard build use case
             // .analyzeCollection's own D9 comment documents `colorIdentity.isEmpty()` as the
             // intentional Colorless wizard pick for exactly these formats, and this scorer must
             // gate the SAME way, never fall through to a universal pass (the old unconditional

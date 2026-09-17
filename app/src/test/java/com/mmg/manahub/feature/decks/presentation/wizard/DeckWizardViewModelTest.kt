@@ -36,9 +36,9 @@ import com.mmg.manahub.feature.decks.domain.engine.StrategyPin
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.WizardPreferenceStore
 import com.mmg.manahub.feature.decks.domain.template.AmbiguityGroup
-import com.mmg.manahub.feature.decks.domain.template.BuildCommanderDeckUseCase
+import com.mmg.manahub.feature.decks.domain.template.BuildWizardDeckUseCase
 import com.mmg.manahub.feature.decks.domain.template.CommanderBuildOutcome
-import com.mmg.manahub.feature.decks.domain.template.CommanderDraftBuild
+import com.mmg.manahub.feature.decks.domain.template.WizardDraftBuild
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
 import com.mmg.manahub.feature.decks.domain.template.OwnedCard
 import com.mmg.manahub.feature.decks.domain.template.WizardBuildResult
@@ -81,7 +81,7 @@ import org.junit.Test
  * Deck Builder v2 (`docs/plans/deck-builder-v2-plan.md` §3.4) -- [DeckWizardViewModel] phase
  * transitions, event emission, generation happy/failure paths, and cancellation cleanup.
  *
- * [BuildDeckFromTemplateUseCase] is mocked so the Flow<TemplateBuildProgress> sequence is fully
+ * [the deleted Motor A wizard build use case] is mocked so the Flow<TemplateBuildProgress> sequence is fully
  * controllable per test (mirrors [DeckStudioViewModelTest]'s split between real and mocked
  * use cases). [CollectionProfileUseCase] runs REAL (cheap, deterministic, avoids stubbing burden).
  */
@@ -109,11 +109,11 @@ class DeckWizardViewModelTest {
     private val deckAnalysisPipeline = mockk<DeckAnalysisPipeline>()
     // Deck Wizard Commander v3 plan, Phase 6 -- the Commander build path's own use case. A REAL
     // spy (not a full mock): a Commander-format `onGenerate()` test stubs the placement engine's
-    // own `invoke()` (its internals are BuildCommanderDeckUseCaseTest's job, not this VM test's),
+    // own `invoke()` (its internals are BuildWizardDeckUseCaseTest's job, not this VM test's),
     // but leaves `persist()` running for real so this file's write-path assertions
     // (replaceAllCardsWithSource/updateArchetypeOverride/etc.) still exercise real behavior against
     // the mocked deckRepository above.
-    private val buildCommanderDeckUseCase = spyk(BuildCommanderDeckUseCase(deckAnalysisPipeline, crashReporter))
+    private val buildCommanderDeckUseCase = spyk(BuildWizardDeckUseCase(deckAnalysisPipeline, crashReporter))
     // Deck Wizard v4, W0.2/W5.3 -- relaxed: no existing test exercises the basic-land pre-warm path
     // directly, and an unstubbed call is swallowed by guaranteeBasicsAvailable's own runCatching, so
     // this only needs to exist, never to be configured.
@@ -149,8 +149,8 @@ class DeckWizardViewModelTest {
             pin = StrategyPin(archetype = null, posture = null, themes = emptyList(), tribe = null),
         )
 
-    /** Deck Wizard v4, W7 Task B -- a minimal, relaxed [CommanderDraftBuild] fixture for stubbing
-     * [buildCommanderDeckUseCase]'s [BuildCommanderDeckUseCase.buildWithGroups] in a Commander-format
+    /** Deck Wizard v4, W7 Task B -- a minimal, relaxed [WizardDraftBuild] fixture for stubbing
+     * [buildCommanderDeckUseCase]'s [BuildWizardDeckUseCase.buildWithGroups] in a Commander-format
      * `onGenerate()` test. Every unspecified property reads back as an empty/relaxed default
      * (mockk's own contract) -- a test overrides only what it actually inspects: [ambiguityGroups]
      * (empty by default -- the zero-group path is what most existing tests exercise, matching the
@@ -172,8 +172,8 @@ class DeckWizardViewModelTest {
         candidateMaxCopies: Map<String, Int> = candidatesById.keys.associateWith { id ->
             if (tentativeByRole.values.any { id in it }) 0 else 1
         },
-    ): CommanderDraftBuild {
-        val draft = mockk<CommanderDraftBuild>(relaxed = true)
+    ): WizardDraftBuild {
+        val draft = mockk<WizardDraftBuild>(relaxed = true)
         every { draft.ambiguityGroups } returns ambiguityGroups
         every { draft.tentativeByRole } returns tentativeByRole
         every { draft.candidatesById } returns candidatesById
@@ -754,7 +754,7 @@ class DeckWizardViewModelTest {
         advanceUntilIdle()
         advanceCommanderToReview(vm)
 
-        // W7 Task D (plan 7.5): never lands on WizardPhase.RESULT -- fires OpenDeckStudio directly.
+        // W7 Task D (plan 7.5): never lands on the deleted RESULT phase -- fires OpenDeckStudio directly.
         vm.events.test {
             vm.onGenerate()
             advanceUntilIdle()
@@ -816,7 +816,7 @@ class DeckWizardViewModelTest {
         coEvery {
             buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
         } returns bigDraft
-        val draftSlot = slot<CommanderDraftBuild>()
+        val draftSlot = slot<WizardDraftBuild>()
         coEvery { buildCommanderDeckUseCase.finalize(capture(draftSlot), any(), any(), any()) } returns commanderOutcome()
         val vm = viewModel(mapOf("format" to "COMMANDER"))
         advanceUntilIdle()
@@ -1025,7 +1025,7 @@ class DeckWizardViewModelTest {
         vm.onChangeChoiceQuantity("removal_spot", "tent-1", -1)
         vm.onChangeChoiceQuantity("removal_spot", "alt-a", 1)
 
-        // W7 Task D (plan 7.5): never lands on WizardPhase.RESULT -- fires OpenDeckStudio directly.
+        // W7 Task D (plan 7.5): never lands on the deleted RESULT phase -- fires OpenDeckStudio directly.
         vm.events.test {
             vm.onFinishChoices()
             advanceUntilIdle()

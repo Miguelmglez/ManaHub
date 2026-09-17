@@ -55,7 +55,7 @@ class SuggestCutsUseCase(
     private val deckScorer: DeckScorer,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
     // Appended last (defaulted) so no existing positional-arg call site needs to change --
-    // mirrors BuildDeckFromTemplateUseCase's own "Motor B appended last" precedent.
+    // mirrors the deleted Motor A wizard build use case's own "Motor B appended last" precedent.
     private val manaBaseAnalyzer: ManaBaseAnalyzer = ManaBaseAnalyzer(),
 ) {
 

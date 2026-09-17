@@ -51,7 +51,7 @@ import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
  *     it is a genuine but narrow safety net, not dead code.
  *  6. [SuggestionCategory.OTHER].
  *
- * Reused by the v2 builder ([BuildDeckFromTemplateUseCase]) and, per the plan, intended for reuse
+ * Reused by the v2 builder ([the deleted Motor A wizard build use case]) and, per the plan, intended for reuse
  * later by Motor A/B grouping and Discoveries v2 (Phase 4/5, out of scope for this run) — the public
  * API therefore takes only a [Card] plus OPTIONAL aggregate/profile context, no ViewModel/UI coupling.
  */

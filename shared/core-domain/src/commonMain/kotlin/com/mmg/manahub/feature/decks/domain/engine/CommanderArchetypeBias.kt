@@ -60,7 +60,7 @@ object CommanderArchetypeBias {
      * must not depend on tag list order (`firstNotNullOfOrNull` did). A tie is broken by
      * [ArchetypeId.name] alphabetically, which is likewise independent of input order.
      *
-     * Deck Wizard 60-card wave (v6), plan §5 Phase 1.2: renamed from `commanderTagArchetype` — this
+     * Deck Wizard 60-card wave (v6), plan §5 Phase 1.2: renamed from `tagArchetype` — this
      * function has no commander-specific logic (it always took a plain tag list) and
      * [WizardPlanResolver]'s Sixty branch now calls it over a seed pool's tags the same way the
      * Commander branch calls it over one card's tags.
@@ -72,7 +72,4 @@ object CommanderArchetypeBias {
         val topCount = counts.values.max()
         return counts.filterValues { it == topCount }.keys.minByOrNull { it.name }
     }
-
-    @Deprecated("renamed to tagArchetype (v6, plan §5 Phase 1.2) -- no behavior change", ReplaceWith("tagArchetype(commanderTags)"))
-    fun commanderTagArchetype(commanderTags: List<CardTag>): ArchetypeId? = tagArchetype(commanderTags)
 }

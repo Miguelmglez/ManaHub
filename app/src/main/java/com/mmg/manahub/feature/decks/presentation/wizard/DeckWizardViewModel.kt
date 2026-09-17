@@ -53,13 +53,11 @@ import com.mmg.manahub.feature.decks.domain.template.BuildWizardDeckUseCase
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfile
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
 import com.mmg.manahub.feature.decks.domain.template.CollectionTribeSignal
-import com.mmg.manahub.feature.decks.domain.template.CommanderDraftBuild
+import com.mmg.manahub.feature.decks.domain.template.WizardDraftBuild
 import com.mmg.manahub.feature.decks.domain.template.ManualAdd
 import com.mmg.manahub.feature.decks.domain.template.OwnedCard
 import com.mmg.manahub.feature.decks.domain.template.WizardBuildResult
-import com.mmg.manahub.feature.decks.domain.template.WizardDraftBuild
 import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
-import com.mmg.manahub.feature.decks.domain.usecase.RecommendCommanderStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.RecommendWizardStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.StrategyRecommendation
 import kotlinx.coroutines.Job
@@ -206,9 +204,9 @@ data class DeckWizardUiState(
 
     // ── STRATEGY (shared by every anchor, S7) ─────────────────────────────────
     /** Deck Wizard Commander v3 plan, Phase 4.1 -- the ranked recommendation list from
-     * [RecommendCommanderStrategiesUseCase] (rename of `commanderStrategyRecommendations`, 60-card
+     * [RecommendWizardStrategiesUseCase] (rename of `commanderStrategyRecommendations`, 60-card
      * wave v6 plan §5 Phase 5.2 -- Commander AND every 60-card anchor share this ONE field now),
-     * sorted best-first; the UI splits it via [RecommendCommanderStrategiesUseCase.splitRecommended]
+     * sorted best-first; the UI splits it via [RecommendWizardStrategiesUseCase.splitRecommended]
      * into "Recommended" and collapsed "Partial fit" (Custom is a UI-level sentinel, always offered
      * separately). */
     val strategyRecommendations: List<StrategyRecommendation> = emptyList(),
@@ -281,12 +279,12 @@ data class DeckWizardUiState(
 
     // ── Generation ─────────────────────────────────────────────────────────────
     /** Deck Wizard Commander v3 plan, Phase 6 (6.3) — the wizard's OWN staged-progress track
-     * ([com.mmg.manahub.feature.decks.domain.template.CommanderBuildStage]). Every format uses this
+     * ([com.mmg.manahub.feature.decks.domain.template.WizardBuildStage]). Every format uses this
      * ONE track now (the legacy Casual `BuildStage`/`completedStages` pair was deleted in the
      * 60-card wave's UI unification -- `generateCasualDeck` no longer surfaces per-stage progress,
      * only a generic "Validating…" spinner, until run C unifies generation itself). */
-    val commanderBuildStage: com.mmg.manahub.feature.decks.domain.template.CommanderBuildStage? = null,
-    val commanderCompletedStages: List<com.mmg.manahub.feature.decks.domain.template.CommanderBuildStage> = emptyList(),
+    val commanderBuildStage: com.mmg.manahub.feature.decks.domain.template.WizardBuildStage? = null,
+    val commanderCompletedStages: List<com.mmg.manahub.feature.decks.domain.template.WizardBuildStage> = emptyList(),
     val buildError: String? = null,
 
     val createdDeckId: String? = null,
@@ -294,7 +292,7 @@ data class DeckWizardUiState(
     // ── Choice (W7 Task B, Commander only) ────────────────────────────────────
     /** The engine's pre-land, pre-persist draft — held in memory only while [WizardPhase.CHOICE] is
      * showing (never persisted, never surviving process death by design). `null` outside that phase. */
-    val commanderDraftBuild: CommanderDraftBuild? = null,
+    val commanderDraftBuild: WizardDraftBuild? = null,
     /** Per-role selections made so far on the Choice screen: [RoleKey] -> id -> selected COPY count
      * (Deck Wizard 60-card wave v6, plan §5 Phase 5.4, S6: a 60-card row can hold more than one
      * copy of the same id, unlike Commander's always-1 world). A role ABSENT from this map has not
@@ -407,7 +405,7 @@ class DeckWizardViewModel(
     private val deckAnalysisPipeline: DeckAnalysisPipeline,
     // Deck Wizard Commander v3 plan, Phase 6; generalized to every format by the 60-card wave (v6,
     // plan §5 Phase 5.4) -- onGenerate's ONE build path now, replacing the deleted
-    // BuildDeckFromTemplateUseCase/generateCasualDeck entirely. Defaulted from the two deps already
+    // the deleted Motor A wizard build use case/generateCasualDeck entirely. Defaulted from the two deps already
     // required above so no pre-existing test construction site needs to change unless it wants to
     // inject a fake/spy.
     private val buildWizardDeckUseCase: BuildWizardDeckUseCase = BuildWizardDeckUseCase(deckAnalysisPipeline, crashReporter),
@@ -500,7 +498,7 @@ class DeckWizardViewModel(
         val commander: Card?,
         val strategyPick: StrategyPick,
         val manualAdds: List<ManualAdd>,
-        val draft: CommanderDraftBuild,
+        val draft: WizardDraftBuild,
         val resolutions: Map<RoleKey, List<String>>,
     )
 
@@ -900,7 +898,7 @@ class DeckWizardViewModel(
 
     /**
      * Deck Wizard Commander v3 plan, Phase 4.1 — ranks [com.mmg.manahub.feature.decks.domain.engine
-     * .CuratedStrategyCatalog.ALL] for [commander] via [RecommendCommanderStrategiesUseCase]. Never
+     * .CuratedStrategyCatalog.ALL] for [commander] via [RecommendWizardStrategiesUseCase]. Never
      * throws: every signal degrades to zero contribution when its input is empty/absent. Preselects
      * the #1 recommendation on arrival via [selectCommanderStrategy].
      */
@@ -1528,7 +1526,7 @@ class DeckWizardViewModel(
             )
         }
         // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4: ONE build path for every format now --
-        // generateCasualDeck/BuildDeckFromTemplateUseCase are gone; the Sixty-anchor branch that
+        // generateCasualDeck/the deleted Motor A wizard build use case are gone; the Sixty-anchor branch that
         // used to fork here is what generateWizardDeck's own anchor resolution replaces.
         generateJob = viewModelScope.launch { generateWizardDeck(state, format) }
     }
@@ -1961,7 +1959,7 @@ class DeckWizardViewModel(
     }
 
     /** W8 (telemetry) -- classifies HOW the Choice screen's ambiguity groups were resolved. */
-    private fun classifyChoiceResolutionMode(draft: CommanderDraftBuild, resolutions: Map<RoleKey, List<String>>): String {
+    private fun classifyChoiceResolutionMode(draft: WizardDraftBuild, resolutions: Map<RoleKey, List<String>>): String {
         val groups = draft.ambiguityGroups
         if (groups.isEmpty()) return "wizard_finish_all"
         val perGroup = groups.map { group ->

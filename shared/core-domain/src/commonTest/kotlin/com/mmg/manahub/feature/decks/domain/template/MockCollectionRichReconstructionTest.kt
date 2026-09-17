@@ -47,7 +47,7 @@ class MockCollectionRichReconstructionTest {
         ReconstructionCrashReporter,
     )
 
-    private fun newUseCase(): BuildCommanderDeckUseCase = BuildCommanderDeckUseCase(newPipeline(), ReconstructionCrashReporter)
+    private fun newUseCase(): BuildWizardDeckUseCase = BuildWizardDeckUseCase(newPipeline(), ReconstructionCrashReporter)
 
     private fun ownedPool(): List<OwnedCard> =
         (MockCollectionRich.ownedCards + MockCollectionRich.ownedBasics).map { OwnedCard(it.card, it.quantity) }

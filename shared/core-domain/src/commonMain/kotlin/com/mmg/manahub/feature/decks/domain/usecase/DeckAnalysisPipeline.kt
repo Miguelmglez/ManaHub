@@ -28,7 +28,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ThemeId
  * the harness's own Motor A cuts/adds calls are NOT part of this pipeline — only the shared
  * seed-inference-through-evaluate core is.
  *
- * [com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase.recomputeProfile] is
+ * [the deleted Motor A wizard build use case.recomputeProfile] is
  * NOT a mirror of this sequence (verified 2026-09-08) — it calls `DeckScorer.profile()` (the legacy
  * Motor A engine) directly and never touches [EvaluateDeckUseCase]/v3 [DeckAnalysis], so it stays
  * untouched and does not delegate here.
