@@ -58,15 +58,18 @@ Build and manage decks backed by your collection and real-time Scryfall data.
 - Import / export in Moxfield / MTGO text format
 - Format validation (Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Commander, Casual)
 - Card detail with double-faced support; quick add/remove from search or your collection
-- **Deck creation wizard**: guided multi-step builder for Commander & Commander Casual, built by the
-  SAME scoring/analysis engine that grades the deck afterward — pick a curated strategy (or go
-  Custom), fill remaining plan sections from your collection. Genuine close calls the engine can't
-  break on its own surface as a short Choice screen (only the real questions, with a one-tap "let
-  the wizard decide" for any of them); every other card is placed automatically with a transparent
-  gap report (no silent placeholder cards). It never over-fills a role past its plan, never picks a
-  card that doesn't serve the plan while a fitting one remains, and when your collection genuinely
-  runs out it says so on that same screen instead of padding the deck quietly. Casual keeps a
-  separate, community-template-matched build path.
+- **Deck creation wizard**: guided multi-step builder for every non-Draft format — Commander,
+  Commander Casual, Casual, Standard, Pioneer, Modern, Legacy, Vintage and Pauper — built by the SAME
+  scoring/analysis engine that grades the deck afterward. Commander decks start from a commander;
+  60-card decks start from your cards, your colors (colorless included) or a strategy, with the seed
+  search locked to the format's legality. Pick a curated strategy (or go Custom), fill remaining plan
+  sections — mana base included — from your collection. The engine adds up to four copies of a card
+  but never more than you own; genuine close calls it can't break on its own surface as a short
+  Choice screen (only the real questions, with a one-tap "let the wizard decide" for any of them);
+  every other card is placed automatically with a transparent gap report (no silent placeholder
+  cards). It never over-fills a role past its plan, never picks a card that doesn't serve the plan
+  while a fitting one remains, and when your collection genuinely runs out it says so instead of
+  padding the deck quietly. The finished deck opens straight in Deck Studio.
 - **Deck analysis**: every category the engine classifies can be browsed, in your collection and on
   Scryfall, from the same button — and both find the same cards. Synergies are shown as engines,
   pairing the cards that produce a resource with the cards that pay it off (life, tokens, counters,

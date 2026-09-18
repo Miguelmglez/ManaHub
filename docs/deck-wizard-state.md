@@ -544,10 +544,10 @@ Remaining v4 workstreams (W2-W8) are NOT started.
 | Item | State |
 |---|---|
 | Feature flag `FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED` | **`true`** (flipped Run 12, Phase 8 — full verify gauntlet green first) |
-| Formats reachable in this wave | `COMMANDER`, `COMMANDER_CASUAL` |
-| Formats deferred | `CASUAL`, `STANDARD`, `PIONEER`, `MODERN`, `LEGACY`, `VINTAGE`, `PAUPER` (§7) |
-| Engine used by the wizard | Commander/Commander Casual: `BuildCommanderDeckUseCase` (`PlacementScorer` + `DeckAnalysisPipeline` verify/refine), wired into production since Run 9, LIVE since Run 12. Casual: still legacy Motor A (`DeckScorer.fit`), unchanged (non-goal). |
-| Campaign phase | **CLOSED** — P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 DONE (Run 5); P4 DONE (Run 6); P5 DONE (Run 7); P6 DONE (Runs 8-10); P7 DONE (Run 11 — harness v2 green, calibration verdict NO CHANGE, telemetry added); P8 DONE (Run 12 — F17 fixed, persist() atomicity closed, cleanup, flag flip) |
+| Formats reachable | **Every non-Draft format** — `COMMANDER`, `COMMANDER_CASUAL`, `CASUAL`, `STANDARD`, `PIONEER`, `MODERN`, `LEGACY`, `VINTAGE`, `PAUPER` (v6, 60-card wave, 2026-09-17) |
+| Formats deferred | `DRAFT` only (a Draft nav arg emits `DeckWizardEvent.Exit` + a toast, never a silent fallback) |
+| Engine used by the wizard | ONE engine for every format: `BuildWizardDeckUseCase` (`PlacementScorer` + `DeckAnalysisPipeline` verify/refine) with a sealed `BuildAnchor` (`Commander(card)` / `Sixty(identity, seeds)`) resolved by `WizardPlanResolver`. The legacy Motor A wizard path (`BuildDeckFromTemplateUseCase`, `DeckTemplateResolver`, `MainboardTrimmer`, `CandidatePoolGenerator`, `DeckWizardSpec`) was DELETED in v6 Phase 7 (ADR-010). |
+| Campaign phase | **v6 60-card wave CLOSED 2026-09-17** (Phases 0-7, see changelog + ADR-010). v3 campaign: **CLOSED** — P0 done (incl. 0.5); P1 done (contracts only); P2 gate CLOSED (Run 4); P3 DONE (Run 5); P4 DONE (Run 6); P5 DONE (Run 7); P6 DONE (Runs 8-10); P7 DONE (Run 11 — harness v2 green, calibration verdict NO CHANGE, telemetry added); P8 DONE (Run 12 — F17 fixed, persist() atomicity closed, cleanup, flag flip) |
 
 Phase log (fill one line per gate): `P0 done 2026-09-08 (0.1/0.2/0.3/0.5/E1/E2/E3/E4/E5) · P1 done 2026-09-08 (1.1/1.2/1.3, contracts only) · P2 gate CLOSED 2026-09-09 (Run 4 closed the land-fill/reconstruction/thin/atomicity test items Run 3 deferred — see progress tracker) · P3 DONE 2026-09-09 (Run 4: 3.1 F10 fix + 3.4 search-plumbing; Run 5: 3.2 UI + 3.3 StructuredCardSearch + lockedCriteria + VM wiring + tests + compose-design-reviewer pass — see progress tracker) · P4 DONE 2026-09-09 (Run 6: RecommendCommanderStrategiesUseCase + single-select STRATEGY step UI/VM wiring + DeriveCommanderStrategiesUseCase retirement + tests + compose-design-reviewer pass — see progress tracker) · P5 DONE 2026-09-09 (Run 7: PlanSectionsStepContent replaces MANUAL_ADDS for Commander, DeckAnalysisPipeline-only attribution, selectedPosture F3 gap closed, onAddSeed/onRemoveSeed hardened, ownedAvailabilityBySection, tests + compose-design-reviewer pass — see progress tracker) · P6 DONE 2026-09-09 (Run 8: write-atomicity + nav-arg plumbing; Run 9: BuildCommanderDeckUseCase wired into onGenerate, D12/D13 write path, persistence round-trip proof; Run 10: Result/Generating/Review UI for Commander, Studio "Rebuild with the Wizard" CTA + confirm dialog, pop-back nav, item 8 verified by code trace, compose-design-reviewer + android-edge-case-tester passes with fixes applied — see progress tracker Run 10; one flagged-not-fully-closed item: persist()'s 4-call write is not yet one Room transaction, mitigated via a cancel-blocking guard, low real risk while DECK_BUILDER_V2_ENABLED stays false) · P7 DONE 2026-09-09 (Run 11: harness v2
 real-collection segment 180/180 HARD-pass + MockCollectionRich/Thin segments green (1 diagnosed
@@ -597,58 +597,74 @@ the Studio Analysis tab runs. If a future change needs a "wizard-only" heuristic
 ## 3. Architecture contract
 
 ```
-Commander formats:  COMMANDER_PICK → STRATEGY → PLAN_SECTIONS → REVIEW → GENERATING → RESULT
-                    (format + optional deckId arrive by navigation; no format step)
+Commander : COMMANDER_PICK → STRATEGY → PLAN_SECTIONS → REVIEW → GENERATING → [CHOICE → GENERATING] → Studio
+Cards     : ENTRY → SEED_PICK → STRATEGY → PLAN_SECTIONS → REVIEW → GENERATING → [CHOICE → GENERATING] → Studio
+Colors    : ENTRY → COLOR_PICK (colors + ranked strategies) → PLAN_SECTIONS → REVIEW → …
+Strategy  : ENTRY → STRATEGY_PICK (catalog + inline color combos) → PLAN_SECTIONS → REVIEW → …
+            (format + deckId arrive by navigation; no format step; no Result screen — every format
+             opens Deck Studio directly after persist)
 
-Build target   = CommanderPlanResolver(format, commander, StrategyPick, identity)
-                 → ResolvedArchetypeSkeleton (ALWAYS non-null; Custom = generic baseline)
-                 → target axes (themes' axes ∪ commander's produced/consumed axes ∪ tribe)
-                 → curve targets, land band, mana-fix band
+BuildAnchor    = Commander(card) | Sixty(identity: Set<ManaColor>, seeds: List<Card>)
+WizardPlan     = WizardPlanResolver.resolve(format, anchor, StrategyPick)
+                 Commander: skeleton + commander axes + tribe (byte-identical to v3-v5)
+                 Sixty:     skeleton = ArchetypeSkeletonResolver.resolveWithColor(SIXTY, hint, posture,
+                            themes, identity, deckFormat) — the SAME call AnalysisEngine makes for a
+                            60-card deck; targetAxes = themes' axes ∪ (∪ seeds' produced/consumed axes)
+                            ∪ tribe axis; internalTribe = pin.tribe or (Custom) the subtype ≥ 2 seeds
+                            share; hint (Custom) = majority-vote archetype over the seeds' tags
                  == exactly what AnalysisEngine.evaluate resolves for the same pin
 
-Placement      = PlacementScorer.marginalGain: role gain (P3 bands, ideal-weighted, 0 at max,
-                 negative for anti-roles) · axis gain (P4 producers/payoffs toward axis ideals,
-                 v5 R4: a bare type-line density producer — SPELLS/ARTIFACTS/ENCHANTMENTS with no
-                 dedicated role backing it — counts only if the plan targets the axis or a payoff
-                 is already placed) · curve gain (P2 band + shape) · power tie-break · pip
-                 feasibility · optional community prior (≤ ×1.15, owned cards, flag-gated) − role
-                 overflow cost (v5 R4, S7: a candidate pushing a non-anti role past its own `max`
-                 is charged at ROLE_WEIGHT, the same scale as that role's own positive credit).
-                 Filler floor: no role gain and no axis gain ⇒ not placed by the main loop.
-                 Overflow gate (v5 R4): the main loop hard-excludes an overflowing candidate
-                 whenever ANY non-overflowing candidate still clears the filler floor that
-                 iteration — overflow only wins when it is genuinely the only option left.
-                 D4 fallback (v5 R4): once the main loop has no more skeleton/axis-relevant
-                 candidate, remaining slots fill with the best Standalone card (any classified
-                 role, even off-skeleton) by EDHREC power, then true off-plan cards (no role, no
-                 axis edge) as the last resort — both tiers recorded on `CommanderDraftBuild`/
-                 `WizardBuildResult` (`fallbackStandaloneIds`/`fallbackOffPlanIds`) and flagged,
-                 never silently absorbed, on the Choice screen.
+Copies         = CopyPolicy.maxPlaceable(card, format, owned) = basic → ∞ · Commander-shaped → 1 ·
+                 Vintage restricted → 1 · else min(format.maxCopies, owned). Seeds are user-capped by
+                 CopyPolicy.maxSeedCopies (legality only, NEVER owned-clamped — S3); the engine places
+                 only owned copies (S2). Seed cap = targetDeckSize − commander slot (60 / 99, in COPIES).
 
-Lands          = LandTargetResolver (shared with Studio) → owned non-basics in identity
-                 (LAND_MIX cap, Karsten-safe) → basics (mainboard + commander pips, Phyrexian = 0)
-                 → bounded Karsten rebalance via ManaBaseAnalyzer.
+Placement      = PlacementScorer.marginalGain (unchanged objective: role gain · axis gain · curve gain ·
+                 power tie-break · pip feasibility − overflow cost; filler floor; overflow gate; D4
+                 fallback tiers) applied PER COPY: a card stays in the pool until its copies reach
+                 maxPlaceable; fold() runs once per placed copy so role/axis/curve counters count copies;
+                 copy k ≥ 1 gets + CONSISTENCY_CREDIT × powerNormalized (S5, 0.06 — the Phase 6 sweep
+                 found the 4-of target unreachable at any value in {0, .03, .06, .10}; see §5).
+                 tentativeByRole holds one id per tentative COPY; the Choice screen renders one row per
+                 DISTINCT id with a +/- stepper (60-card) or a selected toggle (Commander), capped per
+                 section in copies; finalize() takes Map<RoleKey, List<String>> where a REPEATED id means
+                 that many copies (a Map<String, Int> overload clashes on the JVM signature).
 
-Verification   = DeckAnalysisPipeline.analyze (the ONE analysis entry point, shared by
-                 DeckDoctorOrchestrator, the wizard and the harness) → refine: bounded local search
-                 (v5 R4, ≤ 20 swaps) retargeting the worst wizard-placed card each round (off-plan
-                 first, then role overflow, then lowest EDHREC power), trialing the top few
-                 remaining candidates by marginalGain and keeping whichever verified re-analysis
-                 raises totalScore the most, until no improving swap remains → DeckAnalysis stored
-                 in the result.
+Lands          = LandTargetResolver.resolve(format, skeleton, profile = null) → skeleton.lands.ideal
+                 (SixtyFormatProfile deltas already inside) → Stage A owned non-basics ⊆ identity AND
+                 legal in the target format (Phase 6.2 fix) → Stage B basics from pips, identity passed
+                 EXPLICITLY (empty ⇒ Wastes) → Stage C Karsten rebalance.
 
-Persistence    = one atomic write: cards (source WIZARD for engine-placed + commander, USER for
-                 manual adds), commanderCardId/coverCardId, name, pin (archetype, posture, themes,
-                 tribe) via CuratedStrategy.toPin, strategyLocked (true for curated, false for Custom).
+Verification   = DeckAnalysisPipeline.analyze(mainboard, format, commander = anchor.commanderOrNull, pin)
+                 → refine in COPY units (decrement one copy of the worst card, add one copy of the best
+                 replacement under candidateMaxCopies). AnalysisEngine now emits produces:<X> for EVERY
+                 identity color even at 0 (gap table) + a `lands` section banded by skeleton.lands, first
+                 in MANA_BASE — Studio inherits both; sections never feed the score.
 
-UI reuse       = CardSectionRow / SectionSearchQuery.toAdvancedQuery / CardSearchSheet (sections step),
-                 CuratedStrategyPickerSheet rows (strategy step), AdvancedSearchSheet with lockedCriteria
-                 (commander pick), PillarTile (result), CardDetailSheet (commander choice).
+Strategies     = 60-card vocabulary = CuratedStrategyCatalog.availableIn(format) ONLY, ranked by
+                 RecommendWizardStrategiesUseCase (Sixty path: seeds' axis profiles + role confidences,
+                 seeds' card_strategy_tags, ColorStrategyAffinity.curatedFor(identity, format) ×2 when
+                 seedless, owned support scaled by CopyPolicy.maxPlaceable). Colorless = the
+                 `emptySet()` ColorStrategyAffinity row (big_mana, artifacts, aggro, tribal:eldrazi,
+                 prison where available); ManaColor.C is UI-only state, stripped by
+                 DeckWizardUiState.engineIdentity before it reaches the engine.
+
+Persistence    = one atomic write, DeckRepository.persistWizardBuild (renamed): cards (WIZARD for
+                 engine-placed + commander, USER for seeds, slots carry quantity), commanderCardId
+                 (Commander only — the 60-card path never writes it and never renames the deck), pin,
+                 strategyLocked. D12: always into launchedFromDeckId.
+
+UI reuse       = CardRow (quantity stepper, onImageClick, addEnabled) for seed/plan/review/choice rows;
+                 CardDetailSheet (seedSelection / readOnly modes); DeckCardQueueSheet (generic queue,
+                 scanner keeps its wrapper); AdvancedSearchSheet with lockedCriteria =
+                 SectionSearchQuery.legalityCriterion(format) (seed search, Pauper included);
+                 StrategyRecommendationList shared by STRATEGY / COLOR_PICK; CardSectionRow +
+                 SectionSearchQuery.toAdvancedQuery (plan sections, incl. lands / produces:X).
 ```
 
 Vocabulary: `RoleKey` / `AxisKey` / `CardSection.id` / `CuratedStrategy.id` — nothing else. The legacy
-`DeckRole`, `SuggestionCategory`, `DeckTemplate`, `CategoryFill`, `DeckGap` are Casual-only leftovers
-(§7), not part of the Commander contract.
+`DeckTemplate`/`DeckWizardSpec`/Motor A wizard vocabulary is gone (v6 Phase 7); `SuggestionCategory`
+survives only inside `SuggestionCategoryResolver` for Studio's `SuggestionGrouping`.
 
 ---
 
@@ -672,6 +688,16 @@ Vocabulary: `RoleKey` / `AxisKey` / `CardSection.id` / `CuratedStrategy.id` — 
 | D14 | `SearchCriterion.CommanderEligible` + `AdvancedSearchSheet.lockedCriteria` | the sheet itself must carry the non-removable filters | 60-card has no commander lock; reuse `lockedCriteria` for format legality |
 | D15 | Self-evaluation in-app (Result = the analysis) and in the harness (`AnalysisEngine` metrics only) | production quality must be observable | same harness, new segments |
 | D16 | Flag stays off until the final gate | ship dark | same |
+| D17 (v6 S1) | ONE build engine for every format: `BuildWizardDeckUseCase` + sealed `BuildAnchor` (`Commander` / `Sixty`), `WizardPlanResolver` | two pipelines could never be kept honest with each other; Commander stayed byte-identical through the merge (rule 0.3) | — |
+| D18 (v6 S2/S3/S4) | Engine places ONLY owned copies, ≤ `CopyPolicy.maxPlaceable`; seeds may be unowned and are capped by `maxSeedCopies` (legality only); seed cap = deck size in copies | "build from what I own" stays honest; a seed is a user decision, not an ownership claim | — |
+| D19 (v6 S5) | Copy k ≥ 2 earns `CONSISTENCY_CREDIT × powerNormalized` (0.06) | consistency should beat breadth for a strong card; Phase 6 showed the loop's own differentiation pressure dominates — kept as documented, not forced | revisit only with a new calibration ADR |
+| D20 (v6 S6) | Choice screen: per-section cap in COPIES, `CardRow` rows (+/- for 60-card, toggle for Commander), image tap opens `CardDetailSheet` inline, no Info icon, no navigation away | one row primitive everywhere; the wizard never leaves its own screen mid-flow | — |
+| D21 (v6 S7/S8) | 60-card strategies = `CuratedStrategyCatalog.availableIn(format)` only, via `RecommendWizardStrategiesUseCase`; Custom = generic SIXTY skeleton + `SixtyFormatProfile` + seeds' axes | the raw ArchetypeId/ThemeId browser and "suggested seed cards" were a second vocabulary | — |
+| D22 (v6 S9) | Colorless is an EXCLUSIVE chip; identity `{}`; Wastes; its own `ColorStrategyAffinity` row; never mixed with WUBRG | a colorless deck is a real archetype, not "no colors picked" | — |
+| D23 (v6 S10) | `AnalysisEngine` emits `produces:<X>` at 0 for every identity color + a `lands` section | the plan-sections step needs a real mana base; Studio inherits it; sections never feed the score | — |
+| D24 (v6 S11) | `isLegalForFormat` everywhere; Vintage `restricted` ⇒ 1 copy via `CopyPolicy`, still "legal" | one predicate, one restricted rule | — |
+| D25 (v6 S12/S13/S14) | No Result screen (every format opens Studio); no `fillLands` / community toggles; `persistWizardBuild` writes into `launchedFromDeckId`, never renames a 60-card deck | Studio owns the name; the analysis IS the result | — |
+| D26 (v6 S18) | Motor A wizard path deleted; `DeckScorer`, `SuggestCutsUseCase`, `SuggestionCategoryResolver`, `SuggestAddsFromCollectionUseCase` (harness) stay | delete what has no caller, keep what does | — |
 
 Design principles carried over from the engine work (do not re-litigate): calibration is normative
 (fixtures are a regression harness, never a training set — ADR-007 §4); new params appended last with
@@ -896,32 +922,32 @@ per-format strategy curation for the 5 non-Standard 60-card formats.
 
 ---
 
-## 7. What the 60-card wave inherits (read before planning it)
+## 7. What the 60-card wave inherited — CLOSED (v6, 2026-09-17)
 
-Things that differ from Commander and are NOT solved by this campaign:
+Every item this section used to list was closed by the 60-card wave (ADR-010; plan
+`docs/plans/deck-wizard-sixty-card-plan.md`, gitignored):
 
-- **No commander ⇒ no anchor.** Entry must be strategy-first or seed-first (the Casual flows exist:
-  `WizardEntryFlow.CARDS/COLORS/STRATEGY`, `DIRECTION` step, `SuggestStrategiesForSeedsUseCase`,
-  `ColorStrategyAffinity`, `RankOwnedCardsForProfileUseCase`). They still run through the LEGACY build
-  (`BuildDeckFromTemplateUseCase` + Motor A + `DeckTemplateResolver` + `SuggestionCategoryResolver` +
-  `MainboardTrimmer`). Plan: port them onto `BuildCommanderDeckUseCase`'s shape (rename to a
-  format-agnostic builder), delete the legacy path afterwards, and only then retire `DeckScorer`/Motor A
-  entirely (check `EvaluateDeckUseCase`'s dormant `evaluation` field and `LandTargetResolver`'s 60-card
-  branch, which still needs `DeckProfile`).
-- **Copies.** 4-of consistency: `PlacementScorer` must reason about copies (a 4th copy of a core card
-  beats a 1st copy of a marginal one); owned quantity clamps placements (`min(want, owned)`).
-- **Colour choice is a decision, not a given.** Identity comes from the user/seeds; `D6` Custom needs
-  seed-card axes instead of commander axes; `ColorStrategyAffinity` is still a hand-curated table.
-- **Legality.** `CASUAL` is permissive; competitive formats need per-format legality (already in
-  `Card.legality*`) and Vintage restricted = max 1; Pauper = `r:common` in searches.
-- **Skeletons.** Same `ArchetypeData` SIXTY bands + `SixtyFormatProfile` deltas through the same
-  resolver — no fork. `LandTargetResolver` uses `ManaBaseAnalyzer.dynamicLandIdeal` for 60-card.
-- **Sideboard.** Out of scope for the builder; the analysis only checks size.
-- **Harness.** Add 60-card segments to harness v2; the v3 corpus already has Modern fixtures
-  (14–22) usable as `MockCollectionRich` seeds for 60-card reconstructions.
-- **UI.** `FormatStepContent`/`COMING_SOON_FORMATS` were DELETED for Commander (R13/R14, Run 6) —
-  the 60-card wave needs its OWN format-selection UI, not a revived fallback. Studio CTA gating by
-  `isCommanderFormat` — flip per format when ready.
+- **No commander ⇒ no anchor** → `BuildAnchor.Sixty(identity, seeds)`; entry flows CARDS / COLORS /
+  STRATEGY run through the same engine and the same step language. Legacy path deleted.
+- **Copies** → `CopyPolicy` + per-copy placement/finalize/refine; `CONSISTENCY_CREDIT` swept in Phase 6.
+- **Colour choice** → seeds define the identity (CARDS flow, locked colors) or the user picks it
+  (COLOR_PICK, colorless exclusive); D6 Custom uses the seeds' axes.
+- **Legality** → `isLegalForFormat` in pool / seed add / Browse lock / Choice; Vintage restricted = 1.
+  Pauper = `f:pauper` via `SectionSearchQuery.legalityCriterion` (commons-only by definition).
+- **Skeletons** → same resolver call as `AnalysisEngine`; `LandTargetResolver` called with
+  `profile = null` (target = `skeleton.lands.ideal`).
+- **Harness** → `WizardHarnessSixtyMockSegmentsTest` (22 specs + colorless) and
+  `WizardSixtyHarnessV1Test` (68 real-collection specs); numbers in §5.
+- **UI** → no format step (format is a nav arg); Studio's "Build from seed" / "Rebuild with the
+  Wizard" gated by `isWizardAvailableForFormat` (= not Draft).
+
+Still open after v6 (recorded, not hidden): (1) 60-card builds almost never place 4-ofs — the
+Phase 6 sweep could not reach a `fourOfCount` median ≥ 4 for AGGRO/MIDRANGE at any tested credit;
+a deliberate re-design of copy preference (not a constant) is the next step if 4-ofs matter to
+users. (2) `ManaBaseAnalyzer`'s `KARSTEN_60` row flags `ColorSourceShortage` on most 2+-color
+60-card builds (20 sources of one color for a double-pip card is unreachable with ~24 lands) — 44/68
+real-collection specs are excluded on that metric alone, diagnosed in §5; the table needs a
+60-card-specific review. (3) Sideboard generation remains out of scope.
 
 ---
 
@@ -1039,16 +1065,17 @@ calibration/corpus/skeleton-differentiation suites and the harness score distrib
 
 | Concept | Path |
 |---|---|
-| Wizard UI/VM | `app/.../feature/decks/presentation/wizard/` (`DeckWizardViewModel.kt`, `DeckWizardScreen.kt`, `DeckWizardCommanderSteps.kt`, `DeckWizardGenerationResult.kt`; Casual: `DeckWizardEntryFlows.kt`, `DeckWizardDirectionIdentity.kt`) |
-| Commander builder (target) | `shared/core-domain/.../feature/decks/domain/template/BuildCommanderDeckUseCase.kt`, `engine/CommanderPlanResolver.kt`, `engine/PlacementScorer.kt`, `engine/CurveTargets.kt` |
+| Wizard UI/VM | `app/.../feature/decks/presentation/wizard/` (`DeckWizardViewModel.kt`, `DeckWizardScreen.kt`, `DeckWizardCommanderSteps.kt` (Commander pick, strategy, plan sections, review), `DeckWizardSixtySteps.kt` (SEED_PICK, COLOR_PICK, STRATEGY_PICK), `DeckWizardChoiceStep.kt`, `DeckWizardEntryFlows.kt` (entry cards, color combos, `ColorToggleChip`), `DeckWizardGenerating.kt`) |
+| Wizard builder (every format) | `shared/core-domain/.../feature/decks/domain/template/BuildWizardDeckUseCase.kt` (+ `ManualAdd`), `template/WizardBuildResult.kt`, `engine/WizardPlanResolver.kt` (`BuildAnchor`, `WizardPlan`, `StrategyPick`), `engine/CopyPolicy.kt`, `engine/PlacementScorer.kt`, `engine/CurveTargets.kt` |
 | Shared analysis entry (target) | `shared/core-domain/.../feature/decks/domain/usecase/DeckAnalysisPipeline.kt` |
 | Analysis engine | `shared/core-domain/.../feature/decks/domain/engine/` (`AnalysisEngine.kt`, `ArchetypeSkeletonResolver.kt`, `ArchetypeRoleClassifier.kt`, `SynergyGraph.kt`, `CuratedStrategyCatalog.kt`, `SectionSearchQuery.kt`, `LandTargetResolver.kt`, `ManaBaseAnalyzer.kt`) |
-| Strategy recommendation | `.../domain/usecase/RecommendCommanderStrategiesUseCase.kt` (Phase 4, done) |
+| Strategy recommendation | `.../domain/usecase/RecommendWizardStrategiesUseCase.kt` (Commander + Sixty paths), `engine/ColorStrategyAffinity.kt` (`curatedFor`, colorless row) |
 | Search | `shared/core-model/.../AdvancedSearchQuery.kt`, `shared/core-domain/.../core/domain/search/AdvancedSearchCardMatcher.kt`, `.../usecase/search/BuildScryfallQueryUseCase.kt`, `app/.../core/ui/components/search/AdvancedSearchSheet.kt`, `app/.../core/ui/components/CardSearchSheet.kt` |
 | Section UI | `app/.../feature/decks/presentation/components/CardSectionComponents.kt`, `CuratedStrategyPickerSheet.kt`, `HealthComponents.kt` |
 | Persistence | `shared/core-model/.../Deck.kt`, `DeckRepository`, Room migrations `Migration_x_y.kt`, Supabase `decks` + `batch_upsert_decks` |
-| Harness | `app/src/test/java/com/mmg/manahub/feature/decks/harness/`; fixtures in gitignored `testdata/wizard-harness/` (real user data — never commit) |
-| Legacy (Casual-only after this campaign) | `template/BuildDeckFromTemplateUseCase.kt`, `template/DeckTemplateResolver.kt`, `template/SuggestionCategoryResolver.kt`, `template/MainboardTrimmer.kt`, `usecase/SuggestAddsFromCollectionUseCase.kt` (Motor A), `engine/DeckScorer.kt` — all confirmed to still have real Casual callers (Phase 8, Run 12), left untouched. `components/StrategyPickerSheet.kt` was DELETED in Phase 8 (Run 12) after confirming zero remaining callers; `TribeOption` moved to `CuratedStrategyPickerSheet.kt`. |
+| Harness | `app/src/test/java/com/mmg/manahub/feature/decks/harness/` (`WizardCommanderHarnessV2Test`, `WizardHarnessV3RealCollectionTest`, `WizardSixtyHarnessV1Test`, `WizardHarnessSectionVocabularyTest`); commonTest `WizardHarnessMockSegmentsTest` + `WizardHarnessSixtyMockSegmentsTest`; fixtures in gitignored `testdata/wizard-harness/` (real user data — never commit) |
+| Shared UI primitives (v6) | `shared/core-ui/.../components/CardRow.kt` (`onImageClick`, `addEnabled`), `app/.../core/ui/components/DeckCardQueueSheet.kt` (generic queue; `DeckScannerQueueSheet` is its wrapper), `app/.../feature/decks/presentation/components/CardDetailSheet.kt` (`seedSelection`, `readOnly`) |
+| Legacy | DELETED in v6 Phase 7: `BuildDeckFromTemplateUseCase`, `DeckTemplateResolver`, `MainboardTrimmer`, `DeckTemplate`, `DeckWizardSpec`, `TemplateBuildResult`, `CandidatePoolGenerator`, `SuggestStrategiesForSeedsUseCase`, `RankOwnedCardsForProfileUseCase`, `SuggestAddsFromCommunityUseCase`, `StrategyProfile`, `DeckWizardDirectionIdentity.kt`, `DeckWizardGenerationResult.kt`, `WizardQualityMatrixTest`/`HarnessMatrixRunner`/`P0BaselineTest`. Kept with live callers: `SuggestionCategoryResolver` (Studio), `DeckScorer`, `SuggestCutsUseCase`, `SuggestAddsUseCase`, `SuggestAddsFromCollectionUseCase` (`HarnessDoctorPipeline`). |
 
 ---
 
@@ -1335,3 +1362,18 @@ calibration/corpus/skeleton-differentiation suites and the harness score distrib
   each round instead of a fixed 8-swap/first-candidate loop. Real-collection harness: 180/180 HARD
   (incl. 2 new metrics), score +1 across min/p25/median, determinism/variety unchanged within noise.
   No fixture diff; no analysis-side file touched.
+- 2026-09-17 — **v6 60-card wave CLOSED** (ADR-010). Phases 0-7 on `feature/deck-wizard`: P1
+  `9b28b1aa`/`1c072bb4` (CopyPolicy, BuildAnchor/WizardPlanResolver, copy-aware
+  BuildWizardDeckUseCase, persistWizardBuild), P2 `034de7be` (RecommendWizardStrategiesUseCase Sixty
+  path, colorless ColorStrategyAffinity row, curatedFor), P3 `4132346b` (produces:X at 0 + lands
+  section), P4 `674e1762`/`8e5e1a47` (CardRow image tap + addEnabled, CardDetailSheet seed/readOnly,
+  DeckCardQueueSheet), P5 `5045bb3f`/`c4acf331`/`3fa83173`/`8562b10a`/`2500b335` (phases/state,
+  SEED_PICK, StrategyRecommendationList, COLOR_PICK, STRATEGY_PICK, one generateWizardDeck, Choice in
+  copies, Studio gate, 20+ new VM tests, audit fixes), P6 `3e0a94da`/`167101ab`/`158155ae`
+  (Sixty harness segments, Stage-A land legality fix, CONSISTENCY_CREDIT sweep), P7 `ca3aa80b`/
+  `59a81d2f` + telemetry (Motor A deletion, harness legacy segments). Commander rule-0.3 numbers
+  reproduced at every gate (180/180, 78/85/88/90/96, determinism 180/176). Deviations from the plan
+  worth knowing: `finalize` kept `Map<RoleKey, List<String>>` (repeated ids = copies) because a
+  `Map<String, Int>` overload clashes on the JVM; the generic queue sheet is `DeckCardQueueSheet`
+  (the plan's name was taken); `DeckWizardDirectionIdentity.kt` had to go in P5a (compile-driven);
+  fixture-14 seeds rank `aggro` top-5, not #1 (spellslinger-shaped entries own the SPELLS axis).
