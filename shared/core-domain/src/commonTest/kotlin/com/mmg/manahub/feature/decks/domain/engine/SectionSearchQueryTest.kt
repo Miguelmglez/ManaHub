@@ -291,11 +291,30 @@ class SectionSearchQueryTest {
     }
 
     @Test
-    fun buildFor_colorlessOnlyIdentity_omitsIdClause() {
+    fun buildFor_colorlessOnlyIdentity_boundsToColorless() {
+        // N4: a colourless commander is a real constraint -- both tabs must list only colourless cards.
         val context = ctx(colors = setOf(ManaColor.C), format = DeckFormat.COMMANDER)
         val built = SectionSearchQuery.buildFor("role:removal_spot", context)
         assertNotNull(built)
-        assertFalse(built.contains("id<="), "a C-only identity must omit id<=, got: $built")
+        assertTrue(built.contains("id<=c"), "a C-only identity must bound to colourless, got: $built")
+        assertTrue(SectionSearchQuery.buildFor("role:removal_spot", ctx(colors = emptySet(), format = DeckFormat.COMMANDER))!!.contains("id<=c"))
+    }
+
+    @Test
+    fun toAdvancedQuery_commanderEmptyIdentity_addsColorlessIdentityCriterion() {
+        val context = ctx(colors = emptySet(), format = DeckFormat.COMMANDER)
+        val query = SectionSearchQuery.toAdvancedQuery("role:ramp", context)!!
+        val criterion = query.criteria.filterIsInstance<com.mmg.manahub.core.model.SearchCriterion.ColorIdentity>().single()
+        assertEquals(setOf("C"), criterion.colors)
+        assertEquals(com.mmg.manahub.core.model.ColorMatchMode.AT_MOST, criterion.mode)
+        // The shared renderer spells a C-only AT_MOST set as `id=c` -- the same colourless-only pool.
+        assertEquals("id=c", com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase()
+            .let { it(com.mmg.manahub.core.model.AdvancedSearchQuery(listOf(criterion))) })
+        val gate = SectionSearchQuery.localStructuralGate(context)
+        assertTrue(gate(card(id = "rock", name = "Rock", colorIdentity = emptyList())))
+        assertFalse(gate(card(id = "bolt", name = "Bolt", colorIdentity = listOf("R"))))
+        assertFalse(SectionSearchQuery.toAdvancedQuery("role:ramp", ctx(colors = emptySet(), format = DeckFormat.STANDARD))!!
+            .criteria.any { it is com.mmg.manahub.core.model.SearchCriterion.ColorIdentity })
     }
 
     // ── buildFor: legality composition ──────────────────────────────────────────────────────

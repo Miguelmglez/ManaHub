@@ -1328,6 +1328,10 @@
     <string name="deck_wizard_plan_sections_owned_hint">%1$d in your collection</string>
     <string name="deck_wizard_plan_sections_added_title">Your cards</string>
     <string name="deck_wizard_manual_add_rejected">That card doesn\'t fit this deck\'s color identity or format legality.</string>
+    <plurals name="deck_wizard_seeds_pruned_outside_identity">
+        <item quantity="one">%1$d card outside the deck\'s colors was removed</item>
+        <item quantity="other">%1$d cards outside the deck\'s colors were removed</item>
+    </plurals>
     <!-- Step 4 — Review -->
     <string name="deck_wizard_review_title">Review &amp; generate</string>
     <string name="deck_wizard_review_commander_section">Commander</string>

@@ -142,6 +142,9 @@ data class WizardDraftBuild(
     /** D4/S8 -- the genuine last resort: no classified role and no axis edge either, placed only
      * because neither the main loop nor the Standalone fallback had anything left to offer. */
     val fallbackOffPlanIds: List<String> = emptyList(),
+    /** Manual adds outside a Commander anchor's identity, dropped before placement (defence in
+     * depth behind the wizard's own seed pruning) — the caller must surface them, never hide them. */
+    val droppedOffIdentityIds: List<String> = emptyList(),
 )
 
 class BuildWizardDeckUseCase(
@@ -292,7 +295,15 @@ class BuildWizardDeckUseCase(
         val dominantTribeKey = plan.internalTribe
 
         val landTarget = LandTargetResolver.resolve(format, plan.skeleton, profile = null, manaBaseAnalyzer = manaBaseAnalyzer)
-        val (manualNonLandRaw, manualLandRaw) = manualAdds.partition { !BasicLandCalculator.isLand(it.card) }
+        // A Commander identity is fixed by the commander; a Sixty CARDS flow derives its identity FROM the seeds, so only the former filters.
+        val anchorIdentitySymbols = identity.map { it.symbol }.toSet()
+        val (keptManualAdds, droppedManualAdds) = if (anchor is BuildAnchor.Commander) {
+            manualAdds.partition { anchorIdentitySymbols.containsAll(it.card.colorIdentity) }
+        } else {
+            manualAdds to emptyList()
+        }
+        if (droppedManualAdds.isNotEmpty()) crashReporter.log("deck_wizard_manual_add_off_identity_dropped")
+        val (manualNonLandRaw, manualLandRaw) = keptManualAdds.partition { !BasicLandCalculator.isLand(it.card) }
         // S3: manual adds are kept at the user's requested quantity, clamped ONLY by legality
         // (CopyPolicy.maxSeedCopies) -- never by ownership; the engine's OWN extra copies (the main
         // loop below) are separately capped by CopyPolicy.maxPlaceable (owned-clamped). For
@@ -322,7 +333,7 @@ class BuildWizardDeckUseCase(
 
         // ── Candidate pool (2.1, S2/S3) ─────────────────────────────────────────────────────────
         val identitySymbols = identity.map { it.symbol }.toSet()
-        val manualIds = manualAdds.map { it.card.scryfallId }.toSet()
+        val manualIds = keptManualAdds.map { it.card.scryfallId }.toSet()
         val commanderId = commander?.scryfallId
         // S2: owned quantity per NAME, summed across every printing -- computed BEFORE the
         // printing dedupe below (a user owning 2x printing A + 2x printing B of the same name owns
@@ -596,6 +607,7 @@ class BuildWizardDeckUseCase(
             preferenceBonusAppliedCount = preferenceBonusAppliedCount,
             fallbackStandaloneIds = fallbackStandaloneIds,
             fallbackOffPlanIds = fallbackOffPlanIds,
+            droppedOffIdentityIds = droppedManualAdds.map { it.card.scryfallId },
         )
     }
 
@@ -1242,9 +1254,13 @@ class BuildWizardDeckUseCase(
     private fun identitySymbolsToColors(symbols: Set<String>): Set<ManaColor> =
         ManaColor.entries.filter { it.symbol in symbols }.toSet()
 
-    /** The colour a canonical basic land (Plains..Forest, Wastes) is a copy of, `null` otherwise. */
-    private fun basicColorFor(card: Card): ManaColor? =
-        ManaColor.entries.firstOrNull { (BasicLandCalculator.LAND_FOR_COLOR[it.symbol] ?: "Wastes") == card.name }
+    /** The colour a basic land (incl. snow-covered) is a copy of -- `C` for Wastes -- `null` for a non-basic. */
+    private fun basicColorFor(card: Card): ManaColor? {
+        if (!BasicLandCalculator.isBasicLand(card)) return null
+        val produced = BasicLandCalculator.getProducedColors(card)
+        if (produced.isEmpty()) return ManaColor.C
+        return produced.singleOrNull()?.let { symbol -> ManaColor.entries.firstOrNull { it.symbol == symbol } }
+    }
 
     /**
      * R12/E13: the ONE lookup for "the [Card] object backing basic-land [name]" — used by Stage B's

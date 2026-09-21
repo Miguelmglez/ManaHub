@@ -102,6 +102,7 @@ class DeckWizardViewModelTest {
     private val cardStrategyTagsRepository = mockk<CardStrategyTagsRepository>()
     private val crashReporter = mockk<CrashReporter>(relaxed = true)
     private val appContext = mockk<Context>()
+    private val resources = mockk<android.content.res.Resources>()
     // Deck Wizard Commander v3 plan, Phase 5 -- stubbed to a real DeckHealth (analysis defaults
     // null) rather than left relaxed: `analyze` is `suspend` and every Commander STRATEGY-step test
     // now exercises `recomputePlanAnalysis()` via `onNextFromStrategy()`, so an unstubbed call would
@@ -181,6 +182,7 @@ class DeckWizardViewModelTest {
         every { draft.fallbackOffPlanIds } returns fallbackOffPlanIds
         every { draft.placedNonLand } returns placedNonLand
         every { draft.candidateMaxCopies } returns candidateMaxCopies
+        every { draft.droppedOffIdentityIds } returns emptyList()
         return draft
     }
 
@@ -210,6 +212,8 @@ class DeckWizardViewModelTest {
         every { appContext.getString(any()) } returns "TPL"
         // W7 fix 4.1: onToggleChoiceCard's cap-reached toast uses the vararg getString overload.
         every { appContext.getString(any(), *anyVararg()) } returns "TPL"
+        every { appContext.resources } returns resources
+        every { resources.getQuantityString(any(), any(), *anyVararg()) } returns "TPL"
         every { userCardRepository.observeCollection() } returns flowOf(emptyList())
         coEvery { deckRepository.createDeck(any(), any(), any()) } returns "wizard-deck-1"
         // Default: no analysis available (degrades PLAN_SECTIONS to its error state) -- tests that
@@ -2332,5 +2336,274 @@ class DeckWizardViewModelTest {
         assertEquals("tribe:elf", committed.selectedTribeKey)
         assertEquals(setOf(ManaColor.G), committed.colorIdentity)
         assertNull(committed.pendingTribeStrategy)
+    }
+
+    // ── Run 4c re-audit fixes (N1-N8) ────────────────────────────────────────────
+
+    private val blackCommander = card(id = "cmd-black", name = "Black Lord", typeLine = "Legendary Creature — Vampire", colorIdentity = listOf("B"), colors = listOf("B"))
+    private val whiteCommander = card(id = "cmd-white", name = "White Lord", typeLine = "Legendary Creature — Angel", colorIdentity = listOf("W"), colors = listOf("W"))
+
+    @Test
+    fun `N1 -- Commander, swapping the commander prunes seeds outside the new identity and never widens it`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val blackSeed = card(id = "seed-b", name = "Black Seed", colorIdentity = listOf("B"))
+        val whiteSeed = card(id = "seed-w", name = "White Seed", colorIdentity = listOf("W"))
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        vm.onSelectCommander(blackCommander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        advanceUntilIdle()
+        vm.onAddSeed(blackSeed)
+        assertEquals(listOf(blackSeed), vm.uiState.value.seeds.map { it.card })
+
+        vm.onBackPressed()
+        vm.onBackPressed()
+        assertEquals(WizardPhase.COMMANDER_PICK, vm.uiState.value.phase)
+        vm.onClearCommander()
+        vm.events.test {
+            vm.onSelectCommander(whiteCommander)
+            advanceUntilIdle()
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+            cancelAndIgnoreRemainingEvents()
+        }
+        verify { resources.getQuantityString(R.plurals.deck_wizard_seeds_pruned_outside_identity, 1, 1) }
+        assertTrue("the black seed must not survive a white commander", vm.uiState.value.seeds.isEmpty())
+        assertEquals(setOf(ManaColor.W), vm.uiState.value.colorIdentity)
+
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        advanceUntilIdle()
+        vm.onAddSeed(whiteSeed)
+        assertEquals(setOf(ManaColor.W), vm.uiState.value.colorIdentity)
+        assertEquals(setOf(ManaColor.W), vm.uiState.value.lockedColors)
+    }
+
+    @Test
+    fun `N1 -- clearing the commander prunes every coloured seed, colourless ones stay`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val blackSeed = card(id = "seed-b", name = "Black Seed", colorIdentity = listOf("B"))
+        val rock = card(id = "seed-c", name = "Mana Rock", colorIdentity = emptyList())
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        vm.onSelectCommander(blackCommander)
+        advanceUntilIdle()
+        vm.onAddSeed(blackSeed)
+        vm.onAddSeed(rock)
+        assertEquals(2, vm.uiState.value.seeds.size)
+
+        vm.onClearCommander()
+        assertEquals(listOf(rock), vm.uiState.value.seeds.map { it.card })
+        assertTrue(vm.uiState.value.colorIdentity.isEmpty())
+    }
+
+    @Test
+    fun `N1 -- COLORS flow, untoggling a colour prunes the seeds that needed it`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.COLORS)
+        vm.onToggleColorFlowColor(ManaColor.R)
+        vm.onToggleColorFlowColor(ManaColor.G)
+        advanceUntilIdle()
+        vm.onNextFromColorPick()
+        advanceUntilIdle()
+        assertEquals(WizardPhase.PLAN_SECTIONS, vm.uiState.value.phase)
+        val bolt = card(id = "bolt", name = "Lightning Bolt", colorIdentity = listOf("R"), legalityStandard = "legal")
+        val elf = card(id = "elf", name = "Llanowar Elves", colorIdentity = listOf("G"), legalityStandard = "legal")
+        vm.onAddSeed(bolt)
+        vm.onAddSeed(elf)
+        assertEquals(2, vm.uiState.value.seeds.size)
+
+        vm.onBackPressed()
+        assertEquals(WizardPhase.COLOR_PICK, vm.uiState.value.phase)
+        vm.events.test {
+            vm.onToggleColorFlowColor(ManaColor.R)
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals(listOf(elf), vm.uiState.value.seeds.map { it.card })
+        assertEquals(setOf(ManaColor.G), vm.uiState.value.colorIdentity)
+    }
+
+    @Test
+    fun `N1 -- STRATEGY flow, backing into STRATEGY_PICK drops the identity and the seeds that needed it`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.STRATEGY)
+        advanceUntilIdle()
+        val plain = CuratedStrategyCatalog.ALL.first { it.availableIn(DeckFormat.STANDARD) && !it.requiresTribe }
+        vm.onSelectStrategyPickEntry(plain)
+        vm.onSelectStrategyPickCombo(plain, ColorComboSuggestion(setOf(ManaColor.W, ManaColor.U), 1f))
+        vm.onNextFromStrategyPick()
+        advanceUntilIdle()
+        val blue = card(id = "blue-seed", name = "Blue Seed", colorIdentity = listOf("U"), legalityStandard = "legal")
+        vm.onAddSeed(blue)
+        assertEquals(1, vm.uiState.value.seeds.size)
+
+        vm.onBackPressed()
+        advanceUntilIdle()
+        assertEquals(WizardPhase.STRATEGY_PICK, vm.uiState.value.phase)
+        assertTrue(vm.uiState.value.colorIdentity.isEmpty())
+        assertTrue("a seed outside the (now empty) identity must not survive", vm.uiState.value.seeds.isEmpty())
+    }
+
+    @Test
+    fun `N1 -- engine-dropped off-identity manual adds are reported with the pruning toast`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val draft = commanderDraft()
+        every { draft.droppedOffIdentityIds } returns listOf("seed-g")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
+        } returns draft
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onAddSeed(card(id = "seed-g", name = "Green Seed", colorIdentity = listOf("G")))
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        vm.onNextFromPlanSections()
+        vm.events.test {
+            vm.onGenerate()
+            advanceUntilIdle()
+            val events = listOf(awaitItem(), awaitItem())
+            assertTrue(events.any { it is DeckWizardEvent.ShowToast })
+            assertTrue(events.any { it is DeckWizardEvent.OpenDeckStudio })
+        }
+        verify { resources.getQuantityString(R.plurals.deck_wizard_seeds_pruned_outside_identity, 1, 1) }
+        verify { crashReporter.log("deck_wizard_seeds_pruned_outside_identity_1-2") }
+    }
+
+    @Test
+    fun `N2 -- the per-card cap toast reports the card's cap when the refusal comes from another section`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
+        } returns twoSectionSharedAlternateDraft(sharedHeadroom = 1)
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        vm.onChangeChoiceQuantity("removal_spot", "shared-1", 1)
+        vm.events.test {
+            vm.onChangeChoiceQuantity("card_draw", "shared-1", 1)
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+        }
+        verify { appContext.getString(R.string.deck_wizard_seed_copy_cap, 1) }
+        verify(exactly = 0) { appContext.getString(R.string.deck_wizard_seed_copy_cap, 0) }
+    }
+
+    @Test
+    fun `N5 -- a refused unconfirmed write is not retryable, Retry routes to REVIEW and records no non-fatal`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
+        every { deckRepository.observeDeckWithCards("full-deck-1") } returns flowOf(nonEmptyDeckWithCards("full-deck-1", commanderId = null))
+        val vm = viewModel(mapOf("format" to "COMMANDER", "deckId" to "full-deck-1", "replaceConfirmed" to false))
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        assertNotNull(vm.uiState.value.buildError)
+        assertFalse(vm.uiState.value.isBuildErrorRetryable)
+
+        vm.onRetryGeneration()
+        advanceUntilIdle()
+        assertEquals(WizardPhase.REVIEW, vm.uiState.value.phase)
+        assertNull(vm.uiState.value.buildError)
+        assertTrue(vm.uiState.value.isBuildErrorRetryable)
+        coVerify(exactly = 0) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { crashReporter.recordException(any()) }
+        verify { crashReporter.log("deck_wizard_write_refused_unconfirmed") }
+    }
+
+    @Test
+    fun `N6 -- clearing the commander cancels an in-flight seed pre-fill, nothing lands afterwards`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val comboRock = card(id = "combo-rock", name = "Combo Rock", colorIdentity = emptyList())
+        coEvery { searchCardsUseCase("Combo Rock") } coAnswers {
+            gate.await()
+            DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(cards = listOf(comboRock), totalCards = 1, hasMore = false))
+        }
+        val vm = viewModel(mapOf("format" to "COMMANDER", "seeds" to "Combo Rock"))
+        advanceUntilIdle()
+        vm.onSelectCommander(commander)
+        runCurrent() // suspended inside the seed search
+
+        vm.events.test {
+            vm.onClearCommander()
+            gate.complete(Unit)
+            advanceUntilIdle()
+            expectNoEvents()
+        }
+        assertTrue(vm.uiState.value.seeds.isEmpty())
+    }
+
+    @Test
+    fun `N7 -- a Commander hand-off's archetype arg pins the strategy once the recommendations land`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel(mapOf("format" to "COMMANDER", "archetype" to "AGGRO", "colors" to "WU"))
+        advanceUntilIdle()
+        assertEquals(WizardPhase.COMMANDER_PICK, vm.uiState.value.phase)
+        assertNull(vm.uiState.value.selectedArchetype)
+
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        assertEquals(ArchetypeId.AGGRO, vm.uiState.value.selectedArchetype)
+        assertEquals("aggro", vm.uiState.value.selectedCuratedStrategyId)
+        assertEquals("the identity is the commander's, never the colors arg", setOf(ManaColor.G), vm.uiState.value.colorIdentity)
+        verify { crashReporter.log("deck_wizard_commander_prefill_colors_ignored") }
+
+        // A later commander swap ranks fresh -- the hand-off pin applies only once.
+        vm.onClearCommander()
+        vm.onSelectCommander(whiteCommander)
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.strategyRecommendations.isNotEmpty())
+        assertEquals(vm.uiState.value.strategyRecommendations.first().strategy.id, vm.uiState.value.selectedCuratedStrategyId)
+    }
+
+    @Test
+    fun `N7 -- a Commander hand-off whose strategy the catalog cannot resolve is ignored with a breadcrumb`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel(mapOf("format" to "COMMANDER", "theme" to "NOT_A_THEME"))
+        advanceUntilIdle()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        verify { crashReporter.log("deck_wizard_commander_prefill_strategy_unresolved") }
+        assertEquals(vm.uiState.value.strategyRecommendations.first().strategy.id, vm.uiState.value.selectedCuratedStrategyId)
+    }
+
+    @Test
+    fun `N8 -- an orphan cleanup cancelled mid-delete records no non-fatal`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
+        coEvery {
+            deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any(), any())
+        } throws RuntimeException("persist boom")
+        coEvery { deckRepository.deleteDeck("wizard-deck-1") } throws kotlinx.coroutines.CancellationException("scope cleared")
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+        assertEquals("TPL", vm.uiState.value.buildError)
+
+        vm.onCancelGeneration()
+        advanceUntilIdle()
+        coVerify(exactly = 1) { deckRepository.deleteDeck("wizard-deck-1") }
+        verify(exactly = 0) { crashReporter.log("deck_wizard_cancel_cleanup_failed") }
+        // The persist failure itself records its own non-fatal; the cancelled cleanup must add none.
+        verify(exactly = 0) { crashReporter.recordException(match { it.message?.contains("deck_wizard_cancel_cleanup_failed") == true }) }
     }
 }

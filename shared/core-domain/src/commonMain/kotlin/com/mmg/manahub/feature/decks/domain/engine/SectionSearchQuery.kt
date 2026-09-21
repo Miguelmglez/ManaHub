@@ -192,7 +192,8 @@ object SectionSearchQuery {
     private fun identityCriterion(context: SectionQueryContext): SearchCriterion? {
         if (ArchetypeFormat.of(context.format) != ArchetypeFormat.COMMANDER) return null
         val colored = WUBRG_ORDER.filter { it in context.colorIdentity }
-        if (colored.isEmpty()) return null
+        // The renderer emits a C-only AT_MOST set as `id=c` -- the same colourless-only pool as `id<=c`.
+        if (colored.isEmpty()) return SearchCriterion.ColorIdentity(colors = setOf("C"), mode = ColorMatchMode.AT_MOST)
         return SearchCriterion.ColorIdentity(
             colors = colored.map { it.symbol }.toSet(),
             mode = ColorMatchMode.AT_MOST,
@@ -361,15 +362,14 @@ object SectionSearchQuery {
     /**
      * `id<=WUBG` for Commander-family formats (COMMANDER + COMMANDER_CASUAL, via
      * [ArchetypeFormat.of] -- the same distinction [AnalysisEngine] already uses), omitted for
-     * 60-card/Draft formats whose legal pool is not identity-bounded. Colorless-only identity
-     * (`{C}` with no WUBRG colors, or a genuinely colorless deck) omits the clause entirely --
-     * `id<=C` is never useful ("colorless or less" adds no filtering `id<=` doesn't already do by
-     * being empty).
+     * 60-card/Draft formats whose legal pool is not identity-bounded. An EMPTY Commander identity
+     * (a colourless commander) is a real constraint -- `id<=c` -- so the All-cards tab lists the
+     * same colourless-only pool [localStructuralGate] admits.
      */
     private fun identityClause(context: SectionQueryContext): String? {
         if (ArchetypeFormat.of(context.format) != ArchetypeFormat.COMMANDER) return null
         val colored = WUBRG_ORDER.filter { it in context.colorIdentity }
-        if (colored.isEmpty()) return null
+        if (colored.isEmpty()) return "id<=c"
         return "id<=" + colored.joinToString("") { it.symbol }
     }
 

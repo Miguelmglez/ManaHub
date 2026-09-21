@@ -87,18 +87,45 @@ class BasicLandPlannerStudioAgreementTest {
             manaBaseAnalyzer = manaBaseAnalyzer,
         )
 
+        // Keyed by colour, like Studio: a snow-covered basic counts toward its colour's allocation.
         val currentCounts = mutableMapOf<String, Int>()
         entries.filter { BasicLandCalculator.isBasicLand(it.card) }
-            .forEach { currentCounts[it.card.name] = (currentCounts[it.card.name] ?: 0) + it.quantity }
+            .forEach { entry ->
+                val colorKey = BasicLandCalculator.getProducedColors(entry.card).singleOrNull() ?: ManaColor.C.symbol
+                currentCounts[colorKey] = (currentCounts[colorKey] ?: 0) + entry.quantity
+            }
 
         ManaColor.entries.forEach { color ->
-            val name = BasicLandCalculator.LAND_FOR_COLOR[color.symbol] ?: "Wastes"
             assertEquals(
-                currentCounts[name] ?: 0,
+                currentCounts[color.symbol] ?: 0,
                 basicCounts[color] ?: 0,
-                "Studio's re-derived $name count must equal what the wizard actually placed",
+                "Studio's re-derived ${color.displayName} basic count must equal what the wizard actually placed",
             )
         }
+    }
+
+    @Test
+    fun `Studio's land-delta math agrees with a 60-card wizard build that seeded snow-covered basics`() = runTest {
+        val fixture = fixture16Tron()
+        val fixtureNonLand = fixture.mainboard.filterNot { BasicLandCalculator.isLand(it.card) }
+        val seeds = fixtureNonLand.take(6).map { it.card }
+        val snowForest = card(id = "agree-snow-forest", name = "Snow-Covered Forest", typeLine = "Basic Snow Land — Forest", cmc = 0.0, colors = emptyList(), colorIdentity = listOf("G"), producedMana = "G")
+        val ownedPool = (
+            MockCollectionRich.ownedCards +
+                fixtureNonLand.map { MockCollectionCard(it.card, 4) } +
+                MockCollectionRich.ownedBasics +
+                MockCollectionCard(snowForest, 4)
+            ).distinctBy { it.card.scryfallId }.toOwned()
+        val anchor = BuildAnchor.Sixty(fixture.colorIdentity, seeds + snowForest)
+        val manualAdds = seeds.map { ManualAdd(it, isOwned = true, quantity = 4) } + ManualAdd(snowForest, isOwned = true, quantity = 4)
+
+        val useCase = newAgreementUseCase()
+        val draft = useCase.buildWithGroups(fixture.format, anchor, StrategyPick.Custom, ownedPool, manualAdds = manualAdds, includeNonBasicLands = true)
+        val outcome = useCase.finalize(draft, resolutions = emptyMap(), fillLands = true)
+
+        assertEquals(60, outcome.result.entries.sumOf { it.quantity })
+        assertEquals(4, outcome.result.entries.first { it.card.scryfallId == snowForest.scryfallId }.quantity)
+        assertZeroDeltas(outcome.result.entries, outcome.plan.skeleton, fixture.format, commanderIdentitySymbols = null)
     }
 
     @Test

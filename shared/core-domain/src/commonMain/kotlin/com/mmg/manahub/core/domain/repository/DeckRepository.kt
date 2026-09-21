@@ -302,9 +302,10 @@ interface DeckRepository {
         updateTribeOverride(deckId, tribeOverride)
         updateStrategyLocked(deckId, strategyLocked)
         if (commanderCardId != null) {
-            observeDeckWithCards(deckId).first()?.deck?.let { deck ->
-                updateDeck(deck.copy(commanderCardId = commanderCardId, coverCardId = commanderCardId))
-            }
+            // Skipping the commander write silently would persist a Commander build with no commander.
+            val deck = observeDeckWithCards(deckId).first()?.deck
+                ?: throw IllegalStateException("persistWizardBuild: deck not found for the commander write")
+            updateDeck(deck.copy(commanderCardId = commanderCardId, coverCardId = commanderCardId))
         }
     }
 }

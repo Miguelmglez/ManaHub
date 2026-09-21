@@ -306,6 +306,9 @@ data class DeckWizardUiState(
     val commanderBuildStage: com.mmg.manahub.feature.decks.domain.template.WizardBuildStage? = null,
     val commanderCompletedStages: List<com.mmg.manahub.feature.decks.domain.template.WizardBuildStage> = emptyList(),
     val buildError: String? = null,
+    /** False only for a refused unconfirmed write: retrying would hit the same guard, so the error
+     * renders with Back alone. */
+    val isBuildErrorRetryable: Boolean = true,
 
     val createdDeckId: String? = null,
 
@@ -570,6 +573,10 @@ class DeckWizardViewModel(
      * them against (identity + legality) -- see the init pre-fill gate. */
     private var pendingCommanderSeedNames: List<String> = emptyList()
 
+    /** A Commander hand-off's strategy pin, applied once the first recommendation pass has landed
+     * (it would otherwise be overwritten by the auto-selected top pick). */
+    private var pendingCommanderStrategyPrefill: Pair<CuratedStrategy, String?>? = null
+
     private data class PendingFinalize(
         val state: DeckWizardUiState,
         val format: DeckFormat,
@@ -637,17 +644,26 @@ class DeckWizardViewModel(
             // first step (SEED_PICK / COLOR_PICK / STRATEGY_PICK) — the pre-v6 shared DIRECTION
             // phase these hand-offs used to dispatch on is gone.
             // Commander always starts at COMMANDER_PICK: the 60-card maps would reject every coloured seed.
+            val archetype = archetypeArg?.let { name -> ArchetypeId.entries.firstOrNull { a -> a.name == name } }
+            val theme = themeArg?.let { name -> ThemeId.entries.firstOrNull { t -> t.name == name } }
+            val nearest = archetype?.let { a -> CuratedStrategyCatalog.nearestFor(a, listOfNotNull(theme), resolvedFormat) }
             when {
-                resolvedFormat.isCommanderFormat -> pendingCommanderSeedNames = seedsArg
+                resolvedFormat.isCommanderFormat -> {
+                    pendingCommanderSeedNames = seedsArg
+                    // The identity is the commander's, so a colors arg has nothing to apply to.
+                    if (colorsArg != null) crashReporter.log("deck_wizard_commander_prefill_colors_ignored")
+                    if (nearest != null) {
+                        pendingCommanderStrategyPrefill = nearest to tribeArg
+                    } else if (archetypeArg != null || themeArg != null || tribeArg != null) {
+                        crashReporter.log("deck_wizard_commander_prefill_strategy_unresolved")
+                    }
+                }
                 seedsArg.isNotEmpty() -> _uiState.update { it.copy(entryFlow = WizardEntryFlow.CARDS, phase = WizardPhase.SEED_PICK) }
                 colorsArg != null -> _uiState.update {
                     it.copy(entryFlow = WizardEntryFlow.COLORS, phase = WizardPhase.COLOR_PICK, colorIdentity = parseColorString(colorsArg))
                 }
                 archetypeArg != null || themeArg != null || tribeArg != null -> {
                     _uiState.update { it.copy(entryFlow = WizardEntryFlow.STRATEGY, phase = WizardPhase.STRATEGY_PICK) }
-                    val archetype = archetypeArg?.let { name -> ArchetypeId.entries.firstOrNull { a -> a.name == name } }
-                    val theme = themeArg?.let { name -> ThemeId.entries.firstOrNull { t -> t.name == name } }
-                    val nearest = archetype?.let { a -> CuratedStrategyCatalog.nearestFor(a, listOfNotNull(theme), resolvedFormat) }
                     if (nearest != null) {
                         selectCommanderStrategy(nearest, tribeArg)
                     } else if (tribeArg != null) {
@@ -717,16 +733,18 @@ class DeckWizardViewModel(
      */
     fun onSelectCommander(card: Card) {
         commanderSearchJob?.cancel()
+        val identity = card.colorIdentity.toManaColorSet()
         _uiState.update {
             it.copy(
                 selectedCommander = card,
-                colorIdentity = card.colorIdentity.toManaColorSet(),
+                colorIdentity = identity,
                 commanderQuery = "",
                 commanderSearchResults = emptyList(),
                 commanderSearchError = false,
                 commanderStructuredQuery = null,
             )
         }
+        pruneSeedsOutsideIdentity(identity)
         recomputeStrategyRecommendations()
         val stashedSeeds = pendingCommanderSeedNames
         if (stashedSeeds.isNotEmpty()) {
@@ -737,8 +755,10 @@ class DeckWizardViewModel(
     }
 
     fun onClearCommander() {
-        // An in-flight EDHREC fetch would otherwise land and pre-select a strategy for no commander.
+        // An in-flight EDHREC fetch would otherwise land and pre-select a strategy for no commander;
+        // a still-resolving seed hand-off would add seeds against an empty identity.
         commanderStrategyJob?.cancel()
+        comboSeedResolveJob?.cancel()
         _uiState.update {
             it.copy(
                 selectedCommander = null,
@@ -749,6 +769,35 @@ class DeckWizardViewModel(
                 isCustomStrategyChosen = false,
                 pendingTribeStrategy = null,
                 commanderTribePickerCandidates = emptyList(),
+            )
+        }
+        pruneSeedsOutsideIdentity(emptySet())
+    }
+
+    /**
+     * Drops every seed whose colour identity is not contained in [identity] — called by every
+     * identity-narrowing writer, since [onAddSeed] validates only at add time. Reports the removed
+     * count once (toast + bucketed breadcrumb); silent when nothing was outside.
+     */
+    private fun pruneSeedsOutsideIdentity(identity: Set<ManaColor>) {
+        val identitySymbols = identity.filter { it != ManaColor.C }.map { it.symbol }.toSet()
+        var removedCount = 0
+        _uiState.update { state ->
+            val (kept, dropped) = state.seeds.partition { seed -> identitySymbols.containsAll(seed.card.colorIdentity) }
+            removedCount = dropped.sumOf { it.quantity }
+            if (dropped.isEmpty()) state else state.copy(seeds = kept, lockedColors = kept.flatMap { it.card.colorIdentity }.toManaColorSet())
+        }
+        if (removedCount > 0) reportSeedsRemovedOutsideIdentity(removedCount)
+    }
+
+    private fun reportSeedsRemovedOutsideIdentity(removedCount: Int) {
+        crashReporter.log("deck_wizard_seeds_pruned_outside_identity_${countBucket(removedCount)}")
+        viewModelScope.launch {
+            _events.send(
+                DeckWizardEvent.ShowToast(
+                    appContext.resources.getQuantityString(R.plurals.deck_wizard_seeds_pruned_outside_identity, removedCount, removedCount),
+                    MagicToastType.WARNING,
+                )
             )
         }
     }
@@ -1047,8 +1096,14 @@ class DeckWizardViewModel(
             )
             ensureActive()
             _uiState.update { it.copy(strategyRecommendations = recommendations, isLoadingCommanderStrategies = false) }
+            val prefill = pendingCommanderStrategyPrefill
+            pendingCommanderStrategyPrefill = null
             val topPick = recommendations.firstOrNull()
-            if (topPick != null) selectCommanderStrategy(topPick.strategy, topPick.tribe) else selectCommanderStrategy(null, null)
+            when {
+                prefill != null -> selectCommanderStrategy(prefill.first, prefill.second)
+                topPick != null -> selectCommanderStrategy(topPick.strategy, topPick.tribe)
+                else -> selectCommanderStrategy(null, null)
+            }
         }
     }
 
@@ -1132,6 +1187,7 @@ class DeckWizardViewModel(
                 colorIdentity = pendingColors ?: it.colorIdentity,
             )
         }
+        if (pendingColors != null) pruneSeedsOutsideIdentity(pendingColors)
         selectCommanderStrategy(strategy, tribeKey)
     }
 
@@ -1190,6 +1246,7 @@ class DeckWizardViewModel(
             }
             state.copy(colorIdentity = updated)
         }
+        pruneSeedsOutsideIdentity(_uiState.value.engineIdentity)
         recomputeStrategyRecommendations(debounceMs = COLOR_PICK_STRATEGY_DEBOUNCE_MS)
     }
 
@@ -1238,6 +1295,7 @@ class DeckWizardViewModel(
             val base = if (isOtherRowCommitted) it.clearStalePick().copy(colorIdentity = emptySet()) else it
             base.copy(expandedStrategyPickId = strategy.id, showStrategyPickColorSheet = true, strategyPickCombos = emptyList())
         }
+        if (isOtherRowCommitted) pruneSeedsOutsideIdentity(emptySet())
         recomputeColorComboSuggestions(strategy.archetypes.firstOrNull(), strategy.themes.firstOrNull())
     }
 
@@ -1267,6 +1325,7 @@ class DeckWizardViewModel(
             pendingStrategyPickColors = combo.colors
         } else {
             _uiState.update { it.copy(colorIdentity = combo.colors) }
+            pruneSeedsOutsideIdentity(combo.colors)
             selectCommanderStrategy(strategy, null)
         }
     }
@@ -1601,13 +1660,17 @@ class DeckWizardViewModel(
 
     /** Recomputes [DeckWizardUiState.lockedColors] from scratch as the union of the CURRENT seeds'
      * identities. In the 60-card CARDS flow the seeds are the ONLY identity source, so
-     * [DeckWizardUiState.colorIdentity] is REPLACED (removing a seed shrinks it); a Commander build
-     * keeps its commander's identity and only unions the (always contained) seed colors. */
+     * [DeckWizardUiState.colorIdentity] is REPLACED (removing a seed shrinks it); a Commander build's
+     * identity is the commander's, period -- seed colours are never unioned into it. */
     private fun recomputeSeedLockedColors() {
         _uiState.update { state ->
             val locked = state.seeds.flatMap { it.card.colorIdentity }.toManaColorSet()
-            val seedsDefineIdentity = state.selectedFormat?.isCommanderFormat != true && state.entryFlow == WizardEntryFlow.CARDS
-            state.copy(lockedColors = locked, colorIdentity = if (seedsDefineIdentity) locked else state.colorIdentity + locked)
+            val identity = when {
+                state.selectedFormat?.isCommanderFormat == true -> state.selectedCommander?.colorIdentity?.toManaColorSet() ?: state.colorIdentity
+                state.entryFlow == WizardEntryFlow.CARDS -> locked
+                else -> state.colorIdentity
+            }
+            state.copy(lockedColors = locked, colorIdentity = identity)
         }
     }
 
@@ -1702,6 +1765,7 @@ class DeckWizardViewModel(
                 // recomputeStrategyRecommendations below drops.
                 val identity = if (target == WizardPhase.STRATEGY_PICK) emptySet() else state.colorIdentity
                 _uiState.update { it.copy(phase = target, colorIdentity = identity).clearPlanAnalysis(isAnalyzing = false) }
+                if (target == WizardPhase.STRATEGY_PICK) pruneSeedsOutsideIdentity(emptySet())
                 // The target step has no Next-driven re-entry here, so it re-ranks itself now
                 // (synchronously loading) instead of showing the previous list/pick as still valid.
                 recomputeStrategyRecommendations()
@@ -1733,6 +1797,7 @@ class DeckWizardViewModel(
                 commanderBuildStage = null,
                 commanderCompletedStages = emptyList(),
                 buildError = null,
+                isBuildErrorRetryable = true,
             )
         }
         // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4: ONE build path for every format now --
@@ -1807,6 +1872,12 @@ class DeckWizardViewModel(
             logFailure("deck_wizard_generate_crashed", t)
             _uiState.update { it.copy(buildError = appContext.getString(R.string.deck_wizard_build_error)) }
             return
+        }
+
+        // Engine-side defence in depth for identity pruning: whatever it dropped is reported, never silent.
+        val droppedOffIdentity = draft.droppedOffIdentityIds
+        if (droppedOffIdentity.isNotEmpty()) {
+            reportSeedsRemovedOutsideIdentity(manualAdds.filter { it.card.scryfallId in droppedOffIdentity }.sumOf { it.quantity })
         }
 
         val hasFallback = draft.fallbackStandaloneIds.isNotEmpty() || draft.fallbackOffPlanIds.isNotEmpty()
@@ -1900,12 +1971,13 @@ class DeckWizardViewModel(
                         (existing.deck.commanderCardId != null && existing.deck.commanderCardId != commander?.scryfallId)
                     )
             if (hasCardsToLose) {
-                crashReporter.recordException(
-                    IllegalStateException("[DeckWizardViewModel] refused an unconfirmed wizard write into a non-empty deck")
-                )
+                crashReporter.log("deck_wizard_write_refused_unconfirmed")
                 commanderGenerationStartAtMs = null
-                // A visible, retryable error state -- never a bare return that strands GENERATING on a spinner.
-                _uiState.update { it.copy(buildError = appContext.getString(R.string.deck_wizard_replace_not_confirmed)) }
+                // Retry would hit this same guard: the attempt is dropped and the error renders with Back only.
+                pendingFinalize = null
+                _uiState.update {
+                    it.copy(buildError = appContext.getString(R.string.deck_wizard_replace_not_confirmed), isBuildErrorRetryable = false)
+                }
                 _events.send(
                     DeckWizardEvent.ShowToast(
                         appContext.getString(R.string.deck_wizard_replace_not_confirmed),
@@ -2007,7 +2079,7 @@ class DeckWizardViewModel(
                     val message = if (sectionFull) {
                         appContext.getString(R.string.deck_wizard_choice_cap_reached, group.remainingSlots)
                     } else {
-                        appContext.getString(R.string.deck_wizard_seed_copy_cap, currentForId)
+                        appContext.getString(R.string.deck_wizard_seed_copy_cap, draft.globalChoiceCap(cardId))
                     }
                     crashReporter.log(if (sectionFull) "deck_wizard_choice_section_cap_reached" else "deck_wizard_choice_copy_cap_reached")
                     viewModelScope.launch { _events.send(DeckWizardEvent.ShowToast(message, MagicToastType.INFO)) }
@@ -2075,6 +2147,7 @@ class DeckWizardViewModel(
                 commanderBuildStage = null,
                 commanderCompletedStages = emptyList(),
                 buildError = null,
+                isBuildErrorRetryable = true,
             )
         }
         pendingFinalize = PendingFinalize(state, format, commander, strategyPick, manualAdds, draft, resolutions = resolutions)
@@ -2269,7 +2342,10 @@ class DeckWizardViewModel(
         pendingDeckId = null
         viewModelScope.launch {
             runCatching { deckRepository.deleteDeck(orphanId) }
-                .onFailure { logFailure("deck_wizard_cancel_cleanup_failed", it) }
+                .onFailure { t ->
+                    if (t is CancellationException) throw t
+                    logFailure("deck_wizard_cancel_cleanup_failed", t)
+                }
         }
     }
 
@@ -2286,6 +2362,7 @@ class DeckWizardViewModel(
                 commanderBuildStage = null,
                 commanderCompletedStages = emptyList(),
                 buildError = null,
+                isBuildErrorRetryable = true,
                 commanderDraftBuild = null,
                 choiceSelections = emptyMap(),
             )
@@ -2299,13 +2376,13 @@ class DeckWizardViewModel(
         val retry = pendingFinalize
         if (retry != null) {
             FirebaseCrashlytics.getInstance().log("deck_wizard_finalize_retry_resumed")
-            _uiState.update { it.copy(buildError = null, phase = WizardPhase.GENERATING) }
+            _uiState.update { it.copy(buildError = null, isBuildErrorRetryable = true, phase = WizardPhase.GENERATING) }
             generateJob = viewModelScope.launch {
                 finalizeWizardDraft(retry.state, retry.format, retry.commander, retry.strategyPick, retry.manualAdds, retry.draft, retry.resolutions)
             }
             return
         }
-        _uiState.update { it.copy(buildError = null, phase = WizardPhase.REVIEW) }
+        _uiState.update { it.copy(buildError = null, isBuildErrorRetryable = true, phase = WizardPhase.REVIEW) }
     }
 
     private fun logFailure(tag: String, t: Throwable) {

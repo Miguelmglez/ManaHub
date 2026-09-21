@@ -69,11 +69,13 @@ internal fun GeneratingContent(
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(spacing.md)) {
                 Text(stringResource(R.string.deck_wizard_build_error_title), style = ty.titleLarge, color = mc.textPrimary)
                 Text(uiState.buildError, style = ty.bodyMedium, color = mc.textSecondary)
-                Button(
-                    onClick = onRetry,
-                    shape = ChipShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent, contentColor = mc.background),
-                ) { Text(stringResource(R.string.deck_wizard_retry)) }
+                if (uiState.isBuildErrorRetryable) {
+                    Button(
+                        onClick = onRetry,
+                        shape = ChipShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent, contentColor = mc.background),
+                    ) { Text(stringResource(R.string.deck_wizard_retry)) }
+                }
                 OutlinedButton(onClick = onCancel, shape = ChipShape, border = BorderStroke(1.dp, mc.textSecondary)) {
                     Text(stringResource(R.string.action_back), color = mc.textSecondary)
                 }

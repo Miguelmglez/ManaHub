@@ -287,6 +287,26 @@ class BuildWizardDeckUseCaseTest {
     }
 
     @Test
+    fun `N1 -- a Commander manual add outside the commander's identity is dropped and reported, never placed`() = runTest {
+        val useCase = newUseCase()
+        val commander = MockCollectionThin.commander
+        val identity = commander.colorIdentity.toManaColors()
+        val owned = ownedFrom(MockCollectionThin.ownedCards, MockCollectionThin.ownedBasics)
+        val offIdentitySymbol = ManaColor.entries.first { it != ManaColor.C && it !in identity }.symbol
+
+        val offIdentity = card(id = "manual-off-identity", name = "Manual Off Identity", typeLine = "Instant", cmc = 1.0, colors = listOf(offIdentitySymbol), colorIdentity = listOf(offIdentitySymbol))
+        val inIdentity = card(id = "manual-in-identity", name = "Manual In Identity", typeLine = "Artifact", cmc = 1.0, colors = emptyList(), colorIdentity = emptyList())
+        val manualAdds = listOf(ManualAdd(offIdentity, isOwned = false), ManualAdd(inIdentity, isOwned = false))
+
+        val draft = useCase.buildWithGroups(DeckFormat.COMMANDER, commander, StrategyPick.Custom, identity, owned, manualAdds = manualAdds)
+
+        assertEquals(listOf(offIdentity.scryfallId), draft.droppedOffIdentityIds)
+        assertTrue(draft.placedNonLand.none { it.card.scryfallId == offIdentity.scryfallId }, "an off-identity manual add must never be placed")
+        assertTrue(draft.placedNonLand.any { it.card.scryfallId == inIdentity.scryfallId })
+        assertTrue(offIdentity.scryfallId !in draft.manualIds)
+    }
+
+    @Test
     fun `MockCollectionThin -- builds without crashing, declares gaps, places no filler, still fills lands, reports the score honestly`() = runTest {
         val useCase = newUseCase()
         val commander = MockCollectionThin.commander

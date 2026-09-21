@@ -884,15 +884,19 @@ class DeckStudioViewModel(
             emptyMap()
         }
 
+        // Keyed by colour, not name: a seeded Snow-Covered Forest counts as the wizard's Forest allocation.
         val currentCounts = mutableMapOf<String, Int>()
         entries.filter { it.card != null && !it.isSideboard && BasicLandCalculator.isBasicLand(it.card!!) }
-            .forEach { currentCounts[it.card!!.name] = (currentCounts[it.card!!.name] ?: 0) + it.quantity }
+            .forEach { entry ->
+                val colorKey = BasicLandCalculator.getProducedColors(entry.card!!).singleOrNull() ?: ManaColor.C.symbol
+                currentCounts[colorKey] = (currentCounts[colorKey] ?: 0) + entry.quantity
+            }
 
         val deltas = mutableListOf<LandDelta>()
         ManaColor.entries.forEach { color ->
             val landName = BasicLandCalculator.LAND_FOR_COLOR[color.symbol] ?: "Wastes"
             val suggestedCount = basicCounts[color] ?: 0
-            val currentCount = currentCounts[landName] ?: 0
+            val currentCount = currentCounts[color.symbol] ?: 0
             if (suggestedCount != currentCount) {
                 deltas.add(LandDelta(landName, color.symbol, suggestedCount - currentCount))
             }
