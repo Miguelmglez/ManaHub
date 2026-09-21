@@ -32,12 +32,6 @@ object FeatureFlags {
         const val SIMULATOR_ENABLED = false
     }
 
-    /** Flags for the Massive Add Cards feature. */
-    object MassiveAdd {
-        /** Massive Add Cards feature (multi-card input for collection/decks). */
-        const val MASSIVE_CARDS_ENABLED = false
-    }
-
     /** Flags for Online Multiplayer sessions and Tournaments. */
     object Online {
         /** Online multiplayer sessions: host/join a room, online tournaments. */

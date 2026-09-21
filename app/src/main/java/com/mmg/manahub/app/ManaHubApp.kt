@@ -105,7 +105,6 @@ import com.mmg.manahub.feature.friends.di.friendsKoinModule
 import com.mmg.manahub.feature.game.di.gameKoinModule
 import com.mmg.manahub.feature.gamification.di.gamificationKoinModule
 import com.mmg.manahub.feature.home.di.homeKoinModule
-import com.mmg.manahub.feature.massiveadd.di.massiveAddCardKoinModule
 import com.mmg.manahub.feature.news.di.newsKoinModule
 import com.mmg.manahub.feature.playtest.di.playtestKoinModule
 import com.mmg.manahub.feature.profile.di.profileKoinModule
@@ -566,7 +565,6 @@ class ManaHubApp : Application(), KoinComponent {
                     nearbyRepository = nearbySessionRepository,
                     voiceCommandRecognizer = voiceCommandRecognizer,
                 ),
-                massiveAddCardKoinModule()
             )
         }
 

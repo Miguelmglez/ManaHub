@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
@@ -104,6 +105,7 @@ fun CommunityDeckDetailScreen(
     onNavigateToDeck: (String) -> Unit,
     onCardClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onSelectCards: (archidektId: Int) -> Unit = {},
     viewModel: CommunityDeckDetailViewModel = koinViewModel(),
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
@@ -186,6 +188,18 @@ fun CommunityDeckDetailScreen(
                                 contentDescription = stringResource(R.string.action_back),
                                 tint = mc.textSecondary,
                             )
+                        }
+                    },
+                    actions = {
+                        val deck = (uiState as? CommunityDeckDetailUiState.Content)?.deck
+                        if (deck != null && deck.cards.isNotEmpty()) {
+                            IconButton(onClick = { onSelectCards(deck.archidektId) }) {
+                                Icon(
+                                    imageVector = Icons.Default.Checklist,
+                                    contentDescription = stringResource(R.string.community_deck_select_cards_cd),
+                                    tint = mc.textSecondary,
+                                )
+                            }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),

@@ -227,7 +227,7 @@ fun DeckStudioScreen(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     viewModel: DeckStudioViewModel = koinViewModel(),
-    onNavigateToMassiveAddCards: (List<Card>) -> Unit = {},
+    onNavigateToSelectCards: (deckId: String) -> Unit = {},
     ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val deckStats by viewModel.deckStatsFlow.collectAsStateWithLifecycle()
@@ -407,7 +407,7 @@ fun DeckStudioScreen(
                             context.startActivity(Intent.createChooser(intent, context.getString(R.string.deckbuilder_share_chooser)))
                         }
                     },
-                    onMassiveAdd = {onNavigateToMassiveAddCards(emptyList())},
+                    onSelectCards = { uiState.deck?.id?.let(onNavigateToSelectCards) },
                     shareEnabled = !uiState.isEmptyDeck,
                     onDeleteDeck = { showDeleteDialog = true },
                 )
@@ -890,7 +890,7 @@ private fun DeckStudioTopBar(
     onEdit: () -> Unit,
     onShare: () -> Unit,
     shareEnabled: Boolean,
-    onMassiveAdd: ()->Unit,
+    onSelectCards: () -> Unit,
     onDeleteDeck: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -1055,29 +1055,27 @@ private fun DeckStudioTopBar(
                         },
                     )
 
-                    if (FeatureFlags.MassiveAdd.MASSIVE_CARDS_ENABLED) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = "Massive add",
-                                    style = ty.bodyMedium,
-                                    color = if (shareEnabled) mc.textPrimary else mc.textDisabled,
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.CollectionsBookmark,
-                                    contentDescription = null,
-                                    tint = if (shareEnabled) mc.textSecondary else mc.textDisabled,
-                                )
-                            },
-                            enabled = shareEnabled,
-                            onClick = {
-                                showOverflow = false
-                                onMassiveAdd()
-                            },
-                        )
-                    }
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = stringResource(R.string.deckstudio_select_cards),
+                                style = ty.bodyMedium,
+                                color = if (shareEnabled) mc.textPrimary else mc.textDisabled,
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.CollectionsBookmark,
+                                contentDescription = null,
+                                tint = if (shareEnabled) mc.textSecondary else mc.textDisabled,
+                            )
+                        },
+                        enabled = shareEnabled,
+                        onClick = {
+                            showOverflow = false
+                            onSelectCards()
+                        },
+                    )
                 }
             }
         }

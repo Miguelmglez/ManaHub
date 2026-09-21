@@ -111,7 +111,9 @@ import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.LanguageSelectorSheet
+import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicProgressBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
@@ -218,18 +220,31 @@ fun AddCardScreen(
                             tint = mc.textPrimary,
                         )
                     }
-                    Text(
-                        text = stringResource(
-                            if (isMultiSelectMode) R.string.addcard_multi_select_title else R.string.addcard_title
-                        ),
-                        style = ty.titleLarge,
-                        color = mc.textPrimary,
+                    Column(
                         modifier = Modifier
                             .weight(1f)
                             .padding(horizontal = 8.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    ) {
+                        Text(
+                            text = stringResource(
+                                if (isMultiSelectMode) R.string.addcard_multi_select_title else R.string.addcard_title
+                            ),
+                            style = ty.titleLarge,
+                            color = mc.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        val deckName = uiState.deckName
+                        if (uiState.isDeckMode && !deckName.isNullOrBlank()) {
+                            Text(
+                                text = deckName,
+                                style = ty.bodySmall,
+                                color = mc.textSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                     IconToggleButton(
                         checked = isMultiSelectMode,
                         onCheckedChange = { viewModel.onToggleMultiSelectMode() },
@@ -276,6 +291,10 @@ fun AddCardScreen(
                 animatedVisibilityScope = animatedVisibilityScope,
                 onViewModeToggle = viewModel::onViewModeToggle,
                 extraBottomPadding = ctaReservedHeight,
+                onClearDeckCards = viewModel::onClearDeckCards,
+                onSelectAllDeckCards = viewModel::onSelectAllDeckCards,
+                onSelectMissingDeckCards = viewModel::onSelectMissingDeckCards,
+                onRetryDeckLoad = viewModel::onRetryDeckLoad,
             )
 
             AnimatedVisibility(
@@ -404,10 +423,15 @@ private fun SearchSurface(
     animatedVisibilityScope: AnimatedVisibilityScope?,
     onViewModeToggle: () -> Unit,
     extraBottomPadding: Dp,
+    onClearDeckCards: () -> Unit,
+    onSelectAllDeckCards: () -> Unit,
+    onSelectMissingDeckCards: () -> Unit,
+    onRetryDeckLoad: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val focusManager = LocalFocusManager.current
+    val isDeckMode = uiState.isDeckMode
     val keyboardController = LocalSoftwareKeyboardController.current
 
     Column(
@@ -442,7 +466,7 @@ private fun SearchSurface(
                                 tint = mc.textDisabled
                             )
                         }
-                    } else {
+                    } else if (!isDeckMode) {
                         val languageDescription = stringResource(
                             R.string.addcard_language_button,
                             CardConstants.getLanguageName(uiState.searchLanguage),
@@ -552,10 +576,43 @@ private fun SearchSurface(
         } else {
             WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         }
-        val isIdle = uiState.query.length < 2 && uiState.activeFilterCount == 0
+        val isIdle = !isDeckMode && uiState.query.length < 2 && uiState.activeFilterCount == 0
 
         Box(modifier = Modifier.fillMaxSize()) {
             when {
+                isDeckMode && uiState.isDeckLoading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        MagicLoadingSpinner(modifier = Modifier.size(32.dp))
+                    }
+                }
+                isDeckMode && uiState.deckLoadFailed -> {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        InlineErrorState(
+                            message = stringResource(R.string.addcard_deck_load_error),
+                            retryLabel = stringResource(R.string.retry),
+                            onRetry = onRetryDeckLoad,
+                        )
+                        TextButton(onClick = onClearDeckCards) {
+                            Text(
+                                text = stringResource(R.string.addcard_clear_deck_cards),
+                                style = ty.labelLarge,
+                                color = mc.primaryAccent,
+                            )
+                        }
+                    }
+                }
+                isDeckMode && uiState.deckCards.isEmpty() -> {
+                    EmptyState(
+                        title = stringResource(R.string.addcard_deck_empty_title),
+                        subtitle = stringResource(R.string.addcard_deck_empty_subtitle),
+                        actionLabel = stringResource(R.string.addcard_clear_deck_cards),
+                        onAction = onClearDeckCards,
+                    )
+                }
                 uiState.isSearching && uiState.results.isEmpty() -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         MagicLoadingSpinner(
@@ -629,12 +686,34 @@ private fun SearchSurface(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
-                                text = stringResource(R.string.advsearch_show_results, uiState.totalCards),
-                                style = MaterialTheme.magicTypography.labelLarge,
-                                color = mc.textSecondary,
-                                modifier = Modifier.weight(1f)
-                            )
+                            if (isDeckMode) {
+                                Box(modifier = Modifier.weight(1f)) {
+                                    TextButton(
+                                        onClick = onClearDeckCards,
+                                        contentPadding = PaddingValues(horizontal = MaterialTheme.spacing.sm),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Clear,
+                                            contentDescription = null,
+                                            tint = mc.lifeNegative,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                        Spacer(Modifier.width(MaterialTheme.spacing.xs))
+                                        Text(
+                                            text = stringResource(R.string.addcard_clear_deck_cards),
+                                            style = ty.labelLarge,
+                                            color = mc.lifeNegative,
+                                        )
+                                    }
+                                }
+                            } else {
+                                Text(
+                                    text = stringResource(R.string.advsearch_show_results, uiState.totalCards),
+                                    style = MaterialTheme.magicTypography.labelLarge,
+                                    color = mc.textSecondary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
 
                             IconButton(onClick = onViewModeToggle, modifier = Modifier.size(24.dp)) {
                                 Icon(
@@ -642,6 +721,27 @@ private fun SearchSurface(
                                     contentDescription = stringResource(R.string.collection_view_grid),
                                     tint = mc.textSecondary,
                                     modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        if (isDeckMode) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = MaterialTheme.spacing.sm),
+                                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+                            ) {
+                                MagicCtaButton(
+                                    onClick = onSelectAllDeckCards,
+                                    text = stringResource(R.string.addcard_select_all),
+                                    style = MagicCtaStyle.Outlined,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                MagicCtaButton(
+                                    onClick = onSelectMissingDeckCards,
+                                    text = stringResource(R.string.addcard_select_missing),
+                                    style = MagicCtaStyle.Outlined,
+                                    modifier = Modifier.weight(1f),
                                 )
                             }
                         }
@@ -1271,6 +1371,9 @@ private fun queueToastText(toast: AddCardQueueToast): String = when (toast) {
         stringResource(R.string.scanner_toast_added_all_to_wishlist, toast.count)
     is AddCardQueueToast.AddAllPartialFailure ->
         stringResource(R.string.scanner_toast_add_all_partial_failure, toast.failed, toast.total)
+    is AddCardQueueToast.DeckCardsSelected ->
+        if (toast.count == 0) stringResource(R.string.addcard_deck_nothing_new_selected)
+        else pluralStringResource(R.plurals.addcard_deck_cards_selected, toast.count, toast.count)
 }
 
 private fun AddCardQueueToast.toastType(): MagicToastType = when (this) {
@@ -1280,4 +1383,6 @@ private fun AddCardQueueToast.toastType(): MagicToastType = when (this) {
     is AddCardQueueToast.AddedAllToWishlist -> MagicToastType.SUCCESS
     is AddCardQueueToast.AddFailed -> MagicToastType.ERROR
     is AddCardQueueToast.AddAllPartialFailure -> MagicToastType.WARNING
+    is AddCardQueueToast.DeckCardsSelected ->
+        if (count == 0) MagicToastType.INFO else MagicToastType.SUCCESS
 }

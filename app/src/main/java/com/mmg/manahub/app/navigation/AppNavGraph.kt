@@ -58,6 +58,7 @@ import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.PlayerTheme
+import com.mmg.manahub.feature.addcard.presentation.AddCardLaunchArgs
 import com.mmg.manahub.feature.addcard.presentation.AddCardScreen
 import com.mmg.manahub.feature.auth.data.repository.AuthRepositoryImpl
 import com.mmg.manahub.feature.auth.presentation.AccountManagementScreen
@@ -90,7 +91,6 @@ import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import com.mmg.manahub.feature.home.presentation.HomeAction
 import com.mmg.manahub.feature.home.presentation.HomeHeroState
 import com.mmg.manahub.feature.home.presentation.HomeScreen
-import com.mmg.manahub.feature.massiveadd.presentation.MassiveAddCardScreen
 import com.mmg.manahub.feature.news.presentation.NewsScreen
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.manahub.feature.news.presentation.VideoPlayerScreen
@@ -384,7 +384,7 @@ fun AppNavGraph(
                                         }
                                     }
                                     HomeAction.ScanCard -> navController.navigate(Screen.CollectionScanner.route)
-                                    HomeAction.SearchCard -> navController.navigate(Screen.CollectionAddCard.route)
+                                    HomeAction.SearchCard -> navController.navigate(Screen.CollectionAddCard.createRoute())
                                     HomeAction.CreateDeck -> navController.navigate(Screen.DeckStudio.createRoute(null))
                                     HomeAction.DraftGuide -> navController.navigate(Screen.Draft.route)
                                     HomeAction.DraftSimulator -> navController.navigate(Screen.Draft.route)
@@ -475,7 +475,7 @@ fun AppNavGraph(
                                     is HomeAction.OpenCompetitive->{
                                         navController.navigate(Screen.Competitive.route)
                                     }
-                                    is HomeAction.OpenMultiAdd-> navController.navigate(Screen.CollectionMassiveAddCard)
+                                    is HomeAction.OpenMultiAdd -> navController.navigate(Screen.CollectionAddCard.createRoute(multi = true))
                                     // ── Widget board: handled in HomeScreen/VM ───────────
                                     HomeAction.OpenWidgetGallery,
                                     HomeAction.ResetLayout,
@@ -522,7 +522,7 @@ fun AppNavGraph(
                             onCardClick = { id, key ->
                                 navController.navigate(Screen.CollectionCardDetail.createRoute(id, key))
                             },
-                            onAddCardClick = { navController.navigate(Screen.CollectionAddCard.route) },
+                            onAddCardClick = { navController.navigate(Screen.CollectionAddCard.createRoute()) },
                             onDeckClick = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
                             onPlaytestClick = { id ->
                                 navController.navigate(Screen.PlaytestSetup.createRoute(id))
@@ -544,7 +544,25 @@ fun AppNavGraph(
                     }
 
                     // Add card (tabbed: text search + scanner link)
-                    composable(Screen.CollectionAddCard.route) {
+                    composable(
+                        route = Screen.CollectionAddCard.route,
+                        arguments = listOf(
+                            navArgument(AddCardLaunchArgs.ARG_MULTI) {
+                                type = NavType.BoolType
+                                defaultValue = false
+                            },
+                            navArgument(AddCardLaunchArgs.ARG_SOURCE) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                            navArgument(AddCardLaunchArgs.ARG_SOURCE_ID) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                        ),
+                    ) {
                         AddCardScreen(
                             onNavigateBack = { navController.popBackStack() },
                             onNavigateToScanner = { navController.navigate(Screen.CollectionScanner.route) },
@@ -556,24 +574,13 @@ fun AppNavGraph(
                         )
                     }
 
-                    composable(Screen.CollectionMassiveAddCard.route) {
-                        MassiveAddCardScreen(
-                            onBack = { navController.popBackStack() },
-                            sharedTransitionScope = this@SharedTransitionLayout,
-                            animatedVisibilityScope = this@composable,
-                            onNavigateToCardDetail = { scryfallId ->
-                                navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
-                            },
-                        )
-                    }
-
                     composable(Screen.CollectionScanner.route) {
                         ScannerScreen(
                             onBack = { navController.popBackStack() },
                             onNavigateToCardDetail = { scryfallId ->
                                 navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
                             },
-                            onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.route) },
+                            onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.createRoute()) },
                             onNavigateToDeck = { id ->
                                 navController.navigate(Screen.DeckStudio.createRoute(id))
                             },
@@ -601,7 +608,7 @@ fun AppNavGraph(
                         val sharedTransitionKey = backStackEntry.arguments?.getString("sharedTransitionKey")
                         CardDetailScreen(
                             onBack              = { navController.popBackStack() },
-                            onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.route) },
+                            onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.createRoute()) },
                             onNavigateToDeck    = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
                             onNavigateToCard    = { id ->
                                 navController.navigate(Screen.CollectionCardDetail.createRoute(id)) {
@@ -631,6 +638,15 @@ fun AppNavGraph(
                     },
                     onCardClick = { scryfallId ->
                         navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
+                    },
+                    onSelectCards = { archidektId ->
+                        navController.navigate(
+                            Screen.CollectionAddCard.createRoute(
+                                multi = true,
+                                source = Screen.CollectionAddCard.Source.COMMUNITY,
+                                sourceId = archidektId.toString(),
+                            )
+                        )
                     },
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedVisibilityScope = this@composable,
@@ -739,8 +755,14 @@ fun AppNavGraph(
                     onNavigateToWizard = { archetype, theme, tribe, colors, seeds ->
                         navController.navigate(Screen.DeckWizard.createRoute(archetype, theme, tribe, colors, seeds))
                     },
-                    onNavigateToMassiveAddCards = {
-                        navController.navigate(Screen.CollectionMassiveAddCard.route)
+                    onNavigateToSelectCards = { deckId ->
+                        navController.navigate(
+                            Screen.CollectionAddCard.createRoute(
+                                multi = true,
+                                source = Screen.CollectionAddCard.Source.DECK,
+                                sourceId = deckId,
+                            )
+                        )
                     },
                 )
             }

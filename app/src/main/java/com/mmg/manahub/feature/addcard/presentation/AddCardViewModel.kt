@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.domain.repository.CardQueueRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
+import com.mmg.manahub.core.domain.repository.DeckRepository
+import com.mmg.manahub.core.domain.search.AdvancedSearchCardMatcher
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.queue.AddAllToCollectionResult
 import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
@@ -29,12 +32,14 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * ViewModel of the AddCard screen: Scryfall search plus the "Select multiple" mode, where tapping a
@@ -53,7 +58,10 @@ class AddCardViewModel(
     private val queueActions:       CardQueueActions,
     private val userCardRepository: UserCardRepository,
     private val cardRepository:     CardRepository,
+    private val deckRepository:     DeckRepository,
+    private val communityDecksRepository: CommunityDecksRepository,
     appScope:                       CoroutineScope,
+    launchArgs:                     AddCardLaunchArgs = AddCardLaunchArgs(),
     private val nowMillis:          () -> Long = { System.currentTimeMillis() },
 ) : ViewModel() {
 
@@ -72,6 +80,7 @@ class AddCardViewModel(
 
     private var printsLoadJob: Job? = null
     private var variantLoadJob: Job? = null
+    private var deckLoadJob: Job? = null
 
     private val textQueryFlow  = MutableStateFlow("")
     private val activeQueryFlow = MutableStateFlow<AdvancedSearchQuery?>(null)
@@ -87,6 +96,8 @@ class AddCardViewModel(
     init {
         observeSharedQueue()
         observeOwnedCardIdentityKeys()
+        if (launchArgs.multi || launchArgs.deckSource != null) enableMultiSelectMode()
+        launchArgs.deckSource?.let(::loadDeckSource)
         viewModelScope.launch {
             val dataFlow = combine(
                 textQueryFlow.debounce(400L),
@@ -107,6 +118,8 @@ class AddCardViewModel(
                             searchLanguage = prefs.cardLanguage.toScryfallCode(),
                         )
                     }
+                    // A preloaded deck list is filtered locally; Scryfall is never queried meanwhile.
+                    if (_uiState.value.isDeckMode) return@collectLatest
 
                     val advancedString = active?.let { buildScryfallQuery(it) } ?: ""
                     val combinedQuery = when {
@@ -184,6 +197,7 @@ class AddCardViewModel(
     fun loadNextPage() {
         val query = lastEffectiveQuery ?: return
         val currentState = _uiState.value
+        if (currentState.isDeckMode) return
         
         if (!currentState.hasMore || currentState.isLoadingMore || currentState.isSearching) return
         
@@ -210,6 +224,7 @@ class AddCardViewModel(
     fun onQueryChange(query: String) {
         _uiState.update { it.copy(query = query) }
         textQueryFlow.value = query
+        applyDeckFilter()
     }
 
     fun onAdvancedQuerySearch(query: AdvancedSearchQuery) {
@@ -220,11 +235,13 @@ class AddCardViewModel(
         if (nameCriterion != null && nameCriterion.value.isNotBlank()) {
             onQueryChange(nameCriterion.value)
         }
+        applyDeckFilter()
     }
 
     fun onClearFilters() {
         _uiState.update { it.copy(activeQuery = null) }
         activeQueryFlow.value = null
+        applyDeckFilter()
     }
 
     fun onClearAll() {
@@ -243,6 +260,7 @@ class AddCardViewModel(
         textQueryFlow.value = ""
         activeQueryFlow.value = null
         lastEffectiveQuery = null
+        applyDeckFilter()
     }
 
     fun onLanguageChange(code: String) {
@@ -336,7 +354,7 @@ class AddCardViewModel(
                 .flatMapLatest { active ->
                     if (active) {
                         userCardRepository.observeCollection().map { rows ->
-                            rows.mapTo(mutableSetOf()) { it.card.oracleId.ifBlank { it.card.name } }
+                            rows.mapTo(mutableSetOf()) { it.card.identityKey() }
                         }
                     } else {
                         flowOf(emptySet())
@@ -344,6 +362,11 @@ class AddCardViewModel(
                 }
                 .collect { keys -> _uiState.update { it.copy(ownedCardIdentityKeys = keys) } }
         }
+    }
+
+    /** Turns "Select multiple" on; idempotent (nav args and deck sources call it unconditionally). */
+    fun enableMultiSelectMode() {
+        _uiState.update { if (it.isMultiSelectMode) it else it.copy(isMultiSelectMode = true) }
     }
 
     /** Turns "Select multiple" on or off. Turning it off closes the queue sheet; the queue is kept. */
@@ -364,20 +387,20 @@ class AddCardViewModel(
         if (alreadyQueued) {
             queueRepository.removeByScryfallId(card.scryfallId)
         } else {
-            queueRepository.add(
-                QueuedCard(
-                    card = card,
-                    quantity = 1,
-                    isFoil = false,
-                    language = card.lang,
-                    condition = DEFAULT_CONDITION,
-                    setCode = card.setCode,
-                    timestamp = nowMillis(),
-                )
-            )
+            queueRepository.add(newQueueEntry(card))
         }
         syncQueueSnapshot()
     }
+
+    private fun newQueueEntry(card: Card) = QueuedCard(
+        card = card,
+        quantity = 1,
+        isFoil = false,
+        language = card.lang,
+        condition = DEFAULT_CONDITION,
+        setCode = card.setCode,
+        timestamp = nowMillis(),
+    )
 
     /** Opens the queue sheet; no-op when the queue is empty. */
     fun onOpenQueueSheet() {
@@ -565,9 +588,169 @@ class AddCardViewModel(
         _uiState.update { it.copy(expandedVariantImageUrl = null) }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Deck source mode
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun loadDeckSource(source: AddCardDeckSource) {
+        deckLoadJob?.cancel()
+        _uiState.update {
+            it.copy(
+                deckSource = source,
+                deckCards = emptyList(),
+                results = emptyList(),
+                totalCards = 0,
+                hasMore = false,
+                isSearching = false,
+                isLoadingMore = false,
+                error = null,
+                isDeckLoading = true,
+                deckLoadFailed = false,
+            )
+        }
+        deckLoadJob = viewModelScope.launch {
+            val loaded = try {
+                when (source) {
+                    is AddCardDeckSource.Local -> loadLocalDeck(source.deckId)
+                    is AddCardDeckSource.Community -> loadCommunityDeck(source.archidektId)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
+            if (_uiState.value.deckSource != source) return@launch
+            _uiState.update {
+                if (loaded == null) {
+                    it.copy(isDeckLoading = false, deckLoadFailed = true)
+                } else {
+                    it.copy(
+                        isDeckLoading = false,
+                        deckLoadFailed = false,
+                        deckName = loaded.name,
+                        deckCards = loaded.cards,
+                    )
+                }
+            }
+            applyDeckFilter()
+        }
+    }
+
+    /** Null means the deck could not be loaded (missing deck or unresolvable cards). */
+    private suspend fun loadLocalDeck(deckId: String): LoadedDeck? {
+        val deck = deckRepository.observeDeckWithCards(deckId).first() ?: return null
+        val ids = buildList {
+            deck.deck.commanderCardId?.takeIf { it.isNotBlank() }?.let(::add)
+            deck.mainboard.forEach { add(it.scryfallId) }
+            deck.sideboard.forEach { add(it.scryfallId) }
+        }.distinct()
+        val cards = resolveCards(ids) ?: return null
+        return LoadedDeck(deck.deck.name, cards)
+    }
+
+    private suspend fun loadCommunityDeck(archidektId: Int): LoadedDeck? {
+        val result = communityDecksRepository.getDeckById(archidektId)
+        if (result !is DataResult.Success) return null
+        val ids = result.data.cards.map { it.scryfallId }.filter { it.isNotBlank() }.distinct()
+        val cards = resolveCards(ids) ?: return null
+        return LoadedDeck(result.data.name, cards)
+    }
+
+    // Batch path only (never a per-card name search); keeps deck order. Null when ids exist but
+    // none resolved, which in practice means the batch fetch failed.
+    private suspend fun resolveCards(ids: List<String>): List<Card>? {
+        if (ids.isEmpty()) return emptyList()
+        cardRepository.warmCacheForIds(ids)
+        val byId = cardRepository.getCardsByIds(ids).associateBy { it.scryfallId }
+        return ids.mapNotNull(byId::get).ifEmpty { null }
+    }
+
+    private fun applyDeckFilter() {
+        _uiState.update { state ->
+            if (!state.isDeckMode) return@update state
+            val text = state.query.trim()
+            val active = state.activeQuery
+            val filtered = state.deckCards.filter { card ->
+                val nameMatches = text.isEmpty() ||
+                    card.name.contains(text, ignoreCase = true) ||
+                    card.printedName?.contains(text, ignoreCase = true) == true
+                nameMatches && (active == null || AdvancedSearchCardMatcher.matches(card, active, lenient = true))
+            }
+            state.copy(
+                results = filtered,
+                totalCards = filtered.size,
+                hasMore = false,
+                currentPage = 1,
+                isSearching = false,
+                isLoadingMore = false,
+                error = null,
+            )
+        }
+    }
+
+    /** Retries loading the current deck source after a failure. */
+    fun onRetryDeckLoad() {
+        _uiState.value.deckSource?.let(::loadDeckSource)
+    }
+
+    /**
+     * Drops the preloaded deck list and its source and returns to the normal Scryfall search with
+     * the current query/filters. Multi-select mode and the queue are kept.
+     */
+    fun onClearDeckCards() {
+        if (!_uiState.value.isDeckMode) return
+        deckLoadJob?.cancel()
+        _uiState.update {
+            it.copy(
+                deckSource = null,
+                deckName = null,
+                deckCards = emptyList(),
+                isDeckLoading = false,
+                deckLoadFailed = false,
+                results = emptyList(),
+                totalCards = 0,
+                hasMore = false,
+                currentPage = 1,
+            )
+        }
+        lastEffectiveQuery = null
+        forceSearch()
+    }
+
+    /** Queues every visible deck card that is not selected yet (qty 1, same defaults as a tap). */
+    fun onSelectAllDeckCards() {
+        val state = _uiState.value
+        if (!state.isDeckMode) return
+        queueUnselected(state.results)
+    }
+
+    /** Queues every visible deck card whose identity (oracleId, else name) is not in the collection. */
+    fun onSelectMissingDeckCards() {
+        val candidates = _uiState.value.takeIf { it.isDeckMode }?.results ?: return
+        viewModelScope.launch {
+            // Read once instead of the multi-mode collector, which may not have emitted yet.
+            val owned = userCardRepository.observeCollection().first()
+                .mapTo(HashSet()) { it.card.identityKey() }
+            queueUnselected(candidates.filterNot { it.identityKey() in owned })
+        }
+    }
+
+    private fun queueUnselected(cards: List<Card>) {
+        enableMultiSelectMode()
+        val queued = queueRepository.queue.value.selectedIds()
+        val toAdd = cards.filter { it.scryfallId !in queued }.distinctBy { it.scryfallId }
+        toAdd.forEach { queueRepository.add(newQueueEntry(it)) }
+        syncQueueSnapshot()
+        showQueueToast(AddCardQueueToast.DeckCardsSelected(toAdd.size))
+    }
+
+    private data class LoadedDeck(val name: String, val cards: List<Card>)
+
     private companion object {
         const val DEFAULT_CONDITION = "NM"
 
         fun List<QueuedCard>.selectedIds(): Set<String> = mapTo(HashSet(size)) { it.card.scryfallId }
+
+        fun Card.identityKey(): String = oracleId.ifBlank { name }
     }
 }

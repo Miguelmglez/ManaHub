@@ -44,7 +44,16 @@ data class AddCardUiState(
     val cardVariants: List<Card> = emptyList(),
     val isLoadingVariants: Boolean = false,
     val expandedVariantImageUrl: String? = null,
+    val deckSource: AddCardDeckSource? = null,
+    val deckName: String? = null,
+    val deckCards: List<Card> = emptyList(),
+    val isDeckLoading: Boolean = false,
+    val deckLoadFailed: Boolean = false,
     )
+
+/** True while a preloaded deck list replaces the Scryfall search. */
+val AddCardUiState.isDeckMode: Boolean
+    get() = deckSource != null
 
 val AddCardUiState.activeFilterCount: Int
     get() = activeQuery?.criteria?.size ?: 0
@@ -65,4 +74,5 @@ sealed interface AddCardQueueToast {
     data class AddedAllToCollection(val count: Int) : AddCardQueueToast
     data class AddedAllToWishlist(val count: Int) : AddCardQueueToast
     data class AddAllPartialFailure(val failed: Int, val total: Int) : AddCardQueueToast
+    data class DeckCardsSelected(val count: Int) : AddCardQueueToast
 }

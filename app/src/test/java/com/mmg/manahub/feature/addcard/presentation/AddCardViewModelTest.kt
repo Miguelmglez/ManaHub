@@ -5,6 +5,8 @@ import app.cash.turbine.test
 import com.mmg.manahub.core.data.queue.InMemoryCardQueueStore
 import com.mmg.manahub.core.data.queue.PersistentCardQueueRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
+import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.card.GetSpotlightFeedUseCase
@@ -15,7 +17,16 @@ import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.model.AppLanguage
+import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.CardLanguage
+import com.mmg.manahub.core.model.CommunityDeck
+import com.mmg.manahub.core.model.CommunityDeckCard
+import com.mmg.manahub.core.model.CommunityDeckOwner
+import com.mmg.manahub.core.model.Deck
+import com.mmg.manahub.core.model.DeckSlot
+import com.mmg.manahub.core.model.DeckWithCards
+import com.mmg.manahub.core.model.PaginatedCards
+import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.MagicSet
@@ -27,6 +38,7 @@ import com.mmg.manahub.core.model.UserPreferences
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
@@ -61,6 +73,8 @@ class AddCardViewModelTest {
     private val cardRepository: CardRepository = mockk(relaxed = true)
     private val commitScannedCards: CommitScannedCardsUseCase = mockk(relaxed = true)
     private val addToWishlist: AddToWishlistUseCase = mockk()
+    private val deckRepository: DeckRepository = mockk()
+    private val communityDecksRepository: CommunityDecksRepository = mockk()
 
     private val testSet = MagicSet(
         code = "tst",
@@ -105,7 +119,7 @@ class AddCardViewModelTest {
         viewModel = buildViewModel()
     }
 
-    private fun buildViewModel() = AddCardViewModel(
+    private fun buildViewModel(launchArgs: AddCardLaunchArgs = AddCardLaunchArgs()) = AddCardViewModel(
         searchCards = searchCards,
         userPreferences = userPreferences,
         buildScryfallQuery = buildScryfallQuery,
@@ -118,7 +132,10 @@ class AddCardViewModelTest {
         ),
         userCardRepository = userCardRepository,
         cardRepository = cardRepository,
+        deckRepository = deckRepository,
+        communityDecksRepository = communityDecksRepository,
         appScope = appScope,
+        launchArgs = launchArgs,
         nowMillis = { 1_000L },
     )
 
@@ -348,5 +365,249 @@ class AddCardViewModelTest {
         viewModel.onRemoveQueuedCard(entry)
         assertEquals(1, viewModel.uiState.value.queueCount)
         assertEquals(setOf("bolt-1"), viewModel.uiState.value.selectedScryfallIds)
+    }
+
+    // ── Deck source mode ────────────────────────────────────────────────────
+
+    private val goblin = TestFixtures.buildCard(
+        scryfallId = "goblin-1", name = "Goblin Guide", setCode = "zen", typeLine = "Creature — Goblin Scout",
+    ).copy(oracleId = "oracle-goblin", printedName = "Guía goblin")
+    private val sol = TestFixtures.buildCard(
+        scryfallId = "sol-1", name = "Sol Ring", setCode = "c21", typeLine = "Artifact",
+    ).copy(oracleId = "oracle-sol")
+    private val boltWithOracle = bolt.copy(oracleId = "oracle-bolt")
+
+    private val localDeckArgs = AddCardLaunchArgs(deckSource = AddCardDeckSource.Local("deck-1"))
+
+    private fun stubLocalDeck() {
+        every { deckRepository.observeDeckWithCards("deck-1") } returns flowOf(
+            DeckWithCards(
+                deck = Deck(id = "deck-1", name = "Burn", commanderCardId = "sol-1"),
+                mainboard = listOf(DeckSlot("bolt-1", 4), DeckSlot("goblin-1", 4)),
+                sideboard = listOf(DeckSlot("bolt-1", 1)),
+            )
+        )
+        coEvery { cardRepository.getCardsByIds(any()) } returns listOf(goblin, boltWithOracle, sol)
+    }
+
+    private fun communityCard(name: String, scryfallId: String) = CommunityDeckCard(
+        name = name,
+        quantity = 1,
+        categories = emptyList(),
+        oracleId = "",
+        scryfallId = scryfallId,
+    )
+
+    private fun enterLocalDeckMode(): AddCardViewModel {
+        stubLocalDeck()
+        return buildViewModel(localDeckArgs)
+    }
+
+    @Test
+    fun `launch args parse deck and community sources and reject unusable ids`() {
+        assertEquals(AddCardDeckSource.Local("d1"), AddCardLaunchArgs.from(false, "deck", "d1").deckSource)
+        assertEquals(AddCardDeckSource.Community(42), AddCardLaunchArgs.from(false, "community", "42").deckSource)
+        assertEquals(null, AddCardLaunchArgs.from(false, "community", "abc").deckSource)
+        assertEquals(null, AddCardLaunchArgs.from(false, "deck", " ").deckSource)
+        assertEquals(null, AddCardLaunchArgs.from(true, null, null).deckSource)
+        assertTrue(AddCardLaunchArgs.from(true, null, null).multi)
+    }
+
+    @Test
+    fun `multi launch arg opens in multi-select mode and enabling it again is idempotent`() = runTest(dispatcher) {
+        val vm = buildViewModel(AddCardLaunchArgs(multi = true))
+        assertTrue(vm.uiState.value.isMultiSelectMode)
+
+        vm.enableMultiSelectMode()
+
+        assertTrue(vm.uiState.value.isMultiSelectMode)
+        assertFalse(vm.uiState.value.isDeckMode)
+    }
+
+    @Test
+    fun `local deck source loads mainboard sideboard and commander distinct in deck order`() = runTest(dispatcher) {
+        val vm = enterLocalDeckMode()
+        assertTrue("a source forces multi mode", vm.uiState.value.isMultiSelectMode)
+        assertTrue(vm.uiState.value.isDeckLoading)
+
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertFalse(state.isDeckLoading)
+        assertFalse(state.deckLoadFailed)
+        assertEquals("Burn", state.deckName)
+        assertEquals(listOf("sol-1", "bolt-1", "goblin-1"), state.deckCards.map { it.scryfallId })
+        assertEquals(state.deckCards, state.results)
+        assertEquals(3, state.totalCards)
+        coVerify { cardRepository.warmCacheForIds(listOf("sol-1", "bolt-1", "goblin-1")) }
+        coVerify(exactly = 0) { searchCards(any(), any()) }
+    }
+
+    @Test
+    fun `community deck source skips blank scryfall ids and batches the lookup`() = runTest(dispatcher) {
+        coEvery { communityDecksRepository.getDeckById(7) } returns DataResult.Success(
+            CommunityDeck(
+                archidektId = 7,
+                name = "Community Burn",
+                description = "",
+                format = "modern",
+                owner = CommunityDeckOwner(id = 1, username = "u", avatarUrl = ""),
+                viewCount = 0,
+                createdAt = "",
+                updatedAt = "",
+                cards = listOf(
+                    communityCard("Lightning Bolt", "bolt-1"),
+                    communityCard("Unknown", ""),
+                    communityCard("Goblin Guide", "goblin-1"),
+                    communityCard("Lightning Bolt", "bolt-1"),
+                ),
+                sourceUrl = "",
+            )
+        )
+        coEvery { cardRepository.getCardsByIds(listOf("bolt-1", "goblin-1")) } returns listOf(goblin, boltWithOracle)
+
+        val vm = buildViewModel(AddCardLaunchArgs(deckSource = AddCardDeckSource.Community(7)))
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals("Community Burn", state.deckName)
+        assertEquals(listOf("bolt-1", "goblin-1"), state.results.map { it.scryfallId })
+        coVerify(exactly = 1) { cardRepository.warmCacheForIds(listOf("bolt-1", "goblin-1")) }
+        coVerify(exactly = 1) { cardRepository.getCardsByIds(listOf("bolt-1", "goblin-1")) }
+        coVerify(exactly = 0) { searchCards(any(), any()) }
+    }
+
+    @Test
+    fun `community deck load failure exposes the error state and retry reloads`() = runTest(dispatcher) {
+        coEvery { communityDecksRepository.getDeckById(7) } returns DataResult.Error("boom")
+        val vm = buildViewModel(AddCardLaunchArgs(deckSource = AddCardDeckSource.Community(7)))
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.deckLoadFailed)
+        assertTrue(vm.uiState.value.isDeckMode)
+
+        vm.onRetryDeckLoad()
+        assertTrue(vm.uiState.value.isDeckLoading)
+        advanceUntilIdle()
+
+        coVerify(exactly = 2) { communityDecksRepository.getDeckById(7) }
+    }
+
+    @Test
+    fun `search text filters the deck list locally by name and printed name`() = runTest(dispatcher) {
+        val vm = enterLocalDeckMode()
+        advanceUntilIdle()
+
+        vm.onQueryChange("BOLT")
+        assertEquals(listOf("bolt-1"), vm.uiState.value.results.map { it.scryfallId })
+
+        vm.onQueryChange("guía")
+        assertEquals(listOf("goblin-1"), vm.uiState.value.results.map { it.scryfallId })
+
+        vm.onQueryChange("")
+        advanceUntilIdle()
+        assertEquals(3, vm.uiState.value.results.size)
+        coVerify(exactly = 0) { searchCards(any(), any()) }
+    }
+
+    @Test
+    fun `advanced search runs the local matcher over the deck list without Scryfall`() = runTest(dispatcher) {
+        val vm = enterLocalDeckMode()
+        advanceUntilIdle()
+
+        vm.onAdvancedQuerySearch(
+            AdvancedSearchQuery(criteria = listOf(SearchCriterion.CardType(types = setOf("Creature"))))
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf("goblin-1"), vm.uiState.value.results.map { it.scryfallId })
+        coVerify(exactly = 0) { searchCards(any(), any()) }
+        coVerify(exactly = 0) { buildScryfallQuery(any()) }
+
+        vm.onClearFilters()
+        assertEquals(3, vm.uiState.value.results.size)
+    }
+
+    @Test
+    fun `clear deck cards returns to Scryfall search and keeps multi mode and the queue`() = runTest(dispatcher) {
+        coEvery { searchCards("bolt", 1) } returns DataResult.Success(
+            PaginatedCards(cards = listOf(bolt, counterspell), hasMore = false, totalCards = 2)
+        )
+        val vm = enterLocalDeckMode()
+        advanceUntilIdle()
+        vm.onToggleCardSelection(goblin)
+        vm.onQueryChange("bolt")
+        advanceUntilIdle()
+        coVerify(exactly = 0) { searchCards(any(), any()) }
+
+        vm.onClearDeckCards()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertFalse(state.isDeckMode)
+        assertEquals(null, state.deckName)
+        assertTrue(state.deckCards.isEmpty())
+        assertTrue(state.isMultiSelectMode)
+        assertEquals(setOf("goblin-1"), state.selectedScryfallIds)
+        assertEquals(listOf("bolt-1", "counter-1"), state.results.map { it.scryfallId })
+        coVerify(exactly = 1) { searchCards("bolt", 1) }
+    }
+
+    @Test
+    fun `select all queues only the visible cards that are not selected yet`() = runTest(dispatcher) {
+        val vm = enterLocalDeckMode()
+        advanceUntilIdle()
+        vm.onToggleCardSelection(goblin)
+
+        vm.onSelectAllDeckCards()
+
+        val queued = queueRepository.queue.value
+        assertEquals(3, queued.size)
+        assertEquals(1, queued.count { it.card.scryfallId == "goblin-1" })
+        queued.forEach {
+            assertEquals(1, it.quantity)
+            assertEquals("NM", it.condition)
+            assertFalse(it.isFoil)
+        }
+        assertEquals(AddCardQueueToast.DeckCardsSelected(2), vm.uiState.value.queueToast)
+
+        vm.onSelectAllDeckCards()
+        assertEquals(3, queueRepository.queue.value.size)
+        assertEquals(AddCardQueueToast.DeckCardsSelected(0), vm.uiState.value.queueToast)
+    }
+
+    @Test
+    fun `select all respects the current local filter`() = runTest(dispatcher) {
+        val vm = enterLocalDeckMode()
+        advanceUntilIdle()
+        vm.onQueryChange("sol")
+
+        vm.onSelectAllDeckCards()
+
+        assertEquals(listOf("sol-1"), queueRepository.queue.value.map { it.card.scryfallId })
+    }
+
+    @Test
+    fun `select missing queues only cards whose identity is not in the collection`() = runTest(dispatcher) {
+        val ownedBoltOtherPrinting = TestFixtures.buildCard(scryfallId = "bolt-2", name = "Lightning Bolt")
+            .copy(oracleId = "oracle-bolt")
+        val ownedSolByName = TestFixtures.buildCard(scryfallId = "sol-9", name = "Sol Ring")
+        every { userCardRepository.observeCollection() } returns flowOf(
+            listOf(
+                TestFixtures.buildUserCardWithCard(card = ownedBoltOtherPrinting),
+                TestFixtures.buildUserCardWithCard(card = ownedSolByName),
+            )
+        )
+        val vm = enterLocalDeckMode()
+        advanceUntilIdle()
+
+        vm.onSelectMissingDeckCards()
+        advanceUntilIdle()
+
+        // Sol Ring's owned row has no oracleId, so its identity falls back to the name, which does
+        // not match the deck card's oracleId key: it still counts as missing.
+        assertEquals(
+            setOf("goblin-1", "sol-1"),
+            queueRepository.queue.value.map { it.card.scryfallId }.toSet(),
+        )
     }
 }
