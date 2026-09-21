@@ -15,6 +15,7 @@ import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.UpdateCollectionEntryUseCase
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
+import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.data.usecase.stats.GetTradeStatsUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
@@ -162,8 +163,7 @@ fun sharedDomainKoinModule(
         )
     }
 
-    // ── Trades use cases. AddToWishlistUseCase is ALSO consumed by the still-Hilt (excluded)
-    //    ScannerViewModel via the reverse KoinToHiltBridgeModule — same singleton instance either way. ──
+    // ── Trades use cases. ──
     single { AddToWishlistUseCase(repo = get(), authRepo = get()) }
     single { MigrateLocalTradeListsUseCase(wishlistRepo = get(), openForTradeRepo = get()) }
     // Card Versions & Languages, Phase 1A.
@@ -190,12 +190,18 @@ fun sharedDomainKoinModule(
             userCardRepository = get(),
         )
     }
-    // Also consumed by the still-Hilt (excluded) ScannerViewModel via the reverse
-    // KoinToHiltBridgeModule — same singleton instance either way.
     single {
         CommitScannedCardsUseCase(
             addCardToCollection = get(),
             progressionEventBus = get(),
+        )
+    }
+    // App-wide so its commit guard covers the shared queue from every screen (also bridged to Hilt).
+    single {
+        CardQueueActions(
+            queueRepository = get(),
+            commitScannedCards = get(),
+            addToWishlist = get(),
         )
     }
 

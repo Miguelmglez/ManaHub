@@ -290,8 +290,7 @@ class ManaHubApp : Application(), KoinComponent {
     //    coreBridgeKoinModule (shared with other islands, natively Koin-built as of batch 3).
     // Only the CardDetail-only deps are here.
     // AddCardToCollectionUseCase/AddToWishlistUseCase moved to SharedDomainKoinModule (batch 2) —
-    // cardDetailKoinModule now resolves both via get(). AddToWishlistUseCase is ALSO consumed by the
-    // still-Hilt (excluded) ScannerViewModel, via KoinToHiltBridgeModule's reverse bridge.
+    // cardDetailKoinModule now resolves both via get().
     @Inject lateinit var userCardRepository: Lazy<UserCardRepository>
 
     // Friends island (Phase 1) bridge deps. FriendRepository is shared with Profile → natively Koin-built

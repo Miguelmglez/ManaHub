@@ -3,10 +3,14 @@ package com.mmg.manahub.feature.scanner
 import android.content.Context
 import android.graphics.PointF
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import com.mmg.manahub.core.data.queue.InMemoryCardQueueStore
+import com.mmg.manahub.core.data.queue.PersistentCardQueueRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.CommitScanResult
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
+import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
+import com.mmg.manahub.core.model.QueuedCard
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel
@@ -134,11 +138,17 @@ class ScannerViewModelTest {
         // needs a real Flow — a relaxed mock alone would return Unit for `collect` without ever
         // touching FlowCollector, which happens to be harmless here but this stub keeps intent explicit.
         every { userCardRepository.observeCollection() } returns emptyFlow()
+        // Real shared queue over an in-memory store: the VM's queue behaviour is exercised end to end.
+        val queueRepository = PersistentCardQueueRepository(store = InMemoryCardQueueStore())
         viewModel = ScannerViewModel(
             cardRepository = cardRepository,
             userCardRepository = userCardRepository,
-            commitScannedCards = commitScannedCards,
-            addToWishlist = addToWishlist,
+            queueRepository = queueRepository,
+            queueActions = CardQueueActions(
+                queueRepository = queueRepository,
+                commitScannedCards = commitScannedCards,
+                addToWishlist = addToWishlist,
+            ),
             analyticsHelper = analyticsHelper,
             soundManager = soundManager,
             context = context,
@@ -569,7 +579,7 @@ class ScannerViewModelTest {
         )
     }
 
-    private fun sampleScannedCard() = com.mmg.manahub.feature.scanner.presentation.ScannedCard(
+    private fun sampleScannedCard() = QueuedCard(
         card = defaultCard,
         quantity = 1,
         isFoil = false,
@@ -800,5 +810,59 @@ class ScannerViewModelTest {
             1, remaining.size,
         )
         assertEquals(defaultCard.scryfallId, remaining[0].card.scryfallId)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Shared card queue (CardQueueRepository + CardQueueActions)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onAddAllToCollection_fullSuccess_emptiesQueueAndClosesSheet() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        viewModel.onOpenQueue()
+        coEvery { commitScannedCards(any()) } returns CommitScanResult(
+            committedCopies = 1, failedEntries = 0, entrySucceeded = listOf(true),
+        )
+
+        viewModel.onAddAllToCollection()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.scanSession.cards.isEmpty())
+        assertFalse(state.showQueueSheet)
+        assertFalse(state.isCommittingQueue)
+    }
+
+    @Test
+    fun onAddEntryToCollection_failure_keepsEntryInQueue() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        val entry = viewModel.uiState.value.scanSession.cards.single()
+        coEvery { commitScannedCards(any()) } returns CommitScanResult(
+            committedCopies = 0, failedEntries = 1, entrySucceeded = listOf(false),
+        )
+
+        viewModel.onAddEntryToCollection(entry)
+        advanceUntilIdle()
+
+        assertEquals(listOf(entry.id), viewModel.uiState.value.scanSession.cards.map { it.id })
+    }
+
+    @Test
+    fun queueMutations_areReflectedSynchronouslyInScanSession() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        val entry = viewModel.uiState.value.scanSession.cards.single()
+
+        viewModel.onDuplicateSessionCard(entry)
+        assertEquals(2, viewModel.uiState.value.scanSession.cards.size)
+
+        viewModel.onIncrementSessionCardQuantity(entry)
+        assertEquals(2, viewModel.uiState.value.scanSession.cards.first().quantity)
+
+        viewModel.onRemoveSessionCard(entry)
+        assertEquals(1, viewModel.uiState.value.scanSession.cards.size)
+        assertNotEquals(entry.id, viewModel.uiState.value.scanSession.cards.single().id)
     }
 }

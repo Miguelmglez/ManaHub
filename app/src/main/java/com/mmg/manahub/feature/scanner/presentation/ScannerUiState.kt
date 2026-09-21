@@ -2,37 +2,21 @@ package com.mmg.manahub.feature.scanner.presentation
 
 import android.graphics.PointF
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.QueuedCard
 import com.mmg.manahub.core.ui.components.MagicToastType
-import java.util.UUID
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Session models
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * A single card entry inside a scan session, capturing all collection parameters
- * chosen by the user at the moment of scanning.
- */
-data class ScannedCard(
-    val card: Card,
-    val quantity: Int,
-    val isFoil: Boolean,
-    val language: String,
-    val condition: String,
-    val setCode: String,
-    val timestamp: Long,
-    // Write-path hardening audit (2026-09-06): stable identity for queue operations (edit/remove/
-    // duplicate/partial-retry) -- timestamp alone collides when two entries share a millisecond.
-    val id: String = UUID.randomUUID().toString(),
-)
-
-/**
- * Accumulates all cards scanned in the current session.
- * Duplicate entries (same scryfallId + isFoil + language + condition) are
- * merged by incrementing [ScannedCard.quantity] rather than creating a new row.
+ * Snapshot of the shared, persisted card queue
+ * ([com.mmg.manahub.core.domain.repository.CardQueueRepository]) as seen by the scanner.
+ * Duplicate scans (same scryfallId + isFoil + language + condition) are merged by incrementing
+ * [QueuedCard.quantity] rather than creating a new row.
  */
 data class ScanSession(
-    val cards: List<ScannedCard> = emptyList(),
+    val cards: List<QueuedCard> = emptyList(),
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,11 +75,11 @@ data class ScanSession(
  *                                  fully unbinds the camera (`cameraProvider.unbindAll()`, ~250 ms
  *                                  debounced) to actually save power, not just skip frames.
  * @property isAutoDeleteOnAddEnabled  True when a per-entry "Add to collection"/"Add to wishlist"
- *                                  action in [ScanQueueSheet] should also remove that entry from
+ *                                  action in `CardQueueSheet` should also remove that entry from
  *                                  the queue once the add succeeds.
  * @property ownedCardIdentityKeys  Live set of identity keys (`oracleId.ifBlank { name }`) already
  *                                  present in the user's collection — feeds the "already in
- *                                  collection" badge in [QueueCardItem]. Kept up to date by a
+ *                                  collection" badge in `CardQueueSheet`. Kept up to date by a
  *                                  [ScannerViewModel] collector on `UserCardRepository.observeCollection()`.
  * @property rateLimitedUntilMs     W2.10 (scanner-reliability-plan.md, 2026-08-24). Wall-clock
  *                                  epoch millis until which [CardRecognizer] is suspending every
@@ -123,7 +107,7 @@ data class ScannerUiState(
     val showEditSheet: Boolean = false,
     val showPriceDetailSheet: Boolean = false,
     // Edit card
-    val editingCard: ScannedCard? = null,
+    val editingCard: QueuedCard? = null,
     val availablePrints: List<Card> = emptyList(),
     val isLoadingPrints: Boolean = false,
     // Toast
@@ -158,13 +142,12 @@ data class ScannerUiState(
 
     // Variant selector sheet
     val showVariantSelector: Boolean = false,
-    val variantSelectorEntry: ScannedCard? = null,
+    val variantSelectorEntry: QueuedCard? = null,
     val cardVariants: List<Card> = emptyList(),
     val isLoadingVariants: Boolean = false,
     // Full-screen image viewer
     val expandedVariantImageUrl: String? = null,
 
-    // Re-entrancy guard for onAddAllToCollection -- a second tap before the first commit
-    // resolves must not double-commit the queue.
+    // Mirrors CardQueueActions.isCommitting (the app-wide "add all" re-entrancy guard).
     val isCommittingQueue: Boolean = false,
 )

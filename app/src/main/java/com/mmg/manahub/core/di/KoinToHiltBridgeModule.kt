@@ -1,8 +1,8 @@
 package com.mmg.manahub.core.di
 
 import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
-import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
+import com.mmg.manahub.core.domain.repository.CardQueueRepository
+import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -18,9 +18,10 @@ import javax.inject.Singleton
  * a problem for the small number of use cases that still have a **Hilt-only** consumer — a class that
  * is not (yet) migrated to Koin and therefore can only receive its dependencies via `@Inject`:
  *
- * - [AddToWishlistUseCase] → `feature.scanner.presentation.ScannerViewModel` (`@HiltViewModel`; the
- *   scanner feature is explicitly EXCLUDED from the KMP migration — CLAUDE.md).
- * - [CommitScannedCardsUseCase] → the same `ScannerViewModel`.
+ * - [CardQueueRepository] + [CardQueueActions] → `feature.scanner.presentation.ScannerViewModel`
+ *   (`@HiltViewModel`; the scanner feature is explicitly EXCLUDED from the KMP migration — CLAUDE.md).
+ *   The queue is shared with the Koin-built AddCard screen, so both graphs MUST see the one Koin
+ *   instance (two instances over the same SharedPreferences key would overwrite each other).
  * - [AuthRepository] (batch 5) → the excluded `feature.online` lobby ViewModels
  *   (`LobbyHostViewModel`/`LobbyJoinViewModel`, `@HiltViewModel` — `feature/online` is explicitly
  *   EXCLUDED from the KMP migration). The repo itself is now natively Koin-built in
@@ -50,7 +51,7 @@ import javax.inject.Singleton
  * - The excluded online lobby ViewModels are likewise instantiated by `hiltViewModel()` only on
  *   navigation, strictly after `onCreate()`.
  *
- * This is why these three (and ONLY these three) use cases/repositories can be safely provided via this
+ * This is why these (and ONLY these) types can be safely provided via this
  * reverse bridge. One other moved type —
  * [com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase] — is needed by `CardRepositoryImpl`,
  * which IS constructed eagerly (it satisfies `ManaHubApp`'s OWN `@Inject` field `cardRepository`,
@@ -71,12 +72,12 @@ object KoinToHiltBridgeModule {
 
     @Provides
     @Singleton
-    fun provideAddToWishlistUseCase(): AddToWishlistUseCase =
+    fun provideCardQueueRepository(): CardQueueRepository =
         GlobalContext.get().get()
 
     @Provides
     @Singleton
-    fun provideCommitScannedCardsUseCase(): CommitScannedCardsUseCase =
+    fun provideCardQueueActions(): CardQueueActions =
         GlobalContext.get().get()
 
     @Provides
