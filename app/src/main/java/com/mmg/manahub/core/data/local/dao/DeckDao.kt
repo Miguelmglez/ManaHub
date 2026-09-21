@@ -257,6 +257,28 @@ interface DeckDao {
     )
 
     /**
+     * The whole strategy pin (archetype/themes/posture + tribe) in ONE statement -- a Studio
+     * strategy pick can never leave a half-applied pin the way two sequential updates could.
+     */
+    @Query("""
+        UPDATE decks SET
+            archetype_override = :archetypeOverride,
+            themes_override = :themesOverrideJson,
+            posture_override = :postureOverride,
+            tribe_override = :tribeOverride,
+            updated_at = :updatedAt
+        WHERE id = :deckId
+    """)
+    suspend fun updateStrategyPin(
+        deckId: String,
+        archetypeOverride: String?,
+        themesOverrideJson: String?,
+        postureOverride: String?,
+        tribeOverride: String?,
+        updatedAt: Long = System.currentTimeMillis(),
+    )
+
+    /**
      * Sets (or clears) the deck's `strategy_locked` flag (D4 hard no-cut guarantee). Bumps
      * `updated_at`.
      */

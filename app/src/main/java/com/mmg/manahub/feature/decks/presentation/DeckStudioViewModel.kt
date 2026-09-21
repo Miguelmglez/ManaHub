@@ -1638,8 +1638,9 @@ class DeckStudioViewModel(
                 activeCollectionQuery = query.takeIf { q -> !q.isEmpty() },
             )
         }
-        // Clears addCardsQuery, so the collection refresh below sees the same empty name filter.
-        searchScryfallDirect("")
+        // Re-issues the search with whatever the user typed: the sheet's preset LaunchedEffect
+        // re-fires on every derived-context change, and wiping the name filter there lost their text.
+        searchScryfallDirect(_uiState.value.addCardsQuery)
         val collectionMatches = collectionCardsMatching(_uiState.value.addCardsQuery)
         publishCollectionResults(collectionMatches)
         // Counts only -- a zero-hit structured search over a non-empty collection is the exact

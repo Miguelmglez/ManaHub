@@ -155,12 +155,16 @@ fun DeckWizardScreen(
                     },
                     label = "DeckWizardPhase",
                 ) { phase ->
+                    // The exiting step renders its last snapshot: the VM has already cleared its state for the new phase.
+                    val snapshot = remember(phase) { WizardStepStateHolder(uiState) }
+                    if (phase == uiState.phase) snapshot.value = uiState
+                    val stepState = snapshot.value
                     when (phase) {
                         WizardPhase.ENTRY -> EntryStepContent(
                             onSelect = viewModel::onSelectEntryFlow,
                         )
                         WizardPhase.COMMANDER_PICK -> CommanderPickStepContent(
-                            uiState = uiState,
+                            uiState = stepState,
                             onQueryChange = viewModel::onCommanderNameFilterChange,
                             onSelectCommander = viewModel::onSelectCommander,
                             onClearCommander = viewModel::onClearCommander,
@@ -170,7 +174,7 @@ fun DeckWizardScreen(
                             onNext = viewModel::onNextFromCommanderPick,
                         )
                         WizardPhase.SEED_PICK -> SeedPickStepContent(
-                            uiState = uiState,
+                            uiState = stepState,
                             onQueryChange = viewModel::onSeedPickQueryChange,
                             onApplyStructuredSearch = viewModel::applySeedPickStructuredSearch,
                             onClearFilters = viewModel::onClearSeedPickFilters,
@@ -182,7 +186,7 @@ fun DeckWizardScreen(
                             onNext = viewModel::onNextFromSeedPick,
                         )
                         WizardPhase.COLOR_PICK -> ColorPickStepContent(
-                            uiState = uiState,
+                            uiState = stepState,
                             onToggleColor = viewModel::onToggleColorFlowColor,
                             onSelectStrategy = viewModel::onSelectCommanderStrategy,
                             onSelectCustom = viewModel::onSelectCustomStrategy,
@@ -192,7 +196,7 @@ fun DeckWizardScreen(
                             onNext = viewModel::onNextFromColorPick,
                         )
                         WizardPhase.STRATEGY_PICK -> StrategyPickStepContent(
-                            uiState = uiState,
+                            uiState = stepState,
                             onQueryChange = viewModel::onStrategyPickQueryChange,
                             onSelectEntry = viewModel::onSelectStrategyPickEntry,
                             onSelectCombo = viewModel::onSelectStrategyPickCombo,
@@ -203,7 +207,7 @@ fun DeckWizardScreen(
                             onNext = viewModel::onNextFromStrategyPick,
                         )
                         WizardPhase.STRATEGY -> StrategyStepContent(
-                            uiState = uiState,
+                            uiState = stepState,
                             onSelectStrategy = viewModel::onSelectCommanderStrategy,
                             onSelectCustom = viewModel::onSelectCustomStrategy,
                             onRequestTribe = viewModel::onRequestTribeForStrategy,
@@ -216,7 +220,7 @@ fun DeckWizardScreen(
                         // branch was deleted along with the DIRECTION/IDENTITY step machinery it
                         // depended on.
                         WizardPhase.PLAN_SECTIONS -> PlanSectionsStepContent(
-                            uiState = uiState,
+                            uiState = stepState,
                             onQueryChange = viewModel::onPlanSectionsQueryChange,
                             onApplyStructuredSearch = viewModel::applyPlanSectionsStructuredSearch,
                             onFilterByTags = viewModel::searchPlanSectionsCollectionByTags,
@@ -234,12 +238,12 @@ fun DeckWizardScreen(
                             onNext = viewModel::onNextFromPlanSections,
                         )
                         WizardPhase.REVIEW -> ReviewStepContent(
-                            uiState = uiState,
+                            uiState = stepState,
                             onToggleIncludeNonBasicLands = viewModel::onToggleIncludeNonBasicLands,
                             onGenerate = viewModel::onGenerate,
                         )
                         WizardPhase.GENERATING -> GeneratingContent(
-                            uiState = uiState,
+                            uiState = stepState,
                             onCancel = viewModel::onCancelGeneration,
                             onRetry = viewModel::onRetryGeneration,
                         )
@@ -247,7 +251,7 @@ fun DeckWizardScreen(
                         // build surfaced at least one ambiguity group; a zero-group build skips this
                         // phase entirely (see WizardPhase.CHOICE's own KDoc).
                         WizardPhase.CHOICE -> ChoiceStepContent(
-                            uiState = uiState,
+                            uiState = stepState,
                             onChangeQuantity = viewModel::onChangeChoiceQuantity,
                             onAutoFillSection = viewModel::onAutoFillChoiceSection,
                             onFinish = viewModel::onFinishChoices,
@@ -443,7 +447,7 @@ private fun ReviewStepContent(
             // verticalScroll), replacing the pre-v6 horizontal thumbnail strip for every anchor.
             if (uiState.seeds.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                    ReviewSectionLabel(stringResource(R.string.deck_wizard_review_your_cards, uiState.seeds.size))
+                    ReviewSectionLabel(stringResource(R.string.deck_wizard_review_your_cards, uiState.seedCopies))
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
                         uiState.seeds.forEach { seed ->
                             CardRow(
@@ -551,3 +555,7 @@ private fun ReviewColorsRow(label: String, colors: Set<ManaColor>) {
         ColorIdentitySymbols(colors = colors)
     }
 }
+
+/** Plain (non-snapshot) holder so an exiting `AnimatedContent` step can keep rendering the last
+ * state it was current for -- see the phase lambda in [DeckWizardScreen]. */
+private class WizardStepStateHolder(var value: DeckWizardUiState)

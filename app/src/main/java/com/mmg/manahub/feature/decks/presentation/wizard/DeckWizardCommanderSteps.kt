@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.rounded.CollectionsBookmark
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -40,6 +41,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,6 +61,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -89,6 +92,7 @@ import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicSelectionItem
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
 import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -727,7 +731,8 @@ internal fun tribeDisplayLabel(tribeKey: String): String =
 /**
  * One STRATEGY/COLOR_PICK/STRATEGY_PICK row: a [MagicSelectionItem] titled with the strategy name
  * (plus " — <Tribe>" when the recommender resolved a tribe, or [titleOverride] for the selected
- * row) and described by the owned fitting-card count alone. [icon] is STRATEGY_PICK's committed
+ * row), described by the strategy's own explanation, with the owned fitting-card count as a
+ * compact trailing badge ([OwnedCountBadge], hidden at 0). [icon] is STRATEGY_PICK's committed
  * color-combo symbols; every other caller leaves it null.
  */
 @Composable
@@ -741,14 +746,46 @@ internal fun StrategyRecommendationRow(
     val title = titleOverride
         ?: recommendation.tribe?.let { "${recommendation.strategy.displayName} — ${tribeDisplayLabel(it)}" }
         ?: recommendation.strategy.displayName
+    val ownedCount = recommendation.ownedFittingCount
     MagicSelectionItem(
         title = title,
-        description = stringResource(R.string.deck_wizard_strategy_owned_count, recommendation.ownedFittingCount),
+        description = recommendation.strategy.description,
         isSelected = isSelected,
         accentColor = MaterialTheme.magicColors.primaryAccent,
         icon = icon,
+        trailing = if (ownedCount > 0) ({ OwnedCountBadge(count = ownedCount) }) else null,
         onClick = onClick,
     )
+}
+
+/** "You own N cards" as a chip: the same owned-icon language [CardRow] uses, tonal accent fill with
+ * full-opacity accent text (the [com.mmg.manahub.core.ui.components.CardTagChip] recipe) so it clears
+ * contrast on HallowedPrint as well as the dark palettes. */
+@Composable
+private fun OwnedCountBadge(count: Int) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    val ownedDescription = stringResource(R.string.deck_wizard_strategy_owned_count, count)
+    Surface(
+        shape = ChipShape,
+        color = mc.primaryAccent.copy(alpha = 0.12f),
+        modifier = Modifier.semantics { contentDescription = ownedDescription },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.xxs),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.CollectionsBookmark,
+                contentDescription = null,
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(14.dp),
+            )
+            Text(text = count.toString(), style = ty.labelMedium, color = mc.primaryAccent)
+        }
+    }
 }
 
 // ── PLAN_SECTIONS (Deck Wizard Commander v3 plan, Phase 5, R4; generalized to every anchor by the
@@ -766,6 +803,25 @@ private val PLAN_SECTIONS_PILLAR_ORDER = listOf(PillarId.PLAN_ROLES, PillarId.MA
  * wizard never auto-drops a manual add for being off-plan) rather than their normal
  * [CardSection.label]. */
 private val KEPT_OUTSIDE_PLAN_IDS = setOf("interaction", "standalone", "offplan")
+
+/** The merged residual section's id (never an engine id; `SectionSearchQuery` has no Browse for it). */
+internal const val KEPT_OUTSIDE_PLAN_SECTION_ID = "kept_outside_plan"
+
+/** Folds the SYNERGY residual buckets ([KEPT_OUTSIDE_PLAN_IDS]) into ONE section labelled [label],
+ * placed where the first of them appeared -- three back-to-back rows with the same header read as
+ * a rendering bug. Sections with no residual bucket come back untouched. */
+internal fun mergeKeptOutsidePlanSections(sections: List<CardSection>, label: String): List<CardSection> {
+    val residual = sections.filter { it.id in KEPT_OUTSIDE_PLAN_IDS }
+    if (residual.isEmpty()) return sections
+    val merged = CardSection(
+        id = KEPT_OUTSIDE_PLAN_SECTION_ID,
+        label = label,
+        current = residual.sumOf { it.current },
+        contributions = residual.flatMap { it.contributions },
+    )
+    val firstIndex = sections.indexOfFirst { it.id in KEPT_OUTSIDE_PLAN_IDS }
+    return sections.filterNot { it.id in KEPT_OUTSIDE_PLAN_IDS }.toMutableList().apply { add(firstIndex, merged) }
+}
 
 /** Same [SnapshotStateMap] + flattened-`List<String>` [Saver] shape as `DeckStudioScreen.kt`'s
  * `CollapsedCategorySectionsSaver` -- duplicated locally (not promoted to a shared file) per this
@@ -867,6 +923,7 @@ internal fun PlanSectionsStepContent(
     val pillars = remember(analysis) {
         PLAN_SECTIONS_PILLAR_ORDER.mapNotNull { id -> analysis?.pillars?.firstOrNull { it.id == id } }
     }
+    val keptOutsidePlanLabel = stringResource(R.string.deck_wizard_plan_sections_kept_outside_plan)
 
     Column(Modifier.fillMaxSize()) {
         when {
@@ -922,21 +979,16 @@ internal fun PlanSectionsStepContent(
                             modifier = Modifier.padding(top = spacing.sm, bottom = spacing.xxs),
                         )
                     }
-                    items(selectedPillar.sections, key = { "${selectedPillar.id.name}:${it.id}" }) { section ->
+                    items(mergeKeptOutsidePlanSections(selectedPillar.sections, keptOutsidePlanLabel), key = { "${selectedPillar.id.name}:${it.id}" }) { section ->
                         val sectionKey = "${selectedPillar.id.name}:${section.id}"
                         // Defaults to EXPANDED (matches DeckStudioScreen's Analysis tab convention,
                         // where collapsedCategorySections gates on `!= true`) -- this step's whole
                         // purpose is to surface each category's Browse action, so hiding everything
                         // behind a tap on first load would bury the primary action of the screen.
                         val expanded = expandedSections[sectionKey] ?: true
-                        val renderedSection = if (section.id in KEPT_OUTSIDE_PLAN_IDS) {
-                            section.copy(label = stringResource(R.string.deck_wizard_plan_sections_kept_outside_plan))
-                        } else {
-                            section
-                        }
-                        val browseFragment = SectionSearchQuery.fragmentFor(section.id, queryContext)
+                        val browseFragment = if (section.id == KEPT_OUTSIDE_PLAN_SECTION_ID) null else SectionSearchQuery.fragmentFor(section.id, queryContext)
                         CardSectionRow(
-                            section = renderedSection,
+                            section = section,
                             resolveCard = ::resolveCard,
                             onCardClick = onCardClick,
                             onBrowse = if (browseFragment == null) null else {
@@ -966,11 +1018,10 @@ internal fun PlanSectionsStepContent(
                             modifier = Modifier.padding(top = spacing.sm, bottom = spacing.xxs),
                         )
                     }
-                    // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4 (S6): Commander rows are
-                    // unchanged (a full navigate + a full remove -- quantity is always 1 there, so
-                    // remove and decrement coincide); a 60-card row gets the +/- stepper, an
-                    // addEnabled cap at CopyPolicy.maxSeedCopies, and its own inline detail sheet
-                    // instead of navigating away.
+                    // One gesture contract everywhere: row/image tap = inspect, +/- = copies.
+                    // Commander seeds navigate to the full detail screen (quantity is always 1
+                    // there); a 60-card row gets the +/- stepper capped at CopyPolicy.maxSeedCopies
+                    // and its own inline detail sheet.
                     items(uiState.seeds, key = { "planadded_${it.card.scryfallId}" }) { seed ->
                         if (format.isCommanderFormat) {
                             CardRow(
@@ -978,6 +1029,7 @@ internal fun PlanSectionsStepContent(
                                 isInCollection = true,
                                 onClick = { onCardClick(seed.card.scryfallId) },
                                 onRemove = { onRemoveCard(seed.card) },
+                                onImageClick = { onCardClick(seed.card.scryfallId) },
                             )
                         } else {
                             val maxCopies = remember(seed.card, format) { CopyPolicy.maxSeedCopies(seed.card, format) }
@@ -985,7 +1037,7 @@ internal fun PlanSectionsStepContent(
                                 card = seed.card,
                                 isInCollection = (uiState.ownedQuantityByName[seed.card.name] ?: 0) > 0,
                                 quantity = seed.quantity,
-                                onClick = { onAddCard(seed.card) },
+                                onClick = { onShowSeedDetail(seed.card) },
                                 onAdd = { onAddCard(seed.card) },
                                 onRemove = { onRemoveCard(seed.card) },
                                 addEnabled = seed.quantity < maxCopies,

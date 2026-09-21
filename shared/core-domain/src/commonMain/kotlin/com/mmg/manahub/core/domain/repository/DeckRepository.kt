@@ -245,6 +245,23 @@ interface DeckRepository {
     suspend fun updateTribeOverride(deckId: String, tribeOverride: String?)
 
     /**
+     * The whole strategy pin -- [updateArchetypeOverride] AND [updateTribeOverride] -- as ONE
+     * write, for callers that always decide both halves together (the Studio strategy picker).
+     * The default composes the two single writes; a backend with a transactional store overrides
+     * it so a failure can never leave the pin half-applied.
+     */
+    suspend fun updateStrategyPin(
+        deckId: String,
+        archetypeOverride: String?,
+        themesOverride: List<String>,
+        posture: String?,
+        tribeOverride: String?,
+    ) {
+        updateArchetypeOverride(deckId, archetypeOverride, themesOverride, posture)
+        updateTribeOverride(deckId, tribeOverride)
+    }
+
+    /**
      * Sets (or clears) the deck's [Deck.strategyLocked] flag (D4 hard no-cut guarantee). Bumps
      * [Deck.updatedAt].
      */

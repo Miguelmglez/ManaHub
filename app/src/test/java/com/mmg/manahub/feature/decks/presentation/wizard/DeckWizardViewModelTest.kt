@@ -2236,4 +2236,101 @@ class DeckWizardViewModelTest {
         advanceUntilIdle()
         assertEquals(listOf(comboElf), vm.uiState.value.seeds.map { it.card })
     }
+
+    @Test
+    fun `F12 -- the per-card copy cap fires its own message, the section cap fires the section message`() = runTest(dispatcher) {
+        val onlyOne = card(id = "one-1", name = "Owned Once", colorIdentity = emptyList())
+        val other = card(id = "other-1", name = "Other Card", colorIdentity = emptyList())
+        val draft = commanderDraft(
+            ambiguityGroups = listOf(AmbiguityGroup(sectionId = "removal_spot", candidateIds = listOf("one-1", "other-1"), remainingSlots = 3)),
+            candidatesById = mapOf("one-1" to onlyOne, "other-1" to other),
+            candidateMaxCopies = mapOf("one-1" to 1, "other-1" to 4),
+        )
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
+        } returns draft
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+        assertEquals(WizardPhase.CHOICE, vm.uiState.value.phase)
+
+        vm.onChangeChoiceQuantity("removal_spot", "one-1", 1)
+        vm.events.test {
+            vm.onChangeChoiceQuantity("removal_spot", "one-1", 1)
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+        }
+        // 3 free slots remain, so only the card's own cap can explain the refusal.
+        verify { appContext.getString(R.string.deck_wizard_seed_copy_cap, 1) }
+        verify(exactly = 0) { appContext.getString(R.string.deck_wizard_choice_cap_reached, any()) }
+
+        vm.onChangeChoiceQuantity("removal_spot", "other-1", 1)
+        vm.onChangeChoiceQuantity("removal_spot", "other-1", 1)
+        vm.events.test {
+            vm.onChangeChoiceQuantity("removal_spot", "other-1", 1)
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+        }
+        verify { appContext.getString(R.string.deck_wizard_choice_cap_reached, 3) }
+        assertEquals(mapOf("one-1" to 1, "other-1" to 2), vm.uiState.value.choiceSelections["removal_spot"])
+    }
+
+    @Test
+    fun `F15 -- clearing the commander cancels the in-flight strategy recommendation, nothing lands afterwards`() = runTest(dispatcher) {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } coAnswers {
+            gate.await()
+            DataResult.Error("Worker down")
+        }
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        vm.onSelectCommander(commander)
+        runCurrent() // suspended inside the EDHREC fetch
+        assertTrue(vm.uiState.value.isLoadingCommanderStrategies)
+
+        vm.onClearCommander()
+        assertFalse(vm.uiState.value.isLoadingCommanderStrategies)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        val state = vm.uiState.value
+        assertNull(state.selectedCommander)
+        assertTrue(state.strategyRecommendations.isEmpty())
+        assertNull(state.selectedCuratedStrategyId)
+        assertFalse(state.isLoadingCommanderStrategies)
+    }
+
+    @Test
+    fun `F18 -- STRATEGY_PICK cancelling the tribe sub-picker rolls the combo back, picking a tribe commits both`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.STRATEGY)
+        advanceUntilIdle()
+        val tribal = CuratedStrategyCatalog.ALL.first { it.availableIn(DeckFormat.STANDARD) && it.requiresTribe }
+
+        vm.onSelectStrategyPickEntry(tribal)
+        vm.onSelectStrategyPickCombo(tribal, ColorComboSuggestion(setOf(ManaColor.G), 1f))
+        advanceUntilIdle()
+        assertEquals(tribal, vm.uiState.value.pendingTribeStrategy)
+        assertTrue("identity must wait for the tribe", vm.uiState.value.colorIdentity.isEmpty())
+
+        vm.onCancelTribePickForStrategy()
+        val cancelled = vm.uiState.value
+        assertNull(cancelled.pendingTribeStrategy)
+        assertTrue(cancelled.colorIdentity.isEmpty())
+        assertNull(cancelled.expandedStrategyPickId)
+        assertNull(cancelled.strategyPickSelectedId)
+        assertNull(cancelled.selectedCuratedStrategyId)
+
+        vm.onSelectStrategyPickEntry(tribal)
+        vm.onSelectStrategyPickCombo(tribal, ColorComboSuggestion(setOf(ManaColor.G), 1f))
+        advanceUntilIdle()
+        vm.onPickTribeForStrategy("tribe:elf")
+        val committed = vm.uiState.value
+        assertEquals(tribal.id, committed.selectedCuratedStrategyId)
+        assertEquals("tribe:elf", committed.selectedTribeKey)
+        assertEquals(setOf(ManaColor.G), committed.colorIdentity)
+        assertNull(committed.pendingTribeStrategy)
+    }
 }

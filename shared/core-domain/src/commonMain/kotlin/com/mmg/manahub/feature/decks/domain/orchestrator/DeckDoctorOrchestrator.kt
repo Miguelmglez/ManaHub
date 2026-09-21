@@ -27,6 +27,7 @@ import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.FindSimilarDecksUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SimilarDeckResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -680,7 +681,7 @@ class DeckDoctorOrchestrator(
 
     /**
      * Pins (or, when [archetypeId]/[themes] are both null/empty, clears) the deck's archetype/theme
-     * override — writes through [DeckRepository.updateArchetypeOverride] then re-runs a FULL
+     * override — writes through [DeckRepository.updateStrategyPin] (ONE write, tribe included) then re-runs a FULL
      * [loadAnalysis] (a macro/theme change reshapes the whole resolved skeleton, so an incremental
      * recompute is not enough — mirrors [changeFormat]'s "cheap enough to just reload" precedent).
      *
@@ -688,17 +689,15 @@ class DeckDoctorOrchestrator(
      * @param themes at most 2 (the caller — the Studio bottom sheet — already enforces this cap);
      *        empty clears the theme pin.
      * @param tribe Deck Analysis Engine v2 Phase 3 -- the curated strategy picker's tribe sub-pick
-     *        (only meaningful when a [ThemeId.TRIBAL]-requiring strategy is applied), written through
-     *        the SEPARATE [DeckRepository.updateTribeOverride] column (mirrors the wizard's own
-     *        `updateArchetypeOverride` + `updateTribeOverride` pair, see [DeckWizardViewModel]).
+     *        (only meaningful when a [ThemeId.TRIBAL]-requiring strategy is applied), written on the
+     *        SAME [DeckRepository.updateStrategyPin] call as the archetype/theme/posture pin.
      *        Defaults to `null` so every pre-Phase-3 call site (the legacy `ArchetypePlanSheet`,
      *        which has no tribe UI, and existing tests) keeps clearing/leaving the tribe pin exactly
      *        as before -- `null` here always clears the tribe column, which is also the CORRECT
      *        behavior for a non-tribal strategy pick or "Auto-detect" ([clearArchetypeOverride]).
      * @param posture Deck Wizard Commander v3 plan (E3, D5, fixes F3) -- a raw `PostureId.name`,
-     *        written on the SAME [DeckRepository.updateArchetypeOverride] call (unlike [tribe],
-     *        which has its own column write -- posture is meant to travel WITH the archetype/theme
-     *        pin it describes, via [CuratedStrategy.toPin]). Defaults to `null`, same "null clears,
+     *        written on the same [DeckRepository.updateStrategyPin] call (posture travels WITH the
+     *        archetype/theme pin it describes, via [CuratedStrategy.toPin]). Defaults to `null`, same "null clears,
      *        also correct for a non-postured pick or Auto-detect" convention as [tribe].
      */
     fun setArchetypeOverride(
@@ -710,18 +709,19 @@ class DeckDoctorOrchestrator(
     ) {
         scope.launch {
             runCatching {
-                deckRepository.updateArchetypeOverride(
+                deckRepository.updateStrategyPin(
                     deckId = deckId,
                     archetypeOverride = archetypeId?.name,
                     themesOverride = themes.take(2).map { it.name },
                     posture = posture?.name,
+                    tribeOverride = tribe,
                 )
-                deckRepository.updateTribeOverride(deckId, tribe)
             }.onFailure {
+                if (it is CancellationException) throw it
                 crashReporter.log("deck_studio_archetype_override_failed")
                 crashReporter.recordException(RuntimeException("[DeckDoctorOrchestrator] deck_studio_archetype_override_failed", it))
-                return@launch
             }
+            // Reload even after a failed write so the chip shows what is actually persisted.
             loadAnalysis(deckId)
         }
     }

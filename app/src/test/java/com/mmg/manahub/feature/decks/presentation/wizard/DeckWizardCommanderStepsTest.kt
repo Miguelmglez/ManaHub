@@ -5,6 +5,7 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.TagCategory
+import com.mmg.manahub.feature.decks.domain.engine.CardContribution
 import com.mmg.manahub.feature.decks.domain.engine.CardSection
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.card
@@ -348,5 +349,33 @@ class DeckWizardCommanderStepsTest {
     fun `an id present in both lists is never duplicated`() {
         val ids = choiceDisplayIds(tentativeIds = listOf("tent-1"), alternativeIds = listOf("tent-1", "alt-1"), cap = 10)
         assertEquals(listOf("tent-1", "alt-1"), ids)
+    }
+
+    // ── mergeKeptOutsidePlanSections (F21) ──────────────────────────────────────
+
+    @Test
+    fun `the three SYNERGY residual buckets fold into ONE Kept section at the first bucket's position`() {
+        val sections = listOf(
+            CardSection(id = "engine:TOKENS:producers", label = "Producers", current = 3),
+            CardSection(id = "interaction", label = "Interaction", current = 2, contributions = listOf(CardContribution("a", 1, 1f), CardContribution("b", 1, 1f))),
+            CardSection(id = "tribe:elf", label = "Elf", current = 5),
+            CardSection(id = "standalone", label = "Standalone", current = 1, contributions = listOf(CardContribution("c", 1, 1f))),
+            CardSection(id = "offplan", label = "Off-plan", current = 1, contributions = listOf(CardContribution("d", 2, 1f))),
+        )
+
+        val merged = mergeKeptOutsidePlanSections(sections, label = "Kept — outside the plan")
+
+        assertEquals(listOf("engine:TOKENS:producers", KEPT_OUTSIDE_PLAN_SECTION_ID, "tribe:elf"), merged.map { it.id })
+        val kept = merged.first { it.id == KEPT_OUTSIDE_PLAN_SECTION_ID }
+        assertEquals("Kept — outside the plan", kept.label)
+        assertEquals(listOf("a", "b", "c", "d"), kept.contributions.map { it.scryfallId })
+        assertEquals(5, kept.realCount)
+        assertEquals(1, merged.count { it.label == "Kept — outside the plan" })
+    }
+
+    @Test
+    fun `a pillar with no residual bucket is returned untouched`() {
+        val sections = listOf(CardSection(id = "role:removal_spot", label = "Removal", current = 4))
+        assertEquals(sections, mergeKeptOutsidePlanSections(sections, label = "Kept — outside the plan"))
     }
 }

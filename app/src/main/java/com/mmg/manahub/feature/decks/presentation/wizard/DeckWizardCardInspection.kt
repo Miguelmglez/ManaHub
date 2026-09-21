@@ -90,6 +90,9 @@ internal class WizardCardInspectionState(
     }
 }
 
+/** Deliberately `remember`, not `rememberSaveable`: a rotation closes an open overlay. The state
+ * holds a full [Card] and a host-relative source rect, neither of which restores meaningfully
+ * (the rect is stale in the new layout, so a "restored" overlay would fly in from nowhere). */
 @Composable
 internal fun rememberWizardCardInspectionState(): WizardCardInspectionState {
     val density = LocalDensity.current

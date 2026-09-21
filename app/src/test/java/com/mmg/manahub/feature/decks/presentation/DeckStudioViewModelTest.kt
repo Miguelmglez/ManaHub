@@ -4101,4 +4101,50 @@ class DeckStudioViewModelTest {
                 vm.uiState.value.strategyMatchScores.keys,
             )
         }
+
+    @Test
+    fun `F16 -- applyStructuredSearch keeps the typed name filter and re-issues the search with it`() =
+        runTest(dispatcher) {
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            val queries = mutableListOf<String>()
+            coEvery { searchCardsUseCase(capture(queries)) } returns
+                DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false, totalCards = 1))
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.searchScryfallDirect("elf")
+            advanceUntilIdle()
+
+            // The sheet's preset LaunchedEffect re-fires (derived context changed / remount).
+            vm.applyStructuredSearch(AdvancedSearchQuery(criteria = listOf(SearchCriterion.CardType(setOf("Creature")))))
+            advanceUntilIdle()
+
+            assertEquals("elf", vm.uiState.value.addCardsQuery)
+            assertEquals("elf (t:Creature)", queries.last())
+        }
+
+    @Test
+    fun `F17 -- a strategy pick is ONE repository write carrying the tribe, never a second tribe write`() =
+        runTest(dispatcher) {
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            // The pick reloads the analysis afterwards; give that reload what it observes.
+            every { wishlistRepository.observeLocal() } returns flowOf(emptyList())
+            coEvery { cardRepository.searchWithRawQuery(any()) } returns emptyList()
+            val vm = createVm()
+            advanceUntilIdle()
+
+            vm.onSetArchetypeOverride(
+                archetypeId = com.mmg.manahub.feature.decks.domain.engine.ArchetypeId.AGGRO,
+                themes = listOf(com.mmg.manahub.feature.decks.domain.engine.ThemeId.TRIBAL),
+                tribe = "tribe:elf",
+            )
+            advanceUntilIdle()
+
+            io.mockk.coVerify(exactly = 1) {
+                deckRepository.updateStrategyPin(DECK_ID, "AGGRO", listOf("TRIBAL"), null, "tribe:elf")
+            }
+            io.mockk.coVerify(exactly = 0) { deckRepository.updateTribeOverride(any(), any()) }
+            io.mockk.coVerify(exactly = 0) { deckRepository.updateArchetypeOverride(any(), any(), any(), any()) }
+        }
 }

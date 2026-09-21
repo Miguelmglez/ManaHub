@@ -523,6 +523,10 @@ class DeckWizardViewModel(
      * the fact. Cancelled alongside every other direction-scoped search job now. */
     private var comboSeedResolveJob: Job? = null
 
+    /** STRATEGY_PICK: the combo colors waiting on a tribe sub-pick before they become
+     * [DeckWizardUiState.colorIdentity]; `null` whenever no tribe pick is pending on a combo. */
+    private var pendingStrategyPickColors: Set<ManaColor>? = null
+
     /** Set only once [onGenerate] has actually created the deck row -- lets [onCancelGeneration]
      * clean up a partial build instead of orphaning an empty draft. */
     private var pendingDeckId: String? = null
@@ -733,11 +737,14 @@ class DeckWizardViewModel(
     }
 
     fun onClearCommander() {
+        // An in-flight EDHREC fetch would otherwise land and pre-select a strategy for no commander.
+        commanderStrategyJob?.cancel()
         _uiState.update {
             it.copy(
                 selectedCommander = null,
                 colorIdentity = emptySet(),
                 strategyRecommendations = emptyList(),
+                isLoadingCommanderStrategies = false,
                 selectedCuratedStrategyId = null,
                 isCustomStrategyChosen = false,
                 pendingTribeStrategy = null,
@@ -1086,8 +1093,9 @@ class DeckWizardViewModel(
     /** Opens the tribe sub-picker for [strategy], seeded with the collection's dominant tribes
      * within the current identity — reuses [CollectionProfileUseCase.dominantTribes] over an
      * identity-filtered slice of [cardSnapshot] (no new dominant-tribe computation). */
-    fun onRequestTribeForStrategy(strategy: CuratedStrategy) {
-        val identitySymbols = _uiState.value.colorIdentity.map { it.symbol }.toSet()
+    fun onRequestTribeForStrategy(strategy: CuratedStrategy, identity: Set<ManaColor> = _uiState.value.colorIdentity) {
+        pendingStrategyPickColors = null
+        val identitySymbols = identity.map { it.symbol }.toSet()
         viewModelScope.launch {
             val identityCards = cardSnapshot.filter { card -> identitySymbols.containsAll(card.colorIdentity) }
             val profile = collectionProfileUseCase(identityCards, limit = TRIBE_PICKER_CANDIDATE_LIMIT)
@@ -1097,15 +1105,34 @@ class DeckWizardViewModel(
         }
     }
 
+    /** Cancelling the tribe sub-picker leaves nothing half-applied: a STRATEGY_PICK combo whose
+     * identity was waiting on this tribe is dropped and its row collapses back to "nothing pending". */
     fun onCancelTribePickForStrategy() {
         crashReporter.log("deck_wizard_tribe_pick_cancelled")
-        _uiState.update { it.copy(pendingTribeStrategy = null, commanderTribePickerCandidates = emptyList()) }
+        val hadPendingCombo = pendingStrategyPickColors != null
+        pendingStrategyPickColors = null
+        _uiState.update { state ->
+            val base = state.copy(pendingTribeStrategy = null, commanderTribePickerCandidates = emptyList())
+            if (hadPendingCombo && state.expandedStrategyPickId != state.selectedCuratedStrategyId) {
+                base.copy(expandedStrategyPickId = null, strategyPickCombos = emptyList())
+            } else {
+                base
+            }
+        }
     }
 
     fun onPickTribeForStrategy(tribeKey: String) {
         val strategy = _uiState.value.pendingTribeStrategy ?: return
+        val pendingColors = pendingStrategyPickColors
+        pendingStrategyPickColors = null
+        _uiState.update {
+            it.copy(
+                pendingTribeStrategy = null,
+                commanderTribePickerCandidates = emptyList(),
+                colorIdentity = pendingColors ?: it.colorIdentity,
+            )
+        }
         selectCommanderStrategy(strategy, tribeKey)
-        _uiState.update { it.copy(pendingTribeStrategy = null, commanderTribePickerCandidates = emptyList()) }
     }
 
     /** STRATEGY_PICK's own free-text taxonomy filter (run B wires its UI, plan §5 Phase 5.3). */
@@ -1233,10 +1260,13 @@ class DeckWizardViewModel(
      * picker AND finalizes the strategy pin (or opens the existing tribe sub-picker first, for a
      * `requiresTribe` entry, same as every other strategy-pick surface). */
     fun onSelectStrategyPickCombo(strategy: CuratedStrategy, combo: ColorComboSuggestion) {
-        _uiState.update { it.copy(colorIdentity = combo.colors, showStrategyPickColorSheet = false) }
+        _uiState.update { it.copy(showStrategyPickColorSheet = false) }
         if (strategy.requiresTribe) {
-            onRequestTribeForStrategy(strategy)
+            // The identity commits together with the tribe, so a cancelled tribe pick has nothing to undo.
+            onRequestTribeForStrategy(strategy, identity = combo.colors)
+            pendingStrategyPickColors = combo.colors
         } else {
+            _uiState.update { it.copy(colorIdentity = combo.colors) }
             selectCommanderStrategy(strategy, null)
         }
     }
@@ -1970,20 +2000,18 @@ class DeckWizardViewModel(
         val currentForId = current[cardId] ?: 0
         when {
             delta > 0 -> {
-                val cap = (draft.candidateMaxCopies[cardId] ?: 0) + (tentative[cardId] ?: 0)
-                // One card can be an alternate in several sections: its copies elsewhere count too.
-                val elsewhere = copiesSelectedInOtherSections(state, draft, role, cardId)
-                if (current.values.sum() >= group.remainingSlots || currentForId >= cap || currentForId + elsewhere >= draft.globalChoiceCap(cardId)) {
-                    crashReporter.log("deck_wizard_choice_copy_cap_reached")
-                    viewModelScope.launch {
-                        _events.send(
-                            DeckWizardEvent.ShowToast(
-                                appContext.getString(R.string.deck_wizard_choice_cap_reached, group.remainingSlots),
-                                MagicToastType.INFO,
-                            )
-                        )
+                val sectionFull = current.values.sum() >= group.remainingSlots
+                val copyHeadroom = draft.choiceCopyHeadroom(state.choiceSelections, role, cardId)
+                if (sectionFull || copyHeadroom <= 0) {
+                    // Two different caps, two different messages: the section's slot budget vs this card's copies.
+                    val message = if (sectionFull) {
+                        appContext.getString(R.string.deck_wizard_choice_cap_reached, group.remainingSlots)
+                    } else {
+                        appContext.getString(R.string.deck_wizard_seed_copy_cap, currentForId)
                     }
-                    return // cap reached -- ignore the tap
+                    crashReporter.log(if (sectionFull) "deck_wizard_choice_section_cap_reached" else "deck_wizard_choice_copy_cap_reached")
+                    viewModelScope.launch { _events.send(DeckWizardEvent.ShowToast(message, MagicToastType.INFO)) }
+                    return
                 }
                 manuallyToggledChoiceRoles += role
                 _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to (current + (cardId to currentForId + 1)))) }
@@ -2010,10 +2038,10 @@ class DeckWizardViewModel(
         if (missing <= 0) return
         for (id in draft.tentativeByRole[role].orEmpty().distinct()) {
             if (missing <= 0) break
-            val cap = (draft.candidateMaxCopies[id] ?: 0) + (tentative[id] ?: 0)
             val have = current[id] ?: 0
-            val globalRoom = draft.globalChoiceCap(id) - have - copiesSelectedInOtherSections(state, draft, role, id)
-            val add = minOf((cap - have).coerceAtLeast(0), globalRoom.coerceAtLeast(0), missing)
+            // Headroom is read against the live map so copies added earlier in this loop count.
+            val headroom = draft.choiceCopyHeadroom(state.choiceSelections + (role to current), role, id)
+            val add = minOf(headroom, missing)
             if (add > 0) {
                 current[id] = have + add
                 missing -= add
@@ -2023,13 +2051,6 @@ class DeckWizardViewModel(
         autoFilledChoiceRoles += role
         _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to current)) }
     }
-
-    /** [cardId]'s selected copies across every section other than [role] (tentative defaults for
-     * untouched sections) -- what the per-section cap cannot see. */
-    private fun copiesSelectedInOtherSections(state: DeckWizardUiState, draft: WizardDraftBuild, role: RoleKey, cardId: String): Int =
-        draft.ambiguityGroups
-            .filter { it.sectionId != role }
-            .sumOf { group -> (state.choiceSelections[group.sectionId] ?: draft.tentativeCopies(group.sectionId))[cardId] ?: 0 }
 
     /** Global "Let the wizard finish" — resolves every section the user has already decided exactly
      * as chosen, and every untouched section with the engine's own tentative defaults, then persists
@@ -2397,3 +2418,17 @@ internal fun WizardDraftBuild.tentativeCopies(role: RoleKey): Map<String, Int> =
  * already holds anywhere (mirrors `BuildWizardDeckUseCase.finalize`'s own global gate). */
 internal fun WizardDraftBuild.globalChoiceCap(id: String): Int =
     (candidateMaxCopies[id] ?: 0) + tentativeByRole.values.sumOf { ids -> ids.count { it == id } }
+
+/** How many MORE copies of [id] the user may still add in [role] given [selections] (absent
+ * section = its tentative defaults): the tighter of the section's own cap (`finalize`'s per-role
+ * `candidateMaxCopies + tentative` contract) and the global cap net of copies selected in OTHER
+ * sections. Shared by the VM gate and the Choice row's `+` affordance so they never disagree. */
+internal fun WizardDraftBuild.choiceCopyHeadroom(selections: Map<RoleKey, Map<String, Int>>, role: RoleKey, id: String): Int {
+    val tentative = tentativeCopies(role)
+    val own = (selections[role] ?: tentative)[id] ?: 0
+    val sectionCap = (candidateMaxCopies[id] ?: 0) + (tentative[id] ?: 0)
+    val elsewhere = ambiguityGroups
+        .filter { it.sectionId != role }
+        .sumOf { group -> (selections[group.sectionId] ?: tentativeCopies(group.sectionId))[id] ?: 0 }
+    return minOf(sectionCap - own, globalChoiceCap(id) - own - elsewhere).coerceAtLeast(0)
+}

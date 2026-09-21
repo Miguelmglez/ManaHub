@@ -39,8 +39,6 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -178,6 +176,7 @@ internal fun ChoiceStepContent(
                     expanded = collapsedSections[group.sectionId] != true,
                     onToggleExpanded = { collapsedSections[group.sectionId] = collapsedSections[group.sectionId] != true },
                     onChangeQuantity = { cardId, delta -> onChangeQuantity(group.sectionId, cardId, delta) },
+                    copyHeadroom = { cardId -> draft.choiceCopyHeadroom(uiState.choiceSelections, group.sectionId, cardId) },
                     onAutoFill = { onAutoFillSection(group.sectionId) },
                     onOpenDetail = { id -> detailSelection = ChoiceDetailSelection(group.sectionId, id) },
                 )
@@ -334,6 +333,8 @@ private fun ChoiceSectionCard(
     expanded: Boolean,
     onToggleExpanded: () -> Unit,
     onChangeQuantity: (String, Int) -> Unit,
+    /** Copies of a card still addable in THIS section (per-card cap net of other sections). */
+    copyHeadroom: (String) -> Int,
     onAutoFill: () -> Unit,
     onOpenDetail: (String) -> Unit,
 ) {
@@ -401,9 +402,9 @@ private fun ChoiceSectionCard(
                         isCommanderFormat = isCommanderFormat,
                         quantity = current[id] ?: 0,
                         isTentativeDefault = true,
-                        // A tap that would ADD past the cap is a no-op in the VM too -- addEnabled
+                        // A tap that would ADD past either cap is a no-op in the VM too -- addEnabled
                         // is a visual affordance only, never the actual gate.
-                        addEnabled = !isFull,
+                        addEnabled = !isFull && copyHeadroom(id) > 0,
                         onIncrement = { onChangeQuantity(id, 1) },
                         onDecrement = { onChangeQuantity(id, -1) },
                         onOpenDetail = { onOpenDetail(id) },
@@ -415,7 +416,7 @@ private fun ChoiceSectionCard(
                         isCommanderFormat = isCommanderFormat,
                         quantity = current[id] ?: 0,
                         isTentativeDefault = false,
-                        addEnabled = !isFull,
+                        addEnabled = !isFull && copyHeadroom(id) > 0,
                         onIncrement = { onChangeQuantity(id, 1) },
                         onDecrement = { onChangeQuantity(id, -1) },
                         onOpenDetail = { onOpenDetail(id) },
@@ -451,11 +452,9 @@ private fun ChoiceSectionCard(
     }
 }
 
-/** S6: Commander renders a `selected` (quantity > 0) toggle row -- tapping it selects/deselects,
- * mirroring [CardRow]'s own boolean-selection convention. A 60-card anchor renders the +/-
- * quantity stepper instead (`onAdd`/`onRemove`, `onClick` also increments). Tapping the image
- * opens the read-only detail sheet in both cases -- the old dedicated Info icon is gone (S6: "the
- * Info icon is gone"). */
+/** ONE gesture contract for every wizard list (row/image tap = inspect, +/- = copies): both formats
+ * render [CardRow]'s +/- stepper; Commander additionally shows the `selected` glow, and its `+`
+ * disables at one copy because every Commander candidate's own cap is 1. */
 @Composable
 private fun ChoiceCandidateRow(
     card: Card,
@@ -489,30 +488,19 @@ private fun ChoiceCandidateRow(
         null
     }
 
-    if (isCommanderFormat) {
-        val isSelected = quantity > 0
-        CardRow(
-            card = card,
-            isInCollection = true,
-            selected = isSelected,
-            // CardRow's `selected` is visual only; announce the toggle state to TalkBack here.
-            modifier = Modifier.semantics { role = Role.Checkbox; selected = isSelected },
-            onClick = { if (isSelected) onDecrement() else onIncrement() },
-            onRemove = null,
-            onImageClick = onOpenDetail,
-            extraSupportingContent = badge,
-        )
-    } else {
-        CardRow(
-            card = card,
-            isInCollection = true,
-            quantity = quantity,
-            onAdd = onIncrement,
-            onRemove = onDecrement,
-            addEnabled = addEnabled,
-            onClick = onIncrement,
-            onImageClick = onOpenDetail,
-            extraSupportingContent = badge,
-        )
-    }
+    val isSelected = quantity > 0
+    CardRow(
+        card = card,
+        isInCollection = true,
+        quantity = quantity,
+        selected = isCommanderFormat && isSelected,
+        // CardRow's `selected` is visual only; announce the chosen state to TalkBack here.
+        modifier = if (isCommanderFormat) Modifier.semantics { selected = isSelected } else Modifier,
+        onAdd = onIncrement,
+        onRemove = onDecrement,
+        addEnabled = addEnabled,
+        onClick = onOpenDetail,
+        onImageClick = onOpenDetail,
+        extraSupportingContent = badge,
+    )
 }

@@ -269,13 +269,16 @@ fun CuratedStrategyPickerSheet(
                 (query.isBlank() || entry.displayName.contains(query, ignoreCase = true) || entry.description.contains(query, ignoreCase = true))
         }
     }
-    // Run 1 §1.6: sorted by match % descending within each group -- an unscored entry (still
-    // loading, or a requiresTribe entry with no dominant tribe) sorts to the end via the -1 default,
-    // never mixed in ahead of a genuinely lower real score.
-    val corePlans = filtered.filter { it.themes.isEmpty() }
-        .sortedByDescending { strategyMatchScores[it.id] ?: -1 }
-    val themedPresets = filtered.filter { it.themes.isNotEmpty() }
-        .sortedByDescending { strategyMatchScores[it.id] ?: -1 }
+    // Sorted by match % descending within each group ONLY once the scoring pass has finished --
+    // sorting while scores stream in reorders rows under the user's finger. Until then the catalog
+    // order stands (stable sort, every key -1); an entry that never scores stays at the end after.
+    val sortScores = if (isScoringStrategyMatches) emptyMap() else strategyMatchScores
+    val corePlans = remember(filtered, sortScores) {
+        filtered.filter { it.themes.isEmpty() }.sortedByDescending { sortScores[it.id] ?: -1 }
+    }
+    val themedPresets = remember(filtered, sortScores) {
+        filtered.filter { it.themes.isNotEmpty() }.sortedByDescending { sortScores[it.id] ?: -1 }
+    }
 
     Column(modifier.fillMaxSize().padding(horizontal = spacing.lg, vertical = spacing.md)) {
         Row(

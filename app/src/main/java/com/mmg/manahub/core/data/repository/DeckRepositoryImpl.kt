@@ -304,6 +304,25 @@ class DeckRepositoryImpl(
         }
     }
 
+    override suspend fun updateStrategyPin(
+        deckId: String,
+        archetypeOverride: String?,
+        themesOverride: List<String>,
+        posture: String?,
+        tribeOverride: String?,
+    ) {
+        withContext(ioDispatcher) {
+            deckDao.updateStrategyPin(
+                deckId = deckId,
+                archetypeOverride = archetypeOverride,
+                themesOverrideJson = if (themesOverride.isEmpty()) null else gson.toJson(themesOverride),
+                postureOverride = posture,
+                tribeOverride = tribeOverride,
+                updatedAt = System.currentTimeMillis(),
+            )
+        }
+    }
+
     override suspend fun updateStrategyLocked(deckId: String, locked: Boolean) {
         withContext(ioDispatcher) {
             deckDao.updateStrategyLocked(
