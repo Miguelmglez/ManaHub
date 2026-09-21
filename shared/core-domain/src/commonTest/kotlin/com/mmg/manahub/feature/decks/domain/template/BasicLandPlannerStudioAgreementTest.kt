@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.template
-// COMMENTS_REVIEWED: 2026-09-20
+// COMMENTS_REVIEWED: 2026-09-21
 
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
@@ -20,6 +20,7 @@ import com.mmg.manahub.feature.decks.domain.engine.StrategyPick
 import com.mmg.manahub.feature.decks.domain.engine.analysisv3.MockCollectionCard
 import com.mmg.manahub.feature.decks.domain.engine.analysisv3.MockCollectionRich
 import com.mmg.manahub.feature.decks.domain.engine.analysisv3.fixture16Tron
+import com.mmg.manahub.feature.decks.domain.engine.card
 import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
@@ -133,6 +134,33 @@ class BasicLandPlannerStudioAgreementTest {
         val draft = useCase.buildWithGroups(fixture.format, anchor, pick, ownedPool, includeNonBasicLands = true)
         val outcome = useCase.finalize(draft, resolutions = emptyMap(), fillLands = true)
 
+        assertZeroDeltas(outcome.result.entries, outcome.plan.skeleton, fixture.format, commanderIdentitySymbols = null)
+    }
+
+    @Test
+    fun `Studio's land-delta math agrees with a 60-card wizard build that seeded a basic AND a non-basic land`() = runTest {
+        val fixture = fixture16Tron()
+        val fixtureNonLand = fixture.mainboard.filterNot { BasicLandCalculator.isLand(it.card) }
+        val seeds = fixtureNonLand.take(6).map { it.card }
+        val forest = MockCollectionRich.ownedBasics.first { it.card.name == "Forest" }.card
+        val utilityLand = card(id = "agree-utility-land", name = "Agreement Utility Land", typeLine = "Land", cmc = 0.0, colors = emptyList(), colorIdentity = listOf("G"), producedMana = "G")
+        val ownedPool = (
+            MockCollectionRich.ownedCards +
+                fixtureNonLand.map { MockCollectionCard(it.card, 4) } +
+                MockCollectionRich.ownedBasics +
+                MockCollectionCard(utilityLand, 1)
+            ).distinctBy { it.card.scryfallId }.toOwned()
+        val anchor = BuildAnchor.Sixty(fixture.colorIdentity, seeds + forest + utilityLand)
+        val manualAdds = seeds.map { ManualAdd(it, isOwned = true, quantity = 4) } +
+            ManualAdd(forest, isOwned = true, quantity = 4) +
+            ManualAdd(utilityLand, isOwned = true, quantity = 1)
+
+        val useCase = newAgreementUseCase()
+        val draft = useCase.buildWithGroups(fixture.format, anchor, StrategyPick.Custom, ownedPool, manualAdds = manualAdds, includeNonBasicLands = true)
+        val outcome = useCase.finalize(draft, resolutions = emptyMap(), fillLands = true)
+
+        assertEquals(60, outcome.result.entries.sumOf { it.quantity })
+        assertEquals(1, outcome.result.entries.count { it.card.scryfallId == forest.scryfallId }, "a seeded basic and the same basic placed by the fill must persist as ONE slot")
         assertZeroDeltas(outcome.result.entries, outcome.plan.skeleton, fixture.format, commanderIdentitySymbols = null)
     }
 }

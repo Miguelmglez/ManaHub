@@ -326,8 +326,11 @@ must-know invariants live here:
   `targetDeckSize − commander slot` in copies (60 / 99). Seeds may be unowned (kept, D7, shown with the
   owned icon); the idle SEED_PICK grid is owned + legal cards, text/advanced search goes to Scryfall with
   `AdvancedSearchSheet.lockedCriteria = SectionSearchQuery.legalityCriterion(format)` (Pauper ⇒
-  `f:pauper`). In the CARDS flow seeds DEFINE the identity (locked colors); in COLORS/STRATEGY flows a
-  seed outside the identity is rejected with the existing toast. `ManaColor.C` is UI-only state for the
+  `f:pauper`). In the CARDS flow seeds DEFINE the identity — `colorIdentity` is REPLACED by the union
+  of the CURRENT seeds on every add/remove (never accumulated, Run 4a F3); in COLORS/STRATEGY flows a
+  seed outside the identity is rejected with the existing toast. Seeds past the non-land budget (or
+  lands past `landTarget`) shrink the OTHER side's fill — the deck never exceeds its size and seeds
+  are never dropped (Run 4a F5). `ManaColor.C` is UI-only state for the
   exclusive Colorless chip — `DeckWizardUiState.engineIdentity` strips it; the engine sees `{}` and
   fills basics with Wastes. Never let `C` reach `BuildAnchor`.
 - **No format step (R13/R14); four step maps (v6 S20).** `Screen.DeckWizard.createRoute` requires
@@ -369,9 +372,13 @@ must-know invariants live here:
   stays score-only.
 - **Persistence is ONE atomic write** — `BuildWizardDeckUseCase.persist(anchor, …)` →
   `DeckRepository.persistWizardBuild` (single Room `@Transaction` via `DeckDao.persistWizardBuild`;
-  slots carry `quantity`; WIZARD source for engine-placed + commander, USER for seeds). The 60-card
-  path never writes `commanderCardId` and never renames the deck (Studio owns the name); D12: always
-  into `launchedFromDeckId`.
+  slots carry `quantity`; WIZARD source for engine-placed + commander, USER for seeds; a Commander
+  build's `commanderCardId`/`coverCardId` ride the SAME transaction via its `commanderCardId` param —
+  never a separate `updateDeck` before the cards, UX polish Run 4a F2). The 60-card path never writes
+  `commanderCardId` and never renames the deck (Studio owns the name); D12: always into
+  `launchedFromDeckId`. `finalize` merges land entries by scryfallId before persisting: a seeded basic
+  plus the same basic placed by the fill would otherwise collapse to ONE `deck_cards` row (PK
+  `deck_id, scryfall_id, is_sideboard`) and silently lose copies.
 - **Collection-only, D7** — no Scryfall backstop for ANY format, Casual included; seeds (owned or not)
   are always kept. A thin collection legitimately declares gaps — never force-filled.
 - **Shared UI primitives (v6 S16).** `CardRow(onImageClick, addEnabled)` (commonMain) is the row for

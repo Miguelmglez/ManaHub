@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.template
-// COMMENTS_REVIEWED: 2026-09-16
+// COMMENTS_REVIEWED: 2026-09-21
 
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.repository.CardSlotWrite
@@ -303,8 +303,10 @@ class BuildWizardDeckUseCase(
         val manualLandClamped = manualLandRaw.map { it to clampedManualQuantity(it) }
         val manualNonLandCopies = manualNonLand.sumOf { it.second }
 
+        val manualLandCopies = manualLandClamped.sumOf { it.second }
         val totalSlots = if (anchor is BuildAnchor.Commander) NON_COMMANDER_SLOTS else format.targetDeckSize
-        val nonLandTarget = (totalSlots - landTarget - manualNonLandCopies).coerceAtLeast(0)
+        // Seeds are never dropped: an overflow on either side shrinks the OTHER side's fill, not the deck size.
+        val nonLandTarget = (totalSlots - maxOf(landTarget, manualLandCopies) - manualNonLandCopies).coerceAtLeast(0)
 
         val curveTargets = CurveTargets.forSkeleton(plan.skeleton, nonLandCount = nonLandTarget)
         val axisIdeals = SynergyGraph.axisIdeals(archetypeFormat, nonLandCount = nonLandTarget, dominantTribeAxis = dominantTribeAxis)
@@ -560,7 +562,8 @@ class BuildWizardDeckUseCase(
         val manualLandEntries = manualLandClamped.map { (manual, quantity) ->
             DeckEntry(card = manual.card, quantity = quantity, isOwned = manual.isOwned, isSideboard = false)
         }
-        val remainingLandSlots = (landTarget - manualLandEntries.sumOf { it.quantity }).coerceAtLeast(0)
+        val remainingLandSlots = (landTarget - manualLandCopies).coerceAtLeast(0)
+            .coerceAtMost((totalSlots - manualNonLandCopies - manualLandCopies).coerceAtLeast(0))
         val candidatesById = candidateCards.associateBy { it.scryfallId }
         val candidateMaxCopies: Map<String, Int> = candidatesById.mapValues { (id, _) ->
             ((maxPlaceable[id] ?: 0) - copiesPlaced(id)).coerceAtLeast(0)
@@ -644,6 +647,9 @@ class BuildWizardDeckUseCase(
         val placedNonLandMap = LinkedHashMap<String, DeckEntry>()
         draft.placedNonLand.forEach { placedNonLandMap[it.card.scryfallId] = it }
         val remainingCandidates = draft.remainingCandidates.toMutableList()
+        // Absolute cap (CopyPolicy.maxPlaceable) across ALL roles -- one card can be an alternate in two sections.
+        val draftQuantityById = draft.placedNonLand.associate { it.card.scryfallId to it.quantity }
+        fun globalCap(id: String): Int = (draft.candidateMaxCopies[id] ?: 0) + (draftQuantityById[id] ?: 0)
 
         resolutions.forEach { (role, chosenIds) ->
             val group = groupsByRole[role] ?: return@forEach
@@ -678,6 +684,8 @@ class BuildWizardDeckUseCase(
             droppedSlots.forEachIndexed { index, tentativeId ->
                 val replacementId = newAlternativeIds.getOrNull(index) ?: return@forEachIndexed
                 val replacement = draft.candidatesById[replacementId] ?: return@forEachIndexed
+                // Already at its cap via another role's resolution: the slot keeps its default.
+                if ((placedNonLandMap[replacementId]?.quantity ?: 0) >= globalCap(replacementId)) return@forEachIndexed
 
                 val current = placedNonLandMap[tentativeId]
                 if (current != null) {
@@ -704,14 +712,17 @@ class BuildWizardDeckUseCase(
 
         // ── Land fill v2 (2.4) ──────────────────────────────────────────────────────────────────
         onStage(WizardBuildStage.FILLING_LANDS)
-        val landEntries = mutableListOf<DeckEntry>()
-        landEntries += draft.manualLand
+        val rawLandEntries = mutableListOf<DeckEntry>()
+        rawLandEntries += draft.manualLand
         if (fillLands && draft.remainingLandSlots > 0) {
-            landEntries += fillLandsV2(
+            rawLandEntries += fillLandsV2(
                 identity = draft.identity,
                 colorCount = draft.colorCount,
-                landTarget = draft.landTarget,
+                // The deck's REAL land budget (shrunk by an over-seeded non-land count), so the
+                // planner sees the same total Studio will re-derive over the persisted mainboard.
+                landTarget = draft.remainingLandSlots + draft.manualLand.sumOf { it.quantity },
                 remainingLandSlots = draft.remainingLandSlots,
+                manualLand = draft.manualLand,
                 nonLandMainboard = placedNonLand,
                 commander = draft.commander,
                 ownedCollection = draft.ownedCollection,
@@ -722,6 +733,14 @@ class BuildWizardDeckUseCase(
                 deckId = draft.deckId,
             )
         }
+
+        // A seeded basic + the same basic from Stage B share a scryfallId; the deck_cards PK would collapse them.
+        val landEntries = LinkedHashMap<String, DeckEntry>().apply {
+            rawLandEntries.forEach { entry ->
+                val existing = this[entry.card.scryfallId]
+                this[entry.card.scryfallId] = existing?.copy(quantity = existing.quantity + entry.quantity, isOwned = existing.isOwned || entry.isOwned) ?: entry
+            }
+        }.values.toList()
 
         val commanderEntry = draft.commander?.let { DeckEntry(card = it, quantity = 1, isOwned = true, isSideboard = false) }
         val fullMainboard = listOfNotNull(commanderEntry) + placedNonLand + landEntries
@@ -821,14 +840,12 @@ class BuildWizardDeckUseCase(
     ) = persist(deckRepository, deckId, BuildAnchor.Commander(commander), manualIds, outcome)
 
     /**
-     * Persists [outcome]'s cards + pin into [deckId] in ONE atomic write —
-     * [DeckRepository.persistWizardBuild] plus [DeckCardSource] provenance (D13): [anchor]'s own
-     * commander (if any) and every engine-placed card are [DeckCardSource.WIZARD]; a card whose id
-     * is in [manualIds] is [DeckCardSource.USER]. Deck NAME and `commanderCardId`/`coverCardId` are
-     * deliberately NOT written here — those need the deck's current [com.mmg.manahub.core.model.Deck]
-     * row (via `DeckRepository.updateDeck`), which this use case is never handed (only a [deckId]
-     * string); the wizard VM already holds that row and should call `updateDeck` itself alongside
-     * this method, in the same build-completion step.
+     * Persists [outcome]'s cards + pin + the anchor's commander (as `commanderCardId`/`coverCardId`,
+     * `null` for a 60-card anchor, which never touches those columns) into [deckId] in ONE atomic
+     * write — [DeckRepository.persistWizardBuild] plus [DeckCardSource] provenance (D13): [anchor]'s
+     * own commander (if any) and every engine-placed card are [DeckCardSource.WIZARD]; a card whose
+     * id is in [manualIds] is [DeckCardSource.USER]. The deck NAME is deliberately NOT written here
+     * (Studio owns it).
      */
     suspend fun persist(
         deckRepository: DeckRepository,
@@ -854,6 +871,7 @@ class BuildWizardDeckUseCase(
             posture = outcome.pin.posture?.name,
             tribeOverride = outcome.pin.tribe,
             strategyLocked = outcome.pin.archetype != null || outcome.pin.themes.isNotEmpty(),
+            commanderCardId = commanderId,
         )
     }
 
@@ -1095,6 +1113,7 @@ class BuildWizardDeckUseCase(
         colorCount: Int,
         landTarget: Int,
         remainingLandSlots: Int,
+        manualLand: List<DeckEntry>,
         nonLandMainboard: List<DeckEntry>,
         commander: Card?,
         ownedCollection: List<OwnedCard>,
@@ -1109,6 +1128,17 @@ class BuildWizardDeckUseCase(
         val commanderPipEntry = listOfNotNull(commander?.let { DeckEntry(it, 1, true, false) })
         val intensity = manaBaseAnalyzer.maxSinglePipIntensity(nonLandMainboard + commanderPipEntry)
         val sources = mutableMapOf<ManaColor, Int>()
+        // Studio re-derives from the persisted board: canonical basics are pre-allocated plan copies, other lands are sources.
+        val (manualBasics, manualNonBasics) = manualLand.partition { basicColorFor(it.card) != null }
+        val manualBasicsByColor: Map<ManaColor, Int> = manualBasics
+            .groupBy { basicColorFor(it.card)!! }
+            .mapValues { (_, entries) -> entries.sumOf { it.quantity } }
+        val manualNonBasicCopies = manualNonBasics.sumOf { it.quantity }
+        manualNonBasics.forEach { entry ->
+            manaBaseAnalyzer.producedColors(entry.card, identity).intersect(identitySymbolsToColors(identitySymbols)).forEach { c ->
+                sources[c] = (sources[c] ?: 0) + entry.quantity
+            }
+        }
 
         // ── Stage A: owned non-basic lands within identity — OFF by default (R8), skipped straight
         //    to Stage B/basics when includeNonBasicLands is false; remainingLandSlots is unchanged,
@@ -1116,7 +1146,7 @@ class BuildWizardDeckUseCase(
         if (includeNonBasicLands) {
             val mix = ArchetypeData.landMixFor(archetypeFormat, colorCount)
             val nonBasicCap = ((1.0 - (mix.basicsRatio.start + mix.basicsRatio.endInclusive) / 2.0) * landTarget)
-                .let { kotlin.math.round(it).toInt() }
+                .let { kotlin.math.round(it).toInt() - manualNonBasicCopies }
                 .coerceIn(0, remainingLandSlots)
 
             // Deck Wizard 60-card wave (v6), Phase 6.2 fix: a rotating 60-card format (Standard/
@@ -1176,16 +1206,27 @@ class BuildWizardDeckUseCase(
         //    distribution + bounded Karsten rebalance, extracted so Studio's own land-delta math can
         //    call the exact same counts logic. Materializing the counts into real Card entries via
         //    resolveBasicCard stays here (the planner is pure counts, no ownedCollection). ─────────
-        val basicSlots = remainingLandSlots - placed.size
+        val basicSlots = remainingLandSlots - placed.sumOf { it.quantity }
         if (basicSlots > 0) {
-            val nonBasicDeckCards = placed.map { com.mmg.manahub.core.model.DeckCard(it.card, it.quantity) }
-            val basicCounts = BasicLandPlanner.planBasics(
+            val nonBasicDeckCards = (placed + manualNonBasics).map { com.mmg.manahub.core.model.DeckCard(it.card, it.quantity) }
+            val planned = BasicLandPlanner.planBasics(
                 identity = identity,
-                landTarget = remainingLandSlots,
+                landTarget = landTarget,
                 nonLandMainboard = nonLandMainboard + commanderPipEntry,
                 nonBasicLands = nonBasicDeckCards,
                 manaBaseAnalyzer = manaBaseAnalyzer,
             )
+            val basicCounts = ManaColor.entries.associateWith { color ->
+                ((planned[color] ?: 0) - (manualBasicsByColor[color] ?: 0)).coerceAtLeast(0)
+            }.toMutableMap()
+            // An over-seeded colour is never trimmed, so its surplus comes off the largest fills instead.
+            var surplus = basicCounts.values.sum() - basicSlots
+            while (surplus > 0) {
+                val largest = basicCounts.maxByOrNull { it.value } ?: break
+                if (largest.value <= 0) break
+                basicCounts[largest.key] = largest.value - 1
+                surplus--
+            }
             placed += ManaColor.entries.mapNotNull { color ->
                 val qty = basicCounts[color] ?: 0
                 if (qty <= 0) return@mapNotNull null
@@ -1200,6 +1241,10 @@ class BuildWizardDeckUseCase(
 
     private fun identitySymbolsToColors(symbols: Set<String>): Set<ManaColor> =
         ManaColor.entries.filter { it.symbol in symbols }.toSet()
+
+    /** The colour a canonical basic land (Plains..Forest, Wastes) is a copy of, `null` otherwise. */
+    private fun basicColorFor(card: Card): ManaColor? =
+        ManaColor.entries.firstOrNull { (BasicLandCalculator.LAND_FOR_COLOR[it.symbol] ?: "Wastes") == card.name }
 
     /**
      * R12/E13: the ONE lookup for "the [Card] object backing basic-land [name]" — used by Stage B's

@@ -360,6 +360,7 @@ interface DeckDao {
         postureOverride: String?,
         tribeOverride: String?,
         strategyLocked: Boolean,
+        commanderCardId: String? = null,
         updatedAt: Long = System.currentTimeMillis(),
     ) {
         clearDeckCards(deckId)
@@ -367,7 +368,18 @@ interface DeckDao {
         updateArchetypeOverride(deckId, archetypeOverride, themesOverrideJson, postureOverride, updatedAt)
         updateTribeOverride(deckId, tribeOverride, updatedAt)
         updateStrategyLocked(deckId, strategyLocked, updatedAt)
+        // Same transaction as the cards: a Commander build never leaves a commander on an empty deck.
+        if (commanderCardId != null) updateCommanderAndCover(deckId, commanderCardId, updatedAt)
     }
+
+    @Query("""
+        UPDATE decks SET
+            commander_card_id = :commanderCardId,
+            cover_card_id = :commanderCardId,
+            updated_at = :updatedAt
+        WHERE id = :deckId
+    """)
+    suspend fun updateCommanderAndCover(deckId: String, commanderCardId: String, updatedAt: Long)
 
     // ── Stats / other features ─────────────────────────────────────────────────
 

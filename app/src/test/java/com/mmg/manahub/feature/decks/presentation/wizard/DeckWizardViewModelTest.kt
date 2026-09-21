@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
-// COMMENTS_REVIEWED: 2026-09-10
+// COMMENTS_REVIEWED: 2026-09-21
 
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
@@ -740,7 +740,7 @@ class DeckWizardViewModelTest {
         assertNotNull(vm.uiState.value.commanderDraftBuild)
         assertTrue(vm.uiState.value.choiceSelections.isEmpty())
         coVerify(exactly = 0) { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) }
-        coVerify(exactly = 0) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -785,7 +785,7 @@ class DeckWizardViewModelTest {
         assertEquals(WizardPhase.CHOICE, vm.uiState.value.phase)
         assertEquals(fallbackDraft, vm.uiState.value.commanderDraftBuild)
         coVerify(exactly = 0) { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) }
-        coVerify(exactly = 0) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any(), any()) }
 
         // The only way out of this phase-with-zero-groups build is "Let the wizard finish" --
         // it must still finalize exactly once, with no resolutions (nothing was ever selectable).
@@ -797,7 +797,7 @@ class DeckWizardViewModelTest {
             assertTrue(event is DeckWizardEvent.OpenDeckStudio)
         }
         coVerify(exactly = 1) { buildCommanderDeckUseCase.finalize(fallbackDraft, emptyMap(), any(), any()) }
-        coVerify(exactly = 1) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 1) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -939,7 +939,7 @@ class DeckWizardViewModelTest {
         } returns twoGroupChoiceDraft()
         coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
         coEvery {
-            deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any())
+            deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any(), any())
         } throws RuntimeException("persist boom")
         val vm = viewModel(mapOf("format" to "COMMANDER"))
         advanceUntilIdle()
@@ -1091,7 +1091,7 @@ class DeckWizardViewModelTest {
         coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
         var persistCallCount = 0
         coEvery {
-            deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any())
+            deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any(), any())
         } answers {
             persistCallCount++
             if (persistCallCount == 1) throw RuntimeException("persist boom")
@@ -1121,7 +1121,7 @@ class DeckWizardViewModelTest {
         // retry's persist call carries the same user-chosen alternative.
         coVerify(exactly = 1) { deckRepository.deleteDeck("wizard-deck-1") }
         coVerify(exactly = 1) { buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any()) }
-        coVerify(exactly = 2) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 2) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any(), any()) }
         assertNull(vm.uiState.value.buildError)
     }
 
@@ -1147,7 +1147,7 @@ class DeckWizardViewModelTest {
         assertNull(vm.uiState.value.commanderDraftBuild)
         assertTrue(vm.uiState.value.choiceSelections.isEmpty())
         coVerify(exactly = 0) { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) }
-        coVerify(exactly = 0) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any(), any()) }
         coVerify(exactly = 0) { deckRepository.createDeck(any(), any(), any()) }
     }
 
@@ -1479,7 +1479,7 @@ class DeckWizardViewModelTest {
         assertEquals(2, manualAdds.first { it.card.scryfallId == seedB.scryfallId }.quantity)
 
         coVerify(exactly = 0) { deckRepository.updateDeck(any()) }
-        coVerify(exactly = 1) { deckRepository.persistWizardBuild(eq("existing-deck-1"), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 1) { deckRepository.persistWizardBuild(eq("existing-deck-1"), any(), any(), any(), any(), any(), any(), any()) }
         coVerify(exactly = 0) { deckRepository.createDeck(any(), any(), any()) }
     }
 
@@ -1988,5 +1988,252 @@ class DeckWizardViewModelTest {
 
         vm.onSelectCustomStrategy()
         assertNull(vm.uiState.value.strategyDisplayLabel)
+    }
+
+    // ── Run 4a -- feature-wide audit fixes (F1-F11) ─────────────────────────────
+
+    private fun twoSectionSharedAlternateDraft(sharedHeadroom: Int) = commanderDraft(
+        ambiguityGroups = listOf(
+            AmbiguityGroup(sectionId = "removal_spot", candidateIds = listOf("shared-1", "alt-a"), remainingSlots = 3),
+            AmbiguityGroup(sectionId = "card_draw", candidateIds = listOf("shared-1", "alt-c"), remainingSlots = 3),
+        ),
+        tentativeByRole = mapOf("removal_spot" to listOf("tent-1"), "card_draw" to listOf("tent-2")),
+        candidatesById = mapOf(
+            "tent-1" to choiceTentative1, "tent-2" to choiceTentative2,
+            "shared-1" to card(id = "shared-1", name = "Shared Alternate", colorIdentity = listOf("G")),
+            "alt-a" to choiceAltA, "alt-c" to choiceAltC,
+        ),
+        candidateMaxCopies = mapOf("tent-1" to 0, "tent-2" to 0, "shared-1" to sharedHeadroom, "alt-a" to 1, "alt-c" to 1),
+    )
+
+    @Test
+    fun `F1 -- Commander, the same alternate chosen in a second section is refused with the cap toast`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
+        } returns twoSectionSharedAlternateDraft(sharedHeadroom = 1)
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        vm.onChangeChoiceQuantity("removal_spot", "shared-1", 1)
+        assertEquals(1, vm.uiState.value.choiceSelections["removal_spot"]?.get("shared-1"))
+
+        vm.events.test {
+            vm.onChangeChoiceQuantity("card_draw", "shared-1", 1)
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+        }
+        assertNull("the second section must not hold a copy the card has no headroom for", vm.uiState.value.choiceSelections["card_draw"]?.get("shared-1"))
+
+        // Freeing the copy in the first section makes it selectable in the second.
+        vm.onChangeChoiceQuantity("removal_spot", "shared-1", -1)
+        vm.onChangeChoiceQuantity("card_draw", "shared-1", 1)
+        assertEquals(1, vm.uiState.value.choiceSelections["card_draw"]?.get("shared-1"))
+    }
+
+    @Test
+    fun `F1 -- 60-card, copies of one card across two sections never exceed its global headroom`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
+        } returns twoSectionSharedAlternateDraft(sharedHeadroom = 2)
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+
+        vm.onChangeChoiceQuantity("removal_spot", "shared-1", 1)
+        vm.onChangeChoiceQuantity("card_draw", "shared-1", 1)
+        assertEquals(1, vm.uiState.value.choiceSelections["removal_spot"]?.get("shared-1"))
+        assertEquals(1, vm.uiState.value.choiceSelections["card_draw"]?.get("shared-1"))
+
+        vm.onChangeChoiceQuantity("card_draw", "shared-1", 1)
+        assertEquals("1 + 1 already reaches the global headroom of 2", 1, vm.uiState.value.choiceSelections["card_draw"]?.get("shared-1"))
+
+        // Auto-fill respects the global headroom too: tent-2 has headroom 1 (its own tentative copy).
+        vm.onAutoFillChoiceSection("card_draw")
+        val cardDraw = vm.uiState.value.choiceSelections["card_draw"].orEmpty()
+        assertEquals(1, cardDraw["shared-1"])
+        assertEquals(1, cardDraw["tent-2"])
+    }
+
+    @Test
+    fun `F2 -- a Commander persist carries the commander id inside the single write, retry succeeds, updateDeck is never called`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
+        every { deckRepository.observeDeckWithCards("cmd-deck-1") } returns flowOf(emptyDeckWithCards("cmd-deck-1"))
+        var persistCallCount = 0
+        coEvery {
+            deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any(), any())
+        } answers {
+            persistCallCount++
+            if (persistCallCount == 1) throw RuntimeException("persist boom")
+        }
+        val vm = viewModel(mapOf("format" to "COMMANDER", "deckId" to "cmd-deck-1", "replaceConfirmed" to false))
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+        vm.onGenerate()
+        advanceUntilIdle()
+        assertEquals("TPL", vm.uiState.value.buildError)
+        assertEquals(WizardPhase.GENERATING, vm.uiState.value.phase)
+
+        vm.events.test {
+            vm.onRetryGeneration()
+            advanceUntilIdle()
+            assertTrue(awaitItem() is DeckWizardEvent.OpenDeckStudio)
+        }
+
+        coVerify(exactly = 0) { deckRepository.updateDeck(any()) }
+        coVerify(exactly = 2) { deckRepository.persistWizardBuild(eq("cmd-deck-1"), any(), any(), any(), any(), any(), any(), eq("cmd-1")) }
+        coVerify(exactly = 0) { deckRepository.createDeck(any(), any(), any()) }
+        assertNull(vm.uiState.value.buildError)
+    }
+
+    @Test
+    fun `F2 F10 -- an unconfirmed write into a deck with sideboard-only cards is refused as a visible, retryable build error`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
+        every { deckRepository.observeDeckWithCards("sb-deck-1") } returns flowOf(
+            DeckWithCards(
+                deck = com.mmg.manahub.core.model.Deck(id = "sb-deck-1", name = "Sideboard Only", format = "commander", commanderCardId = null),
+                mainboard = emptyList(),
+                sideboard = listOf(com.mmg.manahub.core.model.DeckSlot(scryfallId = "side-1", quantity = 2)),
+            )
+        )
+        val vm = viewModel(mapOf("format" to "COMMANDER", "deckId" to "sb-deck-1", "replaceConfirmed" to false))
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+
+        vm.events.test {
+            vm.onGenerate()
+            advanceUntilIdle()
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+        }
+
+        assertEquals(WizardPhase.GENERATING, vm.uiState.value.phase)
+        assertNotNull("the refusal must surface as buildError, never a bare spinner", vm.uiState.value.buildError)
+        coVerify(exactly = 0) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `F2 -- an existing commander equal to the one being written is not data to lose`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery {
+            buildCommanderDeckUseCase.buildWithGroups(any(), any<BuildAnchor>(), any(), any(), any(), any(), any(), any(), any())
+        } returns commanderDraft()
+        coEvery { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) } returns commanderOutcome()
+        every { deckRepository.observeDeckWithCards("same-cmd-deck") } returns flowOf(
+            DeckWithCards(
+                deck = com.mmg.manahub.core.model.Deck(id = "same-cmd-deck", name = "Same Commander", format = "commander", commanderCardId = "cmd-1"),
+                mainboard = emptyList(),
+                sideboard = emptyList(),
+            )
+        )
+        val vm = viewModel(mapOf("format" to "COMMANDER", "deckId" to "same-cmd-deck", "replaceConfirmed" to false))
+        advanceUntilIdle()
+        advanceCommanderToReview(vm)
+
+        vm.events.test {
+            vm.onGenerate()
+            advanceUntilIdle()
+            assertTrue(awaitItem() is DeckWizardEvent.OpenDeckStudio)
+        }
+        coVerify(exactly = 1) { deckRepository.persistWizardBuild(eq("same-cmd-deck"), any(), any(), any(), any(), any(), any(), eq("cmd-1")) }
+    }
+
+    @Test
+    fun `F3 -- CARDS flow identity is the union of the CURRENT seeds, so removing a seed shrinks it`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        val red = card(id = "red-seed", name = "Red Seed", colorIdentity = listOf("R"))
+        val green = card(id = "green-seed", name = "Green Seed", colorIdentity = listOf("G"))
+
+        vm.onAddSeed(red)
+        assertEquals(setOf(ManaColor.R), vm.uiState.value.colorIdentity)
+        vm.onAddSeed(green)
+        assertEquals(setOf(ManaColor.R, ManaColor.G), vm.uiState.value.colorIdentity)
+
+        vm.onRemoveSeed(red)
+        assertEquals(setOf(ManaColor.G), vm.uiState.value.colorIdentity)
+        assertEquals(setOf(ManaColor.G), vm.uiState.value.engineIdentity)
+
+        vm.onRemoveSeedCopy(green)
+        assertTrue(vm.uiState.value.colorIdentity.isEmpty())
+    }
+
+    @Test
+    fun `F4 -- PLAN_SECTIONS Browse Collection tab lists only identity-legal, format-legal cards for the section`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val greenDork = card(id = "dork-g", name = "Green Dork", colorIdentity = listOf("G"), tags = listOf(CardTag.MANA_DORK))
+        val blackDork = card(id = "dork-b", name = "Black Dork", colorIdentity = listOf("B"), tags = listOf(CardTag.MANA_DORK))
+        val bannedGreenDork = card(id = "dork-banned", name = "Banned Green Dork", colorIdentity = listOf("G"), tags = listOf(CardTag.MANA_DORK), legalityCommander = "banned")
+        every { userCardRepository.observeCollection() } returns flowOf(listOf(userCardWith(greenDork), userCardWith(blackDork), userCardWith(bannedGreenDork)))
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        advanceUntilIdle()
+
+        vm.searchPlanSectionsCollectionByTags(setOf("mana_dork"))
+
+        assertEquals(listOf(greenDork.scryfallId), vm.uiState.value.planSectionsCollectionResults.map { it.scryfallId })
+    }
+
+    @Test
+    fun `F6 -- superseding an in-flight plan analysis records no non-fatal and keeps the new pass loading`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        coEvery {
+            deckAnalysisPipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } coAnswers {
+            gate.await()
+            DeckHealth(evaluation = mockk(relaxed = true), profile = mockk(relaxed = true))
+        }
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        runCurrent() // the entry analysis is now suspended inside analyze()
+
+        vm.onAddSeed(card(id = "seed-g", name = "Green Seed", colorIdentity = listOf("G")))
+        runCurrent()
+
+        assertTrue("the superseded pass must not clear the new pass's loading flag", vm.uiState.value.isAnalyzingPlan)
+        verify(exactly = 0) { crashReporter.recordException(any()) }
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isAnalyzingPlan)
+        verify(exactly = 0) { crashReporter.recordException(any()) }
+    }
+
+    @Test
+    fun `F11 -- a Commander format with a seeds pre-fill still starts at COMMANDER_PICK, seeds land once a commander is picked`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val comboElf = card(id = "combo-elf", name = "Combo Elf", colorIdentity = listOf("G"))
+        every { userCardRepository.observeCollection() } returns flowOf(listOf(userCardWith(comboElf)))
+        val vm = viewModel(mapOf("format" to "COMMANDER", "seeds" to "Combo Elf"))
+        advanceUntilIdle()
+
+        assertEquals(WizardPhase.COMMANDER_PICK, vm.uiState.value.phase)
+        assertTrue(vm.uiState.value.seeds.isEmpty())
+
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        assertEquals(listOf(comboElf), vm.uiState.value.seeds.map { it.card })
     }
 }

@@ -349,6 +349,7 @@ class DeckRepositoryImpl(
         posture: String?,
         tribeOverride: String?,
         strategyLocked: Boolean,
+        commanderCardId: String?,
     ) {
         withContext(ioDispatcher) {
             val entities = slots.map { slot ->
@@ -368,6 +369,7 @@ class DeckRepositoryImpl(
                 postureOverride = posture,
                 tribeOverride = tribeOverride,
                 strategyLocked = strategyLocked,
+                commanderCardId = commanderCardId,
                 updatedAt = System.currentTimeMillis(),
             )
         }

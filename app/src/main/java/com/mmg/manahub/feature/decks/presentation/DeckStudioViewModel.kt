@@ -48,6 +48,7 @@ import com.mmg.manahub.feature.decks.domain.engine.SectionMembership
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.PostureId
 import com.mmg.manahub.feature.decks.domain.engine.SectionQueryContext
+import com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 import com.mmg.manahub.feature.decks.domain.engine.availableIn
@@ -74,11 +75,13 @@ import com.mmg.manahub.feature.decks.domain.template.DiscoverySearchFilter
 import com.mmg.manahub.feature.decks.domain.model.ComboResult
 import com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase
 import com.mmg.manahub.core.domain.repository.WishlistRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -1482,15 +1485,16 @@ class DeckStudioViewModel(
         publishCollectionResults(collectionCardsMatching(query))
     }
 
-    // Shared predicate for onAddCardsQueryChange/searchCollectionByTags/applyStructuredSearch (Deck
-    // Wizard UX polish plan, Run 1 §1.2): a section-driven browse (activeSectionPredicate non-null)
-    // filters by the predicate alone; otherwise the generic structured query (or no filter at all)
-    // applies -- never ORed/ANDed together, they are mutually exclusive entry points.
+    // A section-driven browse (activeSectionPredicate non-null) ANDs the category predicate with the
+    // deck's identity/legality gate; otherwise the generic structured query applies -- the two entry
+    // points are mutually exclusive, never combined.
     private fun collectionCardsMatching(query: String): List<Card> {
         val state = _uiState.value
         val sectionPredicate = state.activeSectionPredicate
         val structuralMatch: (Card) -> Boolean = if (sectionPredicate != null) {
-            sectionPredicate
+            val gate = SectionSearchQuery.localStructuralGate(sectionQueryContext())
+            val combined: (Card) -> Boolean = { card -> sectionPredicate(card) && gate(card) }
+            combined
         } else {
             val structuredQuery = state.activeCollectionQuery
             { card -> StructuredCardSearch.matches(card, structuredQuery) }
@@ -1966,6 +1970,8 @@ class DeckStudioViewModel(
                         emitProgression = false,
                     ).analysis?.totalScore
                 }.getOrElse { t ->
+                    // A cancelled pass must neither log a non-fatal per entry nor clear the NEW pass's spinner.
+                    if (t is CancellationException) throw t
                     crashReporter.log("deck_studio_strategy_match_score_failed")
                     crashReporter.recordException(RuntimeException("[DeckStudioViewModel] deck_studio_strategy_match_score_failed", t))
                     null
@@ -1974,6 +1980,7 @@ class DeckStudioViewModel(
                     _uiState.update { it.copy(strategyMatchScores = it.strategyMatchScores + (entry.id to score)) }
                 }
             }
+            ensureActive()
             _uiState.update { it.copy(isScoringStrategyMatches = false) }
         }
     }

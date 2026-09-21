@@ -276,10 +276,18 @@ interface DeckRepository {
         posture: String?,
         tribeOverride: String?,
         strategyLocked: Boolean,
+        // Non-null only for a Commander build: written as commanderCardId + coverCardId in the same
+        // write, so a failed persist can never leave a commander set on a deck with zero cards.
+        commanderCardId: String? = null,
     ) {
         replaceAllCardsWithSource(deckId, slots)
         updateArchetypeOverride(deckId, archetypeOverride, themesOverride, posture)
         updateTribeOverride(deckId, tribeOverride)
         updateStrategyLocked(deckId, strategyLocked)
+        if (commanderCardId != null) {
+            observeDeckWithCards(deckId).first()?.deck?.let { deck ->
+                updateDeck(deck.copy(commanderCardId = commanderCardId, coverCardId = commanderCardId))
+            }
+        }
     }
 }

@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.decks.domain.engine
 // COMMENTS_REVIEWED: 2026-09-10
 
 import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.ColorMatchMode
 import com.mmg.manahub.core.model.ComparisonOperator
 import com.mmg.manahub.core.model.DeckFormat
@@ -159,6 +160,24 @@ object SectionSearchQuery {
         identityCriterion(context)?.let(criteria::add)
         legalityCriterion(context.format)?.let(criteria::add)
         return AdvancedSearchQuery(criteria = criteria)
+    }
+
+    /**
+     * Local mirror of [toAdvancedQuery]'s identity + legality half for a section-predicate
+     * Collection browse ([SectionMembership.predicate] is category-only): the SAME
+     * [isLegalForFormat] the add path applies, plus identity containment. [enforceIdentity]
+     * defaults to the Commander-family rule [identityCriterion] encodes; a caller whose identity
+     * is user-picked (a 60-card Colors/Strategy flow) opts in, a Cards flow (seeds define the
+     * identity) opts out.
+     */
+    fun localStructuralGate(
+        context: SectionQueryContext,
+        enforceIdentity: Boolean = ArchetypeFormat.of(context.format) == ArchetypeFormat.COMMANDER,
+    ): (Card) -> Boolean {
+        val identitySymbols = context.colorIdentity.map { it.symbol }.toSet()
+        return { card ->
+            isLegalForFormat(card, context.format) && (!enforceIdentity || identitySymbols.containsAll(card.colorIdentity))
+        }
     }
 
     /**

@@ -65,6 +65,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -4031,6 +4032,73 @@ class DeckStudioViewModelTest {
             assertTrue(
                 "a requiresTribe entry must never be scored (not even a fake 0%) when no dominant tribe exists",
                 tribalId !in vm.uiState.value.strategyMatchScores,
+            )
+        }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  GROUP — Deck Wizard UX polish plan, Run 4a: F4 (Browse identity/legality gate) + F7
+    //  (strategy scoring cancellation)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `F4 -- searchCollectionByTags on a Commander deck excludes off-identity and Commander-illegal cards even when the section predicate matches`() =
+        runTest(dispatcher) {
+            val blackDork = card(id = "dork-b", name = "Black Dork", typeLine = "Creature — Elf", colorIdentity = listOf("B"), colors = listOf("B"), tags = listOf(CardTag.MANA_DORK))
+            val bannedGreenDork = card(id = "dork-banned", name = "Banned Green Dork", typeLine = "Creature — Elf", colorIdentity = listOf("G"), colors = listOf("G"), tags = listOf(CardTag.MANA_DORK), legalityCommander = "banned")
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(commanderDeckWithCards(listOf(DeckSlot(elfCard.scryfallId, 1))))
+            every { userCardRepository.observeCollection() } returns flowOf(
+                listOf(userCardWith(elfCard), userCardWith(blackDork), userCardWith(bannedGreenDork))
+            )
+            coEvery { cardRepository.getCardById(any()) } answers {
+                DataResult.Success(listOf(elfCard, commander, blackDork, bannedGreenDork).first { it.scryfallId == firstArg() })
+            }
+            val vm = createVm()
+            advanceUntilIdle()
+
+            vm.searchCollectionByTags(setOf("mana_dork"))
+
+            assertEquals(setOf(elfCard.scryfallId), vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet())
+        }
+
+    @Test
+    fun `F7 -- a superseded scoring pass records no non-fatals and leaves the new pass's spinner on until it ends`() =
+        runTest(dispatcher) {
+            val deckFlow = MutableStateFlow(
+                DeckWithCards(deck = Deck(id = DECK_ID, name = "Test", format = "casual"), mainboard = listOf(DeckSlot(elfCard.scryfallId, 1)), sideboard = emptyList())
+            )
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns deckFlow
+            coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
+            coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns DataResult.Success(removalCard)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val pipeline = mockk<DeckAnalysisPipeline>()
+            coEvery {
+                pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            } coAnswers {
+                gate.await()
+                fakeHealth(42)
+            }
+            val vm = createVmWithAnalysisPipeline(pipeline)
+            advanceUntilIdle()
+
+            vm.scoreStrategyMatches()
+            runCurrent() // first pass is suspended inside its first analyze()
+
+            deckFlow.value = deckFlow.value.copy(mainboard = listOf(DeckSlot(elfCard.scryfallId, 1), DeckSlot(removalCard.scryfallId, 1)))
+            advanceUntilIdle()
+            vm.scoreStrategyMatches() // snapshot changed -> cancels the first pass mid-loop
+            runCurrent()
+
+            assertTrue("the cancelled pass must not clear the new pass's spinner", vm.uiState.value.isScoringStrategyMatches)
+            io.mockk.verify(exactly = 0) { crashReporter.recordException(any()) }
+
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertFalse(vm.uiState.value.isScoringStrategyMatches)
+            io.mockk.verify(exactly = 0) { crashReporter.recordException(any()) }
+            assertEquals(
+                CuratedStrategyCatalog.ALL.filter { it.availableIn(DeckFormat.CASUAL) }.map { it.id }.toSet(),
+                vm.uiState.value.strategyMatchScores.keys,
             )
         }
 }

@@ -256,6 +256,42 @@ class DeckWizardCommanderStepsTest {
     }
 
     @Test
+    fun `a Standard hint uses Standard legality -- a Commander-legal, Standard-illegal card is never counted`() {
+        val rotated = card(id = "rotated-1", name = "Rotated Ramp", colorIdentity = listOf("G"), tags = listOf(CardTag("ramp", TagCategory.ROLE)), legalityStandard = "not_legal", legalityCommander = "legal")
+        val commanderBanned = card(id = "cmd-banned-1", name = "Commander-banned Ramp", colorIdentity = listOf("G"), tags = listOf(CardTag("ramp", TagCategory.ROLE)), legalityStandard = "legal", legalityCommander = "banned")
+        val sections = listOf(CardSection(id = "role:ramp", label = "Ramp", current = 0, min = 8, ideal = 10, max = 14))
+
+        val availability = computeOwnedAvailabilityBySection(
+            sections = sections,
+            ownedCards = listOf(rotated, commanderBanned),
+            excludeIds = emptySet(),
+            identity = setOf(ManaColor.G),
+            format = DeckFormat.STANDARD,
+            ownedQuantityByName = mapOf(rotated.name to 4, commanderBanned.name to 4),
+        )
+
+        assertEquals("only the Standard-legal card counts, at its Standard copy cap", 4, availability["role:ramp"])
+    }
+
+    @Test
+    fun `the CARDS flow skips the identity gate -- seeds define the identity, so an off-color owned card still counts`() {
+        val offColor = card(id = "off-2", name = "Off Color Ramp", colorIdentity = listOf("U"), tags = listOf(CardTag("ramp", TagCategory.ROLE)))
+        val sections = listOf(CardSection(id = "role:ramp", label = "Ramp", current = 0, min = 8, ideal = 10, max = 14))
+
+        val availability = computeOwnedAvailabilityBySection(
+            sections = sections,
+            ownedCards = listOf(offColor),
+            excludeIds = emptySet(),
+            identity = setOf(ManaColor.G),
+            format = DeckFormat.STANDARD,
+            enforceIdentity = false,
+            ownedQuantityByName = mapOf(offColor.name to 1),
+        )
+
+        assertEquals(1, availability["role:ramp"])
+    }
+
+    @Test
     fun `a section id with no matching signal (offplan) is absent from the map, never zero`() {
         val plainCard = card(id = "plain-1", name = "Plain Card", colorIdentity = listOf("G"))
         val sections = listOf(CardSection(id = "offplan", label = "Off-plan", current = 0))

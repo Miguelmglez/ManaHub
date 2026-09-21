@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.template
-// COMMENTS_REVIEWED: 2026-09-16
+// COMMENTS_REVIEWED: 2026-09-21
 
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
@@ -227,6 +227,78 @@ class BuildWizardDeckUseCaseSixtyTest {
         val outcome = useCase.finalize(draft, resolutions = mapOf(group.sectionId to listOf(altId, altId)))
         val altEntry = outcome.result.entries.first { it.card.scryfallId == altId }
         assertEquals(2, altEntry.quantity, "requesting the same alternative id twice must place exactly 2 copies of it")
+    }
+
+    /** The crowded-removal scenario from (f), reused: a real draft with at least one >=2-slot group. */
+    private suspend fun crowdedRemovalDraft(useCase: BuildWizardDeckUseCase, deckId: String): WizardDraftBuild {
+        val removalFillers = (1..30).map { i ->
+            OwnedCard(card(id = "sixty-cross-removal-$i", name = "Sixty Cross Removal Filler $i", typeLine = "Instant", cmc = 2.0, colors = listOf("R"), colorIdentity = listOf("R"), tags = listOf(CardTag.REMOVAL)), 4)
+        }
+        val offPlanManualAdds = (1..30).map { i ->
+            ManualAdd(card(id = "sixty-cross-offplan-$i", name = "Sixty Cross Off-plan Filler $i", typeLine = "Artifact", cmc = 1.0, colors = emptyList(), colorIdentity = emptyList()), isOwned = true)
+        }
+        val basics = MockCollectionRich.ownedBasics.filter { it.card.name == "Mountain" }
+        return useCase.buildWithGroups(
+            format = DeckFormat.MODERN,
+            anchor = BuildAnchor.Sixty(setOf(ManaColor.R), emptyList()),
+            strategyPick = StrategyPick.Custom,
+            ownedCollection = removalFillers + basics.map { OwnedCard(it.card, it.quantity) },
+            manualAdds = offPlanManualAdds,
+            deckId = deckId,
+        )
+    }
+
+    @Test
+    fun `(g) one id chosen in TWO sections is capped globally -- finalize places it once, the second slot keeps its default`() = runTest {
+        val useCase = newUseCase()
+        val realDraft = crowdedRemovalDraft(useCase, "sixty-cross-section-cap")
+        val placedIds = realDraft.placedNonLand.map { it.card.scryfallId }.toSet()
+        val groupA = realDraft.ambiguityGroups.firstOrNull { group ->
+            group.remainingSlots >= 2 && group.candidateIds.any { it !in placedIds }
+        }
+        assertTrue(groupA != null, "expected the crowded-removal scenario to surface a >=2-slot group with an unplaced alternate")
+        val altId = groupA.candidateIds.first { it !in placedIds }
+        // Section A resolves only its FIRST slot, so its last tentative occupant survives A and
+        // can stand in as the second section's own tentative slot.
+        val otherSlotId = realDraft.tentativeByRole.getValue(groupA.sectionId).last()
+        // A second section listing the SAME alternate, with a global cap of exactly 1 copy.
+        val draft = realDraft.copy(
+            ambiguityGroups = realDraft.ambiguityGroups + AmbiguityGroup(sectionId = "card_draw", candidateIds = listOf(altId), remainingSlots = 1),
+            tentativeByRole = realDraft.tentativeByRole + ("card_draw" to listOf(otherSlotId)),
+            candidateMaxCopies = realDraft.candidateMaxCopies + (altId to 1),
+        )
+
+        val outcome = useCase.finalize(
+            draft,
+            resolutions = mapOf(groupA.sectionId to listOf(altId), "card_draw" to listOf(altId)),
+            fillLands = false,
+        )
+
+        assertEquals(1, outcome.result.entries.filter { it.card.scryfallId == altId }.sumOf { it.quantity }, "the same id resolved in two sections must never exceed its global cap")
+        assertTrue(outcome.result.entries.any { it.card.scryfallId == otherSlotId }, "the over-cap section's slot must keep its engine default, not vanish")
+    }
+
+    @Test
+    fun `(h) seeding more non-land copies than the non-land budget shrinks the land fill -- the deck never exceeds 60`() = runTest {
+        val useCase = newUseCase()
+        val seeds = fixture14MonoRedBurn().mainboard.filterNot { BasicLandCalculator.isLand(it.card) }.map { it.card }
+        val manualAdds = seeds.map { ManualAdd(it, isOwned = true, quantity = 4) }
+        assertTrue(manualAdds.sumOf { it.quantity } > 60 - 20, "the fixture must over-seed the non-land budget for this test to mean anything")
+
+        val draft = useCase.buildWithGroups(
+            format = DeckFormat.STANDARD,
+            anchor = BuildAnchor.Sixty(setOf(ManaColor.R), seeds),
+            strategyPick = StrategyPick.Custom,
+            ownedCollection = sixtyOwned(),
+            manualAdds = manualAdds,
+            deckId = "sixty-h",
+        )
+        val outcome = useCase.finalize(draft, resolutions = emptyMap())
+
+        assertEquals(60, outcome.result.entries.sumOf { it.quantity }, "seeds are kept, so the land fill must shrink to hold the format size")
+        seeds.forEach { seed ->
+            assertEquals(4, outcome.result.entries.first { it.card.scryfallId == seed.scryfallId }.quantity, "a seed must never be dropped or trimmed")
+        }
     }
 
     // ── Plan §10 extras ────────────────────────────────────────────────────────────────────────

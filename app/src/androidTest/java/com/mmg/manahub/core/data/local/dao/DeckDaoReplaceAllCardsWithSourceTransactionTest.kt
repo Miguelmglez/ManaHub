@@ -182,4 +182,62 @@ class DeckDaoReplaceAllCardsWithSourceTransactionTest {
         assertEquals("a rolled-back write must NOT leave a stale strategyLocked flag", false, deck?.strategyLocked)
         assertEquals(100L, deck?.updatedAt)
     }
+
+    // ── Run 4a (F2): commanderCardId/coverCardId ride the SAME transaction as the cards ────────
+
+    @Test
+    fun happyPath_persistWizardBuild_writesCommanderAndCoverWithTheCards() = runBlocking {
+        val deckId = "deck-pcb-3"
+        deckDao.upsertDeck(makeDeck(deckId, updatedAt = 100L))
+
+        deckDao.persistWizardBuild(
+            deckId = deckId,
+            cards = listOf(DeckCardEntity(deckId = deckId, scryfallId = "commander-1", quantity = 1, source = "WIZARD")),
+            archetypeOverride = null,
+            themesOverrideJson = null,
+            postureOverride = null,
+            tribeOverride = null,
+            strategyLocked = false,
+            commanderCardId = "commander-1",
+            updatedAt = 200L,
+        )
+
+        val deck = deckDao.getDeckById(deckId)
+        assertEquals("commander-1", deck?.commanderCardId)
+        assertEquals("commander-1", deck?.coverCardId)
+        assertEquals(200L, deck?.updatedAt)
+    }
+
+    @Test
+    fun failurePath_persistWizardBuild_fkViolation_neverLeavesACommanderOnAnEmptyDeck() = runBlocking {
+        val deckId = "deck-pcb-4"
+        deckDao.upsertDeck(makeDeck(deckId, updatedAt = 100L))
+
+        var threw = false
+        try {
+            deckDao.persistWizardBuild(
+                deckId = deckId,
+                cards = listOf(
+                    DeckCardEntity(deckId = deckId, scryfallId = "commander-1", quantity = 1, source = "WIZARD"),
+                    DeckCardEntity(deckId = "no-such-deck", scryfallId = "commander-2", quantity = 1),
+                ),
+                archetypeOverride = null,
+                themesOverrideJson = null,
+                postureOverride = null,
+                tribeOverride = null,
+                strategyLocked = false,
+                commanderCardId = "commander-1",
+                updatedAt = 200L,
+            )
+        } catch (e: Exception) {
+            threw = true
+        }
+
+        assertTrue("the FK violation must surface as a thrown exception", threw)
+        assertTrue(deckDao.getDeckCards(deckId).isEmpty())
+        val deck = deckDao.getDeckById(deckId)
+        assertEquals("a rolled-back build must NOT leave a commander set on a card-less deck", null, deck?.commanderCardId)
+        assertEquals(null, deck?.coverCardId)
+        assertEquals(100L, deck?.updatedAt)
+    }
 }

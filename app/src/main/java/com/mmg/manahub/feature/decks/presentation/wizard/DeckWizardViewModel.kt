@@ -44,6 +44,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.SectionMembership
 import com.mmg.manahub.feature.decks.domain.engine.SectionQueryContext
+import com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery
 import com.mmg.manahub.feature.decks.domain.engine.StrategyPick
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
@@ -62,9 +63,11 @@ import com.mmg.manahub.feature.decks.domain.template.WizardBuildResult
 import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.RecommendWizardStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.StrategyRecommendation
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -559,6 +562,10 @@ class DeckWizardViewModel(
      * [generateWizardDeck]'s entry to [finalizeWizardDraft]'s successful persist. */
     private var commanderGenerationStartAtMs: Long? = null
 
+    /** Seed names handed to a Commander wizard, applied only once a commander exists to validate
+     * them against (identity + legality) -- see the init pre-fill gate. */
+    private var pendingCommanderSeedNames: List<String> = emptyList()
+
     private data class PendingFinalize(
         val state: DeckWizardUiState,
         val format: DeckFormat,
@@ -625,7 +632,9 @@ class DeckWizardViewModel(
             // Deck Wizard 60-card wave (v6), plan §5 Phase 5.1: pre-fill routes to the matching NEW
             // first step (SEED_PICK / COLOR_PICK / STRATEGY_PICK) — the pre-v6 shared DIRECTION
             // phase these hand-offs used to dispatch on is gone.
+            // Commander always starts at COMMANDER_PICK: the 60-card maps would reject every coloured seed.
             when {
+                resolvedFormat.isCommanderFormat -> pendingCommanderSeedNames = seedsArg
                 seedsArg.isNotEmpty() -> _uiState.update { it.copy(entryFlow = WizardEntryFlow.CARDS, phase = WizardPhase.SEED_PICK) }
                 colorsArg != null -> _uiState.update {
                     it.copy(entryFlow = WizardEntryFlow.COLORS, phase = WizardPhase.COLOR_PICK, colorIdentity = parseColorString(colorsArg))
@@ -666,10 +675,11 @@ class DeckWizardViewModel(
                     // Gate 5 audit (edge-case P1): held in its own Job (was a bare suspend call)
                     // so cancelDirectionSearchJobs can actually cancel it -- see comboSeedResolveJob's
                     // own KDoc.
-                    if (seedsArg.isNotEmpty()) {
+                    if (seedsArg.isNotEmpty() && !resolvedFormat.isCommanderFormat) {
                         comboSeedResolveJob = viewModelScope.launch { resolveComboSeeds(seedsArg) }
                     }
                 }.onFailure { t ->
+                    if (t is CancellationException) throw t
                     logFailure("deck_wizard_profile_load_failed", t)
                     _uiState.update { it.copy(isLoadingProfile = false) }
                 }
@@ -714,6 +724,12 @@ class DeckWizardViewModel(
             )
         }
         recomputeStrategyRecommendations()
+        val stashedSeeds = pendingCommanderSeedNames
+        if (stashedSeeds.isNotEmpty()) {
+            pendingCommanderSeedNames = emptyList()
+            comboSeedResolveJob?.cancel()
+            comboSeedResolveJob = viewModelScope.launch { resolveComboSeeds(stashedSeeds) }
+        }
     }
 
     fun onClearCommander() {
@@ -961,7 +977,10 @@ class DeckWizardViewModel(
             val topSeeds = state.seeds.sortedByDescending { it.quantity }.take(MAX_SEED_TAGS_FETCH).map { it.card }
             val tagResults = topSeeds.map { seed ->
                 runCatching { cardStrategyTagsRepository.getStrategyTags(seed.oracleId) }
-                    .onFailure { crashReporter.log("deck_wizard_seed_strategy_tags_fetch_failed") }
+                    .onFailure { t ->
+                        if (t is CancellationException) throw t
+                        crashReporter.log("deck_wizard_seed_strategy_tags_fetch_failed")
+                    }
                     .getOrNull() as? CardStrategyTagsResult.Found
             }
             val ownTags = tagResults.flatMap { it?.tags.orEmpty() }.distinct()
@@ -974,6 +993,8 @@ class DeckWizardViewModel(
                 ownTags = ownTags,
                 ownTribes = ownTribes,
             )
+            // The use case is not suspending: a job cancelled by Back must not land its zombie list.
+            ensureActive()
             _uiState.update { it.copy(strategyRecommendations = recommendations, isLoadingCommanderStrategies = false) }
             // STRATEGY_PICK commits a pick only through a color-combo tap (onSelectStrategyPickCombo):
             // preselecting #1 there would highlight a row and enable Next with an empty identity.
@@ -995,12 +1016,18 @@ class DeckWizardViewModel(
         commanderStrategyJob = viewModelScope.launch {
             val format = _uiState.value.selectedFormat ?: DeckFormat.COMMANDER
             val source1 = runCatching { cardStrategyTagsRepository.getStrategyTags(commander.oracleId) }
-                .onFailure { crashReporter.log("deck_wizard_commander_strategy_tags_fetch_failed") }
+                .onFailure { t ->
+                    if (t is CancellationException) throw t
+                    crashReporter.log("deck_wizard_commander_strategy_tags_fetch_failed")
+                }
                 .getOrNull() as? CardStrategyTagsResult.Found
             val edhrecThemeNames = runCatching {
                 val result = communityAggregateRepository.getCommanderAggregate(commander.name)
                 (result as? DataResult.Success)?.data?.themeTags?.map { it.name }.orEmpty()
-            }.getOrDefault(emptyList())
+            }.getOrElse { t ->
+                if (t is CancellationException) throw t
+                emptyList()
+            }
 
             val recommendations = recommendCommanderStrategiesUseCase(
                 format = format,
@@ -1011,6 +1038,7 @@ class DeckWizardViewModel(
                 ownTribes = source1?.tribes.orEmpty(),
                 edhrecThemeNames = edhrecThemeNames,
             )
+            ensureActive()
             _uiState.update { it.copy(strategyRecommendations = recommendations, isLoadingCommanderStrategies = false) }
             val topPick = recommendations.firstOrNull()
             if (topPick != null) selectCommanderStrategy(topPick.strategy, topPick.tribe) else selectCommanderStrategy(null, null)
@@ -1273,7 +1301,11 @@ class DeckWizardViewModel(
                     postureOverride = state.selectedPosture?.name,
                     emitProgression = false,
                 ).analysis
-            }.onFailure { t -> logFailure("deck_wizard_plan_analysis_failed", t) }.getOrNull()
+            }.onFailure { t ->
+                // A cancelled (superseded) pass is not a failure and must not touch the new pass's loading flag.
+                if (t is CancellationException) throw t
+                logFailure("deck_wizard_plan_analysis_failed", t)
+            }.getOrNull()
             val excludeIds = (listOfNotNull(commander?.scryfallId) + state.seeds.map { it.card.scryfallId }).toSet()
             val availability = analysis?.let {
                 computeOwnedAvailabilityBySection(
@@ -1282,9 +1314,11 @@ class DeckWizardViewModel(
                     excludeIds = excludeIds,
                     identity = commander?.colorIdentity?.toManaColorSet() ?: state.engineIdentity,
                     format = format,
+                    enforceIdentity = format.isCommanderFormat || state.entryFlow != WizardEntryFlow.CARDS,
                     ownedQuantityByName = state.ownedQuantityByName,
                 )
             }.orEmpty()
+            ensureActive()
             _uiState.update { it.copy(planAnalysis = analysis, isAnalyzingPlan = false, ownedAvailabilityBySection = availability) }
         }
     }
@@ -1325,7 +1359,14 @@ class DeckWizardViewModel(
         val state = _uiState.value
         val sectionPredicate = state.planSectionsPredicate
         val structuralMatch: (Card) -> Boolean = if (sectionPredicate != null) {
-            sectionPredicate
+            // The category predicate alone would list off-identity/illegal cards onAddSeed rejects.
+            val format = state.selectedFormat ?: DeckFormat.COMMANDER
+            val gate = SectionSearchQuery.localStructuralGate(
+                SectionQueryContext(colorIdentity = state.colorIdentity, format = format, dominantTribe = null),
+                enforceIdentity = format.isCommanderFormat || state.entryFlow != WizardEntryFlow.CARDS,
+            )
+            val combined: (Card) -> Boolean = { card -> sectionPredicate(card) && gate(card) }
+            combined
         } else {
             val structuredQuery = state.planSectionsStructuredQuery
             { card -> StructuredCardSearch.matches(card, structuredQuery) }
@@ -1493,14 +1534,12 @@ class DeckWizardViewModel(
         if (state.phase == WizardPhase.PLAN_SECTIONS) recomputePlanAnalysis()
     }
 
-    /** Color identity ⊆ [DeckWizardUiState.colorIdentity] + format legality
-     * ([DeckFormat.COMMANDER] requires `legal`, [DeckFormat.COMMANDER_CASUAL] only excludes
-     * `banned`) -- the SAME rule the wizard's own build engine applies to engine-placed candidates,
-     * so a manual add can never be a card the build itself would refuse to place for a rules reason. */
+    /** Color identity ⊆ [DeckWizardUiState.colorIdentity] + the ONE legality predicate
+     * ([isLegalForFormat]) the build engine, Browse and the analysis all apply. */
     private fun isCommanderManualAddValid(card: Card, state: DeckWizardUiState): Boolean {
         val identitySymbols = state.colorIdentity.map { it.symbol }.toSet()
         if (!card.colorIdentity.all { it in identitySymbols }) return false
-        return if (state.selectedFormat == DeckFormat.COMMANDER) card.legalityCommander == "legal" else card.legalityCommander != "banned"
+        return isLegalForFormat(card, state.selectedFormat ?: DeckFormat.COMMANDER)
     }
 
     /** Removes ONE copy of [card] (decrements; removes the entry entirely at 0). Used by the seed
@@ -1530,18 +1569,15 @@ class DeckWizardViewModel(
         if (state.phase == WizardPhase.PLAN_SECTIONS) recomputePlanAnalysis()
     }
 
-    /**
-     * Deck Wizard & Engine Rework plan, Workstream 3.1 — recomputes [DeckWizardUiState.lockedColors]
-     * from scratch as the union of every currently picked [DeckWizardUiState.seeds]' own
-     * [Card.colorIdentity], then folds it INTO [DeckWizardUiState.colorIdentity] (never replaces —
-     * an explicit color the user already toggled on survives untouched, union not overwrite).
-     * Recomputing from scratch (rather than incrementally adding/removing per seed) is what makes
-     * "removing a seed unlocks its color" correct by construction.
-     */
+    /** Recomputes [DeckWizardUiState.lockedColors] from scratch as the union of the CURRENT seeds'
+     * identities. In the 60-card CARDS flow the seeds are the ONLY identity source, so
+     * [DeckWizardUiState.colorIdentity] is REPLACED (removing a seed shrinks it); a Commander build
+     * keeps its commander's identity and only unions the (always contained) seed colors. */
     private fun recomputeSeedLockedColors() {
         _uiState.update { state ->
             val locked = state.seeds.flatMap { it.card.colorIdentity }.toManaColorSet()
-            state.copy(lockedColors = locked, colorIdentity = state.colorIdentity + locked)
+            val seedsDefineIdentity = state.selectedFormat?.isCommanderFormat != true && state.entryFlow == WizardEntryFlow.CARDS
+            state.copy(lockedColors = locked, colorIdentity = if (seedsDefineIdentity) locked else state.colorIdentity + locked)
         }
     }
 
@@ -1566,7 +1602,10 @@ class DeckWizardViewModel(
                     is DataResult.Success -> res.data.cards.firstOrNull { it.name.equals(name, ignoreCase = true) }
                     is DataResult.Error -> null
                 }
-            }.getOrNull()
+            }.getOrElse { t ->
+                if (t is CancellationException) throw t
+                null
+            }
             if (resolved != null) onAddSeed(resolved)
         }
     }
@@ -1734,7 +1773,7 @@ class DeckWizardViewModel(
                 preferenceStore = wizardPreferenceStore,
             )
         }.getOrElse { t ->
-            if (t is kotlinx.coroutines.CancellationException) throw t
+            if (t is CancellationException) throw t
             logFailure("deck_wizard_generate_crashed", t)
             _uiState.update { it.copy(buildError = appContext.getString(R.string.deck_wizard_build_error)) }
             return
@@ -1813,7 +1852,7 @@ class DeckWizardViewModel(
                 },
             )
         }.getOrElse { t ->
-            if (t is kotlinx.coroutines.CancellationException) throw t
+            if (t is CancellationException) throw t
             logFailure("deck_wizard_generate_crashed", t)
             _uiState.update { it.copy(buildError = appContext.getString(R.string.deck_wizard_build_error)) }
             return
@@ -1823,12 +1862,20 @@ class DeckWizardViewModel(
 
         if (launchedFromDeckId != null && !replaceConfirmed) {
             val existing = deckRepository.observeDeckWithCards(launchedFromDeckId!!).first()
+            // persistWizardBuild clears BOTH boards; a commander equal to the one being written is not a loss.
             val hasCardsToLose = existing != null &&
-                (existing.mainboard.sumOf { it.quantity } > 0 || existing.deck.commanderCardId != null)
+                (
+                    existing.mainboard.sumOf { it.quantity } > 0 ||
+                        existing.sideboard.sumOf { it.quantity } > 0 ||
+                        (existing.deck.commanderCardId != null && existing.deck.commanderCardId != commander?.scryfallId)
+                    )
             if (hasCardsToLose) {
                 crashReporter.recordException(
                     IllegalStateException("[DeckWizardViewModel] refused an unconfirmed wizard write into a non-empty deck")
                 )
+                commanderGenerationStartAtMs = null
+                // A visible, retryable error state -- never a bare return that strands GENERATING on a spinner.
+                _uiState.update { it.copy(buildError = appContext.getString(R.string.deck_wizard_replace_not_confirmed)) }
                 _events.send(
                     DeckWizardEvent.ShowToast(
                         appContext.getString(R.string.deck_wizard_replace_not_confirmed),
@@ -1852,18 +1899,13 @@ class DeckWizardViewModel(
                 // creates one of its own.
                 checkNotNull(launchedFromDeckId) { "[DeckWizardViewModel] 60-card generation reached finalize with no launchedFromDeckId" }
             }
-            if (format.isCommanderFormat && commander != null) {
-                val current = deckRepository.observeDeckWithCards(deckId).first()?.deck
-                if (current != null) {
-                    deckRepository.updateDeck(current.copy(commanderCardId = commander.scryfallId, coverCardId = commander.scryfallId))
-                }
-            }
+            // commanderCardId/coverCardId travel inside persist's single transaction, never a prior updateDeck.
             val anchor: BuildAnchor = if (commander != null) BuildAnchor.Commander(commander) else BuildAnchor.Sixty(state.engineIdentity, state.seeds.map { it.card })
             buildWizardDeckUseCase.persist(deckRepository, deckId, anchor, manualIds, outcome)
             deckId
         }.getOrElse { t ->
             isWritingCommanderDeck = false
-            if (t is kotlinx.coroutines.CancellationException) throw t
+            if (t is CancellationException) throw t
             logFailure("deck_wizard_write_failed", t)
             _uiState.update { it.copy(buildError = appContext.getString(R.string.deck_wizard_build_error)) }
             return
@@ -1929,7 +1971,9 @@ class DeckWizardViewModel(
         when {
             delta > 0 -> {
                 val cap = (draft.candidateMaxCopies[cardId] ?: 0) + (tentative[cardId] ?: 0)
-                if (current.values.sum() >= group.remainingSlots || currentForId >= cap) {
+                // One card can be an alternate in several sections: its copies elsewhere count too.
+                val elsewhere = copiesSelectedInOtherSections(state, draft, role, cardId)
+                if (current.values.sum() >= group.remainingSlots || currentForId >= cap || currentForId + elsewhere >= draft.globalChoiceCap(cardId)) {
                     crashReporter.log("deck_wizard_choice_copy_cap_reached")
                     viewModelScope.launch {
                         _events.send(
@@ -1968,7 +2012,8 @@ class DeckWizardViewModel(
             if (missing <= 0) break
             val cap = (draft.candidateMaxCopies[id] ?: 0) + (tentative[id] ?: 0)
             val have = current[id] ?: 0
-            val add = minOf((cap - have).coerceAtLeast(0), missing)
+            val globalRoom = draft.globalChoiceCap(id) - have - copiesSelectedInOtherSections(state, draft, role, id)
+            val add = minOf((cap - have).coerceAtLeast(0), globalRoom.coerceAtLeast(0), missing)
             if (add > 0) {
                 current[id] = have + add
                 missing -= add
@@ -1978,6 +2023,13 @@ class DeckWizardViewModel(
         autoFilledChoiceRoles += role
         _uiState.update { it.copy(choiceSelections = it.choiceSelections + (role to current)) }
     }
+
+    /** [cardId]'s selected copies across every section other than [role] (tentative defaults for
+     * untouched sections) -- what the per-section cap cannot see. */
+    private fun copiesSelectedInOtherSections(state: DeckWizardUiState, draft: WizardDraftBuild, role: RoleKey, cardId: String): Int =
+        draft.ambiguityGroups
+            .filter { it.sectionId != role }
+            .sumOf { group -> (state.choiceSelections[group.sectionId] ?: draft.tentativeCopies(group.sectionId))[cardId] ?: 0 }
 
     /** Global "Let the wizard finish" — resolves every section the user has already decided exactly
      * as chosen, and every untouched section with the engine's own tentative defaults, then persists
@@ -2039,7 +2091,8 @@ class DeckWizardViewModel(
         val missingNames = neededNames.filterNot { name -> ownedCollection.any { it.card.name == name } }
         if (missingNames.isEmpty()) return ownedCollection
         val fetched = missingNames.mapNotNull { name ->
-            runCatching { cardRepository.searchCardByName(name) }.getOrNull()
+            runCatching { cardRepository.searchCardByName(name) }
+                .getOrElse { t -> if (t is CancellationException) throw t else null }
                 .let { it as? DataResult.Success }?.data
                 ?.let { card -> OwnedCard(card, BASIC_LAND_SYNTHETIC_QUANTITY) }
         }
@@ -2272,8 +2325,8 @@ class DeckWizardViewModel(
  *
  * [sections] is every [com.mmg.manahub.feature.decks.domain.engine.PillarResult.sections] for the
  * CURRENT [DeckAnalysis]. [ownedCards] is the full collection snapshot; [excludeIds] removes the
- * commander and every already-manually-added card. [identity]/[format] gate legality the SAME way
- * [DeckWizardViewModel.isCommanderManualAddValid] does for a real add.
+ * commander and every already-manually-added card. [format] legality is the ONE
+ * [isLegalForFormat] predicate; [identity] gates containment the same way `onAddSeed` does.
  */
 internal fun computeOwnedAvailabilityBySection(
     sections: List<CardSection>,
@@ -2281,6 +2334,8 @@ internal fun computeOwnedAvailabilityBySection(
     excludeIds: Set<String>,
     identity: Set<ManaColor>,
     format: DeckFormat,
+    // false for the CARDS flow, where seeds define the identity and no card is identity-rejected.
+    enforceIdentity: Boolean = true,
     // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4: owned COPIES per card name -- the count
     // this hint reports is now "how many copies of this card the build could actually place"
     // (CopyPolicy.maxPlaceable), not "1 per distinct owned card". `null`/absent name = ownership-
@@ -2292,8 +2347,8 @@ internal fun computeOwnedAvailabilityBySection(
     val candidates = ownedCards
         .asSequence()
         .filter { it.scryfallId !in excludeIds }
-        .filter { card -> card.colorIdentity.all { it in identitySymbols } }
-        .filter { card -> if (format == DeckFormat.COMMANDER) card.legalityCommander == "legal" else card.legalityCommander != "banned" }
+        .filter { card -> !enforceIdentity || card.colorIdentity.all { it in identitySymbols } }
+        .filter { card -> isLegalForFormat(card, format) }
         .distinctBy { it.name }
 
     val counts = mutableMapOf<String, Int>()
@@ -2337,3 +2392,8 @@ private fun List<String>.toManaColorSet(): Set<ManaColor> =
  * transition logic) and `DeckWizardChoiceStep.kt` (rendering, same package). */
 internal fun WizardDraftBuild.tentativeCopies(role: RoleKey): Map<String, Int> =
     tentativeByRole[role].orEmpty().groupingBy { it }.eachCount()
+
+/** [id]'s absolute copy cap across ALL sections: fresh headroom plus every tentative copy it
+ * already holds anywhere (mirrors `BuildWizardDeckUseCase.finalize`'s own global gate). */
+internal fun WizardDraftBuild.globalChoiceCap(id: String): Int =
+    (candidateMaxCopies[id] ?: 0) + tentativeByRole.values.sumOf { ids -> ids.count { it == id } }
