@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.ui.components
+// COMMENTS_REVIEWED: 2026-09-06
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -15,11 +16,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -43,12 +42,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.ic_test
-import com.mmg.manahub.core.model.DeckSummary
-import com.mmg.manahub.core.ui.components.MagicAlertDialog
-import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -57,6 +53,7 @@ import com.mmg.manahub.core.ui.theme.spacing
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * A standard card representing a deck summary.
@@ -152,7 +149,7 @@ fun DeckItem(
                 val formatLower = deck.format.lowercase()
                 val formatColor = when (formatLower) {
                     "commander" -> mc.goldMtg.copy(alpha = 0.9f)
-                    "casual" -> mc.primaryAccent.copy(alpha = 0.9f)
+                    "casual","commander_casual" -> mc.primaryAccent.copy(alpha = 0.9f)
                     "draft" -> mc.secondaryAccent.copy(alpha = 0.9f)
                     "standard" -> mc.lifePositive.copy(alpha = 0.9f)
                     "modern" -> mc.lifeNegative.copy(alpha = 0.9f)
@@ -166,10 +163,10 @@ fun DeckItem(
                     modifier = Modifier.align(Alignment.TopEnd),
                 ) {
                     Text(
-                        text = formatLower.replaceFirstChar { it.uppercase() },
+                        text = formatLower.replaceFirstChar { it.uppercase() }.replace("_"," "),
                         style = if (reduced) ty.labelSmall else ty.labelLarge,
                         color = when (formatLower) {
-                            "casual", "draft" -> mc.onAccent
+                            "casual", "draft","commander_casual" -> mc.onAccent
                             "commander", "standard", "modern", "pioneer" -> mc.background
                             else -> mc.textPrimary
                         },
@@ -219,8 +216,6 @@ fun DeckItem(
                     if (!reduced) {
                         Spacer(Modifier.height(MaterialTheme.spacing.xs))
 
-                        // Card count + last-updated date
-                        // Card count + last-updated date
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
                             verticalAlignment = Alignment.CenterVertically,
@@ -233,7 +228,6 @@ fun DeckItem(
                             )
                         }
 
-                        // Mana identity symbols
                         Spacer(Modifier.height(MaterialTheme.spacing.xs))
                         if (deck.colorIdentity.isNotEmpty()) {
                             ColorIdentityRow(colorIdentity = deck.colorIdentity, size = 18.dp)
@@ -277,8 +271,7 @@ fun DeckItem(
                 }
 
                 if (!reduced) {
-                    // ── Play button overlay ──────────────────────────────────────────
-                    if (onPlaytest != null && !reduced) {
+                    if (onPlaytest != null) {
                         IconButton(onClick = onPlaytest) {
                             Icon(
                                 painter = painterResource(Res.drawable.ic_test),

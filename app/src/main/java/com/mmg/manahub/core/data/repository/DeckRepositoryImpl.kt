@@ -5,6 +5,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DeckSummaryRow
+import com.mmg.manahub.core.data.local.dao.ScannerDeckCardAddition
 import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.entity.DeckEntity
 import com.mmg.manahub.core.data.local.mapper.toDomainDeck
@@ -14,6 +15,8 @@ import com.mmg.manahub.core.model.DeckSlot
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.CardSlotWrite
+import com.mmg.manahub.core.domain.repository.DeckCardAddition
+import com.mmg.manahub.core.domain.repository.DeckCardAdditionResult
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
@@ -165,6 +168,29 @@ class DeckRepositoryImpl(
                 deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
             }
         }
+    }
+
+    override suspend fun mergeScannerCards(
+        deckId: String,
+        additions: List<DeckCardAddition>,
+    ): DeckCardAdditionResult = withContext(ioDispatcher) {
+        val result = deckDao.mergeScannerCards(
+            deckId = deckId,
+            additions = additions.map { addition ->
+                ScannerDeckCardAddition(
+                    entryId = addition.entryId,
+                    scryfallId = addition.scryfallId,
+                    oracleId = addition.oracleId,
+                    quantity = addition.quantity,
+                    isSideboard = addition.isSideboard,
+                )
+            },
+        )
+        DeckCardAdditionResult(
+            committedEntryIds = result.committedEntryIds,
+            blockedCommanderEntryIds = result.blockedCommanderEntryIds,
+            committedCopies = result.committedCopies,
+        )
     }
 
     override suspend fun removeCardFromDeck(

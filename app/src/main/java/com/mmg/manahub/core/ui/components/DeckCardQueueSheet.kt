@@ -26,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -34,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.PreferredCurrency
@@ -115,10 +116,16 @@ fun DeckCardQueueSheet(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
+    val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden },
     )
+    fun requestDismiss() {
+        scope.launch {
+            sheetState.hide()
+            onDismiss()
+        }
+    }
     var searchQuery by remember { mutableStateOf("") }
     val filteredItems = remember(items, searchQuery) {
         if (searchQuery.isBlank()) items
@@ -146,7 +153,7 @@ fun DeckCardQueueSheet(
                     modifier = Modifier.fillMaxWidth().padding(start = spacing.xs, end = spacing.sm, top = spacing.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = onDismiss, enabled = !isBusy) {
+                    IconButton(onClick = ::requestDismiss, enabled = !isBusy) {
                         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_cancel), tint = mc.textSecondary)
                     }
                     Text(
@@ -267,7 +274,7 @@ private fun DeckCardQueueRow(
             preferredCurrency = preferredCurrency,
             onImageClick = onImageClick?.let { callback -> { callback(item) } },
             extraSupportingContent = item.supportingLabel?.let { label ->
-                @Composable {
+                {
                     Text(
                         text = label,
                         style = MaterialTheme.magicTypography.labelSmall,

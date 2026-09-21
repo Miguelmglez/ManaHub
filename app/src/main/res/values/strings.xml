@@ -376,6 +376,7 @@
     <string name="scanner_edit_save">Save details</string>
     <string name="scanner_edit_sheet_title">Edit scanned card</string>
     <string name="scanner_permission_camera_required">Camera permission required</string>
+    <string name="scanner_camera_bind_failed">Camera could not be started. Check permission and try again.</string>
     <string name="scanner_permission_grant">Grant permission</string>
     <string name="scanner_language_sheet_title">Scan language</string>
     <string name="scanner_duplicate_entry">Duplicate</string>
@@ -957,16 +958,14 @@
     <string name="deck_analysis_axis_engine">Support</string>
     <string name="deck_analysis_axis_tribe_format">%1$s (Tribe)</string>
 
-    <!-- Deck Analysis Engine v3, Phase 5 (UI): the archetype resemblance card — macro/posture/
-         themes + the full 5-way resemblance profile (ArchetypeResemblanceComponents.kt). Never a
-         "no plan" bucket: there is always a nearest plan with an honest confidence beside it. -->
-    <string name="deck_analysis_archetype_header">Archetype signal</string>
+    <!-- Deck Analysis Engine v3: the macro/hybrid label ("Custom" or "Control / Midrange") folded
+         into StrategyPlanChip's second line since the Deck Wizard UX polish plan, Run 1 §1.6 (the
+         separate "Archetype signal" card was deleted; see ArchetypeResolution.planLabel()). -->
     <string name="deck_analysis_archetype_custom_label">Custom</string>
     <string name="deck_analysis_archetype_hybrid_format">%1$s / %2$s</string>
-    <string name="deck_analysis_archetype_confidence_margin">%1$d%% margin over runner-up</string>
-    <string name="deck_analysis_archetype_ambiguous_caption">No single archetype is confident enough yet — here\'s how this deck resembles each one.</string>
-    <string name="deck_analysis_resemblance_row_format">%1$d%%</string>
-    <string name="deck_analysis_posture_prefix">Posture: %1$s</string>
+    <!-- StrategyPlanChip's "Detected: X" second line (Run 1 §1.6) — never confidence/margin text. -->
+    <string name="deck_studio_strategy_detected_format">Detected: %1$s</string>
+    <string name="deck_studio_strategy_detected_with_posture_format">Detected: %1$s · %2$s</string>
 
     <!-- ══════════════════════════════════════════
          DECK DOCTOR — CUT &amp; ADD SUGGESTIONS
@@ -1086,13 +1085,6 @@
     <!-- Deck Analysis Engine v2 Phase 0 carve-out (interim StrategyCatalog.isValidCombination guard) -->
     <string name="deck_studio_archetype_invalid_combo_warning">This archetype and theme combination isn\'t supported yet.</string>
     <string name="deck_studio_archetype_plan_updated">Deck plan updated</string>
-    <string name="deck_studio_strategy_unlocked">Strategy unlocked</string>
-    <string name="deck_studio_strategy_locked_title">Built by the wizard</string>
-    <string name="deck_studio_strategy_locked_body">This deck\'s strategy is locked, so the Doctor won\'t suggest cutting any card the wizard placed. Unlock it to edit the deck plan and allow those cards to be suggested as cuts again.</string>
-    <string name="deck_studio_strategy_locked_unlock_action">Unlock strategy</string>
-    <string name="deck_studio_unlock_strategy_confirm_title">Unlock this deck\'s strategy?</string>
-    <string name="deck_studio_unlock_strategy_confirm_body">The Deck Doctor will be able to suggest cutting cards the wizard placed, and you\'ll be able to change the deck plan again. This can\'t be undone automatically.</string>
-    <string name="deck_studio_unlock_strategy_confirm_action">Unlock</string>
     <string name="deck_studio_empty_title">Your deck is empty</string>
     <string name="deck_studio_empty_subtitle">Add cards with the + button, or pick one of the options below.</string>
     <string name="deck_studio_build_from_seed">Build from Seed</string>
@@ -1279,6 +1271,8 @@
     <string name="deck_curated_strategy_picker_search_placeholder">Search strategies</string>
     <string name="deck_curated_strategy_picker_core_plans_header">Core plans</string>
     <string name="deck_curated_strategy_picker_themed_header">Build-around themes</string>
+    <!-- Run 1 §1.6: the per-row match-percentage badge. -->
+    <string name="deck_curated_strategy_picker_match_format">%1$d%%</string>
     <string name="deck_curated_strategy_picker_no_results">No strategies match your search.</string>
     <string name="deck_curated_strategy_picker_auto_detect_hint_current">Currently: %1$s</string>
     <string name="deck_curated_strategy_picker_auto_detect_hint_manual">Let ManaHub pick your plan from the cards already in this deck</string>

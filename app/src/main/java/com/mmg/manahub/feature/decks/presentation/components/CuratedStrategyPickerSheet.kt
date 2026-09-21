@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.components
+// COMMENTS_REVIEWED: 2026-09-20
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -21,7 +22,6 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
@@ -61,6 +61,7 @@ import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedStrategyInfo
 import com.mmg.manahub.feature.decks.domain.engine.availableIn
+import com.mmg.manahub.feature.decks.domain.usecase.ArchetypeResolution
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Deck Analysis Engine v2 Phase 3 (plan §3.4 item 1) — the curated-strategy picker that
@@ -83,13 +84,19 @@ import com.mmg.manahub.feature.decks.domain.engine.availableIn
 data class TribeOption(val key: String, val label: String)
 
 /**
- * The Studio "Analysis" tab header chip (plan §3.4 item 2): "Plan: <Strategy> (detected|manual)".
- * Tapping opens [CuratedStrategyPickerSheet]. Reads the v2 [ResolvedStrategyInfo] directly
- * (unlike the retired `ArchetypePlanChip`, which read the legacy `ArchetypeResolution`).
+ * The Studio "Analysis" tab header chip — always tappable (Deck Wizard UX polish plan, Run 1 §1.4
+ * removed the strategy-lock gate and the MANUAL/AUTO badge; the icon alone still distinguishes a
+ * manual pin from an auto-detected one). Tapping opens [CuratedStrategyPickerSheet]. Reads the v2
+ * [ResolvedStrategyInfo] for the matched CURATED strategy name; [archetypeResolution] (Run 1 §1.6)
+ * folds in the raw inferred signal (macro/hybrid label + posture) as a second line, replacing the
+ * separate "Archetype signal" card this chip used to sit above. NEVER renders confidence/margin
+ * text — [ArchetypeResolution.confidence] is 1.0 on every pinned deck, so a margin figure is pure
+ * noise, not information.
  */
 @Composable
 fun StrategyPlanChip(
     strategy: ResolvedStrategyInfo,
+    archetypeResolution: ArchetypeResolution?,
     onClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -145,18 +152,19 @@ fun StrategyPlanChip(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = if (strategy.isManualOverride) mc.goldMtg.copy(alpha = 0.15f) else mc.lifePositive.copy(alpha = 0.15f),
-                ) {
-                    Text(
-                        text = (if (strategy.isManualOverride) "MANUAL" else "AUTO").uppercase(),
-                        style = ty.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = if (strategy.isManualOverride) mc.goldMtg else mc.lifePositive,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+                    if (archetypeResolution != null) {
+                        val detectedLabel = archetypeResolution.planLabel()
+                        val detectedText = archetypeResolution.posture?.let { posture ->
+                            stringResource(R.string.deck_studio_strategy_detected_with_posture_format, detectedLabel, posture.displayName)
+                        } ?: stringResource(R.string.deck_studio_strategy_detected_format, detectedLabel)
+                        Text(
+                            text = detectedText,
+                            style = ty.labelSmall,
+                            color = mc.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
@@ -225,6 +233,14 @@ fun StrategyPlanHint(onClick: () -> Unit) {
  *        that one is a CURATED-catalog id only (`null` for a non-curated archetype match), while
  *        this is the resolved [com.mmg.manahub.feature.decks.domain.engine.ResolvedStrategyInfo
  *        .displayName] the caller already has in scope, curated or not.
+ * @param strategyMatchScores Deck Wizard UX polish plan, Run 1 §1.6: `CuratedStrategy.id` ->
+ *        `DeckAnalysisPipeline`-computed total score (0-100) for pinning THIS deck to that
+ *        strategy, populated incrementally by the caller's `scoreStrategyMatches()` as each entry
+ *        resolves. A row with no entry here is either still being scored ([isScoringStrategyMatches]
+ *        true — renders a loading spinner) or will never be scored (a `requiresTribe` entry on a
+ *        deck with no dominant tribe — renders nothing, never a fake 0%). The Auto-detect row never
+ *        reads this map.
+ * @param isScoringStrategyMatches whether a `scoreStrategyMatches()` pass is still in flight.
  */
 @Composable
 fun CuratedStrategyPickerSheet(
@@ -236,6 +252,8 @@ fun CuratedStrategyPickerSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     currentStrategyName: String? = null,
+    strategyMatchScores: Map<String, Int> = emptyMap(),
+    isScoringStrategyMatches: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -251,8 +269,13 @@ fun CuratedStrategyPickerSheet(
                 (query.isBlank() || entry.displayName.contains(query, ignoreCase = true) || entry.description.contains(query, ignoreCase = true))
         }
     }
+    // Run 1 §1.6: sorted by match % descending within each group -- an unscored entry (still
+    // loading, or a requiresTribe entry with no dominant tribe) sorts to the end via the -1 default,
+    // never mixed in ahead of a genuinely lower real score.
     val corePlans = filtered.filter { it.themes.isEmpty() }
+        .sortedByDescending { strategyMatchScores[it.id] ?: -1 }
     val themedPresets = filtered.filter { it.themes.isNotEmpty() }
+        .sortedByDescending { strategyMatchScores[it.id] ?: -1 }
 
     Column(modifier.fillMaxSize().padding(horizontal = spacing.lg, vertical = spacing.md)) {
         Row(
@@ -362,6 +385,7 @@ fun CuratedStrategyPickerSheet(
                             description = entry.description,
                             isSelected = entry.id == selectedStrategyId,
                             accentColor = mc.primaryAccent,
+                            trailing = strategyMatchTrailing(entry.id, strategyMatchScores, isScoringStrategyMatches),
                             onClick = {
                                 if (entry.requiresTribe) tribePending = entry
                                 else { onApply(entry, null); onDismiss() }
@@ -379,6 +403,7 @@ fun CuratedStrategyPickerSheet(
                             description = entry.description,
                             isSelected = entry.id == selectedStrategyId,
                             accentColor = mc.primaryAccent,
+                            trailing = strategyMatchTrailing(entry.id, strategyMatchScores, isScoringStrategyMatches),
                             onClick = {
                                 if (entry.requiresTribe) tribePending = entry
                                 else { onApply(entry, null); onDismiss() }
@@ -397,6 +422,30 @@ fun CuratedStrategyPickerSheet(
                 }
             }
         }
+    }
+}
+
+/** Run 1 §1.6 — the row-end match-percentage slot: a bold "NN%" once scored, an
+ * [MagicLoadingSpinner] placeholder while [isScoring] is still true and this row hasn't resolved
+ * yet, or `null` (renders nothing) once scoring has finished and this entry was never scored (a
+ * `requiresTribe` entry on a deck with no dominant tribe — never a fake 0%). */
+private fun strategyMatchTrailing(
+    strategyId: String,
+    scores: Map<String, Int>,
+    isScoring: Boolean,
+): (@Composable () -> Unit)? {
+    val score = scores[strategyId]
+    return when {
+        score != null -> ({
+            Text(
+                text = stringResource(R.string.deck_curated_strategy_picker_match_format, score),
+                style = MaterialTheme.magicTypography.labelLarge,
+                color = MaterialTheme.magicColors.primaryAccent,
+                fontWeight = FontWeight.Bold,
+            )
+        })
+        isScoring -> ({ com.mmg.manahub.core.ui.components.MagicLoadingSpinner(size = com.mmg.manahub.core.ui.components.MagicLoadingSize.XSmall) })
+        else -> null
     }
 }
 

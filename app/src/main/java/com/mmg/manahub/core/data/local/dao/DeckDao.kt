@@ -28,6 +28,25 @@ data class DeckSummaryRow(
     @ColumnInfo(name = "imageArtCrop") val imageArtCrop: String?,
 )
 
+data class ScannerDeckCardAddition(
+    val entryId: String,
+    val scryfallId: String,
+    val oracleId: String,
+    val quantity: Int,
+    val isSideboard: Boolean,
+)
+
+data class ScannerDeckCardMergeResult(
+    val committedEntryIds: Set<String>,
+    val blockedCommanderEntryIds: Set<String>,
+    val committedCopies: Int,
+)
+
+data class CardOracleIdentityRow(
+    @ColumnInfo(name = "scryfall_id") val scryfallId: String,
+    @ColumnInfo(name = "oracle_id") val oracleId: String,
+)
+
 @Dao
 interface DeckDao {
 
@@ -49,6 +68,67 @@ interface DeckDao {
 
     @Query("DELETE FROM deck_cards WHERE deck_id = :deckId AND scryfall_id = :scryfallId AND is_sideboard = :isSideboard")
     fun removeDeckCard(deckId: String, scryfallId: String, isSideboard: Boolean)
+
+    @Query("SELECT scryfall_id, oracle_id FROM cards WHERE scryfall_id IN (:scryfallIds)")
+    fun getCardOracleIdentities(scryfallIds: List<String>): List<CardOracleIdentityRow>
+
+    /** Merges scanner additions and validates commander identity in one Room transaction. */
+    @Transaction
+    fun mergeScannerCards(
+        deckId: String,
+        additions: List<ScannerDeckCardAddition>,
+        updatedAt: Long = System.currentTimeMillis(),
+    ): ScannerDeckCardMergeResult {
+        val deck = getDeckById(deckId) ?: error("Deck not found")
+        val ids = buildList {
+            addAll(additions.map { it.scryfallId })
+            deck.commanderCardId?.let(::add)
+        }.distinct()
+        val oracleIds = ids
+            .chunked(500)
+            .flatMap(::getCardOracleIdentities)
+            .associate { it.scryfallId to it.oracleId }
+        val commanderId = deck.commanderCardId
+        val commanderOracleId = commanderId?.let(oracleIds::get).orEmpty()
+        val blocked = linkedSetOf<String>()
+        val permitted = additions.filter { addition ->
+            val additionOracleId = oracleIds[addition.scryfallId]
+                .orEmpty()
+                .ifBlank { addition.oracleId }
+            val isCommander = !addition.isSideboard && (
+                addition.scryfallId == commanderId ||
+                    commanderOracleId.isNotBlank() && additionOracleId == commanderOracleId
+                )
+            if (isCommander) blocked += addition.entryId
+            !isCommander
+        }
+
+        val currentSlots = getDeckCards(deckId).associateBy { it.scryfallId to it.isSideboard }
+        val mergedRows = permitted.groupBy { it.scryfallId to it.isSideboard }.map { (key, grouped) ->
+            val current = currentSlots[key]
+            val added = grouped.sumOf { it.quantity.toLong() }
+            val mergedQuantity = (current?.quantity ?: 0).toLong() + added
+            check(mergedQuantity <= Int.MAX_VALUE) { "merged quantity exceeds Int range" }
+            DeckCardEntity(
+                deckId = deckId,
+                scryfallId = key.first,
+                quantity = mergedQuantity.toInt(),
+                isSideboard = key.second,
+                source = current?.source ?: "USER",
+            )
+        }
+        if (mergedRows.isNotEmpty()) {
+            upsertDeckCards(mergedRows)
+            touchDeckUpdatedAt(deckId, updatedAt)
+        }
+        val committedCopies = permitted.sumOf { it.quantity.toLong() }
+        check(committedCopies <= Int.MAX_VALUE) { "committed copies exceed Int range" }
+        return ScannerDeckCardMergeResult(
+            committedEntryIds = permitted.mapTo(linkedSetOf()) { it.entryId },
+            blockedCommanderEntryIds = blocked,
+            committedCopies = committedCopies.toInt(),
+        )
+    }
 
     /**
      * Atomically moves [quantity] copies of a card between the mainboard and the

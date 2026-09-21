@@ -5,7 +5,6 @@ package com.mmg.manahub.core.ui.components
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -15,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -166,7 +166,7 @@ fun CardRow(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     sharedTransitionKey: Any? = null,
-    extraSupportingContent: @Composable (() -> Unit)? = null,
+    extraSupportingContent: @Composable (RowScope.() -> Unit)? = null,
     preferredCurrency: PreferredCurrency? = null,
     onImageClick: (() -> Unit)? = null,
     addEnabled: Boolean = true,
@@ -248,106 +248,106 @@ fun CardRow(
                 )
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(spacing.md)
-            ) {
-                val layoutModifier = Modifier.size(width = 44.dp, height = 62.dp)
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(spacing.md)
+                ) {
+                    val layoutModifier = Modifier.size(width = 44.dp, height = 62.dp)
 
-                val finalImageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                    with(sharedTransitionScope) {
+                    val finalImageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                        with(sharedTransitionScope) {
+                            layoutModifier
+                                .sharedBounds(
+                                    sharedContentState = rememberSharedContentState(
+                                        key = sharedTransitionKey ?: "card-image-${card.scryfallId}"
+                                    ),
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                    clipInOverlayDuringTransition = OverlayClip(ExtraSmallCardShape),
+                                    boundsTransform = { _, _ ->
+                                        tween(durationMillis = 380, easing = LinearOutSlowInEasing)
+                                    },
+                                    renderInOverlayDuringTransition = true,
+                                )
+                                .clip(ExtraSmallCardShape)
+                                .border(1.dp, mc.surfaceVariant.copy(alpha = 0.8f), ExtraSmallCardShape)
+                        }
+                    } else {
                         layoutModifier
-                            .sharedBounds(
-                                sharedContentState = rememberSharedContentState(
-                                    key = sharedTransitionKey ?: "card-image-${card.scryfallId}"
-                                ),
-                                animatedVisibilityScope = animatedVisibilityScope,
-                                clipInOverlayDuringTransition = OverlayClip(ExtraSmallCardShape),
-                                boundsTransform = { _, _ ->
-                                    tween(durationMillis = 380, easing = LinearOutSlowInEasing)
-                                },
-                                renderInOverlayDuringTransition = true,
-                            )
                             .clip(ExtraSmallCardShape)
                             .border(1.dp, mc.surfaceVariant.copy(alpha = 0.8f), ExtraSmallCardShape)
                     }
-                } else {
-                    layoutModifier
-                        .clip(ExtraSmallCardShape)
-                        .border(1.dp, mc.surfaceVariant.copy(alpha = 0.8f), ExtraSmallCardShape)
-                }
 
-                val cardThumbnail = @Composable {
-                    AsyncImage(
-                        model = card.imageNormal,
-                        contentDescription = null,
-                        placeholder = painterResource(Res.drawable.mtg_card_back),
-                        error = painterResource(Res.drawable.mtg_card_back),
-                        fallback = painterResource(Res.drawable.mtg_card_back),
-                        modifier = finalImageModifier,
-                        contentScale = ContentScale.Crop
-                    )
-                }
-                if (onImageClick != null) {
-                    val viewCardDescription = stringResource(Res.string.card_row_view_card_a11y)
-                    Box(
-                        // 44x62 visual stays put; minimumInteractiveComponentSize only pads the touch target to 48dp.
-                        modifier = Modifier
-                            .minimumInteractiveComponentSize()
-                            .clickable(onClick = onImageClick)
-                            .semantics {
-                                role = Role.Button
-                                contentDescription = viewCardDescription
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        cardThumbnail()
-                    }
-                } else {
-                    cardThumbnail()
-                }
-
-                Column(
-                    modifier = Modifier.weight(1f).height(62.dp),
-                ) {
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.TopStart) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CardName(
-                                name = card.name,
-                                showFrontOnly = true,
-                                style = ty.titleMedium,
-                                color = mc.textPrimary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-                            if (isInCollection) {
-                                Spacer(Modifier.width(spacing.xs))
-                                Icon(
-                                    Icons.Rounded.CollectionsBookmark,
-                                    contentDescription = null,
-                                    tint = if (isCommander) mc.goldMtg else mc.primaryAccent,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                        Text(
-                            card.typeLine,
-                            style = ty.bodySmall,
-                            color = if (isCommander) mc.textPrimary else mc.textSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                    val cardThumbnail = @Composable {
+                        AsyncImage(
+                            model = card.imageNormal,
+                            contentDescription = null,
+                            placeholder = painterResource(Res.drawable.mtg_card_back),
+                            error = painterResource(Res.drawable.mtg_card_back),
+                            fallback = painterResource(Res.drawable.mtg_card_back),
+                            modifier = finalImageModifier,
+                            contentScale = ContentScale.Crop
                         )
                     }
-                    
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.BottomStart) {
-                        Column {
+                    if (onImageClick != null) {
+                        val viewCardDescription = stringResource(Res.string.card_row_view_card_a11y)
+                        Box(
+                            // 44x62 visual stays put; minimumInteractiveComponentSize only pads the touch target to 48dp.
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .clickable(onClick = onImageClick)
+                                .semantics {
+                                    role = Role.Button
+                                    contentDescription = viewCardDescription
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            cardThumbnail()
+                        }
+                    } else {
+                        cardThumbnail()
+                    }
+
+                    Column(
+                        modifier = Modifier.weight(1f).height(62.dp),
+                    ) {
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.TopStart) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CardName(
+                                    name = card.name,
+                                    showFrontOnly = true,
+                                    style = ty.titleMedium,
+                                    color = mc.textPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                if (isInCollection) {
+                                    Spacer(Modifier.width(spacing.xs))
+                                    Icon(
+                                        Icons.Rounded.CollectionsBookmark,
+                                        contentDescription = null,
+                                        tint = if (isCommander) mc.goldMtg else mc.primaryAccent,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                            Text(
+                                card.typeLine,
+                                style = ty.bodySmall,
+                                color = if (isCommander) mc.textPrimary else mc.textSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.BottomStart) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -355,18 +355,26 @@ fun CardRow(
                                 Row(
                                     modifier = Modifier.weight(1f),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(spacing.md),
                                 ) {
-                                    if (card.manaCost != null) {
-                                        ManaCostImages(
-                                            manaCost = card.manaCost!!,
-                                            symbolSize = 14.dp,
-                                        )
+                                    if (!card.manaCost.isNullOrBlank()) {
+                                        val costs = card.manaCost!!.split(" // ")
+                                        costs.forEachIndexed { index, singleCost ->
+                                            ManaCostImages(manaCost = singleCost, symbolSize = 14.dp)
+                                            if (index < costs.size - 1) {
+                                                Text(
+                                                    " // ",
+                                                    style = MaterialTheme.magicTypography.titleMedium,
+                                                    color = MaterialTheme.magicColors.textSecondary,
+                                                    modifier = Modifier.padding(horizontal = MaterialTheme.spacing.xxs)
+                                                )
+                                            }
+                                        }
                                     }
                                     SetSymbol(
                                         setCode = card.setCode,
                                         rarity = CardRarity.fromString(card.rarity),
-                                        size = 14.dp
+                                        size = 14.dp,
+                                        modifier = if (!card.manaCost.isNullOrBlank()) Modifier.padding(start = MaterialTheme.spacing.md) else Modifier
                                     )
                                     Text(
                                         text = card.setCode.uppercase(),
@@ -374,7 +382,7 @@ fun CardRow(
                                         color = if (isCommander) mc.textPrimary else mc.textSecondary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.weight(1f).padding(horizontal = MaterialTheme.spacing.xxs),
                                     )
                                 }
                                 if (formattedPrice != null) {
@@ -387,78 +395,86 @@ fun CardRow(
                                     )
                                 }
                             }
+                        }
+                    }
 
-                            if (extraSupportingContent != null) {
-                                extraSupportingContent()
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                    ) {
+                        if (onAdd != null) {
+                            if (quantity > 0 && onRemove != null) {
+                                IconButton(
+                                    onClick = onRemove,
+                                ) {
+                                    Icon(
+                                        Icons.Default.Remove,
+                                        contentDescription = "Decrease quantity",
+                                        tint = mc.textSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                Text(
+                                    text = "$quantity",
+                                    style = ty.labelMedium,
+                                    color = if (isCommander) mc.goldMtg else mc.primaryAccent
+                                )
+                            }
+
+                            IconButton(
+                                onClick = onAdd,
+                                enabled = addEnabled,
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "Increase quantity",
+                                    tint = when {
+                                        !addEnabled -> mc.textDisabled
+                                        isCommander -> mc.goldMtg
+                                        else -> mc.primaryAccent
+                                    },
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        } else {
+                            if (quantity > 1) {
+                                Surface(
+                                    shape = ChipShape,
+                                    color = (if (isCommander) mc.goldMtg else mc.secondaryAccent).copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        "×$quantity",
+                                        style = ty.labelMedium,
+                                        color = if (isCommander) mc.goldMtg else mc.secondaryAccent,
+                                        modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs)
+                                    )
+                                }
+                            }
+                            if (onRemove != null) {
+                                IconButton(
+                                    onClick = onRemove,
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Remove card",
+                                        tint = if (isCommander) mc.goldMtg else mc.textDisabled,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(spacing.xs)
-                ) {
-                    if (onAdd != null) {
-                        if (quantity > 0 && onRemove != null) {
-                            IconButton(
-                                onClick = onRemove,
-                            ) {
-                                Icon(
-                                    Icons.Default.Remove,
-                                    contentDescription = "Decrease quantity",
-                                    tint = mc.textSecondary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            Text(
-                                text = "$quantity",
-                                style = ty.labelMedium,
-                                color = if (isCommander) mc.goldMtg else mc.primaryAccent
-                            )
-                        }
-
-                        IconButton(
-                            onClick = onAdd,
-                            enabled = addEnabled,
-                        ) {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = "Increase quantity",
-                                tint = when {
-                                    !addEnabled -> mc.textDisabled
-                                    isCommander -> mc.goldMtg
-                                    else -> mc.primaryAccent
-                                },
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    } else {
-                        if (quantity > 1) {
-                            Surface(
-                                shape = ChipShape,
-                                color = (if (isCommander) mc.goldMtg else mc.secondaryAccent).copy(alpha = 0.15f)
-                            ) {
-                                Text(
-                                    "×$quantity",
-                                    style = ty.labelMedium,
-                                    color = if (isCommander) mc.goldMtg else mc.secondaryAccent,
-                                    modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs)
-                                )
-                            }
-                        }
-                        if (onRemove != null) {
-                            IconButton(
-                                onClick = onRemove,
-                            ) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Remove card",
-                                    tint = if (isCommander) mc.goldMtg else mc.textDisabled,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
+                
+                if (extraSupportingContent != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = spacing.md, end = spacing.md, top = spacing.xxs, bottom = spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        extraSupportingContent()
                     }
                 }
             }

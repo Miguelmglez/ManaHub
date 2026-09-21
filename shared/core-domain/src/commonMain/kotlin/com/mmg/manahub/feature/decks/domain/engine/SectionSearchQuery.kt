@@ -334,17 +334,6 @@ object SectionSearchQuery {
         return body.substring(0, separatorIndex) to body.substring(separatorIndex + 1)
     }
 
-    // role:/engine: read CategoryVocabulary (also read by ArchetypeRoleClassifier); tribe:* stays empty (runtime label, not a CardTag).
-    fun collectionTagKeysFor(sectionId: String): Set<String> = when {
-        sectionId.startsWith("role:") -> tagKeyOrEmpty(sectionId.removePrefix("role:"))
-        sectionId.startsWith("engine:") -> parseEngineSectionId(sectionId)
-            ?.let { (axis, side) -> engineRoleKeys(axis, side == "producers").flatMap { tagKeyOrEmpty(it) }.toSet() }
-            .orEmpty()
-        sectionId == "mana_rock" -> setOf("mana_rock")
-        sectionId == "mana_dork" -> setOf("mana_dork")
-        else -> emptySet() // tribe:*, produces:*, mv:*, lands, legal, illegal, offplan, interaction, standalone -- structural, not tag-keyed
-    }
-
     // ── Identity / legality composition ─────────────────────────────────────────────────────
 
     /** WUBRG canonical order for `id<=` clauses (Scryfall accepts any order but this reads best). */
@@ -401,8 +390,6 @@ object SectionSearchQuery {
     private fun roleFragment(key: RoleKey, context: SectionQueryContext): String? =
         if (key == "tribe_members") context.dominantTribe?.let { "t:$it" }
         else ROLE_ORACLE_FRAGMENTS[key]
-
-    private fun tagKeyOrEmpty(key: RoleKey): Set<String> = CategoryVocabulary.cardTagKeysFor(key)
 
     // ── Plan roles -- direct oracle tag (W3 table 1, 20 rows) ───────────────────────────────
 

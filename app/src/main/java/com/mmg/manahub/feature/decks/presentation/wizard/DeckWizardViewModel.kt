@@ -42,6 +42,8 @@ import com.mmg.manahub.feature.decks.domain.engine.PlacementScorer
 import com.mmg.manahub.feature.decks.domain.engine.PostureId
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
+import com.mmg.manahub.feature.decks.domain.engine.SectionMembership
+import com.mmg.manahub.feature.decks.domain.engine.SectionQueryContext
 import com.mmg.manahub.feature.decks.domain.engine.StrategyPick
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
@@ -259,9 +261,19 @@ data class DeckWizardUiState(
     /** The structured query currently APPLIED via the browse sheet's Advanced Search sheet (Tune
      * icon or a section's own "Browse for X" preset). */
     val planSectionsStructuredQuery: AdvancedSearchQuery? = null,
-    /** [com.mmg.manahub.core.model.CardTag] keys applied via [planSectionsStructuredQuery]'s
-     * accompanying collection-tag preset, ANDed together. */
+    /** Deck Wizard UX polish plan, Run 1 §1.2: carries the originating `CardSection.id` itself
+     * (never real `CardTag` keys any more) through
+     * [com.mmg.manahub.core.ui.components.CardSearchSheet]'s `onFilterCollectionByTags(Set<String>)
+     * -> Unit` param shape — kept for parity with the sheet's own param naming; [planSectionsPredicate]
+     * (derived from the SAME section id) is what [DeckWizardViewModel.publishPlanSectionsCollectionResults]
+     * actually filters by. */
     val planSectionsTagFilter: Set<String> = emptySet(),
+    /** Deck Wizard UX polish plan, Run 1 §1.2: the [com.mmg.manahub.feature.decks.domain.engine.SectionMembership.predicate]
+     * derived from the PLAN_SECTIONS "Browse for X" section id — the SAME per-card membership test
+     * [com.mmg.manahub.feature.decks.domain.engine.AnalysisEngine] itself attributed that section's
+     * contributions from. `null` for the generic Advanced Search path, which keeps filtering via
+     * [planSectionsStructuredQuery] instead. */
+    val planSectionsPredicate: ((Card) -> Boolean)? = null,
     /** Collection tab results -- local, lenient [StructuredCardSearch.collectionMatches] over
      * [ownedCards]. */
     val planSectionsCollectionResults: List<Card> = emptyList(),
@@ -1199,20 +1211,34 @@ class DeckWizardViewModel(
         searchPlanSectionsScryfall(_uiState.value.planSectionsQuery)
     }
 
-    /** The Analysis-tab-style category [com.mmg.manahub.core.model.CardTag] pre-filter for the
-     * Collection tab. */
+    /** The Analysis-tab-style category browse filter for the Collection tab. Deck Wizard UX polish
+     * plan, Run 1 §1.2: [keys] carries the originating section id itself (a single-element set,
+     * mirroring [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.searchCollectionByTags]) —
+     * resolves the REAL [SectionMembership.predicate] from it via a [SectionQueryContext] built the
+     * same way [DeckWizardCommanderSteps]'s own `queryContext` is. */
     fun searchPlanSectionsCollectionByTags(keys: Set<String>) {
-        _uiState.update { it.copy(planSectionsTagFilter = keys) }
+        val state = _uiState.value
+        val sectionId = keys.firstOrNull()
+        val format = state.selectedFormat ?: DeckFormat.COMMANDER
+        val dominantTribe = state.selectedTribeKey?.removePrefix(TribeDeriver.TRIBE_PREFIX)
+        val context = SectionQueryContext(colorIdentity = state.colorIdentity, format = format, dominantTribe = dominantTribe)
+        val predicate = sectionId?.let { SectionMembership.predicate(it, context) }
+        _uiState.update { it.copy(planSectionsTagFilter = keys, planSectionsPredicate = predicate) }
         publishPlanSectionsCollectionResults()
     }
 
     private fun publishPlanSectionsCollectionResults() {
         val state = _uiState.value
-        val tagFilter = state.planSectionsTagFilter
-        val structuredQuery = state.planSectionsStructuredQuery
+        val sectionPredicate = state.planSectionsPredicate
+        val structuralMatch: (Card) -> Boolean = if (sectionPredicate != null) {
+            sectionPredicate
+        } else {
+            val structuredQuery = state.planSectionsStructuredQuery
+            { card -> StructuredCardSearch.matches(card, structuredQuery) }
+        }
         val matches = state.ownedCards
             .filter { card ->
-                StructuredCardSearch.matchesForCategoryBrowse(card, structuredQuery, tagFilter) &&
+                structuralMatch(card) &&
                     (state.planSectionsQuery.isBlank() || card.name.contains(state.planSectionsQuery, ignoreCase = true))
             }
             // Gate 5 audit (edge-case P1): one PRINTING per name, mirroring seedPickLocalCandidates
@@ -1255,6 +1281,7 @@ class DeckWizardViewModel(
                 planSectionsQuery = "",
                 planSectionsStructuredQuery = null,
                 planSectionsTagFilter = emptySet(),
+                planSectionsPredicate = null,
                 planSectionsCollectionResults = emptyList(),
                 planSectionsScryfallResults = emptyList(),
                 isSearchingPlanSectionsScryfall = false,

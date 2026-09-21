@@ -13,6 +13,7 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -20,6 +21,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,6 +40,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -71,6 +74,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -132,6 +136,7 @@ import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
 import com.mmg.manahub.feature.scanner.presentation.components.DeckScannerQueueSheet
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.koin.androidx.compose.koinViewModel
 import java.util.concurrent.Executors
@@ -166,6 +171,7 @@ fun ScannerScreen(
     val toastState = rememberMagicToastState()
     val preferredCurrency = LocalPreferredCurrency.current
     val queueListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var showLanguageSelector by remember { mutableStateOf(false) }
 
     // Auto-launch permission dialog on first composition
     LaunchedEffect(Unit) {
@@ -198,12 +204,14 @@ fun ScannerScreen(
                 // payload for scanner_camera_stopped_for_sheet (see CameraPreview), never as an
                 // independent source of truth.
                 val overlayReason: String? = when {
-                    uiState.showQueueSheet -> "queue"
-                    uiState.showEditSheet -> "edit"
-                    uiState.showVariantSelector -> "variant_selector"
-                    uiState.expandedVariantImageUrl != null -> "expanded_image"
                     uiState.selectedCardDetailId != null -> "card_detail"
+                    uiState.expandedVariantImageUrl != null -> "expanded_image"
+                    uiState.showVariantSelector -> "variant_selector"
+                    uiState.showEditSheet -> "edit"
+                    uiState.showQueueSheet -> "queue"
                     uiState.showPriceDetailSheet -> "price_detail"
+                    showLanguageSelector -> "language"
+                    uiState.showAmbiguitySelector -> "ambiguity"
                     else -> null
                 }
                 val isCameraActive = overlayReason == null
@@ -216,6 +224,8 @@ fun ScannerScreen(
                     selectedLanguage = uiState.selectedLanguage,
                     onRecognitionResult = viewModel::onRecognitionResult,
                     onFlashAvailability = viewModel::onFlashAvailabilityChanged,
+                    onCameraBindError = viewModel::onCameraBindFailed,
+                    onCameraBound = viewModel::onCameraBound,
                 )
 
                 NameZoneIndicator()
@@ -233,11 +243,13 @@ fun ScannerScreen(
                     onToggleSound = viewModel::onToggleSound,
                     onToggleRecognitionPaused = viewModel::onToggleRecognitionPaused,
                     onLanguageSelected = viewModel::onLanguageSelected,
+                    onOpenLanguageSelector = { showLanguageSelector = true },
                 )
 
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
                         .padding(bottom = 32.dp, start = 16.dp, end = 16.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -257,7 +269,7 @@ fun ScannerScreen(
                         DetectedCardOverlay(
                             card = uiState.lastDetectedCard,
                             isSearching = uiState.isSearching,
-                            error = uiState.error,
+                            error = uiState.error ?: uiState.cameraBindError,
                             languageMismatch = uiState.languageMismatch,
                             selectedLanguage = uiState.selectedLanguage,
                             isFoil = uiState.selectedIsFoil,
@@ -306,8 +318,12 @@ fun ScannerScreen(
         MagicToastHost(state = toastState)
     }
 
-    if (uiState.showQueueSheet) {
-        when (uiState.target) {
+    when {
+        uiState.selectedCardDetailId != null -> Unit
+        uiState.expandedVariantImageUrl != null -> Unit
+        uiState.showVariantSelector && uiState.variantSelectorEntry != null -> Unit
+        uiState.showEditSheet && uiState.editingCard != null -> Unit
+        uiState.showQueueSheet -> when (uiState.target) {
             ScannerTarget.Collection -> CardQueueSheet(
                 session = uiState.scanSession,
                 preferredCurrency = preferredCurrency,
@@ -355,8 +371,14 @@ fun ScannerScreen(
         }
     }
 
-    // Edit sheet
-    if (uiState.showEditSheet && uiState.editingCard != null) {
+    // Render at most one sheet at a time. The VM intentionally keeps the previous sheet flag
+    // while a child overlay is open so closing the child returns to the parent without a second
+    // ModalBottomSheet being mounted over it.
+    if (uiState.showEditSheet && uiState.editingCard != null &&
+        uiState.selectedCardDetailId == null &&
+        uiState.expandedVariantImageUrl == null &&
+        !uiState.showVariantSelector
+    ) {
         val editingCard = uiState.editingCard!!
         EditScannedCardSheet(
             scannedCard = editingCard,
@@ -367,7 +389,9 @@ fun ScannerScreen(
     }
 
     // Variant selector sheet
-    if (uiState.showVariantSelector && uiState.variantSelectorEntry != null) {
+    if (uiState.showVariantSelector && uiState.variantSelectorEntry != null &&
+        uiState.selectedCardDetailId == null && uiState.expandedVariantImageUrl == null
+    ) {
         VariantSelectorSheet(
             currentCardId = uiState.variantSelectorEntry!!.card.scryfallId,
             variants = uiState.cardVariants,
@@ -379,7 +403,7 @@ fun ScannerScreen(
     }
 
     // Full-screen image viewer
-    if (uiState.expandedVariantImageUrl != null) {
+    if (uiState.expandedVariantImageUrl != null && uiState.selectedCardDetailId == null) {
         FullScreenImageViewer(
             imageUrl = uiState.expandedVariantImageUrl!!,
             onDismiss = viewModel::onCloseExpandedImage,
@@ -390,12 +414,15 @@ fun ScannerScreen(
     // Enter/exit matches the app-wide CardDetail transition (see AppNavGraph's
     // Screen.CollectionCardDetail composable) — a scale+fade, NOT a bottom-sheet slide, since this
     // overlay represents a full "screen", not a sheet.
-    AnimatedVisibility(
-        visible = uiState.selectedCardDetailId != null,
-        enter = fadeIn(tween(400)) + scaleIn(initialScale = 0.92f, animationSpec = tween(450)),
-        exit = fadeOut(tween(300)),
-    ) {
-        if (uiState.selectedCardDetailId != null) {
+    AnimatedContent(
+        targetState = uiState.selectedCardDetailId,
+        transitionSpec = {
+            (fadeIn(tween(400)) + scaleIn(initialScale = 0.92f, animationSpec = tween(450))) togetherWith
+                fadeOut(tween(300))
+        },
+        label = "ScannerCardDetail",
+    ) { detailId ->
+        if (detailId != null) {
             CardDetailScreen(
                 onBack = viewModel::onCloseCardDetail,
                 onNavigateToAddCard = {
@@ -425,10 +452,24 @@ fun ScannerScreen(
                 // and silently ignores the new parametersOf(...) after the first construction — i.e. the
                 // "always shows the same card" bug. selectedCardDetailId is non-null here (guarded above).
                 viewModel = koinViewModel(
-                    key = uiState.selectedCardDetailId,
-                ) { org.koin.core.parameter.parametersOf(uiState.selectedCardDetailId) }
+                    key = detailId,
+                ) { org.koin.core.parameter.parametersOf(detailId) }
             )
         }
+    }
+
+    if (showLanguageSelector && uiState.selectedCardDetailId == null &&
+        uiState.expandedVariantImageUrl == null && !uiState.showVariantSelector &&
+        !uiState.showEditSheet && !uiState.showQueueSheet
+    ) {
+        LanguageSelectorSheet(
+            selectedLanguage = uiState.selectedLanguage,
+            onDismiss = { showLanguageSelector = false },
+            onSelectLanguage = { code ->
+                viewModel.onLanguageSelected(code)
+                showLanguageSelector = false
+            },
+        )
     }
 }
 
@@ -446,7 +487,7 @@ fun ScannerScreen(
  *   ([ImageAnalysis.clearAnalyzer]) and re-attached ([ImageAnalysis.setAnalyzer]) on resume, via
  *   the `LaunchedEffect(isRecognitionPausedByUser, boundImageAnalysis)` below.
  * - [isCameraActive] (`false` while a covering sheet/overlay — queue, edit, variant selector,
- *   expanded image, card detail, price detail — is open, computed by the caller) — a STRONGER
+ *   expanded image, card detail, price detail, language, or ambiguity — is open, computed by the caller) — a STRONGER
  *   condition: the camera session is FULLY unbound ([ProcessCameraProvider.unbindAll]) after a
  *   [CAMERA_STOP_DEBOUNCE_MS] debounce, which actually stops the sensor/ISP/preview surface
  *   (privacy-dot off, real power savings), not just frame delivery. Rebinding on `isCameraActive`
@@ -462,7 +503,7 @@ fun ScannerScreen(
  * @param overlayReason             WS4 (2026-08-25): which covering sheet/overlay caused
  *                                  [isCameraActive] to be `false` (`"queue"`, `"edit"`,
  *                                  `"variant_selector"`, `"expanded_image"`, `"card_detail"`,
- *                                  `"price_detail"`), or `null` while the camera is active. A
+ *                                  `"price_detail"`, `"language"`, `"ambiguity"`), or `null` while the camera is active. A
  *                                  fixed closed set computed by the caller — never user input —
  *                                  used only as the payload for the `scanner_camera_stopped_for_sheet`
  *                                  breadcrumb below.
@@ -476,6 +517,8 @@ private fun CameraPreview(
     selectedLanguage: String,
     onRecognitionResult: (RecognitionResult) -> Unit,
     onFlashAvailability: (Boolean) -> Unit,
+    onCameraBindError: (Throwable) -> Unit,
+    onCameraBound: () -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -614,12 +657,22 @@ private fun CameraPreview(
         }
 
         // Suspend without blocking the main thread until the provider is ready.
-        val cameraProvider = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
-            val future = ProcessCameraProvider.getInstance(context)
-            future.addListener(
-                { cont.resumeWith(runCatching { future.get() }) },
-                androidx.core.content.ContextCompat.getMainExecutor(context),
-            )
+        val cameraProvider = try {
+            kotlinx.coroutines.suspendCancellableCoroutine<ProcessCameraProvider> { cont ->
+                val future = ProcessCameraProvider.getInstance(context)
+                future.addListener(
+                    { cont.resumeWith(runCatching<ProcessCameraProvider> { future.get() }) },
+                    androidx.core.content.ContextCompat.getMainExecutor(context),
+                )
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Structured-concurrency correctness: this effect gets re-keyed (and this coroutine
+            // cancelled) whenever isCameraActive/previewViewRef changes mid-init -- that is a
+            // normal re-run, never a real bind failure, and must never surface as one.
+            throw e
+        } catch (error: Throwable) {
+            onCameraBindError(error)
+            return@LaunchedEffect
         }
         boundCameraProvider = cameraProvider
 
@@ -675,6 +728,9 @@ private fun CameraPreview(
                 preview,
                 imageAnalysis,
             )
+            // 1.7: the actual bug fix -- a previously-shown bind-error banner never cleared once
+            // set, since nothing ever reset it on a later successful (re)bind.
+            onCameraBound()
             onFlashAvailability(camera?.cameraInfo?.hasFlashUnit() ?: false)
             // W3.2: restore torch state immediately after a (re)bind. The separate
             // LaunchedEffect(isFlashOn) below only fires when isFlashOn itself CHANGES, so a
@@ -689,6 +745,12 @@ private fun CameraPreview(
                 FirebaseCrashlytics.getInstance().log("scanner_camera_resumed")
                 wasStoppedForOverlay = false
             }
+        }.onFailure { error ->
+            boundImageAnalysis?.clearAnalyzer()
+            cameraProvider.unbindAll()
+            camera = null
+            boundImageAnalysis = null
+            onCameraBindError(error)
         }
     }
 
@@ -867,11 +929,11 @@ private fun TopScannerControls(
     onToggleSound: () -> Unit,
     onToggleRecognitionPaused: () -> Unit,
     onLanguageSelected: (String) -> Unit,
+    onOpenLanguageSelector: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    var showLanguageSelector by remember { mutableStateOf(false) }
     var isSettingsExpanded by remember { mutableStateOf(false) }
     val languageSelectorDescription = stringResource(R.string.scanner_select_language)
 
@@ -959,7 +1021,7 @@ private fun TopScannerControls(
 
             // Language selector — flag icon opens LanguageSelectorSheet (item 2, 2026-07-17 UX pass)
             IconButton(
-                onClick = { showLanguageSelector = true },
+                onClick = onOpenLanguageSelector,
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
                     .background(mc.background.copy(alpha = 0.6f), CircleShape)
@@ -1048,16 +1110,6 @@ private fun TopScannerControls(
         }
     }
 
-    if (showLanguageSelector) {
-        LanguageSelectorSheet(
-            selectedLanguage = selectedLanguage,
-            onDismiss = { showLanguageSelector = false },
-            onSelectLanguage = { code ->
-                onLanguageSelected(code)
-                showLanguageSelector = false
-            },
-        )
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1102,7 +1154,15 @@ private fun LanguageSelectorSheet(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    fun selectAndDismiss(code: String) {
+        scope.launch {
+            sheetState.hide()
+            onSelectLanguage(code)
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1123,7 +1183,7 @@ private fun LanguageSelectorSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 48.dp)
-                            .clickable { onSelectLanguage(code) }
+                            .clickable { selectAndDismiss(code) }
                             .then(
                                 if (isSelected) Modifier.background(mc.primaryAccent.copy(alpha = 0.08f))
                                 else Modifier

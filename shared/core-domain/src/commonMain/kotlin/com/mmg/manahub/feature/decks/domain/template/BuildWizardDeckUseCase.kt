@@ -12,6 +12,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeData
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.AxisKey
+import com.mmg.manahub.feature.decks.domain.engine.BasicLandPlanner
 import com.mmg.manahub.feature.decks.domain.engine.BuildAnchor
 import com.mmg.manahub.feature.decks.domain.engine.CardSection
 import com.mmg.manahub.feature.decks.domain.engine.WizardPlan
@@ -1083,10 +1084,11 @@ class BuildWizardDeckUseCase(
         return RefineResult(current, swaps)
     }
 
-    /** Owned non-basic lands (Stage A, gated on [includeNonBasicLands] — R8/E10) -> commander+
-     * mainboard-weighted basics (Stage B, always runs — R12) -> a bounded Karsten rebalance
-     * (Stage C, ≤ [KARSTEN_REBALANCE_CAP] moves) — D10, fixes F9. [commander] is `null` for a
-     * [BuildAnchor.Sixty] build (v6) -- every commander-pip reference below degrades to
+    /** Owned non-basic lands (Stage A, gated on [includeNonBasicLands] — R8/E10) -> Stage B+C
+     * (commander+mainboard-weighted basics, then a bounded Karsten rebalance) delegated to
+     * [BasicLandPlanner.planBasics] — D10, fixes F9; extracted (Deck Wizard UX polish plan, Run 1
+     * §1.1) so Studio's land-delta suggestion can call the identical counts logic. [commander] is
+     * `null` for a [BuildAnchor.Sixty] build (v6) -- every commander-pip reference below degrades to
      * `listOfNotNull(commander?.let { ... })`, an empty addition. */
     private fun fillLandsV2(
         identity: Set<ManaColor>,
@@ -1170,29 +1172,28 @@ class BuildWizardDeckUseCase(
             }
         }
 
-        // ── Stage B: basics, commander pips included, Phyrexian excluded (F9) ──────────────────
+        // ── Stage B+C: BasicLandPlanner (Deck Wizard UX polish plan, Run 1 §1.1) — pip-weighted
+        //    distribution + bounded Karsten rebalance, extracted so Studio's own land-delta math can
+        //    call the exact same counts logic. Materializing the counts into real Card entries via
+        //    resolveBasicCard stays here (the planner is pure counts, no ownedCollection). ─────────
         val basicSlots = remainingLandSlots - placed.size
         if (basicSlots > 0) {
-            val pipsRaw = manaBaseAnalyzer.pipDistribution(nonLandMainboard + commanderPipEntry)
-            val pipsByColor = pipsRaw.entries.associate { (color, count) -> color.symbol to count }
             val nonBasicDeckCards = placed.map { com.mmg.manahub.core.model.DeckCard(it.card, it.quantity) }
-            val distribution = BasicLandCalculator.calculateFromPips(
-                pipsByColor = pipsByColor,
+            val basicCounts = BasicLandPlanner.planBasics(
+                identity = identity,
+                landTarget = remainingLandSlots,
+                nonLandMainboard = nonLandMainboard + commanderPipEntry,
                 nonBasicLands = nonBasicDeckCards,
-                totalLandTarget = remainingLandSlots,
-                commanderIdentity = identitySymbols,
+                manaBaseAnalyzer = manaBaseAnalyzer,
             )
-            val basics = materializeBasics(distribution, ownedCollection)
-            basics.forEach { (name, qty) -> sources[nameToColor(name)] = (sources[nameToColor(name)] ?: 0) + qty }
-            placed += basics.mapNotNull { (name, qty) ->
+            placed += ManaColor.entries.mapNotNull { color ->
+                val qty = basicCounts[color] ?: 0
                 if (qty <= 0) return@mapNotNull null
+                val name = BasicLandCalculator.LAND_FOR_COLOR[color.symbol] ?: "Wastes"
                 val card = resolveBasicCard(name, ownedCollection) ?: return@mapNotNull null
                 DeckEntry(card, qty, true, false)
             }
         }
-
-        // ── Stage C: bounded Karsten rebalance (<= KARSTEN_REBALANCE_CAP moves) ─────────────────
-        rebalance(placed, sources, intensity, ownedCollection)
 
         return placed
     }
@@ -1200,30 +1201,10 @@ class BuildWizardDeckUseCase(
     private fun identitySymbolsToColors(symbols: Set<String>): Set<ManaColor> =
         ManaColor.entries.filter { it.symbol in symbols }.toSet()
 
-    private fun nameToColor(name: String): ManaColor = when (name) {
-        "Plains" -> ManaColor.W
-        "Island" -> ManaColor.U
-        "Swamp" -> ManaColor.B
-        "Mountain" -> ManaColor.R
-        "Forest" -> ManaColor.G
-        "Wastes" -> ManaColor.C
-        else -> ManaColor.C
-    }
-
-    private fun materializeBasics(distribution: com.mmg.manahub.core.model.BasicLandDistribution, ownedCollection: List<OwnedCard>): List<Pair<String, Int>> =
-        listOf(
-            "Plains" to distribution.plains,
-            "Island" to distribution.islands,
-            "Swamp" to distribution.swamps,
-            "Mountain" to distribution.mountains,
-            "Forest" to distribution.forests,
-            "Wastes" to distribution.wastes,
-        )
-
     /**
-     * R12/E13: the ONE lookup for "the [Card] object backing basic-land [name]" — used by both
-     * Stage B's materialization and Stage C's rebalance, replacing two independent copies. Basics
-     * are documented as an unlimited resource (never gated by ownership): the VM boundary
+     * R12/E13: the ONE lookup for "the [Card] object backing basic-land [name]" — used by Stage B's
+     * materialization of [BasicLandPlanner.planBasics]'s output. Basics are documented as an
+     * unlimited resource (never gated by ownership): the VM boundary
      * ([com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardViewModel
      * .guaranteeBasicsAvailable]) is responsible for making sure every WUBRG/Wastes basic the
      * identity needs has a real [Card] object in [ownedCollection] BEFORE this use case ever runs,
@@ -1244,54 +1225,6 @@ class BuildWizardDeckUseCase(
         return card
     }
 
-    /** Stage C (D10): moves up to [KARSTEN_REBALANCE_CAP] basic-land copies from the
-     * MOST-oversupplied colour to the MOST-undersupplied one, mutating [placed]/[sources] in
-     * place. Stops early once no colour is short of [ManaBaseAnalyzer.requiredSources]. Never
-     * touches non-basic entries (Stage A already resolved those against the same [intensity]).
-     * R12/E13: a missing [resolveBasicCard] for the SHORT colour skips only that move
-     * (`return@repeat`) rather than aborting rebalancing for every OTHER colour — this should be
-     * unreachable in production (see [resolveBasicCard]'s own KDoc) but stays defensive against a
-     * partial-fetch failure rather than compounding it into a total rebalance abort. */
-    private fun rebalance(
-        placed: MutableList<DeckEntry>,
-        sources: MutableMap<ManaColor, Int>,
-        intensity: Map<ManaColor, Int>,
-        ownedCollection: List<OwnedCard>,
-    ) {
-        val totalLands = placed.sumOf { it.quantity }
-        repeat(KARSTEN_REBALANCE_CAP) {
-            val shortages = intensity.mapNotNull { (color, need) ->
-                if (need <= 0) return@mapNotNull null
-                val required = manaBaseAnalyzer.requiredSources(need, totalLands)
-                val have = sources[color] ?: 0
-                if (have < required) color to (required - have) else null
-            }
-            if (shortages.isEmpty()) return
-            val shortColor = shortages.maxByOrNull { it.second }?.first ?: return
-            val excessColor = sources.entries
-                .filter { (color, count) -> color != shortColor && count > (intensity[color]?.let { manaBaseAnalyzer.requiredSources(it, totalLands) } ?: 0) }
-                .maxByOrNull { it.value }?.key ?: return
-
-            val excessBasicName = BasicLandCalculator.LAND_FOR_COLOR[excessColor.symbol]
-            val shortBasicName = BasicLandCalculator.LAND_FOR_COLOR[shortColor.symbol] ?: return
-            val excessEntryIndex = placed.indexOfFirst { it.card.name == excessBasicName && BasicLandCalculator.isBasicLand(it.card) && it.quantity > 0 }
-            if (excessEntryIndex < 0) return
-            val shortCard = resolveBasicCard(shortBasicName, ownedCollection) ?: return@repeat
-
-            val excessEntry = placed[excessEntryIndex]
-            placed[excessEntryIndex] = excessEntry.copy(quantity = excessEntry.quantity - 1)
-            sources[excessColor] = (sources[excessColor] ?: 1) - 1
-            val shortEntryIndex = placed.indexOfFirst { it.card.name == shortBasicName }
-            if (shortEntryIndex >= 0) {
-                placed[shortEntryIndex] = placed[shortEntryIndex].copy(quantity = placed[shortEntryIndex].quantity + 1)
-            } else {
-                placed += DeckEntry(shortCard, 1, true, false)
-            }
-            sources[shortColor] = (sources[shortColor] ?: 0) + 1
-            if (placed[excessEntryIndex].quantity <= 0) placed.removeAt(excessEntryIndex)
-        }
-    }
-
     companion object {
         /** Commander formats: 100 total cards including the commander -> 99 non-commander slots. */
         private const val NON_COMMANDER_SLOTS = 99
@@ -1307,7 +1240,6 @@ class BuildWizardDeckUseCase(
          * Bounds refine's cost to `REFINE_MAX_SWAPS * REFINE_TRIAL_SAMPLE` real analyses in the
          * worst case, rather than testing every remaining candidate every round. */
         private const val REFINE_TRIAL_SAMPLE = 4
-        private const val KARSTEN_REBALANCE_CAP = 5
 
         /** W6 Task 4 (E6): a candidate within this relative fraction of the section's best remaining
          * gain counts as a genuine alternative, not a clear loser. Judgment call, verified by hand

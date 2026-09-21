@@ -82,8 +82,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -96,6 +96,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -115,8 +116,8 @@ import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.Res
-import com.mmg.manahub.core.ui.components.CardSearchSheet
 import com.mmg.manahub.core.ui.components.CardRow
+import com.mmg.manahub.core.ui.components.CardSearchSheet
 import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
@@ -151,17 +152,16 @@ import com.mmg.manahub.feature.decks.domain.model.ComboResult
 import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
 import com.mmg.manahub.feature.decks.domain.template.DiscoverySearchFilter
 import com.mmg.manahub.feature.decks.domain.template.partitionByAxis
-import com.mmg.manahub.feature.decks.domain.usecase.SimilarDeckResult
 import com.mmg.manahub.feature.decks.domain.usecase.DeckValueSummary
+import com.mmg.manahub.feature.decks.domain.usecase.SimilarDeckResult
 import com.mmg.manahub.feature.decks.presentation.components.AddBasicLandsRow
-import com.mmg.manahub.feature.decks.presentation.components.ArchetypeResemblanceCard
 import com.mmg.manahub.feature.decks.presentation.components.BasicLandsSheet
 import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
 import com.mmg.manahub.feature.decks.presentation.components.CardSectionRow
 import com.mmg.manahub.feature.decks.presentation.components.CuratedStrategyPickerSheet
-import com.mmg.manahub.feature.decks.presentation.components.DeckImportSheet
-import com.mmg.manahub.feature.decks.presentation.components.DeckAddCardsMethodSheet
 import com.mmg.manahub.feature.decks.presentation.components.DeckAddCardsMethod
+import com.mmg.manahub.feature.decks.presentation.components.DeckAddCardsMethodSheet
+import com.mmg.manahub.feature.decks.presentation.components.DeckImportSheet
 import com.mmg.manahub.feature.decks.presentation.components.DeckStatsCard
 import com.mmg.manahub.feature.decks.presentation.components.DeckSummaryCard
 import com.mmg.manahub.feature.decks.presentation.components.DeckValueCard
@@ -190,8 +190,8 @@ private const val ADD_CARDS_TAB_COLLECTION = 0
 private const val ADD_CARDS_TAB_ALL_CARDS = 1
 
 internal sealed interface PendingDeckAddCardsAction {
-    data object OpenManualSearch : PendingDeckAddCardsAction
-    data class NavigateToScanner(val deckId: String) : PendingDeckAddCardsAction
+    data object OpenManualSearch: PendingDeckAddCardsAction
+    data class NavigateToScanner(val deckId: String): PendingDeckAddCardsAction
 }
 
 internal fun resolvePendingDeckAddCardsAction(
@@ -205,10 +205,8 @@ internal fun resolvePendingDeckAddCardsAction(
 
     return when (method) {
         DeckAddCardsMethod.MANUAL_SEARCH -> PendingDeckAddCardsAction.OpenManualSearch
-        DeckAddCardsMethod.SCAN_CARDS -> deckId
-            ?.takeIf { it.isNotBlank() }
-            ?.takeIf { !isNavigatingToScanner }
-            ?.let(PendingDeckAddCardsAction::NavigateToScanner)
+        DeckAddCardsMethod.SCAN_CARDS -> deckId?.takeIf {it.isNotBlank()}
+            ?.takeIf {!isNavigatingToScanner}?.let(PendingDeckAddCardsAction::NavigateToScanner)
     }
 }
 
@@ -256,12 +254,12 @@ fun DeckStudioScreen(
     // Deck Wizard v4 (R15): [replaceConfirmed] is a REQUIRED trailing arg -- the compiler forces
     // every call site to decide whether the user already confirmed replacing this deck's cards;
     // DeckWizardViewModel re-checks the deck's real card count at persist time regardless.
-    onNavigateToWizard: (deckId: String, format: String, archetype: String?, theme: String?, tribe: String?, colors: String?, seeds: List<String>?, replaceConfirmed: Boolean) -> Unit = { _, _, _, _, _, _, _, _ -> },
+    onNavigateToWizard: (deckId: String, format: String, archetype: String?, theme: String?, tribe: String?, colors: String?, seeds: List<String>?, replaceConfirmed: Boolean) -> Unit = {_, _, _, _, _, _, _, _->},
     // Deck Wizard Commander v3 plan (Phase 6, item 4/D12): Studio's own "regenerate this EXISTING
     // draft through the wizard" entry point -- passes the draft's own format + id so the wizard's
     // atomic write targets it directly instead of creating a second deck (D12). Unlike
     // [onNavigateToWizard] above (always a FRESH draft), this always carries a real deckId.
-    onNavigateToWizardFromDraft: (deckId: String, format: String) -> Unit = { _, _ -> },
+    onNavigateToWizardFromDraft: (deckId: String, format: String) -> Unit = {_, _->},
     // Visual-overhaul pass: non-null only when the hosting nav destination is inside a
     // `SharedTransitionLayout` -- drives the Combos-tab card tiles' shared-element transition
     // into the real CardDetailScreen (mirrors AddCardScreen/CollectionScreen's own optional
@@ -271,7 +269,7 @@ fun DeckStudioScreen(
     viewModel: DeckStudioViewModel = koinViewModel(),
     onNavigateToMassiveAddCards: (List<Card>) -> Unit = {},
     onNavigateToScanner: (deckId: String) -> Unit = {},
-    ) {
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val deckStats by viewModel.deckStatsFlow.collectAsStateWithLifecycle()
     val playerName by viewModel.playerNameFlow.collectAsStateWithLifecycle()
@@ -303,24 +301,24 @@ fun DeckStudioScreen(
     // (showBasicLandsSheet/showEditDeckSheet/showImportSheet/showDeleteDialog, SuggestionsTab's own
     // showStrategySheet) was evaluated and left as plain `remember` -- none of their sheet CONTENTS
     // contain a card tap that navigates away to a full screen, so none share this failure mode.
-    var showAddCardsSheet by rememberSaveable { mutableStateOf(false) }
-    var showAddCardsMethodSheet by rememberSaveable { mutableStateOf(false) }
-    var isNavigatingToScanner by rememberSaveable { mutableStateOf(false) }
-    var pendingAddCardsMethod by remember { mutableStateOf<DeckAddCardsMethod?>(null) }
-    var showCommanderSearchSheet by rememberSaveable { mutableStateOf(false) }
+    var showAddCardsSheet by rememberSaveable {mutableStateOf(false)}
+    var showAddCardsMethodSheet by rememberSaveable {mutableStateOf(false)}
+    var isNavigatingToScanner by rememberSaveable {mutableStateOf(false)}
+    var pendingAddCardsMethod by remember {mutableStateOf<DeckAddCardsMethod?>(null)}
+    var showCommanderSearchSheet by rememberSaveable {mutableStateOf(false)}
 
     // CardSearchSheet renders in its own window ABOVE the NavHost, so it would stay on top (owning
     // input and back) while Screen.CollectionCardDetail animates in, killing both the transition and
     // any way to close the detail screen. Gating on RESUMED unmounts it the instant navigation
     // starts and remounts it on return; its results live in the VM, which outlives the unmount.
-    val isDestinationResumed = LocalLifecycleOwner.current.lifecycle
-        .currentStateAsState().value.isAtLeast(Lifecycle.State.RESUMED)
+    val isDestinationResumed =
+        LocalLifecycleOwner.current.lifecycle.currentStateAsState().value.isAtLeast(Lifecycle.State.RESUMED)
     LaunchedEffect(isDestinationResumed) {
         if (isDestinationResumed) isNavigatingToScanner = false
     }
     // Hoisted out of CardSearchSheet so the tab survives that unmount. 0 = Collection, 1 = All
     // Cards (the sheet's own indices with no Wishlist tab); reset wherever sectionBrowseSectionId is.
-    var addCardsSheetTab by rememberSaveable { mutableIntStateOf(ADD_CARDS_TAB_COLLECTION) }
+    var addCardsSheetTab by rememberSaveable {mutableIntStateOf(ADD_CARDS_TAB_COLLECTION)}
     // Deck Analysis Category Sections rework (W7/W8 telemetry): non-null only when the Build tab's
     // own add-cards sheet (below) was opened from an Analysis-tab "Browse for <Category>" button —
     // reset to null on every dismiss/FAB-open so a stale preset never leaks into the next,
@@ -336,16 +334,17 @@ fun DeckStudioScreen(
     // `remember`-derived vals instead of writing a custom Saver for the AdvancedSearchQuery/
     // SearchCriterion sealed hierarchy (14+ subtypes) -- simpler, and they now recompute correctly
     // for free on the same post-navigation recomposition that restores sectionBrowseSectionId.
-    var sectionBrowseSectionId by rememberSaveable { mutableStateOf<String?>(null) }
+    var sectionBrowseSectionId by rememberSaveable {mutableStateOf<String?>(null)}
     // Suggestions Tab UI Polish plan (W11): structured, not a raw Scryfall string --
     // SectionSearchQuery.toAdvancedQuery's output, opened straight into the sheet's own
     // onAdvancedSearch callback via CardSearchSheet's initialAdvancedQuery param.
     val sectionBrowseQuery = remember(sectionBrowseSectionId, sectionQueryContext) {
-        sectionBrowseSectionId?.let { SectionSearchQuery.toAdvancedQuery(it, sectionQueryContext) }
+        sectionBrowseSectionId?.let {SectionSearchQuery.toAdvancedQuery(it, sectionQueryContext)}
     }
-    val sectionBrowseTagKeys = remember(sectionBrowseSectionId) {
-        sectionBrowseSectionId?.let { SectionSearchQuery.collectionTagKeysFor(it) } ?: emptySet()
-    }
+    // Deck Wizard UX polish plan, Run 1 §1.2: carries the raw section id itself (never real
+    // CardTag keys) through CardSearchSheet's onFilterCollectionByTags(Set<String>) -> Unit param
+    // shape -- the VM resolves the real SectionMembership.predicate from it directly.
+    val sectionBrowseTagKeys = remember(sectionBrowseSectionId) { setOfNotNull(sectionBrowseSectionId) }
     LaunchedEffect(pendingAddCardsMethod, showAddCardsMethodSheet, isDestinationResumed) {
         val pendingMethod = pendingAddCardsMethod ?: return@LaunchedEffect
         resolvePendingDeckAddCardsAction(
@@ -378,29 +377,31 @@ fun DeckStudioScreen(
 
             is PendingDeckAddCardsAction.NavigateToScanner -> {
                 isNavigatingToScanner = true
+                FirebaseCrashlytics.getInstance().log("deck_studio_scanner_opened")
+                FirebaseCrashlytics.getInstance().setCustomKey("scanner_entry_source", "deck_studio")
                 onNavigateToScanner(action.deckId)
             }
         }
     }
-    var showBasicLandsSheet by remember { mutableStateOf(false) }
-    var showEditDeckSheet by remember { mutableStateOf(false) }
-    var showImportSheet by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showBasicLandsSheet by remember {mutableStateOf(false)}
+    var showEditDeckSheet by remember {mutableStateOf(false)}
+    var showImportSheet by remember {mutableStateOf(false)}
+    var showDeleteDialog by remember {mutableStateOf(false)}
     // Deck Wizard v4 (R15): "Build from seed" is rendered ONLY on the empty-deck state card
     // (nothing to lose, per resolveWizardNavDecision below it never confirms); "Rebuild with the
     // Wizard" is rendered ONLY in the overflow menu on a non-empty deck, so it ALWAYS confirms
     // before replacing every card (D12's atomic write). One boolean is enough now that only one
     // entry point ever reaches the dialog.
-    var showRebuildConfirm by remember { mutableStateOf(false) }
+    var showRebuildConfirm by remember {mutableStateOf(false)}
     // Edge-case fix (Phase 6 adversarial pass): a rapid double-tap on the menu item (before
     // showOverflow=false tears down the DropdownMenu) could otherwise fire onNavigateToWizardFromDraft
     // twice, pushing two DeckWizard destinations for the same deckId.
-    var hasTriggeredWizardNav by remember { mutableStateOf(false) }
+    var hasTriggeredWizardNav by remember {mutableStateOf(false)}
     // C3: the inline CardDetailSheet target (a scryfallId from a deck-list / commander tap).
-    var selectedCardId by remember { mutableStateOf<String?>(null) }
+    var selectedCardId by remember {mutableStateOf<String?>(null)}
     // True when the detail sheet was opened from the commander-selection flow (shows the
     // commander-specific actions instead of the +/- counter).
-    var isCardDetailInCommanderContext by remember { mutableStateOf(false) }
+    var isCardDetailInCommanderContext by remember {mutableStateOf(false)}
 
     // C3: resolve the tapped card to a DeckSlotEntry from the deck list, commander, or search
     // results.
@@ -411,12 +412,18 @@ fun DeckStudioScreen(
         uiState.scryfallResults,
         uiState.commanderCard,
     ) {
-        selectedCardId?.let { id ->
-            uiState.cards.find { it.scryfallId == id }
-                ?: uiState.commanderCard?.takeIf { it.scryfallId == id }
-                ?: (uiState.addCardsResults + uiState.scryfallResults)
-                    .find { it.card.scryfallId == id }
-                    ?.let { row -> DeckSlotEntry(row.card.scryfallId, row.quantityInDeck, false, row.card) }
+        selectedCardId?.let {id->
+            uiState.cards.find {it.scryfallId == id}
+                ?: uiState.commanderCard?.takeIf {it.scryfallId == id}
+                ?: (uiState.addCardsResults + uiState.scryfallResults).find {it.card.scryfallId == id}
+                    ?.let {row->
+                        DeckSlotEntry(
+                            row.card.scryfallId,
+                            row.quantityInDeck,
+                            false,
+                            row.card
+                        )
+                    }
         }
     }
 
@@ -424,7 +431,6 @@ fun DeckStudioScreen(
     val cardCutMsg = stringResource(R.string.deck_studio_card_cut)
     val externalFailedMsg = stringResource(R.string.deck_studio_external_pool_failed)
     val archetypePlanUpdatedMsg = stringResource(R.string.deck_studio_archetype_plan_updated)
-    val strategyUnlockedMsg = stringResource(R.string.deck_studio_strategy_unlocked)
 
     // Screen-entry breadcrumb (no PII).
     LaunchedEffect(Unit) {
@@ -433,16 +439,28 @@ fun DeckStudioScreen(
 
     // One-shot events (buffered Channel; collected once, never via state).
     LaunchedEffect(Unit) {
-        viewModel.events.collect { event ->
+        viewModel.events.collect {event->
             when (event) {
                 DeckStudioEvent.NavigateBack -> Unit // navigation is invoked in the VM callback
                 is DeckStudioEvent.ShowToast -> toastState.show(event.message, MagicToastType.INFO)
-                is DeckStudioEvent.CardAdded ->
-                    toastState.show(String.format(cardAddedMsg, event.cardName), MagicToastType.SUCCESS)
-                is DeckStudioEvent.CardCut ->
-                    toastState.show(String.format(cardCutMsg, event.cardName), MagicToastType.SUCCESS)
-                DeckStudioEvent.ExternalPoolFailed ->
-                    toastState.show(externalFailedMsg, MagicToastType.ERROR)
+                is DeckStudioEvent.CardAdded -> toastState.show(
+                    String.format(
+                        cardAddedMsg,
+                        event.cardName
+                    ), MagicToastType.SUCCESS
+                )
+
+                is DeckStudioEvent.CardCut -> toastState.show(
+                    String.format(
+                        cardCutMsg,
+                        event.cardName
+                    ), MagicToastType.SUCCESS
+                )
+
+                DeckStudioEvent.ExternalPoolFailed -> toastState.show(
+                    externalFailedMsg,
+                    MagicToastType.ERROR
+                )
             }
         }
     }
@@ -454,11 +472,15 @@ fun DeckStudioScreen(
         when {
             // C3: the inline detail sheet sits on top of everything (incl. the commander
             // search sheet), so it must close first.
-            selectedCardId != null -> { selectedCardId = null; isCardDetailInCommanderContext = false }
+            selectedCardId != null -> {
+                selectedCardId = null; isCardDetailInCommanderContext = false
+            }
+
             showAddCardsMethodSheet -> {
                 pendingAddCardsMethod = null
                 showAddCardsMethodSheet = false
             }
+
             showAddCardsSheet -> {
                 showAddCardsSheet = false
                 sectionBrowseSectionId = null
@@ -466,7 +488,11 @@ fun DeckStudioScreen(
                 // clearAddCardsState() also resets activeStructuredSearchFragment (W11 bug fix).
                 viewModel.clearAddCardsState()
             }
-            showCommanderSearchSheet -> { showCommanderSearchSheet = false; viewModel.clearAddCardsState() }
+
+            showCommanderSearchSheet -> {
+                showCommanderSearchSheet = false; viewModel.clearAddCardsState()
+            }
+
             showBasicLandsSheet -> showBasicLandsSheet = false
             showEditDeckSheet -> showEditDeckSheet = false
             showImportSheet -> showImportSheet = false
@@ -477,9 +503,14 @@ fun DeckStudioScreen(
 
     val inspirationsEnabled = FeatureFlags.Decks.DISCOVERIES_V2_ENABLED
     val seedEnabled = FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED
-    val isCommanderFormat = uiState.deck?.format
-        ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
-        ?.isCommanderFormat == true
+    val isCommanderFormat = uiState.deck?.format?.let {fmt->
+            DeckFormat.entries.firstOrNull {
+                it.name.equals(
+                    fmt,
+                    ignoreCase = true
+                )
+            }
+        }?.isCommanderFormat == true
     // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4 (S15): every non-Draft format can build/
     // rebuild through the wizard now, not just Commander -- Draft has no wizard build path
     // (WizardPhase.ENTRY itself rejects it via DeckWizardEvent.Exit). Separate from
@@ -488,8 +519,14 @@ fun DeckStudioScreen(
     // Extracted to isWizardAvailableForFormat (below) so run C2's DeckStudioScreenLogicTest can
     // cover the format gate as a plain JVM unit test -- zero behavior change.
     val wizardAvailableForFormat = isWizardAvailableForFormat(
-        uiState.deck?.format?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
-    )
+        uiState.deck?.format?.let {fmt->
+            DeckFormat.entries.firstOrNull {
+                it.name.equals(
+                    fmt,
+                    ignoreCase = true
+                )
+            }
+        })
     // Deck Wizard v4 (R15): "Build from seed" is gated to wizardAvailableForFormat at its render
     // site (the empty-deck state card, its ONLY render site now that the overflow duplicate is gone)
     // -- this guard is defense-in-depth, mirroring the codebase's "never trust the UI-only disabled
@@ -507,6 +544,7 @@ fun DeckStudioScreen(
                     onNavigateToWizard(deckId, format, null, null, null, null, null, false)
                 }
             }
+
             WizardNavDecision.REQUIRE_CONFIRM -> Unit // unreachable for this entry point (R15)
             WizardNavDecision.NO_OP -> Unit
         }
@@ -521,6 +559,7 @@ fun DeckStudioScreen(
                 viewModel.onRebuildConfirmShown()
                 showRebuildConfirm = true
             }
+
             WizardNavDecision.NAVIGATE_NOW -> Unit // unreachable for this entry point (R15)
             WizardNavDecision.NO_OP -> Unit
         }
@@ -535,8 +574,8 @@ fun DeckStudioScreen(
                     title = uiState.deck?.name ?: stringResource(R.string.deck_studio_title),
                     format = uiState.deck?.format,
                     onBack = handleBack,
-                    onBrowseInspirations = { viewModel.openInspirations() },
-                    onEdit = { showEditDeckSheet = true },
+                    onBrowseInspirations = {viewModel.openInspirations()},
+                    onEdit = {showEditDeckSheet = true},
                     onShare = {
                         val text = viewModel.exportDeckToText()
                         if (text != null) {
@@ -544,12 +583,17 @@ fun DeckStudioScreen(
                                 type = "text/plain"
                                 putExtra(Intent.EXTRA_TEXT, text)
                             }
-                            context.startActivity(Intent.createChooser(intent, context.getString(R.string.deckbuilder_share_chooser)))
+                            context.startActivity(
+                                Intent.createChooser(
+                                    intent,
+                                    context.getString(R.string.deckbuilder_share_chooser)
+                                )
+                            )
                         }
                     },
                     onMassiveAdd = {onNavigateToMassiveAddCards(emptyList())},
                     shareEnabled = !uiState.isEmptyDeck,
-                    onDeleteDeck = { showDeleteDialog = true },
+                    onDeleteDeck = {showDeleteDialog = true},
                     wizardAvailable = wizardAvailableForFormat,
                     // R15: "Rebuild with the Wizard" only renders for a non-empty deck.
                     isEmptyDeck = uiState.isEmptyDeck,
@@ -567,17 +611,19 @@ fun DeckStudioScreen(
                 ) {
                     MagicCtaButton(
                         text = stringResource(R.string.deck_studio_playtest),
-                        onClick = { uiState.deck?.id?.let(onPlaytest) },
+                        onClick = {uiState.deck?.id?.let(onPlaytest)},
                         enabled = playtestEnabled,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = spacing.md).height(56.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = spacing.md)
+                            .height(56.dp)
                     )
                 }
             },
             floatingActionButton = {
                 // Adding cards is available only after the live deck has loaded.
                 AnimatedVisibility(
-                    visible = uiState.selectedTab == DeckStudioTab.BUILD &&
-                        !uiState.isLoading && uiState.deck != null,
+                    visible = uiState.selectedTab == DeckStudioTab.BUILD && !uiState.isLoading && uiState.deck != null,
                     enter = fadeIn(),
                     exit = fadeOut(),
                 ) {
@@ -591,17 +637,18 @@ fun DeckStudioScreen(
                         shape = CardShape,
                         modifier = Modifier,
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.deck_studio_add_card_fab))
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = stringResource(R.string.deck_studio_add_card_fab)
+                        )
                     }
                 }
             },
-        ) { padding ->
-            Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-                if (uiState.isLoading) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        MagicLoadingSpinner()
-                    }
-                } else if (uiState.deck == null) {
+        ) {padding->
+            Column(modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()) {
+                if (!uiState.isLoading && uiState.deck == null) {
                     FullErrorState(
                         message = stringResource(R.string.deck_studio_create_failed),
                         retryLabel = stringResource(R.string.action_back),
@@ -610,147 +657,149 @@ fun DeckStudioScreen(
                     )
                 } else {
                     // The Suggestions tab is HIDDEN for release behind
-                // DeckFeatureFlags.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED (UI-only; the SUGGESTIONS
-                // branch + SuggestionsTab composable stay compiled). With it disabled, only the
-                // BUILD tab remains — a single-item TabRow looks broken, so it is not rendered.
-                val tabs = buildList {
-                    add(
-                        ManaTabItem(
-                            label = stringResource(R.string.deck_studio_tab_build).uppercase(),
-                            selected = uiState.selectedTab == DeckStudioTab.BUILD,
-                            onClick = { viewModel.onSelectTab(DeckStudioTab.BUILD) }
-                        )
-                    )
-                    val isDraft = uiState.deck?.format?.equals(DeckFormat.DRAFT.name, ignoreCase = true) == true
-                    if (FeatureFlags.Decks.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED && !isDraft) {
+                    // DeckFeatureFlags.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED (UI-only; the SUGGESTIONS
+                    // branch + SuggestionsTab composable stay compiled). With it disabled, only the
+                    // BUILD tab remains — a single-item TabRow looks broken, so it is not rendered.
+                    val tabs = buildList {
                         add(
                             ManaTabItem(
+                            label = stringResource(R.string.deck_studio_tab_build).uppercase(),
+                            selected = uiState.selectedTab == DeckStudioTab.BUILD,
+                            onClick = {viewModel.onSelectTab(DeckStudioTab.BUILD)}))
+                        val isDraft = uiState.deck?.format?.equals(
+                            DeckFormat.DRAFT.name,
+                            ignoreCase = true
+                        ) == true
+                        if (FeatureFlags.Decks.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED && !isDraft) {
+                            add(
+                                ManaTabItem(
                                 label = stringResource(R.string.deck_studio_tab_suggestions).uppercase(),
                                 selected = uiState.selectedTab == DeckStudioTab.SUGGESTIONS,
-                                onClick = { viewModel.onSelectTab(DeckStudioTab.SUGGESTIONS) }
-                            )
+                                onClick = {viewModel.onSelectTab(DeckStudioTab.SUGGESTIONS)}))
+                        }
+                    }
+                    if (!uiState.isLoading && tabs.size > 1) {
+                        ManaTabRow(
+                            items = tabs, modifier = Modifier.fillMaxWidth()
                         )
                     }
-                }
-                if (!uiState.isLoading && tabs.size > 1) {
-                    ManaTabRow(
-                        items = tabs,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
 
-                AnimatedContent(
-                    targetState = uiState.selectedTab,
-                    transitionSpec = {
-                        fadeIn(tween(300)) togetherWith fadeOut(tween(150))
-                    },
-                    label = "DeckStudioTab",
-                ) { tab ->
-                    when (tab) {
-                        DeckStudioTab.BUILD -> BuildTab(
-                            uiState = uiState,
-                            isCommanderFormat = isCommanderFormat,
-                            wizardAvailable = wizardAvailableForFormat,
-                            deckStats = deckStats,
-                            preferredCurrency = uiState.preferredCurrency,
-                            deckValueSummary = uiState.deckValueSummary,
-                            playerName = playerName,
-                            // External nav (full CardDetail screen) — used by the stats card.
-                            onCardClick = onCardClick,
-                            // C3: a tap on a card IN THE DECK LIST opens the inline detail sheet.
-                            onDeckCardClick = { id ->
-                                focusManager.clearFocus()
-                                isCardDetailInCommanderContext = false
-                                selectedCardId = id
-                            },
-                            onReviewSurvey = onReviewSurvey,
-                            onReplaceCard = { card ->
-                                sectionBrowseSectionId = null
-                                addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
-                                // Clear BEFORE filtering, or the pre-fill still runs through a
-                                // stale Analysis-tab structured/tag filter.
-                                viewModel.clearActiveStructuredSearchFragment()
-                                viewModel.onAddCardsQueryChange(card.name)
-                                showAddCardsSheet = true
-                            },
-                            onSetGroupingMode = viewModel::setGroupingMode,
-                            onToggleMainboard = viewModel::toggleMainboard,
-                            onToggleSideboard = viewModel::toggleSideboard,
-                            onToggleSection = viewModel::toggleSection,
-                            onToggleLandSuggestions = viewModel::toggleLandSuggestions,
-                            onApplyLandSuggestions = viewModel::applyLandSuggestions,
-                            onRemoveCard = viewModel::removeCard,
-                            onMoveToSideboard = { id -> viewModel.moveQuantityToSideboard(id) },
-                            onMoveToMainboard = { id -> viewModel.moveQuantityToMainboard(id) },
-                            onRemoveCommander = viewModel::removeCommander,
-                            onAddBasicLands = { showBasicLandsSheet = true },
-                            onChooseCommander = {
-                                viewModel.showCollectionCards()
-                                showCommanderSearchSheet = true
-                            },
-                            onBuildFromSeed = handleBuildFromSeed,
-                            onBrowseInspirations = { viewModel.openInspirations() },
-                            onImportDeck = { showImportSheet = true },
-                            onAcknowledgeOverLimit = viewModel::acknowledgeOverLimit,
-                            onUnacknowledgeOverLimit = viewModel::unacknowledgeOverLimit,
-                        )
-                        DeckStudioTab.SUGGESTIONS -> SuggestionsTab(
-                            uiState = uiState,
-                            onApplyCuratedStrategy = { strategy, tribe ->
-                                viewModel.onApplyCuratedStrategy(strategy, tribe)
-                                toastState.show(archetypePlanUpdatedMsg, MagicToastType.SUCCESS)
-                            },
-                            onAutoDetectArchetypePlan = {
-                                viewModel.onClearArchetypeOverride()
-                                toastState.show(archetypePlanUpdatedMsg, MagicToastType.SUCCESS)
-                            },
-                            onUnlockStrategy = {
-                                viewModel.onUnlockStrategy()
-                                toastState.show(strategyUnlockedMsg, MagicToastType.SUCCESS)
-                            },
-                            onOpenSimilarDeck = onNavigateToCommunityDeckDetail,
-                            onRetryAnalysis = viewModel::retryAnalysis,
-                            // Deck Analysis Category Sections rework (W7): section cards nav to the
-                            // full CardDetail screen -- the SAME entry point search-result taps and
-                            // the stats card already use (see this composable's own onCardClick
-                            // KDoc), never the inline deck-list CardDetailSheet (that sheet is for
-                            // slots actually IN the deck; a section's cards already are, but the
-                            // sheet's commander/remove affordances don't apply to a read-only
-                            // analysis browse row).
-                            onCardClick = onCardClick,
-                            sectionQueryContext = sectionQueryContext,
-                            onUnresolvedSection = viewModel::recordUnresolvedSectionCards,
-                            onBrowseSection = { section, pillarId ->
-                                focusManager.clearFocus()
-                                // Deck Analysis Category Sections rework (W8 telemetry): "Browse for
-                                // <Category>" tap -- section.min is only non-null for a real target
-                                // band (role/mana-fix sections); a bandless section (curve/synergy/
-                                // legality) never has a "gap" in that sense.
-                                val sectionMin = section.min
-                                val hasGap = sectionMin != null && section.current < sectionMin
-                                FirebaseCrashlytics.getInstance().setCustomKey("deck_analysis_section_id", section.id)
-                                FirebaseCrashlytics.getInstance().setCustomKey("deck_analysis_pillar_id", pillarId.name)
-                                FirebaseCrashlytics.getInstance().setCustomKey("deck_analysis_section_has_gap", hasGap)
-                                FirebaseCrashlytics.getInstance().log("deck_analysis_section_browse")
-                                viewModel.showCollectionCards()
-                                // sectionBrowseQuery/sectionBrowseTagKeys are pure derived vals of
-                                // (sectionBrowseSectionId, sectionQueryContext), so setting the id
-                                // alone is enough; the sheet's onAdvancedSearch then runs the real
-                                // filtered search over both tabs.
-                                sectionBrowseSectionId = section.id
-                                // Deck Wizard v4, W4.3 (G7): "Browse for X" must ALWAYS open on the
-                                // Collection tab -- the collection comes first, regardless of
-                                // whether this section happens to have a CardTag equivalent (the
-                                // structured predicate alone, per W4.2b, already renders real
-                                // Collection results for every section with a fragment).
-                                addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
-                                showAddCardsSheet = true
-                            },
-                        )
+                    AnimatedContent(
+                        targetState = uiState.selectedTab,
+                        transitionSpec = {
+                            fadeIn(tween(300)) togetherWith fadeOut(tween(150))
+                        },
+                        label = "DeckStudioTab",
+                    ) {tab->
+                        when (tab) {
+                            DeckStudioTab.BUILD -> BuildTab(
+                                uiState = uiState,
+                                isCommanderFormat = isCommanderFormat,
+                                wizardAvailable = wizardAvailableForFormat,
+                                deckStats = deckStats,
+                                preferredCurrency = uiState.preferredCurrency,
+                                deckValueSummary = uiState.deckValueSummary,
+                                playerName = playerName,
+                                // External nav (full CardDetail screen) — used by the stats card.
+                                onCardClick = onCardClick,
+                                // C3: a tap on a card IN THE DECK LIST opens the inline detail sheet.
+                                onDeckCardClick = {id->
+                                    focusManager.clearFocus()
+                                    isCardDetailInCommanderContext = false
+                                    selectedCardId = id
+                                },
+                                onReviewSurvey = onReviewSurvey,
+                                onReplaceCard = {card->
+                                    sectionBrowseSectionId = null
+                                    addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
+                                    // Clear BEFORE filtering, or the pre-fill still runs through a
+                                    // stale Analysis-tab structured/tag filter.
+                                    viewModel.clearActiveStructuredSearchFragment()
+                                    viewModel.onAddCardsQueryChange(card.name)
+                                    showAddCardsSheet = true
+                                },
+                                onSetGroupingMode = viewModel::setGroupingMode,
+                                onToggleMainboard = viewModel::toggleMainboard,
+                                onToggleSideboard = viewModel::toggleSideboard,
+                                onToggleSection = viewModel::toggleSection,
+                                onToggleLandSuggestions = viewModel::toggleLandSuggestions,
+                                onApplyLandSuggestions = viewModel::applyLandSuggestions,
+                                onRemoveCard = viewModel::removeCard,
+                                onMoveToSideboard = {id-> viewModel.moveQuantityToSideboard(id)},
+                                onMoveToMainboard = {id-> viewModel.moveQuantityToMainboard(id)},
+                                onRemoveCommander = viewModel::removeCommander,
+                                onAddBasicLands = {showBasicLandsSheet = true},
+                                onChooseCommander = {
+                                    viewModel.showCollectionCards()
+                                    showCommanderSearchSheet = true
+                                },
+                                onBuildFromSeed = handleBuildFromSeed,
+                                onBrowseInspirations = {viewModel.openInspirations()},
+                                onImportDeck = {showImportSheet = true},
+                                onAcknowledgeOverLimit = viewModel::acknowledgeOverLimit,
+                                onUnacknowledgeOverLimit = viewModel::unacknowledgeOverLimit,
+                            )
+
+                            DeckStudioTab.SUGGESTIONS -> SuggestionsTab(
+                                uiState = uiState,
+                                onApplyCuratedStrategy = {strategy, tribe->
+                                    viewModel.onApplyCuratedStrategy(strategy, tribe)
+                                    toastState.show(archetypePlanUpdatedMsg, MagicToastType.SUCCESS)
+                                },
+                                onAutoDetectArchetypePlan = {
+                                    viewModel.onClearArchetypeOverride()
+                                    toastState.show(archetypePlanUpdatedMsg, MagicToastType.SUCCESS)
+                                },
+                                onOpenSimilarDeck = onNavigateToCommunityDeckDetail,
+                                onRetryAnalysis = viewModel::retryAnalysis,
+                                // Deck Analysis Category Sections rework (W7): section cards nav to the
+                                // full CardDetail screen -- the SAME entry point search-result taps and
+                                // the stats card already use (see this composable's own onCardClick
+                                // KDoc), never the inline deck-list CardDetailSheet (that sheet is for
+                                // slots actually IN the deck; a section's cards already are, but the
+                                // sheet's commander/remove affordances don't apply to a read-only
+                                // analysis browse row).
+                                onCardClick = onCardClick,
+                                sectionQueryContext = sectionQueryContext,
+                                onUnresolvedSection = viewModel::recordUnresolvedSectionCards,
+                                onBrowseSection = {section, pillarId->
+                                    focusManager.clearFocus()
+                                    // Deck Analysis Category Sections rework (W8 telemetry): "Browse for
+                                    // <Category>" tap -- section.min is only non-null for a real target
+                                    // band (role/mana-fix sections); a bandless section (curve/synergy/
+                                    // legality) never has a "gap" in that sense.
+                                    val sectionMin = section.min
+                                    val hasGap = sectionMin != null && section.current < sectionMin
+                                    FirebaseCrashlytics.getInstance()
+                                        .setCustomKey("deck_analysis_section_id", section.id)
+                                    FirebaseCrashlytics.getInstance()
+                                        .setCustomKey("deck_analysis_pillar_id", pillarId.name)
+                                    FirebaseCrashlytics.getInstance()
+                                        .setCustomKey("deck_analysis_section_has_gap", hasGap)
+                                    FirebaseCrashlytics.getInstance()
+                                        .log("deck_analysis_section_browse")
+                                    viewModel.showCollectionCards()
+                                    // sectionBrowseQuery/sectionBrowseTagKeys are pure derived vals of
+                                    // (sectionBrowseSectionId, sectionQueryContext), so setting the id
+                                    // alone is enough; the sheet's onAdvancedSearch then runs the real
+                                    // filtered search over both tabs.
+                                    sectionBrowseSectionId = section.id
+                                    // Deck Wizard v4, W4.3 (G7): "Browse for X" must ALWAYS open on the
+                                    // Collection tab -- the collection comes first, regardless of
+                                    // whether this section happens to have a CardTag equivalent (the
+                                    // structured predicate alone, per W4.2b, already renders real
+                                    // Collection results for every section with a fragment).
+                                    addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
+                                    showAddCardsSheet = true
+                                },
+                                onOpenStrategySheet = viewModel::scoreStrategyMatches,
+                                strategyMatchScores = uiState.strategyMatchScores,
+                                isScoringStrategyMatches = uiState.isScoringStrategyMatches,
+                            )
+                        }
                     }
                 }
             }
-        }
         }
 
         MagicToastHost(
@@ -770,7 +819,8 @@ fun DeckStudioScreen(
                 viewModel.loadCardDetails(selectedDeckCard.scryfallId)
             }
 
-            val isAlreadyCommander = uiState.commanderCard?.scryfallId == selectedDeckCard.scryfallId
+            val isAlreadyCommander =
+                uiState.commanderCard?.scryfallId == selectedDeckCard.scryfallId
 
             CardDetailSheet(
                 deckCard = selectedDeckCard,
@@ -781,21 +831,29 @@ fun DeckStudioScreen(
                 tags = uiState.detailTags,
                 onAdd = {
                     if (isCardDetailInCommanderContext) {
-                        selectedDeckCard.card?.let { card -> viewModel.setCommander(card) }
+                        selectedDeckCard.card?.let {card-> viewModel.setCommander(card)}
                         selectedCardId = null
                         isCardDetailInCommanderContext = false
                         showCommanderSearchSheet = false
                     } else {
-                        viewModel.addCardToDeck(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard)
+                        viewModel.addCardToDeck(
+                            selectedDeckCard.scryfallId,
+                            selectedDeckCard.isSideboard
+                        )
                     }
                 },
-                onRemove = { viewModel.removeCardFromDeck(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard) },
+                onRemove = {
+                    viewModel.removeCardFromDeck(
+                        selectedDeckCard.scryfallId,
+                        selectedDeckCard.isSideboard
+                    )
+                },
                 onDelete = {
                     viewModel.removeCard(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard)
                     selectedCardId = null
                     isCardDetailInCommanderContext = false
                 },
-                onChooseAsCommander = { card ->
+                onChooseAsCommander = {card->
                     viewModel.setCommander(card)
                     selectedCardId = null
                     isCardDetailInCommanderContext = false
@@ -821,7 +879,7 @@ fun DeckStudioScreen(
     if (uiState.showInspirations) {
         val inspirationsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
-            onDismissRequest = { viewModel.closeInspirations() },
+            onDismissRequest = {viewModel.closeInspirations()},
             sheetState = inspirationsSheetState,
             shape = BottomSheetShape,
             containerColor = mc.background,
@@ -837,7 +895,7 @@ fun DeckStudioScreen(
                 filteredDiscoveries = uiState.filteredDiscoveriesV2,
                 matchingCards = uiState.discoveryMatchingCards,
                 isLoading = uiState.isLoadingDiscoveries,
-                onBuildThis = { discovery ->
+                onBuildThis = {discovery->
                     val deckId = uiState.deck?.id
                     val format = uiState.deck?.format
                     if (deckId != null && format != null) {
@@ -852,7 +910,7 @@ fun DeckStudioScreen(
                             discovery.archetype?.name,
                             discovery.theme?.name,
                             discovery.tribe,
-                            discovery.dominantColors.joinToString("") { it.symbol },
+                            discovery.dominantColors.joinToString("") {it.symbol},
                             null,
                             false,
                         )
@@ -868,7 +926,7 @@ fun DeckStudioScreen(
                 comboResult = uiState.comboResult,
                 comboCardsByName = uiState.comboCardsByName,
                 isLoadingCombos = uiState.isLoadingCombos,
-                onUseComboAsSeed = { cardNames ->
+                onUseComboAsSeed = {cardNames->
                     val deckId = uiState.deck?.id
                     val format = uiState.deck?.format
                     if (deckId != null && format != null) {
@@ -885,7 +943,7 @@ fun DeckStudioScreen(
                 // flips `showQueueSheet` off in the SAME state update as opening the detail
                 // overlay): otherwise the sheet's own show/hide animation is still playing
                 // when CardDetailScreen's entry transition starts, and the two race visibly.
-                onNavigateToCardDetail = { id ->
+                onNavigateToCardDetail = {id->
                     focusManager.clearFocus()
                     viewModel.closeInspirations()
                     onCardClick(id)
@@ -900,10 +958,9 @@ fun DeckStudioScreen(
         EditDeckSheet(
             deck = uiState.deck,
             cards = uiState.cards,
-            onSave = { newName, newCoverId ->
+            onSave = {newName, newCoverId->
                 focusManager.clearFocus()
-                if (newName != null) viewModel.updateDeckName(newName)
-                if (newCoverId != null) viewModel.setCoverCard(newCoverId)
+                viewModel.updateDeckMetadata(newName, newCoverId)
                 showEditDeckSheet = false
             },
             onDismiss = {
@@ -915,7 +972,7 @@ fun DeckStudioScreen(
 
     if (showDeleteDialog) {
         MagicAlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
+            onDismissRequest = {showDeleteDialog = false},
             title = "Delete Deck",
             text = "Are you sure you want to delete this deck? This action cannot be undone.",
             confirmLabel = "Delete",
@@ -925,7 +982,7 @@ fun DeckStudioScreen(
                 showDeleteDialog = false
                 viewModel.deleteDeckUnconditionally(onNavigateBack = onBack)
             },
-            onDismiss = { showDeleteDialog = false },
+            onDismiss = {showDeleteDialog = false},
         )
     }
 
@@ -963,7 +1020,7 @@ fun DeckStudioScreen(
         DeckImportSheet(
             isLoading = uiState.isImporting,
             error = null,
-            onImport = { text ->
+            onImport = {text->
                 focusManager.clearFocus()
                 viewModel.importDeck(text)
                 showImportSheet = false
@@ -981,15 +1038,15 @@ fun DeckStudioScreen(
             onAddBasicLand = viewModel::addBasicLandByName,
             onRemoveBasicLand = viewModel::removeBasicLandByName,
             manaCodeFor = viewModel::getManaCode,
-            onDismiss = { showBasicLandsSheet = false },
+            onDismiss = {showBasicLandsSheet = false},
         )
     }
 
     if (showAddCardsMethodSheet && isDestinationResumed) {
         DeckAddCardsMethodSheet(
             scanEnabled = uiState.deck?.id?.isNotBlank() == true,
-            onDismiss = { showAddCardsMethodSheet = false },
-            onMethodSelected = { pendingAddCardsMethod = it },
+            onDismiss = {showAddCardsMethodSheet = false},
+            onMethodSelected = {pendingAddCardsMethod = it},
         )
     }
 
@@ -1002,24 +1059,25 @@ fun DeckStudioScreen(
             isSearchingCards = uiState.isSearchingCards,
             isSearchingScryfall = uiState.isSearchingScryfall,
             isCommanderMode = false,
-            isCurrentCommander = { it == uiState.commanderCard?.scryfallId },
+            isCurrentCommander = {it == uiState.commanderCard?.scryfallId},
             offerTabLabel = stringResource(R.string.stats_tab_collection),
             allCardsTabLabel = stringResource(R.string.deckdetail_tab_scryfall),
             onQueryChange = viewModel::onAddCardsQueryChange,
             onScryfallSearch = viewModel::searchScryfallDirect,
-            onAdd = { row ->
+            onAdd = {row->
                 viewModel.addCardToDeck(row.card.scryfallId)
                 // Deck Analysis Category Sections rework (W8 telemetry): only when this add came
                 // through the Analysis tab's section-driven sheet preset (sectionBrowseSectionId
                 // non-null), not the normal Build-tab FAB add flow this same sheet instance also
                 // serves. Additive -- does not touch the existing deck_studio_add_failed error path.
-                sectionBrowseSectionId?.let { sectionId ->
-                    FirebaseCrashlytics.getInstance().setCustomKey("deck_analysis_section_id", sectionId)
+                sectionBrowseSectionId?.let {sectionId->
+                    FirebaseCrashlytics.getInstance()
+                        .setCustomKey("deck_analysis_section_id", sectionId)
                     FirebaseCrashlytics.getInstance().log("deck_analysis_section_card_added")
                 }
             },
-            onRemove = { row -> viewModel.removeCardFromDeck(row.card.scryfallId) },
-            onCardClick = { id ->
+            onRemove = {row-> viewModel.removeCardFromDeck(row.card.scryfallId)},
+            onCardClick = {id->
                 focusManager.clearFocus()
                 onCardClick(id)
             },
@@ -1037,10 +1095,15 @@ fun DeckStudioScreen(
             // Collection. Also serves the Advanced Search sheet's own SEARCH CARDS button.
             // sectionBrowseSectionId threaded through so a zero-hit result can be correlated back
             // to its originating Analysis-tab category (null for the generic Advanced Search path).
-            onAdvancedSearch = { query -> viewModel.applyStructuredSearch(query, sectionBrowseSectionId) },
+            onAdvancedSearch = {query->
+                viewModel.applyStructuredSearch(
+                    query,
+                    sectionBrowseSectionId
+                )
+            },
             onFilterCollectionByTags = viewModel::searchCollectionByTags,
             selectedTabIndex = addCardsSheetTab,
-            onSelectedTabChange = { addCardsSheetTab = it },
+            onSelectedTabChange = {addCardsSheetTab = it},
             onDismiss = {
                 focusManager.clearFocus()
                 showAddCardsSheet = false
@@ -1060,18 +1123,18 @@ fun DeckStudioScreen(
             isSearchingCards = uiState.isSearchingCards,
             isSearchingScryfall = uiState.isSearchingScryfall,
             isCommanderMode = true,
-            isCurrentCommander = { it == uiState.commanderCard?.scryfallId },
+            isCurrentCommander = {it == uiState.commanderCard?.scryfallId},
             offerTabLabel = stringResource(R.string.stats_tab_collection),
             allCardsTabLabel = stringResource(R.string.deckdetail_tab_scryfall),
             onQueryChange = viewModel::searchCommander,
             onScryfallSearch = viewModel::searchCommander,
-            onAdd = { row ->
+            onAdd = {row->
                 focusManager.clearFocus()
                 viewModel.setCommander(row.card)
                 showCommanderSearchSheet = false
             },
-            onRemove = { /* No-op in commander selection mode */ },
-            onCardClick = { id ->
+            onRemove = { /* No-op in commander selection mode */},
+            onCardClick = {id->
                 focusManager.clearFocus()
                 // C3: open the inline detail sheet in commander-selection context so the
                 // golden "Choose as commander" CTA is shown instead of navigating away.
@@ -1096,7 +1159,7 @@ private fun DeckStudioTopBar(
     onEdit: () -> Unit,
     onShare: () -> Unit,
     shareEnabled: Boolean,
-    onMassiveAdd: ()->Unit,
+    onMassiveAdd: () -> Unit,
     onDeleteDeck: () -> Unit,
     // Deck Wizard Commander v3 plan (Phase 6, item 4); Deck Wizard 60-card wave (v6), plan §5
     // Phase 5.4 (S15): "regenerate this draft through the wizard" entry point, gated by the SAME
@@ -1112,7 +1175,7 @@ private fun DeckStudioTopBar(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    var showOverflow by remember { mutableStateOf(false) }
+    var showOverflow by remember {mutableStateOf(false)}
     Surface(color = mc.backgroundSecondary) {
         Row(
             modifier = Modifier
@@ -1122,9 +1185,15 @@ private fun DeckStudioTopBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = mc.textSecondary)
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.action_back),
+                    tint = mc.textSecondary
+                )
             }
-            Column(modifier = Modifier.weight(1f).padding(horizontal = spacing.sm)) {
+            Column(modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = spacing.sm)) {
                 Text(
                     text = title,
                     style = ty.titleLarge,
@@ -1132,13 +1201,16 @@ private fun DeckStudioTopBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                format?.let { fmt ->
+                format?.let {fmt->
                     Surface(shape = ChipShape, color = mc.surfaceVariant) {
                         Text(
-                            text = fmt.uppercase(),
+                            text = fmt.uppercase().replace("_", " "),
                             style = ty.labelSmall,
                             color = mc.textPrimary,
-                            modifier = Modifier.padding(horizontal = spacing.xs, vertical = spacing.xxs),
+                            modifier = Modifier.padding(
+                                horizontal = spacing.xs,
+                                vertical = spacing.xxs
+                            ),
                         )
                     }
                 }
@@ -1147,7 +1219,7 @@ private fun DeckStudioTopBar(
             // "Browse inspirations" (Discoveries sheet), and "Share" — relocated here
             // from standalone icon buttons to keep ≤4 primary actions in the bar.
             Box {
-                IconButton(onClick = { showOverflow = true }) {
+                IconButton(onClick = {showOverflow = true}) {
                     Icon(
                         Icons.Default.MoreVert,
                         contentDescription = stringResource(R.string.deck_studio_more_options),
@@ -1156,7 +1228,7 @@ private fun DeckStudioTopBar(
                 }
                 DropdownMenu(
                     expanded = showOverflow,
-                    onDismissRequest = { showOverflow = false },
+                    onDismissRequest = {showOverflow = false},
                 ) {
                     DropdownMenuItem(
                         text = {
@@ -1253,7 +1325,7 @@ private fun DeckStudioTopBar(
                             onShare()
                         },
                     )
-                    
+
                     DropdownMenuItem(
                         text = {
                             Text(
@@ -1346,9 +1418,14 @@ private fun BuildTab(
     val spacing = MaterialTheme.spacing
 
     // C5: the format copy limit used by the per-card WarningOverlay banners.
-    val maxCopies = uiState.deck?.format
-        ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
-        ?.maxCopies ?: 4
+    val maxCopies = uiState.deck?.format?.let {fmt->
+            DeckFormat.entries.firstOrNull {
+                it.name.equals(
+                    fmt,
+                    ignoreCase = true
+                )
+            }
+        }?.maxCopies ?: 4
 
     // Smooth crossfade between the loading spinner and the loaded content (UI polish, 2026-07-22) —
     // avoids the abrupt jump-cut previously felt right after a Community Deck import navigates
@@ -1359,7 +1436,7 @@ private fun BuildTab(
             fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
         },
         label = "DeckStudioBuildTabLoading",
-    ) { isLoading ->
+    ) {isLoading->
         if (isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 MagicLoadingSpinner()
@@ -1372,8 +1449,8 @@ private fun BuildTab(
                 onImportDeck = onImportDeck,
             )
         } else {
-            val mainboardCards = uiState.cards.filter { !it.isSideboard }
-            val sideboardCards = uiState.cards.filter { it.isSideboard }.sortedBy { it.card?.name }
+            val mainboardCards = uiState.cards.filter {!it.isSideboard}
+            val sideboardCards = uiState.cards.filter {it.isSideboard}.sortedBy {it.card?.name}
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -1381,284 +1458,339 @@ private fun BuildTab(
                 contentPadding = PaddingValues(bottom = FabClearance),
                 verticalArrangement = Arrangement.spacedBy(spacing.md),
             ) {
-        item(key = "summary") {
-            // Derive the deck-size target from the deck's actual DeckFormat.targetDeckSize
-            // (DRAFT = 40, COMMANDER = 100, everything else = 60) instead of a Commander-only
-            // ternary, which silently mislabeled Draft decks (min 40) as "X/60".
-            val targetCount = uiState.deck?.format
-                ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
-                ?.targetDeckSize ?: 60
-            val maxInCurve = uiState.manaCurve.values.maxOrNull() ?: 0
-            val deckCards = (uiState.cards + listOfNotNull(uiState.commanderCard))
-                .filter { it.card != null && !it.isSideboard && !BasicLandCalculator.isLand(it.card!!) }
-                .map { DeckCard(it.card!!, it.quantity, it.scryfallId in uiState.collectionIds) }
-
-            DeckSummaryCard(
-                totalCards = uiState.totalCards,
-                targetCount = targetCount,
-                manaCurve = uiState.manaCurve,
-                maxInCurve = maxInCurve,
-                deckCards = deckCards,
-                modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md).animateItem(),
-            )
-        }
-
-        item(key = "deck_value") {
-            DeckValueCard(
-                summary = deckValueSummary,
-                currency = preferredCurrency,
-                modifier = Modifier.padding(horizontal = spacing.lg).animateItem(),
-            )
-        }
-
-        // Per-deck game stats (Group C / C2): only present once the deck has recorded
-        // games. DeckStatsCard itself no-ops on null / zero games, but gating the item
-        // keeps an empty padded slot out of the list.
-        if (deckStats != null) {
-            item(key = "deck_stats") {
-                DeckStatsCard(
-                    stats = deckStats,
-                    playerName = playerName,
-                    onCardClick = onCardClick,
-                    onReviewSurvey = onReviewSurvey,
-                    onReplaceCard = onReplaceCard,
-                    modifier = Modifier.padding(horizontal = spacing.lg).animateItem(),
-                )
-            }
-        }
-
-        item(key = "grouping_selector") {
-            Column(Modifier.padding(horizontal = spacing.lg).animateItem()) {
-                // F.4: migrated from GroupingFlowSelector (dropdown) to ManaHubBottomSheetSelector,
-                // the same modal-sheet picker CollectionScreen already uses for its sort/group pickers.
-                ManaHubBottomSheetSelector(
-                    icon = Icons.Default.Layers,
-                    valueText = stringResource(uiState.groupingMode.displayResId),
-                    items = GroupingMode.entries,
-                    selectedItem = uiState.groupingMode,
-                    onSelect = onSetGroupingMode,
-                    itemLabel = { stringResource(it.displayResId) },
-                )
-            }
-        }
-
-        if (isCommanderFormat) {
-            item(key = "commander_section") {
-                Column(modifier = Modifier.padding(horizontal = spacing.lg).animateItem()) {
-                    Text(
-                        text = stringResource(R.string.deckbuilder_commander_label),
-                        style = ty.titleMedium,
-                        color = mc.goldMtg,
-                        modifier = Modifier.padding(vertical = spacing.sm),
-                    )
-                    val commander = uiState.commanderCard
-                    if (commander?.card != null) {
-                        CardRow(
-                            card = commander.card!!,
-                            isInCollection = commander.scryfallId in uiState.collectionIds,
-                            onClick = { onDeckCardClick(commander.scryfallId) },
-                            onRemove = null,
-                            isCommander = true,
-                            modifier = Modifier.animateItem(),
-                        )
-                        Spacer(Modifier.height(spacing.xs))
-                        // C5: the commander's own validity warning (non-legendary, etc.).
-                        WarningOverlay(
-                            entry = commander,
-                            isOverLimit = false,
-                            isInvalidIdentity = false,
-                            isNonLegendaryCommander = uiState.isCommanderInvalid,
-                            isAcknowledged = commander.scryfallId in uiState.acknowledgedOverLimitCards,
-                            maxCopies = maxCopies,
-                            onAcknowledge = onAcknowledgeOverLimit,
-                            onUnacknowledge = onUnacknowledgeOverLimit,
-                            isCommander = true,
-                        )
-                        TextButton(
-                            onClick = onRemoveCommander,
-                            modifier = Modifier.align(Alignment.CenterHorizontally),
-                        ) {
-                            Text(stringResource(R.string.deckbuilder_remove_commander), style = ty.labelLarge, color = mc.lifeNegative)
-                        }
-                    } else {
-                        OutlinedButton(
-                            onClick = onChooseCommander,
-                            modifier = Modifier.fillMaxWidth(),
-                            border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
-                            shape = ChipShape,
-                        ) {
-                            Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(spacing.sm))
-                            Text(stringResource(R.string.deckbuilder_setup_commander_label), style = ty.labelLarge)
-                        }
-                    }
-                }
-            }
-        }
-
-        item(key = "mainboard_header") {
-            SectionHeader(
-                title = stringResource(R.string.deckdetail_tab_mainboard, mainboardCards.sumOf { it.quantity }),
-                expanded = uiState.mainboardExpanded,
-                onToggle = onToggleMainboard,
-                modifier = Modifier.animateItem(),
-            )
-        }
-
-        if (uiState.mainboardExpanded) {
-            val groupedMain = groupCards(mainboardCards, uiState.groupingMode)
-            groupedMain.forEach { (groupLabel, cards) ->
-                val isLandGroup = groupLabel == "Lands" || groupLabel == "Land"
-                val sectionKey = "main_$groupLabel"
-                val isExpanded = sectionKey !in uiState.collapsedSections
-                item(key = "main_header_$groupLabel") {
-                    GroupHeader(
-                        label = groupLabel,
-                        count = cards.sumOf { it.quantity },
-                        showSuggestionToggle = isLandGroup,
-                        isSuggestionEnabled = uiState.showLandSuggestions,
-                        onToggleSuggestion = onToggleLandSuggestions,
-                        expandable = true,
-                        expanded = isExpanded,
-                        onToggleExpand = { onToggleSection(sectionKey) },
-                        modifier = Modifier.padding(horizontal = spacing.lg).animateItem(),
-                    )
-                }
-                if (isExpanded) {
-                    if (isLandGroup) {
-                        item(key = "main_lands_logic") {
-                            Column(Modifier.animateItem()) {
-                                // C4: the basic-land suggestion strip; tapping it applies all deltas.
-                                AnimatedVisibility(
-                                    visible = uiState.showLandSuggestions && uiState.landDeltas.isNotEmpty(),
-                                    enter = expandVertically() + fadeIn(),
-                                    exit = shrinkVertically() + fadeOut(),
-                                ) {
-                                    MagicLandSuggestionStatic(
-                                        deltas = uiState.landDeltas,
-                                        onClick = onApplyLandSuggestions,
-                                        modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.xs),
-                                    )
-                                }
-                                AddBasicLandsRow(onClick = onAddBasicLands, modifier = Modifier.padding(horizontal = spacing.lg))
+                item(key = "summary") {
+                    // Derive the deck-size target from the deck's actual DeckFormat.targetDeckSize
+                    // (DRAFT = 40, COMMANDER = 100, everything else = 60) instead of a Commander-only
+                    // ternary, which silently mislabeled Draft decks (min 40) as "X/60".
+                    val targetCount = uiState.deck?.format?.let {fmt->
+                            DeckFormat.entries.firstOrNull {
+                                it.name.equals(
+                                    fmt,
+                                    ignoreCase = true
+                                )
                             }
+                        }?.targetDeckSize ?: 60
+                    val maxInCurve = uiState.manaCurve.values.maxOrNull() ?: 0
+                    val deckCards = (uiState.cards + listOfNotNull(uiState.commanderCard)).filter {
+                            it.card != null && !it.isSideboard && !BasicLandCalculator.isLand(it.card!!)
+                        }.map {
+                            DeckCard(
+                                it.card!!,
+                                it.quantity,
+                                it.scryfallId in uiState.collectionIds
+                            )
                         }
+
+                    DeckSummaryCard(
+                        totalCards = uiState.totalCards,
+                        targetCount = targetCount,
+                        manaCurve = uiState.manaCurve,
+                        maxInCurve = maxInCurve,
+                        deckCards = deckCards,
+                        modifier = Modifier
+                            .padding(horizontal = spacing.lg, vertical = spacing.md)
+                            .animateItem(),
+                    )
+                }
+
+                item(key = "deck_value") {
+                    DeckValueCard(
+                        summary = deckValueSummary,
+                        currency = preferredCurrency,
+                        modifier = Modifier
+                            .padding(horizontal = spacing.lg)
+                            .animateItem(),
+                    )
+                }
+
+                // Per-deck game stats (Group C / C2): only present once the deck has recorded
+                // games. DeckStatsCard itself no-ops on null / zero games, but gating the item
+                // keeps an empty padded slot out of the list.
+                if (deckStats != null) {
+                    item(key = "deck_stats") {
+                        DeckStatsCard(
+                            stats = deckStats,
+                            playerName = playerName,
+                            onCardClick = onCardClick,
+                            onReviewSurvey = onReviewSurvey,
+                            onReplaceCard = onReplaceCard,
+                            modifier = Modifier
+                                .padding(horizontal = spacing.lg)
+                                .animateItem(),
+                        )
                     }
-                    items(cards, key = { "main_${it.scryfallId}_$groupLabel" }) { entry ->
-                        Surface(
-                            shape = CardShape,
-                            color = mc.backgroundSecondary,
-                            border = BorderStroke(0.5.dp, mc.surfaceVariant),
-                            modifier = Modifier.padding(horizontal = spacing.lg).animateItem(),
-                        ) {
-                            Column {
+                }
+
+                item(key = "grouping_selector") {
+                    Column(Modifier
+                        .padding(horizontal = spacing.lg)
+                        .animateItem()) {
+                        // F.4: migrated from GroupingFlowSelector (dropdown) to ManaHubBottomSheetSelector,
+                        // the same modal-sheet picker CollectionScreen already uses for its sort/group pickers.
+                        ManaHubBottomSheetSelector(
+                            icon = Icons.Default.Layers,
+                            valueText = stringResource(uiState.groupingMode.displayResId),
+                            items = GroupingMode.entries,
+                            selectedItem = uiState.groupingMode,
+                            onSelect = onSetGroupingMode,
+                            itemLabel = {stringResource(it.displayResId)},
+                        )
+                    }
+                }
+
+                if (isCommanderFormat) {
+                    item(key = "commander_section") {
+                        Column(modifier = Modifier
+                            .padding(horizontal = spacing.lg)
+                            .animateItem()) {
+                            Text(
+                                text = stringResource(R.string.deckbuilder_commander_label),
+                                style = ty.titleMedium,
+                                color = mc.goldMtg,
+                                modifier = Modifier.padding(vertical = spacing.sm),
+                            )
+                            val commander = uiState.commanderCard
+                            if (commander?.card != null) {
                                 CardRow(
-                                    entry = entry,
-                                    isInCollection = entry.scryfallId in uiState.collectionIds,
-                                    onClick = { onDeckCardClick(entry.scryfallId) },
-                                    onRemove = { onRemoveCard(entry.scryfallId, false) },
+                                    card = commander.card!!,
+                                    isInCollection = commander.scryfallId in uiState.collectionIds,
+                                    onClick = {onDeckCardClick(commander.scryfallId)},
+                                    onRemove = null,
+                                    isCommander = true,
+                                    modifier = Modifier.animateItem(),
                                 )
-                                // Mainboard<->sideboard movement is format-agnostic (bug fix,
-                                // 2026-07-22): DeckStudioViewModel.moveQuantityToSideboard/
-                                // moveQuantityToMainboard and DeckRepository.moveCardQuantity have no
-                                // format restriction, and a Commander import can legitimately land
-                                // cards in the sideboard (Archidekt Maybeboard/custom-excluded
-                                // categories — see CommunityDeckMappers.kt). Previously gated behind
-                                // `!isCommanderFormat`, which hid this affordance for Commander decks
-                                // with no domain-level backing (parity fix vs. the legacy
-                                // DeckBuilderScreen.kt editor, which always showed it).
-                                val qtyInSideboard = uiState.cards.find { it.scryfallId == entry.scryfallId && it.isSideboard }?.quantity ?: 0
-                                MovementRow(
-                                    labelTo = stringResource(R.string.deckbuilder_move_to_sideboard),
-                                    onMoveTo = { onMoveToSideboard(entry.scryfallId) },
-                                    labelFrom = if (qtyInSideboard > 0) stringResource(R.string.deckbuilder_from_sideboard) else null,
-                                    onMoveFrom = if (qtyInSideboard > 0) {
-                                        { onMoveToMainboard(entry.scryfallId) }
-                                    } else null,
-                                )
-                                // C5: per-card over-limit / off-identity construction warning.
+                                Spacer(Modifier.height(spacing.xs))
+                                // C5: the commander's own validity warning (non-legendary, etc.).
                                 WarningOverlay(
-                                    entry = entry,
-                                    isOverLimit = entry.scryfallId in uiState.overLimitCards,
-                                    isInvalidIdentity = entry.scryfallId in uiState.invalidColorIdentityCards,
-                                    isNonLegendaryCommander = false,
-                                    isAcknowledged = entry.scryfallId in uiState.acknowledgedOverLimitCards,
+                                    entry = commander,
+                                    isOverLimit = false,
+                                    isInvalidIdentity = false,
+                                    isNonLegendaryCommander = uiState.isCommanderInvalid,
+                                    isAcknowledged = commander.scryfallId in uiState.acknowledgedOverLimitCards,
                                     maxCopies = maxCopies,
                                     onAcknowledge = onAcknowledgeOverLimit,
                                     onUnacknowledge = onUnacknowledgeOverLimit,
+                                    isCommander = true,
                                 )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Sideboard is format-agnostic (bug fix, 2026-07-22 — see the mainboard MovementRow
-        // comment above for the full rationale): always render it, mirroring the legacy
-        // DeckBuilderScreen.kt editor's unconditional behavior. A Commander-format import can
-        // legitimately have sideboard-zone cards (Archidekt Maybeboard/custom-excluded
-        // categories), which previously had no UI to view or move for Commander decks.
-        item(key = "sideboard_header") {
-            SectionHeader(
-                title = stringResource(R.string.deckdetail_tab_sideboard, sideboardCards.sumOf { it.quantity }),
-                expanded = uiState.sideboardExpanded,
-                onToggle = onToggleSideboard,
-                modifier = Modifier.animateItem(),
-            )
-        }
-        if (uiState.sideboardExpanded) {
-            if (sideboardCards.isEmpty()) {
-                item(key = "sideboard_empty") {
-                    Text(
-                        text = stringResource(R.string.deckbuilder_sideboard_empty),
-                        style = ty.bodySmall,
-                        color = mc.textSecondary,
-                        modifier = Modifier.padding(horizontal = spacing.xxl, vertical = spacing.sm).animateItem(),
-                    )
-                }
-            } else {
-                val groupedSide = groupCards(sideboardCards, uiState.groupingMode)
-                groupedSide.forEach { (groupLabel, cards) ->
-                    val sectionKey = "side_$groupLabel"
-                    val isExpanded = sectionKey !in uiState.collapsedSections
-                    item(key = "side_header_$groupLabel") {
-                        GroupHeader(
-                            label = groupLabel,
-                            count = cards.sumOf { it.quantity },
-                            expandable = true,
-                            expanded = isExpanded,
-                            onToggleExpand = { onToggleSection(sectionKey) },
-                            modifier = Modifier.padding(horizontal = spacing.lg).animateItem(),
-                        )
-                    }
-                    if (isExpanded) {
-                        items(cards, key = { "side_${it.scryfallId}_$groupLabel" }) { entry ->
-                            Surface(
-                                shape = CardShape,
-                                color = mc.backgroundSecondary,
-                                border = BorderStroke(0.5.dp, mc.surfaceVariant),
-                                modifier = Modifier.padding(horizontal = spacing.lg).animateItem(),
-                            ) {
-                                Column {
-                                    CardRow(
-                                        entry = entry,
-                                        isInCollection = entry.scryfallId in uiState.collectionIds,
-                                        onClick = { onDeckCardClick(entry.scryfallId) },
-                                        onRemove = { onRemoveCard(entry.scryfallId, true) },
+                                TextButton(
+                                    onClick = onRemoveCommander,
+                                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                                ) {
+                                    Text(
+                                        stringResource(R.string.deckbuilder_remove_commander),
+                                        style = ty.labelLarge,
+                                        color = mc.lifeNegative
                                     )
-                                    MovementRow(
-                                        labelTo = stringResource(R.string.deckbuilder_move_to_mainboard),
-                                        onMoveTo = { onMoveToMainboard(entry.scryfallId) },
+                                }
+                            } else {
+                                OutlinedButton(
+                                    onClick = onChooseCommander,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        mc.primaryAccent.copy(alpha = 0.5f)
+                                    ),
+                                    shape = ChipShape,
+                                ) {
+                                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(spacing.sm))
+                                    Text(
+                                        stringResource(R.string.deckbuilder_setup_commander_label),
+                                        style = ty.labelLarge
                                     )
                                 }
                             }
                         }
                     }
                 }
+
+                item(key = "mainboard_header") {
+                    SectionHeader(
+                        title = stringResource(
+                            R.string.deckdetail_tab_mainboard,
+                            mainboardCards.sumOf {it.quantity}),
+                        expanded = uiState.mainboardExpanded,
+                        onToggle = onToggleMainboard,
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+
+                if (uiState.mainboardExpanded) {
+                    val groupedMain = groupCards(mainboardCards, uiState.groupingMode)
+                    groupedMain.forEach {(groupLabel, cards)->
+                        val isLandGroup = groupLabel == "Lands" || groupLabel == "Land"
+                        val sectionKey = "main_$groupLabel"
+                        val isExpanded = sectionKey !in uiState.collapsedSections
+                        item(key = "main_header_$groupLabel") {
+                            GroupHeader(
+                                label = groupLabel,
+                                count = cards.sumOf {it.quantity},
+                                showSuggestionToggle = isLandGroup,
+                                isSuggestionEnabled = uiState.showLandSuggestions,
+                                onToggleSuggestion = onToggleLandSuggestions,
+                                expandable = true,
+                                expanded = isExpanded,
+                                onToggleExpand = {onToggleSection(sectionKey)},
+                                modifier = Modifier
+                                    .padding(horizontal = spacing.lg)
+                                    .animateItem(),
+                            )
+                        }
+                        if (isExpanded) {
+                            if (isLandGroup) {
+                                item(key = "main_lands_logic") {
+                                    Column(Modifier.animateItem()) {
+                                        // C4: the basic-land suggestion strip; tapping it applies all deltas.
+                                        AnimatedVisibility(
+                                            visible = uiState.showLandSuggestions && uiState.landDeltas.isNotEmpty(),
+                                            enter = expandVertically() + fadeIn(),
+                                            exit = shrinkVertically() + fadeOut(),
+                                        ) {
+                                            MagicLandSuggestionStatic(
+                                                deltas = uiState.landDeltas,
+                                                onClick = onApplyLandSuggestions,
+                                                modifier = Modifier.padding(
+                                                    horizontal = spacing.lg,
+                                                    vertical = spacing.xs
+                                                ),
+                                            )
+                                        }
+                                        AddBasicLandsRow(
+                                            onClick = onAddBasicLands,
+                                            modifier = Modifier.padding(horizontal = spacing.lg)
+                                        )
+                                    }
+                                }
+                            }
+                            items(cards, key = {"main_${it.scryfallId}_$groupLabel"}) {entry->
+                                Surface(
+                                    shape = CardShape,
+                                    color = mc.backgroundSecondary,
+                                    border = BorderStroke(0.5.dp, mc.surfaceVariant),
+                                    modifier = Modifier
+                                        .padding(horizontal = spacing.lg)
+                                        .animateItem(),
+                                ) {
+                                    Column {
+                                        CardRow(
+                                            entry = entry,
+                                            isInCollection = entry.scryfallId in uiState.collectionIds,
+                                            onClick = {onDeckCardClick(entry.scryfallId)},
+                                            onRemove = {onRemoveCard(entry.scryfallId, false)},
+                                        )
+                                        // Mainboard<->sideboard movement is format-agnostic (bug fix,
+                                        // 2026-07-22): DeckStudioViewModel.moveQuantityToSideboard/
+                                        // moveQuantityToMainboard and DeckRepository.moveCardQuantity have no
+                                        // format restriction, and a Commander import can legitimately land
+                                        // cards in the sideboard (Archidekt Maybeboard/custom-excluded
+                                        // categories — see CommunityDeckMappers.kt). Previously gated behind
+                                        // `!isCommanderFormat`, which hid this affordance for Commander decks
+                                        // with no domain-level backing (parity fix vs. the legacy
+                                        // DeckBuilderScreen.kt editor, which always showed it).
+                                        val qtyInSideboard =
+                                            uiState.cards.find {it.scryfallId == entry.scryfallId && it.isSideboard}?.quantity
+                                                ?: 0
+                                        MovementRow(
+                                            labelTo = stringResource(R.string.deckbuilder_move_to_sideboard),
+                                            onMoveTo = {onMoveToSideboard(entry.scryfallId)},
+                                            labelFrom = if (qtyInSideboard > 0) stringResource(R.string.deckbuilder_from_sideboard) else null,
+                                            onMoveFrom = if (qtyInSideboard > 0) {
+                                                {onMoveToMainboard(entry.scryfallId)}
+                                            } else null,
+                                        )
+                                        // C5: per-card over-limit / off-identity construction warning.
+                                        WarningOverlay(
+                                            entry = entry,
+                                            isOverLimit = entry.scryfallId in uiState.overLimitCards,
+                                            isInvalidIdentity = entry.scryfallId in uiState.invalidColorIdentityCards,
+                                            isNonLegendaryCommander = false,
+                                            isAcknowledged = entry.scryfallId in uiState.acknowledgedOverLimitCards,
+                                            maxCopies = maxCopies,
+                                            onAcknowledge = onAcknowledgeOverLimit,
+                                            onUnacknowledge = onUnacknowledgeOverLimit,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Sideboard is format-agnostic (bug fix, 2026-07-22 — see the mainboard MovementRow
+                // comment above for the full rationale): always render it, mirroring the legacy
+                // DeckBuilderScreen.kt editor's unconditional behavior. A Commander-format import can
+                // legitimately have sideboard-zone cards (Archidekt Maybeboard/custom-excluded
+                // categories), which previously had no UI to view or move for Commander decks.
+                item(key = "sideboard_header") {
+                    SectionHeader(
+                        title = stringResource(
+                            R.string.deckdetail_tab_sideboard,
+                            sideboardCards.sumOf {it.quantity}),
+                        expanded = uiState.sideboardExpanded,
+                        onToggle = onToggleSideboard,
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+                if (uiState.sideboardExpanded) {
+                    if (sideboardCards.isEmpty()) {
+                        item(key = "sideboard_empty") {
+                            Text(
+                                text = stringResource(R.string.deckbuilder_sideboard_empty),
+                                style = ty.bodySmall,
+                                color = mc.textSecondary,
+                                modifier = Modifier
+                                    .padding(
+                                        horizontal = spacing.xxl, vertical = spacing.sm
+                                    )
+                                    .animateItem(),
+                            )
+                        }
+                    } else {
+                        val groupedSide = groupCards(sideboardCards, uiState.groupingMode)
+                        groupedSide.forEach {(groupLabel, cards)->
+                            val sectionKey = "side_$groupLabel"
+                            val isExpanded = sectionKey !in uiState.collapsedSections
+                            item(key = "side_header_$groupLabel") {
+                                GroupHeader(
+                                    label = groupLabel,
+                                    count = cards.sumOf {it.quantity},
+                                    expandable = true,
+                                    expanded = isExpanded,
+                                    onToggleExpand = {onToggleSection(sectionKey)},
+                                    modifier = Modifier
+                                        .padding(horizontal = spacing.lg)
+                                        .animateItem(),
+                                )
+                            }
+                            if (isExpanded) {
+                                items(cards, key = {"side_${it.scryfallId}_$groupLabel"}) {entry->
+                                    Surface(
+                                        shape = CardShape,
+                                        color = mc.backgroundSecondary,
+                                        border = BorderStroke(0.5.dp, mc.surfaceVariant),
+                                        modifier = Modifier
+                                            .padding(horizontal = spacing.lg)
+                                            .animateItem(),
+                                    ) {
+                                        Column {
+                                            CardRow(
+                                                entry = entry,
+                                                isInCollection = entry.scryfallId in uiState.collectionIds,
+                                                onClick = {onDeckCardClick(entry.scryfallId)},
+                                                onRemove = {onRemoveCard(entry.scryfallId, true)},
+                                            )
+                                            MovementRow(
+                                                labelTo = stringResource(R.string.deckbuilder_move_to_mainboard),
+                                                onMoveTo = {onMoveToMainboard(entry.scryfallId)},
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
-        }
-    }
         }
     }
 }
@@ -1696,7 +1828,8 @@ internal fun resolveWizardNavDecision(
  * rejects Draft with `DeckWizardEvent.Exit`, so this gate must agree). `null` (format not yet
  * resolved) reads as unavailable, same as the pre-extraction inline expression.
  */
-internal fun isWizardAvailableForFormat(format: DeckFormat?): Boolean = format != null && format != DeckFormat.DRAFT
+internal fun isWizardAvailableForFormat(format: DeckFormat?): Boolean =
+    format != null && format != DeckFormat.DRAFT
 
 /** Which [EmptyStateOptionCard]s [EmptyDeckState] renders, and which one is primary. */
 internal data class EmptyDeckStateOptions(
@@ -1761,11 +1894,13 @@ private fun EmptyDeckState(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.md),
-        verticalArrangement = Arrangement.spacedBy(spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(spacing.lg, Alignment.CenterVertically),
     ) {
         item(key = "empty_hero") {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(top = spacing.md),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = spacing.md),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(spacing.xs),
             ) {
@@ -1794,11 +1929,13 @@ private fun EmptyDeckState(
                     style = ty.bodyMedium,
                     color = mc.textSecondary,
                     modifier = Modifier.fillMaxWidth(0.9f),
+                    textAlign = TextAlign.Center,
                 )
             }
         }
 
-        if (true) {
+
+        if (options.showSeed) {
             item(key = "empty_option_seed") {
                 EmptyStateOptionCard(
                     icon = Icons.Default.AutoAwesome,
@@ -1812,6 +1949,7 @@ private fun EmptyDeckState(
                 )
             }
         }
+
         if (options.showInspirations) {
             item(key = "empty_option_inspirations") {
                 EmptyStateOptionCard(
@@ -1871,7 +2009,10 @@ private fun EmptyStateOptionCard(
             modifier = Modifier.padding(spacing.lg),
             verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.md)
+            ) {
                 Box(
                     modifier = Modifier
                         .size(44.dp)
@@ -1879,7 +2020,12 @@ private fun EmptyStateOptionCard(
                         .background(accent.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(title, style = ty.titleMedium, color = mc.textPrimary)
@@ -1891,7 +2037,9 @@ private fun EmptyStateOptionCard(
                 text = ctaLabel,
                 style = if (isPrimary) MagicCtaStyle.Filled else MagicCtaStyle.Outlined,
                 color = ctaColor,
-                modifier = Modifier.fillMaxWidth().heightIn(min = LargeButtonHeight),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = LargeButtonHeight),
             )
         }
     }
@@ -1930,7 +2078,7 @@ private fun SectionHeader(
             Icons.Default.ExpandMore,
             contentDescription = toggleDescription,
             tint = mc.primaryAccent,
-            modifier = Modifier.graphicsLayer { rotationZ = rotation },
+            modifier = Modifier.graphicsLayer {rotationZ = rotation},
         )
     }
 }
@@ -1997,17 +2145,19 @@ private fun InspirationsSheetContentV2(
     // zoomed overlay in place, mirroring `PlaytestSetupScreen`'s single-card
     // MagicCardInspectionOverlay pattern. rootCoordinates anchors every tile's captured Rect to
     // THIS Box so the overlay's flight animation lines up regardless of scroll position.
-    var rootCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    var inspectionCard by remember { mutableStateOf<Card?>(null) }
-    var inspectionRect by remember { mutableStateOf(Rect.Zero) }
-    var isDismissingInspection by remember { mutableStateOf(false) }
+    var rootCoordinates by remember {mutableStateOf<LayoutCoordinates?>(null)}
+    var inspectionCard by remember {mutableStateOf<Card?>(null)}
+    var inspectionRect by remember {mutableStateOf(Rect.Zero)}
+    var isDismissingInspection by remember {mutableStateOf(false)}
 
     Box(
         modifier = Modifier
             .fillMaxHeight(0.92f)
-            .onGloballyPositioned { rootCoordinates = it },
+            .onGloballyPositioned {rootCoordinates = it},
     ) {
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = spacing.lg)) {
+        Column(modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = spacing.lg)) {
             Text(
                 text = stringResource(R.string.deck_studio_inspirations_title),
                 style = ty.titleLarge,
@@ -2028,7 +2178,7 @@ private fun InspirationsSheetContentV2(
             ) {
                 Tab(
                     selected = inspirationsTab == InspirationsTab.STRATEGIES,
-                    onClick = { onSelectTab(InspirationsTab.STRATEGIES) },
+                    onClick = {onSelectTab(InspirationsTab.STRATEGIES)},
                     text = {
                         Text(
                             stringResource(R.string.deck_studio_inspirations_tab_strategies),
@@ -2038,7 +2188,7 @@ private fun InspirationsSheetContentV2(
                 )
                 Tab(
                     selected = inspirationsTab == InspirationsTab.COMBOS,
-                    onClick = { onSelectTab(InspirationsTab.COMBOS) },
+                    onClick = {onSelectTab(InspirationsTab.COMBOS)},
                     text = {
                         Text(
                             stringResource(R.string.deck_studio_inspirations_tab_combos),
@@ -2056,7 +2206,7 @@ private fun InspirationsSheetContentV2(
                     matchingCards = matchingCards,
                     isLoading = isLoading,
                     rootCoordinates = rootCoordinates,
-                    onCardTap = { card, rect ->
+                    onCardTap = {card, rect->
                         isDismissingInspection = false
                         inspectionCard = card
                         inspectionRect = rect
@@ -2068,6 +2218,7 @@ private fun InspirationsSheetContentV2(
                     onToggleSearchCard = onToggleSearchCard,
                     onClearSearch = onClearSearch,
                 )
+
                 InspirationsTab.COMBOS -> CombosTabContent(
                     comboResult = comboResult,
                     cardsByName = comboCardsByName,
@@ -2080,13 +2231,13 @@ private fun InspirationsSheetContentV2(
             }
         }
 
-        inspectionCard?.let { card ->
+        inspectionCard?.let {card->
             MagicCardInspectionOverlay(
                 card = card,
                 initialRect = inspectionRect,
                 isVisible = true,
                 isDismissing = isDismissingInspection,
-                onDismissRequest = { isDismissingInspection = true },
+                onDismissRequest = {isDismissingInspection = true},
                 onDismiss = {
                     inspectionCard = null
                     isDismissingInspection = false
@@ -2130,13 +2281,14 @@ private fun StrategiesTabContent(
     // Pure derivation of the pickable pool from the (small, already-loaded) cluster list -- not
     // worth VM state, mirrors this screen's own `tabs = buildList { ... }` local-derivation
     // precedent above.
-    val pickableCardNames = remember(discoveries) { DiscoverySearchFilter.pickableCardNames(discoveries) }
+    val pickableCardNames =
+        remember(discoveries) {DiscoverySearchFilter.pickableCardNames(discoveries)}
     // Every discovery member is already a resolved Card (DeckDiscoveryV2.members) -- these are
     // owned collection cards, unlike the Combos tab's comboCardsByName which may miss unowned
     // names. Same remember(discoveries) key as pickableCardNames above; last-write-wins on a
     // duplicate name across clusters is fine, they're the same printing.
     val cardsByPickableName = remember(discoveries) {
-        discoveries.flatMap { it.members }.associateBy { it.name }
+        discoveries.flatMap {it.members}.associateBy {it.name}
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -2147,8 +2299,19 @@ private fun StrategiesTabContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = spacing.xs),
-                placeholder = { Text(stringResource(R.string.deck_studio_inspirations_search_hint), style = ty.bodyMedium) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary) },
+                placeholder = {
+                    Text(
+                        stringResource(R.string.deck_studio_inspirations_search_hint),
+                        style = ty.bodyMedium
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint = mc.textSecondary
+                    )
+                },
                 trailingIcon = if (searchQuery.isNotEmpty() || selectedCardNames.isNotEmpty()) {
                     {
                         IconButton(onClick = onClearSearch, modifier = Modifier.size(48.dp)) {
@@ -2166,17 +2329,19 @@ private fun StrategiesTabContent(
 
             if (pickableCardNames.isNotEmpty()) {
                 LazyRow(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = spacing.sm),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = spacing.sm),
                     horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                 ) {
-                    items(pickableCardNames, key = { it }) { name ->
+                    items(pickableCardNames, key = {it}) {name->
                         val card = cardsByPickableName[name]
                         if (card != null) {
                             com.mmg.manahub.feature.decks.presentation.components.PickableSynergyCardTile(
                                 card = card,
                                 isSelected = name in selectedCardNames,
                                 rootCoordinates = rootCoordinates,
-                                onToggleSelect = { onToggleSearchCard(name) },
+                                onToggleSelect = {onToggleSearchCard(name)},
                                 onZoom = onCardTap,
                             )
                         } else {
@@ -2185,7 +2350,7 @@ private fun StrategiesTabContent(
                             // keep a text chip so an unresolved name never silently vanishes.
                             MagicFilterChip(
                                 selected = name in selectedCardNames,
-                                onClick = { onToggleSearchCard(name) },
+                                onClick = {onToggleSearchCard(name)},
                                 label = name,
                             )
                         }
@@ -2197,16 +2362,21 @@ private fun StrategiesTabContent(
             // so it never duplicates the full unfiltered pool.
             if (matchingCards.isNotEmpty()) {
                 Text(
-                    text = stringResource(R.string.deck_studio_inspirations_matching_cards, matchingCards.size),
+                    text = stringResource(
+                        R.string.deck_studio_inspirations_matching_cards,
+                        matchingCards.size
+                    ),
                     style = ty.labelMedium,
                     color = mc.textSecondary,
                     modifier = Modifier.padding(bottom = spacing.xs),
                 )
                 LazyRow(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = spacing.sm),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = spacing.sm),
                     horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                 ) {
-                    items(matchingCards.take(20), key = { "match_${it.scryfallId}" }) { card ->
+                    items(matchingCards.take(20), key = {"match_${it.scryfallId}"}) {card->
                         SynergyCardTile(
                             card = card,
                             rootCoordinates = rootCoordinates,
@@ -2221,16 +2391,19 @@ private fun StrategiesTabContent(
             isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 MagicLoadingSpinner()
             }
+
             discoveries.isEmpty() -> EmptyState(
                 title = stringResource(R.string.deck_studio_inspirations_empty_title),
                 subtitle = stringResource(R.string.deck_studio_inspirations_empty_subtitle),
                 icon = Icons.Default.AutoAwesome,
             )
+
             filteredDiscoveries.isEmpty() -> EmptyState(
                 title = stringResource(R.string.deck_studio_inspirations_search_empty_title),
                 subtitle = stringResource(R.string.deck_studio_inspirations_search_empty_subtitle),
                 icon = Icons.Default.Search,
             )
+
             else -> {
                 // Deck Wizard & Engine Rework plan (WS 1.3, plan §0 F1): Strategy and Tribe are
                 // disjoint taxonomy axes -- they used to render as ONE mixed labeled list here
@@ -2254,12 +2427,12 @@ private fun StrategiesTabContent(
                         }
                         // Keyed by the cluster's own stable identity (tag key) -- distinct from the
                         // legacy MagicDiscovery key shape (no primaryTag on this model).
-                        items(strategyDiscoveries.take(20), key = { it.key.stableKey() }) { discovery ->
+                        items(strategyDiscoveries.take(20), key = {it.key.stableKey()}) {discovery->
                             com.mmg.manahub.feature.decks.presentation.components.DiscoveryRowV2(
                                 discovery = discovery,
                                 rootCoordinates = rootCoordinates,
                                 onCardTap = onCardTap,
-                                onBuildThis = { onBuildThis(discovery) },
+                                onBuildThis = {onBuildThis(discovery)},
                             )
                         }
                     }
@@ -2272,12 +2445,12 @@ private fun StrategiesTabContent(
                                 modifier = Modifier.padding(top = if (strategyDiscoveries.isNotEmpty()) spacing.sm else 0.dp),
                             )
                         }
-                        items(tribeDiscoveries.take(20), key = { it.key.stableKey() }) { discovery ->
+                        items(tribeDiscoveries.take(20), key = {it.key.stableKey()}) {discovery->
                             com.mmg.manahub.feature.decks.presentation.components.DiscoveryRowV2(
                                 discovery = discovery,
                                 rootCoordinates = rootCoordinates,
                                 onCardTap = onCardTap,
-                                onBuildThis = { onBuildThis(discovery) },
+                                onBuildThis = {onBuildThis(discovery)},
                             )
                         }
                     }
@@ -2313,14 +2486,17 @@ private fun CombosTabContent(
         isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             MagicLoadingSpinner()
         }
+
         comboResult == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             MagicLoadingSpinner()
         }
+
         comboResult.complete.isEmpty() && comboResult.almostThere.isEmpty() -> EmptyState(
             title = stringResource(R.string.deck_studio_combos_empty_title),
             subtitle = stringResource(R.string.deck_studio_combos_empty_subtitle),
             icon = Icons.Default.AutoAwesome,
         )
+
         else -> LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = rememberLazyListState(),
@@ -2330,17 +2506,20 @@ private fun CombosTabContent(
             if (comboResult.complete.isNotEmpty()) {
                 item(key = "combos_complete_header") {
                     Text(
-                        text = stringResource(R.string.deck_studio_combos_complete_header, comboResult.complete.size),
+                        text = stringResource(
+                            R.string.deck_studio_combos_complete_header,
+                            comboResult.complete.size
+                        ),
                         style = MaterialTheme.magicTypography.labelLarge,
                         color = mc.textSecondary,
                     )
                 }
-                items(comboResult.complete, key = { "combo_${it.id}" }) { combo ->
+                items(comboResult.complete, key = {"combo_${it.id}"}) {combo->
                     com.mmg.manahub.feature.decks.presentation.components.ComboRow(
                         combo = combo,
                         cardsByName = cardsByName,
                         onCardClick = onCardClick,
-                        onUseAsSeed = { onUseComboAsSeed(combo.cardNames) },
+                        onUseAsSeed = {onUseComboAsSeed(combo.cardNames)},
                         sharedTransitionScope = sharedTransitionScope,
                         animatedVisibilityScope = animatedVisibilityScope,
                     )
@@ -2349,18 +2528,21 @@ private fun CombosTabContent(
             if (comboResult.almostThere.isNotEmpty()) {
                 item(key = "combos_almost_header") {
                     Text(
-                        text = stringResource(R.string.deck_studio_combos_almost_header, comboResult.almostThere.size),
+                        text = stringResource(
+                            R.string.deck_studio_combos_almost_header,
+                            comboResult.almostThere.size
+                        ),
                         style = MaterialTheme.magicTypography.labelLarge,
                         color = mc.textSecondary,
                         modifier = Modifier.padding(top = spacing.sm),
                     )
                 }
-                items(comboResult.almostThere, key = { "almost_${it.id}" }) { almost ->
+                items(comboResult.almostThere, key = {"almost_${it.id}"}) {almost->
                     com.mmg.manahub.feature.decks.presentation.components.AlmostComboRow(
                         almostCombo = almost,
                         cardsByName = cardsByName,
                         onCardClick = onCardClick,
-                        onUseAsSeed = { onUseComboAsSeed(almost.ownedCardNames + almost.missingCardName) },
+                        onUseAsSeed = {onUseComboAsSeed(almost.ownedCardNames + almost.missingCardName)},
                         sharedTransitionScope = sharedTransitionScope,
                         animatedVisibilityScope = animatedVisibilityScope,
                     )
@@ -2370,10 +2552,11 @@ private fun CombosTabContent(
     }
 }
 
-private fun com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.stableKey(): String = when (this) {
-    is com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.Strategy -> "strategy_${tag.key}"
-    is com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.Tribe -> "tribe_$tribeKey"
-}
+private fun com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.stableKey(): String =
+    when (this) {
+        is com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.Strategy -> "strategy_${tag.key}"
+        is com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.Tribe -> "tribe_$tribeKey"
+    }
 
 /**
  * The Suggestions surface (Deck Doctor inline, Phase 1/2): a Health summary, the Cut list, and
@@ -2416,7 +2599,7 @@ private fun DoctorStagedProgressContent(
                 verticalArrangement = Arrangement.spacedBy(spacing.xs),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                completedStages.forEach { done ->
+                completedStages.forEach {done->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(spacing.xs),
@@ -2443,19 +2626,18 @@ private fun DoctorStagedProgressContent(
  * entry to a single `$key<sep>$value` string (<sep> = a literal U+0001 control character,
  * which cannot appear in a section/pillar id) and restores by splitting on the LAST such separator.
  */
-private val CollapsedCategorySectionsSaver: Saver<SnapshotStateMap<String, Boolean>, List<String>> = Saver(
-    save = { map -> map.map { (key, value) -> "$key\u0001$value" } },
-    restore = { encoded ->
+private val CollapsedCategorySectionsSaver: Saver<SnapshotStateMap<String, Boolean>, List<String>> =
+    Saver(save = {map-> map.map {(key, value)-> "$key\u0001$value"}}, restore = {encoded->
         mutableStateMapOf<String, Boolean>().apply {
-            encoded.forEach { entry ->
+            encoded.forEach {entry->
                 val separatorIndex = entry.lastIndexOf('\u0001')
                 if (separatorIndex >= 0) {
-                    this[entry.substring(0, separatorIndex)] = entry.substring(separatorIndex + 1).toBoolean()
+                    this[entry.substring(0, separatorIndex)] =
+                        entry.substring(separatorIndex + 1).toBoolean()
                 }
             }
         }
-    }
-)
+    })
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -2463,9 +2645,6 @@ private fun SuggestionsTab(
     uiState: DeckStudioUiState,
     onApplyCuratedStrategy: (CuratedStrategy, String?) -> Unit,
     onAutoDetectArchetypePlan: () -> Unit,
-    // Deck Engine Unification (D4) — explicit "Unlock strategy" action, gated behind a confirmation
-    // dialog owned by this composable (see the `strategyLocked` banner below).
-    onUnlockStrategy: () -> Unit = {},
     // "Decks like yours" (Motor B / Deck Doctor Community/Archetype plan, Phase 4) -- independent
     // of the deleted Motor A/B "Adds"/"Cuts" suggestion engine (D3/D5, Deck Analysis Category
     // Sections rework plan, W0).
@@ -2482,15 +2661,25 @@ private fun SuggestionsTab(
     // Color identity + format + dominant tribe for SectionSearchQuery.fragmentFor/buildFor --
     // computed once per composition by the caller (DeckStudioViewModel.sectionQueryContext), not
     // re-derived here (this composable stays a pure renderer over already-shaped state).
-    sectionQueryContext: SectionQueryContext = SectionQueryContext(emptySet(), DeckFormat.COMMANDER, null),
+    sectionQueryContext: SectionQueryContext = SectionQueryContext(
+        emptySet(),
+        DeckFormat.COMMANDER,
+        null
+    ),
     // Opens the SAME CardSearchSheet the Build tab's FAB uses, pre-searched for this section
-    // (SectionSearchQuery.buildFor/collectionTagKeysFor) -- wired by the caller since the sheet
+    // (SectionSearchQuery.buildFor / SectionMembership.predicate) -- wired by the caller since the sheet
     // itself lives at the DeckStudioScreen level, outside this tab's own composition. The PillarId
     // param (W8 telemetry) is the expanded pillar this section belongs to -- not derivable from
     // CardSection alone, so it's passed alongside rather than looked up again by the caller.
-    onBrowseSection: (CardSection, PillarId) -> Unit = { _, _ -> },
+    onBrowseSection: (CardSection, PillarId) -> Unit = {_, _->},
     // Forwarded to every CardSectionRow's onUnresolvedContributions.
-    onUnresolvedSection: (String, Int) -> Unit = { _, _ -> },
+    onUnresolvedSection: (String, Int) -> Unit = {_, _->},
+    // Deck Wizard UX polish plan, Run 1 §1.6: kicks off DeckStudioViewModel.scoreStrategyMatches()
+    // the moment the "Deck plan" sheet opens (either entry point below) -- the VM owns caching/
+    // cancellation, this tab only forwards the open signal and renders whatever score map it publishes.
+    onOpenStrategySheet: () -> Unit = {},
+    strategyMatchScores: Map<String, Int> = emptyMap(),
+    isScoringStrategyMatches: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
 
@@ -2501,7 +2690,7 @@ private fun SuggestionsTab(
     // uiState.cards excludes the commander mainboard slot -- resolve against commander + mainboard
     // so a section the commander itself fills isn't shown as empty.
     val cardById = remember(uiState.cards, uiState.commanderCard) {
-        (uiState.cards + listOfNotNull(uiState.commanderCard)).associateBy { it.scryfallId }
+        (uiState.cards + listOfNotNull(uiState.commanderCard)).associateBy {it.scryfallId}
     }
 
     // Deck Wizard & Engine Rework plan, Workstream 8.4: the FULL analysis pass (loadAnalysis) is
@@ -2513,7 +2702,10 @@ private fun SuggestionsTab(
     // `uiState.communityEngineEnabled && uiState.similarDecks.isNotEmpty()` further down, so a
     // slow/absent community fetch never delays revealing the rest of the tab.
     if (uiState.doctorStage != null) {
-        DoctorStagedProgressContent(stage = uiState.doctorStage, completedStages = uiState.doctorCompletedStages)
+        DoctorStagedProgressContent(
+            stage = uiState.doctorStage,
+            completedStages = uiState.doctorCompletedStages
+        )
         return
     }
     // Defensive fallback for the (should-be-impossible-in-practice) window before the FIRST
@@ -2527,7 +2719,12 @@ private fun SuggestionsTab(
 
     val health = uiState.health
     if (health == null) {
-        Box(Modifier.fillMaxSize().padding(MaterialTheme.spacing.xl), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(MaterialTheme.spacing.xl),
+            contentAlignment = Alignment.Center
+        ) {
             EmptyState(
                 title = stringResource(R.string.deck_studio_suggestions_coming_soon_title),
                 subtitle = stringResource(R.string.deck_studio_suggestions_coming_soon_subtitle),
@@ -2557,14 +2754,13 @@ private fun SuggestionsTab(
     // score/roleCoverage/warnings) is no longer read anywhere in this composable.
     val analysis = health.analysis
     val spacing = MaterialTheme.spacing
-    var showStrategySheet by remember { mutableStateOf(false) }
+    var showStrategySheet by remember {mutableStateOf(false)}
     // Deck Analysis Engine v2 Phase 4 (telemetry): disambiguates a genuine picker abandon (swipe/
     // backdrop tap with no pick) from the sheet's own internal dismiss that immediately follows a
     // successful apply/auto-detect (same onDismissRequest/onDismiss callback fires for both) --
     // reset to false every time the sheet is (re)opened, flipped true inside the onApply/onAutoDetect
     // wrappers below BEFORE delegating to the real handlers.
-    var strategyPicked by remember { mutableStateOf(false) }
-    var showUnlockConfirmDialog by remember { mutableStateOf(false) }
+    var strategyPicked by remember {mutableStateOf(false)}
     // Which single pillar tile is expanded (plan §3.4 item 3) -- Plan roles starts expanded by
     // default (plan §3.4 item 4: "always expanded by default"), tapping any tile (including the
     // already-expanded one, to collapse it) reassigns this.
@@ -2575,14 +2771,7 @@ private fun SuggestionsTab(
     // recreating this composition on the pop and silently resetting the expand state to defaults.
     // `PillarId?` is a nullable enum, natively Bundle-Saveable (Kotlin enums compile to Java
     // enums, which implement Serializable) -- no custom Saver needed.
-    var expandedPillar by rememberSaveable { mutableStateOf<PillarId?>(PillarId.PLAN_ROLES) }
-    // Deck Analysis Engine v3, Phase 5 (UI) -- the "Archetype signal" card's own collapse state
-    // (macro/posture/themes + confidence are always visible; the full 5-way resemblance profile is
-    // the part that starts folded, mirroring every other collapsible detail on this tab).
-    //
-    // Edge-case QA fix (MEDIUM, 2026-09-06): `rememberSaveable` -- same nav-round-trip reason as
-    // `expandedPillar` above; `Boolean` is natively Saveable.
-    var archetypeDetailExpanded by rememberSaveable { mutableStateOf(false) }
+    var expandedPillar by rememberSaveable {mutableStateOf<PillarId?>(PillarId.PLAN_ROLES)}
     // Suggestions Tab UI Polish plan (W1/D2): per-category-section collapse state, keyed by a
     // composite "${pillarId}:${section.id}" string -- mirrors CollectionScreen.kt's
     // CollectionGroupHeader/collapsedSections pattern exactly. A composite key (not just
@@ -2592,12 +2781,8 @@ private fun SuggestionsTab(
     // same nav-round-trip reason as `expandedPillar`/`archetypeDetailExpanded` above, but
     // `SnapshotStateMap<String, Boolean>` has no default Saver, so [CollapsedCategorySectionsSaver]
     // (file-level, below) flattens it to a `key<sep>value`-encoded `List<String>` and back.
-    val collapsedCategorySections = rememberSaveable(saver = CollapsedCategorySectionsSaver) { mutableStateMapOf() }
-    // Deck Engine Unification (D4): the deck's own persisted flag (Deck.strategyLocked), not the
-    // orchestrator's own async-loaded DeckDoctorState.strategyLocked -- uiState.deck is always
-    // current (observed live), so the "Deck plan" editor gate can never lag one analysis cycle
-    // behind a fresh wizard build or a just-completed unlock.
-    val strategyLocked = uiState.deck?.strategyLocked == true
+    val collapsedCategorySections =
+        rememberSaveable(saver = CollapsedCategorySectionsSaver) {mutableStateMapOf()}
 
     // Deck Analysis Engine v2 Phase 3: tribe candidates for CuratedStrategyPickerSheet's
     // requiresTribe sub-step -- derived from the LIVE deck's own tag fingerprint (already computed
@@ -2606,26 +2791,23 @@ private fun SuggestionsTab(
     // EDHREC fetch this analysis-only picker has no reason to pull in). Capitalized-only labels
     // ("Elf", not "Elves") mirror that same use case's own `displayLabel` precedent.
     val availableTribes = remember(health.profile) {
-        health.profile.tagFingerprint.keys
-            .filter { it.startsWith(TribeDeriver.TRIBE_PREFIX) }
-            .sortedByDescending { health.profile.tagFingerprint[it] ?: 0f }
-            .map { fingerprintKey ->
+        health.profile.tagFingerprint.keys.filter {it.startsWith(TribeDeriver.TRIBE_PREFIX)}
+            .sortedByDescending {health.profile.tagFingerprint[it] ?: 0f}.map {fingerprintKey->
                 TribeOption(
                     key = fingerprintKey,
-                    label = fingerprintKey.removePrefix(TribeDeriver.TRIBE_PREFIX).replaceFirstChar { it.uppercase() },
+                    label = fingerprintKey.removePrefix(TribeDeriver.TRIBE_PREFIX)
+                        .replaceFirstChar {it.uppercase()},
                 )
             }
     }
 
-    // Deck Engine Unification (D4): the "Deck plan" editor sheet is only reachable while unlocked
-    // -- showStrategySheet can only ever flip true from the (now-hidden) chip's onClick below, but
-    // this guard is defensive against a stray state carried across a locked->unlocked transition.
-    if (showStrategySheet && !strategyLocked) {
+    if (showStrategySheet) {
         val strategySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         // Deck Analysis Engine v2 Phase 4 (telemetry): a genuine abandon (swipe/backdrop tap without
         // picking anything) -- see `strategyPicked`'s own KDoc above for why this needs the flag.
         val onStrategySheetDismiss = {
-            if (!strategyPicked) FirebaseCrashlytics.getInstance().log("deck_analysis_picker_abandoned")
+            if (!strategyPicked) FirebaseCrashlytics.getInstance()
+                .log("deck_analysis_picker_abandoned")
             showStrategySheet = false
         }
         ModalBottomSheet(
@@ -2635,36 +2817,29 @@ private fun SuggestionsTab(
             containerColor = mc.background,
         ) {
             CuratedStrategyPickerSheet(
-                currentFormat = uiState.deck?.format
-                    ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
-                    ?: DeckFormat.COMMANDER,
+                currentFormat = uiState.deck?.format?.let {fmt->
+                        DeckFormat.entries.firstOrNull {
+                            it.name.equals(
+                                fmt,
+                                ignoreCase = true
+                            )
+                        }
+                    } ?: DeckFormat.COMMANDER,
                 selectedStrategyId = analysis?.strategy?.curatedStrategyId,
                 availableTribes = availableTribes,
-                onApply = { strategy, tribe -> strategyPicked = true; onApplyCuratedStrategy(strategy, tribe) },
-                onAutoDetect = { strategyPicked = true; onAutoDetectArchetypePlan() },
+                onApply = {strategy, tribe->
+                    strategyPicked = true; onApplyCuratedStrategy(
+                    strategy,
+                    tribe
+                )
+                },
+                onAutoDetect = {strategyPicked = true; onAutoDetectArchetypePlan()},
                 onDismiss = onStrategySheetDismiss,
                 currentStrategyName = analysis?.strategy?.displayName,
+                strategyMatchScores = strategyMatchScores,
+                isScoringStrategyMatches = isScoringStrategyMatches,
             )
         }
-    }
-
-    if (showUnlockConfirmDialog) {
-        MagicAlertDialog(
-            onDismissRequest = { showUnlockConfirmDialog = false },
-            title = stringResource(R.string.deck_studio_unlock_strategy_confirm_title),
-            text = stringResource(R.string.deck_studio_unlock_strategy_confirm_body),
-            confirmLabel = stringResource(R.string.deck_studio_unlock_strategy_confirm_action),
-            onConfirm = {
-                showUnlockConfirmDialog = false
-                onUnlockStrategy()
-            },
-            dismissLabel = stringResource(R.string.action_cancel),
-            onDismiss = {
-                FirebaseCrashlytics.getInstance().log("deck_studio_unlock_strategy_declined")
-                showUnlockConfirmDialog = false
-            },
-            confirmColor = MagicCtaColor.Error
-        )
     }
 
     LazyColumn(
@@ -2673,40 +2848,28 @@ private fun SuggestionsTab(
         contentPadding = PaddingValues(spacing.lg),
         verticalArrangement = Arrangement.spacedBy(spacing.md),
     ) {
-        // ── Strategy plan chip (plan §3.4 item 1-2) — hidden while strategyLocked (D4): editing
-        // the deck plan on a wizard-built deck would contradict the strategy it was built for. A
-        // dedicated banner (below) explains why and offers the explicit unlock action instead. ──
-        if (strategyLocked) {
-            item(key = "strategy_locked_banner") {
-                StrategyLockedBanner(onUnlockClick = {
-                    FirebaseCrashlytics.getInstance().log("deck_studio_unlock_strategy_dialog_shown")
-                    showUnlockConfirmDialog = true
-                })
-            }
-        } else if (analysis != null) {
+        // ── Strategy plan chip (plan §3.4 item 1-2) — always shown and tappable (Deck Wizard UX
+        // polish plan, Run 1 §1.4 removed the strategy-lock gate). ─────────────────────────────
+        if (analysis != null) {
             item(key = "strategy_plan_chip") {
-                StrategyPlanChip(strategy = analysis.strategy, onClick = { showStrategySheet = true })
+                // Deck Wizard UX polish plan, Run 1 §1.6: the raw inferred archetype signal
+                // (macro/hybrid label + posture) is folded into the chip's own second line
+                // instead of a separate "Archetype signal" card -- reads health.archetypeResolution
+                // directly (not analysis.strategy) since resemblance/hybrid-label data isn't
+                // threaded through ResolvedStrategyInfo, see ArchetypeResolution.planLabel's own KDoc.
+                StrategyPlanChip(
+                    strategy = analysis.strategy,
+                    archetypeResolution = health.archetypeResolution,
+                    onClick = {showStrategySheet = true; onOpenStrategySheet()},
+                )
             }
             // No confident curated match AND still auto-detected (v2's "Custom"/no-match sentinel,
             // CuratedStrategyCatalog.nearestFor) — mirrors the retired ArchetypePlanHint's own
             // "GENERIC + no themes + not manual" gate, translated onto the v2 strategy shape.
             if (!analysis.strategy.isManualOverride && analysis.strategy.curatedStrategyId == null) {
                 item(key = "strategy_plan_hint") {
-                    StrategyPlanHint(onClick = { showStrategySheet = true })
+                    StrategyPlanHint(onClick = {showStrategySheet = true; onOpenStrategySheet()})
                 }
-            }
-            // Deck Analysis Engine v3, Phase 5 (UI) -- the raw inferred archetype signal
-            // (macro/posture/themes/confidence + the full resemblance profile), independent of
-            // the CURATED strategy match the chip above shows. Reads health.archetypeResolution
-            // directly (not analysis.strategy) -- resemblance/hybrid-label data isn't threaded
-            // through ResolvedStrategyInfo, see ArchetypeResolution.planLabel's own KDoc.
-            item(key = "archetype_resemblance_card") {
-                ArchetypeResemblanceCard(
-                    resolution = health.archetypeResolution,
-                    expanded = archetypeDetailExpanded,
-                    onToggleExpanded = { archetypeDetailExpanded = !archetypeDetailExpanded },
-                    modifier = Modifier.animateItem(),
-                )
             }
         }
 
@@ -2733,7 +2896,7 @@ private fun SuggestionsTab(
                 item(key = "analysis_score_limiter_hint") {
                     ScoreLimiterHint(
                         limiter = analysis.limiter,
-                        onExpandPillar = { pillarId -> expandedPillar = pillarId },
+                        onExpandPillar = {pillarId-> expandedPillar = pillarId},
                         modifier = Modifier.animateItem()
                     )
                 }
@@ -2746,18 +2909,21 @@ private fun SuggestionsTab(
                         .animateItem(),
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                 ) {
-                    analysis.pillars.forEach { pillar ->
+                    analysis.pillars.forEach {pillar->
                         PillarTile(
                             pillar = pillar,
                             expanded = expandedPillar == pillar.id,
-                            onClick = { expandedPillar = if (expandedPillar == pillar.id) null else pillar.id },
+                            onClick = {
+                                expandedPillar =
+                                    if (expandedPillar == pillar.id) null else pillar.id
+                            },
                             modifier = Modifier.weight(1f),
                         )
                     }
                 }
             }
 
-            val expanded = analysis.pillars.firstOrNull { it.id == expandedPillar }
+            val expanded = analysis.pillars.firstOrNull {it.id == expandedPillar}
             if (expanded != null) {
                 item(key = "analysis_pillar_detail_header") {
                     Column(modifier = Modifier.animateItem()) {
@@ -2797,10 +2963,12 @@ private fun SuggestionsTab(
                             engines = expanded.synergyEngines,
                             sections = expanded.sections,
                             notApplicable = expanded.notApplicable,
-                            resolveCard = { id -> cardById[id]?.card },
+                            resolveCard = {id-> cardById[id]?.card},
                             onCardClick = onCardClick,
-                            onBrowseSection = { section -> onBrowseSection(section, expanded.id) },
-                            modifier = Modifier.padding(top = spacing.xs, bottom = spacing.md).animateItem(),
+                            onBrowseSection = {section-> onBrowseSection(section, expanded.id)},
+                            modifier = Modifier
+                                .padding(top = spacing.xs, bottom = spacing.md)
+                                .animateItem(),
                         )
                     }
                 }
@@ -2820,12 +2988,14 @@ private fun SuggestionsTab(
                 // SYNERGY's engine:<axis>:producers/payoffs sections are rendered above as paired
                 // engine cards, not a second time here.
                 val genericSections = if (expanded.id == PillarId.SYNERGY) {
-                    expanded.sections.filterNot { it.id.startsWith("engine:") }
+                    expanded.sections.filterNot {it.id.startsWith("engine:")}
                 } else {
                     expanded.sections
                 }
                 if (genericSections.isNotEmpty()) {
-                    items(genericSections, key = { "pillar_section_${expanded.id}_${it.id}" }) { section ->
+                    items(
+                        genericSections,
+                        key = {"pillar_section_${expanded.id}_${it.id}"}) {section->
                         val sectionKey = "${expanded.id}:${section.id}"
                         if (collapsedCategorySections[sectionKey] != true) {
                             val browseFragment = remember(section.id, sectionQueryContext) {
@@ -2836,28 +3006,39 @@ private fun SuggestionsTab(
                                 // CardSection/CardContribution carry only ids/primitives by design
                                 // (never a Card object) -- resolve against the already-loaded deck
                                 // slots, never a fresh fetch.
-                                resolveCard = { id -> cardById[id]?.card },
+                                resolveCard = {id-> cardById[id]?.card},
                                 onCardClick = onCardClick,
-                                onBrowse = browseFragment?.let { { onBrowseSection(section, expanded.id) } },
+                                onBrowse = browseFragment?.let {
+                                    {
+                                        onBrowseSection(
+                                            section,
+                                            expanded.id
+                                        )
+                                    }
+                                },
                                 expanded = true, // CardSectionRow content is visible since we aren't collapsed in the LazyColumn
                                 onToggleExpanded = {
                                     collapsedCategorySections[sectionKey] = true
                                 },
-                                modifier = Modifier.padding(vertical = spacing.xs).animateItem(),
+                                modifier = Modifier
+                                    .padding(vertical = spacing.xs)
+                                    .animateItem(),
                                 onUnresolvedContributions = onUnresolvedSection,
                             )
                         } else {
                             // If collapsed, only show the header
                             CardSectionRow(
                                 section = section,
-                                resolveCard = { null },
+                                resolveCard = {null},
                                 onCardClick = {},
                                 onBrowse = null,
                                 expanded = false,
                                 onToggleExpanded = {
                                     collapsedCategorySections[sectionKey] = false
                                 },
-                                modifier = Modifier.padding(vertical = spacing.xs).animateItem(),
+                                modifier = Modifier
+                                    .padding(vertical = spacing.xs)
+                                    .animateItem(),
                             )
                         }
                     }
@@ -2895,14 +3076,14 @@ private fun SuggestionsTab(
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                 ) {
-                    items(uiState.similarDecks, key = { "similar_${it.archidektId}" }) { result ->
+                    items(uiState.similarDecks, key = {"similar_${it.archidektId}"}) {result->
                         // Suggestions Tab UI Polish plan (W10, D7): swapped the bespoke
                         // SimilarDeckCard for the shared DeckItem component -- the SAME one
                         // HomeWidgets.kt's CommunityDecksWidget already uses for community decks,
                         // for visual consistency between the two surfaces.
                         DeckItem(
                             deck = result.toDeckSummary(),
-                            onClick = { onOpenSimilarDeck(result.archidektId) },
+                            onClick = {onOpenSimilarDeck(result.archidektId)},
                             reduced = true,
                             ownerName = result.ownerUsername,
                             cardBackPainter = painterResource(Res.drawable.mtg_card_back),
@@ -2915,45 +3096,9 @@ private fun SuggestionsTab(
     }
 }
 
-/**
- * Deck Engine Unification (D4): shown INSTEAD of the "Deck plan" chip while `Deck.strategyLocked`
- * -- explains why editing is unavailable and offers the explicit unlock action (behind a
- * confirmation dialog, owned by the caller). Never a silent hide with no explanation.
- */
-@Composable
-private fun StrategyLockedBanner(onUnlockClick: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    Surface(shape = CardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(spacing.lg), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-            Text(
-                text = stringResource(R.string.deck_studio_strategy_locked_title),
-                style = ty.titleMedium,
-                color = mc.textPrimary,
-            )
-            Text(
-                text = stringResource(R.string.deck_studio_strategy_locked_body),
-                style = ty.bodySmall,
-                color = mc.textSecondary,
-            )
-            OutlinedButton(
-                onClick = onUnlockClick,
-                shape = ChipShape,
-                border = BorderStroke(1.dp, mc.textSecondary),
-                modifier = Modifier.heightIn(min = 48.dp),
-            ) {
-                Text(stringResource(R.string.deck_studio_strategy_locked_unlock_action), color = mc.textPrimary)
-            }
-        }
-    }
-}
-
 @Composable
 private fun SuggestionsSectionHeader(
-    text: String,
-    color: androidx.compose.ui.graphics.Color,
-    icon: (@Composable () -> Unit)? = null
+    text: String, color: androidx.compose.ui.graphics.Color, icon: (@Composable () -> Unit)? = null
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (icon != null) {

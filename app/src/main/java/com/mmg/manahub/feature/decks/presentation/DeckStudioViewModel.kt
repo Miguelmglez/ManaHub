@@ -36,22 +36,26 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
+import com.mmg.manahub.feature.decks.domain.engine.BasicLandPlanner
 import com.mmg.manahub.feature.decks.domain.engine.CategoryVocabulary
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
+import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
-import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.LandTargetResolver
 import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
+import com.mmg.manahub.feature.decks.domain.engine.SectionMembership
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.PostureId
 import com.mmg.manahub.feature.decks.domain.engine.SectionQueryContext
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
+import com.mmg.manahub.feature.decks.domain.engine.availableIn
 import com.mmg.manahub.feature.decks.domain.engine.toPin
 import com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorEvent
 import com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorOrchestrator
 import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
+import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import com.mmg.manahub.feature.decks.domain.usecase.BoardValue
 import com.mmg.manahub.feature.decks.domain.usecase.CalculateDeckValueSummaryUseCase
@@ -71,6 +75,7 @@ import com.mmg.manahub.feature.decks.domain.model.ComboResult
 import com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -186,23 +191,35 @@ data class DeckStudioUiState(
      */
     val activeStructuredSearchFragment: String? = null,
     /**
-     * Edge-case QA fix (MEDIUM, 2026-09-06): the Collection-tab counterpart of
-     * [activeStructuredSearchFragment] -- the [com.mmg.manahub.core.model.CardTag] key set from
-     * the Analysis tab's "Browse for X" entry point (via [searchCollectionByTags]), kept SEPARATE
-     * from [addCardsQuery] for the exact same reason as the Scryfall fragment. Non-null only while
-     * a tag-filtered Collection-tab session is active; [onAddCardsQueryChange] ANDs it onto every
-     * subsequent keystroke instead of overwriting it (the pre-fix bug: typing after a tag-filtered
-     * Browse-for-X search silently dropped back to a plain name-only filter over the WHOLE
-     * collection). Reset at the same sites [activeStructuredSearchFragment] is.
+     * Edge-case QA fix (MEDIUM, 2026-09-06): non-null only while a section-driven Collection-tab
+     * browse session is active (via [searchCollectionByTags]), kept SEPARATE from [addCardsQuery]
+     * for the exact same reason as the Scryfall fragment. Deck Wizard UX polish plan, Run 1 §1.2:
+     * [searchCollectionByTags] keeps [CardSearchSheet][com.mmg.manahub.core.ui.components.CardSearchSheet]'s
+     * `onFilterCollectionByTags(Set<String>) -> Unit` shape, but the set it receives now carries the
+     * originating `CardSection.id` itself (never real `CardTag` keys) — this field is a passthrough
+     * of that raw value, kept for parity with the sheet's own param naming; [activeSectionPredicate]
+     * (derived from the SAME section id) is what [collectionCardsMatching] actually filters by.
      */
     val activeCollectionTagFilter: Set<String>? = null,
     /**
+     * Deck Wizard UX polish plan, Run 1 §1.2: the [SectionMembership.predicate] derived from the
+     * Analysis tab's "Browse for X" section id (or the wizard's PLAN_SECTIONS equivalent) — the
+     * SAME per-card membership test [AnalysisEngine] itself attributed that section's contributions
+     * from. Replaces the old oracle-text/tag-key OR-approximation
+     * (`StructuredCardSearch.matchesForCategoryBrowse`, ADR-009's known gap): while non-null, the
+     * Collection tab is `predicate && name filter` ONLY (never ANDed with [activeCollectionQuery]
+     * too — that field still drives the All Cards/Scryfall tab's remote query unchanged). `null`
+     * for the generic Advanced Search sheet path, which keeps filtering the Collection tab via
+     * [activeCollectionQuery] instead. Reset at the same sites [activeCollectionTagFilter] is.
+     */
+    val activeSectionPredicate: ((Card) -> Boolean)? = null,
+    /**
      * The Analysis tab's "Browse for X" structured query, evaluated LOCALLY (leniently) against the
      * collection so the Collection tab is filtered by the same criteria
-     * [activeStructuredSearchFragment] sends to Scryfall for the All Cards tab. Complements — never
-     * replaces — [activeCollectionTagFilter]: the two operate on different key spaces (structured
-     * search criteria vs. internal `CardTag` keys, see `feature/decks/CLAUDE.md`), and many sections
-     * (curve / mana / legality) have no tag keys at all. Reset at the same sites as the other two.
+     * [activeStructuredSearchFragment] sends to Scryfall for the All Cards tab, whenever
+     * [activeSectionPredicate] is `null` (the generic Advanced Search path — many sections have no
+     * card-level membership predicate at all, e.g. curve/legality). Reset at the same sites as the
+     * other two.
      */
     val activeCollectionQuery: AdvancedSearchQuery? = null,
 
@@ -311,6 +328,15 @@ data class DeckStudioUiState(
     // ── Import (Group B) ──────────────────────────────────────────────────────
     /** True while a pasted deck list is being resolved + written into the live draft. */
     val isImporting: Boolean = false,
+
+    // ── Strategy match preview (Deck Wizard UX polish plan, Run 1 §1.6) ───────────
+    /** `CuratedStrategy.id` -> [scoreStrategyMatches]'s `DeckAnalysisPipeline`-computed score
+     * (0-100) for pinning this deck to that strategy — published incrementally as each entry
+     * resolves. An entry absent here is either still scoring ([isScoringStrategyMatches]) or a
+     * `requiresTribe` entry the deck has no dominant tribe for (never scored, never a fake 0%). */
+    val strategyMatchScores: Map<String, Int> = emptyMap(),
+    /** True while a [scoreStrategyMatches] pass is in flight. */
+    val isScoringStrategyMatches: Boolean = false,
 ) {
     val isEmptyDeck: Boolean get() = cards.isEmpty() && commanderCard == null
 }
@@ -373,12 +399,6 @@ class DeckStudioViewModel(
     // existing test call site needs to change; null means the Combos tab always degrades to an
     // empty result (never a crash -- mirrors every other optional community-data dependency here).
     private val findCombosUseCase: FindCombosUseCase? = null,
-    // Deck Wizard & Engine Rework plan, Workstream 6 ("One land engine") -- appended last,
-    // nullable/defaulted so no existing test call site needs to change. `deckScorer == null` (every
-    // test call site that doesn't pass it) means calculateLandDeltas falls back to EXACTLY the
-    // pre-WS6 behavior (format.targetLandCount-based BasicLandCalculator.calculate) -- never a
-    // crash, never a silently wrong number. See calculateLandDeltas'/resolveStudioLandTarget's KDoc.
-    private val deckScorer: DeckScorer? = null,
     private val manaBaseAnalyzer: ManaBaseAnalyzer = ManaBaseAnalyzer(),
     // Suggestions Tab UI Polish plan (W11 bug-fix pass, 2026-08-25) -- appended last,
     // nullable-defaulted so no existing test call site needs to change. Builds the raw Scryfall
@@ -389,6 +409,11 @@ class DeckStudioViewModel(
     private val buildScryfallQueryUseCase: BuildScryfallQueryUseCase? = null,
     private val calculateDeckValueSummaryUseCase: CalculateDeckValueSummaryUseCase =
         CalculateDeckValueSummaryUseCase(),
+    // Deck Wizard UX polish plan, Run 1 §1.6 -- appended last, nullable-defaulted so no existing
+    // test call site needs to change. The SAME DeckAnalysisPipeline singleton DecksKoinModule wires
+    // into DeckDoctorOrchestrator/BuildWizardDeckUseCase (never a second instance); `null` means
+    // scoreStrategyMatches() is a no-op (every test call site that doesn't pass it).
+    private val deckAnalysisPipeline: DeckAnalysisPipeline? = null,
 ) : ViewModel() {
 
     /**
@@ -806,21 +831,20 @@ class DeckStudioViewModel(
     // ── Basic-land suggestions (C4) ─────────────────────────────────────────────
 
     /**
-     * Computes the per-color basic-land deltas between the [BasicLandCalculator] recommendation
-     * and the deck's current basic-land counts. A positive delta = add that many of the land; a
-     * negative delta = remove that many. Originally ported from the retired
-     * `DeckMagicDetailViewModel.calculateLandDeltas` (identical math; this VM only reads from
-     * resolved [DeckSlotEntry]s instead of an in-memory map).
+     * Computes the per-color basic-land deltas between [BasicLandPlanner]'s recommendation and the
+     * deck's current basic-land counts. A positive delta = add that many of the land; a negative
+     * delta = remove that many. Originally ported from the retired
+     * `DeckMagicDetailViewModel.calculateLandDeltas` (this VM only reads from resolved
+     * [DeckSlotEntry]s instead of an in-memory map).
      *
-     * WS6 (One land engine, `docs/plans/deck-wizard-rework-plan.md`): the TOTAL land target now
-     * comes from [LandTargetResolver] (via [resolveStudioLandTarget]) -- the SAME resolver
-     * [the deleted Motor A wizard build use case] uses at build
-     * time -- instead of [BasicLandCalculator]'s convenience overload that hardcodes
-     * [DeckFormat.targetLandCount] (archetype-blind, `dynamicLandIdeal`-blind). [deckScorer] is
-     * `null` at every existing test call site (a nullable-defaulted, appended-last constructor
-     * param): that falls back to EXACTLY the pre-WS6 behavior, never a crash. A failure resolving
-     * the WS6 land target (defensive; should not happen in practice) also falls back to the legacy
-     * path rather than propagating.
+     * Deck Wizard UX polish plan, Run 1 §1.1: the TOTAL land target comes from [LandTargetResolver]
+     * (via [resolveStudioLandTarget]) and the per-colour split comes from [BasicLandPlanner] — the
+     * SAME two objects [BuildWizardDeckUseCase] calls at build time — so a wizard-built deck
+     * reopened here shows zero deltas. This replaces the old `deckScorer`-gated
+     * [BasicLandCalculator.calculate] fallback entirely (that convenience overload hardcoded
+     * [DeckFormat.targetLandCount], archetype/`dynamicLandIdeal`-blind); a failure resolving the
+     * target (defensive; should not happen in practice) degrades to an empty delta list rather than
+     * propagating.
      */
     private fun calculateLandDeltas(
         entries: List<DeckSlotEntry>,
@@ -835,62 +859,66 @@ class DeckStudioViewModel(
 
         val nonBasicLands = deckCards.filter { !BasicLandCalculator.isBasicLand(it.card) && BasicLandCalculator.isLand(it.card) }
         val mainboardNonLands = deckCards.filter { !BasicLandCalculator.isLand(it.card) }
+        val identity = deriveStudioColorIdentity(mainboardNonLands, commanderIdentity)
 
-        val scorer = deckScorer
-        val distribution = if (scorer != null) {
+        // BasicLandPlanner has no way to express "no colour signal at all" (unlike the retired
+        // BasicLandCalculator.calculate's nullable commanderIdentity) -- it always treats an EMPTY
+        // identity as "genuinely colourless, fill with Wastes" (F17, matching the wizard's own
+        // anchor identity, which the user always explicitly chose). Studio's identity is INFERRED
+        // from whatever cards happen to be in the mainboard, so an empty result with no real
+        // commander resolved (commanderIdentity == null: no commander at all, never a confirmed
+        // colourless one) means "no data yet", not "confirmed colourless" -- skip straight to zero
+        // deltas rather than spuriously suggesting Wastes for an empty/early/non-Commander deck.
+        val basicCounts = if (identity.isEmpty() && commanderIdentity == null) {
+            emptyMap()
+        } else {
             runCatching {
-                val landTarget = resolveStudioLandTarget(scorer, format, deck, mainboardNonLands, commanderIdentity)
-                BasicLandCalculator.calculate(
-                    mainboard = mainboardNonLands,
+                val landTarget = resolveStudioLandTarget(format, deck, mainboardNonLands, commanderIdentity)
+                BasicLandPlanner.planBasics(
+                    identity = identity,
+                    landTarget = landTarget,
+                    nonLandMainboard = mainboardNonLands.map { DeckEntry(it.card, it.quantity, isOwned = true, isSideboard = false) },
                     nonBasicLands = nonBasicLands,
-                    totalLandTarget = landTarget,
-                    commanderIdentity = commanderIdentity,
+                    manaBaseAnalyzer = manaBaseAnalyzer,
                 )
             }.getOrElse { t ->
                 crashReporter.log("deck_studio_land_target_resolve_failed")
                 crashReporter.recordException(RuntimeException("[DeckStudioViewModel] deck_studio_land_target_resolve_failed", t))
-                BasicLandCalculator.calculate(
-                    mainboard = mainboardNonLands,
-                    nonBasicLands = nonBasicLands,
-                    format = format,
-                    commanderIdentity = commanderIdentity,
-                )
+                emptyMap()
             }
-        } else {
-            BasicLandCalculator.calculate(
-                mainboard = mainboardNonLands,
-                nonBasicLands = nonBasicLands,
-                format = format,
-                commanderIdentity = commanderIdentity,
-            )
         }
-        val suggestedMap = distribution.toMap()
 
         val currentCounts = mutableMapOf<String, Int>()
         entries.filter { it.card != null && !it.isSideboard && BasicLandCalculator.isBasicLand(it.card!!) }
             .forEach { currentCounts[it.card!!.name] = (currentCounts[it.card!!.name] ?: 0) + it.quantity }
 
         val deltas = mutableListOf<LandDelta>()
-        BasicLandCalculator.LAND_FOR_COLOR.forEach { (symbol, landName) ->
-            val suggestedCount = suggestedMap[symbol] ?: 0
+        ManaColor.entries.forEach { color ->
+            val landName = BasicLandCalculator.LAND_FOR_COLOR[color.symbol] ?: "Wastes"
+            val suggestedCount = basicCounts[color] ?: 0
             val currentCount = currentCounts[landName] ?: 0
             if (suggestedCount != currentCount) {
-                deltas.add(LandDelta(landName, symbol, suggestedCount - currentCount))
+                deltas.add(LandDelta(landName, color.symbol, suggestedCount - currentCount))
             }
         }
         return deltas
     }
 
     /**
-     * WS6 (One land engine): resolves the land target the SAME way
-     * [the deleted Motor A wizard build use case] does at build
-     * time -- [LandTargetResolver.resolve] over a resolved [ArchetypeSkeletonResolver] skeleton (or
-     * `null` for the GENERIC-with-no-themes case) plus a [DeckScorer.profile] snapshot of the
-     * mainboard.
+     * Resolves the land target the SAME way [BuildWizardDeckUseCase] does at build time --
+     * [ArchetypeSkeletonResolver.resolveWithColor] (archetype + posture + themes + identity +
+     * deckFormat, UNCONDITIONALLY once the format has an [ArchetypeFormat] -- exactly like
+     * [AnalysisEngine.evaluate] resolves its own skeleton, never short-circuited to `null` for an
+     * unpinned archetype/themes) fed into [LandTargetResolver.resolve].
      *
-     * The archetype/themes come from [Deck.archetypeOverride]/[Deck.themesOverride] -- the RAW
-     * persisted pin the wizard itself wrote at build time via `template.archetypeInfo`, mapped
-     * defensively via `entries.firstOrNull` (same pattern as
+     * Deck Wizard UX polish plan, Run 1 §1.1: `profile` is ALWAYS `null` here, INTENTIONALLY
+     * bypassing [LandTargetResolver.resolve]'s `dynamicLandIdeal` branch for every format -- Studio
+     * has no build-time mainboard-shape signal the wizard used at land-fill time, so the only way
+     * both agree byte-for-byte is for both to resolve off the archetype/generic skeleton alone.
+     *
+     * The archetype/posture/themes come from [Deck.archetypeOverride]/[Deck.postureOverride]/
+     * [Deck.themesOverride] -- the RAW persisted pin the wizard itself wrote at build time via
+     * `template.archetypeInfo`, mapped defensively via `entries.firstOrNull` (same pattern as
      * [com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorOrchestrator.pinSeedTags]) --
      * deliberately NOT a re-inferred/Doctor-evaluated identity (`DeckHealth.archetypeResolution`),
      * since that requires [DeckDoctorOrchestrator]'s async analysis state, which may not be loaded
@@ -902,7 +930,6 @@ class DeckStudioViewModel(
      * a placeholder/simplification WS9 (color-identity/count awareness) will revisit.
      */
     private fun resolveStudioLandTarget(
-        scorer: DeckScorer,
         format: DeckFormat,
         deck: Deck,
         mainboardNonLands: List<DeckCard>,
@@ -912,15 +939,15 @@ class DeckStudioViewModel(
         // (no override, or a stale override string from before the taxonomy migration, e.g. old
         // "RAMP"/"TEMPO"/"GENERIC" values that no longer parse) is represented as `null` directly.
         val archetype = deck.archetypeOverride?.let { name -> ArchetypeId.entries.firstOrNull { it.name == name } }
+        val posture = deck.postureOverride?.let { raw -> PostureId.entries.firstOrNull { it.name == raw } }
         val themes = deck.themesOverride.mapNotNull { name -> ThemeId.entries.firstOrNull { it.name == name } }
         val colorIdentity = deriveStudioColorIdentity(mainboardNonLands, commanderIdentitySymbols)
         val archetypeFormat = ArchetypeFormat.of(format)
-        val skeleton = if (archetypeFormat == null || (archetype == null && themes.isEmpty())) {
-            null
-        } else {
+        val skeleton = archetypeFormat?.let {
             ArchetypeSkeletonResolver.resolveWithColor(
-                format = archetypeFormat,
+                format = it,
                 archetype = archetype,
+                posture = posture,
                 themes = themes,
                 identity = colorIdentity,
                 // Edge-case QA fix (MEDIUM, 2026-09-06): AnalysisEngine.evaluate() already passes
@@ -931,14 +958,10 @@ class DeckStudioViewModel(
                 deckFormat = format,
             )
         }
-        val mainboardEntries = mainboardNonLands.map { deckCard ->
-            DeckEntry(card = deckCard.card, quantity = deckCard.quantity, isOwned = true, isSideboard = false)
-        }
-        val profile = scorer.profile(mainboard = mainboardEntries, format = format, colorIdentity = colorIdentity, seedTags = emptyList())
         return LandTargetResolver.resolve(
             format = format,
             archetypeSkeleton = skeleton,
-            profile = profile,
+            profile = null,
             manaBaseAnalyzer = manaBaseAnalyzer,
         )
     }
@@ -1340,21 +1363,31 @@ class DeckStudioViewModel(
 
     // ── Metadata ────────────────────────────────────────────────────────────────
 
-    fun updateDeckName(name: String) {
-        val trimmed = name.trim()
-        if (trimmed.isEmpty()) return
+    /**
+     * ONE write for the Edit Deck sheet's Save action — [name] and [coverCardId] land in a SINGLE
+     * `deck.copy(...)` + SINGLE `updateDeck` call (Deck Wizard UX polish plan, Run 1 §1.3). Replaces
+     * the old back-to-back `updateDeckName`/`setCoverCard` calls, which each independently read
+     * `_uiState.value.deck` and wrote a full `deck.copy` — the second call's copy silently reverted
+     * whatever the first call had just written a moment earlier (a genuine rename race, not just a
+     * redundant write). [name] is trimmed and treated as "keep the current name" when `null` or
+     * blank (mirrors the old `updateDeckName`'s no-op-on-blank guard, but scoped to just that field
+     * rather than aborting the whole save); [coverCardId] is treated as "keep the current cover" when
+     * `null`. A call where both resolve to "keep current" is a no-op — never an empty write.
+     */
+    fun updateDeckMetadata(name: String?, coverCardId: String?) {
+        val trimmedName = name?.trim()?.takeIf { it.isNotEmpty() }
+        if (trimmedName == null && coverCardId == null) return
         viewModelScope.launch {
             val deck = _uiState.value.deck ?: return@launch
-            runCatching { deckRepository.updateDeck(deck.copy(name = trimmed, updatedAt = System.currentTimeMillis())) }
-                .onFailure { logFailure("deck_studio_rename_failed", it) }
-        }
-    }
-
-    fun setCoverCard(scryfallId: String) {
-        viewModelScope.launch {
-            val deck = _uiState.value.deck ?: return@launch
-            runCatching { deckRepository.updateDeck(deck.copy(coverCardId = scryfallId, updatedAt = System.currentTimeMillis())) }
-                .onFailure { logFailure("deck_studio_set_cover_failed", it) }
+            runCatching {
+                deckRepository.updateDeck(
+                    deck.copy(
+                        name = trimmedName ?: deck.name,
+                        coverCardId = coverCardId ?: deck.coverCardId,
+                        updatedAt = System.currentTimeMillis(),
+                    ),
+                )
+            }.onFailure { logFailure("deck_studio_update_metadata_failed", it) }
         }
     }
 
@@ -1456,16 +1489,21 @@ class DeckStudioViewModel(
         publishCollectionResults(collectionCardsMatching(query))
     }
 
-    // Shared predicate for onAddCardsQueryChange/searchCollectionByTags/applyStructuredSearch; see
-    // StructuredCardSearch.matchesForCategoryBrowse for why the tag filter and structured query
-    // don't just AND/OR naively.
+    // Shared predicate for onAddCardsQueryChange/searchCollectionByTags/applyStructuredSearch (Deck
+    // Wizard UX polish plan, Run 1 §1.2): a section-driven browse (activeSectionPredicate non-null)
+    // filters by the predicate alone; otherwise the generic structured query (or no filter at all)
+    // applies -- never ORed/ANDed together, they are mutually exclusive entry points.
     private fun collectionCardsMatching(query: String): List<Card> {
         val state = _uiState.value
-        val structuredQuery = state.activeCollectionQuery
-        val activeTagFilter = state.activeCollectionTagFilter.orEmpty()
+        val sectionPredicate = state.activeSectionPredicate
+        val structuralMatch: (Card) -> Boolean = if (sectionPredicate != null) {
+            sectionPredicate
+        } else {
+            val structuredQuery = state.activeCollectionQuery
+            { card -> StructuredCardSearch.matches(card, structuredQuery) }
+        }
         return collectionCards.filter { card ->
-            StructuredCardSearch.matchesForCategoryBrowse(card, structuredQuery, activeTagFilter) &&
-                (query.isBlank() || card.name.contains(query, ignoreCase = true))
+            structuralMatch(card) && (query.isBlank() || card.name.contains(query, ignoreCase = true))
         }
     }
 
@@ -1481,17 +1519,26 @@ class DeckStudioViewModel(
     }
 
     /**
-     * The Analysis tab's category-browse [CardTag] pre-filter for the Collection tab. [keys] are a
-     * `CardSection`'s equivalent tag keys (`SectionSearchQuery.collectionTagKeysFor`) — a DIFFERENT
-     * key space from the structured criteria of [applyStructuredSearch], so the two AND together
-     * rather than replacing each other.
+     * The Analysis tab's category-browse Collection-tab filter. Deck Wizard UX polish plan, Run 1
+     * §1.2: [keys] carries the originating `CardSection.id` itself (a single-element set — see
+     * [DeckStudioScreen]'s own `sectionBrowseTagKeys`), NOT real `CardTag` keys any more — this
+     * keeps [CardSearchSheet][com.mmg.manahub.core.ui.components.CardSearchSheet]'s
+     * `onFilterCollectionByTags(Set<String>) -> Unit` param shape unchanged while resolving the
+     * REAL [SectionMembership.predicate] from the section id directly, via [sectionQueryContext].
      *
-     * Empty [keys] is a no-op filter (falls back to whatever the structured query and typed name
-     * leave), never an empty result — many sections (curve / mana / legality) have no tag keys at
-     * all and would otherwise render a dead-looking Collection tab.
+     * A `null`/unresolvable predicate (a section with no card-level membership fact — `mv:*`,
+     * `legal`/`illegal`, `interaction`/`standalone`/`offplan`) is a no-op filter (falls back to
+     * whatever [activeCollectionQuery] and the typed name leave), never an empty result.
      */
     fun searchCollectionByTags(keys: Set<String>) {
-        _uiState.update { it.copy(activeCollectionTagFilter = keys.takeIf { k -> k.isNotEmpty() }) }
+        val sectionId = keys.firstOrNull()
+        val predicate = sectionId?.let { SectionMembership.predicate(it, sectionQueryContext()) }
+        _uiState.update {
+            it.copy(
+                activeCollectionTagFilter = keys.takeIf { k -> k.isNotEmpty() },
+                activeSectionPredicate = predicate,
+            )
+        }
         publishCollectionResults(collectionCardsMatching(_uiState.value.addCardsQuery))
     }
 
@@ -1632,6 +1679,7 @@ class DeckStudioViewModel(
             it.copy(
                 activeStructuredSearchFragment = null,
                 activeCollectionTagFilter = null,
+                activeSectionPredicate = null,
                 activeCollectionQuery = null,
             )
         }
@@ -1660,6 +1708,7 @@ class DeckStudioViewModel(
                 // CardSearchSheet's own onDismiss) already call it -- see that field's KDoc.
                 activeStructuredSearchFragment = null,
                 activeCollectionTagFilter = null,
+                activeSectionPredicate = null,
                 activeCollectionQuery = null,
             )
         }
@@ -1856,16 +1905,84 @@ class DeckStudioViewModel(
         deckDoctorOrchestrator.clearArchetypeOverride(deckId)
     }
 
+    /** A snapshot of everything [scoreStrategyMatches]'s result depends on — an unchanged deck
+     * reopening the "Deck plan" sheet skips recompute entirely (see that function's own KDoc). */
+    private data class StrategyMatchSnapshot(
+        val cardCounts: List<Pair<String, Int>>,
+        val format: DeckFormat,
+        val commanderId: String?,
+    )
+
+    private var strategyScoreJob: Job? = null
+    private var strategyScoreSnapshot: StrategyMatchSnapshot? = null
+
     /**
-     * Deck Engine Unification plan (D4): the deck's own explicit "Unlock strategy" action (Studio
-     * shows a confirmation dialog before calling this — see [DeckStudioScreen]). Delegates straight
-     * to [DeckDoctorOrchestrator.unlockStrategy], which flips `Deck.strategyLocked` off and re-runs a
-     * full analysis.
+     * Deck Wizard UX polish plan, Run 1 §1.6: the "Deck plan" sheet's per-strategy match %. For
+     * every [CuratedStrategyCatalog] entry [CuratedStrategy.availableIn] the live deck's format,
+     * runs the SAME [DeckAnalysisPipeline] the orchestrator/wizard use — pinned to that strategy —
+     * and publishes its `totalScore` into [DeckStudioUiState.strategyMatchScores] the moment each
+     * one resolves (rows fill in one by one, never a single blocking wait for the whole list).
+     *
+     * A `requiresTribe` entry scores against the deck's own [ArchetypeRoleClassifier.dominantTribeKey]
+     * when one exists; with no dominant tribe, that entry is skipped outright — left permanently
+     * unscored, never a misleading 0%.
+     *
+     * Cached per [StrategyMatchSnapshot] (mainboard card ids+quantities, format, commander id): a
+     * second call with an unchanged snapshot is a no-op, so reopening the sheet on the same deck
+     * never re-triggers `DeckAnalysisPipeline.analyze` calls. Any in-flight scoring job from a
+     * PREVIOUS snapshot (a stale open, or a deck mutation mid-scoring) is cancelled first.
      */
-    fun onUnlockStrategy() {
-        if (!::deckId.isInitialized) return
-        crashReporter.log("deck_studio_unlock_strategy_confirmed")
-        deckDoctorOrchestrator.unlockStrategy(deckId)
+    fun scoreStrategyMatches() {
+        val pipeline = deckAnalysisPipeline ?: return
+        val format = deckFormat ?: return
+        val state = _uiState.value
+        val commander = state.commanderCard?.card
+        val mainboardEntries = (listOfNotNull(state.commanderCard) + state.cards)
+            .filter { it.card != null && !it.isSideboard }
+            .map { entry -> DeckEntry(card = entry.card!!, quantity = entry.quantity, isOwned = true, isSideboard = false) }
+
+        val snapshot = StrategyMatchSnapshot(
+            cardCounts = mainboardEntries.map { it.card.scryfallId to it.quantity }.sortedBy { it.first },
+            format = format,
+            commanderId = commander?.scryfallId,
+        )
+        if (snapshot == strategyScoreSnapshot) return
+        strategyScoreSnapshot = snapshot
+        strategyScoreJob?.cancel()
+
+        val dominantTribeKey = ArchetypeRoleClassifier.dominantTribeKey(mainboardEntries)
+        val entries = CuratedStrategyCatalog.ALL.filter { it.availableIn(format) }
+        _uiState.update { it.copy(strategyMatchScores = emptyMap(), isScoringStrategyMatches = true) }
+        // No explicit Dispatchers.Default here -- matches DeckDoctorOrchestrator.loadAnalysis's own
+        // convention (plain `scope.launch { }`): DeckAnalysisPipeline.analyze already switches to
+        // its own background dispatcher internally (EvaluateDeckUseCase's withContext(ioDispatcher)),
+        // so this loop only needs viewModelScope's default context.
+        strategyScoreJob = viewModelScope.launch {
+            for (entry in entries) {
+                if (entry.requiresTribe && dominantTribeKey == null) continue
+                val pin = entry.toPin(if (entry.requiresTribe) dominantTribeKey else null)
+                val score = runCatching {
+                    pipeline.analyze(
+                        mainboard = mainboardEntries,
+                        format = format,
+                        commander = commander,
+                        archetypeOverride = pin.archetype?.name,
+                        themesOverride = pin.themes.map { it.name },
+                        tribeOverride = pin.tribe,
+                        postureOverride = pin.posture?.name,
+                        emitProgression = false,
+                    ).analysis?.totalScore
+                }.getOrElse { t ->
+                    crashReporter.log("deck_studio_strategy_match_score_failed")
+                    crashReporter.recordException(RuntimeException("[DeckStudioViewModel] deck_studio_strategy_match_score_failed", t))
+                    null
+                }
+                if (score != null) {
+                    _uiState.update { it.copy(strategyMatchScores = it.strategyMatchScores + (entry.id to score)) }
+                }
+            }
+            _uiState.update { it.copy(isScoringStrategyMatches = false) }
+        }
     }
 
     /**

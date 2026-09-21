@@ -94,9 +94,9 @@ data class DeckDoctorState(
      * Reset to empty at the start of every [loadAnalysis]. */
     val completedStages: List<DoctorAnalysisStage> = emptyList(),
     /**
-     * Deck Engine Unification plan (D4): mirrors `Deck.strategyLocked`. The host UI hides the
-     * "Deck plan" archetype/theme editor while true. Flip off via [unlockStrategy] (an explicit,
-     * confirmed user action).
+     * Mirrors `Deck.strategyLocked` (still persisted/synced from a wizard build). Deck Wizard UX
+     * polish plan, Run 1 §1.4 removed the UI gate + explicit unlock action this field used to drive
+     * — nothing reads it any more, kept only because the persisted flag itself stays.
      */
     val strategyLocked: Boolean = false,
 
@@ -729,25 +729,6 @@ class DeckDoctorOrchestrator(
     /** "Auto-detect" — clears both the macro and theme pin and re-infers from scratch. */
     fun clearArchetypeOverride(deckId: String) {
         setArchetypeOverride(deckId, archetypeId = null, themes = emptyList())
-    }
-
-    /**
-     * Deck Engine Unification plan (D4): the deck's own explicit "Unlock strategy" action —
-     * flips `Deck.strategyLocked` off (releasing the gate on the host UI's "Deck plan" editor) then
-     * re-runs a full [loadAnalysis] (mirrors [setArchetypeOverride]'s "cheap enough to just reload"
-     * precedent).
-     */
-    fun unlockStrategy(deckId: String) {
-        scope.launch {
-            runCatching {
-                deckRepository.updateStrategyLocked(deckId, false)
-            }.onFailure {
-                crashReporter.log("deck_studio_unlock_strategy_failed")
-                crashReporter.recordException(RuntimeException("[DeckDoctorOrchestrator] deck_studio_unlock_strategy_failed", it))
-                return@launch
-            }
-            loadAnalysis(deckId)
-        }
     }
 
     /** Appends a [DeckWarning.UnresolvedCards] (legacy) / [Finding.UnresolvedCards] (Deck Analysis

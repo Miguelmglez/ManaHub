@@ -812,4 +812,44 @@ class ScannerViewModelTest {
         )
         assertEquals(defaultCard.scryfallId, remaining[0].card.scryfallId)
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Deck Wizard UX polish plan, Run 1 §1.7: camera bind error clears correctly
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // onCameraBindFailed records via recordSafeNonFatal -> FirebaseCrashlytics.getInstance(),
+    // outside any runCatching -- needs a static mock in every test that calls it (see the class's
+    // own testing convention: CLAUDE.md "ViewModels that call Crashlytics outside a runCatching
+    // block need mockkStatic(FirebaseCrashlytics::class)").
+
+    @Test
+    fun onCameraBindFailed_setsCameraBindError_withoutTouchingError() {
+        io.mockk.mockkStatic(com.google.firebase.crashlytics.FirebaseCrashlytics::class)
+        every { com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
+        try {
+            viewModel.onCameraBindFailed(RuntimeException("bind failed"))
+
+            val state = viewModel.uiState.value
+            assertNotNull("a failed bind must set cameraBindError", state.cameraBindError)
+            assertNull("cameraBindError is separate from the general-purpose error field", state.error)
+        } finally {
+            io.mockk.unmockkStatic(com.google.firebase.crashlytics.FirebaseCrashlytics::class)
+        }
+    }
+
+    @Test
+    fun onCameraBound_clearsAPreviouslySetCameraBindError() {
+        io.mockk.mockkStatic(com.google.firebase.crashlytics.FirebaseCrashlytics::class)
+        every { com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
+        try {
+            viewModel.onCameraBindFailed(RuntimeException("bind failed"))
+            assertNotNull(viewModel.uiState.value.cameraBindError)
+
+            viewModel.onCameraBound()
+
+            assertNull("a successful (re)bind must clear the stale bind-error banner", viewModel.uiState.value.cameraBindError)
+        } finally {
+            io.mockk.unmockkStatic(com.google.firebase.crashlytics.FirebaseCrashlytics::class)
+        }
+    }
 }

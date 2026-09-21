@@ -37,6 +37,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -129,6 +131,7 @@ class ScannerViewModel @Inject constructor(
 
     // ── Variant load job — cancelled if the user closes the sheet before load completes ──
     private var variantLoadJob: kotlinx.coroutines.Job? = null
+    private var persistJob: Job? = null
 
     // ── SharedPreferences for queue persistence ───────────────────────────────
     private val prefs by lazy {
@@ -196,37 +199,40 @@ class ScannerViewModel @Inject constructor(
      * Must be called after any mutation that modifies [ScannerUiState.scanSession].
      */
     private fun persistQueue() {
-        val cards = _uiState.value.scanSession.entries
-        val array = JSONArray()
-        for (entry in cards) {
-            val obj = JSONObject().apply {
-                put("scryfallId",       entry.card.scryfallId)
-                put("name",             entry.card.name)
-                put("manaCost",         entry.card.manaCost ?: JSONObject.NULL)
-                put("typeLine",         entry.card.typeLine)
-                put("colors",           JSONArray(entry.card.colors))
-                put("rarity",           entry.card.rarity)
-                put("oracleId",         entry.card.oracleId)
-                put("setCode",          entry.card.setCode)
-                put("setName",          entry.card.setName)
-                put("lang",             entry.card.lang)
-                put("priceUsd",         entry.card.priceUsd ?: JSONObject.NULL)
-                put("priceUsdFoil",     entry.card.priceUsdFoil ?: JSONObject.NULL)
-                put("priceEur",         entry.card.priceEur ?: JSONObject.NULL)
-                put("priceEurFoil",     entry.card.priceEurFoil ?: JSONObject.NULL)
-                put("imageNormal",      entry.card.imageNormal ?: JSONObject.NULL)
-                put("imageArtCrop",     entry.card.imageArtCrop ?: JSONObject.NULL)
-                put("collectorNumber",  entry.card.collectorNumber)
-                put("quantity",         entry.quantity)
-                put("isFoil",           entry.isFoil)
-                put("language",         entry.language)
-                put("condition",        entry.condition)
-                put("timestamp",        entry.timestamp)
-                put("id",               entry.id)
+        val cards = _uiState.value.scanSession.entries.toList()
+        persistJob?.cancel()
+        persistJob = viewModelScope.launch(Dispatchers.IO) {
+            val array = JSONArray()
+            for (entry in cards) {
+                val obj = JSONObject().apply {
+                    put("scryfallId", entry.card.scryfallId)
+                    put("name", entry.card.name)
+                    put("manaCost", entry.card.manaCost ?: JSONObject.NULL)
+                    put("typeLine", entry.card.typeLine)
+                    put("colors", JSONArray(entry.card.colors))
+                    put("rarity", entry.card.rarity)
+                    put("oracleId", entry.card.oracleId)
+                    put("setCode", entry.card.setCode)
+                    put("setName", entry.card.setName)
+                    put("lang", entry.card.lang)
+                    put("priceUsd", entry.card.priceUsd ?: JSONObject.NULL)
+                    put("priceUsdFoil", entry.card.priceUsdFoil ?: JSONObject.NULL)
+                    put("priceEur", entry.card.priceEur ?: JSONObject.NULL)
+                    put("priceEurFoil", entry.card.priceEurFoil ?: JSONObject.NULL)
+                    put("imageNormal", entry.card.imageNormal ?: JSONObject.NULL)
+                    put("imageArtCrop", entry.card.imageArtCrop ?: JSONObject.NULL)
+                    put("collectorNumber", entry.card.collectorNumber)
+                    put("quantity", entry.quantity)
+                    put("isFoil", entry.isFoil)
+                    put("language", entry.language)
+                    put("condition", entry.condition)
+                    put("timestamp", entry.timestamp)
+                    put("id", entry.id)
+                }
+                array.put(obj)
             }
-            array.put(obj)
+            prefs.edit { putString(queuePreferenceKey(target), array.toString()) }
         }
-        prefs.edit { putString(queuePreferenceKey(target), array.toString()) }
     }
 
     /**
@@ -904,6 +910,20 @@ class ScannerViewModel @Inject constructor(
         _uiState.update { it.copy(hasFlash = available) }
     }
 
+    fun onCameraBindFailed(error: Throwable) {
+        recordSafeNonFatal("scanner_camera_bind_failed", error)
+        _uiState.update {
+            it.copy(cameraBindError = context.getString(R.string.scanner_camera_bind_failed))
+        }
+    }
+
+    /** Deck Wizard UX polish plan, Run 1 §1.7: called right after a successful `bindToLifecycle` —
+     * clears a previously-shown [ScannerUiState.cameraBindError] banner, which used to never clear
+     * on its own once set. */
+    fun onCameraBound() {
+        _uiState.update { it.copy(cameraBindError = null) }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     //  Recognition pause toggle (top bar) — independent of sheet-driven pauses
     // ─────────────────────────────────────────────────────────────────────────
@@ -952,7 +972,7 @@ class ScannerViewModel @Inject constructor(
             it.copy(
                 scanSession = CardSelectionSession(),
                 multiSelectedIds = emptySet(),
-                showQueueSheet = false,
+                showQueueSheet = if (target is ScannerTarget.Deck) it.showQueueSheet else false,
             )
         }
         lastAddedId = null
@@ -1066,6 +1086,10 @@ class ScannerViewModel @Inject constructor(
         if (state.isCommittingQueue || state.scanSession.entries.none { it.id == entry.id }) return
         val snapshot = entry.copy()
         _uiState.update { it.copy(isCommittingQueue = true) }
+        analyticsHelper.logEvent(
+            "scanner_deck_entry_add_started",
+            mapOf("board" to board.name.lowercase()),
+        )
         viewModelScope.launch {
             try {
                 val result = addScannedCardsToDeck(
@@ -1075,6 +1099,7 @@ class ScannerViewModel @Inject constructor(
                             entryId = snapshot.id,
                             scryfallId = snapshot.card.scryfallId,
                             quantity = snapshot.quantity,
+                            oracleId = snapshot.card.oracleId,
                         ),
                     ),
                     board = board,
@@ -1132,6 +1157,13 @@ class ScannerViewModel @Inject constructor(
         if (state.isCommittingQueue || state.scanSession.entries.isEmpty()) return
         val snapshot = state.scanSession.entries.toList()
         _uiState.update { it.copy(isCommittingQueue = true) }
+        analyticsHelper.logEvent(
+            "scanner_deck_bulk_add_started",
+            mapOf(
+                "board" to board.name.lowercase(),
+                "entry_count" to snapshot.size.toString(),
+            ),
+        )
         viewModelScope.launch {
             try {
                 val result = addScannedCardsToDeck(
@@ -1141,6 +1173,7 @@ class ScannerViewModel @Inject constructor(
                             entryId = entry.id,
                             scryfallId = entry.card.scryfallId,
                             quantity = entry.quantity,
+                            oracleId = entry.card.oracleId,
                         )
                     },
                     board = board,
@@ -1181,7 +1214,6 @@ class ScannerViewModel @Inject constructor(
                         toastType = if (blockedCount > 0) MagicToastType.WARNING else MagicToastType.SUCCESS,
                     )
                 }
-                if (_uiState.value.scanSession.entries.isEmpty()) onCloseQueue()
             } catch (e: Exception) {
                 recordSafeNonFatal("scanner_deck_bulk_add_failed", e)
                 analyticsHelper.logEvent(

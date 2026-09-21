@@ -933,9 +933,10 @@ internal fun PlanSectionsStepContent(
     val browseQuery = remember(browseSectionId, queryContext) {
         browseSectionId?.let { SectionSearchQuery.toAdvancedQuery(it, queryContext) }
     }
-    val browseTagKeys = remember(browseSectionId) {
-        browseSectionId?.let { SectionSearchQuery.collectionTagKeysFor(it) }.orEmpty()
-    }
+    // Deck Wizard UX polish plan, Run 1 §1.2: carries the raw section id itself (never real
+    // CardTag keys) through CardSearchSheet's onFilterCollectionByTags(Set<String>) -> Unit param
+    // shape -- the VM resolves the real SectionMembership.predicate from it directly.
+    val browseTagKeys = remember(browseSectionId) { setOfNotNull(browseSectionId) }
 
     fun resolveCard(scryfallId: String): Card? =
         uiState.selectedCommander?.takeIf { it.scryfallId == scryfallId }

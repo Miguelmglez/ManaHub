@@ -32,13 +32,17 @@ import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
+import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.LandTargetResolver
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
+import com.mmg.manahub.feature.decks.domain.engine.availableIn
 import com.mmg.manahub.feature.decks.domain.engine.card
 import com.mmg.manahub.feature.decks.domain.engine.fixedPower
+import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
+import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
@@ -202,16 +206,17 @@ class DeckStudioViewModelTest {
         tags = listOf(CardTag.TRIBAL, CardTag.MANA_DORK),
     )
 
-    /** A second REMOVAL-tagged card with a distinct name -- Group 7c uses it to prove
-     * [DeckStudioViewModel.onAddCardsQueryChange] ANDs a typed name onto an active tag filter
-     * instead of dropping it (edge-case QA fix, 2026-09-06). */
+    /** A second MANA_DORK-tagged card with a distinct name -- Group 7c uses it to prove
+     * [DeckStudioViewModel.onAddCardsQueryChange] ANDs a typed name onto an active section
+     * predicate instead of dropping it (edge-case QA fix, 2026-09-06; repurposed onto a real
+     * `mana_dork` section id, Deck Wizard UX polish plan, Run 1 §1.2). */
     private val beastWithinCard = card(
         id = "beast-within-1",
-        name = "Beast Within",
-        typeLine = "Instant",
+        name = "Birds of Paradise",
+        typeLine = "Creature — Bird",
         colorIdentity = listOf("G"),
         colors = listOf("G"),
-        tags = listOf(CardTag.REMOVAL),
+        tags = listOf(CardTag.MANA_DORK),
     )
 
     private fun deckWithCards(
@@ -279,6 +284,33 @@ class DeckStudioViewModelTest {
             savedStateHandle = savedStateHandle ?: SavedStateHandle(
                 if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
             ),
+        )
+
+    /** Deck Wizard UX polish plan, Run 1 §1.6 -- the ONE `createVm*` helper wiring a real
+     * [DeckAnalysisPipeline] mock, so [DeckStudioViewModel.scoreStrategyMatches] actually runs
+     * (every other helper leaves it at its nullable default, a no-op). */
+    private fun createVmWithAnalysisPipeline(
+        pipeline: DeckAnalysisPipeline,
+        deckId: String? = null,
+    ): DeckStudioViewModel =
+        DeckStudioViewModel(
+            deckRepository = deckRepository,
+            cardRepository = cardRepository,
+            userCardRepository = userCardRepository,
+            searchCardsUseCase = searchCardsUseCase,
+            suggestTagsUseCase = suggestTagsUseCase,
+            evaluateDeckUseCase = evaluateDeckUseCase,
+            inferDeckIdentityUseCase = inferDeckIdentityUseCase,
+            getDeckGameStatsUseCase = getDeckGameStatsUseCase,
+            importDeckUseCase = importDeckUseCase,
+            wishlistRepository = wishlistRepository,
+            userPreferences = userPreferences,
+            crashReporter = crashReporter,
+            appContext = appContext,
+            savedStateHandle = SavedStateHandle(
+                if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
+            ),
+            deckAnalysisPipeline = pipeline,
         )
 
     @Test
@@ -507,36 +539,6 @@ class DeckStudioViewModelTest {
             ),
             discoverSynergiesV2UseCase = discoverSynergiesV2UseCase,
             findCombosUseCase = findCombosUseCase,
-        )
-
-    /**
-     * Creates the ViewModel with the REAL [scorer] wired as [DeckStudioViewModel]'s `deckScorer`
-     * (every other `createVm*` helper leaves it at its nullable default, which routes
-     * `calculateLandDeltas` through the pre-WS6 format-only fallback and never exercises
-     * [DeckStudioViewModel.resolveStudioLandTarget] at all). Edge-case QA fix (MEDIUM,
-     * 2026-09-06) parity test below needs this to actually reach the
-     * [com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver.resolveWithColor]
-     * call site being fixed.
-     */
-    private fun createVmWithScorer(deckId: String? = null): DeckStudioViewModel =
-        DeckStudioViewModel(
-            deckRepository = deckRepository,
-            cardRepository = cardRepository,
-            userCardRepository = userCardRepository,
-            searchCardsUseCase = searchCardsUseCase,
-            suggestTagsUseCase = suggestTagsUseCase,
-            evaluateDeckUseCase = evaluateDeckUseCase,
-            inferDeckIdentityUseCase = inferDeckIdentityUseCase,
-            getDeckGameStatsUseCase = getDeckGameStatsUseCase,
-            importDeckUseCase = importDeckUseCase,
-            wishlistRepository = wishlistRepository,
-            userPreferences = userPreferences,
-            crashReporter = crashReporter,
-            appContext = appContext,
-            savedStateHandle = SavedStateHandle(
-                if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
-            ),
-            deckScorer = scorer,
         )
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1672,19 +1674,22 @@ class DeckStudioViewModelTest {
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `searchCollectionByTags returns only cards whose tags plus userTags intersect the given keys`() =
+    fun `searchCollectionByTags resolves a SectionMembership predicate from the section id and unions tags plus userTags`() =
         runTest(dispatcher) {
-            // Arrange — elfCard carries TRIBAL/MANA_DORK, removalCard carries REMOVAL (built-in
-            // tags); a third card carries its match ONLY via userTags to prove the union
-            // (`card.tags + card.userTags`) is honored, not just `tags`.
+            // Arrange — Deck Wizard UX polish plan, Run 1 §1.2: the set passed to
+            // searchCollectionByTags now carries the raw `CardSection.id` itself (never real
+            // CardTag keys) -- "mana_dork" resolves to SectionMembership's own
+            // card.hasTagKey("mana_dork") predicate, which reads `tags + userTags`. elfCard
+            // carries the built-in MANA_DORK tag; a third card carries its match ONLY via
+            // userTags to prove the union is honored, not just `tags`. removalCard has neither.
             val userTaggedCard = card(
                 id = "user-tagged-1",
-                name = "Homebrew Sac Outlet",
-                typeLine = "Artifact",
+                name = "Homebrew Mana Dork",
+                typeLine = "Creature — Elf",
                 colorIdentity = emptyList(),
                 colors = emptyList(),
                 tags = emptyList(),
-                userTags = listOf(CardTag.SACRIFICE),
+                userTags = listOf(CardTag.MANA_DORK),
             )
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(
@@ -1696,15 +1701,15 @@ class DeckStudioViewModelTest {
             val vm = createVm()
             advanceUntilIdle()
 
-            // Act — request only REMOVAL + SACRIFICE, excluding elfCard's TRIBAL/MANA_DORK keys.
-            vm.searchCollectionByTags(setOf(CardTag.REMOVAL.key, CardTag.SACRIFICE.key))
+            // Act — "mana_dork" is a real CardSection.id (AnalysisEngine's own manaDorkSection).
+            vm.searchCollectionByTags(setOf("mana_dork"))
 
             // Assert
             val resultIds = vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet()
-            assertEquals(setOf(removalCard.scryfallId, userTaggedCard.scryfallId), resultIds)
+            assertEquals(setOf(elfCard.scryfallId, userTaggedCard.scryfallId), resultIds)
             assertTrue(
-                "elfCard has none of the requested keys and must be excluded",
-                elfCard.scryfallId !in resultIds
+                "removalCard has no mana_dork tag on either tags or userTags and must be excluded",
+                removalCard.scryfallId !in resultIds
             )
         }
 
@@ -1712,8 +1717,8 @@ class DeckStudioViewModelTest {
     fun `searchCollectionByTags with an empty key set falls back to the full collection`() =
         runTest(dispatcher) {
             // Arrange — documented no-op behavior (see the function's KDoc): an empty key set
-            // (e.g. a curve/mana/legality section with no CardTag equivalent) degrades to
-            // showCollectionCards() rather than clearing addCardsResults to empty.
+            // (e.g. a curve/mana/legality section with no card-level membership predicate)
+            // degrades to showCollectionCards() rather than clearing addCardsResults to empty.
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(
                 listOf(userCardWith(elfCard), userCardWith(removalCard))
@@ -1739,11 +1744,11 @@ class DeckStudioViewModelTest {
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `onAddCardsQueryChange after searchCollectionByTags keeps ANDing the active tag filter`() =
+    fun `onAddCardsQueryChange after searchCollectionByTags keeps ANDing the active section predicate`() =
         runTest(dispatcher) {
-            // Arrange — elfCard (TRIBAL/MANA_DORK) must never surface once REMOVAL is the active
-            // tag filter; removalCard and beastWithinCard both carry REMOVAL but only one matches
-            // a subsequent typed name.
+            // Arrange — removalCard (no mana_dork tag) must never surface once "mana_dork" is the
+            // active section predicate; elfCard and beastWithinCard both carry MANA_DORK but only
+            // one matches a subsequent typed name.
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(
                 listOf(userCardWith(elfCard), userCardWith(removalCard), userCardWith(beastWithinCard))
@@ -1754,38 +1759,39 @@ class DeckStudioViewModelTest {
             val vm = createVm()
             advanceUntilIdle()
 
-            // Act 1 — Analysis tab "Browse for X" opens the Collection tab pre-filtered by REMOVAL.
-            vm.searchCollectionByTags(setOf(CardTag.REMOVAL.key))
+            // Act 1 — Analysis tab "Browse for X" opens the Collection tab pre-filtered by the
+            // "mana_dork" section predicate.
+            vm.searchCollectionByTags(setOf("mana_dork"))
             var resultIds = vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet()
             assertEquals(
-                "the tag filter alone must already exclude the non-REMOVAL elfCard",
-                setOf(removalCard.scryfallId, beastWithinCard.scryfallId),
+                "the section predicate alone must already exclude the non-mana_dork removalCard",
+                setOf(elfCard.scryfallId, beastWithinCard.scryfallId),
                 resultIds,
             )
 
-            // Act 2 — the user types on top of the active tag filter (the pre-fix bug: this used
-            // to drop the tag constraint and filter the WHOLE collection by name alone).
-            vm.onAddCardsQueryChange("Beast")
+            // Act 2 — the user types on top of the active section predicate (the pre-fix bug: this
+            // used to drop the tag constraint and filter the WHOLE collection by name alone).
+            vm.onAddCardsQueryChange("Birds")
             resultIds = vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet()
             assertEquals(
-                "typing must AND the name substring onto the still-active REMOVAL tag filter",
+                "typing must AND the name substring onto the still-active mana_dork predicate",
                 setOf(beastWithinCard.scryfallId),
                 resultIds,
             )
 
-            // Act 3 — clearing the search field must preserve the tag filter, not reset to the
-            // full collection.
+            // Act 3 — clearing the search field must preserve the section predicate, not reset to
+            // the full collection.
             vm.onAddCardsQueryChange("")
             resultIds = vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet()
             assertEquals(
-                "a blank query must keep the active tag filter, not fall back to the full collection",
-                setOf(removalCard.scryfallId, beastWithinCard.scryfallId),
+                "a blank query must keep the active section predicate, not fall back to the full collection",
+                setOf(elfCard.scryfallId, beastWithinCard.scryfallId),
                 resultIds,
             )
         }
 
     @Test
-    fun `clearActiveStructuredSearchFragment also clears the active collection tag filter`() =
+    fun `clearActiveStructuredSearchFragment also clears the active section predicate`() =
         runTest(dispatcher) {
             // Arrange
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
@@ -1797,7 +1803,7 @@ class DeckStudioViewModelTest {
             }
             val vm = createVm()
             advanceUntilIdle()
-            vm.searchCollectionByTags(setOf(CardTag.REMOVAL.key))
+            vm.searchCollectionByTags(setOf("mana_dork"))
 
             // Act — mirrors the FAB / onReplaceCard entry points resetting a stale preset.
             vm.clearActiveStructuredSearchFragment()
@@ -1850,21 +1856,14 @@ class DeckStudioViewModelTest {
         }
 
     @Test
-    fun `collectionCardsMatching unions the structured query with the tag filter, both ANDed with the typed name`() =
+    fun `searchCollectionByTags' section predicate REPLACES a previously active structured query, never unions with it`() =
         runTest(dispatcher) {
-            // Deck Wizard v4, W4.2b (G14): rewritten from the old "ANDs all three" assertion, which
-            // encoded the exact bug this workstream fixes -- an untagged card the tagging engine
-            // never got to (but that genuinely satisfies the section's own structured predicate)
-            // used to be invisible on the Collection tab. `untaggedInstant` is that card: it matches
-            // the CardType(Instant) structured query but carries no REMOVAL tag.
-            val untaggedInstant = card(
-                id = "beast-trick-1",
-                name = "Beast Trick",
-                typeLine = "Instant",
-                colorIdentity = listOf("G"),
-                colors = listOf("G"),
-            )
-            val all = listOf(elfCard, removalCard, beastWithinCard, untaggedInstant)
+            // Deck Wizard UX polish plan, Run 1 §1.2: a section-driven browse's Collection tab is
+            // `predicate && name filter` ONLY -- it must never stay ANDed/ORed with whatever
+            // activeCollectionQuery a PRIOR generic Advanced Search left behind. removalCard is an
+            // Instant (matches the earlier structured query) but has no mana_dork tag; elfCard is
+            // the reverse -- proving the predicate takes over completely rather than combining.
+            val all = listOf(elfCard, removalCard, beastWithinCard)
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(all.map { userCardWith(it) })
             coEvery { cardRepository.getCardById(any()) } answers {
@@ -1875,29 +1874,32 @@ class DeckStudioViewModelTest {
             val vm = createVm()
             advanceUntilIdle()
 
-            // Act — structured query (Instant) drops elfCard (a Creature); the tag filter (REMOVAL)
-            // no longer needs to ALSO match for untaggedInstant to survive; the typed name "Beast"
-            // narrows to the two cards whose name contains it.
+            // Act 1 — a generic Advanced Search structured query filters the Collection tab to
+            // every Instant (removalCard only, here).
             vm.applyStructuredSearch(AdvancedSearchQuery(criteria = listOf(SearchCriterion.CardType(setOf("Instant")))))
             advanceUntilIdle()
-            vm.searchCollectionByTags(setOf(CardTag.REMOVAL.key))
-            vm.onAddCardsQueryChange("Beast")
-
-            // Assert — beastWithinCard passes via EITHER gate (Instant AND REMOVAL); untaggedInstant
-            // now also surfaces via the structured predicate alone (the G14 fix), even though it was
-            // never tagged REMOVAL.
             assertEquals(
-                setOf(beastWithinCard.scryfallId, untaggedInstant.scryfallId),
+                "sanity check: the structured query alone must match removalCard (an Instant)",
+                setOf(removalCard.scryfallId),
+                vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet(),
+            )
+
+            // Act 2 — a section browse now starts on TOP of that same sheet session.
+            vm.searchCollectionByTags(setOf("mana_dork"))
+
+            // Assert — the predicate REPLACES the structured query outright: elfCard/beastWithinCard
+            // (mana_dork, not Instants) now match; removalCard (an Instant, not mana_dork) drops out.
+            assertEquals(
+                setOf(elfCard.scryfallId, beastWithinCard.scryfallId),
                 vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet(),
             )
         }
 
     @Test
-    fun `collectionCardsMatching keeps the tag filter as the sole gate when no structured query is active`() =
+    fun `collectionCardsMatching keeps the section predicate as the sole gate when no structured query is active`() =
         runTest(dispatcher) {
-            // Deck Wizard v4, W4.2b (G14): a bare tag-only filter (searchCollectionByTags with no
-            // accompanying applyStructuredSearch -- Trades' own tag search, or a section whose id
-            // never carried a structured query) must NOT degrade to "matches everything" just
+            // Deck Wizard UX polish plan, Run 1 §1.2: a bare section-predicate filter (no
+            // accompanying applyStructuredSearch) must NOT degrade to "matches everything" just
             // because StructuredCardSearch.matches(card, null) trivially returns true.
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(
@@ -1909,10 +1911,10 @@ class DeckStudioViewModelTest {
             val vm = createVm()
             advanceUntilIdle()
 
-            vm.searchCollectionByTags(setOf(CardTag.REMOVAL.key))
+            vm.searchCollectionByTags(setOf("mana_dork"))
 
             assertEquals(
-                setOf(removalCard.scryfallId),
+                setOf(elfCard.scryfallId),
                 vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet(),
             )
         }
@@ -2676,7 +2678,7 @@ class DeckStudioViewModelTest {
     }
 
     @Test
-    fun `updateDeckName with empty or blank string is a no-op`() = runTest(dispatcher) {
+    fun `updateDeckMetadata with blank name and null cover is a no-op`() = runTest(dispatcher) {
         // Arrange
         every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
             deckWithCards(deckName = "My Deck")
@@ -2686,15 +2688,38 @@ class DeckStudioViewModelTest {
         advanceUntilIdle()
 
         // Act
-        vm.updateDeckName("   ")
+        vm.updateDeckMetadata("   ", null)
         advanceUntilIdle()
 
-        // Assert — no repository call for a blank name.
+        // Assert — no repository call when both fields resolve to "keep current".
         coVerify(exactly = 0) { deckRepository.updateDeck(any()) }
     }
 
     @Test
-    fun `updateDeckName with valid name calls updateDeck`() = runTest(dispatcher) {
+    fun `updateDeckMetadata with a valid name and cover writes both fields in ONE updateDeck call`() = runTest(dispatcher) {
+        // Arrange — Edit-Deck-sheet rename race regression (Deck Wizard UX polish plan, Run 1 §1.3):
+        // the old back-to-back updateDeckName/setCoverCard calls each read-then-wrote the whole deck,
+        // so the second write silently reverted the first's name change. A single updateDeckMetadata
+        // call must carry BOTH fields in the SAME deck.copy/updateDeck call.
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+            deckWithCards(deckName = "My Deck")
+        )
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+        val vm = createVm()
+        advanceUntilIdle()
+
+        // Act
+        vm.updateDeckMetadata("Dragon Stompy", "cover-card-1")
+        advanceUntilIdle()
+
+        // Assert — exactly one write, carrying both the new name AND the new cover.
+        coVerify(exactly = 1) {
+            deckRepository.updateDeck(match { it.name == "Dragon Stompy" && it.coverCardId == "cover-card-1" })
+        }
+    }
+
+    @Test
+    fun `updateDeckMetadata with blank name keeps the current name but still applies the cover`() = runTest(dispatcher) {
         // Arrange
         every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
             deckWithCards(deckName = "My Deck")
@@ -2704,11 +2729,11 @@ class DeckStudioViewModelTest {
         advanceUntilIdle()
 
         // Act
-        vm.updateDeckName("Dragon Stompy")
+        vm.updateDeckMetadata("   ", "cover-card-2")
         advanceUntilIdle()
 
         // Assert
-        coVerify { deckRepository.updateDeck(match { it.name == "Dragon Stompy" }) }
+        coVerify { deckRepository.updateDeck(match { it.name == "My Deck" && it.coverCardId == "cover-card-2" }) }
     }
 
     @Test
@@ -3771,7 +3796,7 @@ class DeckStudioViewModelTest {
             coEvery { cardRepository.getCardById(vinSpell.scryfallId) } returns DataResult.Success(vinSpell)
             every { userCardRepository.observeCollection() } returns flowOf(emptyList())
 
-            val vm = createVmWithScorer()
+            val vm = createVm()
             advanceUntilIdle()
 
             // Act — the Build tab's own suggested total (sum of positive per-color deltas; see
@@ -3802,21 +3827,146 @@ class DeckStudioViewModelTest {
                 fixedSkeleton.lands.ideal,
             )
 
-            val profile = scorer.profile(
-                mainboard = listOf(
-                    DeckEntry(card = vinCreature, quantity = 4, isOwned = true, isSideboard = false),
-                    DeckEntry(card = vinSpell, quantity = 4, isOwned = true, isSideboard = false),
-                ),
-                format = DeckFormat.VINTAGE,
-                colorIdentity = colorIdentity,
-                seedTags = emptyList(),
-            )
+            // Deck Wizard UX polish plan, Run 1 §1.1: resolveStudioLandTarget always calls
+            // LandTargetResolver.resolve with profile = null (intentionally bypassing
+            // dynamicLandIdeal), so the expected value here must match that, not a real profile.
             val expectedTarget = LandTargetResolver.resolve(
                 format = DeckFormat.VINTAGE,
                 archetypeSkeleton = fixedSkeleton,
-                profile = profile,
+                profile = null,
             )
 
             assertEquals(expectedTarget, buildTabTarget)
+        }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  GROUP — Deck Wizard UX polish plan, Run 1 §1.6: scoreStrategyMatches
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun fakeHealth(score: Int): DeckHealth =
+        DeckHealth(evaluation = mockk(relaxed = true), profile = mockk(relaxed = true), analysis = mockk { every { totalScore } returns score })
+
+    @Test
+    fun `scoreStrategyMatches publishes a score for every availableIn entry`() =
+        runTest(dispatcher) {
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+                DeckWithCards(deck = Deck(id = DECK_ID, name = "Test", format = "casual"), mainboard = listOf(DeckSlot(elfCard.scryfallId, 1)), sideboard = emptyList())
+            )
+            coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            val pipeline = mockk<DeckAnalysisPipeline>()
+            coEvery {
+                pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            } returns fakeHealth(77)
+
+            val vm = createVmWithAnalysisPipeline(pipeline)
+            advanceUntilIdle()
+
+            vm.scoreStrategyMatches()
+            advanceUntilIdle()
+
+            // elfCard's typeLine ("Creature — Elf Druid") gives it a real subtype, so
+            // ArchetypeRoleClassifier.dominantTribeKey resolves a dominant tribe -- every
+            // requiresTribe entry (e.g. "tribal") gets scored too, not left unscored.
+            val expectedIds = CuratedStrategyCatalog.ALL
+                .filter { it.availableIn(DeckFormat.CASUAL) }
+                .map { it.id }
+                .toSet()
+            val state = vm.uiState.value
+            assertEquals(expectedIds, state.strategyMatchScores.keys)
+            assertTrue("every published score must be the pipeline's own value", state.strategyMatchScores.values.all { it == 77 })
+            assertFalse("scoring must report done once every entry has resolved", state.isScoringStrategyMatches)
+            coVerify(exactly = expectedIds.size) {
+                pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `scoreStrategyMatches with an unchanged deck snapshot skips recompute entirely`() = runTest(dispatcher) {
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+            DeckWithCards(deck = Deck(id = DECK_ID, name = "Test", format = "casual"), mainboard = listOf(DeckSlot(elfCard.scryfallId, 1)), sideboard = emptyList())
+        )
+        coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+        val pipeline = mockk<DeckAnalysisPipeline>()
+        coEvery {
+            pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns fakeHealth(50)
+
+        val vm = createVmWithAnalysisPipeline(pipeline)
+        advanceUntilIdle()
+
+        vm.scoreStrategyMatches()
+        advanceUntilIdle()
+        val firstPassCount = CuratedStrategyCatalog.ALL.count { it.availableIn(DeckFormat.CASUAL) }
+
+        // Act -- reopening the sheet on the SAME deck must not re-invoke the pipeline at all.
+        vm.scoreStrategyMatches()
+        advanceUntilIdle()
+
+        coVerify(exactly = firstPassCount) {
+            pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        }
+    }
+
+    @Test
+    fun `scoreStrategyMatches recomputes after a deck mutation invalidates the cached snapshot`() = runTest(dispatcher) {
+        val deckFlow = MutableStateFlow(
+            DeckWithCards(deck = Deck(id = DECK_ID, name = "Test", format = "casual"), mainboard = listOf(DeckSlot(elfCard.scryfallId, 1)), sideboard = emptyList())
+        )
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns deckFlow
+        coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
+        coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns DataResult.Success(removalCard)
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+        val pipeline = mockk<DeckAnalysisPipeline>()
+        coEvery {
+            pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns fakeHealth(60)
+
+        val vm = createVmWithAnalysisPipeline(pipeline)
+        advanceUntilIdle()
+
+        vm.scoreStrategyMatches()
+        advanceUntilIdle()
+        val firstPassCount = CuratedStrategyCatalog.ALL.count { it.availableIn(DeckFormat.CASUAL) }
+
+        // Act -- a real deck mutation (a second card added) must invalidate the cached snapshot.
+        deckFlow.value = deckFlow.value.copy(
+            mainboard = listOf(DeckSlot(elfCard.scryfallId, 1), DeckSlot(removalCard.scryfallId, 1)),
+        )
+        advanceUntilIdle()
+        vm.scoreStrategyMatches()
+        advanceUntilIdle()
+
+        coVerify(exactly = firstPassCount * 2) {
+            pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        }
+    }
+
+    @Test
+    fun `scoreStrategyMatches leaves a requiresTribe entry unscored when the deck has no dominant tribe`() =
+        runTest(dispatcher) {
+            // removalCard (Instant, no creature subtype) carries no tribal signal at all.
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+                DeckWithCards(deck = Deck(id = DECK_ID, name = "Test", format = "casual"), mainboard = listOf(DeckSlot(removalCard.scryfallId, 1)), sideboard = emptyList())
+            )
+            coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns DataResult.Success(removalCard)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            val pipeline = mockk<DeckAnalysisPipeline>()
+            coEvery {
+                pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            } returns fakeHealth(42)
+
+            val vm = createVmWithAnalysisPipeline(pipeline)
+            advanceUntilIdle()
+
+            vm.scoreStrategyMatches()
+            advanceUntilIdle()
+
+            val tribalId = CuratedStrategyCatalog.ALL.first { it.requiresTribe }.id
+            assertTrue(
+                "a requiresTribe entry must never be scored (not even a fake 0%) when no dominant tribe exists",
+                tribalId !in vm.uiState.value.strategyMatchScores,
+            )
         }
 }

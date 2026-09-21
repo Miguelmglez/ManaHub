@@ -7,10 +7,6 @@ import com.mmg.manahub.core.model.CardSelectionEntry
 import com.mmg.manahub.core.model.CardSelectionSession
 import com.mmg.manahub.core.ui.components.MagicToastType
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  UI State
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
  * Full UI state for the no-modal scanner screen.
  *
@@ -22,6 +18,12 @@ import com.mmg.manahub.core.ui.components.MagicToastType
  *                                  left over from before the overlay.
  * @property lastDetectedCard       The most recently confirmed card from Scryfall.
  * @property error                  Transient error message shown in the bottom bar.
+ * @property cameraBindError        Deck Wizard UX polish plan, Run 1 §1.7: separate from [error]
+ *                                  (which has other, unrelated write-path uses) so clearing one
+ *                                  never clobbers the other. Set by
+ *                                  [ScannerViewModel.onCameraBindFailed], cleared by
+ *                                  [ScannerViewModel.onCameraBound] on the next successful
+ *                                  `bindToLifecycle` -- the banner used to never clear once shown.
  * @property scanSession            Accumulated cards for the current session.
  * @property selectedIsFoil         Current foil toggle in the mode bar.
  * @property selectedLanguage       Current language code in the mode bar (e.g. "en").
@@ -84,6 +86,7 @@ data class ScannerUiState(
     val isSearching: Boolean = false,
     val lastDetectedCard: Card? = null,
     val error: String? = null,
+    val cameraBindError: String? = null,
     val scanSession: CardSelectionSession = CardSelectionSession(),
     // Mode bar state
     val selectedIsFoil: Boolean = false,
@@ -121,14 +124,14 @@ data class ScannerUiState(
     val languageMismatch: Boolean = false,
     // W2.10 (2026-08-24): active Scryfall rate-limit cooldown — see the field KDoc above.
     val rateLimitedUntilMs: Long? = null,
+    // Rolling FPS counter — only populated in DEBUG builds, always 0 in release
+    val fps: Int = 0,
+
     // Ambiguity resolution (normal mode only)
     val showAmbiguitySelector: Boolean = false,
     // Card Detail overlay (Phase 2 scanner UX, 2026-07-17)
     val selectedCardDetailId: String? = null,
     val returnToQueueOnDetailClose: Boolean = false,
-    // Rolling FPS counter — only populated in DEBUG builds, always 0 in release
-    val fps: Int = 0,
-
     // Variant selector sheet
     val showVariantSelector: Boolean = false,
     val variantSelectorEntry: CardSelectionEntry? = null,
@@ -136,7 +139,6 @@ data class ScannerUiState(
     val isLoadingVariants: Boolean = false,
     // Full-screen image viewer
     val expandedVariantImageUrl: String? = null,
-
     // Re-entrancy guard for onAddAllToCollection -- a second tap before the first commit
     // resolves must not double-commit the queue.
     val isCommittingQueue: Boolean = false,

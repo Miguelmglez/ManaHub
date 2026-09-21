@@ -43,6 +43,11 @@ fun MagicSelectionItem(
     description: String? = null,
     accentColor: Color? = null,
     icon: (@Composable () -> Unit)? = null,
+    // Deck Wizard UX polish plan, Run 1 §1.6 -- appended last, defaulted null so every existing
+    // call site renders unchanged. A row-end slot (e.g. a match-percentage badge or a loading
+    // spinner placeholder) rendered OUTSIDE the title/description Column's own `weight(1f)`, so it
+    // never gets squeezed by a long description.
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -116,6 +121,9 @@ fun MagicSelectionItem(
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
+                    }
+                    if (trailing != null) {
+                        trailing()
                     }
                 }
             }

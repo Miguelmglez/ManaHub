@@ -1,10 +1,11 @@
 package com.mmg.manahub.feature.addcard.presentation
 
+// COMMENTS_REVIEWED: 2026-09-06
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -85,6 +86,7 @@ import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.ui.components.CardRow
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.LanguageSelectorSheet
@@ -92,7 +94,6 @@ import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicProgressBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
-import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
@@ -584,16 +585,18 @@ private fun ResultsList(
         modifier = Modifier.fillMaxSize(),
     ) {
         items(results, key = { it.scryfallId }, contentType = { "card" }) { card ->
-            SearchResultItem(
+            CardRow(
                 card = card,
-                uiState = uiState,
+                isInCollection = false,
                 onClick = {
                     focusManager.clearFocus(force = true)
                     keyboardController?.hide()
                     onCardSelected(card)
                 },
+                onRemove = null,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
+                preferredCurrency = uiState.preferredCurrency,
             )
         }
         if (hasMore) {
@@ -623,7 +626,6 @@ private fun ResultsGrid(
     sharedTransitionScope: SharedTransitionScope?,
     animatedVisibilityScope: AnimatedVisibilityScope?,
 ) {
-    val mc = MaterialTheme.magicColors
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
@@ -684,7 +686,6 @@ private fun SearchResultGridItem(
     animatedVisibilityScope: AnimatedVisibilityScope?,
 ) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     Surface(
         onClick = onClick,
         shape = CardShape,
@@ -779,139 +780,4 @@ private fun SearchResultGridItem(
         }
     }
 }
-// ─────────────────────────────────────────────────────────────────────────────
-//  Search result row
-// ─────────────────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-private fun SearchResultItem(
-    card: Card,
-    uiState: AddCardUiState,
-    onClick: () -> Unit,
-    sharedTransitionScope: SharedTransitionScope?,
-    animatedVisibilityScope: AnimatedVisibilityScope?,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-
-    Surface(
-        onClick = onClick,
-        shape = CardShape,
-        color = mc.surface,
-        border = BorderStroke(0.5.dp, mc.surfaceVariant),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            // Art thumbnail
-            AsyncImage(
-                model = card.imageNormal,
-                contentDescription = card.name,
-                placeholder = painterResource(Res.drawable.mtg_card_back),
-                error = painterResource(Res.drawable.mtg_card_back),
-                contentScale = ContentScale.Crop,
-                modifier =
-                    Modifier
-                        .size(width = 44.dp, height = 60.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .then(
-                            if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                                with(sharedTransitionScope) {
-                                    Modifier.sharedBounds(
-                                        sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
-                                        animatedVisibilityScope = animatedVisibilityScope,
-                                        clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(6.dp)),
-                                        renderInOverlayDuringTransition = true,
-                                    )
-                                }
-                            } else {
-                                Modifier
-                            },
-                        ).background(mc.surfaceVariant),
-            )
-
-            // Name / type / set
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                val frontFace = card.cardFaces?.firstOrNull()
-                val printedName = card.printedName
-                val printedTypeLine = card.printedTypeLine
-                CardName(
-                    name = frontFace?.name ?: if (printedName.isNullOrEmpty()) card.name else printedName,
-                    showFrontOnly = true,
-                    style = ty.bodyMedium,
-                    color = mc.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = frontFace?.typeLine ?: if (printedTypeLine.isNullOrEmpty()) card.typeLine else printedTypeLine,
-                    style = ty.bodySmall,
-                    color = mc.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(2.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    SetSymbol(
-                        setCode = card.setCode,
-                        rarity = CardRarity.fromString(card.rarity),
-                        size = 14.dp,
-                    )
-                    Text(
-                        text = card.setName,
-                        style = ty.labelSmall,
-                        color = mc.secondaryAccent,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-
-            // Mana cost + price
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                card.manaCost?.let { cost ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val costs = cost.split(" // ")
-                        costs.forEachIndexed { index, singleCost ->
-                            ManaCostImages(manaCost = singleCost, symbolSize = 20.dp)
-                            if (index < costs.size - 1) {
-                                Text(
-                                    " // ",
-                                    style = MaterialTheme.magicTypography.titleMedium,
-                                    color = MaterialTheme.magicColors.textSecondary,
-                                    modifier = Modifier.padding(horizontal = MaterialTheme.spacing.xxs),
-                                )
-                            }
-                        }
-                    }
-                }
-                val formattedPrice =
-                    PriceFormatter.formatFromScryfall(
-                        priceUsd = card.priceUsd,
-                        priceEur = card.priceEur,
-                        preferredCurrency = uiState.preferredCurrency,
-                    )
-                if (formattedPrice != "—") {
-                    Text(
-                        text = formattedPrice,
-                        style = ty.bodySmall,
-                        color = mc.goldMtg,
-                    )
-                }
-            }
-        }
-    }
-}

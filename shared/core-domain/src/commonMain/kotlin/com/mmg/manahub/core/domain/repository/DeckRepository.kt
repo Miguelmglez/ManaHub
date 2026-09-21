@@ -6,6 +6,7 @@ import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DeckWithCards
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 /** One slot for [DeckRepository.replaceAllCardsWithSource] -- see that function's KDoc. */
 data class CardSlotWrite(
@@ -13,6 +14,20 @@ data class CardSlotWrite(
     val quantity: Int,
     val isSideboard: Boolean = false,
     val source: DeckCardSource = DeckCardSource.USER,
+)
+
+data class DeckCardAddition(
+    val entryId: String,
+    val scryfallId: String,
+    val oracleId: String,
+    val quantity: Int,
+    val isSideboard: Boolean,
+)
+
+data class DeckCardAdditionResult(
+    val committedEntryIds: Set<String>,
+    val blockedCommanderEntryIds: Set<String>,
+    val committedCopies: Int,
 )
 
 /**
@@ -73,6 +88,63 @@ interface DeckRepository {
         isSideboard: Boolean = false,
         source: DeckCardSource = DeckCardSource.USER,
     )
+
+    /**
+     * Merges scanner additions without replacing unrelated deck slots.
+     *
+     * Android overrides this with one Room transaction. The portable fallback keeps web
+     * implementations source-compatible until they provide an equivalent transactional store.
+     */
+    suspend fun mergeScannerCards(
+        deckId: String,
+        additions: List<DeckCardAddition>,
+    ): DeckCardAdditionResult {
+        val deck = observeDeckWithCards(deckId).first() ?: error("Deck not found")
+        val commanderId = deck.deck.commanderCardId
+        val blockedIds = additions.asSequence()
+            .filter { !it.isSideboard && it.scryfallId == commanderId }
+            .mapTo(linkedSetOf()) { it.entryId }
+        val permitted = additions.filterNot { it.entryId in blockedIds }
+        if (permitted.isNotEmpty()) {
+            val slots = LinkedHashMap<Pair<String, Boolean>, CardSlotWrite>()
+            deck.mainboard.forEach { slot ->
+                slots[slot.scryfallId to false] = CardSlotWrite(
+                    scryfallId = slot.scryfallId,
+                    quantity = slot.quantity,
+                    isSideboard = false,
+                    source = slot.source,
+                )
+            }
+            deck.sideboard.forEach { slot ->
+                slots[slot.scryfallId to true] = CardSlotWrite(
+                    scryfallId = slot.scryfallId,
+                    quantity = slot.quantity,
+                    isSideboard = true,
+                    source = slot.source,
+                )
+            }
+            permitted.groupBy { it.scryfallId to it.isSideboard }.forEach { (key, grouped) ->
+                val current = slots[key]
+                val added = grouped.sumOf { it.quantity.toLong() }
+                val quantity = (current?.quantity ?: 0).toLong() + added
+                check(quantity <= Int.MAX_VALUE) { "merged quantity exceeds Int range" }
+                slots[key] = CardSlotWrite(
+                    scryfallId = key.first,
+                    quantity = quantity.toInt(),
+                    isSideboard = key.second,
+                    source = current?.source ?: DeckCardSource.USER,
+                )
+            }
+            replaceAllCardsWithSource(deckId, slots.values.toList())
+        }
+        val committedCopies = permitted.sumOf { it.quantity.toLong() }
+        check(committedCopies <= Int.MAX_VALUE) { "committed copies exceed Int range" }
+        return DeckCardAdditionResult(
+            committedEntryIds = permitted.mapTo(linkedSetOf()) { it.entryId },
+            blockedCommanderEntryIds = blockedIds,
+            committedCopies = committedCopies.toInt(),
+        )
+    }
 
     /** Removes a card slot from the deck. */
     suspend fun removeCardFromDeck(deckId: String, scryfallId: String, isSideboard: Boolean)

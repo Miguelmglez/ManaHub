@@ -207,15 +207,15 @@ fun decksKoinModule(): Module = module {
             importDeckCardsUseCase = get(),
             discoverSynergiesV2UseCase = get(),
             findCombosUseCase = get(),
-            // Deck Wizard & Engine Rework plan, Workstream 6 -- unifies calculateLandDeltas onto the
-            // SAME LandTargetResolver the wizard uses at build time (see DeckStudioViewModel's KDoc
-            // on resolveStudioLandTarget).
-            deckScorer = get(),
             manaBaseAnalyzer = get(),
             // Suggestions Tab UI Polish plan (W11 bug-fix pass, 2026-08-25) -- already a `single`
             // in SharedDomainKoinModule (shared with AdvancedSearchViewModel/AddCardViewModel).
             buildScryfallQueryUseCase = get(),
             calculateDeckValueSummaryUseCase = get(),
+            // Deck Wizard UX polish plan, Run 1 §1.6 -- the SAME DeckAnalysisPipeline singleton
+            // declared above (also resolved by DeckDoctorOrchestrator/BuildWizardDeckUseCase), for
+            // scoreStrategyMatches()'s per-strategy "match %" preview. Never a second instance.
+            deckAnalysisPipeline = get(),
         )
     }
 

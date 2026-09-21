@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.draft.presentation.ui
 
+// COMMENTS_REVIEWED: 2026-09-17
+
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
@@ -23,6 +25,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
@@ -51,6 +56,7 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,8 +67,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.LinkInteractionListener
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -123,6 +142,118 @@ private fun extractColorLetters(colorsStr: String): List<String> {
         colorsStr.filter { it in "WUBRGC" && it != ' ' }.map { it.toString() }
     }
 }
+
+@Composable
+private fun DraftGuideRichText(
+    text: String,
+    style: TextStyle,
+    linkKeyPrefix: String,
+    onCardClick: (String, String?) -> Unit,
+    modifier: Modifier = Modifier,
+    baseColor: Color = MaterialTheme.magicColors.textPrimary,
+) {
+    val colors = MaterialTheme.magicColors
+    val typography = MaterialTheme.magicTypography
+    val segments = remember(text) { DraftGuideRichTextParser.parse(text) }
+    val fontSize = if (style.fontSize == TextUnit.Unspecified) typography.bodyMedium.fontSize else style.fontSize
+    val inlineSize = fontSize * 1.15f
+    val inlineContent = remember(segments, inlineSize) {
+        segments
+            .filterIsInstance<DraftGuideRichTextSegment.Mana>()
+            .map { it.token }
+            .distinct()
+            .associate { token ->
+                manaInlineContentId(token) to InlineTextContent(
+                    placeholder = Placeholder(
+                        width = inlineSize,
+                        height = inlineSize,
+                        placeholderVerticalAlign = PlaceholderVerticalAlign.Center,
+                    ),
+                ) {
+                    ManaSymbolImage(
+                        token = token,
+                        size = with(androidx.compose.ui.platform.LocalDensity.current) { inlineSize.toDp() },
+                    )
+                }
+            }
+    }
+    val annotatedText = remember(segments, linkKeyPrefix, colors, baseColor) {
+        buildAnnotatedString {
+            segments.forEachIndexed { index, segment ->
+                when (segment) {
+                    is DraftGuideRichTextSegment.Text -> {
+                        withStyle(segment.style.toSpanStyle(colors, baseColor)) {
+                            append(segment.value)
+                        }
+                    }
+
+                    is DraftGuideRichTextSegment.Mana -> {
+                        appendInlineContent(
+                            id = manaInlineContentId(segment.token),
+                            alternateText = "{${segment.token}}",
+                        )
+                    }
+
+                    is DraftGuideRichTextSegment.CardReference -> {
+                        val stableCardKey = "$linkKeyPrefix-card-$index-${segment.scryfallId}"
+                        val link = LinkAnnotation.Clickable(
+                            tag = stableCardKey,
+                            styles = TextLinkStyles(
+                                style = SpanStyle(
+                                    color = colors.primaryAccent,
+                                    textDecoration = TextDecoration.Underline,
+                                ),
+                            ),
+                            linkInteractionListener = LinkInteractionListener {
+                                onCardClick(segment.scryfallId, stableCardKey)
+                            },
+                        )
+                        withLink(link) {
+                            withStyle(segment.style.toSpanStyle(colors, baseColor)) {
+                                append(segment.name)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    BasicText(
+        text = annotatedText,
+        inlineContent = inlineContent,
+        style = style.copy(color = baseColor),
+        modifier = modifier,
+    )
+}
+
+private fun manaInlineContentId(token: String): String = "draft-guide-mana-${token.hashCode()}"
+
+private fun DraftGuideTextStyle.toSpanStyle(
+    colors: MagicColors,
+    baseColor: Color,
+): SpanStyle = SpanStyle(
+    color = when (colorToken?.trim()?.lowercase()) {
+        "primary", "accent", "primary_accent", "primaryaccent" -> colors.primaryAccent
+        "secondary", "secondary_accent", "secondaryaccent" -> colors.secondaryAccent
+        "gold", "gold_mtg", "goldmtg", "warning" -> colors.goldMtg
+        "success", "life_positive", "lifepositive" -> colors.lifePositive
+        "error", "negative", "life_negative", "lifenegative" -> colors.lifeNegative
+        "text_primary", "textprimary" -> colors.textPrimary
+        "text_secondary", "secondary_text", "textsecondary", "muted" -> colors.textSecondary
+        "disabled", "text_disabled", "textdisabled" -> colors.textDisabled
+        "mana_w", "manaw", "white" -> colors.manaW
+        "mana_u", "manau", "blue" -> colors.manaU
+        "mana_b", "manab", "black" -> colors.manaB
+        "mana_r", "manar", "red" -> colors.manaR
+        "mana_g", "manag", "green" -> colors.manaG
+        "mana_c", "manac", "colorless" -> colors.manaC
+        else -> baseColor
+    },
+    fontWeight = if (bold) FontWeight.Bold else null,
+    fontStyle = if (italic) FontStyle.Italic else null,
+    textDecoration = if (strikeThrough) TextDecoration.LineThrough else null,
+)
 
 private val RARITY_ITEMS = listOf(
     Triple("common", "C", Color(0xFF888888)),
@@ -420,15 +551,29 @@ private fun GuideTab(
                         iconColor = colors.primaryAccent
                     ) {
                         if (guide.summary.isNotBlank()) {
-                            Text(
-                                guide.summary,
-                                style = typography.bodyLarge,
-                                color = colors.textPrimary,
-                                lineHeight = typography.bodyLarge.lineHeight * 1.2f,
-                                modifier = Modifier.padding(horizontal = 4.dp)
+                            DraftGuideRichText(
+                                text = guide.summary,
+                                style = typography.bodyLarge.copy(
+                                    lineHeight = typography.bodyLarge.lineHeight * 1.2f,
+                                ),
+                                linkKeyPrefix = "guide-summary",
+                                onCardClick = onCardClick,
+                                modifier = Modifier.padding(horizontal = 4.dp),
                             )
                         }
-                        
+
+                        if (guide.formatSpeed.isNotBlank()) {
+                            DraftGuideRichText(
+                                text = guide.formatSpeed,
+                                style = typography.bodyMedium.copy(
+                                    lineHeight = typography.bodyMedium.lineHeight * 1.1f,
+                                ),
+                                linkKeyPrefix = "guide-format-speed",
+                                onCardClick = onCardClick,
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
+                        }
+
                         if (guide.keyGameplayNotes.isNotEmpty()) {
                             Column(
                                 modifier = Modifier
@@ -442,7 +587,7 @@ private fun GuideTab(
                                     color = colors.secondaryAccent,
                                     fontWeight = FontWeight.Bold,
                                 )
-                                guide.keyGameplayNotes.forEach { note ->
+                                guide.keyGameplayNotes.forEachIndexed { index, note ->
                                     Row(verticalAlignment = Alignment.Top) {
                                         Icon(
                                             Icons.Default.Lightbulb,
@@ -453,11 +598,14 @@ private fun GuideTab(
                                                 .padding(top = 2.dp),
                                         )
                                         Spacer(Modifier.width(10.dp))
-                                        Text(
-                                            note,
-                                            style = typography.bodyMedium,
-                                            color = colors.textPrimary,
-                                            lineHeight = typography.bodyMedium.lineHeight * 1.1f
+                                        DraftGuideRichText(
+                                            text = note,
+                                            style = typography.bodyMedium.copy(
+                                                lineHeight = typography.bodyMedium.lineHeight * 1.1f,
+                                            ),
+                                            linkKeyPrefix = "guide-key-note-$index",
+                                            onCardClick = onCardClick,
+                                            modifier = Modifier.weight(1f),
                                         )
                                     }
                                 }
@@ -482,7 +630,8 @@ private fun GuideTab(
                                     entry = colorEntry,
                                     note = guide.colorNotes[colorEntry],
                                     colors = colors,
-                                    typography = typography
+                                    typography = typography,
+                                    onCardClick = onCardClick,
                                 )
                             }
                         }
@@ -578,6 +727,7 @@ private fun ColorRankingItem(
     note: String?,
     colors: MagicColors,
     typography: MagicTypography,
+    onCardClick: (String, String?) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -603,12 +753,12 @@ private fun ColorRankingItem(
             
             Spacer(Modifier.width(10.dp))
 
-            Text(
-                entry.replace(Regex("\\{[^}]+\\}\\s*"), "").trim(),
-                style = typography.bodyLarge,
-                color = colors.textPrimary,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
+            DraftGuideRichText(
+                text = entry.replace(Regex("^\\s*(?:\\{[WUBRGC]\\}\\s*)+"), "").trim(),
+                style = typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                linkKeyPrefix = "guide-color-ranking-$rank",
+                onCardClick = onCardClick,
+                modifier = Modifier.weight(1f),
             )
 
             if (Regex("\\{([WUBRGC])\\}").find(entry) != null) {
@@ -623,12 +773,15 @@ private fun ColorRankingItem(
 
         if (!note.isNullOrBlank()) {
             Spacer(Modifier.height(2.dp))
-            Text(
-                note,
-                style = typography.bodyMedium,
-                color = colors.textSecondary,
+            DraftGuideRichText(
+                text = note,
+                style = typography.bodyMedium.copy(
+                    lineHeight = typography.bodyMedium.lineHeight * 1.05f,
+                ),
+                linkKeyPrefix = "guide-color-note-$rank",
+                onCardClick = onCardClick,
                 modifier = Modifier.padding(start = 42.dp),
-                lineHeight = typography.bodyMedium.lineHeight * 1.05f
+                baseColor = colors.textSecondary,
             )
         }
         Spacer(Modifier.height(4.dp))
@@ -669,12 +822,14 @@ private fun MechanicCard(
             )
 
             if (mechanic.summary.isNotBlank()) {
-                Text(
-                    mechanic.summary,
-                    style = typography.bodyLarge,
-                    color = colors.textPrimary,
-                    lineHeight = typography.bodyLarge.lineHeight * 1.1f,
-                    modifier = Modifier.padding(start = 4.dp, end = 4.dp)
+                DraftGuideRichText(
+                    text = mechanic.summary,
+                    style = typography.bodyLarge.copy(
+                        lineHeight = typography.bodyLarge.lineHeight * 1.1f,
+                    ),
+                    linkKeyPrefix = "mechanic-${mechanic.name}-summary",
+                    onCardClick = onCardClick,
+                    modifier = Modifier.padding(start = 4.dp, end = 4.dp),
                 )
             }
 
@@ -696,7 +851,13 @@ private fun MechanicCard(
                             .padding(top = 2.dp)
                     )
                     Spacer(Modifier.width(10.dp))
-                    Text(mechanic.performance, style = typography.bodyMedium, color = colors.textPrimary)
+                    DraftGuideRichText(
+                        text = mechanic.performance,
+                        style = typography.bodyMedium,
+                        linkKeyPrefix = "mechanic-${mechanic.name}-performance",
+                        onCardClick = onCardClick,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
 
@@ -876,12 +1037,28 @@ private fun ArchetypeCard(
 
             if (archetype.strategy.isNotBlank()) {
                 Spacer(Modifier.height(16.dp))
-                Text(
-                    archetype.strategy,
-                    style = typography.bodyLarge,
-                    color = colors.textPrimary,
-                    lineHeight = typography.bodyLarge.lineHeight * 1.2f,
-                    modifier = Modifier.padding(start = 4.dp, end = 4.dp)
+                DraftGuideRichText(
+                    text = archetype.strategy,
+                    style = typography.bodyLarge.copy(
+                        lineHeight = typography.bodyLarge.lineHeight * 1.2f,
+                    ),
+                    linkKeyPrefix = "archetype-${archetype.name}-strategy",
+                    onCardClick = onCardClick,
+                    modifier = Modifier.padding(start = 4.dp, end = 4.dp),
+                )
+            }
+
+            if (archetype.notes.isNotBlank()) {
+                Spacer(Modifier.height(12.dp))
+                DraftGuideRichText(
+                    text = archetype.notes,
+                    style = typography.bodyMedium.copy(
+                        lineHeight = typography.bodyMedium.lineHeight * 1.1f,
+                    ),
+                    linkKeyPrefix = "archetype-${archetype.name}-notes",
+                    onCardClick = onCardClick,
+                    modifier = Modifier.padding(start = 4.dp, end = 4.dp),
+                    baseColor = colors.textSecondary,
                 )
             }
 
@@ -1110,7 +1287,12 @@ private fun TierListSubTab(
 
                     if (filteredCards.isNotEmpty()) {
                         stickyHeader(key = "tier_${tier.tier}") {
-                            TierBanner(tier.tier, tier.label, tier.description)
+                            TierBanner(
+                                tier = tier.tier,
+                                label = tier.label,
+                                description = tier.description,
+                                onCardClick = onCardClick,
+                            )
                         }
 
                         items(filteredCards, key = { it.scryfallId }) { card ->
@@ -1144,7 +1326,12 @@ private fun TierListSubTab(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun TierBanner(tier: String, label: String, description: String) {
+private fun TierBanner(
+    tier: String,
+    label: String,
+    description: String,
+    onCardClick: (String, String?) -> Unit,
+) {
     val tierColor = TIER_COLORS[tier] ?: Color.Gray
     val typography = MaterialTheme.magicTypography
     val mc = MaterialTheme.magicColors
@@ -1180,10 +1367,12 @@ private fun TierBanner(tier: String, label: String, description: String) {
                             fontWeight = FontWeight.Bold
                         )
                         if (description.isNotBlank()) {
-                            Text(
-                                description,
+                            DraftGuideRichText(
+                                text = description,
                                 style = typography.labelSmall,
-                                color = tierColor.copy(alpha = 0.7f)
+                                linkKeyPrefix = "tier-description-$tier",
+                                onCardClick = onCardClick,
+                                baseColor = tierColor.copy(alpha = 0.7f),
                             )
                         }
                     }

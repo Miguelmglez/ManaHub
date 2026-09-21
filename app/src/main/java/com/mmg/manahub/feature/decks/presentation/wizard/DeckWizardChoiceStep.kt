@@ -7,11 +7,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -439,28 +442,20 @@ private fun ChoiceCandidateRow(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    val badge: (@Composable () -> Unit)? = if (isTentativeDefault) {
+    val badge: (@Composable RowScope.() -> Unit)? = if (isTentativeDefault) {
         {
-            // W7 fix 5.4 (design review P1): a distinct badge (icon + tonal chip), independent of
-            // the row's own selection tint, replacing the old labelSmall/textSecondary caption
-            // that read too weakly and was easily confused with "currently selected".
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(spacing.xxs),
-                modifier = Modifier.padding(top = spacing.xxs),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.AutoAwesome,
-                    contentDescription = null,
-                    tint = mc.secondaryAccent,
-                    modifier = Modifier.size(12.dp),
-                )
-                Text(
-                    text = stringResource(R.string.deck_wizard_choice_wizards_pick),
-                    style = ty.labelSmall,
-                    color = mc.secondaryAccent,
-                )
-            }
+            Icon(
+                imageVector = Icons.Default.AutoAwesome,
+                contentDescription = null,
+                tint = mc.secondaryAccent,
+                modifier = Modifier.size(12.dp),
+            )
+            Spacer(Modifier.width(spacing.xxs))
+            Text(
+                text = stringResource(R.string.deck_wizard_choice_wizards_pick),
+                style = ty.labelSmall,
+                color = mc.secondaryAccent,
+            )
         }
     } else {
         null

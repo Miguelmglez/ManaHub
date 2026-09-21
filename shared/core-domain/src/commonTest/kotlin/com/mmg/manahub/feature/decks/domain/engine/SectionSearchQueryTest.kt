@@ -338,47 +338,6 @@ class SectionSearchQueryTest {
         assertEquals(1, Regex("-t:land").findAll(mv).count(), "mv: id must carry exactly one -t:land, got: $mv")
     }
 
-    // ── collectionTagKeysFor ─────────────────────────────────────────────────────────────────
-
-    @Test
-    fun collectionTagKeysFor_roleWithTagEquivalent_returnsTheKeyItself() {
-        assertEquals(setOf("sac_outlet"), SectionSearchQuery.collectionTagKeysFor("role:sac_outlet"))
-        assertEquals(setOf("mana_fix"), SectionSearchQuery.collectionTagKeysFor("role:mana_fix"))
-    }
-
-    @Test
-    fun collectionTagKeysFor_roleWithNoTagEquivalent_returnsEmpty() {
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("role:removal_spot"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("role:removal_mass"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("role:finisher"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("role:equipment_or_aura"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("role:tribe_members"))
-    }
-
-    @Test
-    fun collectionTagKeysFor_engineDelegatesToTheAxisRoleUnion() {
-        assertEquals(
-            setOf("lifegain_payoff"),
-            SectionSearchQuery.collectionTagKeysFor("engine:LIFE:payoffs"),
-        )
-    }
-
-    @Test
-    fun collectionTagKeysFor_manaRockAndDork_returnOwnKey() {
-        assertEquals(setOf("mana_rock"), SectionSearchQuery.collectionTagKeysFor("mana_rock"))
-        assertEquals(setOf("mana_dork"), SectionSearchQuery.collectionTagKeysFor("mana_dork"))
-    }
-
-    @Test
-    fun collectionTagKeysFor_structuralIds_returnEmpty() {
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("tribe:elf"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("produces:B"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("mv:3"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("legal"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("illegal"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("offplan"))
-    }
-
     // ── translate() as a standalone, directly-testable function ────────────────────────────
 
     @Test
@@ -616,8 +575,4 @@ class SectionSearchQueryTest {
         assertEquals(com.mmg.manahub.core.model.SearchCriterion.CardType(setOf("land")), query.criteria.first())
     }
 
-    @Test
-    fun landsSection_collectionTagKeysAreEmpty() {
-        assertTrue(SectionSearchQuery.collectionTagKeysFor("lands").isEmpty())
-    }
 }
