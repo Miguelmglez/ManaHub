@@ -47,7 +47,8 @@ import java.util.concurrent.ConcurrentHashMap
  * - **Guide / Tier-list**: Per-set JSON files in `filesDir/draft/{setCode}/`.
  *   Invalidated when the content version stored in SharedPreferences differs from the
  *   version in the sets-index. No automatic TTL — content only refreshes when the
- *   Worker publishes a new version.
+ *   Worker publishes a new version. The parsed domain models are memoised in memory per
+ *   set + content version, so reopening a set skips the file read and JSON parse.
  *
  * No assets/ reads. If Cloudflare is unreachable and no local file exists, an error is returned.
  *
@@ -82,6 +83,12 @@ class DraftRepositoryImpl(
 
     private fun guideMutex(code: String) = guideMutexes.computeIfAbsent(code) { Mutex() }
     private fun tierMutex(code: String) = tierMutexes.computeIfAbsent(code) { Mutex() }
+
+    // Parsed models keyed by set code; only read/written under that set's mutex.
+    private val parsedGuides = ConcurrentHashMap<String, VersionedModel<SetDraftGuide>>()
+    private val parsedTierLists = ConcurrentHashMap<String, VersionedModel<SetTierList>>()
+
+    private data class VersionedModel<T>(val version: String?, val model: T)
 
     // -------------------------------------------------------------------------
     // getDraftableSets — Cloudflare sets-index.json with Room cache
@@ -134,6 +141,7 @@ class DraftRepositoryImpl(
                         (remoteVersion != null && remoteVersion != storedVersion)
 
                     if (needsRefresh) {
+                        parsedGuides.remove(safeCode)
                         val jsonString = cloudflareClient.getSetGuide(safeCode)
                         saveJsonToFile(jsonString, localFile)
                         if (remoteVersion != null) {
@@ -146,8 +154,13 @@ class DraftRepositoryImpl(
                     if (!localFile.exists()) {
                         DataResult.Error("Guide not available for $safeCode")
                     } else {
-                        val jsonObject = gson.fromJson(localFile.readText(), JsonObject::class.java)
-                        DataResult.Success(parseGuide(safeCode, jsonObject))
+                        val currentVersion = if (needsRefresh) remoteVersion ?: storedVersion else storedVersion
+                        val cached = parsedGuides[safeCode]?.takeIf { it.version == currentVersion }
+                        val model = cached?.model ?: parseGuide(
+                            safeCode,
+                            gson.fromJson(localFile.readText(), JsonObject::class.java),
+                        ).also { parsedGuides[safeCode] = VersionedModel(currentVersion, it) }
+                        DataResult.Success(model)
                     }
                 }
             } catch (e: Exception) {
@@ -173,6 +186,7 @@ class DraftRepositoryImpl(
                         (remoteVersion != null && remoteVersion != storedVersion)
 
                     if (needsRefresh) {
+                        parsedTierLists.remove(safeCode)
                         val jsonString = cloudflareClient.getSetTierList(safeCode)
                         saveJsonToFile(jsonString, localFile)
                         if (remoteVersion != null) {
@@ -185,8 +199,13 @@ class DraftRepositoryImpl(
                     if (!localFile.exists()) {
                         DataResult.Error("Tier list not available for $safeCode")
                     } else {
-                        val jsonObject = gson.fromJson(localFile.readText(), JsonObject::class.java)
-                        DataResult.Success(parseTierList(safeCode, jsonObject))
+                        val currentVersion = if (needsRefresh) remoteVersion ?: storedVersion else storedVersion
+                        val cached = parsedTierLists[safeCode]?.takeIf { it.version == currentVersion }
+                        val model = cached?.model ?: parseTierList(
+                            safeCode,
+                            gson.fromJson(localFile.readText(), JsonObject::class.java),
+                        ).also { parsedTierLists[safeCode] = VersionedModel(currentVersion, it) }
+                        DataResult.Success(model)
                     }
                 }
             } catch (e: Exception) {

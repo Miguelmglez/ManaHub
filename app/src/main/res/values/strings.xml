@@ -2599,7 +2599,6 @@
     <string name="draft_cards_all">All Cards</string>
     <string name="draft_guide_videos">Videos</string>
     <string name="draft_card_artist">Artist: %1$s</string>
-    <string name="draft_color_ranking_label">Color Ranking:</string>
     <string name="draft_key_notes_label">Key Notes:</string>
     <string name="draft_mechanic_overperformers">Overperformers</string>
     <string name="draft_mechanic_underperformers">Underperformers</string>
@@ -2609,6 +2608,15 @@
     <string name="draft_cards_to_avoid_label">Cards to Avoid</string>
     <string name="draft_archetype_win_rate">%1$.1f%% Win Rate</string>
     <string name="draft_key_commons_by_color">Key Commons by Color</string>
+    <string name="draft_guide_color_ranking">Color Ranking</string>
+    <string name="draft_guide_state_expanded">Expanded</string>
+    <string name="draft_guide_state_collapsed">Collapsed</string>
+    <string name="draft_guide_loading">Loading guide</string>
+    <string name="draft_search_clear">Clear search</string>
+    <plurals name="draft_guide_section_count">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
 
     <!-- Draft Simulator -->
     <string name="draft_sim_setup_title">Draft Simulator</string>

@@ -39,7 +39,7 @@ private const val MAX_RESPONSE_BYTES = 5L * 1024 * 1024 // 5 MB
 
 /**
  * KMP migration — Hilt→Koin cutover batch 3. The Draft feature is the Koin island for
- * [DraftViewModel] (set list), [SetDraftDetailViewModel] (guide/tier/videos) and [DraftSimViewModel]
+ * [DraftViewModel] (set list), [SetDraftDetailViewModel] (guide/tier list) and [DraftSimViewModel]
  * (the setup → drafting → result simulator flow).
  *
  * ## Everything below is now natively Koin-built (the feature-private Hilt `DraftModule` was DELETED)
@@ -59,7 +59,7 @@ private const val MAX_RESPONSE_BYTES = 5L * 1024 * 1024 // 5 MB
  *
  * ## Dependencies resolved via `get()` from OTHER loaded modules (NOT re-registered here)
  * `ScryfallClient`/`ScryfallRequestQueue` (`SharedDomainKoinModule`), `DeckScorer` (`decksKoinModule`),
- * `GetDraftableSetsUseCase`/`GetSetGuideUseCase`/`GetSetTierListUseCase`/`GetSetVideosUseCase`/
+ * `GetDraftableSetsUseCase`/`GetSetGuideUseCase`/`GetSetTierListUseCase`/
  * `ObserveDraftUseCase`/`GetDraftableSimSetUseCase`/`StartDraftUseCase`/`MakePickUseCase`/
  * `AutoPickUseCase`/`CompleteDraftUseCase` (`SharedDomainKoinModule`), `AnalyticsHelper` +
  * `DraftRepository`/`DraftSimRepository` (`coreBridgeKoinModule`).
@@ -174,8 +174,8 @@ fun draftKoinModule(
             savedStateHandle = get(),
             getSetGuideUseCase = get(),
             getSetTierListUseCase = get(),
-            getSetVideosUseCase = get(),
             getDraftableSetsUseCase = get(),
+            defaultDispatcher = Dispatchers.Default,
         )
     }
 

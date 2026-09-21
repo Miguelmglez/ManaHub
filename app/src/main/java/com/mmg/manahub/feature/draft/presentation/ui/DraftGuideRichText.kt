@@ -95,8 +95,13 @@ internal object DraftGuideRichTextParser {
                 continue
             }
 
-            appendText(result, source[index].toString(), inheritedStyle)
-            index++
+            // Appending one plain run at a time keeps parsing linear; per-char appends were quadratic.
+            var runEnd = index + 1
+            while (runEnd < source.length && source[runEnd] != '{' && markerAt(source, runEnd) == null) {
+                runEnd++
+            }
+            appendText(result, source.substring(index, runEnd), inheritedStyle)
+            index = runEnd
         }
 
         return result
