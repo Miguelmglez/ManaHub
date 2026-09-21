@@ -41,6 +41,11 @@ fun addCardKoinModule(): Module = module {
             userPreferences = get(),
             buildScryfallQuery = get(),
             getSpotlightFeed = get(),
+            queueRepository = get(),
+            queueActions = get(),
+            userCardRepository = get(),
+            cardRepository = get(),
+            appScope = get(),
         )
     }
 }

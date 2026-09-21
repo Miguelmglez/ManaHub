@@ -130,6 +130,14 @@
     <string name="addcard_spotlight_header">Latest Set: %1$s</string>
     <string name="addcard_language_button">Search language: %1$s. Tap to change.</string>
     <string name="addcard_language_sheet_title">Search language</string>
+    <string name="addcard_multi_select_title">Select multiple</string>
+    <string name="addcard_multi_select_toggle_cd">Select multiple cards</string>
+    <string name="addcard_multi_select_toggle_action">Select or deselect card</string>
+    <string name="addcard_multi_select_open_details">Open card details</string>
+    <plurals name="addcard_multi_select_proceed">
+        <item quantity="one">Proceed with %d selected</item>
+        <item quantity="other">Proceed with %d selected</item>
+    </plurals>
     <string name="shared_foil">Foil</string>
 
 
