@@ -267,8 +267,8 @@ fun DeckStudioScreen(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     viewModel: DeckStudioViewModel = koinViewModel(),
-    onNavigateToMassiveAddCards: (List<Card>) -> Unit = {},
     onNavigateToScanner: (deckId: String) -> Unit = {},
+    onNavigateToSelectCards: (deckId: String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val deckStats by viewModel.deckStatsFlow.collectAsStateWithLifecycle()
@@ -591,7 +591,7 @@ fun DeckStudioScreen(
                             )
                         }
                     },
-                    onMassiveAdd = {onNavigateToMassiveAddCards(emptyList())},
+                    onSelectCards = { uiState.deck?.id?.let(onNavigateToSelectCards) },
                     shareEnabled = !uiState.isEmptyDeck,
                     onDeleteDeck = {showDeleteDialog = true},
                     wizardAvailable = wizardAvailableForFormat,
@@ -1159,7 +1159,7 @@ private fun DeckStudioTopBar(
     onEdit: () -> Unit,
     onShare: () -> Unit,
     shareEnabled: Boolean,
-    onMassiveAdd: () -> Unit,
+    onSelectCards: () -> Unit,
     onDeleteDeck: () -> Unit,
     // Deck Wizard Commander v3 plan (Phase 6, item 4); Deck Wizard 60-card wave (v6), plan §5
     // Phase 5.4 (S15): "regenerate this draft through the wizard" entry point, gated by the SAME
@@ -1347,29 +1347,27 @@ private fun DeckStudioTopBar(
                         },
                     )
 
-                    if (FeatureFlags.MassiveAdd.MASSIVE_CARDS_ENABLED) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = "Massive add",
-                                    style = ty.bodyMedium,
-                                    color = if (shareEnabled) mc.textPrimary else mc.textDisabled,
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.CollectionsBookmark,
-                                    contentDescription = null,
-                                    tint = if (shareEnabled) mc.textSecondary else mc.textDisabled,
-                                )
-                            },
-                            enabled = shareEnabled,
-                            onClick = {
-                                showOverflow = false
-                                onMassiveAdd()
-                            },
-                        )
-                    }
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = stringResource(R.string.deckstudio_select_cards),
+                                style = ty.bodyMedium,
+                                color = if (shareEnabled) mc.textPrimary else mc.textDisabled,
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.CollectionsBookmark,
+                                contentDescription = null,
+                                tint = if (shareEnabled) mc.textSecondary else mc.textDisabled,
+                            )
+                        },
+                        enabled = shareEnabled,
+                        onClick = {
+                            showOverflow = false
+                            onSelectCards()
+                        },
+                    )
                 }
             }
         }

@@ -126,11 +126,50 @@
     <string name="addcard_index_title">Browse the MTG universe!</string>
     <string name="addcard_index_subtitle">Type the name of a card or open the Advanced search to find by its attributes</string>
 
-    <string name="addcard_multi_add_button">Add multiple</string>
     <string name="addcard_scanner_button">Open Scanner</string>
     <string name="addcard_spotlight_header">Latest Set: %1$s</string>
     <string name="addcard_language_button">Search language: %1$s. Tap to change.</string>
     <string name="addcard_language_sheet_title">Search language</string>
+    <string name="addcard_multi_select_title">Select multiple</string>
+    <string name="addcard_multi_select_toggle_cd">Select multiple cards</string>
+    <string name="addcard_multi_select_toggle_action">Select or deselect card</string>
+    <string name="addcard_multi_select_open_details">Open card details</string>
+    <string name="addcard_clear_deck_cards">Clear deck cards</string>
+    <string name="addcard_select_all">Select all</string>
+    <string name="addcard_select_missing">Select missing</string>
+    <string name="addcard_deck_load_error">Could not load the cards of this deck.</string>
+    <string name="addcard_deck_empty_title">No cards in this deck</string>
+    <string name="addcard_deck_empty_subtitle">Clear deck cards to search every card instead.</string>
+    <string name="addcard_deck_nothing_new_selected">These cards are already selected</string>
+    <string name="addcard_selection_locked_while_adding">%1$s is being added to your collection</string>
+    <plurals name="addcard_deck_cards_selected">
+        <item quantity="one">%d card selected</item>
+        <item quantity="other">%d cards selected</item>
+    </plurals>
+    <plurals name="addcard_multi_select_proceed">
+        <item quantity="one">Proceed with %d selected</item>
+        <item quantity="other">Proceed with %d selected</item>
+    </plurals>
+    <plurals name="addcard_queue_added_all_to_collection">
+        <item quantity="one">%d card added to Collection</item>
+        <item quantity="other">%d cards added to Collection</item>
+    </plurals>
+    <plurals name="addcard_queue_added_all_to_wishlist">
+        <item quantity="one">%d card added to Wishlist</item>
+        <item quantity="other">%d cards added to Wishlist</item>
+    </plurals>
+    <plurals name="addcard_queue_add_all_partial_failure">
+        <item quantity="one">%1$d of %2$d card could not be added — kept in queue</item>
+        <item quantity="other">%1$d of %2$d cards could not be added — kept in queue</item>
+    </plurals>
+    <plurals name="card_queue_title">
+        <item quantity="one">%d card in queue</item>
+        <item quantity="other">%d cards in queue</item>
+    </plurals>
+    <string name="card_queue_set_and_number">%1$s #%2$s</string>
+    <string name="card_queue_clear_cd">Clear queue</string>
+    <string name="card_queue_decrease_quantity_cd">Decrease quantity</string>
+    <string name="card_queue_increase_quantity_cd">Increase quantity</string>
     <string name="shared_foil">Foil</string>
 
 
@@ -146,7 +185,6 @@
     <!-- ══════════════════════════════════════════
          MULTI ADD CARD SCREEN
     ═══════════════════════════════════════════ -->
-    <string name="multi_add_card_proceed_with_selected_cta">Proceed with %1$d selected</string>
     <!-- ══════════════════════════════════════════
          CARD DETAIL SCREEN
     ═══════════════════════════════════════════ -->
@@ -313,7 +351,6 @@
     <string name="scanner_toast_added_all_to_collection">%1$d items added to Collection</string>
     <string name="scanner_toast_add_failed">Could not add %1$s — try again</string>
     <string name="scanner_toast_add_all_partial_failure">%1$d of %2$d cards could not be added — kept in queue</string>
-    <string name="scanner_queue_title">%1$d cards scanned</string>
     <string name="scanner_queue_search_hint">Filter by name…</string>
     <string name="scanner_queue_button_desc">Scan queue</string>
     <string name="scanner_pause_recognition">Pause card recognition</string>
@@ -712,6 +749,7 @@
     <string name="deckbuilder_save_changes_button">Save changes</string>
     <string name="deckbuilder_saved_button">Saved</string>
     <string name="deckbuilder_share_chooser">Share Deck</string>
+    <string name="deckstudio_select_cards">Select cards</string>
     <string name="deckbuilder_move_to_sideboard">1x To Sideboard</string>
     <string name="deckbuilder_from_sideboard">1x From Sideboard</string>
     <string name="deckbuilder_move_to_mainboard">1x To Mainboard</string>
@@ -3891,6 +3929,7 @@
     <string name="community_deck_import_success">Deck imported successfully</string>
     <string name="community_deck_import_partial">Deck imported (%1$d of %2$d cards resolved)</string>
     <string name="community_deck_import_failed">Failed to import deck</string>
+    <string name="community_deck_select_cards_cd">Select cards from this deck</string>
     <string name="community_deck_owned_count">%1$d in your collection</string>
     <string name="community_deck_missing_count">%1$d missing</string>
     <string name="community_deck_error_not_found">Deck not found on Archidekt</string>

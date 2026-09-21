@@ -74,7 +74,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
-import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.core.model.QuickStartAction
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
@@ -130,11 +129,7 @@ fun HomeScreen(
     // can show that the user was on Home. Fires once per entry (keyed on Unit).
     LaunchedEffect(Unit) { FirebaseCrashlytics.getInstance().log("screen_viewed: home") }
 
-    val availableQuickStartActions = remember {
-        QuickStartAction.entries.filter {
-            it != QuickStartAction.MULTI_ADD_CARD || FeatureFlags.MassiveAdd.MASSIVE_CARDS_ENABLED
-        }
-    }
+    val availableQuickStartActions = remember { QuickStartAction.entries.toList() }
 
     val effectiveQuickStartActions = remember(uiState.quickStartActions, availableQuickStartActions) {
         val valid = uiState.quickStartActions.filter { it in availableQuickStartActions }.toMutableList()
@@ -178,7 +173,6 @@ fun HomeScreen(
                 HomeAction.ResetLayout,
                 HomeAction.RetryDiscover,
                 HomeAction.RefreshDiscover,
-                HomeAction.OpenMultiAdd,
                 HomeAction.RefreshRandomCard,
                 is HomeAction.SelectDiscoverSet,
                 is HomeAction.SelectCommunityDecksCategory,

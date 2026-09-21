@@ -3,9 +3,27 @@ package com.mmg.manahub.feature.scanner.presentation
 
 import android.graphics.PointF
 import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.model.CardSelectionEntry
-import com.mmg.manahub.core.model.CardSelectionSession
+import com.mmg.manahub.core.model.QueuedCard
 import com.mmg.manahub.core.ui.components.MagicToastType
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Session models
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Snapshot of the scanner's persisted card queue: the shared app-wide
+ * [com.mmg.manahub.core.domain.repository.CardQueueRepository] for the collection target, or the
+ * scanned deck's own per-deck queue for a [ScannerTarget.Deck] target.
+ * Duplicate scans (same scryfallId + isFoil + language + condition) are merged by incrementing
+ * [QueuedCard.quantity] rather than creating a new row.
+ */
+data class ScanSession(
+    val cards: List<QueuedCard> = emptyList(),
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  UI State
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Full UI state for the no-modal scanner screen.
@@ -65,11 +83,11 @@ import com.mmg.manahub.core.ui.components.MagicToastType
  *                                  fully unbinds the camera (`cameraProvider.unbindAll()`, ~250 ms
  *                                  debounced) to actually save power, not just skip frames.
  * @property isAutoDeleteOnAddEnabled  True when a per-entry "Add to collection"/"Add to wishlist"
- *                                  action in [ScanQueueSheet] should also remove that entry from
+ *                                  action in `CardQueueSheet` should also remove that entry from
  *                                  the queue once the add succeeds.
  * @property ownedCardIdentityKeys  Live set of identity keys (`oracleId.ifBlank { name }`) already
  *                                  present in the user's collection — feeds the "already in
- *                                  collection" badge in [QueueCardItem]. Kept up to date by a
+ *                                  collection" badge in `CardQueueSheet`. Kept up to date by a
  *                                  [ScannerViewModel] collector on `UserCardRepository.observeCollection()`.
  * @property rateLimitedUntilMs     W2.10 (scanner-reliability-plan.md, 2026-08-24). Wall-clock
  *                                  epoch millis until which [CardRecognizer] is suspending every
@@ -87,7 +105,7 @@ data class ScannerUiState(
     val lastDetectedCard: Card? = null,
     val error: String? = null,
     val cameraBindError: String? = null,
-    val scanSession: CardSelectionSession = CardSelectionSession(),
+    val scanSession: ScanSession = ScanSession(),
     // Mode bar state
     val selectedIsFoil: Boolean = false,
     val selectedLanguage: String = "en",
@@ -99,7 +117,7 @@ data class ScannerUiState(
     val showEditSheet: Boolean = false,
     val showPriceDetailSheet: Boolean = false,
     // Edit card
-    val editingCard: CardSelectionEntry? = null,
+    val editingCard: QueuedCard? = null,
     val availablePrints: List<Card> = emptyList(),
     val isLoadingPrints: Boolean = false,
     // Toast
@@ -134,12 +152,17 @@ data class ScannerUiState(
     val returnToQueueOnDetailClose: Boolean = false,
     // Variant selector sheet
     val showVariantSelector: Boolean = false,
-    val variantSelectorEntry: CardSelectionEntry? = null,
+    val variantSelectorEntry: QueuedCard? = null,
     val cardVariants: List<Card> = emptyList(),
     val isLoadingVariants: Boolean = false,
     // Full-screen image viewer
     val expandedVariantImageUrl: String? = null,
-    // Re-entrancy guard for onAddAllToCollection -- a second tap before the first commit
-    // resolves must not double-commit the queue.
+
+    // Collection target: mirrors CardQueueActions.isCommitting (the app-wide "add all" guard).
+    // Deck target: the scanner's own deck-write guard.
     val isCommittingQueue: Boolean = false,
+    // Mirrors CardQueueActions.isAddingAllToWishlist.
+    val isAddingAllToWishlist: Boolean = false,
+    // Mirrors CardQueueActions.inFlightIds: queue rows whose controls are locked while written.
+    val inFlightQueueIds: Set<String> = emptySet(),
 )

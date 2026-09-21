@@ -34,9 +34,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mmg.manahub.R
-import com.mmg.manahub.core.model.CardSelectionEntry
-import com.mmg.manahub.core.model.CardSelectionSession
 import com.mmg.manahub.core.model.PreferredCurrency
+import com.mmg.manahub.core.model.QueuedCard
 import com.mmg.manahub.core.ui.components.DeckCardQueueItem
 import com.mmg.manahub.core.ui.components.DeckCardQueueSheet
 import com.mmg.manahub.core.ui.components.MagicCtaButton
@@ -50,14 +49,12 @@ import com.mmg.manahub.feature.decks.domain.usecase.DeckBoard
 
 /**
  * The scanner's own deck-target queue — a thin wrapper (Deck Wizard 60-card wave v6 P4, plan 4.4)
- * mapping [CardSelectionEntry] onto the generic [DeckCardQueueSheet]. Public signature UNCHANGED
- * from before the extraction, so [com.mmg.manahub.feature.scanner.presentation.ScannerScreen]'s own
- * call site needed no edits.
+ * mapping the scanner's per-deck [QueuedCard] queue onto the generic [DeckCardQueueSheet].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeckScannerQueueSheet(
-    session: CardSelectionSession,
+    cards: List<QueuedCard>,
     preferredCurrency: PreferredCurrency,
     isCommitting: Boolean,
     toastMessage: String?,
@@ -65,20 +62,20 @@ fun DeckScannerQueueSheet(
     onToastDismissed: () -> Unit,
     listState: LazyListState = rememberLazyListState(),
     onDismiss: () -> Unit,
-    onRemoveEntry: (CardSelectionEntry) -> Unit,
-    onEditEntry: (CardSelectionEntry) -> Unit,
+    onRemoveEntry: (QueuedCard) -> Unit,
+    onEditEntry: (QueuedCard) -> Unit,
     onClearSession: () -> Unit,
-    onAddEntryToDeck: (CardSelectionEntry, DeckBoard) -> Unit,
+    onAddEntryToDeck: (QueuedCard, DeckBoard) -> Unit,
     onAddAllToDeck: (DeckBoard) -> Unit,
     isAutoDeleteOnAddEnabled: Boolean,
     onToggleAutoDeleteOnAdd: () -> Unit,
-    onIncrementQuantity: (CardSelectionEntry) -> Unit,
-    onDecrementQuantity: (CardSelectionEntry) -> Unit,
+    onIncrementQuantity: (QueuedCard) -> Unit,
+    onDecrementQuantity: (QueuedCard) -> Unit,
 ) {
-    val entriesById = remember(session.entries) { session.entries.associateBy { it.id } }
+    val entriesById = remember(cards) { cards.associateBy { it.id } }
     val foilLabel = stringResource(R.string.scanner_edit_foil_value)
-    val items = remember(session.entries, foilLabel) {
-        session.entries.map { entry ->
+    val items = remember(cards, foilLabel) {
+        cards.map { entry ->
             DeckCardQueueItem(
                 id = entry.id,
                 card = entry.card,
@@ -90,7 +87,7 @@ fun DeckScannerQueueSheet(
     }
 
     DeckCardQueueSheet(
-        title = stringResource(R.string.scanner_deck_queue_title, session.entries.size),
+        title = stringResource(R.string.scanner_deck_queue_title, cards.size),
         items = items,
         preferredCurrency = preferredCurrency,
         isBusy = isCommitting,
@@ -133,7 +130,7 @@ fun DeckScannerQueueSheet(
                 onClick = { onAddAllToDeck(DeckBoard.MAINBOARD) },
                 text = stringResource(R.string.scanner_deck_add_all_mainboard),
                 color = MagicCtaColor.Primary,
-                enabled = !isCommitting && session.entries.isNotEmpty(),
+                enabled = !isCommitting && cards.isNotEmpty(),
                 isLoading = isCommitting,
                 modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
             )
@@ -142,7 +139,7 @@ fun DeckScannerQueueSheet(
                 text = stringResource(R.string.scanner_deck_add_all_sideboard),
                 color = MagicCtaColor.Accent,
                 style = MagicCtaStyle.Outlined,
-                enabled = !isCommitting && session.entries.isNotEmpty(),
+                enabled = !isCommitting && cards.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
             )
         },
@@ -152,7 +149,7 @@ fun DeckScannerQueueSheet(
 /** The Mainboard / Sideboard / Discard action row below each scanned card (unchanged from before the extraction). */
 @Composable
 private fun DeckScannerQueueRowActions(
-    entry: CardSelectionEntry,
+    entry: QueuedCard,
     isCommitting: Boolean,
     onMainboard: () -> Unit,
     onSideboard: () -> Unit,

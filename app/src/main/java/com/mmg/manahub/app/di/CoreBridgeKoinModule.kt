@@ -5,6 +5,9 @@ import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.common.provideCrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.data.queue.PersistentCardQueueRepository
+import com.mmg.manahub.core.data.queue.SharedPreferencesCardQueueStore
+import com.mmg.manahub.core.domain.repository.CardQueueRepository
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.FriendDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
@@ -348,6 +351,14 @@ fun coreBridgeKoinModule(
         OpenForTradeRepositoryImpl(
             dao = get(),
             remote = get(),
+        )
+    }
+
+    // Shared Scanner + AddCard queue: exactly one instance app-wide (also bridged to Hilt).
+    single<CardQueueRepository> {
+        PersistentCardQueueRepository(
+            store = SharedPreferencesCardQueueStore(androidContext()),
+            crashReporter = get(),
         )
     }
 }

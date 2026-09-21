@@ -1576,10 +1576,7 @@ private fun HomeProgressBar(
 @Composable
 private fun QuickActionsWidget(actions: List<QuickStartAction>, onAction: (HomeAction) -> Unit) {
     val spacing = MaterialTheme.spacing
-    val filteredActions = remember(actions) {
-        actions.filter { it != QuickStartAction.MULTI_ADD_CARD || FeatureFlags.MassiveAdd.MASSIVE_CARDS_ENABLED }
-    }
-    val visible = filteredActions.take(4)
+    val visible = actions.take(4)
     WidgetShell {
         visible.chunked(2).forEach { rowActions ->
             Row(

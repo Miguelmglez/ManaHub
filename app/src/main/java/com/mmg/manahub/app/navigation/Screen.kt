@@ -20,8 +20,28 @@ sealed class Screen(val route: String) {
         /** Builds a route that opens the collection with a specific tab selected. */
         fun routeWithTab(tab: String) = "collection?tab=$tab"
     }
-    object CollectionAddCard  : Screen("collection/add")
-    object CollectionMultiAddCard  : Screen("collection/multiaddcard")
+    /**
+     * AddCard search. Optional query args: `multi` opens "Select multiple" mode; `source` +
+     * `sourceId` preload a deck's cards as the browse list (and force multi mode).
+     */
+    object CollectionAddCard  : Screen("collection/add?multi={multi}&source={source}&sourceId={sourceId}") {
+        const val baseRoute = "collection/add"
+
+        /** Deck sources AddCard can preload; [value] is the raw `source` nav argument. */
+        enum class Source(val value: String) { DECK("deck"), COMMUNITY("community") }
+
+        /** Builds the route; the defaults open the plain search. */
+        fun createRoute(multi: Boolean = false, source: Source? = null, sourceId: String? = null): String {
+            val params = buildList {
+                if (multi) add("multi=true")
+                if (source != null && !sourceId.isNullOrBlank()) {
+                    add("source=${source.value}")
+                    add("sourceId=${Uri.encode(sourceId)}")
+                }
+            }
+            return if (params.isEmpty()) baseRoute else "$baseRoute?${params.joinToString("&")}"
+        }
+    }
 
     object CollectionScanner  : Screen("collection/scanner")
     object DeckScanner : Screen("deck/{deckId}/scanner") {

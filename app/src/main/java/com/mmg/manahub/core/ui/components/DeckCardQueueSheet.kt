@@ -53,7 +53,7 @@ import com.mmg.manahub.core.ui.theme.spacing
 
 /**
  * One row of a [DeckCardQueueSheet] — a card plus the quantity/collection state the sheet needs to
- * render it, decoupled from any specific queue's own entry model (`CardSelectionEntry`,
+ * render it, decoupled from any specific queue's own entry model (`QueuedCard`,
  * `WizardSeed`, ...).
  */
 data class DeckCardQueueItem(
@@ -68,12 +68,12 @@ data class DeckCardQueueItem(
 /**
  * A generic bottom sheet listing cards queued for a deck (Deck Wizard 60-card wave v6 P4,
  * plan 4.3) — extracted from the scanner's own `DeckScannerQueueSheet`, which now wraps this with
- * its own `CardSelectionEntry`-shaped signature (plan 4.4).
+ * its own `QueuedCard`-shaped signature (plan 4.4).
  *
  * Named `DeckCardQueueSheet`/`DeckCardQueueItem` rather than the plan's literal `CardQueueSheet`/
  * `CardQueueItem` — this package already declares an UNRELATED `CardQueueSheet`/`CardQueueItem`
- * pair (`core/ui/components/CardQueueSheet.kt`, the Multi Add/collection-and-wishlist bulk-add
- * queue consumed by `MultiAddCardScreen` and the scanner's collection-target mode) predating this
+ * pair (`core/ui/components/CardQueueSheet.kt`, the shared collection-and-wishlist queue consumed
+ * by AddCard "Select multiple" and the scanner's collection-target mode) predating this
  * plan. Renamed the NEW component instead of touching that unrelated, live one — same resolution
  * this codebase already used for the `StrategyPickerSheet` name collision (see feature/decks
  * CLAUDE.md).

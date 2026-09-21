@@ -4,11 +4,16 @@ package com.mmg.manahub.feature.scanner
 import android.content.Context
 import android.graphics.PointF
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.data.queue.InMemoryCardQueueStore
+import com.mmg.manahub.core.data.queue.PersistentCardQueueRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.CommitScanResult
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
-import com.mmg.manahub.core.model.CardSelectionEntry
+import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
+import com.mmg.manahub.core.model.QueuedCard
+import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.decks.domain.usecase.AddScannedCardsToDeckResult
 import com.mmg.manahub.feature.decks.domain.usecase.AddScannedCardsToDeckUseCase
@@ -22,9 +27,14 @@ import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
+import io.mockk.slot
 import io.mockk.mockk
 import androidx.lifecycle.SavedStateHandle
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -94,6 +104,8 @@ class ScannerViewModelTest {
     // ── ViewModel under test ───────────────────────────────────────────────────
 
     private lateinit var viewModel: ScannerViewModel
+    private lateinit var appScope: CoroutineScope
+    private lateinit var queueRepository: PersistentCardQueueRepository
 
     // ── Sample data ────────────────────────────────────────────────────────────
 
@@ -142,21 +154,30 @@ class ScannerViewModelTest {
         // needs a real Flow — a relaxed mock alone would return Unit for `collect` without ever
         // touching FlowCollector, which happens to be harmless here but this stub keeps intent explicit.
         every { userCardRepository.observeCollection() } returns emptyFlow()
+        // Real shared queue over an in-memory store: the VM's queue behaviour is exercised end to end.
+        appScope = CoroutineScope(SupervisorJob())
+        queueRepository = PersistentCardQueueRepository(store = InMemoryCardQueueStore())
         viewModel = ScannerViewModel(
             savedStateHandle = SavedStateHandle(),
             cardRepository = cardRepository,
             userCardRepository = userCardRepository,
-            commitScannedCards = commitScannedCards,
-            addToWishlist = addToWishlist,
+            sharedQueueRepository = queueRepository,
+            queueActions = CardQueueActions(
+                queueRepository = queueRepository,
+                commitScannedCards = commitScannedCards,
+                addToWishlist = addToWishlist,
+            ),
             analyticsHelper = analyticsHelper,
             soundManager = soundManager,
             addScannedCardsToDeck = addScannedCardsToDeck,
             context = context,
+            appScope = appScope,
         )
     }
 
     @After
     fun tearDown() {
+        appScope.cancel()
         Dispatchers.resetMain()
     }
 
@@ -182,7 +203,7 @@ class ScannerViewModelTest {
         val state = viewModel.uiState.value
 
         assertNull(state.lastDetectedCard)
-        assertTrue(state.scanSession.entries.isEmpty())
+        assertTrue(state.scanSession.cards.isEmpty())
         assertFalse(state.isSearching)
         assertFalse(state.showAmbiguitySelector)
         assertFalse(state.languageMismatch)
@@ -230,9 +251,9 @@ class ScannerViewModelTest {
         // Assert — card confirmed and added after just 1 frame
         assertFalse(
             "Session should contain the card after a single high-confidence frame",
-            viewModel.uiState.value.scanSession.entries.isEmpty(),
+            viewModel.uiState.value.scanSession.cards.isEmpty(),
         )
-        assertEquals(defaultCard.scryfallId, viewModel.uiState.value.scanSession.entries.first().card.scryfallId)
+        assertEquals(defaultCard.scryfallId, viewModel.uiState.value.scanSession.cards.first().card.scryfallId)
     }
 
     @Test
@@ -244,8 +265,8 @@ class ScannerViewModelTest {
 
         // Assert — card appears in session
         val session = viewModel.uiState.value.scanSession
-        assertFalse(session.entries.isEmpty())
-        assertEquals(defaultCard.scryfallId, session.entries.first().card.scryfallId)
+        assertFalse(session.cards.isEmpty())
+        assertEquals(defaultCard.scryfallId, session.cards.first().card.scryfallId)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -259,13 +280,13 @@ class ScannerViewModelTest {
         viewModel.onRecognitionResult(identified(similarity = 1.0f))
         advanceUntilIdle()
 
-        val countAfterFirst = viewModel.uiState.value.scanSession.entries.sumOf { it.quantity }
+        val countAfterFirst = viewModel.uiState.value.scanSession.cards.sumOf { it.quantity }
 
         // Act — immediately try to add the same card again (within 800 ms window)
         viewModel.onRecognitionResult(identified(similarity = 1.0f))
         advanceUntilIdle()
 
-        val countAfterSecond = viewModel.uiState.value.scanSession.entries.sumOf { it.quantity }
+        val countAfterSecond = viewModel.uiState.value.scanSession.cards.sumOf { it.quantity }
 
         // Assert — count unchanged; second scan within 800 ms was blocked
         assertEquals(
@@ -291,7 +312,7 @@ class ScannerViewModelTest {
         // Assert — card rejected by set lock; session empty
         assertTrue(
             "Set lock mismatch: card should not be added",
-            viewModel.uiState.value.scanSession.entries.isEmpty(),
+            viewModel.uiState.value.scanSession.cards.isEmpty(),
         )
     }
 
@@ -307,7 +328,7 @@ class ScannerViewModelTest {
         // Assert — card passes the lock filter and is added
         assertFalse(
             "Set lock match: card should be added",
-            viewModel.uiState.value.scanSession.entries.isEmpty(),
+            viewModel.uiState.value.scanSession.cards.isEmpty(),
         )
     }
 
@@ -334,9 +355,9 @@ class ScannerViewModelTest {
         assertNotNull(state.lastDetectedCard)
         assertFalse(
             "A language-fallback result must still be added to the session, never silently refused",
-            state.scanSession.entries.isEmpty(),
+            state.scanSession.cards.isEmpty(),
         )
-        assertEquals(defaultCard.scryfallId, state.scanSession.entries.first().card.scryfallId)
+        assertEquals(defaultCard.scryfallId, state.scanSession.cards.first().card.scryfallId)
     }
 
     @Test
@@ -355,7 +376,7 @@ class ScannerViewModelTest {
             "A genuine localized-printing hit must never show the fallback badge",
             state.languageMismatch,
         )
-        assertFalse(state.scanSession.entries.isEmpty())
+        assertFalse(state.scanSession.cards.isEmpty())
     }
 
     @Test
@@ -368,7 +389,7 @@ class ScannerViewModelTest {
 
         // Assert
         assertFalse(viewModel.uiState.value.languageMismatch)
-        assertFalse(viewModel.uiState.value.scanSession.entries.isEmpty())
+        assertFalse(viewModel.uiState.value.scanSession.cards.isEmpty())
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -439,7 +460,7 @@ class ScannerViewModelTest {
         )
         // Card is set in bottom bar but session remains empty (user must confirm)
         assertNotNull(viewModel.uiState.value.lastDetectedCard)
-        assertTrue(viewModel.uiState.value.scanSession.entries.isEmpty())
+        assertTrue(viewModel.uiState.value.scanSession.cards.isEmpty())
     }
 
     @Test
@@ -541,13 +562,13 @@ class ScannerViewModelTest {
         // Arrange — add a card first
         repeatIdentified(3)
         advanceUntilIdle()
-        assertFalse(viewModel.uiState.value.scanSession.entries.isEmpty())
+        assertFalse(viewModel.uiState.value.scanSession.cards.isEmpty())
 
         // Act
         viewModel.onClearSession()
 
         // Assert
-        assertTrue(viewModel.uiState.value.scanSession.entries.isEmpty())
+        assertTrue(viewModel.uiState.value.scanSession.cards.isEmpty())
         assertFalse(viewModel.uiState.value.showQueueSheet)
     }
 
@@ -579,7 +600,7 @@ class ScannerViewModelTest {
         )
     }
 
-    private fun sampleScannedCard() = CardSelectionEntry(
+    private fun sampleScannedCard() = QueuedCard(
         card = defaultCard,
         quantity = 1,
         isFoil = false,
@@ -754,7 +775,7 @@ class ScannerViewModelTest {
     fun onAddAllToCollection_calledTwiceBeforeFirstResolves_commitsOnlyOnce() = runTest {
         viewModel.onRecognitionResult(identified())
         advanceUntilIdle()
-        assertEquals(1, viewModel.uiState.value.scanSession.entries.size) // precondition
+        assertEquals(1, viewModel.uiState.value.scanSession.cards.size) // precondition
 
         coEvery { commitScannedCards(any()) } returns CommitScanResult(
             committedCopies = 1, failedEntries = 0, entrySucceeded = listOf(true),
@@ -781,7 +802,7 @@ class ScannerViewModelTest {
         viewModel.onRecognitionResult(identified(card = cardB))
         advanceUntilIdle()
 
-        val seeded = viewModel.uiState.value.scanSession.entries
+        val seeded = viewModel.uiState.value.scanSession.cards
         assertEquals(2, seeded.size) // precondition
 
         // Force both entries to share the EXACT same timestamp (burst recognition, or a
@@ -792,7 +813,7 @@ class ScannerViewModelTest {
             viewModel.onEditScannedCard(entry)
             viewModel.onUpdateScannedCard(entry.copy(timestamp = collidingTimestamp))
         }
-        val collided = viewModel.uiState.value.scanSession.entries
+        val collided = viewModel.uiState.value.scanSession.cards
         assertEquals(2, collided.size)
         assertTrue(collided.all { it.timestamp == collidingTimestamp })
         assertNotEquals(collided[0].id, collided[1].id)
@@ -805,7 +826,7 @@ class ScannerViewModelTest {
         viewModel.onAddAllToCollection()
         advanceUntilIdle()
 
-        val remaining = viewModel.uiState.value.scanSession.entries
+        val remaining = viewModel.uiState.value.scanSession.cards
         assertEquals(
             "The FAILED entry must survive -- a shared timestamp must never drop it alongside the succeeded one",
             1, remaining.size,
@@ -851,5 +872,192 @@ class ScannerViewModelTest {
         } finally {
             io.mockk.unmockkStatic(com.google.firebase.crashlytics.FirebaseCrashlytics::class)
         }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Shared card queue (CardQueueRepository + CardQueueActions)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onAddAllToCollection_fullSuccess_emptiesQueueAndClosesSheet() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        viewModel.onOpenQueue()
+        coEvery { commitScannedCards(any()) } returns CommitScanResult(
+            committedCopies = 1, failedEntries = 0, entrySucceeded = listOf(true),
+        )
+
+        viewModel.onAddAllToCollection()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.scanSession.cards.isEmpty())
+        assertFalse(state.showQueueSheet)
+        assertFalse(state.isCommittingQueue)
+    }
+
+    @Test
+    fun onAddEntryToCollection_failure_keepsEntryInQueue() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        val entry = viewModel.uiState.value.scanSession.cards.single()
+        coEvery { commitScannedCards(any()) } returns CommitScanResult(
+            committedCopies = 0, failedEntries = 1, entrySucceeded = listOf(false),
+        )
+
+        viewModel.onAddEntryToCollection(entry)
+        advanceUntilIdle()
+
+        assertEquals(listOf(entry.id), viewModel.uiState.value.scanSession.cards.map { it.id })
+    }
+
+    @Test
+    fun queueMutations_areReflectedSynchronouslyInScanSession() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        val entry = viewModel.uiState.value.scanSession.cards.single()
+
+        viewModel.onDuplicateSessionCard(entry)
+        assertEquals(2, viewModel.uiState.value.scanSession.cards.size)
+
+        viewModel.onIncrementSessionCardQuantity(entry)
+        assertEquals(2, viewModel.uiState.value.scanSession.cards.first().quantity)
+
+        viewModel.onRemoveSessionCard(entry)
+        assertEquals(1, viewModel.uiState.value.scanSession.cards.size)
+        assertNotEquals(entry.id, viewModel.uiState.value.scanSession.cards.single().id)
+    }
+
+    @Test
+    fun onAddAllToCollection_leavingTheScannerMidBatch_stillRemovesTheWrittenEntries() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        val gate = CompletableDeferred<Unit>()
+        coEvery { commitScannedCards(any()) } coAnswers {
+            gate.await()
+            CommitScanResult(committedCopies = 1, failedEntries = 0, entrySucceeded = listOf(true))
+        }
+
+        viewModel.onAddAllToCollection()
+        advanceUntilIdle()
+        // Leaving the screen clears the ViewModel; the commit runs in the app scope.
+        viewModel.viewModelScope.cancel()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { commitScannedCards(any()) }
+        assertTrue(queueRepository.queue.value.isEmpty())
+        assertFalse(viewModel.uiState.value.isCommittingQueue)
+    }
+
+    @Test
+    fun onAddAllToWishlist_doubleTap_addsEachEntryOnceWithItsQuantity() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        viewModel.onIncrementSessionCardQuantity(viewModel.uiState.value.scanSession.cards.single())
+        val captured = slot<WishlistEntry>()
+        coEvery { addToWishlist(capture(captured)) } returns Result.success(Unit)
+
+        viewModel.onAddAllToWishlist()
+        viewModel.onAddAllToWishlist()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { addToWishlist(any()) }
+        assertEquals(2, captured.captured.quantity)
+    }
+
+    @Test
+    fun onAddEntryToCollection_doubleTap_commitsOnce() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        val entry = viewModel.uiState.value.scanSession.cards.single()
+        coEvery { commitScannedCards(any()) } returns CommitScanResult(
+            committedCopies = 1, failedEntries = 0, entrySucceeded = listOf(true),
+        )
+
+        viewModel.onAddEntryToCollection(entry)
+        viewModel.onAddEntryToCollection(entry)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { commitScannedCards(any()) }
+    }
+
+    @Test
+    fun removingTheLastEntry_closesTheQueueSheet() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        viewModel.onOpenQueue()
+
+        viewModel.onRemoveSessionCard(viewModel.uiState.value.scanSession.cards.single())
+
+        assertFalse(viewModel.uiState.value.showQueueSheet)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Deck target (scanning cards into a deck)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun deckViewModel(deckId: String = "deck-1") = ScannerViewModel(
+        savedStateHandle = SavedStateHandle(mapOf(ScannerTarget.DECK_ID_ARGUMENT to deckId)),
+        cardRepository = cardRepository,
+        userCardRepository = userCardRepository,
+        sharedQueueRepository = queueRepository,
+        queueActions = CardQueueActions(
+            queueRepository = queueRepository,
+            commitScannedCards = commitScannedCards,
+            addToWishlist = addToWishlist,
+        ),
+        analyticsHelper = analyticsHelper,
+        soundManager = soundManager,
+        addScannedCardsToDeck = addScannedCardsToDeck,
+        context = context,
+        appScope = appScope,
+    )
+
+    @Test
+    fun deckTarget_scansIntoItsOwnQueue_neverTheSharedCollectionQueue() = runTest {
+        val deckVm = deckViewModel()
+
+        deckVm.onRecognitionResult(identified(similarity = 1.0f))
+        advanceUntilIdle()
+
+        assertEquals(ScannerTarget.Deck("deck-1"), deckVm.uiState.value.target)
+        assertEquals(1, deckVm.uiState.value.scanSession.cards.size)
+        assertTrue(queueRepository.queue.value.isEmpty())
+    }
+
+    @Test
+    fun deckTarget_addAllToDeck_removesCommittedEntries_andRefusesCollectionCommit() = runTest {
+        val deckVm = deckViewModel()
+        deckVm.onRecognitionResult(identified(similarity = 1.0f))
+        advanceUntilIdle()
+        val entry = deckVm.uiState.value.scanSession.cards.single()
+        coEvery { addScannedCardsToDeck("deck-1", any(), DeckBoard.MAINBOARD) } returns
+            AddScannedCardsToDeckResult(
+                committedEntryIds = setOf(entry.id),
+                blockedCommanderEntryIds = emptySet(),
+                committedCopies = 1,
+            )
+
+        deckVm.onAddAllToCollection()
+        deckVm.onAddAllToDeck(DeckBoard.MAINBOARD)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { commitScannedCards(any()) }
+        coVerify(exactly = 1) { addScannedCardsToDeck("deck-1", any(), DeckBoard.MAINBOARD) }
+        assertTrue(deckVm.uiState.value.scanSession.cards.isEmpty())
+        assertFalse(deckVm.uiState.value.isCommittingQueue)
+    }
+
+    @Test
+    fun collectionTarget_refusesDeckActions() = runTest {
+        viewModel.onRecognitionResult(identified(similarity = 1.0f))
+        advanceUntilIdle()
+
+        viewModel.onAddAllToDeck(DeckBoard.MAINBOARD)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { addScannedCardsToDeck(any(), any(), any()) }
+        assertEquals(1, viewModel.uiState.value.scanSession.cards.size)
     }
 }

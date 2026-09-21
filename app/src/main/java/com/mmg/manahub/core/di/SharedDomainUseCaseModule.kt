@@ -41,10 +41,8 @@ import javax.inject.Singleton
 /**
  * KMP migration — Hilt→Koin cutover batch 2. This module used to provide ~30 pure domain use cases;
  * ALL of them (bar the six below) now live natively in [com.mmg.manahub.core.di.SharedDomainKoinModule]
- * (Koin), consumed via `get()` by the migrated Koin islands. Two of the moved ones
- * ([com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase],
- * [com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase]) still have a
- * Hilt-only consumer (`ScannerViewModel`) and are re-exposed to Hilt via
+ * (Koin), consumed via `get()` by the migrated Koin islands. The Hilt-only `ScannerViewModel` reaches
+ * the shared card queue (`CardQueueRepository`/`CardQueueActions`) through
  * [com.mmg.manahub.core.di.KoinToHiltBridgeModule] (`GlobalContext.get().get()`).
  * [com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase] used to be a THIRD
  * reverse-bridged entry (its Hilt-only consumer was `core.sync.PriceRefreshWorker`, `@HiltWorker`) but
@@ -53,7 +51,7 @@ import javax.inject.Singleton
  *
  * ## Why the remaining two providers COULD NOT move (the ordering hazard the reverse bridge can't fix)
  * `GlobalContext.get()` throws unless Koin has already been started. That is safe for
- * `KoinToHiltBridgeModule`'s two use cases because their Hilt-only consumer (`ScannerViewModel`) is built
+ * `KoinToHiltBridgeModule`'s queue bindings because their Hilt-only consumer (`ScannerViewModel`) is built
  * LAZILY, strictly after `ManaHubApp.onCreate()` has called `startKoin()`.
  *
  * The providers below feed classes with NO such luxury: [ScryfallRemoteDataSource],

@@ -2,22 +2,22 @@ package com.mmg.manahub.feature.scanner.presentation
 // COMMENTS_REVIEWED: 2026-09-16
 
 import android.content.Context
-import android.net.Uri
-import androidx.core.content.edit
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
+import com.mmg.manahub.core.data.queue.InMemoryCardQueueStore
+import com.mmg.manahub.core.data.queue.PersistentCardQueueRepository
+import com.mmg.manahub.core.data.queue.SharedPreferencesCardQueueStore
+import com.mmg.manahub.core.domain.repository.CardQueueRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.core.domain.usecase.collection.CardCommit
-import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
+import com.mmg.manahub.core.domain.usecase.queue.AddAllToCollectionResult
+import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.model.CardSelectionEntry
-import com.mmg.manahub.core.model.CardSelectionSession
 import com.mmg.manahub.core.model.DataResult
-import com.mmg.manahub.core.model.WishlistEntry
+import com.mmg.manahub.core.model.QueuedCard
+import com.mmg.manahub.core.di.ApplicationScope
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.util.recordSafeNonFatal
@@ -27,22 +27,17 @@ import com.mmg.manahub.feature.decks.domain.usecase.ScannedDeckCardInput
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.ANTI_DUPLICATE_MS
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.HIGH_CONFIDENCE_FRAMES
-import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.PREF_FILE
-import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.PREF_KEY_QUEUE
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.STABILITY_FRAMES
-import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
-import java.util.UUID
 import javax.inject.Inject
 
 /**
@@ -88,9 +83,17 @@ private fun ScannerUiState.clearedForOverlay(): ScannerUiState =
  *   over from before it opened. This is independent of [onToggleRecognitionPaused] (the top-bar
  *   toggle), which only stops the analyzer while keeping the preview live.
  *
- * **Queue persistence**: the [ScanSession] is serialized to [SharedPreferences] on every
- * mutation, using [PREF_KEY_QUEUE] inside the [PREF_FILE] preferences file.
- * On ViewModel init, any persisted queue is restored automatically.
+ * **Queue**: for the collection target, cards live in the app-wide [CardQueueRepository] (shared
+ * with AddCard "Select multiple", persisted across process death); [ScannerUiState.scanSession] is a
+ * synchronous snapshot of it, refreshed after every mutation made here and on every external
+ * change. Commit actions (add all / per entry, collection / wishlist) go through the shared
+ * [CardQueueActions] and run in the app scope, so leaving the Scanner mid-batch never cancels a
+ * partially written commit.
+ *
+ * **Target** ([ScannerTarget], from the `deckId` nav argument): a [ScannerTarget.Deck] scanner keeps
+ * its own persisted per-deck queue (never the shared collection queue) and only offers the deck
+ * actions ([onAddEntryToDeck]/[onAddAllToDeck], through [AddScannedCardsToDeckUseCase]); the
+ * collection/wishlist actions are refused for it, and vice versa.
  *
  * Modes (controlled by the settings sheet):
  * - **Quick Mode ON**:  auto-adds the confirmed card to the session.
@@ -102,22 +105,41 @@ class ScannerViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
-    private val commitScannedCards: CommitScannedCardsUseCase,
-    private val addToWishlist: AddToWishlistUseCase,
+    sharedQueueRepository: CardQueueRepository,
+    private val queueActions: CardQueueActions,
+    private val addScannedCardsToDeck: AddScannedCardsToDeckUseCase,
     private val analyticsHelper: AnalyticsHelper,
     private val soundManager: SoundManager,
-    private val addScannedCardsToDeck: AddScannedCardsToDeckUseCase,
     @ApplicationContext private val context: Context,
+    @ApplicationScope appScope: CoroutineScope,
 ) : ViewModel() {
 
     private val target: ScannerTarget = ScannerTarget.from(savedStateHandle)
+    private val isCollectionTarget: Boolean = target is ScannerTarget.Collection
+
+    // A deck scan must never land in (or clear) the shared collection queue.
+    private val queueRepository: CardQueueRepository = when (target) {
+        ScannerTarget.Collection -> sharedQueueRepository
+        is ScannerTarget.Deck -> PersistentCardQueueRepository(
+            SharedPreferencesCardQueueStore(context, SharedPreferencesCardQueueStore.deckQueueKey(target.deckId))
+        )
+        ScannerTarget.Invalid -> PersistentCardQueueRepository(InMemoryCardQueueStore())
+    }
+
+    private val isCommittingToDeck = MutableStateFlow(false)
+
     private val _uiState = MutableStateFlow(
         ScannerUiState(
             target = target,
             error = if (target == ScannerTarget.Invalid) context.getString(R.string.scanner_invalid_link) else null,
-        ),
+            scanSession = ScanSession(queueRepository.queue.value),
+        ).withWriteGuards()
     )
     val uiState: StateFlow<ScannerUiState> = _uiState.asStateFlow()
+
+    // The repository is not synchronized: commit-side mutations stay on the main thread while
+    // outliving this ViewModel.
+    private val commitScope = CoroutineScope(appScope.coroutineContext + Dispatchers.Main.immediate)
 
     // ── Stability buffer ─────────────────────────────────────────────────────
     private val recentMatches = ArrayDeque<String>(STABILITY_FRAMES)
@@ -131,12 +153,6 @@ class ScannerViewModel @Inject constructor(
 
     // ── Variant load job — cancelled if the user closes the sheet before load completes ──
     private var variantLoadJob: kotlinx.coroutines.Job? = null
-    private var persistJob: Job? = null
-
-    // ── SharedPreferences for queue persistence ───────────────────────────────
-    private val prefs by lazy {
-        context.getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE)
-    }
 
     companion object {
         /**
@@ -153,165 +169,80 @@ class ScannerViewModel @Inject constructor(
 
         /** Minimum time in ms before the same card can be added again. */
         private const val ANTI_DUPLICATE_MS = 800L
-
-        /** SharedPreferences file name for scanner settings. */
-        private const val PREF_FILE = "scanner_prefs"
-
-        /** Key storing the serialized scan queue JSON. */
-        private const val PREF_KEY_QUEUE = "scanner_queue_v1"
-
-        private const val PREF_KEY_DECK_QUEUE_PREFIX = "scanner_deck_queue_v1_"
-        internal fun queuePreferenceKey(target: ScannerTarget): String = when (target) {
-            ScannerTarget.Collection -> PREF_KEY_QUEUE
-            is ScannerTarget.Deck -> "$PREF_KEY_DECK_QUEUE_PREFIX${Uri.encode(target.deckId)}"
-            ScannerTarget.Invalid -> "${PREF_KEY_DECK_QUEUE_PREFIX}invalid"
-        }
     }
 
     init {
-        loadPersistedQueue()
-        if (target is ScannerTarget.Collection) observeOwnedCardIdentityKeys()
+        observeSharedQueue()
+        if (isCollectionTarget) observeOwnedCardIdentityKeys()
+    }
+
+    /** Keeps [ScannerUiState.scanSession] / [ScannerUiState.isCommittingQueue] in sync with changes made from other screens. */
+    private fun observeSharedQueue() {
+        viewModelScope.launch {
+            queueRepository.queue.collect { cards -> _uiState.update { it.withQueue(cards) } }
+        }
+        if (!isCollectionTarget) {
+            viewModelScope.launch {
+                isCommittingToDeck.collect { committing -> _uiState.update { it.copy(isCommittingQueue = committing) } }
+            }
+            return
+        }
+        viewModelScope.launch {
+            queueActions.isCommitting.collect { committing ->
+                _uiState.update { it.copy(isCommittingQueue = committing) }
+            }
+        }
+        viewModelScope.launch {
+            queueActions.isAddingAllToWishlist.collect { adding ->
+                _uiState.update { it.copy(isAddingAllToWishlist = adding) }
+            }
+        }
+        viewModelScope.launch {
+            queueActions.inFlightIds.collect { ids -> _uiState.update { it.copy(inFlightQueueIds = ids) } }
+        }
+    }
+
+    // A mutation that empties the collection queue also closes its sheet (nothing is left to act
+    // on); the deck queue sheet has its own empty state and stays open.
+    private fun ScannerUiState.withQueue(cards: List<QueuedCard>) = copy(
+        scanSession = ScanSession(cards),
+        showQueueSheet = showQueueSheet && (cards.isNotEmpty() || !isCollectionTarget),
+    )
+
+    private fun ScannerUiState.withWriteGuards(): ScannerUiState =
+        if (isCollectionTarget) {
+            copy(
+                isCommittingQueue = queueActions.isCommitting.value,
+                isAddingAllToWishlist = queueActions.isAddingAllToWishlist.value,
+                inFlightQueueIds = queueActions.inFlightIds.value,
+            )
+        } else {
+            copy(isCommittingQueue = isCommittingToDeck.value, isAddingAllToWishlist = false, inFlightQueueIds = emptySet())
+        }
+
+    // The repository mutates synchronously; mirroring immediately keeps reads right after a
+    // mutation consistent instead of waiting for the observer coroutine to be dispatched.
+    private fun syncQueueSnapshot() {
+        _uiState.update { it.withQueue(queueRepository.queue.value).withWriteGuards() }
     }
 
     /**
      * Continuously tracks the set of "already owned" card identity keys — the same convention
-     * used across Card Versions & Languages: [com.mmg.manahub.core.model.Card.oracleId] falling
-     * back to the exact English [com.mmg.manahub.core.model.Card.name] when [oracleId] is blank
-     * (some cached rows predate the oracleId backfill). Feeds the "already in collection" badge
-     * in [QueueCardItem]. This is a LIVE collector (not a one-shot fetch) so the badge appears
+     * used across Card Versions & Languages: every owned [com.mmg.manahub.core.model.Card.oracleId]
+     * plus every owned exact [com.mmg.manahub.core.model.Card.name] (some cached rows predate the
+     * oracleId backfill, so a card matches on either key). Feeds the "already in collection" badge
+     * in `CardQueueSheet`. This is a LIVE collector (not a one-shot fetch) so the badge appears
      * immediately after the user adds a card from the queue while the sheet is still open.
      */
     private fun observeOwnedCardIdentityKeys() {
         viewModelScope.launch {
             userCardRepository.observeCollection().collect { rows ->
-                val keys = rows.mapTo(mutableSetOf()) { it.card.oracleId.ifBlank { it.card.name } }
-                _uiState.update { it.copy(ownedCardIdentityKeys = keys) }
-            }
-        }
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Queue persistence — SharedPreferences + org.json
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Serializes the current [ScanSession] to JSON and saves it to [SharedPreferences].
-     * Must be called after any mutation that modifies [ScannerUiState.scanSession].
-     */
-    private fun persistQueue() {
-        val cards = _uiState.value.scanSession.entries.toList()
-        persistJob?.cancel()
-        persistJob = viewModelScope.launch(Dispatchers.IO) {
-            val array = JSONArray()
-            for (entry in cards) {
-                val obj = JSONObject().apply {
-                    put("scryfallId", entry.card.scryfallId)
-                    put("name", entry.card.name)
-                    put("manaCost", entry.card.manaCost ?: JSONObject.NULL)
-                    put("typeLine", entry.card.typeLine)
-                    put("colors", JSONArray(entry.card.colors))
-                    put("rarity", entry.card.rarity)
-                    put("oracleId", entry.card.oracleId)
-                    put("setCode", entry.card.setCode)
-                    put("setName", entry.card.setName)
-                    put("lang", entry.card.lang)
-                    put("priceUsd", entry.card.priceUsd ?: JSONObject.NULL)
-                    put("priceUsdFoil", entry.card.priceUsdFoil ?: JSONObject.NULL)
-                    put("priceEur", entry.card.priceEur ?: JSONObject.NULL)
-                    put("priceEurFoil", entry.card.priceEurFoil ?: JSONObject.NULL)
-                    put("imageNormal", entry.card.imageNormal ?: JSONObject.NULL)
-                    put("imageArtCrop", entry.card.imageArtCrop ?: JSONObject.NULL)
-                    put("collectorNumber", entry.card.collectorNumber)
-                    put("quantity", entry.quantity)
-                    put("isFoil", entry.isFoil)
-                    put("language", entry.language)
-                    put("condition", entry.condition)
-                    put("timestamp", entry.timestamp)
-                    put("id", entry.id)
+                val keys = HashSet<String>(rows.size * 2)
+                rows.forEach { row ->
+                    row.card.oracleId.takeIf { it.isNotBlank() }?.let(keys::add)
+                    keys.add(row.card.name)
                 }
-                array.put(obj)
-            }
-            prefs.edit { putString(queuePreferenceKey(target), array.toString()) }
-        }
-    }
-
-    /**
-     * Loads any previously persisted [ScanSession] from [SharedPreferences] and
-     * updates [uiState] with the restored cards. Called once in [init].
-     */
-    private fun loadPersistedQueue() {
-        val json = prefs.getString(queuePreferenceKey(target), null) ?: return
-        try {
-            val array = JSONArray(json)
-            val entries = mutableListOf<CardSelectionEntry>()
-            for (i in 0 until array.length()) {
-                val obj = array.getJSONObject(i)
-                val card = Card(
-                    scryfallId       = obj.getString("scryfallId"),
-                    name             = obj.getString("name"),
-                    printedName      = null,
-                    manaCost         = obj.optString("manaCost").takeIf { it.isNotEmpty() },
-                    cmc              = 0.0,
-                    colors           = obj.optJSONArray("colors")?.let { colors ->
-                        List(colors.length()) { index -> colors.optString(index) }
-                    } ?: emptyList(),
-                    colorIdentity    = emptyList(),
-                    typeLine         = obj.optString("typeLine"),
-                    printedTypeLine  = null,
-                    oracleText       = null,
-                    printedText      = null,
-                    keywords         = emptyList(),
-                    power            = null,
-                    toughness        = null,
-                    loyalty          = null,
-                    setCode          = obj.getString("setCode"),
-                    setName          = obj.getString("setName"),
-                    collectorNumber  = obj.getString("collectorNumber"),
-                    rarity           = obj.optString("rarity"),
-                    releasedAt       = "",
-                    frameEffects     = emptyList(),
-                    promoTypes       = emptyList(),
-                    lang             = obj.getString("lang"),
-                    imageNormal      = obj.optString("imageNormal").takeIf { it.isNotEmpty() },
-                    imageArtCrop     = obj.optString("imageArtCrop").takeIf { it.isNotEmpty() },
-                    imageBackNormal  = null,
-                    priceUsd         = if (obj.isNull("priceUsd")) null else obj.getDouble("priceUsd"),
-                    priceUsdFoil     = if (obj.isNull("priceUsdFoil")) null else obj.optDouble("priceUsdFoil").takeIf { !it.isNaN() },
-                    priceEur         = if (obj.isNull("priceEur")) null else obj.getDouble("priceEur"),
-                    priceEurFoil     = if (obj.isNull("priceEurFoil")) null else obj.optDouble("priceEurFoil").takeIf { !it.isNaN() },
-                    legalityStandard  = "",
-                    legalityPioneer   = "",
-                    legalityModern    = "",
-                    legalityCommander = "",
-                    flavorText        = null,
-                    artist            = null,
-                    scryfallUri       = "",
-                    oracleId          = obj.optString("oracleId"),
-                )
-                entries.add(
-                    CardSelectionEntry(
-                        card      = card,
-                        quantity  = obj.getInt("quantity"),
-                        isFoil    = obj.getBoolean("isFoil"),
-                        language  = obj.getString("language"),
-                        condition = obj.getString("condition"),
-                        setCode   = obj.getString("setCode"),
-                        timestamp = obj.getLong("timestamp"),
-                        // Backward-compat: a queue persisted before this field existed has no
-                        // "id" key -- fall back to a fresh one rather than failing the whole restore.
-                        id        = obj.optString("id").ifBlank { UUID.randomUUID().toString() },
-                    )
-                )
-            }
-            if (entries.isNotEmpty()) {
-                _uiState.update { it.copy(scanSession = CardSelectionSession(entries)) }
-            }
-        } catch (e: Exception) {
-            // Non-fatal: session data lost but app remains functional.
-            // Track to detect schema migration issues after app updates.
-            FirebaseCrashlytics.getInstance().apply {
-                log("scanner_queue_restore_failed: ${e::class.simpleName}")
-                recordException(RuntimeException("[ScannerViewModel] Queue deserialization failed", e))
+                _uiState.update { it.copy(ownedCardIdentityKeys = keys) }
             }
         }
     }
@@ -426,8 +357,8 @@ class ScannerViewModel @Inject constructor(
                 // Skip adding if already in session with same attributes. Language identity
                 // tracks the RESOLVED printing's language (result.card.lang), not the mode-bar
                 // filter (confirmedState.selectedLanguage) — see addToSession's KDoc (W2.11):
-                // ScannedCard.language must be truthful data, so its identity key must match.
-                val isInSession = confirmedState.scanSession.entries.any { entry ->
+                // QueuedCard.language must be truthful data, so its identity key must match.
+                val isInSession = confirmedState.scanSession.cards.any { entry ->
                     entry.card.scryfallId == result.card.scryfallId &&
                             entry.isFoil == confirmedState.selectedIsFoil &&
                             entry.language == result.card.lang &&
@@ -492,9 +423,9 @@ class ScannerViewModel @Inject constructor(
     /**
      * Merges [card] into the current [ScanSession] and persists the updated queue.
      * Increments quantity if an entry with the same key (scryfallId + isFoil + language + condition)
-     * already exists; otherwise appends a new [ScannedCard].
+     * already exists; otherwise appends a new [QueuedCard].
      *
-     * [ScannedCard.language] stores [Card.lang] (the RESOLVED printing's real language), NOT
+     * [QueuedCard.language] stores [Card.lang] (the RESOLVED printing's real language), NOT
      * [ScannerUiState.selectedLanguage] (the mode-bar filter) — W2.11 (scanner-reliability-plan.md,
      * 2026-08-24). The two coincide in the normal case (the resolution ladder resolves the
      * localized printing when one exists), but on an English-fallback add
@@ -503,34 +434,19 @@ class ScannerViewModel @Inject constructor(
      * reflect the actual printing they now own, not the filter they had selected when scanning.
      */
     private fun addToSession(card: Card) {
-        _uiState.update { state ->
-            val existingIndex = state.scanSession.entries.indexOfFirst { entry ->
-                entry.card.scryfallId == card.scryfallId &&
-                    entry.isFoil == state.selectedIsFoil &&
-                    entry.language == card.lang &&
-                    entry.condition == state.selectedCondition
-            }
-            val updatedEntries = if (existingIndex >= 0) {
-                state.scanSession.entries.toMutableList().also {
-                    it[existingIndex] = it[existingIndex].copy(
-                        quantity = it[existingIndex].quantity + state.selectedQuantity,
-                    )
-                }
-            } else {
-                state.scanSession.entries + CardSelectionEntry(
-                    card = card,
-                    quantity = state.selectedQuantity,
-                    isFoil = state.selectedIsFoil,
-                    language = card.lang,
-                    condition = state.selectedCondition,
-                    setCode = card.setCode,
-                    timestamp = System.currentTimeMillis(),
-                    id = UUID.randomUUID().toString(),
-                )
-            }
-            state.copy(scanSession = state.scanSession.copy(entries = updatedEntries))
-        }
-        persistQueue()
+        val state = _uiState.value
+        queueRepository.addOrMerge(
+            QueuedCard(
+                card = card,
+                quantity = state.selectedQuantity,
+                isFoil = state.selectedIsFoil,
+                language = card.lang,
+                condition = state.selectedCondition,
+                setCode = card.setCode,
+                timestamp = System.currentTimeMillis(),
+            )
+        )
+        syncQueueSnapshot()
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -553,42 +469,29 @@ class ScannerViewModel @Inject constructor(
     //  Individual Actions (Collection & Wishlist)
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** Maps a UI [CardSelectionEntry] to the domain-layer commit shape. */
-    private fun CardSelectionEntry.toCommit(): CardCommit = CardCommit(
-        scryfallId = card.scryfallId,
-        isFoil     = isFoil,
-        condition  = condition,
-        language   = language,
-        quantity   = quantity,
-    )
-
-    /** Adds a single queue entry to the user's collection. */
-    fun onAddEntryToCollection(entry: CardSelectionEntry) {
-        if (target !is ScannerTarget.Collection) {
+    /** Adds a single queue entry to the user's collection; a repeat tap while it is in flight is a no-op. */
+    fun onAddEntryToCollection(entry: QueuedCard) {
+        if (!isCollectionTarget) {
             recordWrongTargetAction("add_entry_to_collection")
             return
         }
-        viewModelScope.launch {
-            // Route through the scanner commit use case so this counts as a scan
-            // (CardScanned XP) rather than a manual add — and is never double-counted.
-            val result = commitScannedCards(listOf(entry.toCommit()))
+        val removeOnSuccess = _uiState.value.isAutoDeleteOnAddEnabled
+        // Committed through the scan path (CardScanned XP), never double-counted as a manual add.
+        val launched = queueActions.addEntryToCollection(commitScope, entry, removeOnSuccess) { succeeded ->
             analyticsHelper.logEvent(
                 "scanner_entry_to_collection",
-                mapOf("result" to if (result.failedEntries == 0) "success" else "error"),
+                mapOf("result" to if (succeeded) "success" else "error"),
             )
-            // Write-path hardening audit (2026-09-06): a failed write must not report success or
-            // remove the entry from the queue — the user would lose track of a card that was
-            // never actually saved.
-            if (result.failedEntries == 0) {
+            syncQueueSnapshot()
+            // A failed write must not report success or drop the entry from the queue.
+            if (succeeded) {
                 _uiState.update {
                     it.copy(
                         toastMessage = context.getString(R.string.scanner_toast_added_to_collection, entry.card.name),
                         toastType = MagicToastType.SUCCESS,
                     )
                 }
-                if (_uiState.value.isAutoDeleteOnAddEnabled) {
-                    onRemoveSessionCard(entry)
-                }
+                if (removeOnSuccess) clearRemovedEntryState(entry)
             } else {
                 _uiState.update {
                     it.copy(
@@ -598,60 +501,51 @@ class ScannerViewModel @Inject constructor(
                 }
             }
         }
+        if (launched) syncQueueSnapshot()
     }
 
     /**
-     * Adds a single queue entry to the user's local wishlist.
-     * No authentication required — wishlist entries are stored locally via Room.
+     * Adds a single queue entry (with its quantity) to the wishlist.
+     * No authentication required — guest wishlist entries are stored locally via Room.
      */
-    fun onAddEntryToWishlist(entry: CardSelectionEntry) {
-        if (target !is ScannerTarget.Collection) {
+    fun onAddEntryToWishlist(entry: QueuedCard) {
+        if (!isCollectionTarget) {
             recordWrongTargetAction("add_entry_to_wishlist")
             return
         }
-        if (_uiState.value.isCommittingQueue) return
-        _uiState.update { it.copy(isCommittingQueue = true) }
-        viewModelScope.launch {
-            try {
-                val result: Result<Unit> = try {
-                    addToWishlist(entry.toWishlistEntry())
-                } catch (error: kotlinx.coroutines.CancellationException) {
-                    throw error
-                } catch (error: Exception) {
-                    Result.failure(error)
-                }
+        val removeOnSuccess = _uiState.value.isAutoDeleteOnAddEnabled
+        val launched = queueActions.addEntryToWishlist(commitScope, entry, removeOnSuccess) { result ->
+            result.exceptionOrNull()?.let { error -> recordSafeNonFatal("scanner_entry_to_wishlist_failed", error) }
+            analyticsHelper.logEvent(
+                "scanner_entry_to_wishlist",
+                mapOf("result" to if (result.isSuccess) "success" else "error"),
+            )
+            syncQueueSnapshot()
+            _uiState.update {
                 if (result.isSuccess) {
-                    analyticsHelper.logEvent(
-                        "scanner_entry_to_wishlist",
-                        mapOf("result" to "success"),
+                    it.copy(
+                        toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name),
+                        toastType = MagicToastType.SUCCESS,
                     )
-                    _uiState.update {
-                        it.copy(
-                            toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name),
-                            toastType = MagicToastType.SUCCESS,
-                        )
-                    }
-                    if (_uiState.value.isAutoDeleteOnAddEnabled) {
-                        onRemoveSessionCard(entry)
-                    }
                 } else {
-                    result.exceptionOrNull()?.let { error ->
-                        recordSafeNonFatal("scanner_entry_to_wishlist_failed", error)
-                    }
-                    analyticsHelper.logEvent(
-                        "scanner_entry_to_wishlist",
-                        mapOf("result" to "error"),
+                    it.copy(
+                        toastMessage = context.getString(R.string.scanner_toast_add_failed, entry.card.name),
+                        toastType = MagicToastType.ERROR,
                     )
-                    _uiState.update {
-                        it.copy(
-                            toastMessage = context.getString(R.string.scanner_toast_add_failed, entry.card.name),
-                            toastType = MagicToastType.ERROR,
-                        )
-                    }
                 }
-            } finally {
-                _uiState.update { it.copy(isCommittingQueue = false) }
             }
+            if (result.isSuccess && removeOnSuccess) clearRemovedEntryState(entry)
+        }
+        if (launched) syncQueueSnapshot()
+    }
+
+    private fun clearRemovedEntryState(entry: QueuedCard) {
+        if (queueRepository.queue.value.any { it.id == entry.id }) return
+        _uiState.update { state ->
+            state.copy(
+                multiSelectedIds = state.multiSelectedIds - entry.card.scryfallId,
+                lastDetectedCard = if (state.lastDetectedCard?.scryfallId == entry.card.scryfallId) null else state.lastDetectedCard,
+            )
         }
     }
 
@@ -660,86 +554,58 @@ class ScannerViewModel @Inject constructor(
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Adds all queue entries to the user's local wishlist.
-     * No authentication required — entries are stored locally via Room.
+     * Adds all queue entries (with their quantities) to the wishlist, keeping them in the queue. A
+     * repeat tap while the batch is in flight is a no-op.
+     * No authentication required — guest wishlist entries are stored locally via Room.
      */
     fun onAddAllToWishlist() {
-        if (target !is ScannerTarget.Collection) {
+        if (!isCollectionTarget) {
             recordWrongTargetAction("add_all_to_wishlist")
             return
         }
-        val entries = _uiState.value.scanSession.entries
-        if (entries.isEmpty() || _uiState.value.isCommittingQueue) return
-
-        _uiState.update { it.copy(isCommittingQueue = true) }
-        viewModelScope.launch {
-            try {
-                var failedCount = 0
-                val successfulEntries = mutableListOf<CardSelectionEntry>()
-                for (entry in entries) {
-                    val result: Result<Unit> = try {
-                        addToWishlist(entry.toWishlistEntry())
-                    } catch (error: kotlinx.coroutines.CancellationException) {
-                        throw error
-                    } catch (error: Exception) {
-                        Result.failure(error)
+        var failedCount = 0
+        val launched = queueActions.addAllToWishlist(
+            scope = commitScope,
+            onEntryAdded = { entry, result ->
+                if (result.isSuccess) {
+                    _uiState.update {
+                        it.copy(
+                            toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name),
+                            toastType = MagicToastType.SUCCESS,
+                        )
                     }
-                    if (result.isSuccess) successfulEntries += entry else {
-                        failedCount++
-                        result.exceptionOrNull()?.let { error ->
-                            recordSafeNonFatal("scanner_bulk_wishlist_entry_failed", error)
-                        }
-                    }
-                    kotlinx.coroutines.delay(100)
+                } else {
+                    failedCount++
+                    result.exceptionOrNull()?.let { error -> recordSafeNonFatal("scanner_bulk_wishlist_entry_failed", error) }
                 }
-                analyticsHelper.logEvent(
-                    "scanner_add_all_wishlist",
-                    mapOf(
-                        "count" to successfulEntries.size.toString(),
-                        "failed_count" to failedCount.toString(),
-                        "result" to when {
-                            failedCount == 0 -> "success"
-                            successfulEntries.isEmpty() -> "error"
-                            else -> "partial"
-                        },
-                    ),
+                kotlinx.coroutines.delay(100)
+            },
+        ) { count ->
+            analyticsHelper.logEvent(
+                "scanner_add_all_wishlist",
+                mapOf(
+                    "count" to (count - failedCount).toString(),
+                    "failed_count" to failedCount.toString(),
+                    "result" to when {
+                        failedCount == 0 -> "success"
+                        failedCount == count -> "error"
+                        else -> "partial"
+                    },
+                ),
+            )
+            _uiState.update {
+                it.copy(
+                    toastMessage = if (failedCount == 0) {
+                        context.getString(R.string.scanner_toast_added_all_to_wishlist, count)
+                    } else {
+                        context.getString(R.string.scanner_toast_add_all_partial_failure, failedCount, count)
+                    },
+                    toastType = if (failedCount == 0) MagicToastType.SUCCESS else MagicToastType.WARNING,
                 )
-                if (successfulEntries.isNotEmpty()) {
-                    if (_uiState.value.isAutoDeleteOnAddEnabled) {
-                        successfulEntries.forEach(::onRemoveSessionCard)
-                    }
-                }
-                _uiState.update {
-                    it.copy(
-                        toastMessage = if (failedCount == 0) {
-                            context.getString(R.string.scanner_toast_added_all_to_wishlist, entries.size)
-                        } else {
-                            context.getString(
-                                R.string.scanner_toast_add_all_partial_failure,
-                                failedCount,
-                                entries.size,
-                            )
-                        },
-                        toastType = if (failedCount == 0) MagicToastType.SUCCESS else MagicToastType.WARNING,
-                    )
-                }
-            } finally {
-                _uiState.update { it.copy(isCommittingQueue = false) }
             }
         }
+        if (launched) syncQueueSnapshot()
     }
-
-    private fun CardSelectionEntry.toWishlistEntry(): WishlistEntry = WishlistEntry(
-        id = UUID.randomUUID().toString(),
-        userId = "",
-        cardId = card.scryfallId,
-        matchAnyVariant = false,
-        isFoil = isFoil,
-        condition = condition.uppercase().trim(),
-        language = language.lowercase().trim(),
-        createdAt = System.currentTimeMillis(),
-        card = card,
-    )
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Common ViewModel Actions
@@ -780,7 +646,7 @@ class ScannerViewModel @Inject constructor(
 
     /**
      * Toggles whether a per-entry "Add to collection" / "Add to wishlist" action in
-     * [ScanQueueSheet] also removes that entry from the queue once the add succeeds. Sticky for
+     * `CardQueueSheet` also removes that entry from the queue once the add succeeds. Sticky for
      * the session (survives sheet close/reopen); does NOT affect the bulk "Add all" actions.
      */
     fun onToggleAutoDeleteOnAdd() {
@@ -844,7 +710,7 @@ class ScannerViewModel @Inject constructor(
      * Opens the edit sheet for a specific scanned card.
      * Fetches all available prints (sets) for that card to populate the set picker.
      */
-    fun onEditScannedCard(entry: CardSelectionEntry) {
+    fun onEditScannedCard(entry: QueuedCard) {
         _uiState.update {
             it.clearedForOverlay().copy(
                 editingCard = entry,
@@ -869,23 +735,12 @@ class ScannerViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Updates an existing entry in the scan session with new attributes,
-     * then persists the updated queue to SharedPreferences.
-     */
-    fun onUpdateScannedCard(updatedEntry: CardSelectionEntry) {
+    /** Replaces the entry being edited with [updatedEntry] in the shared queue and closes the edit sheet. */
+    fun onUpdateScannedCard(updatedEntry: QueuedCard) {
         val original = _uiState.value.editingCard ?: return
-        _uiState.update { state ->
-            val updatedList = state.scanSession.entries.map {
-                if (it.id == original.id) updatedEntry else it
-            }
-            state.copy(
-                scanSession = state.scanSession.copy(entries = updatedList),
-                showEditSheet = false,
-                editingCard = null,
-            )
-        }
-        persistQueue()
+        queueRepository.update(updatedEntry.copy(id = original.id))
+        syncQueueSnapshot()
+        _uiState.update { it.copy(showEditSheet = false, editingCard = null) }
     }
 
     /** Closes the edit sheet without saving. */
@@ -910,6 +765,7 @@ class ScannerViewModel @Inject constructor(
         _uiState.update { it.copy(hasFlash = available) }
     }
 
+    /** Reports a failed camera `bindToLifecycle` and shows [ScannerUiState.cameraBindError]. */
     fun onCameraBindFailed(error: Throwable) {
         recordSafeNonFatal("scanner_camera_bind_failed", error)
         _uiState.update {
@@ -917,9 +773,7 @@ class ScannerViewModel @Inject constructor(
         }
     }
 
-    /** Deck Wizard UX polish plan, Run 1 §1.7: called right after a successful `bindToLifecycle` —
-     * clears a previously-shown [ScannerUiState.cameraBindError] banner, which used to never clear
-     * on its own once set. */
+    /** Clears [ScannerUiState.cameraBindError] after the next successful `bindToLifecycle`. */
     fun onCameraBound() {
         _uiState.update { it.copy(cameraBindError = null) }
     }
@@ -951,53 +805,56 @@ class ScannerViewModel @Inject constructor(
         _uiState.update { it.copy(showQueueSheet = false, multiSelectedIds = emptySet()) }
     }
 
-    /** Removes a single [CardSelectionEntry] from the session and persists the change. */
-    fun onRemoveSessionCard(entry: CardSelectionEntry) {
+    /** Removes a single entry from the shared queue. */
+    fun onRemoveSessionCard(entry: QueuedCard) {
+        queueRepository.remove(entry.id)
+        syncQueueSnapshot()
         _uiState.update { state ->
             state.copy(
-                scanSession = state.scanSession.copy(
-                    entries = state.scanSession.entries.filter { it.id != entry.id },
-                ),
                 multiSelectedIds = state.multiSelectedIds - entry.card.scryfallId,
                 // W2026-09-06: clearing the overlay when the card is removed from queue
                 lastDetectedCard = if (state.lastDetectedCard?.scryfallId == entry.card.scryfallId) null else state.lastDetectedCard
             )
         }
-        persistQueue()
     }
 
-    /** Clears the entire scan session, resets the anti-duplicate guard, and persists. */
+    /** Clears the entire shared queue and resets the anti-duplicate guard. */
     fun onClearSession() {
+        queueRepository.clear()
+        syncQueueSnapshot()
+        resetAfterQueueEmptied()
+    }
+
+    private fun resetAfterQueueEmptied() {
         _uiState.update {
-            it.copy(
-                scanSession = CardSelectionSession(),
-                multiSelectedIds = emptySet(),
-                showQueueSheet = if (target is ScannerTarget.Deck) it.showQueueSheet else false,
-            )
+            it.copy(multiSelectedIds = emptySet(), showQueueSheet = if (isCollectionTarget) false else it.showQueueSheet)
         }
         lastAddedId = null
         lastAddedTime = 0L
-        persistQueue()
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Multi-select in the queue sheet
     // ─────────────────────────────────────────────────────────────────────────
 
-
-    /** Deletes all currently selected entries from the session and persists the change. */
-    fun onDeleteSelected() {
+    /** Toggles the long-press selection state of a session entry. */
+    fun onToggleMultiSelect(entry: QueuedCard) {
         _uiState.update { state ->
-            state.copy(
-                scanSession = state.scanSession.copy(
-                    entries = state.scanSession.entries.filter {
-                        it.card.scryfallId !in state.multiSelectedIds
-                    },
-                ),
-                multiSelectedIds = emptySet(),
-            )
+            val id = entry.card.scryfallId
+            val updated = if (id in state.multiSelectedIds) {
+                state.multiSelectedIds - id
+            } else {
+                state.multiSelectedIds + id
+            }
+            state.copy(multiSelectedIds = updated)
         }
-        persistQueue()
+    }
+
+    /** Deletes all currently selected entries from the shared queue. */
+    fun onDeleteSelected() {
+        queueRepository.removeByScryfallIds(_uiState.value.multiSelectedIds)
+        syncQueueSnapshot()
+        _uiState.update { it.copy(multiSelectedIds = emptySet()) }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1005,122 +862,104 @@ class ScannerViewModel @Inject constructor(
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Persists every [ScannedCard] in the session to the collection in ONE batched
-     * [CommitScannedCardsUseCase] call, then clears the queue and closes the sheet.
-     *
-     * Write-path hardening audit (2026-09-06): this used to loop one
-     * `commitScannedCards(listOf(entry.toCommit()))` call per entry with a `delay(100)` between
-     * them and NO try/catch — a single throwing entry aborted the whole `viewModelScope.launch`
-     * coroutine uncaught, silently stranding every entry after it AND never reaching
-     * `onClearSession()`, so the already-committed entries stayed in the queue too (a retry would
-     * then double-add them). [CommitScannedCardsUseCase] already isolates per-entry failures
-     * internally (see its KDoc), so the batch call below cannot itself throw for a single bad
-     * card; only a fully successful batch clears the whole session, a partial one removes just the
-     * entries that actually committed and surfaces a [MagicToastType.WARNING] naming the shortfall.
-     *
-     * Re-entrancy guard (write-path hardening audit, 2026-09-06): [ScannerUiState.isCommittingQueue]
-     * blocks a second tap while a commit is already in flight -- without it, two fast taps could
-     * commit the whole queue twice (doubled quantities, duplicate `CardScanned` XP events).
+     * Commits the whole shared queue to the collection in ONE batched call via
+     * [CardQueueActions.addAllToCollection]. A full success empties the queue and closes the sheet;
+     * a partial failure keeps only the failed entries (by stable id) and surfaces a
+     * [MagicToastType.WARNING] naming the shortfall. [ScannerUiState.isCommittingQueue] flips
+     * synchronously so a second tap before the first commit resolves is a no-op.
      */
     fun onAddAllToCollection() {
-        if (target !is ScannerTarget.Collection) {
+        if (!isCollectionTarget) {
             recordWrongTargetAction("add_all_to_collection")
             return
         }
-        val state = _uiState.value
-        val entries = state.scanSession.entries
-        if (entries.isEmpty() || state.isCommittingQueue) return
-
-        _uiState.update { it.copy(isCommittingQueue = true) }
-        viewModelScope.launch {
-            try {
-                val result = commitScannedCards(entries.map { it.toCommit() })
-
-                analyticsHelper.logEvent(
-                    "scanner_add_all",
-                    mapOf("count" to entries.size.toString(), "failed" to result.failedEntries.toString()),
-                )
-
-                if (result.failedEntries == 0) {
+        if (_uiState.value.isCommittingQueue) return
+        val launched = queueActions.addAllToCollection(commitScope) { result ->
+            syncQueueSnapshot()
+            when (result) {
+                is AddAllToCollectionResult.Success -> {
+                    analyticsHelper.logEvent(
+                        "scanner_add_all",
+                        mapOf("count" to result.committedEntries.toString(), "failed" to "0"),
+                    )
                     _uiState.update {
                         it.copy(
-                            toastMessage = context.getString(R.string.scanner_toast_added_all_to_collection, entries.size),
+                            toastMessage = context.getString(R.string.scanner_toast_added_all_to_collection, result.committedEntries),
                             toastType = MagicToastType.SUCCESS,
                         )
                     }
-                    onClearSession()
-                } else {
-                    // Stable id, not timestamp: two queue entries can share a millisecond (burst
-                    // recognition, or a duplicate-entry action firing twice), which would silently
-                    // drop the failed one from this filter alongside the succeeded one.
-                    val succeededIds = entries.filterIndexed { index, _ ->
-                        result.entrySucceeded.getOrElse(index) { false }
-                    }.mapTo(mutableSetOf()) { it.id }
-                    _uiState.update { s ->
-                        s.copy(
-                            scanSession = s.scanSession.copy(
-                                entries = s.scanSession.entries.filterNot { it.id in succeededIds },
-                            ),
+                    resetAfterQueueEmptied()
+                }
+                is AddAllToCollectionResult.PartialFailure -> {
+                    analyticsHelper.logEvent(
+                        "scanner_add_all",
+                        mapOf("count" to result.totalEntries.toString(), "failed" to result.failedEntries.toString()),
+                    )
+                    _uiState.update {
+                        it.copy(
                             toastMessage = context.getString(
                                 R.string.scanner_toast_add_all_partial_failure,
                                 result.failedEntries,
-                                entries.size,
+                                result.totalEntries,
                             ),
                             toastType = MagicToastType.WARNING,
                         )
                     }
-                    persistQueue()
                 }
-            } finally {
-                _uiState.update { it.copy(isCommittingQueue = false) }
             }
         }
+        if (launched) syncQueueSnapshot()
     }
 
-    fun onAddEntryToDeck(entry: CardSelectionEntry, board: DeckBoard) {
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Deck target: add queued cards to the scanned deck
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Adds one queued entry to [board] of the target deck. Runs in the app scope; the entry is
+     * removed (via [CardQueueRepository.removeCommitted], so copies added meanwhile stay queued) only
+     * when it committed and auto-delete is on.
+     */
+    fun onAddEntryToDeck(entry: QueuedCard, board: DeckBoard) {
         val deckTarget = target as? ScannerTarget.Deck ?: run {
             recordWrongTargetAction("add_entry_to_deck")
             return
         }
-        val state = _uiState.value
-        if (state.isCommittingQueue || state.scanSession.entries.none { it.id == entry.id }) return
-        val snapshot = entry.copy()
-        _uiState.update { it.copy(isCommittingQueue = true) }
+        if (isCommittingToDeck.value) return
+        val snapshot = queueRepository.queue.value.firstOrNull { it.id == entry.id } ?: return
+        val removeOnSuccess = _uiState.value.isAutoDeleteOnAddEnabled
+        isCommittingToDeck.value = true
+        syncQueueSnapshot()
         analyticsHelper.logEvent(
             "scanner_deck_entry_add_started",
             mapOf("board" to board.name.lowercase()),
         )
-        viewModelScope.launch {
+        commitScope.launch {
             try {
                 val result = addScannedCardsToDeck(
                     deckId = deckTarget.deckId,
-                    entries = listOf(
-                        ScannedDeckCardInput(
-                            entryId = snapshot.id,
-                            scryfallId = snapshot.card.scryfallId,
-                            quantity = snapshot.quantity,
-                            oracleId = snapshot.card.oracleId,
-                        ),
-                    ),
+                    entries = listOf(snapshot.toDeckInput()),
                     board = board,
                 )
-                val committed = result.committedEntryIds intersect setOf(snapshot.id)
-                removeCommittedDeckEntries(committed, autoDelete = _uiState.value.isAutoDeleteOnAddEnabled)
+                val committed = snapshot.id in result.committedEntryIds
+                if (committed && removeOnSuccess) queueRepository.removeCommitted(listOf(snapshot))
                 val isBlocked = snapshot.id in result.blockedCommanderEntryIds
-                val resultKind = when {
-                    isBlocked -> "blocked_commander"
-                    committed.isNotEmpty() -> "success"
-                    else -> "no_op"
-                }
                 analyticsHelper.logEvent(
                     "scanner_deck_entry_add_result",
-                    mapOf("board" to board.name.lowercase(), "result" to resultKind),
+                    mapOf(
+                        "board" to board.name.lowercase(),
+                        "result" to when {
+                            isBlocked -> "blocked_commander"
+                            committed -> "success"
+                            else -> "no_op"
+                        },
+                    ),
                 )
                 _uiState.update {
                     it.copy(
                         toastMessage = when {
                             isBlocked -> context.getString(R.string.scanner_deck_add_blocked_commander)
-                            committed.isNotEmpty() -> context.getString(
+                            committed -> context.getString(
                                 R.string.scanner_deck_add_success,
                                 snapshot.quantity,
                                 boardLabel(board),
@@ -1130,6 +969,8 @@ class ScannerViewModel @Inject constructor(
                         toastType = if (isBlocked) MagicToastType.WARNING else MagicToastType.SUCCESS,
                     )
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 recordSafeNonFatal("scanner_deck_entry_add_failed", e)
                 analyticsHelper.logEvent(
@@ -1143,56 +984,52 @@ class ScannerViewModel @Inject constructor(
                     )
                 }
             } finally {
-                _uiState.update { it.copy(isCommittingQueue = false) }
+                isCommittingToDeck.value = false
+                syncQueueSnapshot()
             }
         }
     }
 
+    /**
+     * Adds every queued entry (a snapshot) to [board] of the target deck in one atomic merge.
+     * Committed entries are removed only when auto-delete is on; commander-blocked ones stay queued.
+     */
     fun onAddAllToDeck(board: DeckBoard) {
         val deckTarget = target as? ScannerTarget.Deck ?: run {
             recordWrongTargetAction("add_all_to_deck")
             return
         }
-        val state = _uiState.value
-        if (state.isCommittingQueue || state.scanSession.entries.isEmpty()) return
-        val snapshot = state.scanSession.entries.toList()
-        _uiState.update { it.copy(isCommittingQueue = true) }
+        val snapshot = queueRepository.queue.value
+        if (isCommittingToDeck.value || snapshot.isEmpty()) return
+        val removeOnSuccess = _uiState.value.isAutoDeleteOnAddEnabled
+        isCommittingToDeck.value = true
+        syncQueueSnapshot()
         analyticsHelper.logEvent(
             "scanner_deck_bulk_add_started",
-            mapOf(
-                "board" to board.name.lowercase(),
-                "entry_count" to snapshot.size.toString(),
-            ),
+            mapOf("board" to board.name.lowercase(), "entry_count" to snapshot.size.toString()),
         )
-        viewModelScope.launch {
+        commitScope.launch {
             try {
                 val result = addScannedCardsToDeck(
                     deckId = deckTarget.deckId,
-                    entries = snapshot.map { entry ->
-                        ScannedDeckCardInput(
-                            entryId = entry.id,
-                            scryfallId = entry.card.scryfallId,
-                            quantity = entry.quantity,
-                            oracleId = entry.card.oracleId,
-                        )
-                    },
+                    entries = snapshot.map { it.toDeckInput() },
                     board = board,
                 )
-                val committed = result.committedEntryIds intersect snapshot.mapTo(mutableSetOf()) { it.id }
-                removeCommittedDeckEntries(
-                    committed,
-                    autoDelete = _uiState.value.isAutoDeleteOnAddEnabled,
-                )
-                val blockedCount = (result.blockedCommanderEntryIds intersect snapshot.mapTo(mutableSetOf()) { it.id }).size
-                val resultKind = when {
-                    blockedCount > 0 && committed.isNotEmpty() -> "partial_commander_block"
-                    blockedCount > 0 -> "blocked_commander"
-                    committed.isNotEmpty() -> "success"
-                    else -> "no_op"
-                }
+                val committed = snapshot.filter { it.id in result.committedEntryIds }
+                if (removeOnSuccess) queueRepository.removeCommitted(committed)
+                val blockedCount = snapshot.count { it.id in result.blockedCommanderEntryIds }
                 analyticsHelper.logEvent(
                     "scanner_deck_bulk_add_result",
-                    mapOf("board" to board.name.lowercase(), "entry_count" to snapshot.size.toString(), "result" to resultKind),
+                    mapOf(
+                        "board" to board.name.lowercase(),
+                        "entry_count" to snapshot.size.toString(),
+                        "result" to when {
+                            blockedCount > 0 && committed.isNotEmpty() -> "partial_commander_block"
+                            blockedCount > 0 -> "blocked_commander"
+                            committed.isNotEmpty() -> "success"
+                            else -> "no_op"
+                        },
+                    ),
                 )
                 _uiState.update {
                     it.copy(
@@ -1214,11 +1051,17 @@ class ScannerViewModel @Inject constructor(
                         toastType = if (blockedCount > 0) MagicToastType.WARNING else MagicToastType.SUCCESS,
                     )
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 recordSafeNonFatal("scanner_deck_bulk_add_failed", e)
                 analyticsHelper.logEvent(
                     "scanner_deck_bulk_add_result",
-                    mapOf("board" to board.name.lowercase(), "entry_count" to snapshot.size.toString(), "result" to "error"),
+                    mapOf(
+                        "board" to board.name.lowercase(),
+                        "entry_count" to snapshot.size.toString(),
+                        "result" to "error",
+                    ),
                 )
                 _uiState.update {
                     it.copy(
@@ -1227,22 +1070,18 @@ class ScannerViewModel @Inject constructor(
                     )
                 }
             } finally {
-                _uiState.update { it.copy(isCommittingQueue = false) }
+                isCommittingToDeck.value = false
+                syncQueueSnapshot()
             }
         }
     }
 
-    private fun removeCommittedDeckEntries(committedIds: Set<String>, autoDelete: Boolean) {
-        if (!autoDelete || committedIds.isEmpty()) return
-        _uiState.update { state ->
-            state.copy(
-                scanSession = state.scanSession.copy(
-                    entries = state.scanSession.entries.filterNot { it.id in committedIds },
-                ),
-            )
-        }
-        persistQueue()
-    }
+    private fun QueuedCard.toDeckInput(): ScannedDeckCardInput = ScannedDeckCardInput(
+        entryId = id,
+        scryfallId = card.scryfallId,
+        quantity = quantity,
+        oracleId = card.oracleId,
+    )
 
     private fun boardLabel(board: DeckBoard): String = when (board) {
         DeckBoard.MAINBOARD -> context.getString(R.string.scanner_deck_action_mainboard)
@@ -1274,7 +1113,7 @@ class ScannerViewModel @Inject constructor(
      * @param fromQueue If true, closes the queue sheet first and flags it for restoration on close.
      */
     fun onOpenCardDetail(id: String, fromQueue: Boolean = false) {
-        if (target is ScannerTarget.Deck) {
+        if (!isCollectionTarget) {
             recordWrongTargetAction("open_card_detail")
             return
         }
@@ -1304,7 +1143,7 @@ class ScannerViewModel @Inject constructor(
     //  Variant selector
     // ─────────────────────────────────────────────────────────────────────────
 
-    fun onOpenVariantSelector(entry: CardSelectionEntry) {
+    fun onOpenVariantSelector(entry: QueuedCard) {
         variantLoadJob?.cancel()
         _uiState.update {
             it.clearedForOverlay().copy(
@@ -1340,30 +1179,19 @@ class ScannerViewModel @Inject constructor(
 
     fun onSelectVariant(variant: Card) {
         val original = _uiState.value.variantSelectorEntry ?: return
+        queueRepository.queue.value.firstOrNull { it.id == original.id }?.let { current ->
+            queueRepository.update(current.copy(card = variant, setCode = variant.setCode, language = variant.lang))
+        }
+        syncQueueSnapshot()
         _uiState.update { state ->
-            val updatedEntries = state.scanSession.entries.map {
-                if (it.id == original.id) {
-                    it.copy(
-                        card = variant,
-                        setCode = variant.setCode,
-                        language = variant.lang,
-                    )
-                } else it
-            }
             state.copy(
-                scanSession = state.scanSession.copy(entries = updatedEntries),
                 showVariantSelector = false,
                 variantSelectorEntry = null,
                 editingCard = if (state.editingCard?.id == original.id) {
-                    state.editingCard.copy(
-                        card = variant,
-                        setCode = variant.setCode,
-                        language = variant.lang,
-                    )
+                    state.editingCard.copy(card = variant, setCode = variant.setCode, language = variant.lang)
                 } else state.editingCard
             )
         }
-        persistQueue()
     }
 
     fun onExpandVariantImage(imageUrl: String) {
@@ -1379,33 +1207,23 @@ class ScannerViewModel @Inject constructor(
     //  Duplicate scanned card
     // ─────────────────────────────────────────────────────────────────────────
 
-    fun onIncrementSessionCardQuantity(entry: CardSelectionEntry) {
-        _uiState.update { state ->
-            val updatedEntries = state.scanSession.entries.map {
-                if (it.id == entry.id) it.copy(quantity = it.quantity + 1) else it
-            }
-            state.copy(scanSession = state.scanSession.copy(entries = updatedEntries))
-        }
-        persistQueue()
+    fun onIncrementSessionCardQuantity(entry: QueuedCard) {
+        queueRepository.incrementQuantity(entry.id)
+        syncQueueSnapshot()
     }
 
-    fun onDecrementSessionCardQuantity(entry: CardSelectionEntry) {
+    fun onDecrementSessionCardQuantity(entry: QueuedCard) {
         if (entry.quantity <= 1) {
             onRemoveSessionCard(entry)
             return
         }
-        _uiState.update { state ->
-            val updatedEntries = state.scanSession.entries.map {
-                if (it.id == entry.id) it.copy(quantity = (it.quantity - 1).coerceAtLeast(1)) else it
-            }
-            state.copy(scanSession = state.scanSession.copy(entries = updatedEntries))
-        }
-        persistQueue()
+        queueRepository.decrementQuantity(entry.id)
+        syncQueueSnapshot()
     }
 
     fun onRemoveLastDetectedCard() {
         val lastCard = _uiState.value.lastDetectedCard ?: return
-        val entryToRemove = _uiState.value.scanSession.entries.lastOrNull {
+        val entryToRemove = _uiState.value.scanSession.cards.lastOrNull {
             it.card.scryfallId == lastCard.scryfallId
         }
         if (entryToRemove != null) {
@@ -1418,25 +1236,14 @@ class ScannerViewModel @Inject constructor(
     /**
      * Duplicates [original] and inserts the copy immediately after it in the scan queue (in
      * place, NOT appended at the end), so quickly stamping several physical copies of the same
-     * card keeps them visually grouped. Backs the "Duplicate" action in [CardQueueItem] (replaced
+     * card keeps them visually grouped. Backs the "Duplicate" action in `CardQueueSheet` (replaced
      * the old per-copy "Variants" button — item 6 of the 2026-07-17 scanner UX pass). Unlike the
      * old `onAddDuplicateScannedCard` this never touches the edit sheet's visibility, since it is
-     * no longer reachable from inside [EditScannedCardSheet].
+     * no longer reachable from inside `EditQueuedCardSheet`.
      */
-    fun onDuplicateSessionCard(original: CardSelectionEntry) {
-        // id must also be regenerated -- copy() otherwise carries the original's id, giving two
-        // distinct queue entries the same identity.
-        val duplicate = original.copy(id = UUID.randomUUID().toString(), timestamp = System.currentTimeMillis())
-        _uiState.update { state ->
-            val index = state.scanSession.entries.indexOfFirst { it.id == original.id }
-            val updatedEntries = if (index >= 0) {
-                state.scanSession.entries.toMutableList().apply { add(index + 1, duplicate) }
-            } else {
-                state.scanSession.entries + duplicate
-            }
-            state.copy(scanSession = state.scanSession.copy(entries = updatedEntries))
-        }
-        persistQueue()
+    fun onDuplicateSessionCard(original: QueuedCard) {
+        queueRepository.duplicate(original)
+        syncQueueSnapshot()
     }
 
     // Note (WS5, `scanner-reliability-plan.md`, 2026-08-25): this ViewModel deliberately does

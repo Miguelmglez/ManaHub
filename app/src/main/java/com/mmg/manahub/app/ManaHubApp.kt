@@ -105,7 +105,6 @@ import com.mmg.manahub.feature.friends.di.friendsKoinModule
 import com.mmg.manahub.feature.game.di.gameKoinModule
 import com.mmg.manahub.feature.gamification.di.gamificationKoinModule
 import com.mmg.manahub.feature.home.di.homeKoinModule
-import com.mmg.manahub.feature.multiadd.di.massiveAddCardKoinModule
 import com.mmg.manahub.feature.news.di.newsKoinModule
 import com.mmg.manahub.feature.playtest.di.playtestKoinModule
 import com.mmg.manahub.feature.profile.di.profileKoinModule
@@ -290,8 +289,7 @@ class ManaHubApp : Application(), KoinComponent {
     //    coreBridgeKoinModule (shared with other islands, natively Koin-built as of batch 3).
     // Only the CardDetail-only deps are here.
     // AddCardToCollectionUseCase/AddToWishlistUseCase moved to SharedDomainKoinModule (batch 2) —
-    // cardDetailKoinModule now resolves both via get(). AddToWishlistUseCase is ALSO consumed by the
-    // still-Hilt (excluded) ScannerViewModel, via KoinToHiltBridgeModule's reverse bridge.
+    // cardDetailKoinModule now resolves both via get().
     @Inject lateinit var userCardRepository: Lazy<UserCardRepository>
 
     // Friends island (Phase 1) bridge deps. FriendRepository is shared with Profile → natively Koin-built
@@ -567,7 +565,6 @@ class ManaHubApp : Application(), KoinComponent {
                     nearbyRepository = nearbySessionRepository,
                     voiceCommandRecognizer = voiceCommandRecognizer,
                 ),
-                massiveAddCardKoinModule()
             )
         }
 

@@ -53,6 +53,7 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FlashOff
 import androidx.compose.material.icons.rounded.FlashOn
 import androidx.compose.material.icons.rounded.Settings
@@ -81,6 +82,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -105,12 +107,10 @@ import com.google.accompanist.permissions.shouldShowRationale
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.model.CardSelectionEntry
 import com.mmg.manahub.core.model.PreferredCurrency
-import com.mmg.manahub.core.ui.Res
-import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardQueueSheet
 import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.ui.components.EditQueuedCardSheet
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
@@ -122,7 +122,6 @@ import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.VariantSelectorSheet
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
-import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -137,7 +136,6 @@ import com.mmg.manahub.feature.scanner.presentation.components.DeckScannerQueueS
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.painterResource
 import org.koin.androidx.compose.koinViewModel
 import java.util.concurrent.Executors
 
@@ -232,7 +230,7 @@ fun ScannerScreen(
 
                 TopScannerControls(
                     onBack = onBack,
-                    queueCount = uiState.scanSession.entries.sumOf { it.quantity },
+                    queueCount = uiState.scanSession.cards.sumOf { it.quantity },
                     isFlashOn = uiState.isFlashOn,
                     hasFlash = uiState.hasFlash,
                     isSoundEnabled = uiState.isSoundEnabled,
@@ -278,7 +276,7 @@ fun ScannerScreen(
                                 val card = uiState.lastDetectedCard
                                 if (uiState.target is ScannerTarget.Deck) {
                                     val entry = card?.let { detected ->
-                                        uiState.scanSession.entries.lastOrNull { it.card.scryfallId == detected.scryfallId }
+                                        uiState.scanSession.cards.lastOrNull { it.card.scryfallId == detected.scryfallId }
                                     }
                                     if (entry != null) viewModel.onEditScannedCard(entry) else viewModel.onOpenQueue()
                                 } else {
@@ -325,31 +323,33 @@ fun ScannerScreen(
         uiState.showEditSheet && uiState.editingCard != null -> Unit
         uiState.showQueueSheet -> when (uiState.target) {
             ScannerTarget.Collection -> CardQueueSheet(
-                session = uiState.scanSession,
+                cards = uiState.scanSession.cards,
                 preferredCurrency = preferredCurrency,
                 ownedCardIdentityKeys = uiState.ownedCardIdentityKeys,
                 isAutoDeleteOnAddEnabled = uiState.isAutoDeleteOnAddEnabled,
                 isCommitting = uiState.isCommittingQueue,
+                isAddingAllToWishlist = uiState.isAddingAllToWishlist,
+                inFlightEntryIds = uiState.inFlightQueueIds,
                 toastMessage = uiState.toastMessage,
                 toastType = uiState.toastType,
-                onToastDismissed = viewModel::onToastDismissed,
+                onToastShown = viewModel::onToastDismissed,
                 listState = queueListState,
                 onDismiss = viewModel::onCloseQueue,
-                onRemoveEntry = viewModel::onRemoveSessionCard,
-                onEditEntry = viewModel::onEditScannedCard,
-                onClearSession = viewModel::onClearSession,
+                onRemoveCard = viewModel::onRemoveSessionCard,
+                onEditCard = viewModel::onEditScannedCard,
+                onClearQueue = viewModel::onClearSession,
                 onAddAllToCollection = viewModel::onAddAllToCollection,
                 onAddAllToWishlist = viewModel::onAddAllToWishlist,
                 onAddEntryToCollection = viewModel::onAddEntryToCollection,
                 onAddEntryToWishlist = viewModel::onAddEntryToWishlist,
-                onNavigateToCardDetail = { id -> viewModel.onOpenCardDetail(id, true) },
-                onDuplicateEntry = viewModel::onDuplicateSessionCard,
+                onCardClick = { entry -> viewModel.onOpenCardDetail(entry.card.scryfallId, fromQueue = true) },
+                onDuplicateCard = viewModel::onDuplicateSessionCard,
                 onToggleAutoDeleteOnAdd = viewModel::onToggleAutoDeleteOnAdd,
                 onIncrementQuantity = viewModel::onIncrementSessionCardQuantity,
                 onDecrementQuantity = viewModel::onDecrementSessionCardQuantity,
             )
             is ScannerTarget.Deck -> DeckScannerQueueSheet(
-                session = uiState.scanSession,
+                cards = uiState.scanSession.cards,
                 preferredCurrency = preferredCurrency,
                 isCommitting = uiState.isCommittingQueue,
                 toastMessage = uiState.toastMessage,
@@ -380,8 +380,10 @@ fun ScannerScreen(
         !uiState.showVariantSelector
     ) {
         val editingCard = uiState.editingCard!!
-        EditScannedCardSheet(
-            scannedCard = editingCard,
+        EditQueuedCardSheet(
+            queuedCard = editingCard,
+            availablePrints = uiState.availablePrints,
+            isLoadingPrints = uiState.isLoadingPrints,
             onDismiss = viewModel::onCloseEditSheet,
             onConfirm = viewModel::onUpdateScannedCard,
             onOpenVariantSelector = { viewModel.onOpenVariantSelector(editingCard) },
@@ -1420,42 +1422,6 @@ private fun AmbiguityDropdown(cardName: String, onConfirm: () -> Unit, onSkip: (
         onConfirm = onConfirm,
         dismissLabel = stringResource(R.string.scanner_skip),
         onDismiss = onSkip,
-    )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Edit Scanned Card Sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun EditScannedCardSheet(
-    scannedCard: CardSelectionEntry,
-    onDismiss: () -> Unit,
-    onConfirm: (CardSelectionEntry) -> Unit,
-    onOpenVariantSelector: () -> Unit,
-) {
-    AddCardSheet(
-        cardName = scannedCard.card.name,
-        onConfirm = { foil: Boolean, cond: String, lang: String, q: Int ->
-            onConfirm(scannedCard.copy(
-                isFoil = foil,
-                condition = cond,
-                language = lang,
-                quantity = q,
-            ))
-        },
-        onDismiss = onDismiss,
-        cardImage = scannedCard.card.imageNormal,
-        initialFoil = scannedCard.isFoil,
-        initialCondition = scannedCard.condition,
-        initialLanguage = scannedCard.language,
-        initialQty = scannedCard.quantity,
-        confirmButtonText = stringResource(R.string.scanner_edit_save),
-        setCode = scannedCard.card.setCode,
-        setName = scannedCard.card.setName,
-        rarity = scannedCard.card.rarity,
-        onOpenVariantSelector = onOpenVariantSelector,
-        cardImagePlaceholder = painterResource(Res.drawable.mtg_card_back),
     )
 }
 
