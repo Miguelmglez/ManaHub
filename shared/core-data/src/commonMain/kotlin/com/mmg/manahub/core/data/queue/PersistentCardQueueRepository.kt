@@ -54,6 +54,11 @@ class PersistentCardQueueRepository(
 
     override fun add(entry: QueuedCard) = mutate { it + entry }
 
+    override fun addAll(entries: List<QueuedCard>) {
+        if (entries.isEmpty()) return
+        mutate { it + entries }
+    }
+
     override fun addOrMerge(entry: QueuedCard) = mutate { cards ->
         val index = cards.indexOfFirst { it.hasSameAttributesAs(entry) }
         if (index < 0) {
@@ -69,6 +74,22 @@ class PersistentCardQueueRepository(
         if (ids.isEmpty()) return
         val idSet = ids.toSet()
         mutate { cards -> cards.filterNot { it.id in idSet } }
+    }
+
+    override fun removeCommitted(committed: Collection<QueuedCard>) {
+        if (committed.isEmpty()) return
+        val byId = committed.associateBy { it.id }
+        mutate { cards ->
+            cards.mapNotNull { current ->
+                val snapshot = byId[current.id] ?: return@mapNotNull current
+                when {
+                    current == snapshot -> null
+                    current.copy(quantity = snapshot.quantity) != snapshot -> current
+                    current.quantity > snapshot.quantity -> current.copy(quantity = current.quantity - snapshot.quantity)
+                    else -> null
+                }
+            }
+        }
     }
 
     override fun removeByScryfallId(scryfallId: String) =

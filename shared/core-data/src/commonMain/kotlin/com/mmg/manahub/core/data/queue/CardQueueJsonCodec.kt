@@ -43,10 +43,13 @@ object CardQueueJsonCodec {
     fun decode(json: String): DecodeResult {
         val array = Json.parseToJsonElement(json).jsonArray
         var skipped = 0
+        val seenIds = HashSet<String>()
         val entries = array.mapNotNull { element ->
             runCatching { element.jsonObject.toQueuedCard() }
                 .onFailure { skipped++ }
                 .getOrNull()
+                // LazyColumn keys on the id and remove(id) would drop every row sharing it.
+                ?.let { entry -> if (seenIds.add(entry.id)) entry else entry.copy(id = newQueuedCardId()) }
         }
         return DecodeResult(entries, skipped)
     }
@@ -57,10 +60,10 @@ object CardQueueJsonCodec {
         put("setCode", card.setCode)
         put("setName", card.setName)
         put("lang", card.lang)
-        put("priceUsd", card.priceUsd)
-        put("priceUsdFoil", card.priceUsdFoil)
-        put("priceEur", card.priceEur)
-        put("priceEurFoil", card.priceEurFoil)
+        put("priceUsd", card.priceUsd.validPriceOrNull())
+        put("priceUsdFoil", card.priceUsdFoil.validPriceOrNull())
+        put("priceEur", card.priceEur.validPriceOrNull())
+        put("priceEurFoil", card.priceEurFoil.validPriceOrNull())
         put("imageNormal", card.imageNormal)
         put("imageArtCrop", card.imageArtCrop)
         put("collectorNumber", card.collectorNumber)
@@ -117,7 +120,7 @@ object CardQueueJsonCodec {
         )
         return QueuedCard(
             card = card,
-            quantity = requirePrimitive("quantity").intOrNull ?: error("quantity"),
+            quantity = requirePrimitive("quantity").intOrNull?.takeIf { it >= 1 } ?: error("quantity"),
             isFoil = requirePrimitive("isFoil").booleanOrNull ?: error("isFoil"),
             language = requireString("language"),
             condition = requireString("condition"),
@@ -147,5 +150,8 @@ object CardQueueJsonCodec {
     }
 
     private fun JsonObject.optionalDouble(key: String): Double? =
-        (get(key) as? JsonPrimitive)?.takeUnless { it is JsonNull }?.doubleOrNull?.takeUnless { it.isNaN() }
+        (get(key) as? JsonPrimitive)?.takeUnless { it is JsonNull }?.doubleOrNull.validPriceOrNull()
+
+    // Non-finite or negative prices are unknown, never a value; encoding NaN would also emit a non-JSON token.
+    private fun Double?.validPriceOrNull(): Double? = this?.takeIf { it.isFinite() && it >= 0 }
 }

@@ -34,7 +34,13 @@ internal object AddCardTelemetry {
     fun selectMissing(addedCount: Int) =
         log("addcard_multiselect_select_missing: ${countBucket(addedCount)}")
 
-    fun deckSourceLoadFailed(source: AddCardDeckSource, failure: DeckSourceLoadFailure, cause: Throwable?) {
+    /** Breadcrumb for every failure; the non-fatal only when [recordNonFatal] (once per source per screen). */
+    fun deckSourceLoadFailed(
+        source: AddCardDeckSource,
+        failure: DeckSourceLoadFailure,
+        cause: Throwable?,
+        recordNonFatal: Boolean,
+    ) {
         val sourceId = when (source) {
             is AddCardDeckSource.Local -> "local"
             is AddCardDeckSource.Community -> "community"
@@ -44,6 +50,7 @@ internal object AddCardTelemetry {
             setCustomKey("addcard_deck_load_failure", failure.id)
             log("addcard_deck_source_load_failed: $sourceId/${failure.id}")
         }
+        if (!recordNonFatal) return
         recordSafeNonFatal(
             tag = "addcard_deck_source_load",
             e = cause ?: IllegalStateException("addcard_deck_source_${failure.id}"),

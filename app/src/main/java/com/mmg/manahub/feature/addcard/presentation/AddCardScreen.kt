@@ -348,6 +348,8 @@ fun AddCardScreen(
                     ownedCardIdentityKeys = uiState.ownedCardIdentityKeys,
                     isAutoDeleteOnAddEnabled = uiState.isAutoDeleteOnAddEnabled,
                     isCommitting = uiState.isCommittingQueue,
+                    isAddingAllToWishlist = uiState.isAddingAllToWishlist,
+                    inFlightEntryIds = uiState.inFlightQueueIds,
                     toastMessage = queueToastMessage,
                     toastType = queueToastType,
                     onToastShown = viewModel::onQueueToastShown,
@@ -1374,6 +1376,8 @@ private fun queueToastText(toast: AddCardQueueToast): String = when (toast) {
     is AddCardQueueToast.DeckCardsSelected ->
         if (toast.count == 0) stringResource(R.string.addcard_deck_nothing_new_selected)
         else pluralStringResource(R.plurals.addcard_deck_cards_selected, toast.count, toast.count)
+    is AddCardQueueToast.SelectionLockedWhileAdding ->
+        stringResource(R.string.addcard_selection_locked_while_adding, toast.cardName)
 }
 
 private fun AddCardQueueToast.toastType(): MagicToastType = when (this) {
@@ -1383,6 +1387,7 @@ private fun AddCardQueueToast.toastType(): MagicToastType = when (this) {
     is AddCardQueueToast.AddedAllToWishlist -> MagicToastType.SUCCESS
     is AddCardQueueToast.AddFailed -> MagicToastType.ERROR
     is AddCardQueueToast.AddAllPartialFailure -> MagicToastType.WARNING
+    is AddCardQueueToast.SelectionLockedWhileAdding -> MagicToastType.INFO
     is AddCardQueueToast.DeckCardsSelected ->
         if (count == 0) MagicToastType.INFO else MagicToastType.SUCCESS
 }

@@ -173,7 +173,6 @@ fun HomeScreen(
                 HomeAction.ResetLayout,
                 HomeAction.RetryDiscover,
                 HomeAction.RefreshDiscover,
-                HomeAction.OpenMultiAdd,
                 HomeAction.RefreshRandomCard,
                 is HomeAction.SelectDiscoverSet,
                 is HomeAction.SelectCommunityDecksCategory,

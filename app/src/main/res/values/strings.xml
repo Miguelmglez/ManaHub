@@ -141,6 +141,7 @@
     <string name="addcard_deck_empty_title">No cards in this deck</string>
     <string name="addcard_deck_empty_subtitle">Clear deck cards to search every card instead.</string>
     <string name="addcard_deck_nothing_new_selected">These cards are already selected</string>
+    <string name="addcard_selection_locked_while_adding">%1$s is being added to your collection</string>
     <plurals name="addcard_deck_cards_selected">
         <item quantity="one">%d card selected</item>
         <item quantity="other">%d cards selected</item>

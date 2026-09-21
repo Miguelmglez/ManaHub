@@ -28,6 +28,11 @@ bottom `MagicCtaButton` ("Proceed with N selected") opens the shared `CardQueueS
   is NOT synchronized: mutate it on the main thread (AddCard commits run in `appScope` +
   `Dispatchers.Main.immediate` so they outlive the screen). Commits go through `CardQueueActions`
   (→ `CommitScannedCardsUseCase`, so AddCard adds count as scans for XP).
+- **Write guards (both hosts).** `CardQueueActions` claims synchronously before launching: `inFlightIds`
+  (per-entry adds + the add-all snapshot; a second write of the same id is a no-op, the sheet locks
+  those rows, AddCard refuses to deselect them), `isCommitting`, `isAddingAllToWishlist`. Commits remove
+  via `removeCommitted(snapshot)`, never by id: copies added / scans merged mid-commit stay queued. Both
+  Scanner and AddCard pass an app scope + `Main.immediate`. Wishlist adds carry the queued quantity.
 - **Deck source mode is local-only.** `Screen.CollectionAddCard.createRoute(multi, source, sourceId)`
   (`Source.DECK` = local deckId, `Source.COMMUNITY` = Archidekt id; no args → plain `collection/add`).
   The VM loads the deck once through the batch path (`warmCacheForIds` + `getCardsByIds`), then the

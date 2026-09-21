@@ -206,6 +206,19 @@ class CardRepositoryImplTest {
         )
     }
 
+    @Test
+    fun `given a pending-hydration placeholder when warmCacheForIds then it is re-fetched and real rows are skipped`() = runTest {
+        val real = TestFixtures.buildFreshCardEntity("real-1")
+        val placeholder = TestFixtures.buildFreshCardEntity("ph-1").copy(isStale = true, staleReason = "pending_hydration")
+        coEvery { cardDao.getByIds(any()) } returns listOf(real, placeholder)
+        coEvery { remote.getCardsBatch(listOf("ph-1")) } returns Result.success(listOf(TestFixtures.buildCard("ph-1")))
+
+        repository.warmCacheForIds(listOf("real-1", "ph-1"))
+
+        coVerify(exactly = 1) { remote.getCardsBatch(listOf("ph-1")) }
+        coVerify(exactly = 1) { cardDao.upsertAll(match { entities -> entities.single().scryfallId == "ph-1" }) }
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     //  GROUP 3 — updatePrices
     // ══════════════════════════════════════════════════════════════════════════

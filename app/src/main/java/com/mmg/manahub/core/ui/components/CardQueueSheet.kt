@@ -86,10 +86,13 @@ import org.jetbrains.compose.resources.painterResource
  * "auto-delete on add" switch and the bulk add-all footer.
  *
  * @param isCommitting disables the "add all to collection" CTA while a commit is in flight.
+ * @param isAddingAllToWishlist disables the "add all to wishlist" CTA while that batch is in flight.
+ * @param inFlightEntryIds entries being written right now; their add, remove, edit and quantity
+ *   controls are disabled so a write can neither be doubled nor lose a mid-write change.
  * @param toastMessage one-shot message shown in the sheet's own toast host; [onToastShown] is
  *   called once it has been handed to the host so the caller can clear it.
- * @param ownedCardIdentityKeys identity keys (`oracleId.ifBlank { name }`) already in the
- *   collection, driving the "already in collection" badge.
+ * @param ownedCardIdentityKeys oracleIds and exact names already in the collection, driving the
+ *   "already in collection" badge (a card is owned when either key matches).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,6 +102,8 @@ fun CardQueueSheet(
     ownedCardIdentityKeys: Set<String>,
     isAutoDeleteOnAddEnabled: Boolean,
     isCommitting: Boolean,
+    isAddingAllToWishlist: Boolean,
+    inFlightEntryIds: Set<String>,
     toastMessage: String?,
     toastType: MagicToastType,
     onToastShown: () -> Unit,
@@ -206,7 +211,8 @@ fun CardQueueSheet(
                         QueueCardItem(
                             entry = entry,
                             preferredCurrency = preferredCurrency,
-                            isInCollection = entry.card.oracleId.ifBlank { entry.card.name } in ownedCardIdentityKeys,
+                            isInCollection = entry.card.isOwnedIn(ownedCardIdentityKeys),
+                            isWriteInFlight = entry.id in inFlightEntryIds,
                             onEdit = { onEditCard(entry) },
                             onDelete = { onRemoveCard(entry) },
                             onAddToCollection = { onAddEntryToCollection(entry) },
@@ -240,6 +246,8 @@ fun CardQueueSheet(
                         text = stringResource(R.string.scanner_queue_add_all_wishlist),
                         icon = @Composable { Icon(Icons.Rounded.FavoriteBorder, null, modifier = Modifier.size(18.dp)) },
                         style = MagicCtaStyle.Outlined,
+                        enabled = !isAddingAllToWishlist,
+                        isLoading = isAddingAllToWishlist,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -255,6 +263,10 @@ fun CardQueueSheet(
         }
     }
 }
+
+// Rows cached before the oracle_id backfill have a blank oracleId, so the name must match too.
+private fun Card.isOwnedIn(ownedKeys: Set<String>): Boolean =
+    (oracleId.isNotBlank() && oracleId in ownedKeys) || name in ownedKeys
 
 /**
  * Edit sheet for one queue entry (foil / condition / language / quantity), with an entry point to
@@ -302,6 +314,7 @@ private fun QueueCardItem(
     entry: QueuedCard,
     preferredCurrency: PreferredCurrency,
     isInCollection: Boolean,
+    isWriteInFlight: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onAddToCollection: () -> Unit,
@@ -396,6 +409,7 @@ private fun QueueCardItem(
 
                     QuantitySelector(
                         quantity = entry.quantity,
+                        enabled = !isWriteInFlight,
                         onIncrement = onIncrement,
                         onDecrement = onDecrement
                     )
@@ -428,6 +442,7 @@ private fun QueueCardItem(
                 label = stringResource(R.string.action_add),
                 tint = mc.primaryAccent,
                 onClick = onAddToCollection,
+                enabled = !isWriteInFlight,
                 modifier = Modifier.weight(1f)
             )
             QueueActionButton(
@@ -435,6 +450,7 @@ private fun QueueCardItem(
                 label = stringResource(R.string.carddetail_add_to_wishlist),
                 tint = mc.secondaryAccent,
                 onClick = onAddToWishlist,
+                enabled = !isWriteInFlight,
                 modifier = Modifier.weight(1f)
             )
             QueueActionButton(
@@ -442,6 +458,7 @@ private fun QueueCardItem(
                 label = stringResource(R.string.action_remove),
                 tint = mc.lifeNegative,
                 onClick = onDelete,
+                enabled = !isWriteInFlight,
                 modifier = Modifier.weight(1f)
             )
             QueueActionButton(
@@ -449,6 +466,7 @@ private fun QueueCardItem(
                 label = stringResource(R.string.action_edit),
                 tint = mc.textSecondary,
                 onClick = onEdit,
+                enabled = !isWriteInFlight,
                 modifier = Modifier.weight(1f)
             )
             QueueActionButton(
@@ -470,6 +488,7 @@ private fun QueueCardItem(
 @Composable
 private fun QuantitySelector(
     quantity: Int,
+    enabled: Boolean,
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
     modifier: Modifier = Modifier
@@ -484,8 +503,8 @@ private fun QuantitySelector(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.xs)
     ) {
-        IconButton(onClick = onDecrement, modifier = Modifier.size(28.dp)) {
-            Icon(Icons.Default.Remove, stringResource(R.string.card_queue_decrease_quantity_cd), tint = mc.textPrimary, modifier = Modifier.size(16.dp))
+        IconButton(onClick = onDecrement, enabled = enabled, modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Default.Remove, stringResource(R.string.card_queue_decrease_quantity_cd), tint = if (enabled) mc.textPrimary else mc.textDisabled, modifier = Modifier.size(16.dp))
         }
         Text(
             text = quantity.toString(),
@@ -494,8 +513,8 @@ private fun QuantitySelector(
             modifier = Modifier.widthIn(min = 20.dp),
             textAlign = TextAlign.Center
         )
-        IconButton(onClick = onIncrement, modifier = Modifier.size(28.dp)) {
-            Icon(Icons.Default.Add, stringResource(R.string.card_queue_increase_quantity_cd), tint = mc.textPrimary, modifier = Modifier.size(16.dp))
+        IconButton(onClick = onIncrement, enabled = enabled, modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Default.Add, stringResource(R.string.card_queue_increase_quantity_cd), tint = if (enabled) mc.textPrimary else mc.textDisabled, modifier = Modifier.size(16.dp))
         }
     }
 }
@@ -506,23 +525,25 @@ private fun QueueActionButton(
     label: String,
     tint: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
+    val effectiveTint = if (enabled) tint else MaterialTheme.magicColors.textDisabled
     Column(
         modifier = modifier
             .clip(ChipShape)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(vertical = spacing.sm, horizontal = spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(spacing.xs)
     ) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
+        Icon(icon, null, tint = effectiveTint, modifier = Modifier.size(22.dp))
         Text(
             text = label,
             style = ty.labelSmall.copy(fontSize = 9.sp),
-            color = tint,
+            color = effectiveTint,
             textAlign = TextAlign.Center,
             maxLines = 1,
             softWrap = false

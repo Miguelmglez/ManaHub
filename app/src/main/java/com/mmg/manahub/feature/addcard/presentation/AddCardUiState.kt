@@ -34,6 +34,8 @@ data class AddCardUiState(
     val selectedScryfallIds: Set<String> = emptySet(),
     val showQueueSheet: Boolean = false,
     val isCommittingQueue: Boolean = false,
+    val isAddingAllToWishlist: Boolean = false,
+    val inFlightQueueIds: Set<String> = emptySet(),
     val queueToast: AddCardQueueToast? = null,
     val ownedCardIdentityKeys: Set<String> = emptySet(),
     val isAutoDeleteOnAddEnabled: Boolean = false,
@@ -75,4 +77,5 @@ sealed interface AddCardQueueToast {
     data class AddedAllToWishlist(val count: Int) : AddCardQueueToast
     data class AddAllPartialFailure(val failed: Int, val total: Int) : AddCardQueueToast
     data class DeckCardsSelected(val count: Int) : AddCardQueueToast
+    data class SelectionLockedWhileAdding(val cardName: String) : AddCardQueueToast
 }

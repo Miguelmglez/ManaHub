@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.data.queue.CardQueueStore
 import com.mmg.manahub.core.data.queue.InMemoryCardQueueStore
 import com.mmg.manahub.core.data.queue.PersistentCardQueueRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
@@ -37,6 +38,7 @@ import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.QueuedCard
 import com.mmg.manahub.core.model.SetType
 import com.mmg.manahub.core.model.UserPreferences
+import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.feature.addcard.di.SavedStateAddCardRestorableState
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.util.TestFixtures
@@ -45,8 +47,10 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.slot
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -601,7 +605,7 @@ class AddCardViewModelTest {
     }
 
     @Test
-    fun `select missing queues only cards whose identity is not in the collection`() = runTest(dispatcher) {
+    fun `select missing queues only cards owned under neither their oracleId nor their name`() = runTest(dispatcher) {
         val ownedBoltOtherPrinting = TestFixtures.buildCard(scryfallId = "bolt-2", name = "Lightning Bolt")
             .copy(oracleId = "oracle-bolt")
         val ownedSolByName = TestFixtures.buildCard(scryfallId = "sol-9", name = "Sol Ring")
@@ -617,10 +621,9 @@ class AddCardViewModelTest {
         vm.onSelectMissingDeckCards()
         advanceUntilIdle()
 
-        // Sol Ring's owned row has no oracleId, so its identity falls back to the name, which does
-        // not match the deck card's oracleId key: it still counts as missing.
+        // Sol Ring's owned row predates the oracle backfill; it still matches by exact name.
         assertEquals(
-            setOf("goblin-1", "sol-1"),
+            setOf("goblin-1"),
             queueRepository.queue.value.map { it.card.scryfallId }.toSet(),
         )
     }
@@ -746,5 +749,238 @@ class AddCardViewModelTest {
         assertEquals("26_50", AddCardTelemetry.countBucket(50))
         assertEquals("51_100", AddCardTelemetry.countBucket(100))
         assertEquals("100_plus", AddCardTelemetry.countBucket(101))
+    }
+
+    // ── Concurrent writes, wishlist quantities, placeholders ───────────────
+
+    private fun gatedCommit(gate: CompletableDeferred<Unit>) {
+        coEvery { commitScannedCards(any()) } coAnswers {
+            gate.await()
+            CommitScanResult(committedCopies = 1, failedEntries = 0, entrySucceeded = listOf(true))
+        }
+    }
+
+    private fun queueBolt(): QueuedCard {
+        viewModel.onToggleMultiSelectMode()
+        viewModel.onToggleCardSelection(bolt)
+        return queueRepository.queue.value.single()
+    }
+
+    @Test
+    fun `per-entry add to collection tapped twice commits the entry once`() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        gatedCommit(gate)
+        val entry = queueBolt()
+
+        viewModel.onAddEntryToCollection(entry)
+        assertEquals(setOf(entry.id), viewModel.uiState.value.inFlightQueueIds)
+        viewModel.onAddEntryToCollection(entry)
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { commitScannedCards(any()) }
+        assertTrue(viewModel.uiState.value.inFlightQueueIds.isEmpty())
+    }
+
+    @Test
+    fun `per-entry add during add-all does not commit the same entry twice`() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        gatedCommit(gate)
+        val entry = queueBolt()
+
+        viewModel.onAddAllToCollection()
+        viewModel.onAddEntryToCollection(entry)
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { commitScannedCards(any()) }
+    }
+
+    @Test
+    fun `quantity added while add-all is in flight stays queued`() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        gatedCommit(gate)
+        queueBolt()
+        viewModel.onAddAllToCollection()
+        advanceUntilIdle()
+
+        viewModel.onIncrementQueuedCardQuantity(queueRepository.queue.value.single())
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf(1), queueRepository.queue.value.map { it.quantity })
+    }
+
+    @Test
+    fun `scan merged into an entry during add-all keeps the merged copy queued`() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        gatedCommit(gate)
+        queueBolt()
+        viewModel.onAddAllToCollection()
+        advanceUntilIdle()
+
+        // What ScannerViewModel.addToSession does for a new scan with the same attributes.
+        queueRepository.addOrMerge(
+            QueuedCard(card = bolt, quantity = 1, isFoil = false, language = bolt.lang,
+                condition = "NM", setCode = bolt.setCode, timestamp = 2L)
+        )
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf(1), queueRepository.queue.value.map { it.quantity })
+    }
+
+    @Test
+    fun `deselecting a card while add-all is in flight is refused with an info toast`() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        gatedCommit(gate)
+        queueBolt()
+        viewModel.onAddAllToCollection()
+        advanceUntilIdle()
+
+        viewModel.onToggleCardSelection(bolt)
+
+        assertEquals(setOf("bolt-1"), viewModel.uiState.value.selectedScryfallIds)
+        assertEquals(AddCardQueueToast.SelectionLockedWhileAdding("Lightning Bolt"), viewModel.uiState.value.queueToast)
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(queueRepository.queue.value.isEmpty())
+    }
+
+    @Test
+    fun `add all to wishlist keeps the queued quantity`() = runTest(dispatcher) {
+        val captured = slot<WishlistEntry>()
+        coEvery { addToWishlist(capture(captured)) } returns Result.success(Unit)
+        val entry = queueBolt()
+        viewModel.onIncrementQueuedCardQuantity(entry)
+        viewModel.onIncrementQueuedCardQuantity(entry)
+
+        viewModel.onAddAllToWishlist()
+        advanceUntilIdle()
+
+        assertEquals(3, captured.captured.quantity)
+    }
+
+    @Test
+    fun `double tap on add all to wishlist adds each entry once`() = runTest(dispatcher) {
+        coEvery { addToWishlist(any()) } returns Result.success(Unit)
+        queueBolt()
+
+        viewModel.onAddAllToWishlist()
+        assertTrue(viewModel.uiState.value.isAddingAllToWishlist)
+        viewModel.onAddAllToWishlist()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { addToWishlist(any()) }
+        assertFalse(viewModel.uiState.value.isAddingAllToWishlist)
+    }
+
+    @Test
+    fun `removing the last queued entry closes the queue sheet`() = runTest(dispatcher) {
+        val entry = queueBolt()
+        viewModel.onOpenQueueSheet()
+        assertTrue(viewModel.uiState.value.showQueueSheet)
+
+        viewModel.onRemoveQueuedCard(entry)
+
+        assertFalse(viewModel.uiState.value.showQueueSheet)
+    }
+
+    @Test
+    fun `deck mode never lists pending-hydration placeholder cards`() = runTest(dispatcher) {
+        val placeholder = TestFixtures.buildCard(scryfallId = "ph-1", name = "Unresolved card (ph-1)")
+            .copy(staleReason = "pending_hydration", setCode = "", oracleId = "")
+        every { deckRepository.observeDeckWithCards("deck-1") } returns flowOf(
+            DeckWithCards(
+                deck = Deck(id = "deck-1", name = "Burn"),
+                mainboard = listOf(DeckSlot("bolt-1", 4), DeckSlot("ph-1", 1)),
+                sideboard = emptyList(),
+            )
+        )
+        coEvery { cardRepository.getCardsByIds(any()) } returns listOf(bolt, placeholder)
+
+        val vm = buildViewModel(localDeckArgs)
+        advanceUntilIdle()
+
+        assertEquals(listOf("bolt-1"), vm.uiState.value.results.map { it.scryfallId })
+    }
+
+    @Test
+    fun `select all persists the queue once, not once per card`() = runTest(dispatcher) {
+        var writes = 0
+        val countingStore = object : CardQueueStore {
+            private var payload: String? = null
+            override fun read(): String? = payload
+            override fun write(payload: String) { writes++; this.payload = payload }
+        }
+        queueRepository = PersistentCardQueueRepository(store = countingStore)
+        val cards = (1..60).map { TestFixtures.buildCard(scryfallId = "c-$it", name = "Card $it") }
+        every { deckRepository.observeDeckWithCards("deck-1") } returns flowOf(
+            DeckWithCards(
+                deck = Deck(id = "deck-1", name = "Big"),
+                mainboard = cards.map { DeckSlot(it.scryfallId, 1) },
+                sideboard = emptyList(),
+            )
+        )
+        coEvery { cardRepository.getCardsByIds(any()) } returns cards
+        val vm = buildViewModel(localDeckArgs)
+        advanceUntilIdle()
+
+        vm.onSelectAllDeckCards()
+
+        assertEquals(60, queueRepository.queue.value.size)
+        assertEquals(1, writes)
+    }
+
+    @Test
+    fun `the toolbar entry point is logged once however often multi-select is toggled`() = runTest(dispatcher) {
+        repeat(3) {
+            viewModel.onToggleMultiSelectMode()
+            viewModel.onToggleMultiSelectMode()
+        }
+
+        verify(exactly = 1) { crashlytics.log("addcard_multiselect_opened_from: toolbar") }
+    }
+
+    @Test
+    fun `a screen opened from home never logs the toolbar entry point`() = runTest(dispatcher) {
+        val vm = buildViewModel(AddCardLaunchArgs(multi = true))
+        vm.onToggleMultiSelectMode()
+        vm.onToggleMultiSelectMode()
+
+        verify(exactly = 0) { crashlytics.log("addcard_multiselect_opened_from: toolbar") }
+    }
+
+    @Test
+    fun `retrying a failing deck load records the non-fatal once and breadcrumbs every failure`() = runTest(dispatcher) {
+        coEvery { communityDecksRepository.getDeckById(7) } returns DataResult.Error("boom")
+        val vm = buildViewModel(AddCardLaunchArgs(deckSource = AddCardDeckSource.Community(7)))
+        advanceUntilIdle()
+
+        vm.onRetryDeckLoad()
+        advanceUntilIdle()
+        vm.onRetryDeckLoad()
+        advanceUntilIdle()
+
+        verify(exactly = 1) { crashlytics.recordException(any()) }
+        verify(exactly = 3) { crashlytics.log("addcard_deck_source_load_failed: community/not_found") }
+    }
+
+    @Test
+    fun `typing while the deck is still loading never queries Scryfall`() = runTest(dispatcher) {
+        val deckGate = CompletableDeferred<Unit>()
+        stubLocalDeck()
+        coEvery { cardRepository.getCardsByIds(any()) } coAnswers { deckGate.await(); listOf(bolt) }
+        val vm = buildViewModel(localDeckArgs)
+        advanceUntilIdle()
+
+        vm.onQueryChange("bolt")
+        vm.forceSearch()
+        advanceUntilIdle()
+        deckGate.complete(Unit)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { searchCards(any(), any()) }
+        assertEquals(listOf("bolt-1"), vm.uiState.value.results.map { it.scryfallId })
     }
 }

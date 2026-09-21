@@ -231,4 +231,43 @@ class PersistentCardQueueRepositoryTest {
         repository.clear()
         assertTrue(PersistentCardQueueRepository(store).queue.value.isEmpty())
     }
+
+    @Test
+    fun removeCommitted_removesUnchangedRows_keepsSurplusCopies_andEditedRows() {
+        val repository = PersistentCardQueueRepository(InMemoryCardQueueStore())
+        val unchanged = entry(id = "a", scryfallId = "sid-a")
+        val grown = entry(id = "b", scryfallId = "sid-b", quantity = 2)
+        val edited = entry(id = "c", scryfallId = "sid-c")
+        val shrunk = entry(id = "d", scryfallId = "sid-d", quantity = 3)
+        listOf(unchanged, grown, edited, shrunk).forEach(repository::add)
+        repository.incrementQuantity("b")
+        repository.update(edited.copy(condition = "LP"))
+        repository.decrementQuantity("d")
+        repository.add(entry(id = "e", scryfallId = "sid-e"))
+
+        repository.removeCommitted(listOf(unchanged, grown, edited, shrunk))
+
+        val queue = repository.queue.value
+        assertEquals(listOf("b", "c", "e"), queue.map { it.id })
+        assertEquals(1, queue.first { it.id == "b" }.quantity)
+        assertEquals("LP", queue.first { it.id == "c" }.condition)
+    }
+
+    @Test
+    fun addAll_appendsEveryEntry_andPersistsOnce() {
+        var writes = 0
+        val backing = InMemoryCardQueueStore()
+        val store = object : CardQueueStore {
+            override fun read(): String? = backing.read()
+            override fun write(payload: String) { writes++; backing.write(payload) }
+        }
+        val repository = PersistentCardQueueRepository(store)
+
+        repository.addAll((1..10).map { entry(id = "id-$it", scryfallId = "sid-$it") })
+        repository.addAll(emptyList())
+
+        assertEquals(10, repository.queue.value.size)
+        assertEquals(1, writes)
+        assertEquals(10, PersistentCardQueueRepository(backing).queue.value.size)
+    }
 }

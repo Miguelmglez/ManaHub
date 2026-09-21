@@ -17,6 +17,9 @@ interface CardQueueRepository {
     /** Appends [entry] as a new row. */
     fun add(entry: QueuedCard)
 
+    /** Appends every entry of [entries] as new rows, persisting once. */
+    fun addAll(entries: List<QueuedCard>)
+
     /**
      * Adds [entry]'s quantity to an existing row with the same scryfallId + foil + language +
      * condition, or appends [entry] when none matches.
@@ -28,6 +31,13 @@ interface CardQueueRepository {
 
     /** Removes every row whose id is in [ids]. */
     fun removeAll(ids: Collection<String>)
+
+    /**
+     * Removes the rows of [committed] (a snapshot taken before a commit) that did not change since.
+     * A row that only gained copies keeps the surplus (`quantity - committed.quantity`); a row whose
+     * attributes were edited is kept as it is.
+     */
+    fun removeCommitted(committed: Collection<QueuedCard>)
 
     /** Removes every row of the printing [scryfallId], whatever its attributes. */
     fun removeByScryfallId(scryfallId: String)

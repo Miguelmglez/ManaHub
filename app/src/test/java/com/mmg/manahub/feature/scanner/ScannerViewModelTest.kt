@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.scanner
 import android.content.Context
 import android.graphics.PointF
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.queue.InMemoryCardQueueStore
 import com.mmg.manahub.core.data.queue.PersistentCardQueueRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
@@ -11,6 +12,7 @@ import com.mmg.manahub.core.domain.usecase.collection.CommitScanResult
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.core.model.QueuedCard
+import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel
@@ -20,8 +22,13 @@ import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
+import io.mockk.slot
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -90,6 +97,8 @@ class ScannerViewModelTest {
     // ── ViewModel under test ───────────────────────────────────────────────────
 
     private lateinit var viewModel: ScannerViewModel
+    private lateinit var appScope: CoroutineScope
+    private lateinit var queueRepository: PersistentCardQueueRepository
 
     // ── Sample data ────────────────────────────────────────────────────────────
 
@@ -139,7 +148,8 @@ class ScannerViewModelTest {
         // touching FlowCollector, which happens to be harmless here but this stub keeps intent explicit.
         every { userCardRepository.observeCollection() } returns emptyFlow()
         // Real shared queue over an in-memory store: the VM's queue behaviour is exercised end to end.
-        val queueRepository = PersistentCardQueueRepository(store = InMemoryCardQueueStore())
+        appScope = CoroutineScope(SupervisorJob())
+        queueRepository = PersistentCardQueueRepository(store = InMemoryCardQueueStore())
         viewModel = ScannerViewModel(
             cardRepository = cardRepository,
             userCardRepository = userCardRepository,
@@ -152,11 +162,13 @@ class ScannerViewModelTest {
             analyticsHelper = analyticsHelper,
             soundManager = soundManager,
             context = context,
+            appScope = appScope,
         )
     }
 
     @After
     fun tearDown() {
+        appScope.cancel()
         Dispatchers.resetMain()
     }
 
@@ -864,5 +876,70 @@ class ScannerViewModelTest {
         viewModel.onRemoveSessionCard(entry)
         assertEquals(1, viewModel.uiState.value.scanSession.cards.size)
         assertNotEquals(entry.id, viewModel.uiState.value.scanSession.cards.single().id)
+    }
+
+    @Test
+    fun onAddAllToCollection_leavingTheScannerMidBatch_stillRemovesTheWrittenEntries() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        val gate = CompletableDeferred<Unit>()
+        coEvery { commitScannedCards(any()) } coAnswers {
+            gate.await()
+            CommitScanResult(committedCopies = 1, failedEntries = 0, entrySucceeded = listOf(true))
+        }
+
+        viewModel.onAddAllToCollection()
+        advanceUntilIdle()
+        // Leaving the screen clears the ViewModel; the commit runs in the app scope.
+        viewModel.viewModelScope.cancel()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { commitScannedCards(any()) }
+        assertTrue(queueRepository.queue.value.isEmpty())
+        assertFalse(viewModel.uiState.value.isCommittingQueue)
+    }
+
+    @Test
+    fun onAddAllToWishlist_doubleTap_addsEachEntryOnceWithItsQuantity() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        viewModel.onIncrementSessionCardQuantity(viewModel.uiState.value.scanSession.cards.single())
+        val captured = slot<WishlistEntry>()
+        coEvery { addToWishlist(capture(captured)) } returns Result.success(Unit)
+
+        viewModel.onAddAllToWishlist()
+        viewModel.onAddAllToWishlist()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { addToWishlist(any()) }
+        assertEquals(2, captured.captured.quantity)
+    }
+
+    @Test
+    fun onAddEntryToCollection_doubleTap_commitsOnce() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        val entry = viewModel.uiState.value.scanSession.cards.single()
+        coEvery { commitScannedCards(any()) } returns CommitScanResult(
+            committedCopies = 1, failedEntries = 0, entrySucceeded = listOf(true),
+        )
+
+        viewModel.onAddEntryToCollection(entry)
+        viewModel.onAddEntryToCollection(entry)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { commitScannedCards(any()) }
+    }
+
+    @Test
+    fun removingTheLastEntry_closesTheQueueSheet() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        viewModel.onOpenQueue()
+
+        viewModel.onRemoveSessionCard(viewModel.uiState.value.scanSession.cards.single())
+
+        assertFalse(viewModel.uiState.value.showQueueSheet)
     }
 }

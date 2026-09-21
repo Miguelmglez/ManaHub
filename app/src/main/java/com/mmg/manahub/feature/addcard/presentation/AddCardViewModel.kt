@@ -13,6 +13,7 @@ import com.mmg.manahub.core.domain.usecase.queue.AddAllToCollectionResult
 import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.QueuedCard
+import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
@@ -71,6 +72,8 @@ class AddCardViewModel(
             queue = queueRepository.queue.value,
             selectedScryfallIds = queueRepository.queue.value.selectedIds(),
             isCommittingQueue = queueActions.isCommitting.value,
+            isAddingAllToWishlist = queueActions.isAddingAllToWishlist.value,
+            inFlightQueueIds = queueActions.inFlightIds.value,
         )
     )
     val uiState: StateFlow<AddCardUiState> = _uiState.asStateFlow()
@@ -82,6 +85,7 @@ class AddCardViewModel(
     private var printsLoadJob: Job? = null
     private var variantLoadJob: Job? = null
     private var deckLoadJob: Job? = null
+    private val reportedDeckLoadFailures = mutableSetOf<AddCardDeckSource>()
 
     private val textQueryFlow  = MutableStateFlow("")
     private val activeQueryFlow = MutableStateFlow<AdvancedSearchQuery?>(null)
@@ -326,26 +330,39 @@ class AddCardViewModel(
 
     private fun observeSharedQueue() {
         viewModelScope.launch {
-            queueRepository.queue.collect { cards ->
-                _uiState.update { it.copy(queue = cards, selectedScryfallIds = cards.selectedIds()) }
-            }
+            queueRepository.queue.collect { cards -> _uiState.update { it.withQueue(cards) } }
         }
         viewModelScope.launch {
             queueActions.isCommitting.collect { committing ->
                 _uiState.update { it.copy(isCommittingQueue = committing) }
             }
         }
+        viewModelScope.launch {
+            queueActions.isAddingAllToWishlist.collect { adding ->
+                _uiState.update { it.copy(isAddingAllToWishlist = adding) }
+            }
+        }
+        viewModelScope.launch {
+            queueActions.inFlightIds.collect { ids -> _uiState.update { it.copy(inFlightQueueIds = ids) } }
+        }
     }
+
+    // An empty queue sheet has nothing to act on (its "Proceed" CTA is already gone).
+    private fun AddCardUiState.withQueue(cards: List<QueuedCard>) = copy(
+        queue = cards,
+        selectedScryfallIds = cards.selectedIds(),
+        showQueueSheet = showQueueSheet && cards.isNotEmpty(),
+    )
 
     // The repository mutates synchronously; mirroring immediately keeps reads right after a
     // mutation consistent instead of waiting for the collector to be dispatched.
     private fun syncQueueSnapshot() {
         val cards = queueRepository.queue.value
         _uiState.update {
-            it.copy(
-                queue = cards,
-                selectedScryfallIds = cards.selectedIds(),
+            it.withQueue(cards).copy(
                 isCommittingQueue = queueActions.isCommitting.value,
+                isAddingAllToWishlist = queueActions.isAddingAllToWishlist.value,
+                inFlightQueueIds = queueActions.inFlightIds.value,
             )
         }
     }
@@ -357,9 +374,7 @@ class AddCardViewModel(
                 .distinctUntilChanged()
                 .flatMapLatest { active ->
                     if (active) {
-                        userCardRepository.observeCollection().map { rows ->
-                            rows.mapTo(mutableSetOf()) { it.card.identityKey() }
-                        }
+                        userCardRepository.observeCollection().map { rows -> rows.ownedIdentityKeys() }
                     } else {
                         flowOf(emptySet())
                     }
@@ -381,7 +396,7 @@ class AddCardViewModel(
         }
         val enabled = _uiState.value.isMultiSelectMode
         AddCardTelemetry.multiSelectToggled(enabled)
-        if (enabled) AddCardTelemetry.multiSelectOpenedFrom(MultiSelectEntryPoint.TOOLBAR)
+        if (enabled) logEntryPointOnce(MultiSelectEntryPoint.TOOLBAR)
     }
 
     private fun logEntryPointOnce(entryPoint: MultiSelectEntryPoint) {
@@ -393,11 +408,17 @@ class AddCardViewModel(
     /**
      * Toggles [card]'s selection: an unselected card is queued once (non-foil, NM, its own language
      * and set); a selected card removes EVERY queue entry with its scryfallId, scanned ones included.
+     * A card with an entry being written cannot be deselected (the write would land anyway).
      */
     fun onToggleCardSelection(card: Card) {
         if (!_uiState.value.isMultiSelectMode) return
-        val alreadyQueued = queueRepository.queue.value.any { it.card.scryfallId == card.scryfallId }
-        if (alreadyQueued) {
+        val entries = queueRepository.queue.value.filter { it.card.scryfallId == card.scryfallId }
+        val inFlight = queueActions.inFlightIds.value
+        if (entries.any { it.id in inFlight }) {
+            showQueueToast(AddCardQueueToast.SelectionLockedWhileAdding(card.name))
+            return
+        }
+        if (entries.isNotEmpty()) {
             queueRepository.removeByScryfallId(card.scryfallId)
         } else {
             queueRepository.add(newQueueEntry(card))
@@ -461,41 +482,44 @@ class AddCardViewModel(
         _uiState.update { it.copy(isAutoDeleteOnAddEnabled = !it.isAutoDeleteOnAddEnabled) }
     }
 
+    /** Commits one entry; a second tap while it (or an "add all" including it) is in flight is a no-op. */
     fun onAddEntryToCollection(entry: QueuedCard) {
         val removeOnSuccess = _uiState.value.isAutoDeleteOnAddEnabled
-        commitScope.launch {
-            val succeeded = queueActions.addEntryToCollection(entry, removeOnSuccess)
+        val launched = queueActions.addEntryToCollection(commitScope, entry, removeOnSuccess) { succeeded ->
             syncQueueSnapshot()
             showQueueToast(
                 if (succeeded) AddCardQueueToast.AddedToCollection(entry.card.name)
                 else AddCardQueueToast.AddFailed(entry.card.name)
             )
         }
+        if (launched) syncQueueSnapshot()
     }
 
     fun onAddEntryToWishlist(entry: QueuedCard) {
         val removeOnSuccess = _uiState.value.isAutoDeleteOnAddEnabled
-        commitScope.launch {
-            val result = queueActions.addEntryToWishlist(entry, removeOnSuccess)
+        val launched = queueActions.addEntryToWishlist(commitScope, entry, removeOnSuccess) { result ->
             syncQueueSnapshot()
             showQueueToast(
                 if (result.isSuccess) AddCardQueueToast.AddedToWishlist(entry.card.name)
                 else AddCardQueueToast.AddFailed(entry.card.name)
             )
         }
+        if (launched) syncQueueSnapshot()
     }
 
-    /** Adds every queued entry to the wishlist, keeping them queued. */
+    /** Adds every queued entry (with its quantity) to the wishlist, keeping them queued. */
     fun onAddAllToWishlist() {
-        if (queueRepository.queue.value.isEmpty()) return
-        commitScope.launch {
-            var failed = 0
-            val total = queueActions.addAllToWishlist { _, result -> if (result.isFailure) failed++ }
+        var failed = 0
+        val launched = queueActions.addAllToWishlist(
+            scope = commitScope,
+            onEntryAdded = { _, result -> if (result.isFailure) failed++ },
+        ) { total ->
             showQueueToast(
                 if (failed == 0) AddCardQueueToast.AddedAllToWishlist(total)
                 else AddCardQueueToast.AddAllPartialFailure(failed = failed, total = total)
             )
         }
+        if (launched) syncQueueSnapshot()
     }
 
     /**
@@ -647,7 +671,9 @@ class AddCardViewModel(
                 }
             }
             if (outcome is DeckLoadOutcome.Failed) {
-                AddCardTelemetry.deckSourceLoadFailed(source, outcome.failure, outcome.cause)
+                // One non-fatal per source per screen; retries of an offline deck only leave breadcrumbs.
+                val firstFailure = reportedDeckLoadFailures.add(source)
+                AddCardTelemetry.deckSourceLoadFailed(source, outcome.failure, outcome.cause, recordNonFatal = firstFailure)
             }
             applyDeckFilter()
         }
@@ -673,12 +699,15 @@ class AddCardViewModel(
         return DeckLoadOutcome.Loaded(result.data.name, cards)
     }
 
-    // Batch path only (never a per-card name search); keeps deck order. Null when ids exist but
-    // none resolved, which in practice means the batch fetch failed.
+    // Batch path only (never a per-card name search); keeps deck order. warmCacheForIds hydrates
+    // sync placeholders; any still unresolved stay out (they carry no real card data). Null when
+    // ids exist but none resolved, which in practice means the batch fetch failed.
     private suspend fun resolveCards(ids: List<String>): List<Card>? {
         if (ids.isEmpty()) return emptyList()
         cardRepository.warmCacheForIds(ids)
-        val byId = cardRepository.getCardsByIds(ids).associateBy { it.scryfallId }
+        val byId = cardRepository.getCardsByIds(ids)
+            .filterNot { it.staleReason == PENDING_HYDRATION }
+            .associateBy { it.scryfallId }
         return ids.mapNotNull(byId::get).ifEmpty { null }
     }
 
@@ -742,14 +771,13 @@ class AddCardViewModel(
         AddCardTelemetry.selectAll(queueUnselected(state.results))
     }
 
-    /** Queues every visible deck card whose identity (oracleId, else name) is not in the collection. */
+    /** Queues every visible deck card not owned under its oracleId or its exact name. */
     fun onSelectMissingDeckCards() {
         val candidates = _uiState.value.takeIf { it.isDeckMode }?.results ?: return
         viewModelScope.launch {
             // Read once instead of the multi-mode collector, which may not have emitted yet.
-            val owned = userCardRepository.observeCollection().first()
-                .mapTo(HashSet()) { it.card.identityKey() }
-            AddCardTelemetry.selectMissing(queueUnselected(candidates.filterNot { it.identityKey() in owned }))
+            val owned = userCardRepository.observeCollection().first().ownedIdentityKeys()
+            AddCardTelemetry.selectMissing(queueUnselected(candidates.filterNot { it.isOwnedIn(owned) }))
         }
     }
 
@@ -758,7 +786,7 @@ class AddCardViewModel(
         enableMultiSelectMode()
         val queued = queueRepository.queue.value.selectedIds()
         val toAdd = cards.filter { it.scryfallId !in queued }.distinctBy { it.scryfallId }
-        toAdd.forEach { queueRepository.add(newQueueEntry(it)) }
+        queueRepository.addAll(toAdd.map(::newQueueEntry))
         syncQueueSnapshot()
         showQueueToast(AddCardQueueToast.DeckCardsSelected(toAdd.size))
         return toAdd.size
@@ -771,9 +799,19 @@ class AddCardViewModel(
 
     private companion object {
         const val DEFAULT_CONDITION = "NM"
+        const val PENDING_HYDRATION = "pending_hydration"
 
         fun List<QueuedCard>.selectedIds(): Set<String> = mapTo(HashSet(size)) { it.card.scryfallId }
 
-        fun Card.identityKey(): String = oracleId.ifBlank { name }
+        // Both keys: an owned row cached before the oracle_id backfill only has its name.
+        fun List<UserCardWithCard>.ownedIdentityKeys(): Set<String> = HashSet<String>(size * 2).also { keys ->
+            forEach { row ->
+                row.card.oracleId.takeIf { it.isNotBlank() }?.let(keys::add)
+                keys.add(row.card.name)
+            }
+        }
+
+        fun Card.isOwnedIn(ownedKeys: Set<String>): Boolean =
+            (oracleId.isNotBlank() && oracleId in ownedKeys) || name in ownedKeys
     }
 }

@@ -479,7 +479,11 @@ class CardRepositoryImpl @Inject constructor(
         if (scryfallIds.isEmpty()) return@withContext
 
         // Single DB read for all IDs instead of N individual getById() calls.
-        val alreadyCached = cardDao.getByIds(scryfallIds).map { it.scryfallId }.toSet()
+        // A sync placeholder row is not real card data: re-fetch it (the upsert's @Update hydrates it).
+        val alreadyCached = cardDao.getByIds(scryfallIds)
+            .filterNot { it.staleReason == PENDING_HYDRATION_REASON }
+            .map { it.scryfallId }
+            .toSet()
         val missing = scryfallIds.filterNot { it in alreadyCached }
         if (missing.isEmpty()) return@withContext
 
@@ -547,3 +551,6 @@ class CardRepositoryImpl @Inject constructor(
         return "${e?.message ?: "Network error"} — $date"
     }
 }
+
+// Written by SyncManager.ensureCardsExist for a card Scryfall has not returned yet.
+private const val PENDING_HYDRATION_REASON = "pending_hydration"

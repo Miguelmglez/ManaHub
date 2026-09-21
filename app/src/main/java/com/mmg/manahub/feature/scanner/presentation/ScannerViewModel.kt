@@ -12,6 +12,7 @@ import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.QueuedCard
+import com.mmg.manahub.core.di.ApplicationScope
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
@@ -20,6 +21,8 @@ import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.H
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.STABILITY_FRAMES
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -73,7 +76,8 @@ private fun ScannerUiState.clearedForOverlay(): ScannerUiState =
  * **Queue**: cards live in the app-wide [CardQueueRepository] (shared with AddCard "Select
  * multiple", persisted across process death); [ScannerUiState.scanSession] is a synchronous
  * snapshot of it, refreshed after every mutation made here and on every external change. Commit
- * actions (add all / per entry, collection / wishlist) go through the shared [CardQueueActions].
+ * actions (add all / per entry, collection / wishlist) go through the shared [CardQueueActions] and
+ * run in the app scope, so leaving the Scanner mid-batch never cancels a partially written commit.
  *
  * Modes (controlled by the settings sheet):
  * - **Quick Mode ON**:  auto-adds the confirmed card to the session.
@@ -89,15 +93,22 @@ class ScannerViewModel @Inject constructor(
     private val analyticsHelper: AnalyticsHelper,
     private val soundManager: SoundManager,
     @ApplicationContext private val context: Context,
+    @ApplicationScope appScope: CoroutineScope,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
         ScannerUiState(
             scanSession = ScanSession(queueRepository.queue.value),
             isCommittingQueue = queueActions.isCommitting.value,
+            isAddingAllToWishlist = queueActions.isAddingAllToWishlist.value,
+            inFlightQueueIds = queueActions.inFlightIds.value,
         )
     )
     val uiState: StateFlow<ScannerUiState> = _uiState.asStateFlow()
+
+    // The repository is not synchronized: commit-side mutations stay on the main thread while
+    // outliving this ViewModel.
+    private val commitScope = CoroutineScope(appScope.coroutineContext + Dispatchers.Main.immediate)
 
     // ── Stability buffer ─────────────────────────────────────────────────────
     private val recentMatches = ArrayDeque<String>(STABILITY_FRAMES)
@@ -137,40 +148,57 @@ class ScannerViewModel @Inject constructor(
     /** Keeps [ScannerUiState.scanSession] / [ScannerUiState.isCommittingQueue] in sync with changes made from other screens. */
     private fun observeSharedQueue() {
         viewModelScope.launch {
-            queueRepository.queue.collect { cards ->
-                _uiState.update { it.copy(scanSession = ScanSession(cards)) }
-            }
+            queueRepository.queue.collect { cards -> _uiState.update { it.withQueue(cards) } }
         }
         viewModelScope.launch {
             queueActions.isCommitting.collect { committing ->
                 _uiState.update { it.copy(isCommittingQueue = committing) }
             }
         }
+        viewModelScope.launch {
+            queueActions.isAddingAllToWishlist.collect { adding ->
+                _uiState.update { it.copy(isAddingAllToWishlist = adding) }
+            }
+        }
+        viewModelScope.launch {
+            queueActions.inFlightIds.collect { ids -> _uiState.update { it.copy(inFlightQueueIds = ids) } }
+        }
     }
+
+    // A mutation that empties the queue also closes its sheet (nothing is left to act on).
+    private fun ScannerUiState.withQueue(cards: List<QueuedCard>) = copy(
+        scanSession = ScanSession(cards),
+        showQueueSheet = showQueueSheet && cards.isNotEmpty(),
+    )
 
     // The repository mutates synchronously; mirroring immediately keeps reads right after a
     // mutation consistent instead of waiting for the observer coroutine to be dispatched.
     private fun syncQueueSnapshot() {
         _uiState.update {
-            it.copy(
-                scanSession = ScanSession(queueRepository.queue.value),
+            it.withQueue(queueRepository.queue.value).copy(
                 isCommittingQueue = queueActions.isCommitting.value,
+                isAddingAllToWishlist = queueActions.isAddingAllToWishlist.value,
+                inFlightQueueIds = queueActions.inFlightIds.value,
             )
         }
     }
 
     /**
      * Continuously tracks the set of "already owned" card identity keys — the same convention
-     * used across Card Versions & Languages: [com.mmg.manahub.core.model.Card.oracleId] falling
-     * back to the exact English [com.mmg.manahub.core.model.Card.name] when [oracleId] is blank
-     * (some cached rows predate the oracleId backfill). Feeds the "already in collection" badge
+     * used across Card Versions & Languages: every owned [com.mmg.manahub.core.model.Card.oracleId]
+     * plus every owned exact [com.mmg.manahub.core.model.Card.name] (some cached rows predate the
+     * oracleId backfill, so a card matches on either key). Feeds the "already in collection" badge
      * in `CardQueueSheet`. This is a LIVE collector (not a one-shot fetch) so the badge appears
      * immediately after the user adds a card from the queue while the sheet is still open.
      */
     private fun observeOwnedCardIdentityKeys() {
         viewModelScope.launch {
             userCardRepository.observeCollection().collect { rows ->
-                val keys = rows.mapTo(mutableSetOf()) { it.card.oracleId.ifBlank { it.card.name } }
+                val keys = HashSet<String>(rows.size * 2)
+                rows.forEach { row ->
+                    row.card.oracleId.takeIf { it.isNotBlank() }?.let(keys::add)
+                    keys.add(row.card.name)
+                }
                 _uiState.update { it.copy(ownedCardIdentityKeys = keys) }
             }
         }
@@ -398,15 +426,16 @@ class ScannerViewModel @Inject constructor(
     //  Individual Actions (Collection & Wishlist)
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** Adds a single queue entry to the user's collection. */
+    /** Adds a single queue entry to the user's collection; a repeat tap while it is in flight is a no-op. */
     fun onAddEntryToCollection(entry: QueuedCard) {
-        viewModelScope.launch {
-            // Committed through the scan path (CardScanned XP), never double-counted as a manual add.
-            val succeeded = queueActions.addEntryToCollection(entry, removeOnSuccess = false)
+        val removeOnSuccess = _uiState.value.isAutoDeleteOnAddEnabled
+        // Committed through the scan path (CardScanned XP), never double-counted as a manual add.
+        val launched = queueActions.addEntryToCollection(commitScope, entry, removeOnSuccess) { succeeded ->
             analyticsHelper.logEvent(
                 "scanner_entry_to_collection",
                 mapOf("card_id" to entry.card.scryfallId)
             )
+            syncQueueSnapshot()
             // A failed write must not report success or drop the entry from the queue.
             if (succeeded) {
                 _uiState.update {
@@ -415,9 +444,7 @@ class ScannerViewModel @Inject constructor(
                         toastType = MagicToastType.SUCCESS,
                     )
                 }
-                if (_uiState.value.isAutoDeleteOnAddEnabled) {
-                    onRemoveSessionCard(entry)
-                }
+                if (removeOnSuccess) clearRemovedEntryState(entry)
             } else {
                 _uiState.update {
                     it.copy(
@@ -427,28 +454,46 @@ class ScannerViewModel @Inject constructor(
                 }
             }
         }
+        if (launched) syncQueueSnapshot()
     }
 
     /**
-     * Adds a single queue entry to the wishlist.
+     * Adds a single queue entry (with its quantity) to the wishlist.
      * No authentication required — guest wishlist entries are stored locally via Room.
      */
     fun onAddEntryToWishlist(entry: QueuedCard) {
-        viewModelScope.launch {
-            queueActions.addEntryToWishlist(entry, removeOnSuccess = false)
+        val removeOnSuccess = _uiState.value.isAutoDeleteOnAddEnabled
+        val launched = queueActions.addEntryToWishlist(commitScope, entry, removeOnSuccess) { result ->
             analyticsHelper.logEvent(
                 "scanner_entry_to_wishlist",
                 mapOf("card_id" to entry.card.scryfallId)
             )
+            syncQueueSnapshot()
             _uiState.update {
-                it.copy(
-                    toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name),
-                    toastType = MagicToastType.SUCCESS,
-                )
+                if (result.isSuccess) {
+                    it.copy(
+                        toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name),
+                        toastType = MagicToastType.SUCCESS,
+                    )
+                } else {
+                    it.copy(
+                        toastMessage = context.getString(R.string.scanner_toast_add_failed, entry.card.name),
+                        toastType = MagicToastType.ERROR,
+                    )
+                }
             }
-            if (_uiState.value.isAutoDeleteOnAddEnabled) {
-                onRemoveSessionCard(entry)
-            }
+            if (result.isSuccess && removeOnSuccess) clearRemovedEntryState(entry)
+        }
+        if (launched) syncQueueSnapshot()
+    }
+
+    private fun clearRemovedEntryState(entry: QueuedCard) {
+        if (queueRepository.queue.value.any { it.id == entry.id }) return
+        _uiState.update { state ->
+            state.copy(
+                multiSelectedIds = state.multiSelectedIds - entry.card.scryfallId,
+                lastDetectedCard = if (state.lastDetectedCard?.scryfallId == entry.card.scryfallId) null else state.lastDetectedCard,
+            )
         }
     }
 
@@ -457,14 +502,14 @@ class ScannerViewModel @Inject constructor(
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Adds all queue entries to the wishlist, keeping them in the queue.
+     * Adds all queue entries (with their quantities) to the wishlist, keeping them in the queue. A
+     * repeat tap while the batch is in flight is a no-op.
      * No authentication required — guest wishlist entries are stored locally via Room.
      */
     fun onAddAllToWishlist() {
-        if (_uiState.value.scanSession.cards.isEmpty()) return
-
-        viewModelScope.launch {
-            val count = queueActions.addAllToWishlist { entry, _ ->
+        val launched = queueActions.addAllToWishlist(
+            scope = commitScope,
+            onEntryAdded = { entry, _ ->
                 _uiState.update {
                     it.copy(
                         toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name),
@@ -472,7 +517,8 @@ class ScannerViewModel @Inject constructor(
                     )
                 }
                 kotlinx.coroutines.delay(100)
-            }
+            },
+        ) { count ->
             analyticsHelper.logEvent(
                 "scanner_add_all_wishlist",
                 mapOf("count" to count.toString()),
@@ -484,6 +530,7 @@ class ScannerViewModel @Inject constructor(
                 )
             }
         }
+        if (launched) syncQueueSnapshot()
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -734,7 +781,7 @@ class ScannerViewModel @Inject constructor(
      */
     fun onAddAllToCollection() {
         if (_uiState.value.isCommittingQueue) return
-        val launched = queueActions.addAllToCollection(viewModelScope) { result ->
+        val launched = queueActions.addAllToCollection(commitScope) { result ->
             syncQueueSnapshot()
             when (result) {
                 is AddAllToCollectionResult.Success -> {

@@ -150,4 +150,8 @@ data class ScannerUiState(
 
     // Mirrors CardQueueActions.isCommitting (the app-wide "add all" re-entrancy guard).
     val isCommittingQueue: Boolean = false,
+    // Mirrors CardQueueActions.isAddingAllToWishlist.
+    val isAddingAllToWishlist: Boolean = false,
+    // Mirrors CardQueueActions.inFlightIds: queue rows whose controls are locked while written.
+    val inFlightQueueIds: Set<String> = emptySet(),
 )

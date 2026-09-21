@@ -299,6 +299,8 @@ fun ScannerScreen(
             ownedCardIdentityKeys = uiState.ownedCardIdentityKeys,
             isAutoDeleteOnAddEnabled = uiState.isAutoDeleteOnAddEnabled,
             isCommitting = uiState.isCommittingQueue,
+            isAddingAllToWishlist = uiState.isAddingAllToWishlist,
+            inFlightEntryIds = uiState.inFlightQueueIds,
             toastMessage = uiState.toastMessage,
             toastType = uiState.toastType,
             onToastShown = viewModel::onToastDismissed,
