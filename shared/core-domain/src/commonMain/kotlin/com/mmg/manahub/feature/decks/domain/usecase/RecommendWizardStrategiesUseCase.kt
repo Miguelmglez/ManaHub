@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.usecase
-// COMMENTS_REVIEWED: 2026-09-09
+// COMMENTS_REVIEWED: 2026-09-21
 
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.model.Card
@@ -43,12 +43,16 @@ import com.mmg.manahub.feature.decks.domain.template.OwnedCard
  * entry is still returned, ranked at the very end regardless of its raw score — plan §8's "Other
  * plans" default — so the UI never offers a Tribal pick this use case cannot resolve to a concrete
  * creature type without the caller running the tribe sub-picker first). [reasons] are ≤ 2 short,
- * already-English display strings for the picker's reason chips — never localized further. */
+ * already-English display strings for the picker's reason chips — never localized further.
+ * [ownedFittingCount] (Deck Wizard UX polish plan, Run 2) is the SAME "N fitting cards" number the
+ * "You own N fitting cards" reason renders when present, exposed structurally so a caller can show
+ * it even when [reasons] dropped it (the ≤2 cap, or a higher-priority reason winning the slot). */
 data class StrategyRecommendation(
     val strategy: CuratedStrategy,
     val score: Double,
     val reasons: List<RecommendationReason>,
     val tribe: String?,
+    val ownedFittingCount: Int = 0,
 )
 
 /** A single already-formatted reason chip label (e.g. "Commander makes tokens", "You own 34 fitting
@@ -174,6 +178,7 @@ class RecommendWizardStrategiesUseCase {
             val edhrecScore = if (entry.themes.any { it in edhrecThemes }) 1.0 else 0.0
             val colorScore = colorAffinityScore(entry, colorAffinity)
             val ownedCoverage = ownedCoverageScore(liveRoles, ownedRoleCounts)
+            val ownedFittingCount = liveRoles.keys.sumOf { ownedRoleCounts[it] ?: 0 }
 
             val total = PRIMARY_WEIGHT * primaryScore +
                 TAG_WEIGHT * tagScore +
@@ -181,9 +186,9 @@ class RecommendWizardStrategiesUseCase {
                 COLOR_WEIGHT * colorScore +
                 OWNED_WEIGHT * ownedCoverage
 
-            val reasons = buildReasons(entry, axisScore, roleScore, tagScore > 0.0, edhrecScore > 0.0, ownedCoverage, ownedRoleCounts, liveRoles.keys)
+            val reasons = buildReasons(entry, axisScore, roleScore, tagScore > 0.0, edhrecScore > 0.0, ownedCoverage, ownedFittingCount)
             val unresolved = entry.requiresTribe && entryTribe == null
-            ScoredEntry(StrategyRecommendation(entry, total, reasons, entryTribe), unresolved)
+            ScoredEntry(StrategyRecommendation(entry, total, reasons, entryTribe, ownedFittingCount), unresolved)
         }
 
         val (resolved, unresolved) = scored.partition { !it.unresolved }
@@ -278,6 +283,7 @@ class RecommendWizardStrategiesUseCase {
             val edhrecScore = if (entry.themes.any { it in edhrecThemes }) 1.0 else 0.0
             val colorScore = colorAffinityScoreSixty(entry.id, curatedForResults) * colorAffinityWeight
             val ownedCoverage = ownedCoverageScore(liveRoles, ownedRoleCounts)
+            val ownedFittingCount = liveRoles.keys.sumOf { ownedRoleCounts[it] ?: 0 }
 
             val total = PRIMARY_WEIGHT * primaryScore +
                 TAG_WEIGHT * tagScore +
@@ -285,9 +291,9 @@ class RecommendWizardStrategiesUseCase {
                 COLOR_WEIGHT * colorScore +
                 OWNED_WEIGHT * ownedCoverage
 
-            val reasons = buildReasonsSixty(entry, anchor.identity, axisScore, roleScore, tagScore > 0.0, colorScore > 0.0, ownedCoverage, ownedRoleCounts, liveRoles.keys)
+            val reasons = buildReasonsSixty(entry, anchor.identity, axisScore, roleScore, tagScore > 0.0, colorScore > 0.0, ownedCoverage, ownedFittingCount)
             val unresolved = entry.requiresTribe && entryTribe == null
-            ScoredEntry(StrategyRecommendation(entry, total, reasons, entryTribe), unresolved)
+            ScoredEntry(StrategyRecommendation(entry, total, reasons, entryTribe, ownedFittingCount), unresolved)
         }
 
         val (resolved, unresolved) = scored.partition { !it.unresolved }
@@ -481,8 +487,7 @@ class RecommendWizardStrategiesUseCase {
         hasTagMatch: Boolean,
         hasEdhrecMatch: Boolean,
         ownedCoverage: Double,
-        ownedRoleCounts: Map<RoleKey, Int>,
-        liveRoles: Set<RoleKey>,
+        ownedFittingCount: Int,
     ): List<RecommendationReason> {
         val reasons = mutableListOf<RecommendationReason>()
         if (axisScore > 0.0 || roleScore > 0.0) {
@@ -493,8 +498,7 @@ class RecommendWizardStrategiesUseCase {
             reasons += RecommendationReason("Popular on EDHREC for this commander")
         }
         if (ownedCoverage > 0.0) {
-            val ownedCount = liveRoles.sumOf { ownedRoleCounts[it] ?: 0 }
-            reasons += RecommendationReason("You own $ownedCount fitting cards")
+            reasons += RecommendationReason("You own $ownedFittingCount fitting cards")
         }
         return reasons.take(2)
     }
@@ -510,8 +514,7 @@ class RecommendWizardStrategiesUseCase {
         hasTagMatch: Boolean,
         hasColorMatch: Boolean,
         ownedCoverage: Double,
-        ownedRoleCounts: Map<RoleKey, Int>,
-        liveRoles: Set<RoleKey>,
+        ownedFittingCount: Int,
     ): List<RecommendationReason> {
         val reasons = mutableListOf<RecommendationReason>()
         if (axisScore > 0.0 || roleScore > 0.0) {
@@ -523,8 +526,7 @@ class RecommendWizardStrategiesUseCase {
             reasons += RecommendationReason("Fits $colorsLabel")
         }
         if (ownedCoverage > 0.0) {
-            val ownedCount = liveRoles.sumOf { ownedRoleCounts[it] ?: 0 }
-            reasons += RecommendationReason("You own $ownedCount fitting cards")
+            reasons += RecommendationReason("You own $ownedFittingCount fitting cards")
         }
         return reasons.take(2)
     }

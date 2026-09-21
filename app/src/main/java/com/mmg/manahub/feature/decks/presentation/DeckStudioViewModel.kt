@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation
-// COMMENTS_REVIEWED: 2026-09-16
+// COMMENTS_REVIEWED: 2026-09-21
 
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
@@ -861,31 +861,24 @@ class DeckStudioViewModel(
         val mainboardNonLands = deckCards.filter { !BasicLandCalculator.isLand(it.card) }
         val identity = deriveStudioColorIdentity(mainboardNonLands, commanderIdentity)
 
-        // BasicLandPlanner has no way to express "no colour signal at all" (unlike the retired
-        // BasicLandCalculator.calculate's nullable commanderIdentity) -- it always treats an EMPTY
-        // identity as "genuinely colourless, fill with Wastes" (F17, matching the wizard's own
-        // anchor identity, which the user always explicitly chose). Studio's identity is INFERRED
-        // from whatever cards happen to be in the mainboard, so an empty result with no real
-        // commander resolved (commanderIdentity == null: no commander at all, never a confirmed
-        // colourless one) means "no data yet", not "confirmed colourless" -- skip straight to zero
-        // deltas rather than spuriously suggesting Wastes for an empty/early/non-Commander deck.
-        val basicCounts = if (identity.isEmpty() && commanderIdentity == null) {
+        // BasicLandPlanner treats an EMPTY identity as "genuinely colourless, fill with Wastes"
+        // (F17) -- correct for a real colourless mainboard (the wizard's own Wastes fill must read
+        // back as zero deltas here), wrong for a spell-less deck with no commander, which has no
+        // colour signal at all: that case yields no deltas rather than "remove every basic".
+        if (mainboardNonLands.isEmpty() && commanderIdentity == null) return emptyList()
+        val basicCounts = runCatching {
+            val landTarget = resolveStudioLandTarget(format, deck, mainboardNonLands, commanderIdentity)
+            BasicLandPlanner.planBasics(
+                identity = identity,
+                landTarget = landTarget,
+                nonLandMainboard = mainboardNonLands.map { DeckEntry(it.card, it.quantity, isOwned = true, isSideboard = false) },
+                nonBasicLands = nonBasicLands,
+                manaBaseAnalyzer = manaBaseAnalyzer,
+            )
+        }.getOrElse { t ->
+            crashReporter.log("deck_studio_land_target_resolve_failed")
+            crashReporter.recordException(RuntimeException("[DeckStudioViewModel] deck_studio_land_target_resolve_failed", t))
             emptyMap()
-        } else {
-            runCatching {
-                val landTarget = resolveStudioLandTarget(format, deck, mainboardNonLands, commanderIdentity)
-                BasicLandPlanner.planBasics(
-                    identity = identity,
-                    landTarget = landTarget,
-                    nonLandMainboard = mainboardNonLands.map { DeckEntry(it.card, it.quantity, isOwned = true, isSideboard = false) },
-                    nonBasicLands = nonBasicLands,
-                    manaBaseAnalyzer = manaBaseAnalyzer,
-                )
-            }.getOrElse { t ->
-                crashReporter.log("deck_studio_land_target_resolve_failed")
-                crashReporter.recordException(RuntimeException("[DeckStudioViewModel] deck_studio_land_target_resolve_failed", t))
-                emptyMap()
-            }
         }
 
         val currentCounts = mutableMapOf<String, Int>()

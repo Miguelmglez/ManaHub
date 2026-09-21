@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
-// COMMENTS_REVIEWED: 2026-09-17
+// COMMENTS_REVIEWED: 2026-09-21
 
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
@@ -240,17 +240,24 @@ data class DeckWizardUiState(
     val strategyPickQuery: String = "",
     val strategyPickCombos: List<ColorComboSuggestion> = emptyList(),
     /** Deck Wizard 60-card wave (v6), plan §5 Phase 5.3: the catalog row currently PENDING in
-     * STRATEGY_PICK -- which row's [InlineColorComboSection] is expanded, before a combo is
-     * actually chosen (see [DeckWizardViewModel.onSelectStrategyPickEntry]'s own KDoc for why this
-     * is a separate field from [selectedCuratedStrategyId]). */
+     * STRATEGY_PICK -- the row whose color-combo picker ([showStrategyPickColorSheet]) is open or
+     * was last committed (see [DeckWizardViewModel.onSelectStrategyPickEntry]'s own KDoc for why
+     * this is a separate field from [selectedCuratedStrategyId]). */
     val expandedStrategyPickId: String? = null,
+    /** Deck Wizard UX polish plan, Run 2: true while STRATEGY_PICK's color-combo picker for
+     * [expandedStrategyPickId] is open -- Run 3 renders it as a real `ModalBottomSheet`; until then
+     * the composable keeps showing `InlineColorComboSection` under that same condition (see
+     * [DeckWizardViewModel.onSelectStrategyPickEntry]'s own KDoc). */
+    val showStrategyPickColorSheet: Boolean = false,
 
     // ── PLAN_SECTIONS (shared by every anchor since the Casual `MANUAL_ADDS` step was deleted) ───
     /** The ONLY analysis engine call this step ever makes -- attribution comes from here, never a
      * wizard-side classifier. `null` while no build has been analyzed yet (before the first
      * recompute lands) or the pipeline degraded. */
     val planAnalysis: DeckAnalysis? = null,
-    /** True while a debounced [planAnalysis] recompute is in flight. */
+    /** True while a [planAnalysis] recompute is in flight -- set synchronously on step entry and on
+     * every in-step seed edit (before its debounce), so the step never renders the error state while
+     * an analysis is merely pending. */
     val isAnalyzingPlan: Boolean = false,
     /** [CardSection.id] -> count of owned, identity-legal, format-legal candidates (excluding the
      * commander/every seed) that the SAME classification signal used to BUILD that section's own id
@@ -331,6 +338,25 @@ data class DeckWizardUiState(
      * .targetDeckSize] for every 60-card format). Replaces the pre-v6 flat `MAX_SEED_CARDS = 8`. */
     val seedCap: Int
         get() = (selectedFormat?.targetDeckSize ?: 60) - (if (selectedFormat?.isCommanderFormat == true) 1 else 0)
+
+    /** Deck Wizard UX polish plan, Run 2: the ONE row id STRATEGY_PICK highlights -- a PENDING row
+     * (mid color-combo pick) wins over an already-committed one, since it is what the user is
+     * currently looking at; falls back to the committed pick otherwise. Fixes the pre-Run-2 bug
+     * where the composable OR'd both fields together and could highlight two different rows at
+     * once (`expandedStrategyPickId` on a fresh row the user just tapped, `selectedCuratedStrategyId`
+     * still pointing at whatever was committed before). */
+    val strategyPickSelectedId: String? get() = expandedStrategyPickId ?: selectedCuratedStrategyId
+
+    /** Deck Wizard UX polish plan, Run 2: the STRATEGY/COLOR_PICK/STRATEGY_PICK pin's display
+     * string for Review's strategy card -- `null` for Custom/no pick (the caller falls back to its
+     * own "Custom" copy). Appends the tribe label for a resolved Tribal pin so Review reads "Tribal
+     * — Elves" instead of the bare catalog name. */
+    val strategyDisplayLabel: String?
+        get() {
+            val displayName = selectedCuratedStrategyId?.let { CuratedStrategyCatalog.byId(it) }?.displayName
+                ?: return null
+            return selectedTribeLabel?.let { "$displayName — $it" } ?: displayName
+        }
 }
 
 /**
@@ -365,6 +391,7 @@ private fun DeckWizardUiState.resetDirectionScratchState(): DeckWizardUiState = 
     strategyPickQuery = "",
     strategyPickCombos = emptyList(),
     expandedStrategyPickId = null,
+    showStrategyPickColorSheet = false,
     planAnalysis = null,
     isAnalyzingPlan = false,
     ownedAvailabilityBySection = emptyMap(),
@@ -374,6 +401,37 @@ private fun DeckWizardUiState.resetDirectionScratchState(): DeckWizardUiState = 
     planSectionsCollectionResults = emptyList(),
     planSectionsScryfallResults = emptyList(),
     isSearchingPlanSectionsScryfall = false,
+)
+
+/**
+ * Deck Wizard UX polish plan, Run 2: the ONE clearing shape every STRATEGY/COLOR_PICK/STRATEGY_PICK
+ * recompute entry point applies to the PREVIOUS pick before a fresh one loads (mirrors
+ * [DeckWizardViewModel.selectCommanderStrategy]'s own `strategy = null` clearing, plus the
+ * STRATEGY_PICK-only fields that function doesn't touch) -- so the OLD selection/combo state never
+ * renders as if it were still valid for the NEW anchor (a fresh commander, seed set, color set, or
+ * a step re-entered via [DeckWizardViewModel.onBackPressed]).
+ */
+private fun DeckWizardUiState.clearStalePick(): DeckWizardUiState = copy(
+    selectedCuratedStrategyId = null,
+    selectedArchetype = null,
+    selectedStrategyThemes = emptyList(),
+    selectedTribeKey = null,
+    selectedTribeLabel = null,
+    selectedPosture = null,
+    isCustomStrategyChosen = false,
+    pendingTribeStrategy = null,
+    commanderTribePickerCandidates = emptyList(),
+    expandedStrategyPickId = null,
+    showStrategyPickColorSheet = false,
+    strategyPickCombos = emptyList(),
+)
+
+/** The PLAN_SECTIONS analysis fields, reset on every entry/exit so a re-entry can never show the
+ * previous analysis before its own spinner. */
+private fun DeckWizardUiState.clearPlanAnalysis(isAnalyzing: Boolean): DeckWizardUiState = copy(
+    planAnalysis = null,
+    ownedAvailabilityBySection = emptyMap(),
+    isAnalyzingPlan = isAnalyzing,
 )
 
 /**
@@ -754,7 +812,11 @@ class DeckWizardViewModel(
         }
     }
 
-    /** COMMANDER_PICK's "Next" — requires a commander. */
+    /** COMMANDER_PICK's "Next" — requires a commander. [recommendCommanderStrategies] already ran
+     * on [onSelectCommander] so this is normally a pure phase transition; the self-heal recompute
+     * below only fires when [DeckWizardUiState.strategyRecommendations] came back empty (an
+     * [onBackPressed] from STRATEGY clears it, Deck Wizard UX polish plan Run 2 -- re-entering with
+     * the SAME, unchanged commander must not strand STRATEGY on a permanently empty list). */
     fun onNextFromCommanderPick() {
         val commander = _uiState.value.selectedCommander
         if (commander == null) {
@@ -766,6 +828,7 @@ class DeckWizardViewModel(
         }
         logStep("strategy")
         _uiState.update { it.copy(phase = WizardPhase.STRATEGY) }
+        if (_uiState.value.strategyRecommendations.isEmpty()) recommendCommanderStrategies(commander)
     }
 
     // ── SEED_PICK ("Start from cards", Deck Wizard 60-card wave v6, plan §5 Phase 5.2) ───────────
@@ -871,6 +934,11 @@ class DeckWizardViewModel(
      * (first N by quantity desc, existing best-effort repository call, union of every found tag/
      * tribe) -- `edhrecThemeNames` stays empty for every 60-card anchor (no EDHREC data exists for
      * seeds/colors/strategy picks, only for a specific commander).
+     *
+     * Deck Wizard UX polish plan, Run 2: every branch clears the PREVIOUS pick/list synchronously
+     * (via [DeckWizardUiState.clearStalePick]) before doing any async work, so a step entry (or a
+     * re-entry via [onBackPressed]) never renders the old recommendation list/selection while the
+     * new one is still loading.
      */
     private fun recomputeStrategyRecommendations(debounceMs: Long = 0L) {
         val state = _uiState.value
@@ -880,15 +948,14 @@ class DeckWizardViewModel(
             recommendCommanderStrategies(commander)
             return
         }
+        commanderStrategyJob?.cancel()
         if (state.entryFlow == WizardEntryFlow.COLORS && state.colorIdentity.isEmpty()) {
-            commanderStrategyJob?.cancel()
-            _uiState.update { it.copy(strategyRecommendations = emptyList(), isLoadingCommanderStrategies = false) }
+            _uiState.update { it.copy(strategyRecommendations = emptyList(), isLoadingCommanderStrategies = false).clearStalePick() }
             return
         }
-        commanderStrategyJob?.cancel()
+        _uiState.update { it.copy(strategyRecommendations = emptyList(), isLoadingCommanderStrategies = true).clearStalePick() }
         commanderStrategyJob = viewModelScope.launch {
             if (debounceMs > 0) delay(debounceMs)
-            _uiState.update { it.copy(isLoadingCommanderStrategies = true) }
             val identity = if (state.entryFlow == WizardEntryFlow.STRATEGY) emptySet() else state.engineIdentity
             val seedsForAnchor = if (state.entryFlow == WizardEntryFlow.CARDS) state.seeds.map { it.card } else emptyList()
             val anchor = BuildAnchor.Sixty(identity = identity, seeds = seedsForAnchor)
@@ -910,6 +977,9 @@ class DeckWizardViewModel(
                 ownTribes = ownTribes,
             )
             _uiState.update { it.copy(strategyRecommendations = recommendations, isLoadingCommanderStrategies = false) }
+            // STRATEGY_PICK commits a pick only through a color-combo tap (onSelectStrategyPickCombo):
+            // preselecting #1 there would highlight a row and enable Next with an empty identity.
+            if (state.entryFlow == WizardEntryFlow.STRATEGY) return@launch
             val topPick = recommendations.firstOrNull()
             if (topPick != null) selectCommanderStrategy(topPick.strategy, topPick.tribe) else selectCommanderStrategy(null, null)
         }
@@ -923,8 +993,8 @@ class DeckWizardViewModel(
      */
     private fun recommendCommanderStrategies(commander: Card) {
         commanderStrategyJob?.cancel()
+        _uiState.update { it.copy(strategyRecommendations = emptyList(), isLoadingCommanderStrategies = true).clearStalePick() }
         commanderStrategyJob = viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingCommanderStrategies = true) }
             val format = _uiState.value.selectedFormat ?: DeckFormat.COMMANDER
             val source1 = runCatching { cardStrategyTagsRepository.getStrategyTags(commander.oracleId) }
                 .onFailure { crashReporter.log("deck_wizard_commander_strategy_tags_fetch_failed") }
@@ -1037,8 +1107,8 @@ class DeckWizardViewModel(
      */
     private fun enterPlanSections() {
         logStep("plan_sections")
-        _uiState.update { it.copy(phase = WizardPhase.PLAN_SECTIONS) }
-        recomputePlanAnalysis()
+        _uiState.update { it.copy(phase = WizardPhase.PLAN_SECTIONS).clearPlanAnalysis(isAnalyzing = true) }
+        recomputePlanAnalysis(debounce = false)
     }
 
     /**
@@ -1089,32 +1159,52 @@ class DeckWizardViewModel(
     /**
      * STRATEGY_PICK's own catalog-row tap -- mirrors the deleted pre-v6 Flow C's "pick strategy,
      * then pick matching colors" two-step (this time against the curated catalog, not raw taxonomy):
-     * tapping a row marks it as PENDING ([DeckWizardUiState.expandedStrategyPickId], which row's
-     * [InlineColorComboSection] is expanded) and ranks its color combos via the existing
-     * [recomputeColorComboSuggestions] (retargeted, unchanged body) -- it does NOT yet commit
+     * tapping a row marks it as PENDING ([DeckWizardUiState.expandedStrategyPickId]), opens its
+     * color-combo picker ([DeckWizardUiState.showStrategyPickColorSheet]) and ranks its combos via
+     * the existing [recomputeColorComboSuggestions] -- it does NOT yet commit
      * [DeckWizardUiState.colorIdentity]/the strategy pin, that happens in
-     * [onSelectStrategyPickCombo]. Re-tapping the already-pending row collapses it.
+     * [onSelectStrategyPickCombo]. Re-tapping the pending row while its picker is open closes it
+     * ([onDismissStrategyPickColorSheet]).
      *
-     * [DeckWizardUiState.selectedCuratedStrategyId] is deliberately left untouched by this function
-     * (only set once a combo is actually chosen) -- a colorless combo pick sets `colorIdentity =
-     * emptySet()`, which would be indistinguishable from "nothing chosen yet" if this function set
+     * Single selection: tapping a DIFFERENT row than the committed one drops that commit (pin AND
+     * `colorIdentity`) first, so [DeckWizardUiState.strategyPickSelectedId] can only ever name one
+     * row. [DeckWizardUiState.selectedCuratedStrategyId] is otherwise left untouched here (only set
+     * once a combo is actually chosen) -- a colorless combo pick sets `colorIdentity = emptySet()`,
+     * which would be indistinguishable from "nothing chosen yet" if this function set
      * `selectedCuratedStrategyId` on the FIRST tap instead of the combo tap.
      */
     fun onSelectStrategyPickEntry(strategy: CuratedStrategy) {
         val state = _uiState.value
-        if (state.expandedStrategyPickId == strategy.id) {
-            _uiState.update { it.copy(expandedStrategyPickId = null, strategyPickCombos = emptyList()) }
+        if (state.expandedStrategyPickId == strategy.id && state.showStrategyPickColorSheet) {
+            onDismissStrategyPickColorSheet()
             return
         }
-        _uiState.update { it.copy(expandedStrategyPickId = strategy.id, strategyPickCombos = emptyList()) }
+        val isOtherRowCommitted = state.selectedCuratedStrategyId != null && state.selectedCuratedStrategyId != strategy.id
+        _uiState.update {
+            val base = if (isOtherRowCommitted) it.clearStalePick().copy(colorIdentity = emptySet()) else it
+            base.copy(expandedStrategyPickId = strategy.id, showStrategyPickColorSheet = true, strategyPickCombos = emptyList())
+        }
         recomputeColorComboSuggestions(strategy.archetypes.firstOrNull(), strategy.themes.firstOrNull())
     }
 
-    /** STRATEGY_PICK's own combo pick -- commits [DeckWizardUiState.colorIdentity] AND finalizes the
-     * strategy pin (or opens the existing tribe sub-picker first, for a `requiresTribe` entry, same
-     * as every other strategy-pick surface). */
+    /** Closes STRATEGY_PICK's color-combo picker without a pick -- a row that never committed a
+     * combo collapses back to "nothing pending"; a committed row keeps its highlight. */
+    fun onDismissStrategyPickColorSheet() {
+        _uiState.update {
+            val committedForRow = it.expandedStrategyPickId != null && it.expandedStrategyPickId == it.selectedCuratedStrategyId
+            if (committedForRow) {
+                it.copy(showStrategyPickColorSheet = false)
+            } else {
+                it.copy(showStrategyPickColorSheet = false, expandedStrategyPickId = null, strategyPickCombos = emptyList())
+            }
+        }
+    }
+
+    /** STRATEGY_PICK's own combo pick -- commits [DeckWizardUiState.colorIdentity], closes the
+     * picker AND finalizes the strategy pin (or opens the existing tribe sub-picker first, for a
+     * `requiresTribe` entry, same as every other strategy-pick surface). */
     fun onSelectStrategyPickCombo(strategy: CuratedStrategy, combo: ColorComboSuggestion) {
-        _uiState.update { it.copy(colorIdentity = combo.colors) }
+        _uiState.update { it.copy(colorIdentity = combo.colors, showStrategyPickColorSheet = false) }
         if (strategy.requiresTribe) {
             onRequestTribeForStrategy(strategy)
         } else {
@@ -1138,20 +1228,23 @@ class DeckWizardViewModel(
     // ── PLAN_SECTIONS (shared by every anchor since MANUAL_ADDS/Casual was deleted) ───────────────
 
     /**
-     * The ONLY analysis call this step makes -- debounced and off the main thread by construction.
-     * [mainboard] mirrors EXACTLY what the wizard's own build engine passes to `analyze` for a REAL
-     * build: the commander (if any) as its own [DeckEntry] first, then every [DeckWizardUiState
-     * .seeds] entry at its real quantity -- so [DeckWizardUiState.planAnalysis] is exactly the
-     * object the real build's own verify pass will produce, never an approximation.
+     * The ONLY analysis call this step makes -- off the main thread by construction, debounced only
+     * for in-step seed edits ([debounce]; step entry runs immediately). [mainboard] mirrors EXACTLY
+     * what the wizard's own build engine passes to `analyze` for a REAL build: the commander (if
+     * any) as its own [DeckEntry] first, then every [DeckWizardUiState.seeds] entry at its real
+     * quantity -- so [DeckWizardUiState.planAnalysis] is exactly the object the real build's own
+     * verify pass will produce, never an approximation.
      *
      * A thrown exception degrades to `planAnalysis = null` -- the step's empty/error state, never a
      * VM crash.
      */
-    private fun recomputePlanAnalysis() {
+    private fun recomputePlanAnalysis(debounce: Boolean = true) {
         planAnalysisJob?.cancel()
+        // Loading flips BEFORE any delay so the step never renders the error/empty state (analysis
+        // null, not analyzing) during the debounce window.
+        _uiState.update { it.copy(isAnalyzingPlan = true) }
         planAnalysisJob = viewModelScope.launch {
-            delay(PLAN_ANALYSIS_DEBOUNCE_MS)
-            _uiState.update { it.copy(isAnalyzingPlan = true) }
+            if (debounce) delay(PLAN_ANALYSIS_DEBOUNCE_MS)
             val state = _uiState.value
             val commander = state.selectedCommander
             val format = state.selectedFormat ?: DeckFormat.COMMANDER
@@ -1518,7 +1611,12 @@ class DeckWizardViewModel(
             }
             WizardPhase.STRATEGY -> {
                 val target = if (state.selectedFormat?.isCommanderFormat == true) WizardPhase.COMMANDER_PICK else WizardPhase.SEED_PICK
-                _uiState.update { it.copy(phase = target) }
+                // The step's Next re-enters via onNextFromSeedPick/onNextFromCommanderPick, which
+                // recompute from scratch -- nothing stale may survive to render before that lands.
+                commanderStrategyJob?.cancel()
+                _uiState.update {
+                    it.copy(phase = target, strategyRecommendations = emptyList(), isLoadingCommanderStrategies = false).clearStalePick()
+                }
                 false
             }
             WizardPhase.PLAN_SECTIONS -> {
@@ -1528,7 +1626,15 @@ class DeckWizardViewModel(
                     state.entryFlow == WizardEntryFlow.COLORS -> WizardPhase.COLOR_PICK
                     else -> WizardPhase.STRATEGY_PICK
                 }
-                _uiState.update { it.copy(phase = target) }
+                planAnalysisJob?.cancel()
+                clearPlanSectionsSearchState()
+                // STRATEGY_PICK's identity exists only as part of a committed combo pick, which
+                // recomputeStrategyRecommendations below drops.
+                val identity = if (target == WizardPhase.STRATEGY_PICK) emptySet() else state.colorIdentity
+                _uiState.update { it.copy(phase = target, colorIdentity = identity).clearPlanAnalysis(isAnalyzing = false) }
+                // The target step has no Next-driven re-entry here, so it re-ranks itself now
+                // (synchronously loading) instead of showing the previous list/pick as still valid.
+                recomputeStrategyRecommendations()
                 false
             }
             WizardPhase.REVIEW -> { _uiState.update { it.copy(phase = WizardPhase.PLAN_SECTIONS) }; false }

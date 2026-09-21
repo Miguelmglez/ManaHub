@@ -412,7 +412,7 @@ private fun ReviewStepContent(
                 Surface(shape = SmallCardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(spacing.md)) {
                         Text(
-                            text = strategy?.displayName ?: stringResource(R.string.deck_wizard_strategy_custom_title),
+                            text = uiState.strategyDisplayLabel ?: stringResource(R.string.deck_wizard_strategy_custom_title),
                             style = ty.titleMedium,
                             color = mc.textPrimary,
                         )

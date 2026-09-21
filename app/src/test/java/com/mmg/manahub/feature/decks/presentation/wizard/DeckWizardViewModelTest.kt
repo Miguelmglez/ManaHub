@@ -1642,4 +1642,351 @@ class DeckWizardViewModelTest {
             vm.uiState.value.seeds.isEmpty(),
         )
     }
+
+    // ── Deck Wizard UX polish plan, Run 2 -- step entry always loading, stale state never survives back ──
+
+    /** A real (non-null) analysis fixture -- the shared setUp stub degrades to `analysis = null`. */
+    private fun stubRealPlanAnalysis(): com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis {
+        val realAnalysis = com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis(
+            totalScore = 80,
+            pillars = emptyList(),
+            strategy = com.mmg.manahub.feature.decks.domain.engine.ResolvedStrategyInfo(
+                curatedStrategyId = null,
+                displayName = "Custom",
+                archetype = null,
+                themes = emptyList(),
+                isManualOverride = false,
+                confidence = 0f,
+            ),
+            limiter = com.mmg.manahub.feature.decks.domain.engine.ScoreLimiter.None,
+        )
+        coEvery {
+            deckAnalysisPipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns DeckHealth(evaluation = mockk(relaxed = true), profile = mockk(relaxed = true), analysis = realAnalysis)
+        return realAnalysis
+    }
+
+    private fun assertPickCleared(state: DeckWizardUiState) {
+        assertNull(state.selectedCuratedStrategyId)
+        assertNull(state.selectedArchetype)
+        assertTrue(state.selectedStrategyThemes.isEmpty())
+        assertNull(state.selectedTribeKey)
+        assertNull(state.selectedTribeLabel)
+        assertNull(state.selectedPosture)
+        assertFalse(state.isCustomStrategyChosen)
+        assertNull(state.pendingTribeStrategy)
+        assertNull(state.expandedStrategyPickId)
+        assertTrue(state.strategyPickCombos.isEmpty())
+    }
+
+    @Test
+    fun `Run 2 -- entering STRATEGY from SEED_PICK shows loading with an empty list and no pick before the recompute lands`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        vm.onAddSeed(card(id = "seed-1", name = "Seed One", colorIdentity = emptyList()))
+
+        vm.onNextFromSeedPick()
+
+        val entering = vm.uiState.value
+        assertEquals(WizardPhase.STRATEGY, entering.phase)
+        assertTrue(entering.isLoadingCommanderStrategies)
+        assertTrue(entering.strategyRecommendations.isEmpty())
+        assertPickCleared(entering)
+
+        advanceUntilIdle()
+        val landed = vm.uiState.value
+        assertFalse(landed.isLoadingCommanderStrategies)
+        assertTrue(landed.strategyRecommendations.isNotEmpty())
+        assertEquals(landed.strategyRecommendations.first().strategy.id, landed.selectedCuratedStrategyId)
+    }
+
+    @Test
+    fun `Run 2 -- picking a commander clears the previous list and pick synchronously, loading until the recompute lands`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        assertNotNull(vm.uiState.value.selectedCuratedStrategyId)
+
+        val otherCommander = card(id = "cmd-2", name = "Other Lord", typeLine = "Legendary Creature — Angel", colorIdentity = listOf("W"), colors = listOf("W"))
+        vm.onSelectCommander(otherCommander)
+
+        val entering = vm.uiState.value
+        assertTrue(entering.isLoadingCommanderStrategies)
+        assertTrue(entering.strategyRecommendations.isEmpty())
+        assertPickCleared(entering)
+
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isLoadingCommanderStrategies)
+        assertTrue(vm.uiState.value.strategyRecommendations.isNotEmpty())
+    }
+
+    @Test
+    fun `Run 2 -- a color toggle clears the list and sets loading synchronously, before its debounce`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.COLORS)
+        vm.onToggleColorFlowColor(ManaColor.U)
+        advanceTimeBy(200)
+        advanceUntilIdle()
+        assertNotNull(vm.uiState.value.selectedCuratedStrategyId)
+
+        vm.onToggleColorFlowColor(ManaColor.G)
+
+        val toggled = vm.uiState.value
+        assertTrue(toggled.isLoadingCommanderStrategies)
+        assertTrue(toggled.strategyRecommendations.isEmpty())
+        assertPickCleared(toggled)
+
+        advanceTimeBy(200)
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isLoadingCommanderStrategies)
+        assertTrue(vm.uiState.value.strategyRecommendations.isNotEmpty())
+    }
+
+    @Test
+    fun `Run 2 -- entering PLAN_SECTIONS sets isAnalyzingPlan and a null planAnalysis synchronously, no debounce on entry`() = runTest(dispatcher) {
+        val realAnalysis = stubRealPlanAnalysis()
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        vm.onAddSeed(card(id = "seed-1", name = "Seed One", colorIdentity = emptyList()))
+        vm.onNextFromSeedPick()
+        advanceUntilIdle()
+
+        vm.onNextFromStrategy()
+
+        val entering = vm.uiState.value
+        assertEquals(WizardPhase.PLAN_SECTIONS, entering.phase)
+        assertTrue(entering.isAnalyzingPlan)
+        assertNull(entering.planAnalysis)
+
+        // Entry runs immediately: the analysis lands without the in-step seed-edit debounce.
+        runCurrent()
+        assertEquals(realAnalysis, vm.uiState.value.planAnalysis)
+        assertFalse(vm.uiState.value.isAnalyzingPlan)
+    }
+
+    @Test
+    fun `Run 2 -- re-entering PLAN_SECTIONS never shows the previous analysis before its own spinner`() = runTest(dispatcher) {
+        val realAnalysis = stubRealPlanAnalysis()
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        vm.onAddSeed(card(id = "seed-1", name = "Seed One", colorIdentity = emptyList()))
+        vm.onNextFromSeedPick()
+        advanceUntilIdle()
+        vm.onNextFromStrategy()
+        advanceUntilIdle()
+        assertEquals(realAnalysis, vm.uiState.value.planAnalysis)
+
+        assertFalse(vm.onBackPressed())
+        val afterBack = vm.uiState.value
+        assertEquals(WizardPhase.STRATEGY, afterBack.phase)
+        assertNull(afterBack.planAnalysis)
+        assertFalse(afterBack.isAnalyzingPlan)
+        assertTrue(afterBack.ownedAvailabilityBySection.isEmpty())
+        advanceUntilIdle()
+
+        vm.onNextFromStrategy()
+        val reentering = vm.uiState.value
+        assertNull(reentering.planAnalysis)
+        assertTrue(reentering.isAnalyzingPlan)
+    }
+
+    @Test
+    fun `Run 2 -- an in-step seed edit keeps the debounce but flips isAnalyzingPlan before it`() = runTest(dispatcher) {
+        stubRealPlanAnalysis()
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        vm.onAddSeed(card(id = "seed-1", name = "Seed One", colorIdentity = emptyList()))
+        vm.onNextFromSeedPick()
+        advanceUntilIdle()
+        vm.onNextFromStrategy()
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isAnalyzingPlan)
+
+        vm.onAddSeed(card(id = "seed-2", name = "Seed Two", colorIdentity = emptyList()))
+
+        assertTrue(vm.uiState.value.isAnalyzingPlan)
+        runCurrent()
+        assertTrue("the seed-edit recompute must still be debounced", vm.uiState.value.isAnalyzingPlan)
+        advanceTimeBy(301)
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isAnalyzingPlan)
+    }
+
+    @Test
+    fun `Run 2 -- back from STRATEGY clears the pick and the list, forward re-enters loading`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        vm.onAddSeed(card(id = "seed-1", name = "Seed One", colorIdentity = emptyList()))
+        vm.onNextFromSeedPick()
+        advanceUntilIdle()
+        assertNotNull(vm.uiState.value.selectedCuratedStrategyId)
+
+        assertFalse(vm.onBackPressed())
+
+        val afterBack = vm.uiState.value
+        assertEquals(WizardPhase.SEED_PICK, afterBack.phase)
+        assertTrue(afterBack.strategyRecommendations.isEmpty())
+        assertFalse(afterBack.isLoadingCommanderStrategies)
+        assertPickCleared(afterBack)
+
+        vm.onNextFromSeedPick()
+        assertTrue(vm.uiState.value.isLoadingCommanderStrategies)
+        assertTrue(vm.uiState.value.strategyRecommendations.isEmpty())
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.strategyRecommendations.isNotEmpty())
+    }
+
+    @Test
+    fun `Run 2 -- Commander back from STRATEGY then Next re-ranks the same commander instead of stranding an empty list`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel(mapOf("format" to "COMMANDER"))
+        advanceUntilIdle()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+
+        assertFalse(vm.onBackPressed())
+        assertEquals(WizardPhase.COMMANDER_PICK, vm.uiState.value.phase)
+        assertPickCleared(vm.uiState.value)
+        assertTrue(vm.uiState.value.strategyRecommendations.isEmpty())
+
+        vm.onNextFromCommanderPick()
+        assertTrue(vm.uiState.value.isLoadingCommanderStrategies)
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.strategyRecommendations.isNotEmpty())
+        assertNotNull(vm.uiState.value.selectedCuratedStrategyId)
+    }
+
+    @Test
+    fun `Run 2 -- back from PLAN_SECTIONS clears the analysis and the browse-sheet state, and re-ranks the target step`() = runTest(dispatcher) {
+        stubRealPlanAnalysis()
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.COLORS)
+        vm.onToggleColorFlowColor(ManaColor.U)
+        advanceTimeBy(200)
+        advanceUntilIdle()
+        vm.onNextFromColorPick()
+        advanceUntilIdle()
+        assertNotNull(vm.uiState.value.planAnalysis)
+        vm.onPlanSectionsQueryChange("bolt")
+
+        assertFalse(vm.onBackPressed())
+
+        val afterBack = vm.uiState.value
+        assertEquals(WizardPhase.COLOR_PICK, afterBack.phase)
+        assertNull(afterBack.planAnalysis)
+        assertFalse(afterBack.isAnalyzingPlan)
+        assertEquals("", afterBack.planSectionsQuery)
+        assertTrue(afterBack.planSectionsCollectionResults.isEmpty())
+        assertEquals(setOf(ManaColor.U), afterBack.colorIdentity)
+        assertTrue(afterBack.isLoadingCommanderStrategies)
+        assertTrue(afterBack.strategyRecommendations.isEmpty())
+        assertPickCleared(afterBack)
+
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.strategyRecommendations.isNotEmpty())
+        assertNotNull(vm.uiState.value.selectedCuratedStrategyId)
+    }
+
+    @Test
+    fun `Run 2 -- STRATEGY_PICK entry ranks the catalog but never preselects a row (a pick needs a combo)`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.STRATEGY)
+        assertTrue(vm.uiState.value.isLoadingCommanderStrategies)
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.strategyRecommendations.isNotEmpty())
+        assertNull(vm.uiState.value.selectedCuratedStrategyId)
+        assertNull(vm.uiState.value.strategyPickSelectedId)
+    }
+
+    @Test
+    fun `Run 2 -- STRATEGY_PICK expanding row B after committing row A leaves exactly one selected id and an empty identity`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.STRATEGY)
+        advanceUntilIdle()
+        val (rowA, rowB) = CuratedStrategyCatalog.ALL.filter { it.availableIn(DeckFormat.STANDARD) && !it.requiresTribe }.take(2)
+
+        vm.onSelectStrategyPickEntry(rowA)
+        assertTrue(vm.uiState.value.showStrategyPickColorSheet)
+        vm.onSelectStrategyPickCombo(rowA, ColorComboSuggestion(setOf(ManaColor.U), 1f))
+        val committed = vm.uiState.value
+        assertEquals(rowA.id, committed.selectedCuratedStrategyId)
+        assertEquals(rowA.id, committed.strategyPickSelectedId)
+        assertEquals(setOf(ManaColor.U), committed.colorIdentity)
+        assertFalse(committed.showStrategyPickColorSheet)
+
+        vm.onSelectStrategyPickEntry(rowB)
+
+        val expanded = vm.uiState.value
+        assertEquals(rowB.id, expanded.strategyPickSelectedId)
+        assertEquals(1, listOfNotNull(expanded.expandedStrategyPickId, expanded.selectedCuratedStrategyId).distinct().size)
+        assertNull(expanded.selectedCuratedStrategyId)
+        assertNull(expanded.selectedArchetype)
+        assertTrue(expanded.colorIdentity.isEmpty())
+        assertTrue(expanded.showStrategyPickColorSheet)
+    }
+
+    @Test
+    fun `Run 2 -- dismissing the STRATEGY_PICK color sheet without a combo clears the expansion, a committed row keeps it`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.STRATEGY)
+        advanceUntilIdle()
+        val row = CuratedStrategyCatalog.ALL.first { it.availableIn(DeckFormat.STANDARD) && !it.requiresTribe }
+
+        vm.onSelectStrategyPickEntry(row)
+        assertEquals(row.id, vm.uiState.value.expandedStrategyPickId)
+        vm.onDismissStrategyPickColorSheet()
+        val dismissed = vm.uiState.value
+        assertFalse(dismissed.showStrategyPickColorSheet)
+        assertNull(dismissed.expandedStrategyPickId)
+        assertNull(dismissed.strategyPickSelectedId)
+        assertTrue(dismissed.strategyPickCombos.isEmpty())
+
+        vm.onSelectStrategyPickEntry(row)
+        vm.onSelectStrategyPickCombo(row, ColorComboSuggestion(setOf(ManaColor.R), 1f))
+        // Re-tapping the committed row re-opens its picker; re-tapping again (or dismissing) closes
+        // it without dropping the commit.
+        vm.onSelectStrategyPickEntry(row)
+        assertTrue(vm.uiState.value.showStrategyPickColorSheet)
+        vm.onSelectStrategyPickEntry(row)
+        val reclosed = vm.uiState.value
+        assertFalse(reclosed.showStrategyPickColorSheet)
+        assertEquals(row.id, reclosed.selectedCuratedStrategyId)
+        assertEquals(row.id, reclosed.strategyPickSelectedId)
+        assertEquals(setOf(ManaColor.R), reclosed.colorIdentity)
+    }
+
+    @Test
+    fun `Run 2 -- strategyDisplayLabel renders Tribal — Elves for a tribal pin, null for Custom`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "STANDARD"))
+        advanceUntilIdle()
+        vm.onSelectEntryFlow(WizardEntryFlow.STRATEGY)
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.strategyDisplayLabel)
+        val tribal = CuratedStrategyCatalog.ALL.first { it.availableIn(DeckFormat.STANDARD) && it.requiresTribe }
+
+        vm.onSelectStrategyPickEntry(tribal)
+        vm.onSelectStrategyPickCombo(tribal, ColorComboSuggestion(setOf(ManaColor.G), 1f))
+        advanceUntilIdle()
+        assertEquals(tribal, vm.uiState.value.pendingTribeStrategy)
+        vm.onPickTribeForStrategy("tribe:elves")
+
+        assertEquals("Tribal — Elves", vm.uiState.value.strategyDisplayLabel)
+
+        vm.onSelectCustomStrategy()
+        assertNull(vm.uiState.value.strategyDisplayLabel)
+    }
 }

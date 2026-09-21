@@ -296,4 +296,30 @@ class RecommendWizardStrategiesUseCaseTest {
         val scoreAt4 = fourOwned.first { it.strategy.id == entryId }.score
         assertTrue(scoreAt4 > scoreAt1, "an owned 4-of must score strictly higher owned-coverage than an owned 1-of (was previously an identical +1 either way)")
     }
+
+    // ── Deck Wizard UX polish plan, Run 2 -- StrategyRecommendation.ownedFittingCount ────────────
+
+    @Test
+    fun `ownedFittingCount is zero with no owned collection`() {
+        val commander = fixture01EdgarMarkov().mainboard.first { it.card.scryfallId == "cmd-edgar-markov" }.card
+        val result = useCase(DeckFormat.COMMANDER, BuildAnchor.Commander(commander))
+        assertTrue(result.all { it.ownedFittingCount == 0 }, "expected every ownedFittingCount to be 0 with no owned collection")
+    }
+
+    @Test
+    fun `ownedFittingCount scales with CopyPolicy maxPlaceable, mirroring the owned-coverage score`() {
+        // Same fixture/setup as "owned support scales by CopyPolicy maxPlaceable" above -- proves
+        // the structurally-exposed count moves the SAME way the score's own private aggregation
+        // does, not just that SOME reason text changed.
+        val removalCard = card(id = "owned-removal-4x", typeLine = "Instant", colorIdentity = listOf("R"), tags = listOf(CardTag.REMOVAL))
+        val anchor = BuildAnchor.Sixty(setOf(ManaColor.R), emptyList())
+        val entryId = CuratedStrategyCatalog.ALL.first { it.availableIn(DeckFormat.STANDARD) && it.archetypes.contains(ArchetypeId.AGGRO) }.id
+
+        val oneOwned = useCase(DeckFormat.STANDARD, anchor, listOf(OwnedCard(removalCard, 1)))
+        val fourOwned = useCase(DeckFormat.STANDARD, anchor, listOf(OwnedCard(removalCard, 4)))
+
+        val countAt1 = oneOwned.first { it.strategy.id == entryId }.ownedFittingCount
+        val countAt4 = fourOwned.first { it.strategy.id == entryId }.ownedFittingCount
+        assertTrue(countAt4 > countAt1, "an owned 4-of must report a strictly higher ownedFittingCount than an owned 1-of, got $countAt1 vs $countAt4")
+    }
 }

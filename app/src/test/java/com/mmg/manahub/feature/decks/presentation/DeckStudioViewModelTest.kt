@@ -3839,6 +3839,70 @@ class DeckStudioViewModelTest {
             assertEquals(expectedTarget, buildTabTarget)
         }
 
+    // Deck Wizard UX polish plan, Run 2 (Run 1 carry-over): a REAL colourless 60-card mainboard
+    // (no commander) must plan Wastes exactly like the wizard did at build time -- the old
+    // `identity.isEmpty() && commanderIdentity == null` gate skipped planning for it and turned the
+    // wizard's own Wastes fill into "remove N Wastes" deltas on reopen.
+    @Test
+    fun `a colourless 60-card mainboard plans Wastes -- the wizard's own Wastes fill reads back as zero deltas`() =
+        runTest(dispatcher) {
+            val golem = card(
+                id = "golem-1", name = "Colourless Golem", typeLine = "Artifact Creature — Golem",
+                colorIdentity = emptyList(), colors = emptyList(), manaCost = "{3}",
+            )
+            val wastes = card(
+                id = "wastes-1", name = "Wastes", typeLine = "Basic Land",
+                colorIdentity = emptyList(), colors = emptyList(),
+            )
+            coEvery { cardRepository.getCardById(golem.scryfallId) } returns DataResult.Success(golem)
+            coEvery { cardRepository.getCardById(wastes.scryfallId) } returns DataResult.Success(wastes)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            fun deck(wastesCount: Int) = DeckWithCards(
+                deck = Deck(id = DECK_ID, name = "Golems", format = "standard"),
+                mainboard = listOfNotNull(
+                    DeckSlot(golem.scryfallId, 24),
+                    DeckSlot(wastes.scryfallId, wastesCount).takeIf { wastesCount > 0 },
+                ),
+                sideboard = emptyList(),
+            )
+
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deck(wastesCount = 0))
+            val withoutWastes = createVm()
+            advanceUntilIdle()
+            val deltas = withoutWastes.uiState.value.landDeltas
+            assertEquals("only a Wastes delta may be planned for a colourless mainboard", listOf("Wastes"), deltas.map { it.landName })
+            val wastesTarget = deltas.single().delta
+            assertTrue("a colourless mainboard must get a positive Wastes suggestion, got $wastesTarget", wastesTarget > 0)
+
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deck(wastesCount = wastesTarget))
+            val withWastes = createVm()
+            advanceUntilIdle()
+            assertEquals(emptyList<LandDelta>(), withWastes.uiState.value.landDeltas)
+        }
+
+    @Test
+    fun `a spell-less deck with no commander yields no land deltas at all, never remove-every-basic`() =
+        runTest(dispatcher) {
+            val forest = card(
+                id = "forest-1", name = "Forest", typeLine = "Basic Land — Forest",
+                colorIdentity = listOf("G"), colors = emptyList(), tags = emptyList(),
+            )
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+                DeckWithCards(
+                    deck = Deck(id = DECK_ID, name = "Lands only", format = "standard"),
+                    mainboard = listOf(DeckSlot(forest.scryfallId, 20)),
+                    sideboard = emptyList(),
+                )
+            )
+            coEvery { cardRepository.getCardById(forest.scryfallId) } returns DataResult.Success(forest)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+            val vm = createVm()
+            advanceUntilIdle()
+
+            assertEquals(emptyList<LandDelta>(), vm.uiState.value.landDeltas)
+        }
+
     // ─────────────────────────────────────────────────────────────────────────
     //  GROUP — Deck Wizard UX polish plan, Run 1 §1.6: scoreStrategyMatches
     // ─────────────────────────────────────────────────────────────────────────

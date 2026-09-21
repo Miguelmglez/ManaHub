@@ -606,10 +606,10 @@ internal fun StrategyPickStepContent(
                         Column {
                             StrategyRecommendationRow(
                                 recommendation = recommendation,
-                                isSelected = uiState.expandedStrategyPickId == strategy.id || uiState.selectedCuratedStrategyId == strategy.id,
+                                isSelected = uiState.strategyPickSelectedId == strategy.id,
                                 onClick = { onSelectEntry(strategy) },
                             )
-                            if (uiState.expandedStrategyPickId == strategy.id) {
+                            if (uiState.showStrategyPickColorSheet && uiState.expandedStrategyPickId == strategy.id) {
                                 InlineColorComboSection(
                                     suggestions = uiState.strategyPickCombos,
                                     selectedColors = uiState.colorIdentity,
