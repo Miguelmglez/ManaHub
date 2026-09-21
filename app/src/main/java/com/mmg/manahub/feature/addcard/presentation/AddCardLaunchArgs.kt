@@ -19,6 +19,18 @@ data class AddCardLaunchArgs(
     val multi: Boolean = false,
     val deckSource: AddCardDeckSource? = null,
 ) {
+    /** Where "Select multiple" was opened from, or null when the screen opens in normal mode. */
+    val entryPoint: MultiSelectEntryPoint?
+        get() = when (deckSource) {
+            is AddCardDeckSource.Local -> MultiSelectEntryPoint.DECK
+            is AddCardDeckSource.Community -> MultiSelectEntryPoint.COMMUNITY
+            null -> if (multi) MultiSelectEntryPoint.HOME else null
+        }
+
+    /** These args after "Clear deck cards": no source, multi mode kept (a source always implied it). */
+    fun withoutDeckSource(): AddCardLaunchArgs =
+        AddCardLaunchArgs(multi = multi || deckSource != null, deckSource = null)
+
     companion object {
         const val ARG_MULTI = "multi"
         const val ARG_SOURCE = "source"

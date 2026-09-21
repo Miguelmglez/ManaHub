@@ -1,7 +1,9 @@
 package com.mmg.manahub.feature.addcard.presentation
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import app.cash.turbine.test
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.queue.InMemoryCardQueueStore
 import com.mmg.manahub.core.data.queue.PersistentCardQueueRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
@@ -35,12 +37,16 @@ import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.QueuedCard
 import com.mmg.manahub.core.model.SetType
 import com.mmg.manahub.core.model.UserPreferences
+import com.mmg.manahub.feature.addcard.di.SavedStateAddCardRestorableState
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
+import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -75,6 +81,7 @@ class AddCardViewModelTest {
     private val addToWishlist: AddToWishlistUseCase = mockk()
     private val deckRepository: DeckRepository = mockk()
     private val communityDecksRepository: CommunityDecksRepository = mockk()
+    private val crashlytics: FirebaseCrashlytics = mockk(relaxed = true)
 
     private val testSet = MagicSet(
         code = "tst",
@@ -103,6 +110,8 @@ class AddCardViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(dispatcher)
+        mockkStatic(FirebaseCrashlytics::class)
+        every { FirebaseCrashlytics.getInstance() } returns crashlytics
 
         coEvery { userPreferences.preferencesFlow } returns flowOf(testPreferences)
         coEvery { getSpotlightFeed(any()) } returns DataResult.Success(
@@ -119,7 +128,10 @@ class AddCardViewModelTest {
         viewModel = buildViewModel()
     }
 
-    private fun buildViewModel(launchArgs: AddCardLaunchArgs = AddCardLaunchArgs()) = AddCardViewModel(
+    private fun buildViewModel(
+        launchArgs: AddCardLaunchArgs = AddCardLaunchArgs(),
+        restorableState: AddCardRestorableState = InMemoryAddCardRestorableState(),
+    ) = AddCardViewModel(
         searchCards = searchCards,
         userPreferences = userPreferences,
         buildScryfallQuery = buildScryfallQuery,
@@ -136,6 +148,7 @@ class AddCardViewModelTest {
         communityDecksRepository = communityDecksRepository,
         appScope = appScope,
         launchArgs = launchArgs,
+        restorableState = restorableState,
         nowMillis = { 1_000L },
     )
 
@@ -152,6 +165,7 @@ class AddCardViewModelTest {
     @After
     fun tearDown() {
         appScope.cancel()
+        unmockkStatic(FirebaseCrashlytics::class)
         Dispatchers.resetMain()
     }
 
@@ -609,5 +623,128 @@ class AddCardViewModelTest {
             setOf("goblin-1", "sol-1"),
             queueRepository.queue.value.map { it.card.scryfallId }.toSet(),
         )
+    }
+
+    // ── Process restore ─────────────────────────────────────────────────────
+
+    @Test
+    fun `withoutDeckSource keeps multi mode and entry points map from the args`() {
+        val cleared = AddCardLaunchArgs(deckSource = AddCardDeckSource.Local("d1")).withoutDeckSource()
+        assertEquals(AddCardLaunchArgs(multi = true, deckSource = null), cleared)
+        assertEquals(MultiSelectEntryPoint.DECK, localDeckArgs.entryPoint)
+        assertEquals(
+            MultiSelectEntryPoint.COMMUNITY,
+            AddCardLaunchArgs(deckSource = AddCardDeckSource.Community(1)).entryPoint,
+        )
+        assertEquals(MultiSelectEntryPoint.HOME, AddCardLaunchArgs(multi = true).entryPoint)
+        assertEquals(null, AddCardLaunchArgs().entryPoint)
+    }
+
+    @Test
+    fun `a screen restored after clear deck cards does not reload the cleared deck`() = runTest(dispatcher) {
+        coEvery { searchCards(any(), any()) } returns DataResult.Success(
+            PaginatedCards(cards = emptyList(), hasMore = false, totalCards = 0)
+        )
+        stubLocalDeck()
+        // The same handle survives process death while the nav args still carry the deck source.
+        val savedStateHandle = SavedStateHandle()
+        val first = buildViewModel(localDeckArgs, SavedStateAddCardRestorableState(savedStateHandle))
+        advanceUntilIdle()
+        assertTrue(first.uiState.value.isDeckMode)
+
+        first.onClearDeckCards()
+        advanceUntilIdle()
+
+        val restored = buildViewModel(localDeckArgs, SavedStateAddCardRestorableState(savedStateHandle))
+        advanceUntilIdle()
+
+        val state = restored.uiState.value
+        assertFalse(state.isDeckMode)
+        assertFalse(state.isDeckLoading)
+        assertTrue("multi mode survives the cleared source", state.isMultiSelectMode)
+        verify(exactly = 1) { deckRepository.observeDeckWithCards("deck-1") }
+    }
+
+    @Test
+    fun `a restored screen whose deck was never cleared reloads it`() = runTest(dispatcher) {
+        val savedStateHandle = SavedStateHandle()
+        stubLocalDeck()
+        buildViewModel(localDeckArgs, SavedStateAddCardRestorableState(savedStateHandle))
+        advanceUntilIdle()
+
+        val restored = buildViewModel(localDeckArgs, SavedStateAddCardRestorableState(savedStateHandle))
+        advanceUntilIdle()
+
+        assertTrue(restored.uiState.value.isDeckMode)
+        assertEquals(3, restored.uiState.value.deckCards.size)
+    }
+
+    // ── Telemetry ───────────────────────────────────────────────────────────
+
+    @Test
+    fun `toggling multi-select logs on and off and the toolbar entry point`() = runTest(dispatcher) {
+        viewModel.onToggleMultiSelectMode()
+        viewModel.onToggleMultiSelectMode()
+
+        verify(exactly = 1) { crashlytics.log("addcard_multiselect_toggled: on") }
+        verify(exactly = 1) { crashlytics.log("addcard_multiselect_toggled: off") }
+        verify(exactly = 1) { crashlytics.log("addcard_multiselect_opened_from: toolbar") }
+    }
+
+    @Test
+    fun `the launch entry point is logged once per destination, not again on restore`() = runTest(dispatcher) {
+        val state = InMemoryAddCardRestorableState()
+        buildViewModel(AddCardLaunchArgs(multi = true), state)
+        buildViewModel(AddCardLaunchArgs(multi = true), state)
+
+        verify(exactly = 1) { crashlytics.log("addcard_multiselect_opened_from: home") }
+    }
+
+    @Test
+    fun `opening the queue logs a count bucket`() = runTest(dispatcher) {
+        viewModel.onToggleMultiSelectMode()
+        viewModel.onToggleCardSelection(bolt)
+        viewModel.onToggleCardSelection(counterspell)
+
+        viewModel.onOpenQueueSheet()
+
+        verify(exactly = 1) { crashlytics.log("addcard_multiselect_queue_opened: 2_5") }
+    }
+
+    @Test
+    fun `select all and select missing log the added count bucket`() = runTest(dispatcher) {
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+        val vm = enterLocalDeckMode()
+        advanceUntilIdle()
+
+        vm.onSelectAllDeckCards()
+        vm.onSelectMissingDeckCards()
+        advanceUntilIdle()
+
+        verify(exactly = 1) { crashlytics.log("addcard_multiselect_select_all: 2_5") }
+        verify(exactly = 1) { crashlytics.log("addcard_multiselect_select_missing: 0") }
+    }
+
+    @Test
+    fun `deck source load failure records a non-fatal with the source and reason`() = runTest(dispatcher) {
+        coEvery { communityDecksRepository.getDeckById(7) } returns DataResult.Error("boom")
+        buildViewModel(AddCardLaunchArgs(deckSource = AddCardDeckSource.Community(7)))
+        advanceUntilIdle()
+
+        verify { crashlytics.setCustomKey("addcard_deck_source", "community") }
+        verify { crashlytics.setCustomKey("addcard_deck_load_failure", "not_found") }
+        verify(exactly = 1) { crashlytics.recordException(any()) }
+    }
+
+    @Test
+    fun `count buckets never expose exact counts above one`() {
+        assertEquals("0", AddCardTelemetry.countBucket(0))
+        assertEquals("1", AddCardTelemetry.countBucket(1))
+        assertEquals("2_5", AddCardTelemetry.countBucket(5))
+        assertEquals("6_10", AddCardTelemetry.countBucket(6))
+        assertEquals("11_25", AddCardTelemetry.countBucket(25))
+        assertEquals("26_50", AddCardTelemetry.countBucket(50))
+        assertEquals("51_100", AddCardTelemetry.countBucket(100))
+        assertEquals("100_plus", AddCardTelemetry.countBucket(101))
     }
 }

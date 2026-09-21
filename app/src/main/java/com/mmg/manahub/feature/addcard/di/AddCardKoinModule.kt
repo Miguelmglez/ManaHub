@@ -35,6 +35,7 @@ fun addCardKoinModule(): Module = module {
                 source = savedStateHandle.get<String>(AddCardLaunchArgs.ARG_SOURCE),
                 sourceId = savedStateHandle.get<String>(AddCardLaunchArgs.ARG_SOURCE_ID),
             ),
+            restorableState = SavedStateAddCardRestorableState(savedStateHandle),
         )
     }
 }

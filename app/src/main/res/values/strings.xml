@@ -149,6 +149,26 @@
         <item quantity="one">Proceed with %d selected</item>
         <item quantity="other">Proceed with %d selected</item>
     </plurals>
+    <plurals name="addcard_queue_added_all_to_collection">
+        <item quantity="one">%d card added to Collection</item>
+        <item quantity="other">%d cards added to Collection</item>
+    </plurals>
+    <plurals name="addcard_queue_added_all_to_wishlist">
+        <item quantity="one">%d card added to Wishlist</item>
+        <item quantity="other">%d cards added to Wishlist</item>
+    </plurals>
+    <plurals name="addcard_queue_add_all_partial_failure">
+        <item quantity="one">%1$d of %2$d card could not be added — kept in queue</item>
+        <item quantity="other">%1$d of %2$d cards could not be added — kept in queue</item>
+    </plurals>
+    <plurals name="card_queue_title">
+        <item quantity="one">%d card in queue</item>
+        <item quantity="other">%d cards in queue</item>
+    </plurals>
+    <string name="card_queue_set_and_number">%1$s #%2$s</string>
+    <string name="card_queue_clear_cd">Clear queue</string>
+    <string name="card_queue_decrease_quantity_cd">Decrease quantity</string>
+    <string name="card_queue_increase_quantity_cd">Increase quantity</string>
     <string name="shared_foil">Foil</string>
 
 
@@ -326,7 +346,6 @@
     <string name="scanner_toast_added_all_to_collection">%1$d items added to Collection</string>
     <string name="scanner_toast_add_failed">Could not add %1$s — try again</string>
     <string name="scanner_toast_add_all_partial_failure">%1$d of %2$d cards could not be added — kept in queue</string>
-    <string name="scanner_queue_title">%1$d cards scanned</string>
     <string name="scanner_queue_search_hint">Filter by name…</string>
     <string name="scanner_queue_button_desc">Scan queue</string>
     <string name="scanner_add_all">+ Add to collection</string>

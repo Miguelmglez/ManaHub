@@ -62,6 +62,7 @@ class AddCardViewModel(
     private val communityDecksRepository: CommunityDecksRepository,
     appScope:                       CoroutineScope,
     launchArgs:                     AddCardLaunchArgs = AddCardLaunchArgs(),
+    private val restorableState:    AddCardRestorableState = InMemoryAddCardRestorableState(),
     private val nowMillis:          () -> Long = { System.currentTimeMillis() },
 ) : ViewModel() {
 
@@ -96,8 +97,11 @@ class AddCardViewModel(
     init {
         observeSharedQueue()
         observeOwnedCardIdentityKeys()
-        if (launchArgs.multi || launchArgs.deckSource != null) enableMultiSelectMode()
-        launchArgs.deckSource?.let(::loadDeckSource)
+        // The nav args outlive "Clear deck cards"; a restored screen must not reload a cleared deck.
+        val args = if (restorableState.isDeckSourceCleared) launchArgs.withoutDeckSource() else launchArgs
+        if (args.multi || args.deckSource != null) enableMultiSelectMode()
+        args.entryPoint?.let(::logEntryPointOnce)
+        args.deckSource?.let(::loadDeckSource)
         viewModelScope.launch {
             val dataFlow = combine(
                 textQueryFlow.debounce(400L),
@@ -375,6 +379,15 @@ class AddCardViewModel(
             val enabled = !it.isMultiSelectMode
             it.copy(isMultiSelectMode = enabled, showQueueSheet = it.showQueueSheet && enabled)
         }
+        val enabled = _uiState.value.isMultiSelectMode
+        AddCardTelemetry.multiSelectToggled(enabled)
+        if (enabled) AddCardTelemetry.multiSelectOpenedFrom(MultiSelectEntryPoint.TOOLBAR)
+    }
+
+    private fun logEntryPointOnce(entryPoint: MultiSelectEntryPoint) {
+        if (restorableState.isEntryPointLogged) return
+        restorableState.isEntryPointLogged = true
+        AddCardTelemetry.multiSelectOpenedFrom(entryPoint)
     }
 
     /**
@@ -404,8 +417,10 @@ class AddCardViewModel(
 
     /** Opens the queue sheet; no-op when the queue is empty. */
     fun onOpenQueueSheet() {
-        if (queueRepository.queue.value.isEmpty()) return
+        val count = queueRepository.queue.value.size
+        if (count == 0) return
         _uiState.update { it.copy(showQueueSheet = true) }
+        AddCardTelemetry.queueOpened(count)
     }
 
     /** Closes the queue sheet. */
@@ -609,7 +624,7 @@ class AddCardViewModel(
             )
         }
         deckLoadJob = viewModelScope.launch {
-            val loaded = try {
+            val outcome = try {
                 when (source) {
                     is AddCardDeckSource.Local -> loadLocalDeck(source.deckId)
                     is AddCardDeckSource.Community -> loadCommunityDeck(source.archidektId)
@@ -617,43 +632,45 @@ class AddCardViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                null
+                DeckLoadOutcome.Failed(DeckSourceLoadFailure.EXCEPTION, e)
             }
             if (_uiState.value.deckSource != source) return@launch
             _uiState.update {
-                if (loaded == null) {
-                    it.copy(isDeckLoading = false, deckLoadFailed = true)
-                } else {
-                    it.copy(
+                when (outcome) {
+                    is DeckLoadOutcome.Failed -> it.copy(isDeckLoading = false, deckLoadFailed = true)
+                    is DeckLoadOutcome.Loaded -> it.copy(
                         isDeckLoading = false,
                         deckLoadFailed = false,
-                        deckName = loaded.name,
-                        deckCards = loaded.cards,
+                        deckName = outcome.name,
+                        deckCards = outcome.cards,
                     )
                 }
+            }
+            if (outcome is DeckLoadOutcome.Failed) {
+                AddCardTelemetry.deckSourceLoadFailed(source, outcome.failure, outcome.cause)
             }
             applyDeckFilter()
         }
     }
 
-    /** Null means the deck could not be loaded (missing deck or unresolvable cards). */
-    private suspend fun loadLocalDeck(deckId: String): LoadedDeck? {
-        val deck = deckRepository.observeDeckWithCards(deckId).first() ?: return null
+    private suspend fun loadLocalDeck(deckId: String): DeckLoadOutcome {
+        val deck = deckRepository.observeDeckWithCards(deckId).first()
+            ?: return DeckLoadOutcome.Failed(DeckSourceLoadFailure.NOT_FOUND)
         val ids = buildList {
             deck.deck.commanderCardId?.takeIf { it.isNotBlank() }?.let(::add)
             deck.mainboard.forEach { add(it.scryfallId) }
             deck.sideboard.forEach { add(it.scryfallId) }
         }.distinct()
-        val cards = resolveCards(ids) ?: return null
-        return LoadedDeck(deck.deck.name, cards)
+        val cards = resolveCards(ids) ?: return DeckLoadOutcome.Failed(DeckSourceLoadFailure.UNRESOLVED)
+        return DeckLoadOutcome.Loaded(deck.deck.name, cards)
     }
 
-    private suspend fun loadCommunityDeck(archidektId: Int): LoadedDeck? {
+    private suspend fun loadCommunityDeck(archidektId: Int): DeckLoadOutcome {
         val result = communityDecksRepository.getDeckById(archidektId)
-        if (result !is DataResult.Success) return null
+        if (result !is DataResult.Success) return DeckLoadOutcome.Failed(DeckSourceLoadFailure.NOT_FOUND)
         val ids = result.data.cards.map { it.scryfallId }.filter { it.isNotBlank() }.distinct()
-        val cards = resolveCards(ids) ?: return null
-        return LoadedDeck(result.data.name, cards)
+        val cards = resolveCards(ids) ?: return DeckLoadOutcome.Failed(DeckSourceLoadFailure.UNRESOLVED)
+        return DeckLoadOutcome.Loaded(result.data.name, cards)
     }
 
     // Batch path only (never a per-card name search); keeps deck order. Null when ids exist but
@@ -713,6 +730,7 @@ class AddCardViewModel(
                 currentPage = 1,
             )
         }
+        restorableState.isDeckSourceCleared = true
         lastEffectiveQuery = null
         forceSearch()
     }
@@ -721,7 +739,7 @@ class AddCardViewModel(
     fun onSelectAllDeckCards() {
         val state = _uiState.value
         if (!state.isDeckMode) return
-        queueUnselected(state.results)
+        AddCardTelemetry.selectAll(queueUnselected(state.results))
     }
 
     /** Queues every visible deck card whose identity (oracleId, else name) is not in the collection. */
@@ -731,20 +749,25 @@ class AddCardViewModel(
             // Read once instead of the multi-mode collector, which may not have emitted yet.
             val owned = userCardRepository.observeCollection().first()
                 .mapTo(HashSet()) { it.card.identityKey() }
-            queueUnselected(candidates.filterNot { it.identityKey() in owned })
+            AddCardTelemetry.selectMissing(queueUnselected(candidates.filterNot { it.identityKey() in owned }))
         }
     }
 
-    private fun queueUnselected(cards: List<Card>) {
+    /** Returns how many cards were newly queued. */
+    private fun queueUnselected(cards: List<Card>): Int {
         enableMultiSelectMode()
         val queued = queueRepository.queue.value.selectedIds()
         val toAdd = cards.filter { it.scryfallId !in queued }.distinctBy { it.scryfallId }
         toAdd.forEach { queueRepository.add(newQueueEntry(it)) }
         syncQueueSnapshot()
         showQueueToast(AddCardQueueToast.DeckCardsSelected(toAdd.size))
+        return toAdd.size
     }
 
-    private data class LoadedDeck(val name: String, val cards: List<Card>)
+    private sealed interface DeckLoadOutcome {
+        data class Loaded(val name: String, val cards: List<Card>) : DeckLoadOutcome
+        data class Failed(val failure: DeckSourceLoadFailure, val cause: Throwable? = null) : DeckLoadOutcome
+    }
 
     private companion object {
         const val DEFAULT_CONDITION = "NM"

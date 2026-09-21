@@ -32,6 +32,7 @@ Identify cards by pointing the camera at the card name. Uses on-device ML Kit OC
 - Auto-pause after add to prevent double-scanning; flash toggle
 - Debounced two-stage lookup (full-text → exact-name fallback)
 - Confirm sheet with foil, condition, language, and quantity
+- Scanned cards land in a persistent queue shared with Add Card's "Select multiple" mode
 
 ### 📁 Collection Manager
 Search and manage your entire collection with real-time Scryfall data.
@@ -40,6 +41,7 @@ Search and manage your entire collection with real-time Scryfall data.
 - Filter by rarity, mana value, format legality, price, oracle text, and trade status
 - Grid and list views; card detail with double-faced support and art crop
 - Edit quantity, condition, language, and foil per copy
+- "Select multiple" in Add Card: tap cards across searches (or browse a deck's cards from Deck Studio or a Community deck, with "Select all" / "Select missing"), then add them all to the collection or wishlist
 - Wishlist mode (a card can live in both collection and wishlist)
 - Batch price refresh via the Scryfall collection endpoint; stale-cache indicator
 

@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -161,13 +162,13 @@ fun CardQueueSheet(
                         )
                     }
                     Text(
-                        text = stringResource(R.string.scanner_queue_title, cards.size),
+                        text = pluralStringResource(R.plurals.card_queue_title, cards.size, cards.size),
                         style = ty.titleMedium,
                         color = mc.textPrimary,
                         modifier = Modifier.weight(1f)
                     )
                     IconButton(onClick = onClearQueue) {
-                        Icon(Icons.Rounded.Delete, null, tint = mc.lifeNegative)
+                        Icon(Icons.Rounded.Delete, stringResource(R.string.card_queue_clear_cd), tint = mc.lifeNegative)
                     }
                 }
 
@@ -355,7 +356,7 @@ private fun QueueCardItem(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "${entry.card.setName} #${entry.card.collectorNumber}",
+                        text = stringResource(R.string.card_queue_set_and_number, entry.card.setName, entry.card.collectorNumber),
                         style = ty.labelMedium,
                         color = mc.secondaryAccent,
                         maxLines = 1,
@@ -484,7 +485,7 @@ private fun QuantitySelector(
         horizontalArrangement = Arrangement.spacedBy(spacing.xs)
     ) {
         IconButton(onClick = onDecrement, modifier = Modifier.size(28.dp)) {
-            Icon(Icons.Default.Remove, null, tint = mc.textPrimary, modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.Remove, stringResource(R.string.card_queue_decrease_quantity_cd), tint = mc.textPrimary, modifier = Modifier.size(16.dp))
         }
         Text(
             text = quantity.toString(),
@@ -494,7 +495,7 @@ private fun QuantitySelector(
             textAlign = TextAlign.Center
         )
         IconButton(onClick = onIncrement, modifier = Modifier.size(28.dp)) {
-            Icon(Icons.Default.Add, null, tint = mc.textPrimary, modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.Add, stringResource(R.string.card_queue_increase_quantity_cd), tint = mc.textPrimary, modifier = Modifier.size(16.dp))
         }
     }
 }

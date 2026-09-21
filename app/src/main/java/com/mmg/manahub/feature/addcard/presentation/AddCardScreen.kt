@@ -1366,11 +1366,11 @@ private fun queueToastText(toast: AddCardQueueToast): String = when (toast) {
     is AddCardQueueToast.AddFailed ->
         stringResource(R.string.scanner_toast_add_failed, toast.cardName)
     is AddCardQueueToast.AddedAllToCollection ->
-        stringResource(R.string.scanner_toast_added_all_to_collection, toast.count)
+        pluralStringResource(R.plurals.addcard_queue_added_all_to_collection, toast.count, toast.count)
     is AddCardQueueToast.AddedAllToWishlist ->
-        stringResource(R.string.scanner_toast_added_all_to_wishlist, toast.count)
+        pluralStringResource(R.plurals.addcard_queue_added_all_to_wishlist, toast.count, toast.count)
     is AddCardQueueToast.AddAllPartialFailure ->
-        stringResource(R.string.scanner_toast_add_all_partial_failure, toast.failed, toast.total)
+        pluralStringResource(R.plurals.addcard_queue_add_all_partial_failure, toast.total, toast.failed, toast.total)
     is AddCardQueueToast.DeckCardsSelected ->
         if (toast.count == 0) stringResource(R.string.addcard_deck_nothing_new_selected)
         else pluralStringResource(R.plurals.addcard_deck_cards_selected, toast.count, toast.count)
