@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
-// COMMENTS_REVIEWED: 2026-09-16
+// COMMENTS_REVIEWED: 2026-09-21
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,13 +29,20 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
@@ -45,6 +53,7 @@ import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.SectionHeader
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -117,6 +126,9 @@ internal fun ChoiceStepContent(
 
     val isCommanderFormat = uiState.selectedFormat?.isCommanderFormat == true
     var detailSelection by remember { mutableStateOf<ChoiceDetailSelection?>(null) }
+    // Keyed by section id, absent = expanded (the default): each section starts open so the choice
+    // rows are visible without a tap, and survives rotation/process death.
+    val collapsedSections = rememberSaveable(saver = CollapsedChoiceSectionsSaver) { mutableStateMapOf() }
 
     // W7 fix 5.5 (design review P1): a compact "N of M sections decided" summary -- a section
     // counts as decided the moment the user has touched it (present in choiceSelections), exactly
@@ -162,8 +174,9 @@ internal fun ChoiceStepContent(
                     draft = draft,
                     isCommanderFormat = isCommanderFormat,
                     current = current,
-                    tentative = tentative,
                     isDecided = uiState.choiceSelections.containsKey(group.sectionId),
+                    expanded = collapsedSections[group.sectionId] != true,
+                    onToggleExpanded = { collapsedSections[group.sectionId] = collapsedSections[group.sectionId] != true },
                     onChangeQuantity = { cardId, delta -> onChangeQuantity(group.sectionId, cardId, delta) },
                     onAutoFill = { onAutoFillSection(group.sectionId) },
                     onOpenDetail = { id -> detailSelection = ChoiceDetailSelection(group.sectionId, id) },
@@ -240,7 +253,7 @@ private fun FallbackFlagCard(draft: WizardDraftBuild, onOpenDetail: (String) -> 
             }
             if (offPlanCards.isNotEmpty()) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.xs), modifier = Modifier.padding(top = spacing.sm)) {
-                    Icon(imageVector = Icons.Default.HelpOutline, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(16.dp))
+                    Icon(imageVector = Icons.Default.HelpOutline, contentDescription = null, tint = mc.textSecondary, modifier = Modifier.size(16.dp))
                     Text(
                         text = stringResource(R.string.deck_wizard_choice_fallback_offplan_subtitle, offPlanCards.size),
                         style = ty.bodySmall,
@@ -291,14 +304,35 @@ private fun FallbackFlagCardList(cards: List<Pair<String, Card>>, onOpenDetail: 
     }
 }
 
+/** Same flattened-`List<String>` [Saver] shape as `DeckWizardCommanderSteps.kt`'s
+ * `CollapsedPlanSectionsSaver` (a small per-file duplicate over cross-file coupling). */
+private const val CHOICE_SECTIONS_SAVER_DELIMITER = "|||"
+
+private val CollapsedChoiceSectionsSaver: Saver<SnapshotStateMap<RoleKey, Boolean>, List<String>> = Saver(
+    save = { map -> map.map { (key, value) -> "$key$CHOICE_SECTIONS_SAVER_DELIMITER$value" } },
+    restore = { encoded ->
+        mutableStateMapOf<RoleKey, Boolean>().apply {
+            encoded.forEach { entry ->
+                val separatorIndex = entry.lastIndexOf(CHOICE_SECTIONS_SAVER_DELIMITER)
+                if (separatorIndex >= 0) {
+                    this[entry.substring(0, separatorIndex)] = entry.substring(separatorIndex + CHOICE_SECTIONS_SAVER_DELIMITER.length).toBoolean()
+                }
+            }
+        }
+    },
+)
+
+/** One ambiguity section: a collapsible [SectionHeader] (label + "chosen/needed" trailing count),
+ * with the tentative picks, alternatives and auto-fill CTA rendered only while [expanded]. */
 @Composable
 private fun ChoiceSectionCard(
     group: AmbiguityGroup,
     draft: WizardDraftBuild,
     isCommanderFormat: Boolean,
     current: Map<String, Int>,
-    tentative: Map<String, Int>,
     isDecided: Boolean,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
     onChangeQuantity: (String, Int) -> Unit,
     onAutoFill: () -> Unit,
     onOpenDetail: (String) -> Unit,
@@ -325,8 +359,8 @@ private fun ChoiceSectionCard(
 
     // W7 fix 5.5: collapse alternatives beyond the default window -- tentative picks are NEVER
     // collapsed. Keyed on the section id so each card keeps its own expand state independently.
-    var expanded by remember(group.sectionId) { mutableStateOf(false) }
-    val visibleAlternativeCards = if (expanded) alternativeCards else alternativeCards.take(DEFAULT_VISIBLE_ALTERNATIVES)
+    var alternativesExpanded by remember(group.sectionId) { mutableStateOf(false) }
+    val visibleAlternativeCards = if (alternativesExpanded) alternativeCards else alternativeCards.take(DEFAULT_VISIBLE_ALTERNATIVES)
     val hiddenAlternativesCount = alternativeCards.size - visibleAlternativeCards.size
 
     // Deck Wizard 60-card wave (v6), plan §5 Phase 5.4 (S6): the section progress now counts
@@ -335,28 +369,21 @@ private fun ChoiceSectionCard(
     val isFull = totalSelected >= group.remainingSlots
 
     Surface(shape = CardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(spacing.md)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = ArchetypeRoleClassifier.label(group.sectionId),
-                    style = ty.titleMedium,
-                    color = mc.textPrimary,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    // W7 fix 6 (design review P2): "Choose N" + "x/N selected" merged into ONE
-                    // line that reads as a unit for TalkBack.
-                    text = stringResource(R.string.deck_wizard_choice_section_progress, totalSelected, group.remainingSlots),
-                    style = ty.labelMedium,
-                    color = if (isDecided) mc.lifePositive else mc.primaryAccent,
-                )
-            }
+        Column(Modifier.padding(horizontal = spacing.md, vertical = spacing.xs)) {
+            SectionHeader(
+                title = ArchetypeRoleClassifier.label(group.sectionId),
+                expanded = expanded,
+                onToggle = onToggleExpanded,
+                titleColor = mc.textPrimary,
+                trailing = {
+                    Text(
+                        text = stringResource(R.string.deck_wizard_choice_section_progress, totalSelected, group.remainingSlots),
+                        style = ty.labelMedium,
+                        color = if (isDecided) mc.lifePositive else mc.primaryAccent,
+                    )
+                },
+            )
+            if (!expanded) return@Column
             Text(
                 text = if (isDecided) {
                     stringResource(R.string.deck_wizard_choice_decided_by_you)
@@ -395,12 +422,12 @@ private fun ChoiceSectionCard(
                     )
                 }
             }
-            if (!expanded && hiddenAlternativesCount > 0) {
+            if (!alternativesExpanded && hiddenAlternativesCount > 0) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 48.dp)
-                        .clickable { expanded = true },
+                        .clickable { alternativesExpanded = true },
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     Text(
@@ -419,6 +446,7 @@ private fun ChoiceSectionCard(
                     modifier = Modifier.fillMaxWidth().padding(top = spacing.sm),
                 )
             }
+            Spacer(Modifier.height(spacing.xs))
         }
     }
 }
@@ -462,11 +490,14 @@ private fun ChoiceCandidateRow(
     }
 
     if (isCommanderFormat) {
+        val isSelected = quantity > 0
         CardRow(
             card = card,
             isInCollection = true,
-            selected = quantity > 0,
-            onClick = { if (quantity > 0) onDecrement() else onIncrement() },
+            selected = isSelected,
+            // CardRow's `selected` is visual only; announce the toggle state to TalkBack here.
+            modifier = Modifier.semantics { role = Role.Checkbox; selected = isSelected },
+            onClick = { if (isSelected) onDecrement() else onIncrement() },
             onRemove = null,
             onImageClick = onOpenDetail,
             extraSupportingContent = badge,

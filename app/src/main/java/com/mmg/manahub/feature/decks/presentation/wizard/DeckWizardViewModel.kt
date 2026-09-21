@@ -244,10 +244,8 @@ data class DeckWizardUiState(
      * was last committed (see [DeckWizardViewModel.onSelectStrategyPickEntry]'s own KDoc for why
      * this is a separate field from [selectedCuratedStrategyId]). */
     val expandedStrategyPickId: String? = null,
-    /** Deck Wizard UX polish plan, Run 2: true while STRATEGY_PICK's color-combo picker for
-     * [expandedStrategyPickId] is open -- Run 3 renders it as a real `ModalBottomSheet`; until then
-     * the composable keeps showing `InlineColorComboSection` under that same condition (see
-     * [DeckWizardViewModel.onSelectStrategyPickEntry]'s own KDoc). */
+    /** True while STRATEGY_PICK's color-combo `ModalBottomSheet` for [expandedStrategyPickId] is
+     * open (see [DeckWizardViewModel.onSelectStrategyPickEntry]'s own KDoc). */
     val showStrategyPickColorSheet: Boolean = false,
 
     // ── PLAN_SECTIONS (shared by every anchor since the Casual `MANUAL_ADDS` step was deleted) ───
@@ -1072,6 +1070,7 @@ class DeckWizardViewModel(
     }
 
     fun onCancelTribePickForStrategy() {
+        crashReporter.log("deck_wizard_tribe_pick_cancelled")
         _uiState.update { it.copy(pendingTribeStrategy = null, commanderTribePickerCandidates = emptyList()) }
     }
 
@@ -1190,8 +1189,10 @@ class DeckWizardViewModel(
     /** Closes STRATEGY_PICK's color-combo picker without a pick -- a row that never committed a
      * combo collapses back to "nothing pending"; a committed row keeps its highlight. */
     fun onDismissStrategyPickColorSheet() {
+        val state = _uiState.value
+        val committedForRow = state.expandedStrategyPickId != null && state.expandedStrategyPickId == state.selectedCuratedStrategyId
+        if (!committedForRow && state.showStrategyPickColorSheet) crashReporter.log("deck_wizard_strategy_pick_color_sheet_dismissed")
         _uiState.update {
-            val committedForRow = it.expandedStrategyPickId != null && it.expandedStrategyPickId == it.selectedCuratedStrategyId
             if (committedForRow) {
                 it.copy(showStrategyPickColorSheet = false)
             } else {

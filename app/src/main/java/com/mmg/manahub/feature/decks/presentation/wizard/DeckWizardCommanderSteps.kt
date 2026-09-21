@@ -1,7 +1,12 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
-// COMMENTS_REVIEWED: 2026-09-09
+// COMMENTS_REVIEWED: 2026-09-21
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -9,10 +14,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -21,20 +24,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.rounded.CollectionsBookmark
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -42,9 +40,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -60,20 +55,18 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
-import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.AddCardRow
 import com.mmg.manahub.core.model.AdvancedSearchQuery
@@ -82,12 +75,9 @@ import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.SearchCriterion
-import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.tagging.label
-import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardRow
 import com.mmg.manahub.core.ui.components.CardSearchSheet
-import com.mmg.manahub.core.ui.components.CardTagChip
 import com.mmg.manahub.core.ui.components.CardTagGroup
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.InlineErrorState
@@ -98,17 +88,14 @@ import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicSelectionItem
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
-import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.CardSection
 import com.mmg.manahub.feature.decks.domain.engine.CopyPolicy
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.PillarId
-import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.SectionQueryContext
 import com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
@@ -122,15 +109,8 @@ import com.mmg.manahub.feature.decks.presentation.components.SeedSelectionUi
 import com.mmg.manahub.feature.decks.presentation.components.TribeOption
 import com.mmg.manahub.feature.decks.presentation.components.TribePickerSection
 import com.mmg.manahub.feature.decks.presentation.components.label
-import org.jetbrains.compose.resources.painterResource
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Deck Wizard & Engine Rework plan (docs/plans/deck-wizard-rework-plan.md), Workstream 2 --
-//  the new Commander-only step sequence: COMMANDER_PICK (2.1) -> STRATEGY (2.2) -> MANUAL_ADDS
-//  (2.3, SHARED with a future Casual caller -- Workstream 3).
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// ── 2.1 — COMMANDER_PICK (Deck Wizard Commander v3 plan, Phase 3.2) ────────────
+// ── COMMANDER_PICK ────────────────────────────────────────────────────────────
 
 /**
  * Deck Wizard Commander v3 plan (Phase 3.1, F10): the COMMANDER_PICK grid's default (no structured
@@ -195,18 +175,16 @@ internal fun buildCommanderSearchQuery(uiState: DeckWizardUiState, lockedCriteri
 }
 
 /**
- * The first Commander step: a [LazyVerticalGrid] of every eligible owned commander
+ * The first Commander step: a [LazyColumn] of [CardRow]s over every eligible owned commander
  * ([commanderPickLocalCandidates]) while idle ([commanderPickIsIdle]), or live Scryfall results
- * ([DeckWizardUiState.commanderSearchResults]) the moment there is search text or an active filter
- * -- no more Collection/All-cards tabs (Deck Wizard Commander v4 plan, W2.1, G2/R2). The trailing
- * Tune icon opens the shared [AdvancedSearchSheet] locked to [commanderLockedCriteria] (D14); the
- * active-filter count row + "clear filters" mirror `CollectionScreen.kt`'s own pattern (W2.2).
+ * ([DeckWizardUiState.commanderSearchResults]) the moment there is search text or an active filter.
+ * The trailing Tune icon opens the shared [AdvancedSearchSheet] locked to [commanderLockedCriteria]
+ * (D14); the active-filter count row + "clear filters" mirror `CollectionScreen.kt`'s own pattern.
  *
- * Tapping a candidate opens the SHARED [CardDetailSheet] in its commander-selection context.
- * Once [DeckWizardUiState.selectedCommander] is set, this step shows the picked commander's large
- * flip portrait + tags + a "Change commander" CTA (W2.3, G3) instead of the grid -- "Next" is owned
- * solely by the sticky [WizardStickyButton] below, same as every sibling step (Deck Wizard Commander
- * v4 plan, Run 2 W2 review, P0: a duplicate inline "Next" here used to render alongside it).
+ * Tapping a row (or its image) opens the single-card inspection overlay with "Choose as commander"
+ * / "Cancel". Once [DeckWizardUiState.selectedCommander] is set, the list cross-fades into the picked
+ * commander's flip portrait + tags + a "Change commander" CTA -- "Next" is owned solely by the sticky
+ * [WizardStickyButton] below, same as every sibling step.
  */
 @Composable
 internal fun CommanderPickStepContent(
@@ -222,8 +200,8 @@ internal fun CommanderPickStepContent(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    var inspectionCard by remember { mutableStateOf<Card?>(null) }
     var showAdvancedSearch by remember { mutableStateOf(false) }
+    val inspection = rememberWizardCardInspectionState()
 
     val commander = uiState.selectedCommander
     val lockedCriteria = remember(uiState.selectedFormat) { commanderLockedCriteria(uiState.selectedFormat) }
@@ -237,151 +215,192 @@ internal fun CommanderPickStepContent(
     val candidatesToShow = if (isIdle) localCandidates else uiState.commanderSearchResults
     val ownedIds = remember(uiState.ownedCards) { commanderOwnedIds(uiState.ownedCards) }
 
-    Column(Modifier.fillMaxSize()) {
-        if (commander != null) {
-            Column(
-                modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = spacing.lg, vertical = spacing.md),
-                verticalArrangement = Arrangement.spacedBy(spacing.md),
-            ) {
-                Text(stringResource(R.string.deck_wizard_commander_pick_title), style = ty.titleLarge, color = mc.textPrimary)
-                CardFlipPortrait(card = commander)
-                val commanderTags = remember(commander) { commander.tags + commander.userTags }
-                if (commanderTags.isNotEmpty()) {
-                    CardTagGroup(tags = commanderTags, tagLabel = { it.label() })
-                }
-                MagicCtaButton(
-                    onClick = onClearCommander,
-                    text = stringResource(R.string.deck_wizard_change_commander),
-                    style = MagicCtaStyle.Outlined,
-                    color = MagicCtaColor.Neutral,
-                    icon = { Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 100.dp),
+    WizardCardInspectionHost(
+        state = inspection,
+        actions = { card ->
+            MagicCtaButton(
+                onClick = {
+                    onSelectCommander(card)
+                    inspection.requestDismiss()
+                },
+                text = stringResource(R.string.deckbuilder_choose_as_commander),
+                color = MagicCtaColor.Gold,
+                icon = { Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            MagicCtaButton(
+                onClick = inspection::requestDismiss,
+                text = stringResource(R.string.action_cancel),
+                style = MagicCtaStyle.Ghost,
+                color = MagicCtaColor.Neutral,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+    ) {
+        Column(Modifier.fillMaxSize()) {
+            AnimatedContent(
+                targetState = commander,
+                transitionSpec = {
+                    (fadeIn(tween(250)) + scaleIn(initialScale = 0.94f, animationSpec = tween(250))) togetherWith fadeOut(tween(250))
+                },
+                contentKey = { it != null },
+                label = "CommanderPickListOrSelected",
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.md),
-                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                verticalArrangement = Arrangement.spacedBy(spacing.sm),
-            ) {
-                item(key = "header", span = { GridItemSpan(maxLineSpan) }) {
-                    Column {
+            ) { selected ->
+                if (selected != null) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = spacing.lg, vertical = spacing.md),
+                        verticalArrangement = Arrangement.spacedBy(spacing.md),
+                    ) {
                         Text(stringResource(R.string.deck_wizard_commander_pick_title), style = ty.titleLarge, color = mc.textPrimary)
-                        Text(
-                            stringResource(R.string.deck_wizard_commander_pick_subtitle),
-                            style = ty.bodyMedium,
-                            color = mc.textSecondary,
-                            modifier = Modifier.padding(top = spacing.xxs),
+                        CardFlipPortrait(card = selected, modifier = Modifier.animateEnterExit(enter = fadeIn() + scaleIn(initialScale = 0.94f), exit = fadeOut()))
+                        val commanderTags = remember(selected) { selected.tags + selected.userTags }
+                        if (commanderTags.isNotEmpty()) {
+                            CardTagGroup(tags = commanderTags, tagLabel = { it.label() })
+                        }
+                        MagicCtaButton(
+                            onClick = onClearCommander,
+                            text = stringResource(R.string.deck_wizard_change_commander),
+                            style = MagicCtaStyle.Outlined,
+                            color = MagicCtaColor.Neutral,
+                            icon = { Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                }
-
-                item(key = "search", span = { GridItemSpan(maxLineSpan) }) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.md),
+                        verticalArrangement = Arrangement.spacedBy(spacing.sm),
                     ) {
-                        OutlinedTextField(
-                            value = uiState.commanderQuery,
-                            onValueChange = onQueryChange,
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            placeholder = { Text(stringResource(R.string.deck_wizard_commander_search_hint), style = ty.bodyMedium, color = mc.textDisabled) },
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary) },
-                            shape = CardShape,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = mc.primaryAccent,
-                                unfocusedBorderColor = mc.surfaceVariant,
-                                focusedTextColor = mc.textPrimary,
-                                unfocusedTextColor = mc.textPrimary,
-                                cursorColor = mc.primaryAccent,
-                            ),
-                        )
-                        BadgedBox(
-                            badge = {
-                                if (filterCount > 0) {
-                                    Badge(containerColor = mc.primaryAccent, contentColor = mc.background) { Text("$filterCount") }
-                                }
-                            },
-                        ) {
-                            IconButton(
-                                onClick = { showAdvancedSearch = true },
-                                modifier = Modifier.size(48.dp),
+                        item(key = "header") {
+                            Column {
+                                Text(stringResource(R.string.deck_wizard_commander_pick_title), style = ty.titleLarge, color = mc.textPrimary)
+                                Text(
+                                    stringResource(R.string.deck_wizard_commander_pick_subtitle),
+                                    style = ty.bodyMedium,
+                                    color = mc.textSecondary,
+                                    modifier = Modifier.padding(top = spacing.xxs),
+                                )
+                            }
+                        }
+
+                        item(key = "search") {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                             ) {
-                                Icon(
-                                    Icons.Default.Tune,
-                                    contentDescription = stringResource(R.string.deck_wizard_commander_advanced_search),
-                                    tint = if (filterCount > 0) mc.primaryAccent else mc.textSecondary,
+                                OutlinedTextField(
+                                    value = uiState.commanderQuery,
+                                    onValueChange = onQueryChange,
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true,
+                                    placeholder = { Text(stringResource(R.string.deck_wizard_commander_search_hint), style = ty.bodyMedium, color = mc.textDisabled) },
+                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary) },
+                                    shape = CardShape,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = mc.primaryAccent,
+                                        unfocusedBorderColor = mc.surfaceVariant,
+                                        focusedTextColor = mc.textPrimary,
+                                        unfocusedTextColor = mc.textPrimary,
+                                        cursorColor = mc.primaryAccent,
+                                    ),
+                                )
+                                BadgedBox(
+                                    badge = {
+                                        if (filterCount > 0) {
+                                            Badge(containerColor = mc.primaryAccent, contentColor = mc.background) { Text("$filterCount") }
+                                        }
+                                    },
+                                ) {
+                                    IconButton(
+                                        onClick = { showAdvancedSearch = true },
+                                        modifier = Modifier.size(48.dp),
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Tune,
+                                            contentDescription = stringResource(R.string.deck_wizard_commander_advanced_search),
+                                            tint = if (filterCount > 0) mc.primaryAccent else mc.textSecondary,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        if (filterCount > 0) {
+                            item(key = "active_filters") {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        stringResource(R.string.deck_wizard_commander_active_filters, filterCount),
+                                        style = ty.bodySmall,
+                                        color = mc.primaryAccent,
+                                    )
+                                    MagicCtaButton(
+                                        onClick = onClearFilters,
+                                        text = stringResource(R.string.deck_wizard_commander_clear_filters),
+                                        style = MagicCtaStyle.Ghost,
+                                        color = MagicCtaColor.Error,
+                                    )
+                                }
+                            }
+                        } else if (isIdle) {
+                            item(key = "collection_header") {
+                                Text(stringResource(R.string.deck_wizard_commanders_in_collection), style = ty.titleMedium, color = mc.textPrimary)
+                            }
+                        }
+
+                        when {
+                            // Loading wins over error and empty: an empty state mid-search reads as "no results".
+                            !isIdle && uiState.isSearchingCommander -> item(key = "loading") {
+                                Box(Modifier.fillMaxWidth().padding(vertical = spacing.lg), contentAlignment = Alignment.Center) {
+                                    MagicLoadingSpinner(size = MagicLoadingSize.Small)
+                                }
+                            }
+                            !isIdle && uiState.commanderSearchError -> item(key = "error") {
+                                InlineErrorState(
+                                    message = stringResource(R.string.deck_wizard_commander_search_error),
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = spacing.lg),
+                                )
+                            }
+                            candidatesToShow.isEmpty() -> item(key = "empty") {
+                                EmptyState(
+                                    title = stringResource(if (isIdle) R.string.deck_wizard_commander_pick_idle_empty else R.string.deck_wizard_commander_pick_empty),
+                                    icon = Icons.Default.Search,
+                                    actionLabel = if (!isIdle) stringResource(R.string.deck_wizard_commander_clear_filters) else null,
+                                    onAction = if (!isIdle) onClearSearchAndFilters else null,
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xl),
+                                )
+                            }
+                            else -> items(candidatesToShow, key = { "cmdcand_${it.scryfallId}" }) { card ->
+                                var thumbnailRect by remember { mutableStateOf(Rect.Zero) }
+                                CardRow(
+                                    card = card,
+                                    isInCollection = card.scryfallId in ownedIds,
+                                    onClick = { inspection.open(card, thumbnailRect) },
+                                    onImageClick = { inspection.open(card, thumbnailRect) },
+                                    onRemove = null,
+                                    onAdd = null,
+                                    selected = false,
+                                    modifier = Modifier
+                                        .animateItem()
+                                        .onGloballyPositioned { thumbnailRect = inspection.thumbnailRectOf(it, imageIsInteractive = true) },
                                 )
                             }
                         }
                     }
                 }
-
-                if (filterCount > 0) {
-                    item(key = "active_filters", span = { GridItemSpan(maxLineSpan) }) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                stringResource(R.string.deck_wizard_commander_active_filters, filterCount),
-                                style = ty.bodySmall,
-                                color = mc.primaryAccent,
-                            )
-                            MagicCtaButton(
-                                onClick = onClearFilters,
-                                text = stringResource(R.string.deck_wizard_commander_clear_filters),
-                                style = MagicCtaStyle.Ghost,
-                                color = MagicCtaColor.Error,
-                            )
-                        }
-                    }
-                } else if (isIdle) {
-                    item(key = "collection_header", span = { GridItemSpan(maxLineSpan) }) {
-                        Text(stringResource(R.string.deck_wizard_commanders_in_collection), style = ty.titleMedium, color = mc.textPrimary)
-                    }
-                }
-
-                when {
-                    // Never render an empty state while a search is in flight -- that reads as
-                    // "no results", which may be a lie (campaign G7). Error takes priority over
-                    // empty (P1.2) but loading still wins over both.
-                    !isIdle && uiState.isSearchingCommander -> item(key = "loading", span = { GridItemSpan(maxLineSpan) }) {
-                        Box(Modifier.fillMaxWidth().padding(vertical = spacing.lg), contentAlignment = Alignment.Center) {
-                            MagicLoadingSpinner(size = MagicLoadingSize.Small)
-                        }
-                    }
-                    !isIdle && uiState.commanderSearchError -> item(key = "error", span = { GridItemSpan(maxLineSpan) }) {
-                        InlineErrorState(
-                            message = stringResource(R.string.deck_wizard_commander_search_error),
-                            modifier = Modifier.fillMaxWidth().padding(vertical = spacing.lg),
-                        )
-                    }
-                    candidatesToShow.isEmpty() -> item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
-                        EmptyState(
-                            title = stringResource(if (isIdle) R.string.deck_wizard_commander_pick_idle_empty else R.string.deck_wizard_commander_pick_empty),
-                            icon = Icons.Default.Search,
-                            actionLabel = if (!isIdle) stringResource(R.string.deck_wizard_commander_clear_filters) else null,
-                            onAction = if (!isIdle) onClearSearchAndFilters else null,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xl),
-                        )
-                    }
-                    else -> items(candidatesToShow, key = { "cmdcand_${it.scryfallId}" }) { card ->
-                        WizardCandidateTile(card = card, isOwned = card.scryfallId in ownedIds, onClick = { inspectionCard = card })
-                    }
-                }
             }
+            WizardStickyButton(
+                label = stringResource(R.string.deck_wizard_next),
+                enabled = uiState.selectedCommander != null,
+                onClick = onNext,
+            )
         }
-        WizardStickyButton(
-            label = stringResource(R.string.deck_wizard_next),
-            enabled = uiState.selectedCommander != null,
-            onClick = onNext,
-        )
     }
 
     if (showAdvancedSearch) {
@@ -395,102 +414,9 @@ internal fun CommanderPickStepContent(
             lockedCriteria = lockedCriteria.toSet(),
         )
     }
-
-    inspectionCard?.let { card ->
-        CardDetailSheet(
-            deckCard = DeckSlotEntry(scryfallId = card.scryfallId, quantity = 0, isSideboard = false, card = card, source = DeckCardSource.USER),
-            displayCard = card,
-            isLoadingDetail = false,
-            isCommander = false,
-            isCommanderSelectionContext = true,
-            tags = card.tags + card.userTags,
-            onAdd = {},
-            onRemove = {},
-            onDelete = {},
-            onChooseAsCommander = { chosen ->
-                onSelectCommander(chosen)
-                inspectionCard = null
-            },
-            onRemoveCommander = { inspectionCard = null },
-            onDismiss = { inspectionCard = null },
-        )
-    }
 }
 
-/** A simple, tap-to-open card image grid tile for the COMMANDER_PICK/SEED_PICK candidate grids
- * (renamed from `CommanderCandidateTile`, Deck Wizard 60-card wave v6, plan §5 Phase 5.2, so
- * SEED_PICK can reuse the SAME tile) -- tap opens the shared [CardDetailSheet]. [isOwned] renders
- * the same [Icons.Rounded.CollectionsBookmark] badge language [CardRow] uses for an owned card
- * (Deck Wizard Commander v4 plan, W2.1, G2) -- Scryfall results otherwise carry no visual signal of
- * what the user already has. [seedQuantity] (> 0) overlays a small quantity badge for a card
- * already picked as a seed -- `null`/`0` for COMMANDER_PICK, which never has this concept. */
-@Composable
-internal fun WizardCandidateTile(card: Card, isOwned: Boolean, onClick: () -> Unit, seedQuantity: Int? = null) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    // Gate 5 audit (design P2c): the visible "xN" quantity badge below was never announced to
-    // TalkBack (only the card image's own name was) -- fold it into ONE merged description on the
-    // tile's root instead.
-    val tileDescription = if (seedQuantity != null && seedQuantity > 0) {
-        stringResource(R.string.deck_wizard_seed_tile_quantity_a11y, card.name, seedQuantity)
-    } else {
-        card.name
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(63f / 88f)
-            .clip(CardShape)
-            .background(mc.surfaceVariant)
-            .clickable(onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = tileDescription },
-    ) {
-        AsyncImage(
-            model = card.imageNormal,
-            contentDescription = null,
-            placeholder = painterResource(Res.drawable.mtg_card_back),
-            error = painterResource(Res.drawable.mtg_card_back),
-            fallback = painterResource(Res.drawable.mtg_card_back),
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize(),
-        )
-        if (isOwned) {
-            Surface(
-                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
-                color = mc.background.copy(alpha = 0.85f),
-                shape = CircleShape,
-            ) {
-                Icon(
-                    Icons.Rounded.CollectionsBookmark,
-                    contentDescription = stringResource(R.string.deck_wizard_commander_owned_badge),
-                    tint = mc.primaryAccent,
-                    modifier = Modifier.padding(4.dp).size(14.dp),
-                )
-            }
-        }
-        if (seedQuantity != null && seedQuantity > 0) {
-            Surface(
-                modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp),
-                color = mc.primaryAccent,
-                shape = CircleShape,
-            ) {
-                Text(
-                    text = "×$seedQuantity",
-                    style = ty.labelSmall,
-                    color = mc.onAccent,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                )
-            }
-        }
-    }
-}
-
-// Deck Wizard 60-card wave (v6, plan §5 Phase 7.1): `OutsideCollectionToggleRow` (the Casual-only
-// "include outside your collection" toggle row) deleted here -- orphaned since Phase 5.1 deleted
-// its backing field and both callers (`ManualAddsStepContent` here, `CardsFlowDirectionContent` in
-// the deleted `DeckWizardDirectionIdentity.kt`).
-
-// ── 2.2 — STRATEGY (Deck Wizard Commander v3 plan, Phase 4.2) ──────────────────
+// ── STRATEGY ──────────────────────────────────────────────────────────────────
 
 /** Sentinel id for the UI-level "Custom" row -- never a [CuratedStrategy.id] (the catalog never
  * mints an id equal to this), so it can share a single-select `selectedId` slot with real catalog
@@ -520,11 +446,14 @@ internal fun strategyRecommendedSplit(recommendations: List<StrategyRecommendati
  *
  * A [CuratedStrategy.requiresTribe] entry the recommender could not resolve a concrete tribe for
  * opens the shared [TribePickerSection] tribe sub-picker (same component Deck Studio's own
- * [CuratedStrategyPickerSheet] uses) instead of applying with no tribe.
+ * [CuratedStrategyPickerSheet] uses) instead of applying with no tribe. [selectedDisplayLabel]
+ * ([DeckWizardUiState.strategyDisplayLabel]) titles the selected row so a tribal pick reads
+ * "Tribal — Elves".
  */
 internal fun LazyListScope.StrategyRecommendationList(
     recommendations: List<StrategyRecommendation>,
     selectedId: String?,
+    selectedDisplayLabel: String?,
     onSelectStrategy: (CuratedStrategy) -> Unit,
     onSelectCustom: () -> Unit,
     onRequestTribe: (CuratedStrategy) -> Unit,
@@ -554,10 +483,12 @@ internal fun LazyListScope.StrategyRecommendationList(
     }
     if (recommended.isNotEmpty()) {
         items(recommended, key = { "rec_${it.strategy.id}" }) { recommendation ->
+            val isSelected = selectedId == recommendation.strategy.id
             StrategyRecommendationRow(
                 recommendation = recommendation,
-                isSelected = selectedId == recommendation.strategy.id,
+                isSelected = isSelected,
                 onClick = { onRowClick(recommendation) },
+                titleOverride = if (isSelected) selectedDisplayLabel else null,
             )
         }
     } else {
@@ -584,10 +515,12 @@ internal fun LazyListScope.StrategyRecommendationList(
         }
         if (otherPlansExpanded) {
             items(other, key = { "other_${it.strategy.id}" }) { recommendation ->
+                val isSelected = selectedId == recommendation.strategy.id
                 StrategyRecommendationRow(
                     recommendation = recommendation,
-                    isSelected = selectedId == recommendation.strategy.id,
+                    isSelected = isSelected,
                     onClick = { onRowClick(recommendation) },
+                    titleOverride = if (isSelected) selectedDisplayLabel else null,
                 )
             }
         }
@@ -706,6 +639,7 @@ internal fun StrategyStepContent(
                     StrategyRecommendationList(
                         recommendations = uiState.strategyRecommendations,
                         selectedId = uiState.selectedCuratedStrategyId,
+                        selectedDisplayLabel = uiState.strategyDisplayLabel,
                         onSelectStrategy = onSelectStrategy,
                         onSelectCustom = onSelectCustom,
                         onRequestTribe = onRequestTribe,
@@ -785,49 +719,36 @@ private fun PartialFitToggle(expanded: Boolean, subtitle: String?, onToggle: () 
     }
 }
 
+/** The display label for a raw `tribe:<subtype>` key -- mirrors [DeckWizardViewModel]'s own
+ * `selectedTribeLabel` derivation so an unselected tribal row reads the same as the selected one. */
+internal fun tribeDisplayLabel(tribeKey: String): String =
+    tribeKey.removePrefix(TribeDeriver.TRIBE_PREFIX).replaceFirstChar(Char::uppercase)
+
 /**
- * One STRATEGY row (D4): mirrors [MagicSelectionItem]'s Surface/border/selected treatment (that
- * shared component has no slot for a reason-chip row, so this is a sibling built on the same
- * tokens/shape rather than a literal clone of its markup -- see the Phase 4 report for this
- * judgment call) plus up to 2 [RecommendationReason] chips via [CardTagChip] (never a raw
- * `Surface`/`InputChip`, per CLAUDE.md's tag-chip rule).
+ * One STRATEGY/COLOR_PICK/STRATEGY_PICK row: a [MagicSelectionItem] titled with the strategy name
+ * (plus " — <Tribe>" when the recommender resolved a tribe, or [titleOverride] for the selected
+ * row) and described by the owned fitting-card count alone. [icon] is STRATEGY_PICK's committed
+ * color-combo symbols; every other caller leaves it null.
  */
 @Composable
-internal fun StrategyRecommendationRow(recommendation: StrategyRecommendation, isSelected: Boolean, onClick: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    val accent = mc.primaryAccent
-
-    Surface(
+internal fun StrategyRecommendationRow(
+    recommendation: StrategyRecommendation,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    titleOverride: String? = null,
+    icon: (@Composable () -> Unit)? = null,
+) {
+    val title = titleOverride
+        ?: recommendation.tribe?.let { "${recommendation.strategy.displayName} — ${tribeDisplayLabel(it)}" }
+        ?: recommendation.strategy.displayName
+    MagicSelectionItem(
+        title = title,
+        description = stringResource(R.string.deck_wizard_strategy_owned_count, recommendation.ownedFittingCount),
+        isSelected = isSelected,
+        accentColor = MaterialTheme.magicColors.primaryAccent,
+        icon = icon,
         onClick = onClick,
-        shape = CardShape,
-        color = mc.backgroundSecondary,
-        border = BorderStroke(width = if (isSelected) 1.5.dp else 1.dp, color = if (isSelected) accent else mc.surfaceVariant),
-        modifier = Modifier.fillMaxWidth().semantics { selected = isSelected },
-    ) {
-        Column(Modifier.padding(spacing.md), verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                Text(
-                    recommendation.strategy.displayName,
-                    style = ty.titleMedium.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold),
-                    color = if (isSelected) accent else mc.textPrimary,
-                    modifier = Modifier.weight(1f),
-                )
-                if (isSelected) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
-                }
-            }
-            Text(recommendation.strategy.description, style = ty.bodySmall, color = mc.textSecondary)
-            if (recommendation.reasons.isNotEmpty()) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.xs), verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                    recommendation.reasons.forEach { reason ->
-                        CardTagChip(label = reason.label, category = TagCategory.STRATEGY)
-                    }
-                }
-            }
-        }
-    }
+    )
 }
 
 // ── PLAN_SECTIONS (Deck Wizard Commander v3 plan, Phase 5, R4; generalized to every anchor by the

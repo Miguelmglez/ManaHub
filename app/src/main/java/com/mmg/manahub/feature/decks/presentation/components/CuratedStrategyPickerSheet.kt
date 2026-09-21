@@ -1,13 +1,11 @@
 package com.mmg.manahub.feature.decks.presentation.components
-// COMMENTS_REVIEWED: 2026-09-20
+// COMMENTS_REVIEWED: 2026-09-21
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,12 +15,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
@@ -50,6 +47,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicSelectionItem
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
@@ -459,14 +459,11 @@ private fun PickerSectionHeader(title: String) {
     )
 }
 
-// AutoDetectRow and CuratedStrategyRow were replaced by MagicSelectionItem
-
 /** The inline "now pick a tribe for <Strategy>" step shown after tapping a `requiresTribe`
- * strategy (plan §3.4 item 1's "tribe sub-picker shown when the selected entry has
- * `requiresTribe=true`") — replaces the flat list until a tribe is chosen or the user backs out.
- * Internal (not `private`) since Deck Wizard Commander v3 plan Phase 4.2 reuses it verbatim from
- * `DeckWizardCommanderSteps.kt`'s new STRATEGY step (a different package, same `:app` module —
- * `internal` is module-visible, per CLAUDE.md's "reuse, don't clone" instruction). */
+ * strategy -- replaces the flat list until a tribe is chosen or the user backs out. One
+ * [MagicSelectionItem] per tribe in a plain [Column] (every caller already scrolls), with a
+ * full-width outlined "Back to strategies" CTA last. Internal (not `private`) because the wizard's
+ * STRATEGY/COLOR_PICK/STRATEGY_PICK steps reuse it verbatim. */
 @Composable
 internal fun TribePickerSection(
     strategy: CuratedStrategy,
@@ -491,35 +488,22 @@ internal fun TribePickerSection(
                 color = mc.textSecondary,
             )
         } else {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                verticalArrangement = Arrangement.spacedBy(spacing.sm),
-            ) {
-                availableTribes.forEach { option ->
-                    Surface(
-                        onClick = { onSelectTribe(option.key) },
-                        shape = ChipShape,
-                        color = mc.surface,
-                        border = BorderStroke(1.dp, mc.surfaceVariant),
-                    ) {
-                        Row(
-                            modifier = Modifier.heightIn(min = 48.dp).wrapContentHeight(Alignment.CenterVertically).padding(horizontal = spacing.sm),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(option.label, style = ty.labelMedium, color = mc.textPrimary)
-                        }
-                    }
-                }
+            availableTribes.forEach { option ->
+                MagicSelectionItem(
+                    title = option.label,
+                    isSelected = false,
+                    accentColor = mc.primaryAccent,
+                    onClick = { onSelectTribe(option.key) },
+                )
             }
         }
-        Text(
+        MagicCtaButton(
+            onClick = onCancel,
             text = stringResource(R.string.deck_curated_strategy_picker_tribe_cancel),
-            style = ty.labelLarge,
-            color = mc.textSecondary,
-            modifier = Modifier
-                .sizeIn(minHeight = 48.dp)
-                .clickable(onClick = onCancel)
-                .padding(vertical = spacing.xs),
+            style = MagicCtaStyle.Outlined,
+            color = MagicCtaColor.Neutral,
+            icon = { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp)) },
+            modifier = Modifier.fillMaxWidth().padding(top = spacing.md),
         )
     }
 }

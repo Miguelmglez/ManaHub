@@ -1,5 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
-// COMMENTS_REVIEWED: 2026-09-08
+// COMMENTS_REVIEWED: 2026-09-21
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -54,7 +54,6 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardRow
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicToastHost
-import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
@@ -180,7 +179,6 @@ fun DeckWizardScreen(
                             onRemoveSeedCopy = viewModel::onRemoveSeedCopy,
                             onRemoveSeed = viewModel::onRemoveSeed,
                             onToggleSeedQueue = viewModel::onToggleSeedQueue,
-                            onShowSeedDetail = viewModel::onShowSeedDetail,
                             onNext = viewModel::onNextFromSeedPick,
                         )
                         WizardPhase.COLOR_PICK -> ColorPickStepContent(
@@ -198,6 +196,7 @@ fun DeckWizardScreen(
                             onQueryChange = viewModel::onStrategyPickQueryChange,
                             onSelectEntry = viewModel::onSelectStrategyPickEntry,
                             onSelectCombo = viewModel::onSelectStrategyPickCombo,
+                            onDismissColorSheet = viewModel::onDismissStrategyPickColorSheet,
                             onRequestTribe = viewModel::onRequestTribeForStrategy,
                             onPickTribe = viewModel::onPickTribeForStrategy,
                             onCancelTribePick = viewModel::onCancelTribePickForStrategy,
@@ -541,52 +540,14 @@ private fun ReviewSectionLabel(text: String) {
     Text(text = text, style = MaterialTheme.magicTypography.labelLarge, color = MaterialTheme.magicColors.textSecondary)
 }
 
-/** A [ReviewRow] variant that renders its value as a tonal chip -- used for the Direction/
- * archetype pick, which is a single discrete choice rather than free-form text. Deck Wizard
- * 60-card wave (v6), plan §5 Phase 5.4: no current call site (the Strategy card replaced the
- * generic Direction chip for every anchor, S12) -- kept as a small, still-generically-useful Review
- * row shape rather than deleted outright; Phase 7's own deletion pass owns removing it if it stays
- * unused. */
-@Composable
-private fun ReviewChipRow(label: String, chipText: String) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = ty.bodyMedium, color = mc.textSecondary)
-        Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.14f)) {
-            Text(
-                text = chipText,
-                style = ty.labelMedium,
-                color = mc.primaryAccent,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
-            )
-        }
-    }
-}
-
-/** Renders the deck's color identity as real WUBRG mana-symbol icons ([ManaCostImages]) instead of
- * the plain `.symbol` letters -- falls back to the existing "Colorless" copy when empty. */
+/** Renders the deck's color identity as real mana symbols ([ColorIdentitySymbols]); an empty
+ * identity renders the `{C}` colorless symbol, never text. */
 @Composable
 private fun ReviewColorsRow(label: String, colors: Set<ManaColor>) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = ty.bodyMedium, color = mc.textSecondary)
-        if (colors.isEmpty()) {
-            Text(stringResource(R.string.deck_seeds_identity_colorless), style = ty.bodyMedium, color = mc.textPrimary)
-        } else {
-            // ManaColor.symbol is already a bare WUBRG letter ("W"/"U"/...), the exact token shape
-            // ManaSymbolImage/ManaCostImages expects (it maps token -> scryfalls's card-symbols
-            // SVG) -- wrapped in "{}" only to satisfy ManaCostImages' cost-string parser.
-            ManaCostImages(
-                manaCost = colors.sortedBy { it.ordinal }.joinToString(separator = "") { "{${it.symbol}}" },
-                symbolSize = 20.dp,
-                spacing = spacing.xxs,
-            )
-        }
+        ColorIdentitySymbols(colors = colors)
     }
 }

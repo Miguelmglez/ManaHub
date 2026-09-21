@@ -1020,7 +1020,6 @@
     <string name="deck_seeds_search_hint">Search a card to seed your deck…</string>
     <string name="deck_seeds_picked_title">Seed cards</string>
     <string name="deck_seeds_identity_colors">Color identity</string>
-    <string name="deck_seeds_identity_colorless">Colorless</string>
 
     <!-- Deck Studio — unified hybrid deck builder (manual + suggestions + seed auto-build) -->
     <string name="deck_studio_title">Deck Studio</string>
@@ -1178,9 +1177,6 @@
     <!-- Gate 5 audit (design P1): the pill's own TalkBack content description; the visible text
          alone doesn't announce that tapping it opens the seed queue list. -->
     <string name="deck_wizard_seeds_added_pill_a11y">%1$d cards added, opens the list</string>
-    <!-- Gate 5 audit (design P2c): WizardCandidateTile's merged TalkBack description, folding the
-         visible "xN" seed quantity badge into the announcement alongside the card name. -->
-    <string name="deck_wizard_seed_tile_quantity_a11y">%1$s, %2$d copies added</string>
     <string name="deck_wizard_seed_queue_title">Your cards (%1$d)</string>
     <string name="deck_wizard_seed_queue_empty_title">No cards added yet</string>
     <string name="deck_wizard_seed_queue_empty_subtitle">Search above and tap Add to deck.</string>
@@ -1188,7 +1184,6 @@
     <string name="deck_wizard_seed_cap_reached">Your deck can hold %1$d cards</string>
     <string name="deck_wizard_seeds_required">Add at least one card to continue.</string>
     <string name="deck_wizard_strategy_subtitle_seeds">for your %1$d cards</string>
-    <string name="deck_wizard_colorless_chip">Colorless</string>
     <string name="deck_wizard_unsupported_format_toast">The wizard can\'t build this format yet.</string>
     <!-- Step 2 — Direction -->
     <string name="deck_wizard_commander_section_title">Commander</string>
@@ -1294,8 +1289,8 @@
     <!-- Deck Wizard Commander v4 plan (W2.1/W2.2) -->
     <string name="deck_wizard_commander_active_filters">%1$d active filter(s)</string>
     <string name="deck_wizard_commander_clear_filters">Clear filters</string>
-    <string name="deck_wizard_commander_owned_badge">In your collection</string>
     <string name="deck_wizard_strategy_step_title">Pick a strategy</string>
+    <string name="deck_wizard_strategy_owned_count">You own %1$d cards</string>
     <string name="deck_wizard_strategy_step_subtitle">These are the game plans your commander supports best.</string>
     <!-- Deck Wizard Commander v3 plan (Phase 4.2) -->
     <string name="deck_wizard_strategy_step_title_for">Pick a strategy for %1$s</string>
