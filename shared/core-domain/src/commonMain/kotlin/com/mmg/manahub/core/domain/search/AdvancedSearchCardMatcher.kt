@@ -31,6 +31,8 @@ object AdvancedSearchCardMatcher {
      *  substring matching — stripped before every term check, as `StrategyAnalyzer` does. */
     private val reminderTextRegex = Regex("""\([^)]*\)""")
 
+    private val whitespaceRegex = Regex("""\s+""")
+
     /** True when [card] satisfies EVERY criterion of [query] (empty query matches everything). */
     fun matches(
         card: Card,
@@ -68,7 +70,8 @@ object AdvancedSearchCardMatcher {
             card.oracleText?.contains(criterion.value, ignoreCase = true) == true
 
         is SearchCriterion.CardType -> {
-            val check: (String) -> Boolean = { type -> card.typeLine.contains(type, ignoreCase = true) }
+            val lines = paddedTypeLines(card)
+            val check: (String) -> Boolean = { type -> hasWholeType(lines, type) }
             // `exclude` renders as `-t:x` remotely, so it must negate locally too (Deck Analysis
             // curve sections are `mv=N -t:land`); the pre-extraction evaluator ignored the flag and
             // matched exactly the cards it was meant to drop.
@@ -204,6 +207,32 @@ object AdvancedSearchCardMatcher {
         // Each `produces:X` renders as its own clause, so multiple colors are AND'd, not OR'd.
         if (criterion.colors.any { !produced.contains(it.uppercase()) }) return false
         return criterion.minDistinctColors?.let { produced.toSet().size >= it } ?: true
+    }
+
+    /**
+     * True when [type] appears as a whole token sequence in any of [paddedLines] — "Rat" must not
+     * match "Pirate". Same rule as the `search_friend_cards` RPC; multi-word types ("Time Lord")
+     * and hyphenated ones ("Assembly-Worker") match as written.
+     */
+    fun hasWholeType(paddedLines: List<String>, type: String): Boolean {
+        val needle = type.trim().lowercase()
+        if (needle.isEmpty()) return false
+        return paddedLines.any { it.contains(" $needle ") }
+    }
+
+    /** The card's type line plus each face's, normalized and space-padded for [hasWholeType]. */
+    fun paddedTypeLines(card: Card): List<String> =
+        (listOf(card.typeLine) + card.cardFaces.orEmpty().mapNotNull { it.typeLine })
+            .map(::normalizeTypeLine)
+            .distinct()
+
+    private fun normalizeTypeLine(typeLine: String): String {
+        val collapsed = typeLine.lowercase()
+            .replace("—", " ")
+            .replace("//", " ")
+            .replace(whitespaceRegex, " ")
+            .trim()
+        return " $collapsed "
     }
 
     /** Lowercase -> strip parenthesized reminder text -> replace each face name with `~`. */

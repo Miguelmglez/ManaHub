@@ -26,6 +26,8 @@ object FriendCardSearchMapper {
     private val COLOR_LETTERS = listOf("W", "U", "B", "R", "G", "C")
     private val FORMAT_ID = Regex("^[a-z]{2,20}$")
     private val DEFAULTS = FriendCardSearchParams()
+    // Mirrors the RPC's type validation; anything else is rejected server-side with INVALID_ARGUMENT.
+    private val TYPE_TOKEN = Regex("^[A-Za-z][A-Za-z' -]{0,39}$")
     private val WHITESPACE = Regex("\\s+")
 
     /** True when the RPC can evaluate [criterion]; everything else is hidden from the friend sheet. */
@@ -45,9 +47,21 @@ object FriendCardSearchMapper {
         else -> false
     }
 
-    /** [query] with every criterion the RPC cannot evaluate removed. */
+    /** True when the RPC accepts [type] (e.g. "Assembly-Worker", "Time Lord"; not Un-set joke types like "B.O.B."). */
+    fun isValidType(type: String): Boolean = TYPE_TOKEN.matches(type.trim())
+
+    /**
+     * [query] with every criterion the RPC cannot evaluate removed, and card-type criteria reduced
+     * to the types the RPC accepts (a criterion left with no valid type is dropped).
+     */
     fun supportedOnly(query: AdvancedSearchQuery): AdvancedSearchQuery =
-        query.copy(criteria = query.criteria.filter(::isSupported))
+        query.copy(
+            criteria = query.criteria.filter(::isSupported).mapNotNull { criterion ->
+                if (criterion !is SearchCriterion.CardType) return@mapNotNull criterion
+                val valid = criterion.types.filterTo(linkedSetOf(), ::isValidType)
+                if (valid.isEmpty()) null else criterion.copy(types = valid)
+            }
+        )
 
     /** Trimmed, whitespace-collapsed, capped name; empty when shorter than [MIN_NAME_LENGTH]. */
     fun normalizeName(raw: String): String {
@@ -69,10 +83,11 @@ object FriendCardSearchMapper {
         val typesAny = mutableListOf<String>()
         val typesExclude = mutableListOf<String>()
         criteria.filterIsInstance<SearchCriterion.CardType>().forEach { c ->
+            val valid = c.types.filter(::isValidType)
             when {
-                c.exclude -> typesExclude += c.types
-                c.matchAll -> typesAll += c.types
-                else -> typesAny += c.types
+                c.exclude -> typesExclude += valid
+                c.matchAll -> typesAll += valid
+                else -> typesAny += valid
             }
         }
 
