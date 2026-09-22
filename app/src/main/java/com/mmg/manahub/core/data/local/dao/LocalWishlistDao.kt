@@ -109,7 +109,11 @@ interface LocalWishlistDao {
                 language = entry.language,
             )
             if (existing != null) {
-                update(existing.copy(quantity = existing.quantity + entry.quantity, synced = false))
+                // Summed as Long first, like the collection path: an Int overflow here would
+                // write a negative wanted quantity.
+                val merged = (existing.quantity.toLong() + entry.quantity)
+                    .coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+                update(existing.copy(quantity = merged, synced = false))
             } else {
                 insert(entry)
             }

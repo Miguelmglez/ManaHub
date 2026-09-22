@@ -7,7 +7,11 @@ import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.domain.collection.transfer.CollectionFileGateway
 import com.mmg.manahub.core.domain.collection.transfer.FileTooLargeException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.io.IOException
 
@@ -34,16 +38,35 @@ class AndroidCollectionFileGateway(
         val uri = Uri.parse(location)
         val stream = appContext.contentResolver.openInputStream(uri) ?: throw IOException("Cannot open document")
         val out = StringBuilder(reportedSize(uri, maxBytes))
-        stream.use { input ->
-            val metered = MeteredInputStream(input, maxBytes)
-            metered.reader(Charsets.UTF_8).use { reader ->
-                val buffer = CharArray(BUFFER_SIZE)
-                while (true) {
-                    val read = reader.read(buffer)
-                    if (read < 0) break
-                    out.appendRange(buffer, 0, read)
+        try {
+            // A blocking read into another process honours neither the timeout nor cancellation, so
+            // the only way to free the thread is to close the stream from outside it.
+            withTimeout(READ_TIMEOUT_MS) {
+                val closer = launch {
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        runCatching { stream.close() }
+                    }
+                }
+                try {
+                    val metered = MeteredInputStream(stream, maxBytes)
+                    metered.reader(Charsets.UTF_8).use { reader ->
+                        val buffer = CharArray(BUFFER_SIZE)
+                        while (true) {
+                            val read = reader.read(buffer)
+                            if (read < 0) break
+                            out.appendRange(buffer, 0, read)
+                        }
+                    }
+                } finally {
+                    closer.cancel()
                 }
             }
+        } catch (e: TimeoutCancellationException) {
+            throw IOException("Document read timed out", e)
+        } finally {
+            runCatching { stream.close() }
         }
         out.toString()
     }
@@ -115,5 +138,8 @@ class AndroidCollectionFileGateway(
         const val DEFAULT_TEXT_CAPACITY = 64 * 1024
         const val MAX_EXPORTS_KEPT = 5
         const val MAX_EXPORT_AGE_MS = 24L * 60 * 60 * 1000
+
+        /** Generous for the 5 MB ceiling; a provider that has not delivered by then is stalled. */
+        const val READ_TIMEOUT_MS = 45_000L
     }
 }

@@ -181,6 +181,12 @@ class CollectionImportViewModel(
     // ── Parse + resolve ──────────────────────────────────────────────────────
 
     fun onImportText(text: String) {
+        // The byte ceiling is a property of the IMPORT, not of the file path: a paste reaches the
+        // same parser with no gateway in front of it to enforce MAX_FILE_BYTES.
+        if (text.length.toLong() * Char.SIZE_BYTES > MAX_FILE_BYTES) {
+            failImport(ImportSource.PASTE, CollectionImportError.FileTooLarge, "paste_too_large")
+            return
+        }
         startImport(ImportSource.PASTE) { text }
     }
 
@@ -279,7 +285,8 @@ class CollectionImportViewModel(
             failImport(source, CollectionImportError.TooManyLines(MAX_IMPORT_QUEUE_ENTRIES), "queue_full")
             return
         }
-        val clampedCopies = resolution.clampedCopies + merge
+        val clampedCopies = (resolution.clampedCopies.toLong() + merge)
+            .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         if (clampedCopies > 0) crashReporter.log("collection_import_quantity_clamped")
         _uiState.update {
             it.copy(
@@ -303,19 +310,20 @@ class CollectionImportViewModel(
     /**
      * Merges [entries] into the review queue with ONE persisted write: bumping an existing row only
      * adds surplus copies, which removeCommitted keeps. Returns the copies the per-row quantity cap
-     * had to drop, or null when the merge would push the queue past [MAX_IMPORT_QUEUE_ENTRIES].
+     * had to drop (Long: it can exceed Int.MAX_VALUE), or null when the merge would push the queue
+     * past [MAX_IMPORT_QUEUE_ENTRIES].
      */
-    private fun mergeIntoQueue(entries: List<QueuedCard>): Int? {
+    private fun mergeIntoQueue(entries: List<QueuedCard>): Long? {
         val current = queueRepository.queue.value
         if (current.isEmpty()) {
             if (entries.size > MAX_IMPORT_QUEUE_ENTRIES) return null
             queueRepository.addAll(entries)
-            return 0
+            return 0L
         }
         val merged = current.toMutableList()
         val indexByKey = HashMap<String, Int>(merged.size)
         merged.forEachIndexed { i, entry -> indexByKey.putIfAbsent(entry.mergeKey(), i) }
-        var clamped = 0
+        var clamped = 0L
         entries.forEach { entry ->
             val index = indexByKey[entry.mergeKey()]
             if (index == null) {
@@ -324,7 +332,7 @@ class CollectionImportViewModel(
             } else {
                 val wanted = merged[index].quantity.toLong() + entry.quantity
                 val capped = wanted.coerceAtMost(CollectionImportParser.MAX_QUANTITY_PER_LINE.toLong())
-                clamped += (wanted - capped).toInt()
+                clamped += wanted - capped
                 merged[index] = merged[index].copy(quantity = capped.toInt())
             }
         }
