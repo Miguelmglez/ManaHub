@@ -5,8 +5,8 @@ import com.mmg.manahub.core.data.local.PendingInviteStore
 import com.mmg.manahub.core.data.remote.FriendRemoteDataSource
 import com.mmg.manahub.core.data.remote.FriendshipClient
 import com.mmg.manahub.feature.friends.domain.usecase.AcceptInviteUseCase
-import com.mmg.manahub.feature.friends.domain.usecase.GetFriendCollectionUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.GetFriendsUseCase
+import com.mmg.manahub.feature.friends.domain.usecase.SearchFriendCardsUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SearchUserByGameTagUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SendFriendRequestUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
@@ -100,7 +100,7 @@ fun friendsKoinModule(
     // ── Friends-only use cases (each depends only on the bridged FriendRepository). ──
     single { SearchUserByGameTagUseCase(get()) }
     single { SendFriendRequestUseCase(get()) }
-    single { GetFriendCollectionUseCase(get()) }
+    single { SearchFriendCardsUseCase(get()) }
     single { AcceptInviteUseCase(get()) }
     // Consumed cross-module by TradesViewModel (tradesKoinModule) via get() — see KDoc above.
     single { GetFriendsUseCase(get()) }
@@ -125,9 +125,10 @@ fun friendsKoinModule(
         FriendDetailViewModel(
             savedStateHandle = get(),
             friendRepo = get(),
-            getFriendCollectionUseCase = get(),
+            searchFriendCards = get(),
             tradesRepo = get(),
             authRepo = get(),
+            crashReporter = get(),
         )
     }
     viewModel {

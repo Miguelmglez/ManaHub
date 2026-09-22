@@ -115,6 +115,8 @@ fun AdvancedSearchSheet(
     onDismiss: () -> Unit,
     onSearch: (advancedQuery: AdvancedSearchQuery, rawScryfall: String) -> Unit,
     isCollectionMode: Boolean = false,
+    // Friend-list search: only criteria the search_friend_cards RPC can evaluate are offered.
+    friendListMode: Boolean = false,
     getAvailableTags: () -> Set<com.mmg.manahub.core.model.CardTag> = { emptySet() },
     /**
      * The structured query the CALLER currently has applied — its own ViewModel state, not a
@@ -149,6 +151,11 @@ fun AdvancedSearchSheet(
     val ty = MaterialTheme.magicTypography
     val scope = rememberCoroutineScope()
     var canDismiss by remember { mutableStateOf(false) }
+    // The friend-list RPC takes inclusive min/max ranges, which cannot express "not equal".
+    val operatorOptions = remember(friendListMode) {
+        if (friendListMode) ComparisonOperator.entries - ComparisonOperator.NOT_EQUAL
+        else ComparisonOperator.entries
+    }
 
     // Seeds once per open from what the caller has applied, an empty query INCLUDED -- skipping
     // the empty case is what let a filter from an earlier, unrelated open stay live and invisible,
@@ -439,7 +446,7 @@ fun AdvancedSearchSheet(
 
                 // ── Card function ── (works in both Scryfall-search and Collection-filter modes,
                 // same as Card type above — not gated by isCollectionMode)
-                item {
+                if (!friendListMode) item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_function),
                         icon = Icons.Default.Bolt,
@@ -537,7 +544,7 @@ fun AdvancedSearchSheet(
                 // ── Mana production (Suggestions Tab UI Polish plan, W11) ── seeded ONLY from
                 // Deck Analysis's "Browse for X" translation -- no manual picker exists, this is
                 // a read-only summary + a single clear action, rendered only while active.
-                if (uiState.manaProduction != null) {
+                if (uiState.manaProduction != null && !friendListMode) {
                     item {
                         val mp = uiState.manaProduction!!
                         SearchSection(
@@ -575,7 +582,7 @@ fun AdvancedSearchSheet(
                 // term is a curated compile-time constant, not user-editable) -- one clear action
                 // removes the whole criterion. Still a real, structured AdvancedSearchSheet field,
                 // never a raw string in CardSearchSheet's plain search bar (D8's own mandate).
-                if (uiState.oracleTerms != null) {
+                if (uiState.oracleTerms != null && !friendListMode) {
                     item {
                         val terms = uiState.oracleTerms!!
                         SearchSection(
@@ -702,6 +709,7 @@ fun AdvancedSearchSheet(
                         ) {
                             OperatorSelector(
                                 selected = uiState.manaCostOp,
+                                options = operatorOptions,
                                 onSelect = { op -> viewModel.setManaCost(uiState.manaCostValue, op) },
                             )
                             OutlinedTextField(
@@ -903,6 +911,7 @@ fun AdvancedSearchSheet(
                                 )
                                 OperatorSelector(
                                     selected = uiState.powerOp,
+                                    options = operatorOptions,
                                     onSelect = { op -> viewModel.setPower(uiState.powerValue, op) },
                                 )
                                 OutlinedTextField(
@@ -937,6 +946,7 @@ fun AdvancedSearchSheet(
                                 )
                                 OperatorSelector(
                                     selected = uiState.toughnessOp,
+                                    options = operatorOptions,
                                     onSelect = { op -> viewModel.setToughness(uiState.toughnessValue, op) },
                                 )
                                 OutlinedTextField(
@@ -962,7 +972,7 @@ fun AdvancedSearchSheet(
                 }
 
                 // ── Max price ──
-                item {
+                if (!friendListMode) item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_price),
                         icon = Icons.Default.MonetizationOn,
@@ -1249,7 +1259,7 @@ fun AdvancedSearchSheet(
                             }
                         }
                     }
-                } else if (!isCollectionMode) {
+                } else if (!isCollectionMode && !friendListMode) {
                     // Scryfall search mode: uses SearchOrder / SearchDirection from the AdvancedSearchViewModel.
                     item {
                         SearchSection(
@@ -1298,7 +1308,7 @@ fun AdvancedSearchSheet(
             // ── Search / Apply button ───────────────────────────────────────────
             MagicCtaButton(
                 text = stringResource(
-                    if (isCollectionMode) R.string.advsearch_apply_button
+                    if (isCollectionMode || friendListMode) R.string.advsearch_apply_button
                     else R.string.advsearch_search_button
                 ),
                 onClick = {
@@ -1309,7 +1319,7 @@ fun AdvancedSearchSheet(
                     .fillMaxWidth()
                     .padding(16.dp),
                 icon = { Icon(Icons.Default.Search, contentDescription = null) },
-                enabled = if (isCollectionMode) true else uiState.builtQuery.isNotBlank(),
+                enabled = if (isCollectionMode || friendListMode) true else uiState.builtQuery.isNotBlank(),
             )
         }
     }
@@ -1366,7 +1376,7 @@ private fun OperatorSelector(
 private fun magicOutlinedTextFieldColors(mc: com.mmg.manahub.core.ui.theme.MagicColors) =
     OutlinedTextFieldDefaults.colors(
         focusedBorderColor = mc.primaryAccent,
-        unfocusedBorderColor = mc.surfaceVariant,
+        unfocusedBorderColor = mc.textDisabled,
         cursorColor = mc.primaryAccent,
         focusedTextColor = mc.textPrimary,
         unfocusedTextColor = mc.textPrimary,

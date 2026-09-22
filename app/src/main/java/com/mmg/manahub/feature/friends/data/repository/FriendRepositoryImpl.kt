@@ -18,11 +18,18 @@ import com.mmg.manahub.core.model.AcceptInviteResult
 import com.mmg.manahub.core.model.FolderFilters
 import com.mmg.manahub.core.model.Friend
 import com.mmg.manahub.core.model.FriendCard
+import com.mmg.manahub.core.model.FriendCardCursor
+import com.mmg.manahub.core.model.FriendCardPage
+import com.mmg.manahub.core.model.FriendCardSearchParams
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.withMetadata
 import com.mmg.manahub.core.model.FriendMatchHistory
 import com.mmg.manahub.core.model.FriendRequest
 import com.mmg.manahub.core.model.FriendStats
 import com.mmg.manahub.core.model.OutgoingFriendRequest
 import com.mmg.manahub.core.domain.repository.FriendRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock
@@ -233,6 +240,89 @@ class FriendRepositoryImpl(
         }
     }
 
+    override suspend fun searchFriendCards(
+        friendUserId: String,
+        list: String,
+        params: FriendCardSearchParams,
+        cursor: FriendCardCursor?,
+        limit: Int,
+    ): Result<FriendCardPage> = try {
+        val rows = remote.searchFriendCards(friendUserId, list, params, cursor, limit)
+        val distinctIds = rows.map { it.scryfallId }.distinct()
+        // Room-only: the Scryfall warm can stall for a whole 429 cooldown, so it runs later, off the page path.
+        val cardsById = if (distinctIds.isEmpty()) emptyMap()
+        else cardRepo.getCardsByIds(distinctIds).associateBy { it.scryfallId }
+
+        val cards = rows.map { row ->
+            val base = FriendCard(
+                sourceList = row.sourceList,
+                scryfallId = row.scryfallId,
+                name = row.cardName.orEmpty(),
+                imageNormal = null,
+                imageArtCrop = null,
+                setCode = row.setCode,
+                setName = null,
+                rarity = row.rarity,
+                priceEur = null,
+                priceUsd = null,
+                priceEurFoil = null,
+                priceUsdFoil = null,
+                quantity = row.quantity,
+                isFoil = row.isFoil,
+                isStale = false,
+                condition = row.condition,
+                language = row.language,
+                rowId = row.rowId,
+            )
+            cardsById[row.scryfallId]?.let(base::withMetadata) ?: base
+        }
+        val unresolved = distinctIds.filterNot { it in cardsById }.toSet()
+        if (unresolved.isNotEmpty()) crashReporter.log("friend_cards_search_local_cache_miss_rows count=${unresolved.size}")
+
+        val last = rows.lastOrNull()
+        val hasMore = last?.hasMore == true
+        Result.success(
+            FriendCardPage(
+                cards = cards,
+                nextCursor = if (hasMore && last != null) FriendCardCursor(last.sortKey, last.rowId) else null,
+                hasMore = hasMore,
+                unindexedCount = rows.firstOrNull()?.unindexedCount ?: 0,
+                unresolvedIds = unresolved,
+            )
+        )
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    override suspend fun getFriendListUnindexedCount(friendUserId: String, list: String): Result<Int> = try {
+        Result.success(remote.friendListUnindexedCount(friendUserId, list))
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    override suspend fun hydrateFriendCardMetadata(scryfallIds: List<String>): Map<String, Card> {
+        if (scryfallIds.isEmpty()) return emptyMap()
+        try {
+            withTimeoutOrNull(HYDRATION_WARM_TIMEOUT_MS) { cardRepo.warmCacheForIds(scryfallIds) }
+                ?: crashReporter.log("friend_cards_hydration_warm_timeout count=${scryfallIds.size}")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            crashReporter.log("friend_cards_hydration_warm_failed")
+        }
+        return try {
+            cardRepo.getCardsByIds(scryfallIds).associateBy { it.scryfallId }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
     override suspend fun getFriendStats(friendUserId: String): Result<FriendStats?> =
         runCatching {
             remote.getFriendStats(friendUserId)?.toDomain()
@@ -303,4 +393,8 @@ class FriendRepositoryImpl(
 
     private fun OutgoingRequestWithProfile.toEntity() =
         OutgoingFriendRequestEntity(id, toUserId, toNickname, toGameTag, toAvatarUrl, createdAt)
+
+    private companion object {
+        const val HYDRATION_WARM_TIMEOUT_MS = 15_000L
+    }
 }

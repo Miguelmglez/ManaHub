@@ -1,9 +1,13 @@
 package com.mmg.manahub.core.domain.repository
 
 import com.mmg.manahub.core.model.AcceptInviteResult
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.FolderFilters
 import com.mmg.manahub.core.model.Friend
 import com.mmg.manahub.core.model.FriendCard
+import com.mmg.manahub.core.model.FriendCardCursor
+import com.mmg.manahub.core.model.FriendCardPage
+import com.mmg.manahub.core.model.FriendCardSearchParams
 import com.mmg.manahub.core.model.FriendMatchHistory
 import com.mmg.manahub.core.model.FriendRequest
 import com.mmg.manahub.core.model.FriendStats
@@ -60,6 +64,30 @@ interface FriendRepository {
         limit: Int = 50,
         offset: Int = 0,
     ): Result<List<FriendCard>>
+
+    /**
+     * One keyset page of the `search_friend_cards` RPC. Failures carry a
+     * [com.mmg.manahub.core.model.FriendCardSearchException]. Rows the local card cache cannot
+     * resolve are still returned, built from the server's name/set/rarity.
+     */
+    // Default keeps implementations without the RPC (the web repository) compiling until they adopt it.
+    suspend fun searchFriendCards(
+        friendUserId: String,
+        list: String,
+        params: FriendCardSearchParams,
+        cursor: FriendCardCursor?,
+        limit: Int,
+    ): Result<FriendCardPage> = Result.failure(UnsupportedOperationException("searchFriendCards"))
+
+    /** Rows of the friend's [list] whose metadata the server has not indexed yet (`friend_list_unindexed_count`). */
+    suspend fun getFriendListUnindexedCount(friendUserId: String, list: String): Result<Int> =
+        Result.failure(UnsupportedOperationException("getFriendListUnindexedCount"))
+
+    /**
+     * Best-effort, single-batch fetch of card metadata missing from the local cache; returns what
+     * the cache can resolve afterwards (possibly nothing).
+     */
+    suspend fun hydrateFriendCardMetadata(scryfallIds: List<String>): Map<String, Card> = emptyMap()
 
     /**
      * Fetches the collection stats snapshot for [friendUserId] from `user_collection_stats`.

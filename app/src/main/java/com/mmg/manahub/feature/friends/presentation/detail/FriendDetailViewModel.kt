@@ -3,19 +3,28 @@ package com.mmg.manahub.feature.friends.presentation.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.model.Condition
-import com.mmg.manahub.core.model.FolderFilters
-import com.mmg.manahub.core.ui.components.MagicToastType
-import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.common.CrashReporter
+import com.mmg.manahub.core.data.repository.TradesRepository
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.core.domain.search.FriendCardSearchMapper
+import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.Friend
 import com.mmg.manahub.core.model.FriendCard
+import com.mmg.manahub.core.model.FriendCardCursor
+import com.mmg.manahub.core.model.FriendCardSearchException
+import com.mmg.manahub.core.model.FriendCardSearchParams
 import com.mmg.manahub.core.model.FriendMatchHistory
 import com.mmg.manahub.core.model.FriendStats
-import com.mmg.manahub.core.domain.repository.FriendRepository
-import com.mmg.manahub.feature.friends.domain.usecase.GetFriendCollectionUseCase
+import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.TradeProposal
-import com.mmg.manahub.core.data.repository.TradesRepository
+import com.mmg.manahub.core.model.withMetadata
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.feature.friends.domain.usecase.SearchFriendCardsUseCase
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,39 +43,43 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ComparableTimeMark
+import kotlin.time.TimeSource
 
 /** Top-level tabs displayed on the friend detail screen. */
 enum class FriendTab { FOLDER, STATS, HISTORY }
 
-/**
- * Sub-tabs within the Folder tab.
- *
- * [listValue] corresponds to the `p_list` parameter accepted by the `get_friend_collection` RPC.
- */
+/** Sub-tabs within the Folder tab; [listValue] is the RPC's `p_list`. */
 enum class FolderSubTab(val listValue: String) {
     COLLECTION("collection"),
     WISHLIST("wishlist"),
     TRADE("trade"),
 }
 
+/** Why the Folder tab's card list could not be shown. */
+enum class FolderCardsError {
+    ACCESS_DENIED,
+    NETWORK,
+    GENERIC,
+    /** Terminal until the user signs in again; no retry is offered. */
+    SESSION_EXPIRED,
+    /** Terminal until the viewer completes their own profile; no retry is offered. */
+    PROFILE_INCOMPLETE,
+}
+
 /**
- * ViewModel for the friend detail screen.
- *
- * Reads the friend's auth UUID from [SavedStateHandle] under key `"userId"`, looks up
- * the matching [Friend] domain model from the local friends cache, and reactively
- * loads card lists whenever the selected sub-tab or search query changes.
- *
- * KMP migration — Phase 1 Hilt→Koin cutover: this VM is resolved by Koin (`koinViewModel()`) via
- * [com.mmg.manahub.feature.friends.di.friendsKoinModule]. Its `savedStateHandle` is the Koin-injected
- * [SavedStateHandle] (`savedStateHandle = get()`), which carries the `"userId"` nav arg exactly as the
- * Hilt-injected one did — so nav-arg behaviour is unchanged.
+ * Friend detail screen: profile header, the friend's searchable card lists, stats and history.
+ * Reads the friend's auth UUID from the `"userId"` nav arg.
  */
 class FriendDetailViewModel(
     savedStateHandle: SavedStateHandle,
     private val friendRepo: FriendRepository,
-    private val getFriendCollectionUseCase: GetFriendCollectionUseCase,
+    private val searchFriendCards: SearchFriendCardsUseCase,
     private val tradesRepo: TradesRepository,
     private val authRepo: AuthRepository,
+    private val crashReporter: CrashReporter,
+    private val timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
 ) : ViewModel() {
 
     /** UI state for the friend detail screen. */
@@ -75,57 +88,81 @@ class FriendDetailViewModel(
         val isLoadingFriend: Boolean = true,
         val selectedTab: FriendTab = FriendTab.FOLDER,
         val folderSubTab: FolderSubTab = FolderSubTab.COLLECTION,
-        val searchQuery: String = "",
-        val filters: FolderFilters = FolderFilters(),
+        /** Raw search-bar text, exactly as typed. */
+        val searchText: String = "",
+        val nameExact: Boolean = false,
+        /** Applied Advanced Search criteria, excluding the name (which lives in [searchText]). */
+        val advancedQuery: AdvancedSearchQuery = AdvancedSearchQuery(),
         val cards: List<FriendCard> = emptyList(),
+        /** True while the first page of a new request is in flight; [cards] may still hold the previous results. */
         val isLoadingCards: Boolean = false,
-        /** True while the next page of cards is being fetched (pagination). */
         val isLoadingMore: Boolean = false,
-        /** True when there are more server pages to fetch for the current list. */
         val hasMoreCards: Boolean = false,
-        /** True when the last card fetch resulted in an error (access denied or network). */
-        val cardError: Boolean = false,
+        val loadMoreFailed: Boolean = false,
+        val cardsError: FolderCardsError? = null,
+        /** Whether the shown [cards] came from a filtered request (drives the empty-state copy). */
+        val resultsFiltered: Boolean = false,
+        /** Bumped on every NEW first page (never on append); the list scrolls to top when it changes. */
+        val resultsVersion: Int = 0,
+        /** Rows of the list the server could not evaluate against the active filters yet. */
+        val unindexedCount: Int = 0,
         val toastMessage: String? = null,
         val toastType: MagicToastType = MagicToastType.ERROR,
-        /** Completed and terminal trade proposals shared between me and this friend. */
         val tradeHistory: List<TradeProposal> = emptyList(),
-        /** Friend's collection statistics snapshot; null until loaded or if unavailable. */
         val friendStats: FriendStats? = null,
-        /** True while the stats request is in flight. */
         val isLoadingStats: Boolean = false,
-        /** True when the last stats fetch resulted in a network or server error. */
         val statsError: Boolean = false,
-        /** Aggregate match history vs this friend; null until loaded. */
         val gameHistory: FriendMatchHistory? = null,
-        /** True while the match history request is in flight. */
         val isLoadingGameHistory: Boolean = false,
-        /** True when the last match history fetch resulted in a network or server error. */
         val gameHistoryError: Boolean = false,
-    )
+    ) {
+        private val hasEffectiveName: Boolean
+            get() = FriendCardSearchMapper.normalizeName(searchText).isNotEmpty()
 
-    private companion object {
-        const val PAGE_SIZE = 50
-        // When a search query is active, client-side name filtering makes server-side
-        // pagination unreliable. Load a generous batch so results feel immediate.
-        const val SEARCH_LIMIT = 500
+        /** Badge count: applied criteria plus the exact-name flag when it is in effect. */
+        val activeCriteriaCount: Int
+            get() = advancedQuery.criteria.size + if (nameExact && hasEffectiveName) 1 else 0
+
+        /** The typed text is too short to be sent as a name filter. */
+        val showMinLengthHint: Boolean
+            get() = searchText.isNotBlank() && !hasEffectiveName
+
+        val hasAnySearch: Boolean
+            get() = searchText.isNotBlank() || advancedQuery.criteria.isNotEmpty()
+
+        /** What the Advanced Search sheet is seeded with: the criteria plus the search-bar name. */
+        val sheetQuery: AdvancedSearchQuery
+            get() {
+                val name = searchText.trim()
+                if (name.isEmpty()) return advancedQuery
+                return advancedQuery.copy(criteria = listOf(SearchCriterion.Name(name, nameExact)) + advancedQuery.criteria)
+            }
     }
 
     /** One-shot events emitted to the UI layer. */
     sealed interface UiEvent {
-        /** Signals that the screen should close and return to the friends list. */
         object NavigateBack : UiEvent
     }
 
+    private data class SearchInput(
+        val list: FolderSubTab = FolderSubTab.COLLECTION,
+        val text: String = "",
+        val nameExact: Boolean = false,
+        val query: AdvancedSearchQuery = AdvancedSearchQuery(),
+        val delayMs: Long = 0L,
+    )
+
+    private data class SearchRequest(val list: FolderSubTab, val params: FriendCardSearchParams)
+
+    private data class CachedResult(
+        val cards: List<FriendCard>,
+        val cursor: FriendCardCursor?,
+        val hasMore: Boolean,
+        val unindexedCount: Int,
+        val loadedAt: ComparableTimeMark,
+    )
+
     private val friendUserId: String = savedStateHandle["userId"] ?: ""
-
-    // Tracks the server-side row offset for "load more". Reset to 0 on every
-    // new query/sub-tab so pagination always starts from page 1.
-    private var serverOffset = 0
-
-    // Incremented each time the FOLDER tab is (re-)entered to force the reactive
-    // pipeline to re-fetch even when subTab/query/filters have not changed.
-    // This token is never exposed in UiState because it carries no display meaning.
-    private val _folderRefreshToken = MutableStateFlow(0)
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -133,9 +170,20 @@ class FriendDetailViewModel(
     private val _events = Channel<UiEvent>(Channel.BUFFERED)
     val events: Flow<UiEvent> = _events.receiveAsFlow()
 
+    // The list lives in the same input as the text so a list switch during a pending typing debounce fires once.
+    private val searchInput = MutableStateFlow(SearchInput())
+    private val reloadToken = MutableStateFlow(0)
+
+    // Main-thread confined: every mutation happens on viewModelScope's Main dispatcher.
+    private var generation = 0
+    private var currentRequest: SearchRequest? = null
+    private var currentCursor: FriendCardCursor? = null
+    private var loadMoreJob: Job? = null
+    private val resultCache = LinkedHashMap<SearchRequest, CachedResult>()
+    private val attemptedHydrationIds = mutableSetOf<String>()
+
     init {
         if (friendUserId.isBlank()) {
-            // Guard: a blank userId means navigation passed a malformed argument.
             viewModelScope.launch { _events.send(UiEvent.NavigateBack) }
         } else {
             setup()
@@ -143,13 +191,10 @@ class FriendDetailViewModel(
     }
 
     private fun setup() {
-        // Observe the local friends cache and find the matching Friend by userId.
         friendRepo.observeFriends()
             .onEach { friends ->
                 val found = friends.firstOrNull { it.userId == friendUserId }
-                // If we had a loaded friend and they no longer appear in the list (removed
-                // externally by the remote peer), navigate back rather than leaving the user
-                // on a blank detail screen.
+                // Removed externally by the peer: leave instead of showing a blank screen.
                 val hadFriend = !_uiState.value.isLoadingFriend && _uiState.value.friend != null
                 if (found == null && hadFriend) {
                     _events.send(UiEvent.NavigateBack)
@@ -158,8 +203,6 @@ class FriendDetailViewModel(
             }
             .launchIn(viewModelScope)
 
-        // Fetch trades from the backend so the cache is populated when this screen opens.
-        // The cache may be empty if the user has not visited the trades section yet.
         viewModelScope.launch {
             val myUserId = authRepo.sessionState
                 .mapNotNull { (it as? SessionState.Authenticated)?.user?.id }
@@ -167,10 +210,6 @@ class FriendDetailViewModel(
             tradesRepo.refreshProposals(myUserId)
         }
 
-        // Observe trade history shared between the current user and this friend.
-        // Uses sessionState in the combine so no suspend call blocks the init path,
-        // and the filter remains live even if the user logs out and back in.
-        @Suppress("OPT_IN_USAGE")
         combine(
             tradesRepo.observeAllProposals(),
             _uiState.map { it.friend?.userId }.distinctUntilChanged(),
@@ -192,147 +231,221 @@ class FriendDetailViewModel(
             .onEach { filtered -> _uiState.update { it.copy(tradeHistory = filtered) } }
             .launchIn(viewModelScope)
 
-        // Reactively reload cards whenever the sub-tab, search query, filters, or the
-        // folder refresh token changes. The refresh token is bumped each time the FOLDER
-        // tab is (re-)entered, ensuring a re-fetch even when the other three values are
-        // unchanged (which would otherwise be swallowed by distinctUntilChanged).
-        //
-        // isLoadingCards is set immediately in onEach (before the debounce) so the loading
-        // indicator appears without the 300 ms jitter of the old emit(null) pattern.
-        // Pagination resets on every new combination.
-        @Suppress("OPT_IN_USAGE") // flatMapLatest is stable in kotlinx.coroutines
-        combine(
-            _uiState.map { it.folderSubTab }.distinctUntilChanged(),
-            _uiState.map { it.searchQuery }.distinctUntilChanged(),
-            _uiState.map { it.filters }.distinctUntilChanged(),
-            _folderRefreshToken,
-        ) { subTab, query, filters, _ -> Triple(subTab, query, filters) }
-            .onEach {
-                _uiState.update {
-                    it.copy(
-                        isLoadingCards = true,
-                        cardError = false,
-                        cards = emptyList(),
-                        hasMoreCards = false,
-                        isLoadingMore = false,
-                    )
-                }
-            }
-            .debounce(300L)
-            .flatMapLatest { (subTab, query, filters) ->
-                flow {
-                    serverOffset = 0
-                    val limit = if (query.isBlank()) PAGE_SIZE else SEARCH_LIMIT
-                    emit(getFriendCollectionUseCase(friendUserId, subTab.listValue, query, filters, limit, 0) to query.isBlank())
-                }
-            }
-            .onEach { (result, isPaginated) ->
-                val cards = result.getOrDefault(emptyList())
-                if (result.isSuccess) serverOffset = if (isPaginated) PAGE_SIZE else SEARCH_LIMIT
-                _uiState.update {
-                    it.copy(
-                        cards = cards,
-                        isLoadingCards = false,
-                        isLoadingMore = false,
-                        cardError = result.isFailure,
-                        hasMoreCards = isPaginated && cards.size >= PAGE_SIZE,
-                    )
-                }
-            }
+        observeCardRequests()
+    }
+
+    @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
+    private fun observeCardRequests() {
+        val requests = searchInput
+            .debounce { it.delayMs }
+            .map { SearchRequest(it.list, FriendCardSearchMapper.toParams(it.text, it.nameExact, it.query)) }
+        combine(requests, reloadToken) { request, token -> request to token }
+            // Whitespace-only edits and 1-char text normalize to the same params and never reach the server.
+            .distinctUntilChanged()
+            .flatMapLatest { (request, _) -> flow<Unit> { loadFirstPage(request) } }
             .launchIn(viewModelScope)
     }
 
-    /**
-     * Fetches the next page of cards and appends them to [UiState.cards].
-     *
-     * No-op when already loading, no more pages exist, or a search query is active
-     * (search loads a single large batch — pagination doesn't compose with client-side
-     * name filtering).
-     */
-    fun loadMoreCards() {
-        val state = _uiState.value
-        if (state.isLoadingMore || state.isLoadingCards || !state.hasMoreCards) return
-        if (state.searchQuery.isNotBlank()) return
-        val subTab = state.folderSubTab
-        val offset = serverOffset
-        val filters = state.filters
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingMore = true) }
-            val result = getFriendCollectionUseCase(friendUserId, subTab.listValue, "", filters, PAGE_SIZE, offset)
-            result.onSuccess { newCards ->
-                serverOffset += PAGE_SIZE
+    private suspend fun loadFirstPage(request: SearchRequest) {
+        val gen = ++generation
+        loadMoreJob?.cancel()
+        loadMoreJob = null
+        val listChanged = currentRequest?.list != request.list
+        currentRequest = request
+        currentCursor = null
+        val filtered = !request.params.isEmpty()
+
+        freshCacheEntry(request)?.let { hit ->
+            currentCursor = hit.cursor
+            _uiState.update {
+                it.copy(
+                    cards = hit.cards,
+                    hasMoreCards = hit.hasMore,
+                    isLoadingCards = false,
+                    isLoadingMore = false,
+                    loadMoreFailed = false,
+                    cardsError = null,
+                    resultsFiltered = filtered,
+                    resultsVersion = it.resultsVersion + 1,
+                    unindexedCount = hit.unindexedCount,
+                )
+            }
+            return
+        }
+
+        // A new query keeps the old results on screen (dimmed); a new list must not show another list's cards.
+        _uiState.update {
+            it.copy(
+                cards = if (listChanged) emptyList() else it.cards,
+                isLoadingCards = true,
+                isLoadingMore = false,
+                hasMoreCards = false,
+                loadMoreFailed = false,
+                cardsError = null,
+            )
+        }
+        reportSubmit(request)
+        val result = searchFriendCards(friendUserId, request.list.listValue, request.params, null, PAGE_SIZE)
+        if (gen != generation) return
+
+        result.fold(
+            onSuccess = { page ->
+                // The row-level count only exists when rows came back; an empty filtered page asks for it.
+                val unindexed = if (filtered && page.cards.isEmpty()) fetchUnindexedCount(request) else page.unindexedCount
+                if (gen != generation) return
+                currentCursor = page.nextCursor
+                putCache(request, CachedResult(page.cards, page.nextCursor, page.hasMore, unindexed, timeSource.markNow()))
+                crashReporter.log(if (page.cards.isEmpty()) "friend_cards_search_result_empty" else "friend_cards_search_result")
                 _uiState.update {
                     it.copy(
-                        cards = it.cards + newCards,
-                        isLoadingMore = false,
-                        hasMoreCards = newCards.size >= PAGE_SIZE,
+                        cards = page.cards,
+                        hasMoreCards = page.hasMore,
+                        isLoadingCards = false,
+                        cardsError = null,
+                        resultsFiltered = filtered,
+                        resultsVersion = it.resultsVersion + 1,
+                        unindexedCount = unindexed,
                     )
                 }
-            }
-            result.onFailure {
-                _uiState.update { it.copy(isLoadingMore = false) }
-            }
+                hydrateInBackground(page.unresolvedIds)
+            },
+            onFailure = { e ->
+                val error = reportFailure(e, "friend_cards_search_error")
+                _uiState.update {
+                    it.copy(cards = emptyList(), hasMoreCards = false, isLoadingCards = false, cardsError = error)
+                }
+            },
+        )
+    }
+
+    /** Fetches the next keyset page; no-op unless a further page exists and nothing is in flight. */
+    fun loadMoreCards() {
+        val state = _uiState.value
+        if (state.isLoadingCards || state.isLoadingMore || !state.hasMoreCards || state.loadMoreFailed) return
+        if (loadMoreJob?.isActive == true) return
+        val request = currentRequest ?: return
+        val cursor = currentCursor ?: return
+        val gen = generation
+
+        loadMoreJob = viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMore = true) }
+            crashReporter.log("friend_cards_search_load_more")
+            val result = searchFriendCards(friendUserId, request.list.listValue, request.params, cursor, PAGE_SIZE)
+            // A newer request superseded this page; its rows belong to a list/query no longer shown.
+            if (gen != generation) return@launch
+            result.fold(
+                onSuccess = { page ->
+                    currentCursor = page.nextCursor
+                    val merged = (_uiState.value.cards + page.cards).dedupedByRow()
+                    resultCache[request]?.let { entry ->
+                        resultCache[request] = entry.copy(
+                            cards = (entry.cards + page.cards).dedupedByRow(),
+                            cursor = page.nextCursor,
+                            hasMore = page.hasMore,
+                        )
+                    }
+                    _uiState.update {
+                        it.copy(cards = merged, hasMoreCards = page.hasMore, isLoadingMore = false)
+                    }
+                    hydrateInBackground(page.unresolvedIds)
+                },
+                onFailure = { e ->
+                    val error = reportFailure(e, "friend_cards_search_load_more_error")
+                    _uiState.update {
+                        if (error.isTerminal()) {
+                            it.copy(cards = emptyList(), hasMoreCards = false, isLoadingMore = false, cardsError = error)
+                        } else {
+                            it.copy(isLoadingMore = false, loadMoreFailed = true)
+                        }
+                    }
+                },
+            )
         }
     }
 
+    /** Retries a failed next-page fetch (never retried automatically, to avoid a request loop). */
+    fun retryLoadMore() {
+        _uiState.update { it.copy(loadMoreFailed = false) }
+        loadMoreCards()
+    }
+
+    /** Re-runs the current request, bypassing the result cache. */
+    fun retryCards() {
+        currentRequest?.let(resultCache::remove)
+        reloadToken.value++
+    }
+
+    /** Free-text edit; debounced unless the field was cleared. */
+    fun onSearchQueryChange(text: String) {
+        val delay = if (text.isBlank()) CHANGE_DEBOUNCE_MS else TYPING_DEBOUNCE_MS
+        updateSearch(delay) { it.copy(text = text, nameExact = it.nameExact && text.isNotBlank()) }
+    }
+
+    /** IME Search action: submits the current text with no debounce at all. */
+    fun onSearchSubmit() {
+        updateSearch(0L) { it }
+    }
+
+    fun clearSearchText() {
+        updateSearch(CHANGE_DEBOUNCE_MS) { it.copy(text = "", nameExact = false) }
+    }
+
+    /** Applies the sheet's result: its Name moves into the search bar, unsupported criteria are dropped. */
+    fun applyAdvancedSearch(query: AdvancedSearchQuery) {
+        val supported = FriendCardSearchMapper.supportedOnly(query)
+        val name = supported.criteria.filterIsInstance<SearchCriterion.Name>().firstOrNull()
+        val rest = supported.copy(criteria = supported.criteria.filterNot { it is SearchCriterion.Name })
+        crashReporter.log("friend_cards_advanced_search_apply")
+        updateSearch(CHANGE_DEBOUNCE_MS) {
+            it.copy(text = name?.value.orEmpty(), nameExact = name?.exact ?: false, query = rest)
+        }
+    }
+
+    fun removeCriterion(criterion: SearchCriterion) {
+        updateSearch(CHANGE_DEBOUNCE_MS) { it.copy(query = it.query.copy(criteria = it.query.criteria - criterion)) }
+    }
+
+    fun clearNameExact() {
+        updateSearch(CHANGE_DEBOUNCE_MS) { it.copy(nameExact = false) }
+    }
+
+    /** Clears the text, the exact flag and every criterion. */
+    fun clearSearch() {
+        updateSearch(CHANGE_DEBOUNCE_MS) { SearchInput(list = it.list) }
+    }
+
+    private fun updateSearch(delayMs: Long, transform: (SearchInput) -> SearchInput) {
+        val next = transform(searchInput.value).copy(delayMs = delayMs)
+        _uiState.update {
+            it.copy(folderSubTab = next.list, searchText = next.text, nameExact = next.nameExact, advancedQuery = next.query)
+        }
+        searchInput.value = next
+    }
+
     /**
-     * Switches the active top-level tab.
-     *
-     * - Switching back to [FriendTab.FOLDER] resets the search query and bumps the
-     *   [_folderRefreshToken] so the reactive pipeline triggers a fresh fetch even when
-     *   subTab/query/filters are already at their default values. Cards are NOT cleared
-     *   here; the pipeline's onEach clears them once it wakes up, keeping [UiState.isLoadingCards]
-     *   and the card list in sync and avoiding a transient empty-state flash.
-     * - Switching to [FriendTab.STATS] triggers a lazy load if stats have not been fetched yet.
+     * Switches the top-level tab. The search is kept across tabs so returning to Folder restores
+     * what the user typed; re-entry re-runs the request, which the result cache serves while fresh.
      */
     fun selectTab(tab: FriendTab) {
-        _uiState.update { state ->
-            when {
-                tab == FriendTab.FOLDER && state.selectedTab != FriendTab.FOLDER ->
-                    state.copy(selectedTab = tab, searchQuery = "")
-                else -> state.copy(selectedTab = tab)
-            }
-        }
-        if (tab == FriendTab.FOLDER) {
-            // Bump the token to guarantee the pipeline fires even if query/subTab/filters
-            // did not change (distinctUntilChanged would suppress the emission otherwise).
-            // This covers both the re-entry case (coming from STATS/HISTORY) and the case
-            // where the user taps FOLDER while already on FOLDER (acts as a manual refresh).
-            _folderRefreshToken.value++
-        }
+        val previous = _uiState.value.selectedTab
+        _uiState.update { it.copy(selectedTab = tab) }
+        if (tab == FriendTab.FOLDER && previous != FriendTab.FOLDER) reloadToken.value++
         if (tab == FriendTab.STATS) {
             val current = _uiState.value
             if (current.friendStats == null && !current.isLoadingStats && !current.statsError) {
                 loadStats()
             }
         }
-        if (tab == FriendTab.HISTORY) {
-            // val current = _uiState.value
-            // if (current.gameHistory == null && !current.isLoadingGameHistory && !current.gameHistoryError) {
-            //    loadGameHistory()
-            // }
-        }
     }
 
-    /**
-     * Retries loading the friend's stats after a previous failure.
-     * Exposed to the UI as an onClick handler for the retry button.
-     */
     fun retryStats() {
         loadStats()
     }
 
-    /** Retries loading the match history after a previous failure. */
     fun retryGameHistory() {
         loadGameHistory()
     }
 
-    /**
-     * Fetches the friend's collection stats from the repository and updates [UiState].
-     *
-     * Sets [UiState.isLoadingStats] while the request is in flight and surfaces any failure
-     * via [UiState.statsError]. On success populates [UiState.friendStats].
-     */
     private fun loadStats() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingStats = true, statsError = false) }
@@ -361,50 +474,13 @@ class FriendDetailViewModel(
         }
     }
 
-    /** Switches the active sub-tab inside the Folder tab. */
+    /** Switches the list; the current search is kept and re-run against the new list. */
     fun selectFolderSubTab(subTab: FolderSubTab) {
-        _uiState.update { it.copy(folderSubTab = subTab) }
-    }
-
-    /** Updates the search query; card reload is debounced in the reactive pipeline. */
-    fun onSearchQueryChange(query: String) {
-        _uiState.update { it.copy(searchQuery = query) }
-    }
-
-    fun toggleFilter(
-        sets: Set<String>? = null,
-        rarities: Set<com.mmg.manahub.core.model.Rarity>? = null,
-        colors: Set<com.mmg.manahub.core.model.MtgColor>? = null,
-        foilOnly: Boolean? = null,
-        conditions: Set<Condition>? = null,
-        languages: Set<String>? = null,
-    ) {
-        _uiState.update { state ->
-            val current = state.filters
-            state.copy(
-                filters = current.copy(
-                    sets = sets ?: current.sets,
-                    rarities = rarities ?: current.rarities,
-                    colors = colors ?: current.colors,
-                    foilOnly = foilOnly ?: current.foilOnly,
-                    conditions = conditions ?: current.conditions,
-                    languages = languages ?: current.languages,
-                )
-            )
-        }
-    }
-
-    fun clearFilters() {
-        _uiState.update { it.copy(filters = FolderFilters()) }
+        updateSearch(CHANGE_DEBOUNCE_MS) { it.copy(list = subTab) }
     }
 
     /**
-     * Removes the current friend using their friendship ID.
-     *
-     * On success emits [UiEvent.NavigateBack] so the screen pops itself.
-     * On failure shows a toast with [errorMsg].
-     *
-     * @param errorMsg Localised error string resolved by the composable layer.
+     * Removes the current friend; on success navigates back, on failure shows [errorMsg].
      */
     fun removeFriend(errorMsg: String) {
         val friendshipId = _uiState.value.friend?.id ?: return
@@ -420,8 +496,89 @@ class FriendDetailViewModel(
         }
     }
 
-    /** Clears the current toast so it does not re-appear after recomposition. */
     fun clearToast() {
         _uiState.update { it.copy(toastMessage = null, toastType = MagicToastType.ERROR) }
+    }
+
+    private suspend fun fetchUnindexedCount(request: SearchRequest): Int =
+        searchFriendCards.unindexedCount(friendUserId, request.list.listValue).getOrElse {
+            crashReporter.log("friend_cards_unindexed_count_error")
+            0
+        }
+
+    // At most one warm per page, and an id is never re-warmed in this session (no Scryfall storm).
+    private fun hydrateInBackground(ids: Set<String>) {
+        val toWarm = ids - attemptedHydrationIds
+        if (toWarm.isEmpty()) return
+        attemptedHydrationIds += toWarm
+        viewModelScope.launch {
+            val resolved = searchFriendCards.hydrateMetadata(toWarm.toList())
+            if (resolved.isEmpty()) return@launch
+            val patch: (FriendCard) -> FriendCard = { card -> resolved[card.scryfallId]?.let(card::withMetadata) ?: card }
+            _uiState.update { it.copy(cards = it.cards.map(patch)) }
+            resultCache.replaceAll { _, entry -> entry.copy(cards = entry.cards.map(patch)) }
+        }
+    }
+
+    // Hydration mid-pagination can move a row between sort groups; drop any row already shown.
+    private fun List<FriendCard>.dedupedByRow(): List<FriendCard> = distinctBy { it.rowId ?: it }
+
+    private fun FolderCardsError.isTerminal(): Boolean =
+        this == FolderCardsError.SESSION_EXPIRED || this == FolderCardsError.PROFILE_INCOMPLETE
+
+    private fun freshCacheEntry(request: SearchRequest): CachedResult? {
+        val entry = resultCache[request] ?: return null
+        if (entry.loadedAt.elapsedNow() > CACHE_TTL) {
+            resultCache.remove(request)
+            return null
+        }
+        return entry
+    }
+
+    private fun putCache(request: SearchRequest, result: CachedResult) {
+        resultCache.remove(request)
+        resultCache[request] = result
+        while (resultCache.size > CACHE_MAX_ENTRIES) resultCache.remove(resultCache.keys.first())
+    }
+
+    // Query length and counts only: the raw text and the friend id never leave the device.
+    private fun reportSubmit(request: SearchRequest) {
+        crashReporter.setCustomKey(KEY_LIST, request.list.listValue)
+        crashReporter.setCustomKey(KEY_CRITERIA_COUNT, request.params.activeFilterCount().toString())
+        crashReporter.setCustomKey(KEY_QUERY_LENGTH, (request.params.name?.length ?: 0).toString())
+        crashReporter.log("friend_cards_search_submit")
+    }
+
+    private fun reportFailure(e: Throwable, event: String): FolderCardsError {
+        val error = when (e) {
+            is FriendCardSearchException.AccessDenied -> FolderCardsError.ACCESS_DENIED
+            is FriendCardSearchException.Network -> FolderCardsError.NETWORK
+            is FriendCardSearchException.SessionExpired -> FolderCardsError.SESSION_EXPIRED
+            is FriendCardSearchException.ProfileIncomplete -> FolderCardsError.PROFILE_INCOMPLETE
+            else -> FolderCardsError.GENERIC
+        }
+        crashReporter.log("${event}_${error.name.lowercase()}")
+        val expected = e is FriendCardSearchException.AccessDenied ||
+            e is FriendCardSearchException.Network ||
+            e is FriendCardSearchException.SessionExpired ||
+            e is FriendCardSearchException.ProfileIncomplete
+        if (!expected) {
+            // Typed messages are server tokens; anything else is reduced to its class name.
+            val reason = if (e is FriendCardSearchException) e.message else e::class.simpleName
+            crashReporter.recordException(RuntimeException("[friend_cards_search] $reason"))
+        }
+        return error
+    }
+
+    private companion object {
+        const val PAGE_SIZE = 50
+        const val TYPING_DEBOUNCE_MS = 450L
+        // Coalesces bursts of chip removals / list switches into one request.
+        const val CHANGE_DEBOUNCE_MS = 150L
+        val CACHE_TTL = 60.seconds
+        const val CACHE_MAX_ENTRIES = 8
+        const val KEY_LIST = "friend_search_list"
+        const val KEY_CRITERIA_COUNT = "friend_search_criteria_count"
+        const val KEY_QUERY_LENGTH = "friend_search_query_length"
     }
 }

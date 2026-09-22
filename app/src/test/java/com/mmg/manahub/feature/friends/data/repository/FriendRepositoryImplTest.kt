@@ -4,6 +4,10 @@ import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.dao.FriendDao
 import com.mmg.manahub.core.data.remote.FriendRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.FriendCardDto
+import com.mmg.manahub.core.data.remote.dto.FriendCardSearchRowDto
+import com.mmg.manahub.core.model.FriendCardCursor
+import com.mmg.manahub.core.model.FriendCardSearchException
+import com.mmg.manahub.core.model.FriendCardSearchParams
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.model.Card
@@ -12,6 +16,9 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -118,4 +125,91 @@ class FriendRepositoryImplTest {
             coVerify(exactly = 1) { cardRepo.warmCacheForIds(match { it == listOf("id-1") }) }
             coVerify(exactly = 1) { cardRepo.getCardsByIds(match { it == listOf("id-1") }) }
         }
+
+    private fun searchRow(id: String, rowId: String = "row-$id", hasMore: Boolean = false, unindexed: Int = 0) =
+        FriendCardSearchRowDto(
+            sourceList = "collection", rowId = rowId, scryfallId = id, quantity = 2, isFoil = true,
+            condition = "NM", language = "en", cardName = "Server $id", setCode = "srv", rarity = "rare",
+            sortKey = "0server $id", hasMore = hasMore, unindexedCount = unindexed,
+        )
+
+    @Test
+    fun `searchFriendCards keeps a row Room cannot resolve, built from the server metadata`() = runTest {
+        coEvery { remote.searchFriendCards(any(), any(), any(), any(), any()) } returns
+            listOf(searchRow("cached", unindexed = 4), searchRow("missing", unindexed = 4))
+        coEvery { cardRepo.getCardsByIds(any()) } returns listOf(minimalCard("cached", name = "Local Name"))
+
+        val page = repository.searchFriendCards("friend-1", "collection", FriendCardSearchParams(), null, 50).getOrThrow()
+
+        assertEquals(2, page.cards.size)
+        assertEquals("Local Name", page.cards[0].name)
+        val fallback = page.cards[1]
+        assertEquals("Server missing", fallback.name)
+        assertEquals("srv", fallback.setCode)
+        assertEquals("rare", fallback.rarity)
+        assertNull(fallback.imageNormal)
+        assertNull(fallback.priceUsd)
+        assertEquals("row-missing", fallback.rowId)
+        assertTrue(fallback.isFoil)
+        assertEquals(setOf("missing"), page.unresolvedIds)
+        assertEquals(4, page.unindexedCount)
+        // The Scryfall warm is off the page path: it can stall for a whole 429 cooldown.
+        coVerify(exactly = 0) { cardRepo.warmCacheForIds(any()) }
+        coVerify(exactly = 0) { cardRepo.getCardById(any()) }
+    }
+
+    @Test
+    fun `hydrateFriendCardMetadata warms once then reads Room`() = runTest {
+        coEvery { cardRepo.warmCacheForIds(any()) } returns Unit
+        coEvery { cardRepo.getCardsByIds(any()) } returns listOf(minimalCard("x", name = "Resolved"))
+
+        val resolved = repository.hydrateFriendCardMetadata(listOf("x", "y"))
+
+        assertEquals(setOf("x"), resolved.keys)
+        coVerify(exactly = 1) { cardRepo.warmCacheForIds(listOf("x", "y")) }
+    }
+
+    @Test
+    fun `hydrateFriendCardMetadata gives up on a stalled warm and still reads Room`() = runTest {
+        coEvery { cardRepo.warmCacheForIds(any()) } coAnswers { kotlinx.coroutines.delay(60_000) }
+        coEvery { cardRepo.getCardsByIds(any()) } returns listOf(minimalCard("x"))
+
+        val resolved = repository.hydrateFriendCardMetadata(listOf("x"))
+
+        assertEquals(setOf("x"), resolved.keys)
+    }
+
+    @Test
+    fun `searchFriendCards exposes the last row as the next cursor when has_more is true`() = runTest {
+        coEvery { remote.searchFriendCards(any(), any(), any(), any(), any()) } returns
+            listOf(searchRow("a"), searchRow("b", hasMore = true))
+        coEvery { cardRepo.getCardsByIds(any()) } returns emptyList()
+
+        val page = repository.searchFriendCards("friend-1", "trade", FriendCardSearchParams(), null, 2).getOrThrow()
+
+        assertTrue(page.hasMore)
+        assertEquals(FriendCardCursor("0server b", "row-b"), page.nextCursor)
+    }
+
+    @Test
+    fun `searchFriendCards last page has no cursor and an empty page skips the cache read`() = runTest {
+        coEvery { remote.searchFriendCards(any(), any(), any(), any(), any()) } returns emptyList()
+
+        val page = repository.searchFriendCards("friend-1", "wishlist", FriendCardSearchParams(), null, 50).getOrThrow()
+
+        assertFalse(page.hasMore)
+        assertNull(page.nextCursor)
+        assertEquals(0, page.unindexedCount)
+        coVerify(exactly = 0) { cardRepo.getCardsByIds(any()) }
+    }
+
+    @Test
+    fun `searchFriendCards surfaces the typed remote error`() = runTest {
+        coEvery { remote.searchFriendCards(any(), any(), any(), any(), any()) } throws
+            FriendCardSearchException.AccessDenied()
+
+        val result = repository.searchFriendCards("friend-1", "collection", FriendCardSearchParams(), null, 50)
+
+        assertTrue(result.exceptionOrNull() is FriendCardSearchException.AccessDenied)
+    }
 }

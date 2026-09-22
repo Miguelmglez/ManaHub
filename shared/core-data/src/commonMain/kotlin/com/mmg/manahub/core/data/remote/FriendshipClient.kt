@@ -3,12 +3,15 @@ package com.mmg.manahub.core.data.remote
 import com.mmg.manahub.core.data.remote.dto.AcceptInviteRequestDto
 import com.mmg.manahub.core.data.remote.dto.AcceptInviteResultDto
 import com.mmg.manahub.core.data.remote.dto.FriendCardDto
+import com.mmg.manahub.core.data.remote.dto.FriendCardSearchRowDto
+import com.mmg.manahub.core.data.remote.dto.FriendListUnindexedCountRequestDto
 import com.mmg.manahub.core.data.remote.dto.FriendMatchHistoryDto
 import com.mmg.manahub.core.data.remote.dto.FriendStatsDto
 import com.mmg.manahub.core.data.remote.dto.FriendshipDto
 import com.mmg.manahub.core.data.remote.dto.GetFriendCollectionRequestDto
 import com.mmg.manahub.core.data.remote.dto.GetFriendMatchHistoryRequestDto
 import com.mmg.manahub.core.data.remote.dto.ReferralCodeDto
+import com.mmg.manahub.core.data.remote.dto.SearchFriendCardsRequestDto
 import com.mmg.manahub.core.data.remote.dto.SendFriendRequestDto
 import com.mmg.manahub.core.data.remote.dto.UpdateFriendshipStatusDto
 import com.mmg.manahub.core.data.remote.dto.UpsertCollectionStatsDto
@@ -124,6 +127,18 @@ class FriendshipClient(
 
     suspend fun getFriendCollection(body: GetFriendCollectionRequestDto): List<FriendCardDto> =
         httpClient.post("${baseUrl}rpc/get_friend_collection") {
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }.body()
+
+    suspend fun searchFriendCards(body: SearchFriendCardsRequestDto): List<FriendCardSearchRowDto> =
+        httpClient.post("${baseUrl}rpc/search_friend_cards") {
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }.body()
+
+    suspend fun friendListUnindexedCount(body: FriendListUnindexedCountRequestDto): Int =
+        httpClient.post("${baseUrl}rpc/friend_list_unindexed_count") {
             contentType(ContentType.Application.Json)
             setBody(body)
         }.body()

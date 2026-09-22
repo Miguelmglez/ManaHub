@@ -90,6 +90,22 @@ fun FriendDetailScreen(
     var showRemoveConfirm by remember { mutableStateOf(false) }
 
     val removeErrorMsg = stringResource(R.string.friends_detail_remove_error)
+    val folderActions = remember(viewModel, onCardClick) {
+        FriendFolderActions(
+            onSubTabSelected = viewModel::selectFolderSubTab,
+            onQueryChange = viewModel::onSearchQueryChange,
+            onSearchSubmit = viewModel::onSearchSubmit,
+            onClearText = viewModel::clearSearchText,
+            onApplyAdvancedSearch = viewModel::applyAdvancedSearch,
+            onRemoveCriterion = viewModel::removeCriterion,
+            onClearNameExact = viewModel::clearNameExact,
+            onClearSearch = viewModel::clearSearch,
+            onLoadMore = viewModel::loadMoreCards,
+            onRetryLoadMore = viewModel::retryLoadMore,
+            onRetry = viewModel::retryCards,
+            onCardClick = onCardClick,
+        )
+    }
 
     // Observe one-shot events from the ViewModel.
     LaunchedEffect(Unit) {
@@ -185,9 +201,8 @@ fun FriendDetailScreen(
                 when (uiState.selectedTab) {
                     FriendTab.FOLDER -> FriendFolderTab(
                         uiState = uiState,
-                        viewModel = viewModel,
                         friendNickname = friend.nickname,
-                        onCardClick = onCardClick,
+                        actions = folderActions,
                     )
                     FriendTab.STATS -> FriendStatsTab(
                         uiState = uiState,

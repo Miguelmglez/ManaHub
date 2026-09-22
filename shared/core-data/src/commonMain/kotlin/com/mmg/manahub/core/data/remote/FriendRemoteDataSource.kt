@@ -4,10 +4,21 @@ import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.remote.dto.AcceptInviteRequestDto
 import com.mmg.manahub.core.data.remote.dto.AcceptInviteResultDto
 import com.mmg.manahub.core.data.remote.dto.FriendCardDto
+import com.mmg.manahub.core.data.remote.dto.FriendCardSearchRowDto
+import com.mmg.manahub.core.data.remote.dto.FriendListUnindexedCountRequestDto
 import com.mmg.manahub.core.data.remote.dto.FriendMatchHistoryDto
 import com.mmg.manahub.core.data.remote.dto.FriendStatsDto
 import com.mmg.manahub.core.data.remote.dto.GetFriendCollectionRequestDto
 import com.mmg.manahub.core.data.remote.dto.GetFriendMatchHistoryRequestDto
+import com.mmg.manahub.core.data.remote.dto.SearchFriendCardsRequestDto
+import com.mmg.manahub.core.model.FriendCardCursor
+import com.mmg.manahub.core.model.FriendCardSearchException
+import com.mmg.manahub.core.model.FriendCardSearchParams
+import io.ktor.client.plugins.ResponseException
+import io.ktor.client.statement.bodyAsText
+import io.ktor.serialization.ContentConvertException
+import kotlinx.serialization.SerializationException
+import kotlinx.coroutines.CancellationException
 import com.mmg.manahub.core.data.remote.dto.SendFriendRequestDto
 import com.mmg.manahub.core.data.remote.dto.UpdateFriendshipStatusDto
 import com.mmg.manahub.core.data.remote.dto.UpsertCollectionStatsDto
@@ -194,6 +205,51 @@ class FriendRemoteDataSource(
                     pOffset = offset,
                 )
             )
+        }
+
+    /**
+     * Calls `search_friend_cards` for one keyset page.
+     *
+     * @throws FriendCardSearchException for every failure except coroutine cancellation.
+     */
+    suspend fun searchFriendCards(
+        friendUserId: String,
+        list: String,
+        params: FriendCardSearchParams,
+        cursor: FriendCardCursor?,
+        limit: Int,
+    ): List<FriendCardSearchRowDto> = friendCardSearchCall {
+        client.searchFriendCards(params.toRequestDto(friendUserId, list, cursor, limit))
+    }
+
+    /**
+     * Calls `friend_list_unindexed_count`: rows of [list] whose metadata is not indexed yet.
+     *
+     * @throws FriendCardSearchException for every failure except coroutine cancellation.
+     */
+    suspend fun friendListUnindexedCount(friendUserId: String, list: String): Int = friendCardSearchCall {
+        client.friendListUnindexedCount(FriendListUnindexedCountRequestDto(friendUserId, list))
+    }
+
+    private suspend fun <T> friendCardSearchCall(block: suspend () -> T): T =
+        withContext(dispatcherProvider.io) {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ResponseException) {
+                val body = runCatching { e.response.bodyAsText() }.getOrDefault("")
+                throw FriendCardSearchErrors.fromResponse(e.response.status.value, body)
+            } catch (e: FriendCardSearchException) {
+                throw e
+            } catch (e: ContentConvertException) {
+                throw FriendCardSearchException.Rejected("MALFORMED_RESPONSE")
+            } catch (e: SerializationException) {
+                throw FriendCardSearchException.Rejected("MALFORMED_RESPONSE")
+            } catch (e: Throwable) {
+                // Throwable, not Exception: a failed wasm fetch surfaces as kotlin.Error.
+                throw FriendCardSearchException.Network(e)
+            }
         }
 
     /**
