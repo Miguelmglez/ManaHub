@@ -12,6 +12,7 @@ import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.domain.repository.AddOutcome
+import com.mmg.manahub.core.domain.repository.CollectionAddRequest
 import com.mmg.manahub.core.domain.repository.UpdateEntryOutcome
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.auth.SessionState
@@ -179,8 +180,52 @@ class UserCardRepositoryImpl @Inject constructor(
         userId: String?,
         quantity: Int,
     ): AddOutcome = withContext(ioDispatcher) {
-        val now = System.currentTimeMillis()
+        addOrIncrementRow(
+            scryfallId = scryfallId,
+            isFoil = isFoil,
+            condition = condition,
+            language = language,
+            isForTrade = isForTrade,
+            resolvedUserId = userId ?: authRepository.getCurrentUser()?.id,
+            quantity = quantity,
+            now = System.currentTimeMillis(),
+        )
+    }
+
+    override suspend fun addOrIncrementBatch(
+        entries: List<CollectionAddRequest>,
+        userId: String?,
+    ): List<AddOutcome> = withContext(ioDispatcher) {
+        if (entries.isEmpty()) return@withContext emptyList()
         val resolvedUserId = userId ?: authRepository.getCurrentUser()?.id
+        val now = System.currentTimeMillis()
+        // Never withContext inside: it would leave Room's transaction thread.
+        database.withTransaction {
+            entries.map { entry ->
+                addOrIncrementRow(
+                    scryfallId = entry.scryfallId,
+                    isFoil = entry.isFoil,
+                    condition = entry.condition,
+                    language = entry.language,
+                    isForTrade = false,
+                    resolvedUserId = resolvedUserId,
+                    quantity = entry.quantity,
+                    now = now,
+                )
+            }
+        }
+    }
+
+    private suspend fun addOrIncrementRow(
+        scryfallId: String,
+        isFoil: Boolean,
+        condition: String,
+        language: String,
+        isForTrade: Boolean,
+        resolvedUserId: String?,
+        quantity: Int,
+        now: Long,
+    ): AddOutcome {
         val normalizedCondition = condition.uppercase().trim()
         val normalizedLanguage = language.lowercase().trim()
 
@@ -197,7 +242,7 @@ class UserCardRepositoryImpl @Inject constructor(
             )
         }
 
-        when {
+        return when {
             existing == null -> {
                 userCardCollectionDao.upsert(
                     UserCardCollectionEntity(

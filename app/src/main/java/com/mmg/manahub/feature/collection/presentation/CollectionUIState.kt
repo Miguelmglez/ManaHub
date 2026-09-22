@@ -9,6 +9,7 @@ import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.sync.CollectionMergeConflict
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.feature.collection.presentation.importexport.CollectionExportUiState
 
 /**
  * Immutable state for the collection screen.
@@ -66,6 +67,7 @@ data class CollectionUiState(
      * card/foil/condition/language was added both offline and in a previously-logged-in session).
      */
     val pendingMergeConflicts: List<MergeConflictUiItem> = emptyList(),
+    val export: CollectionExportUiState = CollectionExportUiState(),
 )
 
 /** Display-ready wrapper: a [CollectionMergeConflict] plus the card metadata to render it. */
@@ -77,6 +79,10 @@ data class MergeConflictUiItem(
 
 val CollectionUiState.activeFilterCount: Int
     get() = activeQuery?.criteria?.size ?: 0
+
+/** Export needs something visible (or unrendered rows it can hydrate) in the Cards tab. */
+val CollectionUiState.canExport: Boolean
+    get() = cards.isNotEmpty() || uncachedSourceRows > 0
 
 enum class SortOrder { DATE_ADDED, NAME, PRICE, RARITY }
 enum class SortDirection { ASC, DESC }

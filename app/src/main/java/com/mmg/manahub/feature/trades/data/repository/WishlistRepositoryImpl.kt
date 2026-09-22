@@ -68,6 +68,10 @@ class WishlistRepositoryImpl(
         }
     }
 
+    override suspend fun addAllLocal(entries: List<WishlistEntry>): Result<Unit> = addMutex.withLock {
+        runCatching { dao.addOrMergeAll(entries.map { it.toEntity() }) }
+    }
+
     override suspend fun removeLocal(id: String): Result<Unit> = runCatching {
         // A synced row also exists server-side — deleting it locally only, with no remote
         // call, means the next syncFromRemote() re-downloads and "resurrects" the entry the

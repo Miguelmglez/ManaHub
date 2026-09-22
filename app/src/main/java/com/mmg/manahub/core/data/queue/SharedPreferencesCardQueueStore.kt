@@ -27,6 +27,9 @@ class SharedPreferencesCardQueueStore(
         private const val PREF_KEY_QUEUE = "scanner_queue_v1"
         private const val PREF_KEY_DECK_QUEUE_PREFIX = "scanner_deck_queue_v1_"
 
+        /** Preference key of the Collection import review queue (never the shared queue). */
+        const val COLLECTION_IMPORT_QUEUE_KEY = "collection_import_queue_v1"
+
         /** Preference key of the Deck Scanner queue for [deckId] (one queue per deck). */
         fun deckQueueKey(deckId: String): String = "$PREF_KEY_DECK_QUEUE_PREFIX${Uri.encode(deckId)}"
     }

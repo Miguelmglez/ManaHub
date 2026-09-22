@@ -1,4 +1,4 @@
-﻿package com.mmg.manahub.feature.collection
+package com.mmg.manahub.feature.collection
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.work.WorkManager
@@ -184,6 +184,8 @@ class CollectionViewModelTest {
             userPreferencesRepository = userPreferencesRepository,
             analyticsHelper           = analyticsHelper,
             collectionMergeConflictResolver = collectionMergeConflictResolver,
+            fileGateway = io.mockk.mockk(relaxed = true),
+            crashReporter = io.mockk.mockk(relaxed = true),
         )
     }
 

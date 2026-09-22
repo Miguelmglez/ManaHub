@@ -5,7 +5,17 @@ import com.mmg.manahub.core.sync.CollectionMergeConflictResolver
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.feature.collection.presentation.CollectionViewModel
+import com.mmg.manahub.core.data.queue.PersistentCardQueueRepository
+import com.mmg.manahub.core.data.queue.SharedPreferencesCardQueueStore
+import com.mmg.manahub.core.domain.collection.transfer.CollectionFileGateway
+import com.mmg.manahub.core.domain.repository.CardQueueRepository
+import com.mmg.manahub.core.domain.usecase.collection.CommitImportedCardsUseCase
+import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
+import com.mmg.manahub.feature.collection.data.AndroidCollectionFileGateway
+import com.mmg.manahub.feature.collection.presentation.importexport.CollectionImportViewModel
+import com.mmg.manahub.feature.trades.domain.usecase.AddAllToWishlistUseCase
 import org.koin.android.ext.koin.androidContext
+import org.koin.core.qualifier.named
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.androidx.workmanager.dsl.worker
 import org.koin.core.module.Module
@@ -115,6 +125,45 @@ fun collectionKoinModule(
             userPreferencesRepository = get(),
             analyticsHelper = get(),
             collectionMergeConflictResolver = get(),
+            fileGateway = get(),
+            crashReporter = get(),
+        )
+    }
+
+    // ── Collection import / export. ──
+    single<CollectionFileGateway> { AndroidCollectionFileGateway(androidContext(), get(named("io"))) }
+    // Private review queue: must stay a single instance over its store, and never the shared queue.
+    single<CardQueueRepository>(named(COLLECTION_IMPORT_QUEUE)) {
+        PersistentCardQueueRepository(
+            store = SharedPreferencesCardQueueStore(
+                androidContext(),
+                SharedPreferencesCardQueueStore.COLLECTION_IMPORT_QUEUE_KEY,
+            ),
+            crashReporter = get(),
+        )
+    }
+    single(named(COLLECTION_IMPORT_QUEUE)) {
+        CardQueueActions(
+            queueRepository = get(named(COLLECTION_IMPORT_QUEUE)),
+            committer = get<CommitImportedCardsUseCase>(),
+            addToWishlist = get(),
+            wishlistBatchWriter = get<AddAllToWishlistUseCase>(),
+        )
+    }
+    viewModel {
+        CollectionImportViewModel(
+            resolveImport = get(),
+            fileGateway = get(),
+            queueRepository = get(named(COLLECTION_IMPORT_QUEUE)),
+            queueActions = get(named(COLLECTION_IMPORT_QUEUE)),
+            cardRepository = get(),
+            userCardRepository = get(),
+            userPreferencesRepository = get(),
+            crashReporter = get(),
+            appScope = get(),
         )
     }
 }
+
+/** Koin qualifier of the Collection import review queue and its actions. */
+const val COLLECTION_IMPORT_QUEUE = "collectionImportQueue"

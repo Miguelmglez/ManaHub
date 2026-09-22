@@ -10,7 +10,9 @@ import com.mmg.manahub.core.data.local.mapper.toSuggestedTagList
 import com.mmg.manahub.core.data.local.mapper.toSuggestedTagsJson
 import com.mmg.manahub.core.data.local.mapper.toTagList
 import com.mmg.manahub.core.data.local.mapper.toTagsJson
+import com.mmg.manahub.core.data.network.RateLimitExhaustedException
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.manahub.core.data.remote.dto.CardIdentifierDto
 import com.mmg.manahub.core.di.DefaultDispatcher
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.Card
@@ -18,6 +20,8 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.SuggestedTag
 import com.mmg.manahub.core.di.ApplicationScope
+import com.mmg.manahub.core.domain.repository.CardLookupIdentifier
+import com.mmg.manahub.core.domain.repository.CardLookupResult
 import com.mmg.manahub.core.domain.repository.CardPriceUpdate
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.card.ResolveCardStrategyTagsUseCase
@@ -525,6 +529,41 @@ class CardRepositoryImpl @Inject constructor(
             // Failures are intentionally swallowed — callers fall back to individual getCardById
         }
     }
+
+    override suspend fun lookupCardsByIdentifiers(
+        identifiers: List<CardLookupIdentifier>,
+    ): DataResult<CardLookupResult> = withContext(ioDispatcher) {
+        if (identifiers.isEmpty()) return@withContext DataResult.Success(CardLookupResult(emptyList(), emptyList()))
+        val result = remote.lookupCollection(identifiers.map { it.toDto() })
+        result.fold(
+            onSuccess = { (cards, notFound) ->
+                if (cards.isNotEmpty()) {
+                    val cachedMap = cardDao.getByIds(cards.map { it.scryfallId }).associateBy { it.scryfallId }
+                    cardDao.upsertAll(entitiesPreservingTagsBatch(cards, cachedMap))
+                    scheduleTagResolutionBatch(cards, cachedMap)
+                }
+                DataResult.Success(CardLookupResult(cards, notFound.map { it.toDomain() }))
+            },
+            onFailure = { e ->
+                if (e !is RateLimitExhaustedException) recordSafeNonFatal("card_identifier_lookup_failed", e)
+                DataResult.Error(e.message ?: "Unknown error")
+            },
+        )
+    }
+
+    private fun CardLookupIdentifier.toDto() = CardIdentifierDto(
+        id = scryfallId,
+        name = name,
+        set = setCode,
+        collectorNumber = collectorNumber,
+    )
+
+    private fun CardIdentifierDto.toDomain() = CardLookupIdentifier(
+        scryfallId = id,
+        name = name,
+        setCode = set,
+        collectorNumber = collectorNumber,
+    )
 
     override suspend fun evictStaleCache() =
         cardDao.evictStaleCache(System.currentTimeMillis() - CachePolicy.EVICT_MS)
