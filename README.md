@@ -127,7 +127,7 @@ Coming soon.
 | Architecture | MVVM + Clean Architecture, KMP-oriented (`:shared:core-*` commonMain + `:app` Android) |
 | Dependency Injection | Koin (new/migrated code) + Hilt (legacy, being phased out) |
 | Database | Room (exported schemas, DB v40) — Android-only (no wasm target); repo interfaces are shared |
-| Networking | Ktor (commonMain, js/wasm-ready) + kotlinx.serialization; a small Retrofit remnant remains only for `DraftModule` (Cloudflare/YouTube manual JSON) |
+| Networking | Ktor (commonMain, js/wasm-ready) + kotlinx.serialization; a small Retrofit remnant remains only for `DraftModule` (Cloudflare manual JSON) |
 | Backend (BaaS) | Supabase (auth + postgrest + realtime + edge functions) via Ktor client |
 | Image loading | Coil + SVG decoder |
 | Camera / OCR | CameraX + ML Kit Text Recognition (on-device) |
@@ -144,7 +144,7 @@ Coming soon.
 
 SDK: `minSdk = 29` (Android 10) · `targetSdk = 36` (Android 16) · `compileSdk = 37`. JDK 17.
 
-Release builds use R8 (minification + resource shrinking) with a custom `proguard-rules.pro`. Sensitive values (`YOUTUBE_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_CLIENT_ID`, `CLOUDFLARE_WORKER_URL`, `COMMUNITY_WORKER_URL`) are injected via `BuildConfig` from `local.properties` (git-ignored) or CI environment variables.
+Release builds use R8 (minification + resource shrinking) with a custom `proguard-rules.pro`. Sensitive values (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_CLIENT_ID`, `CLOUDFLARE_WORKER_URL`, `COMMUNITY_WORKER_URL`) are injected via `BuildConfig` from `local.properties` (git-ignored) or CI environment variables.
 
 ## Architecture
 
@@ -196,7 +196,6 @@ Supabase-backed implementation of the same interfaces when that phase starts.
 
 - **Supabase** — auth (email/password + Google), Postgres, Realtime, Edge Functions, and the push outbox. Backend SQL/migrations/RPCs/Edge Functions live under `supabase/`.
 - **Scryfall API** — all card data, prices, images, set info. Rate-limited (≤10 req/s) via a request queue; queries are allowlist-sanitised; data cached in Room.
-- **YouTube Data API v3** — news videos. The key is injected via BuildConfig; if absent, the feature is gracefully disabled.
 - **ML Kit (Google)** — on-device OCR. No camera frames or OCR results leave the device.
 - **Firebase** — Analytics + Crashlytics (telemetry) and FCM (push delivery). `google-services.json` is git-ignored and never committed.
 
@@ -212,7 +211,6 @@ If you create an account, only email, nickname, Game Tag, auth provider, and the
 - `HttpLoggingInterceptor` is BODY level in debug only; NONE in release
 - Room and DataStore excluded from Google Drive auto-backup (`backup_rules.xml`, `data_extraction_rules.xml`)
 - Release builds use R8 minification + resource shrinking with a custom `proguard-rules.pro`
-- YouTube API key injected via an OkHttp interceptor — not visible in Retrofit signatures or Logcat
 - Scryfall queries sanitised with an allowlist before being appended to API URLs
 - Camera frames never leave the device (on-device ML Kit)
 - User session encrypted on disk (Android Keystore AES-GCM via `SecureSessionManager`)
@@ -238,7 +236,6 @@ Required keys are marked with `*`:
 SUPABASE_URL=...            # *
 SUPABASE_ANON_KEY=...       # *
 GOOGLE_CLIENT_ID=...        # *
-YOUTUBE_API_KEY=...         # optional — News videos disabled if absent
 CLOUDFLARE_WORKER_URL=...   # optional — has a default
 COMMUNITY_WORKER_URL=...    # optional — has a placeholder default, `manahub-community` Worker not yet deployed
 

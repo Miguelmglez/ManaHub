@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.draft.data
+// COMMENTS_REVIEWED: 2026-09-22
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -7,7 +8,6 @@ import com.mmg.manahub.core.data.local.dao.DraftSetDao
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import com.mmg.manahub.core.data.remote.CloudflareContentClient
 import com.mmg.manahub.core.data.remote.ScryfallClient
-import com.mmg.manahub.core.data.remote.YouTubeClient
 import com.mmg.manahub.core.data.remote.dto.SearchResultDto
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.data.local.entity.DraftSetEntity
@@ -29,17 +29,11 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 
-/**
- * Unit tests for [DraftRepositoryImpl.getSetCardsPage], focused on the Scryfall pool query it
- * builds — in particular the `extraPoolSets` widening added for sets whose booster.json declares
- * cards from an additional Scryfall set (e.g. SOS's Mystical Archive sheet draws from `soa`).
- */
 class DraftRepositoryImplTest {
 
     private val context = mockk<Context>(relaxed = true)
     private val scryfallApi = mockk<ScryfallClient>()
     private val scryfallQueue = ScryfallRequestQueue()
-    private val youTubeClient = mockk<YouTubeClient>(relaxed = true)
     private val cloudflareClient = mockk<CloudflareContentClient>(relaxed = true)
     private val draftSetDao = mockk<DraftSetDao>(relaxed = true)
     private val gson = Gson()
@@ -58,7 +52,6 @@ class DraftRepositoryImplTest {
             context = context,
             scryfallApi = scryfallApi,
             scryfallQueue = scryfallQueue,
-            youTubeClient = youTubeClient,
             cloudflareClient = cloudflareClient,
             draftSetDao = draftSetDao,
             gson = gson,
@@ -118,8 +111,7 @@ class DraftRepositoryImplTest {
             )
         } returns emptyResult
 
-        // "SOA" normalizes to "soa" (lowercase); "sos or name:x" (spaces/colon), "a" (too short),
-        // and an 8-char code all fail the allowlist and must be dropped.
+        // "SOA" normalizes to "soa"; the other codes fail the allowlist and must be dropped
         val result = repository.getSetCardsPage(
             "sos",
             1,

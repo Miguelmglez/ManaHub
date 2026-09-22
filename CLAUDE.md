@@ -60,8 +60,6 @@ output; do not restore `es`/`de` locale branches. → memory: `feedback_language
 
 ## Build commands
 
-- YouTube API key is optional (Draft Guide video is silently disabled without it). Add
-  `YOUTUBE_API_KEY=...` to `local.properties` (git-ignored) → injected into `BuildConfig.YOUTUBE_API_KEY`.
 - Room schemas export to `app/schemas/` via `ksp { arg("room.schemaLocation", ...) }`.
 
 ## Architecture
@@ -428,7 +426,6 @@ developer. Reviewers and auditors supply precise implementation briefs rather th
 - HTTP logging `BODY` in debug only, `NONE` in release (`NetworkModule.kt`).
   `network_security_config.xml` blocks cleartext. Room DB + DataStore excluded from Drive auto-backup
   (`backup_rules.xml` / `data_extraction_rules.xml`). Scryfall queries sanitised with an allowlist.
-  YouTube key injected via OkHttp interceptor (not in Retrofit signatures or Logcat).
 
 ### Pre-push security gate (MANDATORY)
 Before any PR or push (even "docs-only"), run the **`pre-push-security-gate` skill**: it delegates a

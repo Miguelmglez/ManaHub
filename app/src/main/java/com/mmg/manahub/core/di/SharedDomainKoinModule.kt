@@ -30,7 +30,6 @@ import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSimSetUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetCardsPageUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetGuideUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
-import com.mmg.manahub.feature.draft.domain.usecase.GetSetVideosUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.MakePickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.ObserveDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.StartDraftUseCase
@@ -131,7 +130,6 @@ fun sharedDomainKoinModule(
     single { GetDraftableSetsUseCase(repository = get()) }
     single { GetSetGuideUseCase(repository = get()) }
     single { GetSetTierListUseCase(repository = get()) }
-    single { GetSetVideosUseCase(repository = get()) }
     single { GetSetCardsPageUseCase(repository = get()) }
     single { ObserveDraftUseCase(repository = get()) }
     single { GetDraftableSimSetUseCase(repository = get(), ioDispatcher = Dispatchers.IO) }

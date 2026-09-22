@@ -1,11 +1,11 @@
 package com.mmg.manahub.feature.draft.data
+// COMMENTS_REVIEWED: 2026-09-22
 
 import android.content.Context
 import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
-import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.data.remote.mapper.toDomain
 import com.mmg.manahub.core.model.Card
@@ -15,13 +15,11 @@ import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import com.mmg.manahub.feature.draft.data.DraftRepositoryImpl.Companion.VALID_SET_CODE
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
 import com.mmg.manahub.core.data.remote.CloudflareContentClient
-import com.mmg.manahub.core.data.remote.YouTubeClient
 import com.mmg.manahub.feature.draft.data.remote.toDomain
 import com.mmg.manahub.feature.draft.data.remote.toEntity
 import com.mmg.manahub.core.model.ArchetypeGuide
 import com.mmg.manahub.core.model.ArchetypeKeyCard
 import com.mmg.manahub.core.model.DraftCardStats
-import com.mmg.manahub.core.model.DraftVideo
 import com.mmg.manahub.core.model.MechanicExamples
 import com.mmg.manahub.core.model.MechanicGuide
 import com.mmg.manahub.core.model.MechanicKeyCard
@@ -38,28 +36,11 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Implementation of [DraftRepository] that fetches draft content from the Cloudflare Worker
- * and caches it locally in [filesDir] (JSON files) and Room (set metadata).
- *
- * Cache strategy:
- * - **Set list**: Room cache with 24h TTL. Falls back to stale Room data on network error.
- * - **Guide / Tier-list**: Per-set JSON files in `filesDir/draft/{setCode}/`.
- *   Invalidated when the content version stored in SharedPreferences differs from the
- *   version in the sets-index. No automatic TTL — content only refreshes when the
- *   Worker publishes a new version. The parsed domain models are memoised in memory per
- *   set + content version, so reopening a set skips the file read and JSON parse.
- *
- * No assets/ reads. If Cloudflare is unreachable and no local file exists, an error is returned.
- *
- * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
- * native Koin `single` in [com.mmg.manahub.app.di.coreBridgeKoinModule].
- */
+// Guide/tier-list JSON is file-cached per set and refreshed only when the sets-index content version changes (no TTL)
 class DraftRepositoryImpl(
     private val context: Context,
     private val scryfallApi: ScryfallClient,
     private val scryfallQueue: ScryfallRequestQueue,
-    private val youTubeClient: YouTubeClient,
     private val cloudflareClient: CloudflareContentClient,
     private val draftSetDao: DraftSetDao,
     private val gson: Gson,
@@ -68,31 +49,24 @@ class DraftRepositoryImpl(
 ) : DraftRepository {
 
     companion object {
-        private const val CACHE_DURATION_MS = 24 * 60 * 60 * 1000L // 24 hours
-        private const val VIDEO_CACHE_DURATION_MS = 60 * 60 * 1000L // 1 hour
+        private const val CACHE_DURATION_MS = 24 * 60 * 60 * 1000L
         private const val PREF_GUIDE_VERSION = "pref_draft_%s_guide_version"
         private const val PREF_TIER_VERSION = "pref_draft_%s_tier_version"
 
-        /** Allowlist: set codes must be 2–6 lowercase ASCII letters/digits (e.g. "2x2", "40k"). */
         private val VALID_SET_CODE = Regex("^[a-z0-9]{2,6}$")
     }
 
-    private val videoCache = ConcurrentHashMap<String, Pair<Long, List<DraftVideo>>>()
     private val guideMutexes = ConcurrentHashMap<String, Mutex>()
     private val tierMutexes = ConcurrentHashMap<String, Mutex>()
 
     private fun guideMutex(code: String) = guideMutexes.computeIfAbsent(code) { Mutex() }
     private fun tierMutex(code: String) = tierMutexes.computeIfAbsent(code) { Mutex() }
 
-    // Parsed models keyed by set code; only read/written under that set's mutex.
+    // Parsed models keyed by set code; only read/written under that set's mutex
     private val parsedGuides = ConcurrentHashMap<String, VersionedModel<SetDraftGuide>>()
     private val parsedTierLists = ConcurrentHashMap<String, VersionedModel<SetTierList>>()
 
     private data class VersionedModel<T>(val version: String?, val model: T)
-
-    // -------------------------------------------------------------------------
-    // getDraftableSets — Cloudflare sets-index.json with Room cache
-    // -------------------------------------------------------------------------
 
     override suspend fun getDraftableSets(forceRefresh: Boolean): DataResult<List<DraftSet>> {
         return withContext(ioDispatcher) {
@@ -123,10 +97,6 @@ class DraftRepositoryImpl(
             }
         }
     }
-
-    // -------------------------------------------------------------------------
-    // getSetGuide — Cloudflare guide.json with versioned local file cache
-    // -------------------------------------------------------------------------
 
     override suspend fun getSetGuide(setCode: String): DataResult<SetDraftGuide> {
         return withContext(ioDispatcher) {
@@ -169,10 +139,6 @@ class DraftRepositoryImpl(
         }
     }
 
-    // -------------------------------------------------------------------------
-    // getSetTierList — Cloudflare tier-list.json with versioned local file cache
-    // -------------------------------------------------------------------------
-
     override suspend fun getSetTierList(setCode: String): DataResult<SetTierList> {
         return withContext(ioDispatcher) {
             try {
@@ -214,10 +180,6 @@ class DraftRepositoryImpl(
         }
     }
 
-    // -------------------------------------------------------------------------
-    // getSetCards — Scryfall (unchanged)
-    // -------------------------------------------------------------------------
-
     override suspend fun getSetCards(setCode: String, page: Int): DataResult<List<Card>> {
         return withContext(ioDispatcher) {
             try {
@@ -254,10 +216,7 @@ class DraftRepositoryImpl(
                 }
                 DataResult.Success(result.data.toDomain() to result.hasMore)
             } catch (first: Exception) {
-                // OkHttp may return a bare HTTP 304 to Retrofit when the cached response body
-                // was evicted from the disk cache (e.g. Coil image loads fill the 50 MB cache).
-                // Retrofit throws HttpException(304) in that case. Retry once without cache so
-                // Scryfall returns a full 200 response.
+                // A bare 304 arrives when the disk-cached body was evicted; retry once uncached
                 try {
                     val poolQuery = buildPoolQuery(setCode, extraPoolSets)
                     val result = scryfallQueue.execute {
@@ -276,15 +235,7 @@ class DraftRepositoryImpl(
         }
     }
 
-    /**
-     * Builds the Scryfall pool query for [setCode], widened to also include [extraPoolSets]
-     * when non-empty (e.g. SOS's booster.json declares `extraPoolSets = ["soa"]` for its
-     * Mystical Archive sheet). Every set code is re-sanitized here via [sanitizeSetCode] even
-     * though [DraftSimRepositoryImpl.parseBoosterConfig] already filters `extraPoolSets` against
-     * the same allowlist — defense in depth, since this string is interpolated directly into a
-     * Scryfall query. When [extraPoolSets] is empty the query is unchanged from before this
-     * feature: `set:$setCode lang:en`.
-     */
+    // Extra set codes are re-sanitized (defense in depth): they are interpolated straight into a Scryfall query
     private fun buildPoolQuery(setCode: String, extraPoolSets: List<String>): String {
         val safeSetCode = sanitizeSetCode(setCode)
         val safeExtras = extraPoolSets.mapNotNull { code ->
@@ -296,52 +247,6 @@ class DraftRepositoryImpl(
         val setClause = (listOf(safeSetCode) + safeExtras).joinToString(" or ") { "set:$it" }
         return "($setClause) lang:en"
     }
-
-    // -------------------------------------------------------------------------
-    // getSetVideos — YouTube API with in-memory cache (unchanged)
-    // -------------------------------------------------------------------------
-
-    override suspend fun getSetVideos(setCode: String, setName: String): DataResult<List<DraftVideo>> {
-        return withContext(ioDispatcher) {
-            val cacheKey = "$setCode:$setName"
-            val cached = videoCache[cacheKey]
-            if (cached != null && (System.currentTimeMillis() - cached.first) < VIDEO_CACHE_DURATION_MS) {
-                return@withContext DataResult.Success(cached.second)
-            }
-
-            if (BuildConfig.YOUTUBE_API_KEY.isBlank()) {
-                return@withContext DataResult.Error("YouTube API key not configured")
-            }
-
-            try {
-                val query = "$setName MTG draft guide"
-                val enResults = runCatching {
-                    youTubeClient.searchVideos(query = query, language = "en")
-                }.getOrNull()?.items ?: emptyList()
-
-                val esResults = runCatching {
-                    youTubeClient.searchVideos(query = query, language = "es")
-                }.getOrNull()?.items ?: emptyList()
-
-                val seenIds = mutableSetOf<String>()
-                val combined = mutableListOf<DraftVideo>()
-                for (item in enResults + esResults) {
-                    if (seenIds.add(item.id.videoId)) {
-                        combined.add(item.toDomain())
-                    }
-                }
-
-                videoCache[cacheKey] = System.currentTimeMillis() to combined
-                DataResult.Success(combined)
-            } catch (e: Exception) {
-                DataResult.Error(e.message ?: "Failed to load videos")
-            }
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // resolveCardId / getCardByName — Scryfall (unchanged)
-    // -------------------------------------------------------------------------
 
     override suspend fun resolveCardId(cardName: String, setCode: String): DataResult<String> {
         return withContext(ioDispatcher) {
@@ -375,28 +280,14 @@ class DraftRepositoryImpl(
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers — file paths
-    // -------------------------------------------------------------------------
-
-    /**
-     * Sanitizes [setCode] to a safe, lowercase string matching [VALID_SET_CODE].
-     * Throws [IllegalArgumentException] for any code that does not match, preventing
-     * path-traversal attacks when the value is used as a directory component.
-     */
+    // Allowlist guards path traversal: the code becomes a cache directory name
     private fun sanitizeSetCode(setCode: String): String {
         val normalized = setCode.lowercase().trim()
         require(VALID_SET_CODE.matches(normalized)) { "Invalid set code: '$normalized'" }
         return normalized
     }
 
-    /**
-     * Returns (and creates if necessary) the per-set cache directory.
-     * Throws [IOException] if the directory cannot be created — callers must not
-     * swallow this, as it indicates the device is out of storage or has a permissions issue.
-     *
-     * @param setCode Already-sanitized (lowercase) set code.
-     */
+    // Throws instead of returning a missing dir: out-of-storage must surface, not be swallowed
     private fun draftDir(setCode: String): File {
         val dir = File(context.filesDir, "draft/$setCode")
         if (!dir.exists() && !dir.mkdirs()) {
@@ -411,11 +302,7 @@ class DraftRepositoryImpl(
     private fun tierListFile(setCode: String): File =
         File(draftDir(setCode), "tier-list.json")
 
-    /**
-     * Writes [jsonString] to [file] atomically: first writes to a sibling `.tmp` file,
-     * then renames it into place. This prevents a partially-written file from being
-     * read as valid JSON if the process is killed mid-write.
-     */
+    // Write-then-rename so a process kill mid-write never leaves truncated JSON behind
     private fun saveJsonToFile(jsonString: String, file: File) {
         val tmp = File(file.parent, "${file.name}.tmp")
         try {
@@ -428,37 +315,13 @@ class DraftRepositoryImpl(
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers — version lookup from Room cache
-    // -------------------------------------------------------------------------
-
-    /**
-     * Returns the guide version stored in Room for [safeCode] (already lowercase), or null if not cached.
-     * This avoids a network call just to check if the version changed.
-     */
+    // Versions come from the Room-cached sets index, avoiding a network round-trip per open
     private suspend fun getRemoteGuideVersion(safeCode: String): String? =
         draftSetDao.getSetByCode(safeCode)?.guideVersion
 
     private suspend fun getRemoteTierVersion(safeCode: String): String? =
         draftSetDao.getSetByCode(safeCode)?.tierListVersion
 
-    // -------------------------------------------------------------------------
-    // Private helpers — JSON parsing (guide)
-    // -------------------------------------------------------------------------
-
-    /**
-     * Parses the new guide.json format from Cloudflare into a [SetDraftGuide] domain model.
-     *
-     * JSON structure:
-     * ```
-     * {
-     *   "metadata": { "set_name", "set_code", "last_updated" },
-     *   "set_overview": { "summary", "color_ranking", "color_notes", "key_gameplay_notes" },
-     *   "mechanics": [ { "name", "summary", "performance", "key_examples": { "overperformers", "underperformers" } } ],
-     *   "archetype_tier_list": { "tier_1": [...], "tier_2": [...], ... }
-     * }
-     * ```
-     */
     private fun parseGuide(setCode: String, json: JsonObject): SetDraftGuide {
         val metadata = json.getAsJsonObject("metadata")
         val setName = metadata?.get("set_name").safeAsString()
@@ -507,14 +370,7 @@ class DraftRepositoryImpl(
         )
     }
 
-    /**
-     * Parses a single mechanic object from the JSON array.
-     *
-     * The `key_examples` field has two legal shapes:
-     * - **JsonObject** with optional `overperformers`/`underperformers` arrays of card objects.
-     * - **JsonArray** of card objects (flat list; placed in [MechanicExamples.overperformers]).
-     * - Absent or JsonNull → [MechanicGuide.keyExamples] is null.
-     */
+    // key_examples is either {overperformers, underperformers} or a flat array (treated as overperformers)
     private fun parseMechanic(obj: JsonObject): MechanicGuide {
         val keyExamplesElement = obj.get("key_examples")
         val examples: MechanicExamples? = when {
@@ -546,10 +402,6 @@ class DraftRepositoryImpl(
         )
     }
 
-    /**
-     * Parses a single card object inside `key_examples`.
-     * Image fields default to empty string when the card omits `image_uris`.
-     */
     private fun parseMechanicKeyCard(obj: JsonObject): MechanicKeyCard {
         val imageUris = obj.getAsJsonObject("image_uris")
         val colors = obj.getAsJsonArray("colors")?.map { it.asString } ?: emptyList()
@@ -574,10 +426,6 @@ class DraftRepositoryImpl(
         )
     }
 
-    /**
-     * Flattens archetype_tier_list (keyed tier_1..tier_5) into a single ordered list.
-     * Tier key order: tier_1 → tier_5.
-     */
     private fun parseArchetypeTierList(obj: JsonObject?): List<ArchetypeGuide> {
         if (obj == null) return emptyList()
         val result = mutableListOf<ArchetypeGuide>()
@@ -615,10 +463,6 @@ class DraftRepositoryImpl(
         )
     }
 
-    /**
-     * Parses a guide card object (archetype key/signpost/avoid cards, key-commons-by-color entries).
-     * All four contexts share the same shape, so a single parser covers them.
-     */
     private fun parseArchetypeKeyCard(obj: JsonObject): ArchetypeKeyCard {
         val imageUris = obj.getAsJsonObject("image_uris")
         val colors = obj.getAsJsonArray("colors")
@@ -642,23 +486,6 @@ class DraftRepositoryImpl(
         )
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers — JSON parsing (tier list)
-    // -------------------------------------------------------------------------
-
-    /**
-     * Parses the new tier-list.json format from Cloudflare into a [SetTierList] domain model.
-     *
-     * JSON structure:
-     * ```
-     * {
-     *   "metadata": { "set_name", "set_code", "last_updated", "tier_key": { "S": "...", ... } },
-     *   "categories": [
-     *     { "priority", "description", "tier_label", "cards": [ { card fields } ] }
-     *   ]
-     * }
-     * ```
-     */
     private fun parseTierList(setCode: String, json: JsonObject): SetTierList {
         val metadata = json.getAsJsonObject("metadata")
         val setName = metadata?.get("set_name").safeAsString()
@@ -724,7 +551,6 @@ class DraftRepositoryImpl(
         )
     }
 
-    /** Parses the optional per-card 17Lands `stats` object (schema v2). Null when absent. */
     private fun parseCardStats(obj: JsonObject?): DraftCardStats? {
         if (obj == null) return null
         return DraftCardStats(
@@ -734,37 +560,20 @@ class DraftRepositoryImpl(
         )
     }
 
-    // -------------------------------------------------------------------------
-    // Null-safe JsonElement extension functions — guard against JsonNull values
-    // -------------------------------------------------------------------------
-
-    /**
-     * Returns [JsonElement.asString] or [default] if the element is null or [com.google.gson.JsonNull].
-     * Using `?.asString` alone does NOT protect against JsonNull — Gson throws
-     * [UnsupportedOperationException] when `asString` is called on a JsonNull element.
-     */
+    // `?.asString` alone throws on JsonNull, hence the explicit isJsonNull checks below
     private fun JsonElement?.safeAsString(default: String = ""): String =
         if (this == null || isJsonNull) default else asString
 
-    /**
-     * Returns [JsonElement.asInt] or [default] if the element is null or [com.google.gson.JsonNull].
-     */
     private fun JsonElement?.safeAsInt(default: Int = 0): Int =
         if (this == null || isJsonNull) default else asInt
 
-    /**
-     * Returns [JsonElement.asDouble] or null if the element is null, [com.google.gson.JsonNull],
-     * or not a valid number. Schema v2 fields (e.g. "cmc") use this instead of a numeric default
-     * because 0.0 is a legitimate value and must not be conflated with "field absent".
-     */
+    // Null, not 0.0, for absent numbers: 0.0 is a legitimate cmc
     private fun JsonElement?.safeAsDoubleOrNull(): Double? =
         if (this == null || isJsonNull) null else runCatching { asDouble }.getOrNull()
 
-    /** Returns [JsonElement.asInt] or null if the element is null, JsonNull, or not a valid int. */
     private fun JsonElement?.safeAsIntOrNull(): Int? =
         if (this == null || isJsonNull) null else runCatching { asInt }.getOrNull()
 
-    /** Returns [JsonElement.asBoolean] or null if the element is null, JsonNull, or not a valid boolean. */
     private fun JsonElement?.safeAsBooleanOrNull(): Boolean? =
         if (this == null || isJsonNull) null else runCatching { asBoolean }.getOrNull()
 }

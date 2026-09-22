@@ -59,11 +59,6 @@ android {
 
         buildConfigField(
             "String",
-            "YOUTUBE_API_KEY",
-            "\"${localProperties.getProperty("YOUTUBE_API_KEY", "")}\"",
-        )
-        buildConfigField(
-            "String",
             "SUPABASE_URL",
             "\"${requiredProperty("SUPABASE_URL")}\"",
         )

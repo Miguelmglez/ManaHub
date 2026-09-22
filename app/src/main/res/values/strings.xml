@@ -2564,7 +2564,6 @@
     <string name="draft_tab_guide">Guide</string>
     <string name="draft_tab_tier_list">Tier List</string>
     <string name="draft_tab_cards">Cards</string>
-    <string name="draft_tab_videos">Videos</string>
     <string name="draft_guide_overview">Overview</string>
     <string name="draft_guide_mechanics">Mechanics</string>
     <string name="draft_guide_archetypes">Archetypes</string>
@@ -2584,8 +2583,6 @@
     <string name="draft_sort_collector">Collector #</string>
     <string name="draft_win_rate_approx">≈%1$.1f%% WR</string>
     <string name="draft_win_rate_disclaimer">Based on AI analysis, approximate values</string>
-    <string name="draft_videos_empty">No videos found for this set</string>
-    <string name="draft_videos_error">Could not load videos</string>
     <string name="draft_key_cards">Key Cards</string>
     <string name="draft_key_cards_label">Key Cards:</string>
     <string name="draft_sort_by_label">Sort by:</string>
@@ -2597,7 +2594,6 @@
     <string name="draft_retry">Retry</string>
     <string name="draft_stale_data">Showing cached data. Pull to refresh.</string>
     <string name="draft_cards_all">All Cards</string>
-    <string name="draft_guide_videos">Videos</string>
     <string name="draft_card_artist">Artist: %1$s</string>
     <string name="draft_key_notes_label">Key Notes:</string>
     <string name="draft_mechanic_overperformers">Overperformers</string>

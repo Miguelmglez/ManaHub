@@ -126,12 +126,13 @@ Using Google Sign-In is optional. You may instead create an account with an emai
 
 **Scryfall Privacy Policy:** [https://scryfall.com/docs/privacy](https://scryfall.com/docs/privacy)
 
-### 6.4 YouTube Data API v3 (Draft Guide feature)
+### 6.4 YouTube (News feature)
 
-**What it does:** Fetches Magic: The Gathering draft guide videos for a given set.
+**What it does:** The News feed lists recent videos from MTG YouTube channels (via public YouTube channel RSS feeds) and plays them in-app using the embedded YouTube player.
 
-**What is sent:** MTG set names as search query parameters. No personal information is transmitted.
+**What is sent:** Fetching channel feeds sends standard HTTPS requests with no personal information. When you play a video, the embedded player loads directly from YouTube, which may receive your IP address, device/browser information, and cookies, and may record playback activity under YouTube's own policies. ManaHub does not receive or store this data.
 
+**YouTube Terms of Service:** [https://www.youtube.com/t/terms](https://www.youtube.com/t/terms)
 **Google's Privacy Policy:** [https://policies.google.com/privacy](https://policies.google.com/privacy)
 
 ### 6.5 Send Feedback Feature
