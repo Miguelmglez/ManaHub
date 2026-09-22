@@ -162,7 +162,7 @@ class ScannerViewModelTest {
             cardRepository = cardRepository,
             userCardRepository = userCardRepository,
             sharedQueueRepository = queueRepository,
-            queueActions = CardQueueActions(
+            queueActions = CardQueueActions.forScannedCards(
                 queueRepository = queueRepository,
                 commitScannedCards = commitScannedCards,
                 addToWishlist = addToWishlist,
@@ -1002,7 +1002,7 @@ class ScannerViewModelTest {
         cardRepository = cardRepository,
         userCardRepository = userCardRepository,
         sharedQueueRepository = queueRepository,
-        queueActions = CardQueueActions(
+        queueActions = CardQueueActions.forScannedCards(
             queueRepository = queueRepository,
             commitScannedCards = commitScannedCards,
             addToWishlist = addToWishlist,

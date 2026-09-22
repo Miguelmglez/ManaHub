@@ -141,7 +141,7 @@ class AddCardViewModelTest {
         buildScryfallQuery = buildScryfallQuery,
         getSpotlightFeed = getSpotlightFeed,
         queueRepository = queueRepository,
-        queueActions = CardQueueActions(
+        queueActions = CardQueueActions.forScannedCards(
             queueRepository = queueRepository,
             commitScannedCards = commitScannedCards,
             addToWishlist = addToWishlist,

@@ -2,6 +2,7 @@ package com.mmg.manahub.core.domain.collection.transfer
 
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -45,16 +46,17 @@ object CollectionExportFormatter {
         CollectionFileFormat.MANABOX_CSV -> formatManaBoxCsv(entries)
     }
 
+    /** The local date an export is stamped with, for both the file name and the header comment. */
+    fun exportDate(epochMillis: Long, timeZone: TimeZone = TimeZone.currentSystemDefault()): LocalDate =
+        Instant.fromEpochMilliseconds(epochMillis).toLocalDateTime(timeZone).date
+
     /** `manahub-<sourceKey>-YYYY-MM-DD.<ext>` in [timeZone]. */
     fun fileName(
         sourceKey: String,
         format: CollectionFileFormat,
         epochMillis: Long,
         timeZone: TimeZone = TimeZone.currentSystemDefault(),
-    ): String {
-        val date = Instant.fromEpochMilliseconds(epochMillis).toLocalDateTime(timeZone).date
-        return "manahub-$sourceKey-$date.${format.fileExtension}"
-    }
+    ): String = "manahub-$sourceKey-${exportDate(epochMillis, timeZone)}.${format.fileExtension}"
 
     /**
      * Rows [format] writes without a printing, so a re-import resolves them to an arbitrary one.

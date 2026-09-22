@@ -47,19 +47,6 @@ class CardQueueActions(
     private val wishlistBatchWriter: WishlistBatchWriter? = null,
 ) {
 
-    /** The Scanner / AddCard queue: commits count as scans (batched CardScanned XP). */
-    constructor(
-        queueRepository: CardQueueRepository,
-        commitScannedCards: CommitScannedCardsUseCase,
-        addToWishlist: AddToWishlistUseCase,
-        nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
-    ) : this(
-        queueRepository = queueRepository,
-        committer = CardBatchCommitter { entries -> commitScannedCards(entries) },
-        addToWishlist = addToWishlist,
-        nowMillis = nowMillis,
-    )
-
     private val _isCommitting = MutableStateFlow(false)
 
     /** True while an [addAllToCollection] commit is in flight. */
@@ -244,4 +231,26 @@ class CardQueueActions(
         createdAt = nowMillis(),
         card = card,
     )
+
+    companion object {
+        /**
+         * The Scanner / AddCard queue: commits count as scans (batched CardScanned XP).
+         *
+         * A named factory rather than a second constructor: the two differ only by the type of
+         * their second argument, so a positional call would pick a committer — and therefore an XP
+         * outcome — that the reader cannot see. Imports must NOT use this (see the Collection
+         * feature's "imports grant no XP" invariant).
+         */
+        fun forScannedCards(
+            queueRepository: CardQueueRepository,
+            commitScannedCards: CommitScannedCardsUseCase,
+            addToWishlist: AddToWishlistUseCase,
+            nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+        ): CardQueueActions = CardQueueActions(
+            queueRepository = queueRepository,
+            committer = CardBatchCommitter { entries -> commitScannedCards(entries) },
+            addToWishlist = addToWishlist,
+            nowMillis = nowMillis,
+        )
+    }
 }

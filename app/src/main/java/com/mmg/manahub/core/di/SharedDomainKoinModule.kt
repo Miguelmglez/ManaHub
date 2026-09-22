@@ -202,7 +202,7 @@ fun sharedDomainKoinModule(
     }
     // App-wide so its commit guard covers the shared queue from every screen (also bridged to Hilt).
     single {
-        CardQueueActions(
+        CardQueueActions.forScannedCards(
             queueRepository = get(),
             commitScannedCards = get(),
             addToWishlist = get(),

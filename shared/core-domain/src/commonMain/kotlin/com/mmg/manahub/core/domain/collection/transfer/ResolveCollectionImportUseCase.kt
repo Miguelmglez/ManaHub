@@ -36,8 +36,10 @@ sealed interface CollectionImportResolution {
  * ([CardRepository.MAX_IDENTIFIERS_PER_LOOKUP] identifiers per call) instead of one fuzzy search
  * per line. Identifier priority: Scryfall id > set + collector number > name + set > name.
  *
- * Lines the batch could not match fall back to a fuzzy name search, at most
- * [MAX_NAME_FALLBACKS] distinct names per import, before being reported unresolved.
+ * Lines the batch reported back as `not_found` fall back to a fuzzy name search, at most
+ * [MAX_NAME_FALLBACKS] distinct names per import, before being reported unresolved. An identifier
+ * that Scryfall answered but [CardIndex] could not map back also falls back, and is counted so the
+ * gap between "not found" and "not matched" stays visible.
  *
  * CPU-bound for thousands of lines and deliberately dispatcher-free (commonMain must stay honest on
  * wasm): the caller runs it off its own thread and throttles [invoke]'s `onProgress` callback.
@@ -67,23 +69,32 @@ class ResolveCollectionImportUseCase(
         val uniqueIdentifiers = identifierByLine.distinctBy { it.key() }
         val cardByIdentifier = HashMap<String, Card>()
         val linesByKey = identifierByLine.groupingBy { it.key() }.eachCount()
+        val notFoundKeys = HashSet<String>()
+        var unmatchedResponses = 0
         var processed = 0
 
         for (chunk in uniqueIdentifiers.chunked(CardRepository.MAX_IDENTIFIERS_PER_LOOKUP)) {
             when (val result = cardRepository.lookupCardsByIdentifiers(chunk)) {
                 is DataResult.Error -> return failure(result.message, total)
                 is DataResult.Success -> {
+                    result.data.notFound.forEach { notFoundKeys += it.key() }
                     val index = CardIndex(result.data.cards)
                     chunk.forEach { identifier ->
-                        index.match(identifier)?.let { card ->
+                        val card = index.match(identifier)
+                        if (card != null) {
                             cardByIdentifier[identifier.key()] = card
                             processed += linesByKey[identifier.key()] ?: 0
+                        } else if (identifier.key() !in notFoundKeys) {
+                            // Scryfall returned something this identifier asked for but the index
+                            // could not map it back; it still falls back, but it is worth knowing.
+                            unmatchedResponses++
                         }
                     }
                 }
             }
             onProgress(processed, total)
         }
+        if (unmatchedResponses > 0) crashReporter?.log("collection_import_unmatched_response")
 
         val fallbackByName = HashMap<String, Card?>()
         var fallbackBudget = MAX_NAME_FALLBACKS
@@ -165,7 +176,7 @@ class ResolveCollectionImportUseCase(
             return CollectionImportResolution.RateLimited(retryAfter.coerceAtLeast(0L))
         }
         crashReporter?.log("collection_import_lookup_failed")
-        crashReporter?.setCustomKey("collection_import_line_count", total.toString())
+        crashReporter?.setCustomKey("collection_import_lines_bucket", transferCountBucket(total))
         return CollectionImportResolution.Failed
     }
 

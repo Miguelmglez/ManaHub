@@ -13,6 +13,9 @@ object CollectionImportParser {
 
     const val MAX_QUANTITY_PER_LINE = 9_999
 
+    private const val BINARY_SAMPLE_CHARS = 64 * 1024
+    private const val BINARY_SUSPECT_PERCENT = 5
+
     private val SECTION_HEADERS = setOf(
         "commander", "commanders", "deck", "mainboard", "main", "sideboard", "side", "sb",
         "maybeboard", "maybe", "companion", "companions", "tokens", "considering",
@@ -40,13 +43,52 @@ object CollectionImportParser {
     }
 
     fun parse(text: String): ParsedCollectionImport {
-        val clean = text.removePrefix("﻿")
-        val firstLine = clean.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
-        return when (detectFormat(firstLine)) {
-            CollectionFileFormat.MOXFIELD_CSV -> parseMoxfieldCsv(clean)
-            CollectionFileFormat.MANABOX_CSV -> parseManaBoxCsv(clean)
-            CollectionFileFormat.TEXT -> parseText(clean)
+        val clean = dropPreamble(text.removePrefix("﻿"))
+        // A CSV re-saved by Excel starts with `sep=,` and some exporters add a title row, either of
+        // which would otherwise push the real header out of view and reject every row as TEXT.
+        val header = clean.lineSequence().filter { it.isNotBlank() }.take(2)
+            .firstOrNull { detectFormat(it) != CollectionFileFormat.TEXT }
+            ?: return parseText(clean)
+        val csv = dropLinesBefore(clean, header)
+        return when (detectFormat(header)) {
+            CollectionFileFormat.MANABOX_CSV -> parseManaBoxCsv(csv)
+            else -> parseMoxfieldCsv(csv)
         }
+    }
+
+    /**
+     * True when [text] is almost certainly not a card list but a binary file decoded as UTF-8.
+     *
+     * The document picker has to accept `* / *` (providers routinely mislabel `.csv`), so a picked
+     * JPEG reaches the parser as mojibake rather than an error, and the user is told "no card lines
+     * were recognized" for a file that was never text. Replacement characters and C0 controls are
+     * the giveaway; a genuine list has effectively none.
+     */
+    fun looksBinary(text: String): Boolean {
+        val sample = if (text.length <= BINARY_SAMPLE_CHARS) text else text.substring(0, BINARY_SAMPLE_CHARS)
+        if (sample.isEmpty()) return false
+        val suspect = sample.count { c ->
+            c == '�' || (c.code < 0x20 && c != '\n' && c != '\r' && c != '\t')
+        }
+        return suspect * 100 > sample.length * BINARY_SUSPECT_PERCENT
+    }
+
+    /** Drops the leading blank, comment and `sep=,` lines an exporter may put above the header. */
+    private fun dropPreamble(text: String): String {
+        val lines = text.lines()
+        val start = lines.indexOfFirst { line ->
+            val trimmed = line.trim()
+            trimmed.isNotEmpty() && !trimmed.startsWith("//") && !trimmed.startsWith("#") &&
+                !SEP_PREAMBLE_REGEX.matches(trimmed)
+        }
+        return if (start <= 0) text else lines.drop(start).joinToString("\n")
+    }
+
+    /** Everything from [header] onwards, so the CSV reader sees the header as its first record. */
+    private fun dropLinesBefore(text: String, header: String): String {
+        val lines = text.lines()
+        val index = lines.indexOf(header)
+        return if (index <= 0) text else lines.drop(index).joinToString("\n")
     }
 
     internal fun detectFormat(firstLine: String): CollectionFileFormat {
@@ -211,4 +253,7 @@ object CollectionImportParser {
     }
 
     private val SCRYFALL_ID_REGEX = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+    // Excel / LibreOffice write this above the header when the list separator is not a comma.
+    private val SEP_PREAMBLE_REGEX = Regex("^sep=.$", RegexOption.IGNORE_CASE)
 }

@@ -285,7 +285,10 @@ class UserCardRepositoryImpl @Inject constructor(
             else -> {
                 userCardCollectionDao.upsert(
                     existing.copy(
-                        quantity   = existing.quantity + quantity,
+                        // Summed as Long first: an Int overflow here would write a NEGATIVE owned
+                        // quantity, which every consumer reads as real ownership data.
+                        quantity   = (existing.quantity.toLong() + quantity)
+                            .coerceIn(0L, Int.MAX_VALUE.toLong()).toInt(),
                         isForTrade = isForTrade || existing.isForTrade,
                         updatedAt  = now,
                     )
