@@ -14,11 +14,14 @@ sealed interface CollectionImportResolution {
     /**
      * @property entries queue-ready cards, identical printings + attributes merged.
      * @property unresolvedLines source lines no card could be found for, in input order.
+     * @property clampedCopies copies dropped by the per-row quantity cap, parsing and merging
+     *   combined; surfaced to the user so the cap is never silent.
      */
     data class Resolved(
         val entries: List<QueuedCard>,
         val unresolvedLines: List<String>,
         val resolvedLineCount: Int,
+        val clampedCopies: Int = 0,
     ) : CollectionImportResolution
 
     /** Scryfall's shared cooldown is active; nothing was resolved. */
@@ -35,6 +38,9 @@ sealed interface CollectionImportResolution {
  *
  * Lines the batch could not match fall back to a fuzzy name search, at most
  * [MAX_NAME_FALLBACKS] distinct names per import, before being reported unresolved.
+ *
+ * CPU-bound for thousands of lines and deliberately dispatcher-free (commonMain must stay honest on
+ * wasm): the caller runs it off its own thread and throttles [invoke]'s `onProgress` callback.
  */
 class ResolveCollectionImportUseCase(
     private val cardRepository: CardRepository,
@@ -48,7 +54,14 @@ class ResolveCollectionImportUseCase(
     ): CollectionImportResolution {
         val lines = parsed.lines
         val total = lines.size
-        if (total == 0) return CollectionImportResolution.Resolved(emptyList(), parsed.rejectedLines, 0)
+        if (total == 0) {
+            return CollectionImportResolution.Resolved(
+                entries = emptyList(),
+                unresolvedLines = parsed.rejectedLines,
+                resolvedLineCount = 0,
+                clampedCopies = parsed.clampedCopies,
+            )
+        }
 
         val identifierByLine = lines.map { identifierFor(it) }
         val uniqueIdentifiers = identifierByLine.distinctBy { it.key() }
@@ -110,12 +123,13 @@ class ResolveCollectionImportUseCase(
         val entries = mutableListOf<QueuedCard>()
         val entryIndexByKey = HashMap<String, Int>()
         val timestamp = nowMillis()
+        var clampedCopies = parsed.clampedCopies
         lines.forEachIndexed { i, line ->
             val card = resolvedCards[i]
             if (card == null) {
                 unresolved += line.rawLine
             } else {
-                entries.mergeOrAdd(
+                clampedCopies += entries.mergeOrAdd(
                     entryIndexByKey,
                     QueuedCard(
                         card = card,
@@ -141,6 +155,7 @@ class ResolveCollectionImportUseCase(
             entries = entries,
             unresolvedLines = parsed.rejectedLines + unresolved,
             resolvedLineCount = total - unresolvedCount,
+            clampedCopies = clampedCopies,
         )
     }
 
@@ -154,17 +169,19 @@ class ResolveCollectionImportUseCase(
         return CollectionImportResolution.Failed
     }
 
-    private fun MutableList<QueuedCard>.mergeOrAdd(indexByKey: MutableMap<String, Int>, entry: QueuedCard) {
+    /** Returns the copies the per-row quantity cap had to drop. */
+    private fun MutableList<QueuedCard>.mergeOrAdd(indexByKey: MutableMap<String, Int>, entry: QueuedCard): Int {
         val key = "${entry.card.scryfallId}|${entry.isFoil}|${entry.language}|${entry.condition}"
         val index = indexByKey[key]
         if (index == null) {
             indexByKey[key] = size
             add(entry)
-        } else {
-            val merged = (this[index].quantity.toLong() + entry.quantity)
-                .coerceAtMost(CollectionImportParser.MAX_QUANTITY_PER_LINE.toLong()).toInt()
-            this[index] = this[index].copy(quantity = merged)
+            return 0
         }
+        val wanted = this[index].quantity.toLong() + entry.quantity
+        val capped = wanted.coerceAtMost(CollectionImportParser.MAX_QUANTITY_PER_LINE.toLong())
+        this[index] = this[index].copy(quantity = capped.toInt())
+        return (wanted - capped).toInt()
     }
 
     /** Matches a returned card back to the identifier that asked for it. */

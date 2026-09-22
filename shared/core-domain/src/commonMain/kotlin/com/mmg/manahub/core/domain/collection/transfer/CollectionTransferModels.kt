@@ -34,11 +34,14 @@ data class CollectionImportLine(
  * Result of [CollectionImportParser.parse].
  *
  * @property rejectedLines non-blank lines that are neither a card, a header nor a comment.
+ * @property clampedCopies copies dropped by the [CollectionImportParser.MAX_QUANTITY_PER_LINE] cap
+ *   while merging identical lines; reported so the cap is never silent.
  */
 data class ParsedCollectionImport(
     val format: CollectionFileFormat,
     val lines: List<CollectionImportLine>,
     val rejectedLines: List<String>,
+    val clampedCopies: Int = 0,
 ) {
     /** Total card copies across [lines]. */
     val totalCopies: Int get() = lines.sumOf { it.quantity }

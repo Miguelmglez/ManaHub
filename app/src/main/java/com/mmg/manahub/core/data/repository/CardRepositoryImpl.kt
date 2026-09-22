@@ -364,7 +364,11 @@ class CardRepositoryImpl @Inject constructor(
 
     override suspend fun getCardsByIds(scryfallIds: List<String>): List<Card> = withContext(ioDispatcher) {
         if (scryfallIds.isEmpty()) return@withContext emptyList()
-        cardDao.getByIds(scryfallIds).map { it.toDomainCard() }
+        // SQLite binds at most 999 variables per statement on API <= 30; an unchunked IN (:ids)
+        // over a whole collection throws instead of returning rows.
+        scryfallIds.chunked(SQLITE_MAX_BIND_ARGS).flatMap { chunk ->
+            cardDao.getByIds(chunk).map { it.toDomainCard() }
+        }
     }
 
     override suspend fun getCardById(scryfallId: String): DataResult<Card> = withContext(ioDispatcher) {
@@ -504,9 +508,10 @@ class CardRepositoryImpl @Inject constructor(
     override suspend fun warmCacheForIds(scryfallIds: List<String>) = withContext(ioDispatcher) {
         if (scryfallIds.isEmpty()) return@withContext
 
-        // Single DB read for all IDs instead of N individual getById() calls.
+        // One DB read per bind-limit chunk instead of N individual getById() calls.
         // A sync placeholder row is not real card data: re-fetch it (the upsert's @Update hydrates it).
-        val alreadyCached = cardDao.getByIds(scryfallIds)
+        val alreadyCached = scryfallIds.chunked(SQLITE_MAX_BIND_ARGS)
+            .flatMap { cardDao.getByIds(it) }
             .filterNot { it.staleReason == PENDING_HYDRATION_REASON }
             .map { it.scryfallId }
             .toSet()
@@ -615,3 +620,6 @@ class CardRepositoryImpl @Inject constructor(
 
 // Written by SyncManager.ensureCardsExist for a card Scryfall has not returned yet.
 private const val PENDING_HYDRATION_REASON = "pending_hydration"
+
+/** SQLITE_MAX_VARIABLE_NUMBER is 999 on API <= 30; stay under it for every `IN (:ids)` query. */
+private const val SQLITE_MAX_BIND_ARGS = 900

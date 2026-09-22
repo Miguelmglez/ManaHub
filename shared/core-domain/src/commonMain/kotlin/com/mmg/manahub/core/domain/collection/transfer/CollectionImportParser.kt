@@ -88,7 +88,8 @@ object CollectionImportParser {
                 rawLine = line,
             )
         }
-        return ParsedCollectionImport(CollectionFileFormat.TEXT, merge(lines), rejected)
+        val merged = merge(lines)
+        return ParsedCollectionImport(CollectionFileFormat.TEXT, merged.lines, rejected, merged.clampedCopies)
     }
 
     // "Sideboard", "SIDEBOARD:" and Arena's "Commander (1)" style headers.
@@ -171,7 +172,8 @@ object CollectionImportParser {
                 rawLine = record.raw.trim(),
             )
         }
-        return ParsedCollectionImport(format, merge(lines), rejected)
+        val merged = merge(lines)
+        return ParsedCollectionImport(format, merged.lines, rejected, merged.clampedCopies)
     }
 
     // Moxfield writes "foil"/"etched"/"", ManaBox "normal"/"foil"/"etched"; etched counts as foil.
@@ -180,22 +182,22 @@ object CollectionImportParser {
         else -> false
     }
 
+    /** [merge]d lines plus the copies the [MAX_QUANTITY_PER_LINE] cap had to drop. */
+    internal class MergeResult(val lines: List<CollectionImportLine>, val clampedCopies: Int)
+
     /** Merges lines sharing identifier + foil + condition + language, summing their quantity. */
-    internal fun merge(lines: List<CollectionImportLine>): List<CollectionImportLine> {
+    internal fun merge(lines: List<CollectionImportLine>): MergeResult {
         val merged = LinkedHashMap<String, CollectionImportLine>()
+        var clamped = 0
         for (line in lines) {
             val key = mergeKey(line)
             val existing = merged[key]
-            merged[key] = if (existing == null) {
-                line.copy(quantity = line.quantity.coerceAtMost(MAX_QUANTITY_PER_LINE))
-            } else {
-                existing.copy(
-                    quantity = (existing.quantity.toLong() + line.quantity)
-                        .coerceAtMost(MAX_QUANTITY_PER_LINE.toLong()).toInt(),
-                )
-            }
+            val wanted = (existing?.quantity?.toLong() ?: 0L) + line.quantity
+            val capped = wanted.coerceAtMost(MAX_QUANTITY_PER_LINE.toLong())
+            clamped += (wanted - capped).toInt()
+            merged[key] = (existing ?: line).copy(quantity = capped.toInt())
         }
-        return merged.values.toList()
+        return MergeResult(merged.values.toList(), clamped)
     }
 
     private fun mergeKey(line: CollectionImportLine): String {

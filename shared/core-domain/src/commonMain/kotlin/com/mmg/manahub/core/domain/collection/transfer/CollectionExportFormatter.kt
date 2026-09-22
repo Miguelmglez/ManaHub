@@ -6,9 +6,17 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
 /**
- * Serialises [CollectionExportEntry] rows into the three [CollectionFileFormat]s. Every output
- * parses back through [CollectionImportParser] to the same entries (Moxfield's condition scale is
- * coarser than the app's, see [CollectionCardAttributes.moxfieldCondition]).
+ * Serialises [CollectionExportEntry] rows into the three [CollectionFileFormat]s.
+ *
+ * Round-trip fidelity is NOT equal across formats:
+ * - the two CSVs parse back through [CollectionImportParser] to the same entries (Moxfield's
+ *   condition scale is coarser than the app's, see [CollectionCardAttributes.moxfieldCondition]);
+ * - [CollectionFileFormat.TEXT] carries quantity, name, printing and foil only. Condition and
+ *   language are not part of the format, so re-importing a text export rebuilds every row at
+ *   [CollectionCardAttributes.DEFAULT_CONDITION]/[CollectionCardAttributes.DEFAULT_LANGUAGE] — a
+ *   backup-and-restore through TEXT both loses grading and splits rows that differed only by it.
+ *   CSV is the lossless choice; see also [countLoosePrintings] for the rows TEXT cannot even pin
+ *   to a printing.
  */
 object CollectionExportFormatter {
 
@@ -47,6 +55,18 @@ object CollectionExportFormatter {
         val date = Instant.fromEpochMilliseconds(epochMillis).toLocalDateTime(timeZone).date
         return "manahub-$sourceKey-$date.${format.fileExtension}"
     }
+
+    /**
+     * Rows [format] writes without a printing, so a re-import resolves them to an arbitrary one.
+     * Only [CollectionFileFormat.TEXT] can lose a printing: `DeckImportExportHelper.formatLine`
+     * drops the whole `(SET) number` group when either half is missing, because the importer's
+     * regex only accepts a set code followed by a collector number — emitting `(SET)` alone would
+     * make the name itself unparseable. The rows are still exported, never dropped; the count is
+     * reported so the loss is visible.
+     */
+    fun countLoosePrintings(entries: List<CollectionExportEntry>, format: CollectionFileFormat): Int =
+        if (format != CollectionFileFormat.TEXT) 0
+        else entries.count { it.setCode.isBlank() || it.collectorNumber.isBlank() }
 
     /** Stable export order: name, then set, then collector number. */
     fun sorted(entries: List<CollectionExportEntry>): List<CollectionExportEntry> =
