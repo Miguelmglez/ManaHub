@@ -9,11 +9,14 @@ import com.mmg.manahub.core.domain.usecase.collection.CardCommit
 import com.mmg.manahub.core.domain.usecase.collection.CommitImportedCardsUseCase
 import com.mmg.manahub.core.domain.usecase.queue.AddAllToCollectionResult
 import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.model.QueuedCard
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -85,4 +88,45 @@ class CommitImportedCardsUseCaseTest {
         assertTrue(queue.queue.value.isEmpty())
         coVerify(exactly = 1) { userCardRepository.addOrIncrementBatch(any(), null) }
     }
+
+    /**
+     * The invariant most likely to regress if someone merges the two `CardQueueActions` bindings:
+     * the import owns a SECOND queue, and its whole lifecycle must leave the shared
+     * AddCard/Scanner queue and the progression bus alone.
+     */
+    @Test
+    fun `a full import cycle never touches the shared queue and publishes no progression event`() = runTest {
+        coEvery { userCardRepository.addOrIncrementBatch(any(), any()) } answers {
+            firstArg<List<CollectionAddRequest>>().map { AddOutcome.CREATED_NEW }
+        }
+        val sharedQueue = PersistentCardQueueRepository(InMemoryCardQueueStore())
+        sharedQueue.addAll(listOf(queued("shared-1"), queued("shared-2")))
+        val sharedSnapshot = sharedQueue.queue.value
+        val importQueue = PersistentCardQueueRepository(InMemoryCardQueueStore())
+        val progressionEventBus = ProgressionEventBus()
+        val published = mutableListOf<ProgressionEvent>()
+        val collector = launch { progressionEventBus.events.collect { published += it } }
+        val importActions = CardQueueActions(
+            queueRepository = importQueue,
+            committer = CommitImportedCardsUseCase(userCardRepository),
+            addToWishlist = mockk(relaxed = true),
+        )
+
+        // Import → review (edit a row) → add all.
+        importQueue.addAll(listOf(queued("import-a"), queued("import-b", quantity = 3)))
+        importQueue.incrementQuantity(importQueue.queue.value.first().id)
+        importQueue.remove(importQueue.queue.value.last().id)
+        var outcome: AddAllToCollectionResult? = null
+        importActions.addAllToCollection(this) { outcome = it }
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(AddAllToCollectionResult.Success(1), outcome)
+        assertTrue(importQueue.queue.value.isEmpty())
+        assertEquals(sharedSnapshot, sharedQueue.queue.value)
+        assertTrue("an import is neither a scan nor a manual add: no XP", published.isEmpty())
+        collector.cancel()
+    }
+
+    private fun queued(id: String, quantity: Int = 1) =
+        QueuedCard(TestFixtures.buildCard(scryfallId = id), quantity, false, "en", "NM", "lea", 0L)
 }
