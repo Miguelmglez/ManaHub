@@ -328,6 +328,10 @@ Unified deck editor + Deck Doctor suggestion engine — see `app/src/main/java/c
 ### Home dashboard & widget board (`feature/home/`)
 See `app/src/main/java/com/mmg/manahub/feature/home/CLAUDE.md`.
 
+### Collection import / export (`feature/collection/`)
+Overflow menu on the Cards tab: paste/file import into a private review queue, and export of the
+visible rows — see `app/src/main/java/com/mmg/manahub/feature/collection/CLAUDE.md`.
+
 ### Gamification (`core/gamification/`)
 Cross-cutting XP/levels/achievements/quests/streaks/cosmetics engine — see `app/src/main/java/com/mmg/manahub/core/gamification/CLAUDE.md`.
 
