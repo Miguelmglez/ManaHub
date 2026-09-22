@@ -16,6 +16,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.collection.transfer.CollectionFileFormat
+import com.mmg.manahub.core.domain.collection.transfer.CollectionImportParser
 import com.mmg.manahub.core.model.QueuedCard
 import com.mmg.manahub.core.ui.components.CardQueueSheet
 import com.mmg.manahub.core.ui.components.EditQueuedCardSheet
@@ -170,6 +171,7 @@ fun CollectionExportHost(
     onSaveTo: (location: String) -> Unit,
     onShare: () -> Unit,
     onShareLaunched: () -> Unit,
+    onShareFailed: () -> Unit,
     onMessageShown: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -183,8 +185,12 @@ fun CollectionExportHost(
     }
     val chooserTitle = stringResource(R.string.collection_export_share_chooser)
 
-    LaunchedEffect(state.pendingShare) {
+    // Gated on isResumed: Android 10+ drops a startActivity from a stopped Activity, and clearing
+    // pendingShare anyway would report a success the user never saw. It stays pending until the
+    // destination is resumed again.
+    LaunchedEffect(state.pendingShare, isResumed) {
         val share = state.pendingShare ?: return@LaunchedEffect
+        if (!isResumed) return@LaunchedEffect
         val uri = Uri.parse(share.location)
         val send = Intent(Intent.ACTION_SEND).apply {
             type = share.mimeType
@@ -192,10 +198,12 @@ fun CollectionExportHost(
             clipData = ClipData.newRawUri(null, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(
-            Intent.createChooser(send, chooserTitle).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        )
-        onShareLaunched()
+        val launched = runCatching {
+            context.startActivity(
+                Intent.createChooser(send, chooserTitle).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            )
+        }.isSuccess
+        if (launched) onShareLaunched() else onShareFailed()
     }
 
     val message = state.message
@@ -230,14 +238,27 @@ private fun importErrorText(error: CollectionImportError): String = when (error)
     CollectionImportError.LookupFailed -> stringResource(R.string.collection_import_error_lookup_failed)
     CollectionImportError.FileTooLarge -> stringResource(R.string.collection_import_error_file_too_large)
     CollectionImportError.FileUnreadable -> stringResource(R.string.collection_import_error_file_unreadable)
+    is CollectionImportError.TooManyLines ->
+        stringResource(R.string.collection_import_error_too_many_lines, error.maxLines)
 }
 
 @Composable
 private fun importToastText(toast: CollectionImportToast): String = when (toast) {
-    is CollectionImportToast.Resolved -> if (toast.unresolved == 0) {
-        pluralStringResource(R.plurals.collection_import_resolved, toast.entries, toast.entries)
-    } else {
-        pluralStringResource(R.plurals.collection_import_resolved_with_unresolved, toast.unresolved, toast.entries, toast.unresolved)
+    is CollectionImportToast.Resolved -> when {
+        toast.clampedCopies > 0 -> pluralStringResource(
+            R.plurals.collection_import_resolved_with_capped,
+            toast.clampedCopies,
+            toast.entries,
+            toast.clampedCopies,
+            CollectionImportParser.MAX_QUANTITY_PER_LINE,
+        )
+        toast.unresolved == 0 -> pluralStringResource(R.plurals.collection_import_resolved, toast.entries, toast.entries)
+        else -> pluralStringResource(
+            R.plurals.collection_import_resolved_with_unresolved,
+            toast.unresolved,
+            toast.entries,
+            toast.unresolved,
+        )
     }
     is CollectionImportToast.AddedToCollection -> stringResource(R.string.scanner_toast_added_to_collection, toast.cardName)
     is CollectionImportToast.AddedToWishlist -> stringResource(R.string.scanner_toast_added_to_wishlist, toast.cardName)
@@ -250,8 +271,9 @@ private fun importToastText(toast: CollectionImportToast): String = when (toast)
         pluralStringResource(R.plurals.addcard_queue_add_all_partial_failure, toast.total, toast.failed, toast.total)
 }
 
-private fun CollectionImportToast.toastType(): MagicToastType = when (this) {
-    is CollectionImportToast.Resolved -> if (unresolved == 0) MagicToastType.SUCCESS else MagicToastType.WARNING
+internal fun CollectionImportToast.toastType(): MagicToastType = when (this) {
+    is CollectionImportToast.Resolved ->
+        if (unresolved == 0 && clampedCopies == 0) MagicToastType.SUCCESS else MagicToastType.WARNING
     is CollectionImportToast.AddedToCollection,
     is CollectionImportToast.AddedToWishlist,
     is CollectionImportToast.AddedAllToCollection,
@@ -262,17 +284,28 @@ private fun CollectionImportToast.toastType(): MagicToastType = when (this) {
 
 @Composable
 private fun exportMessageText(message: CollectionExportMessage): String = when (message) {
-    is CollectionExportMessage.Completed -> if (message.skippedRows == 0) {
-        pluralStringResource(R.plurals.collection_export_saved, message.rows, message.rows)
-    } else {
-        pluralStringResource(R.plurals.collection_export_saved_with_skipped, message.skippedRows, message.rows, message.skippedRows)
+    is CollectionExportMessage.Completed -> when {
+        message.skippedRows > 0 -> pluralStringResource(
+            R.plurals.collection_export_saved_with_skipped,
+            message.skippedRows,
+            message.rows,
+            message.skippedRows,
+        )
+        message.loosePrintingRows > 0 -> pluralStringResource(
+            R.plurals.collection_export_saved_with_loose_printings,
+            message.loosePrintingRows,
+            message.rows,
+            message.loosePrintingRows,
+        )
+        else -> pluralStringResource(R.plurals.collection_export_saved, message.rows, message.rows)
     }
     is CollectionExportMessage.NothingToExport -> stringResource(R.string.collection_export_nothing)
     CollectionExportMessage.Failed -> stringResource(R.string.collection_export_failed)
 }
 
-private fun CollectionExportMessage.toastType(): MagicToastType = when (this) {
-    is CollectionExportMessage.Completed -> if (skippedRows == 0) MagicToastType.SUCCESS else MagicToastType.WARNING
+internal fun CollectionExportMessage.toastType(): MagicToastType = when (this) {
+    is CollectionExportMessage.Completed ->
+        if (skippedRows == 0 && loosePrintingRows == 0) MagicToastType.SUCCESS else MagicToastType.WARNING
     is CollectionExportMessage.NothingToExport -> MagicToastType.WARNING
     CollectionExportMessage.Failed -> MagicToastType.ERROR
 }

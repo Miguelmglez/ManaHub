@@ -5,10 +5,20 @@ Entry point: the 3-dot overflow in `CollectionTopBar`, visible only on `Collecti
 ## Invariants
 
 - **The import review queue is PRIVATE.** It is a second `PersistentCardQueueRepository` over the
-  `collection_import_queue_v1` preference key, registered `named(COLLECTION_IMPORT_QUEUE)` in
-  `collectionKoinModule` with its own `CardQueueActions`. The shared AddCard/Scanner queue
+  `collection_import_queue_v1` key of its OWN `collection_import_prefs` file (never `scanner_prefs`:
+  SharedPreferences rewrites the whole file per write), registered `named(COLLECTION_IMPORT_QUEUE)`
+  in `collectionKoinModule` with its own `CardQueueActions`. The shared AddCard/Scanner queue
   (unqualified `CardQueueRepository`) must never be read, shown or cleared by this feature. Both
   queues are single instances per store — never construct a second one over the same key.
+- **Nothing on this path may run on the main thread.** The queue is built with a `persistenceScope`,
+  so every mutation encodes + writes through a conflated channel on the app scope (and `commit()`s,
+  so `onPause`'s QueuedWork drain never blocks); `ManaHubApp` warms the single at start-up so the
+  restore never lands in composition; parsing and `ResolveCollectionImportUseCase` run on
+  `parseDispatcher` with progress throttled to one update per 250 ms. The queue is capped at
+  `MAX_IMPORT_QUEUE_ENTRIES` (2,000) — `MAX_FILE_BYTES` is a byte cap, not a row cap.
+- **Unresolved lines are persisted with the queue** (`CollectionImportUnresolvedStore`, same
+  preference file, capped at `MAX_PERSISTED_UNRESOLVED_LINES`): the resume dialog offers them, so
+  they must survive process death exactly as the queue does.
 - **Imports grant no XP.** The import `CardQueueActions` is built with `CommitImportedCardsUseCase`
   (a `CardBatchCommitter`), never `CommitScannedCardsUseCase` — an import is neither a scan nor a
   manual add. Large adds go through `UserCardRepository.addOrIncrementBatch`, ONE Room transaction
@@ -18,13 +28,20 @@ Entry point: the 3-dot overflow in `CollectionTopBar`, visible only on `Collecti
   fuzzy `searchCardByName` for what came back `not_found`, capped at `MAX_NAME_FALLBACKS`. Never
   resolve a list one name at a time. Rate-limit exhaustion is a typed `RateLimited` outcome.
 - **Nothing is dropped silently.** Unparseable lines and unresolved identifiers are reported back as
-  `unresolvedLines` and shown with a copy action; an export that could not hydrate a row reports the
-  skipped count in its toast.
+  `unresolvedLines` and shown with a copy action; copies dropped by the 9,999-per-row cap come back
+  as `clampedCopies` in a WARNING toast; an export that could not hydrate a row reports the skipped
+  count, and a TEXT export reports `loosePrintingRows` (rows with no `(SET) number`, which re-import
+  as an arbitrary printing). TEXT also drops condition + language entirely — CSV is the lossless
+  format, and both facts belong in the format's description string.
 - **Export follows the Cards tab.** It serialises `visibleRows` (the per-printing rows behind the
   visible groups: source + search + advanced filters), hydrating `pending_hydration` placeholders
   first. Keep `visibleRows` in sync with `applyFilters` if the filter pipeline changes.
 - **Sharing goes through the FileProvider** `${applicationId}.fileprovider`, limited to
-  `cache/exports/` (`res/xml/file_provider_paths.xml`), which is wiped on each export. Never put the
-  file content in `EXTRA_TEXT` (1 MB Binder limit).
+  `cache/exports/` (`res/xml/file_provider_paths.xml`). Each export writes into its own timestamped
+  sub-directory and prunes older ones (>24 h, or beyond 5) BEFORE writing — never wipe the directory
+  on write: a receiver such as Gmail reads the stream when the message is sent, not when it is
+  attached. Never put the file content in `EXTRA_TEXT` (1 MB Binder limit).
 - Sheets render above the NavHost: they mount only while the destination is RESUMED, with their
-  open state in the ViewModel.
+  open state in the ViewModel. The share chooser is part of that rule — launching it while the
+  destination is not RESUMED is dropped by Android 10+, so `pendingShare` is only cleared once
+  `startActivity` actually succeeded.

@@ -8,10 +8,12 @@ import com.mmg.manahub.feature.collection.presentation.CollectionViewModel
 import com.mmg.manahub.core.data.queue.PersistentCardQueueRepository
 import com.mmg.manahub.core.data.queue.SharedPreferencesCardQueueStore
 import com.mmg.manahub.core.domain.collection.transfer.CollectionFileGateway
+import com.mmg.manahub.core.domain.collection.transfer.CollectionImportUnresolvedStore
 import com.mmg.manahub.core.domain.repository.CardQueueRepository
 import com.mmg.manahub.core.domain.usecase.collection.CommitImportedCardsUseCase
 import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.feature.collection.data.AndroidCollectionFileGateway
+import com.mmg.manahub.feature.collection.data.SharedPreferencesImportUnresolvedStore
 import com.mmg.manahub.feature.collection.presentation.importexport.CollectionImportViewModel
 import com.mmg.manahub.feature.trades.domain.usecase.AddAllToWishlistUseCase
 import org.koin.android.ext.koin.androidContext
@@ -133,13 +135,18 @@ fun collectionKoinModule(
     // ── Collection import / export. ──
     single<CollectionFileGateway> { AndroidCollectionFileGateway(androidContext(), get(named("io"))) }
     // Private review queue: must stay a single instance over its store, and never the shared queue.
+    // Its own preference file + off-main persistence: this queue holds thousands of rows, so both
+    // the re-encode and the SharedPreferences write have to stay off the caller's thread.
     single<CardQueueRepository>(named(COLLECTION_IMPORT_QUEUE)) {
         PersistentCardQueueRepository(
             store = SharedPreferencesCardQueueStore(
                 androidContext(),
-                SharedPreferencesCardQueueStore.COLLECTION_IMPORT_QUEUE_KEY,
+                key = SharedPreferencesCardQueueStore.COLLECTION_IMPORT_QUEUE_KEY,
+                fileName = SharedPreferencesCardQueueStore.COLLECTION_IMPORT_PREF_FILE,
+                blockingWrite = true,
             ),
             crashReporter = get(),
+            persistenceScope = get(),
         )
     }
     single(named(COLLECTION_IMPORT_QUEUE)) {
@@ -150,6 +157,7 @@ fun collectionKoinModule(
             wishlistBatchWriter = get<AddAllToWishlistUseCase>(),
         )
     }
+    single<CollectionImportUnresolvedStore> { SharedPreferencesImportUnresolvedStore(androidContext()) }
     viewModel {
         CollectionImportViewModel(
             resolveImport = get(),
@@ -159,8 +167,10 @@ fun collectionKoinModule(
             cardRepository = get(),
             userCardRepository = get(),
             userPreferencesRepository = get(),
+            unresolvedStore = get(),
             crashReporter = get(),
             appScope = get(),
+            ioDispatcher = get(named("io")),
         )
     }
 }

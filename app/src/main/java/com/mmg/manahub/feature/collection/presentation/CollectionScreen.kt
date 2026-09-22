@@ -253,6 +253,7 @@ fun CollectionScreen(
         onSaveTo = viewModel::onExportSave,
         onShare = viewModel::onExportShare,
         onShareLaunched = viewModel::onExportShareLaunched,
+        onShareFailed = viewModel::onExportShareFailed,
         onMessageShown = viewModel::onExportMessageShown,
         onDismiss = viewModel::onExportSheetDismissed,
     )

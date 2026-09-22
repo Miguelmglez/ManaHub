@@ -184,6 +184,9 @@ class CollectionViewModel(
         const val DEFAULT_LANGUAGE = "en"
         const val PENDING_HYDRATION = "pending_hydration"
         const val DATE_LENGTH = 10
+
+        /** Below SQLITE_MAX_VARIABLE_NUMBER (999 on API <= 30). */
+        const val HYDRATION_CHUNK = 900
     }
 
     private fun observeUserPreferences() {
@@ -890,6 +893,13 @@ class CollectionViewModel(
 
     fun onExportShareLaunched() = updateExport { it.copy(pendingShare = null) }
 
+    /** No app could take the chooser: report it instead of leaving a success toast standing. */
+    fun onExportShareFailed() {
+        crashReporter.log("collection_export_failed")
+        crashReporter.setCustomKey("collection_export_fail_reason", "no_share_target")
+        updateExport { it.copy(pendingShare = null, message = CollectionExportMessage.Failed) }
+    }
+
     fun onExportMessageShown() = updateExport { it.copy(message = null) }
 
     private fun runExport(
@@ -917,10 +927,12 @@ class CollectionViewModel(
                         CollectionExportFormatter.format(entries, format, header)
                     }
                     write(content, format)
+                    val loosePrintings = CollectionExportFormatter.countLoosePrintings(entries, format)
                     crashReporter.log("collection_export_completed")
                     crashReporter.setCustomKey("collection_export_rows_bucket", transferCountBucket(entries.size))
                     crashReporter.setCustomKey("collection_export_skipped_bucket", transferCountBucket(skipped))
-                    CollectionExportMessage.Completed(action, entries.size, skipped)
+                    crashReporter.setCustomKey("collection_export_loose_bucket", transferCountBucket(loosePrintings))
+                    CollectionExportMessage.Completed(action, entries.size, skipped, loosePrintings)
                 }
             } catch (c: CancellationException) {
                 throw c
@@ -964,14 +976,15 @@ class CollectionViewModel(
                 uncachedWishlist.map { it.cardId } +
                 uncachedForTrade.map { it.scryfallId }
             ).distinct()
-        val hydrated: Map<String, Card> = if (idsToHydrate.isEmpty()) {
-            emptyMap()
-        } else {
-            cardRepository.warmCacheForIds(idsToHydrate)
-            cardRepository.getCardsByIds(idsToHydrate)
-                .filterNot { it.isPendingHydration() }
-                .associateBy { it.scryfallId }
-        }
+        // Chunked below SQLITE_MAX_VARIABLE_NUMBER (999 on API <= 30): a whole uncached wishlist is
+        // thousands of ids, and an oversized IN (:ids) throws instead of returning rows.
+        val hydrated: Map<String, Card> = idsToHydrate.chunked(HYDRATION_CHUNK)
+            .flatMap { chunk ->
+                cardRepository.warmCacheForIds(chunk)
+                cardRepository.getCardsByIds(chunk)
+            }
+            .filterNot { it.isPendingHydration() }
+            .associateBy { it.scryfallId }
 
         val fromRows = rows.mapNotNull { row ->
             if (row.card.isPendingHydration()) hydrated[row.card.scryfallId]?.let { row.copy(card = it) } else row

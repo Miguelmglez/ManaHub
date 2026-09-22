@@ -33,7 +33,10 @@ data class CollectionImportUiState(
     val cardVariants: List<Card> = emptyList(),
     val isLoadingVariants: Boolean = false,
     val expandedVariantImageUrl: String? = null,
-)
+) {
+    /** What the screen actually shows — the flag alone can outlive an emptied queue. */
+    val isQueueSheetOpen: Boolean get() = isQueueSheetVisible && queue.isNotEmpty()
+}
 
 /** Why the input sheet could not produce a queue. */
 sealed interface CollectionImportError {
@@ -43,11 +46,15 @@ sealed interface CollectionImportError {
     data object LookupFailed : CollectionImportError
     data object FileTooLarge : CollectionImportError
     data object FileUnreadable : CollectionImportError
+
+    /** The list, or the list plus the pending review, holds more rows than the queue accepts. */
+    data class TooManyLines(val maxLines: Int) : CollectionImportError
 }
 
 /** One-shot messages about the review queue. */
 sealed interface CollectionImportToast {
-    data class Resolved(val entries: Int, val unresolved: Int) : CollectionImportToast
+    /** @property clampedCopies copies dropped by the 9,999-per-row cap, never silent. */
+    data class Resolved(val entries: Int, val unresolved: Int, val clampedCopies: Int = 0) : CollectionImportToast
     data class AddedToCollection(val cardName: String) : CollectionImportToast
     data class AddedToWishlist(val cardName: String) : CollectionImportToast
     data class AddFailed(val cardName: String) : CollectionImportToast

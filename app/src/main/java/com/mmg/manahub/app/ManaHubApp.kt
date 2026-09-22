@@ -94,6 +94,8 @@ import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.feature.addcard.di.addCardKoinModule
 import com.mmg.manahub.feature.auth.di.authKoinModule
 import com.mmg.manahub.feature.carddetail.di.cardDetailKoinModule
+import com.mmg.manahub.core.domain.repository.CardQueueRepository
+import com.mmg.manahub.feature.collection.di.COLLECTION_IMPORT_QUEUE
 import com.mmg.manahub.feature.collection.di.collectionKoinModule
 import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
 import com.mmg.manahub.feature.competitive.di.competitiveKoinModule
@@ -135,6 +137,7 @@ import org.koin.android.ext.koin.androidLogger
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.koin.core.context.startKoin
+import org.koin.core.qualifier.named
 import org.koin.core.logger.Level
 import javax.inject.Inject
 
@@ -149,6 +152,8 @@ class ManaHubApp : Application(), KoinComponent {
     // class's onCreate() body runs, i.e. before startKoin() — see KoinToHiltBridgeModule's KDoc for why
     // that ordering hazard rules out routing this the other way, Hilt-provider-calls-into-Koin.)
     private val syncManaSymbols: SyncManaSymbolsUseCase by inject()
+
+    private val collectionImportQueue: CardQueueRepository by inject(named(COLLECTION_IMPORT_QUEUE))
 
     // ── KMP migration — Hilt→Koin cutover batch 4 ───────────────────────────────────────────────
     // The whole gamification engine graph (ADR-002) is now natively Koin-built in
@@ -594,6 +599,9 @@ class ManaHubApp : Application(), KoinComponent {
         appScope.launch {
             runCatching { syncManaSymbols() }
             runCatching { tagDictionaryRepo.loadAndApply() }
+            // Builds the Collection import review queue here so its (potentially MB-scale) restore
+            // never runs on the main thread when composition first resolves the single.
+            runCatching { collectionImportQueue.queue.value }
         }
         // Backend & Performance Optimization plan, WS1+WS3 Part B item 8 (2026-07-28): the
         // oracle-id + strategy-tags opportunistic backfills that used to run inline here (Edge-case

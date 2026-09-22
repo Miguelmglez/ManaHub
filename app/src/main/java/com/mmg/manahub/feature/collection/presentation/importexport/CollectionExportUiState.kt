@@ -20,8 +20,17 @@ enum class CollectionExportAction(val telemetryKey: String) { SAVE("save"), SHAR
 
 /** One-shot export outcome shown as a toast. */
 sealed interface CollectionExportMessage {
-    /** @property skippedRows rows left out because their card could not be resolved. */
-    data class Completed(val action: CollectionExportAction, val rows: Int, val skippedRows: Int) : CollectionExportMessage
+    /**
+     * @property skippedRows rows left out because their card could not be resolved.
+     * @property loosePrintingRows rows exported without a printing, so a re-import picks any
+     *   version of the card (text format only).
+     */
+    data class Completed(
+        val action: CollectionExportAction,
+        val rows: Int,
+        val skippedRows: Int,
+        val loosePrintingRows: Int = 0,
+    ) : CollectionExportMessage
     data class NothingToExport(val skippedRows: Int) : CollectionExportMessage
     data object Failed : CollectionExportMessage
 }

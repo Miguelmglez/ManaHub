@@ -6,6 +6,7 @@ import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.collection.transfer.CollectionFileGateway
 import com.mmg.manahub.core.domain.collection.transfer.CollectionImportParser
 import com.mmg.manahub.core.domain.collection.transfer.CollectionImportResolution
+import com.mmg.manahub.core.domain.collection.transfer.CollectionImportUnresolvedStore
 import com.mmg.manahub.core.domain.collection.transfer.FileTooLargeException
 import com.mmg.manahub.core.domain.collection.transfer.ParsedCollectionImport
 import com.mmg.manahub.core.domain.collection.transfer.ResolveCollectionImportUseCase
@@ -29,8 +30,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -54,10 +55,13 @@ class CollectionImportViewModel(
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
+    private val unresolvedStore: CollectionImportUnresolvedStore,
     private val crashReporter: CrashReporter,
     appScope: CoroutineScope,
     private val parseDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+    private val progressThrottle: () -> ImportProgressThrottle = { ImportProgressThrottle() },
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -95,12 +99,28 @@ class CollectionImportViewModel(
                 .collect { currency -> _uiState.update { it.copy(preferredCurrency = currency) } }
         }
         observeOwnedCardIdentityKeys()
+        restoreUnresolvedLines()
     }
 
-    // Only collected while the review sheet is open: the owned badge is only shown there.
+    // The queue outlives the process; its unresolved lines must too, or a restored review offers
+    // "show N lines not found" for lines that no longer exist.
+    private fun restoreUnresolvedLines() {
+        viewModelScope.launch {
+            val restored = withContext(ioDispatcher) { runCatching { unresolvedStore.read() }.getOrDefault(emptyList()) }
+            if (restored.isEmpty()) return@launch
+            _uiState.update { if (it.unresolvedLines.isEmpty()) it.copy(unresolvedLines = restored) else it }
+        }
+    }
+
+    private fun persistUnresolvedLines(lines: List<String>) {
+        viewModelScope.launch(ioDispatcher) { runCatching { unresolvedStore.write(lines) } }
+    }
+
+    // Only collected while the review sheet is actually showing: the owned badge is only shown
+    // there, and rebuilding the identity set on every Room invalidation is not free.
     private fun observeOwnedCardIdentityKeys() {
         viewModelScope.launch {
-            _uiState.map { it.isQueueSheetVisible }
+            _uiState.map { it.isQueueSheetOpen }
                 .distinctUntilChanged()
                 .flatMapLatest { visible ->
                     if (visible) userCardRepository.observeCollection().map { rows ->
@@ -110,7 +130,7 @@ class CollectionImportViewModel(
                                 keys.add(row.card.name)
                             }
                         }
-                    } else emptyFlow()
+                    } else flowOf(emptySet())
                 }
                 .catch { }
                 .collect { keys -> _uiState.update { it.copy(ownedCardIdentityKeys = keys) } }
@@ -190,6 +210,12 @@ class CollectionImportViewModel(
                 failImport(source, CollectionImportError.NothingRecognized, "nothing_recognized")
                 return@launch
             }
+            // A byte cap is not a row cap: 500 KB of text is already ~8k rows, and every one of them
+            // would be resolved, held in memory and re-encoded on every later edit.
+            if (parsed.lines.size > MAX_IMPORT_QUEUE_ENTRIES) {
+                failImport(source, CollectionImportError.TooManyLines(MAX_IMPORT_QUEUE_ENTRIES), "too_many_lines")
+                return@launch
+            }
             resolve(source, parsed)
         }
     }
@@ -197,8 +223,15 @@ class CollectionImportViewModel(
     private suspend fun resolve(source: ImportSource, parsed: ParsedCollectionImport) {
         _uiState.update { it.copy(progressTotal = parsed.lines.size) }
         val resolution = try {
-            resolveImport(parsed) { processed, total ->
-                _uiState.update { it.copy(progressProcessed = processed, progressTotal = total) }
+            // The use case is dispatcher-free by design (commonMain): identifier building, the
+            // per-chunk index and the final merge are all CPU-bound over thousands of lines.
+            withContext(parseDispatcher) {
+                val throttle = progressThrottle()
+                resolveImport(parsed) { processed, total ->
+                    if (throttle.shouldEmit(processed, total)) {
+                        _uiState.update { it.copy(progressProcessed = processed, progressTotal = total) }
+                    }
+                }
             }
         } catch (c: CancellationException) {
             throw c
@@ -214,11 +247,11 @@ class CollectionImportViewModel(
                 "rate_limited",
             )
             CollectionImportResolution.Failed -> failImport(source, CollectionImportError.LookupFailed, "lookup_failed")
-            is CollectionImportResolution.Resolved -> onResolved(resolution)
+            is CollectionImportResolution.Resolved -> onResolved(source, resolution)
         }
     }
 
-    private fun onResolved(resolution: CollectionImportResolution.Resolved) {
+    private fun onResolved(source: ImportSource, resolution: CollectionImportResolution.Resolved) {
         crashReporter.log("collection_import_resolved")
         crashReporter.setCustomKey("collection_import_unresolved_bucket", transferCountBucket(resolution.unresolvedLines.size))
         if (resolution.entries.isEmpty()) {
@@ -229,9 +262,15 @@ class CollectionImportViewModel(
                     unresolvedLines = resolution.unresolvedLines,
                 )
             }
+            persistUnresolvedLines(resolution.unresolvedLines)
             return
         }
-        mergeIntoQueue(resolution.entries)
+        val merge = mergeIntoQueue(resolution.entries) ?: run {
+            failImport(source, CollectionImportError.TooManyLines(MAX_IMPORT_QUEUE_ENTRIES), "queue_full")
+            return
+        }
+        val clampedCopies = resolution.clampedCopies + merge
+        if (clampedCopies > 0) crashReporter.log("collection_import_quantity_clamped")
         _uiState.update {
             it.copy(
                 isResolving = false,
@@ -241,33 +280,47 @@ class CollectionImportViewModel(
                 progressTotal = 0,
                 unresolvedLines = resolution.unresolvedLines,
                 isUnresolvedDialogVisible = resolution.unresolvedLines.isNotEmpty(),
-                queueToast = CollectionImportToast.Resolved(resolution.entries.size, resolution.unresolvedLines.size),
+                queueToast = CollectionImportToast.Resolved(
+                    entries = resolution.entries.size,
+                    unresolved = resolution.unresolvedLines.size,
+                    clampedCopies = clampedCopies,
+                ),
             )
         }
+        persistUnresolvedLines(resolution.unresolvedLines)
     }
 
-    // One persisted write: bumping an existing row only adds surplus copies, which removeCommitted keeps.
-    private fun mergeIntoQueue(entries: List<QueuedCard>) {
+    /**
+     * Merges [entries] into the review queue with ONE persisted write: bumping an existing row only
+     * adds surplus copies, which removeCommitted keeps. Returns the copies the per-row quantity cap
+     * had to drop, or null when the merge would push the queue past [MAX_IMPORT_QUEUE_ENTRIES].
+     */
+    private fun mergeIntoQueue(entries: List<QueuedCard>): Int? {
         val current = queueRepository.queue.value
         if (current.isEmpty()) {
+            if (entries.size > MAX_IMPORT_QUEUE_ENTRIES) return null
             queueRepository.addAll(entries)
-            return
+            return 0
         }
         val merged = current.toMutableList()
         val indexByKey = HashMap<String, Int>(merged.size)
         merged.forEachIndexed { i, entry -> indexByKey.putIfAbsent(entry.mergeKey(), i) }
+        var clamped = 0
         entries.forEach { entry ->
             val index = indexByKey[entry.mergeKey()]
             if (index == null) {
                 indexByKey[entry.mergeKey()] = merged.size
                 merged += entry
             } else {
-                val quantity = (merged[index].quantity.toLong() + entry.quantity)
-                    .coerceAtMost(CollectionImportParser.MAX_QUANTITY_PER_LINE.toLong()).toInt()
-                merged[index] = merged[index].copy(quantity = quantity)
+                val wanted = merged[index].quantity.toLong() + entry.quantity
+                val capped = wanted.coerceAtMost(CollectionImportParser.MAX_QUANTITY_PER_LINE.toLong())
+                clamped += (wanted - capped).toInt()
+                merged[index] = merged[index].copy(quantity = capped.toInt())
             }
         }
+        if (merged.size > MAX_IMPORT_QUEUE_ENTRIES) return null
         queueRepository.replaceAll(merged)
+        return clamped
     }
 
     private fun QueuedCard.mergeKey() = "${card.scryfallId}|$isFoil|$language|$condition"
@@ -303,7 +356,10 @@ class CollectionImportViewModel(
 
     fun onClearQueue() {
         queueRepository.clear()
-        _uiState.update { it.copy(isQueueSheetVisible = false, unresolvedLines = emptyList()) }
+        _uiState.update {
+            it.copy(isQueueSheetVisible = false, unresolvedLines = emptyList(), isUnresolvedDialogVisible = false)
+        }
+        persistUnresolvedLines(emptyList())
     }
 
     fun onIncrementQuantity(entry: QueuedCard) = queueRepository.incrementQuantity(entry.id)
@@ -324,6 +380,7 @@ class CollectionImportViewModel(
                 if (ok) CollectionImportToast.AddedToCollection(entry.card.name)
                 else CollectionImportToast.AddFailed(entry.card.name)
             )
+            closeQueueSheetIfEmpty()
         }
     }
 
@@ -333,7 +390,14 @@ class CollectionImportViewModel(
                 if (result.isSuccess) CollectionImportToast.AddedToWishlist(entry.card.name)
                 else CollectionImportToast.AddFailed(entry.card.name)
             )
+            closeQueueSheetIfEmpty()
         }
+    }
+
+    // Auto-delete-on-add can empty the queue one row at a time; the sheet flag has to follow, or the
+    // owned-cards observer keeps collecting for the ViewModel's whole life.
+    private fun closeQueueSheetIfEmpty() {
+        if (queueRepository.queue.value.isEmpty()) _uiState.update { it.copy(isQueueSheetVisible = false) }
     }
 
     fun onAddAllToCollection() {
@@ -455,5 +519,8 @@ class CollectionImportViewModel(
 
     companion object {
         const val MAX_FILE_BYTES = 5L * 1024 * 1024
+
+        /** Rows the review queue accepts. Every mutation re-encodes the whole list to storage. */
+        const val MAX_IMPORT_QUEUE_ENTRIES = 2_000
     }
 }
