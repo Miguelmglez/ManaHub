@@ -1,8 +1,10 @@
 package com.mmg.manahub.core.domain.usecase.queue
 
 import com.mmg.manahub.core.domain.repository.CardQueueRepository
-import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
+import com.mmg.manahub.core.domain.usecase.collection.CardBatchCommitter
 import com.mmg.manahub.core.domain.usecase.collection.CardCommit
+import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.WishlistBatchWriter
 import com.mmg.manahub.core.model.QueuedCard
 import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
@@ -38,10 +40,25 @@ sealed interface AddAllToCollectionResult {
 @OptIn(ExperimentalUuidApi::class)
 class CardQueueActions(
     private val queueRepository: CardQueueRepository,
-    private val commitScannedCards: CommitScannedCardsUseCase,
+    private val committer: CardBatchCommitter,
     private val addToWishlist: AddToWishlistUseCase,
     private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    /** When set, [addAllToWishlist] writes the snapshot in one batch instead of entry by entry. */
+    private val wishlistBatchWriter: WishlistBatchWriter? = null,
 ) {
+
+    /** The Scanner / AddCard queue: commits count as scans (batched CardScanned XP). */
+    constructor(
+        queueRepository: CardQueueRepository,
+        commitScannedCards: CommitScannedCardsUseCase,
+        addToWishlist: AddToWishlistUseCase,
+        nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    ) : this(
+        queueRepository = queueRepository,
+        committer = CardBatchCommitter { entries -> commitScannedCards(entries) },
+        addToWishlist = addToWishlist,
+        nowMillis = nowMillis,
+    )
 
     private val _isCommitting = MutableStateFlow(false)
 
@@ -59,8 +76,8 @@ class CardQueueActions(
     val inFlightIds: StateFlow<Set<String>> = _inFlightIds.asStateFlow()
 
     /**
-     * Commits the current queue snapshot to the collection in ONE [CommitScannedCardsUseCase] batch
-     * (counts as a scan: one batched CardScanned XP event, never per-card manual adds).
+     * Commits the current queue snapshot to the collection in ONE [CardBatchCommitter] batch (the
+     * scan committer rewards it as one CardScanned event; the import committer grants no XP).
      *
      * Entries already in flight (a per-entry add) are left out of the snapshot. Committed entries
      * are removed through [CardQueueRepository.removeCommitted], so copies added or edits made while
@@ -93,7 +110,7 @@ class CardQueueActions(
     }
 
     private suspend fun commitSnapshot(snapshot: List<QueuedCard>): AddAllToCollectionResult {
-        val result = commitScannedCards(snapshot.map { it.toCommit() })
+        val result = committer.commit(snapshot.map { it.toCommit() })
         queueRepository.removeCommitted(
             snapshot.filterIndexed { index, _ -> result.entrySucceeded.getOrElse(index) { false } }
         )
@@ -108,7 +125,7 @@ class CardQueueActions(
     }
 
     /**
-     * Commits a single entry to the collection (through the scan path, so it is rewarded as a scan).
+     * Commits a single entry to the collection through the same [CardBatchCommitter].
      * A failed write never removes the entry.
      *
      * @return false when [entry] is already being written (nothing launched). Otherwise
@@ -123,7 +140,7 @@ class CardQueueActions(
         if (claimAvailable(listOf(entry)).isEmpty()) return false
         scope.launch {
             val succeeded = try {
-                val committed = commitScannedCards(listOf(entry.toCommit())).failedEntries == 0
+                val committed = committer.commit(listOf(entry.toCommit())).failedEntries == 0
                 if (committed && removeOnSuccess) queueRepository.removeCommitted(listOf(entry))
                 committed
             } finally {
@@ -162,8 +179,9 @@ class CardQueueActions(
     }
 
     /**
-     * Adds every entry of the current queue snapshot to the wishlist, each with its quantity, one by
-     * one, without removing them from the queue. [onEntryAdded] runs after each entry.
+     * Adds every entry of the current queue snapshot to the wishlist, each with its quantity, without
+     * removing them from the queue. [onEntryAdded] runs after each entry (with the batch result when
+     * a [WishlistBatchWriter] is set).
      *
      * @return false when the queue is empty or a batch is already in flight (nothing launched).
      *   Otherwise [onComplete] runs in [scope] with the number of entries processed.
@@ -177,7 +195,13 @@ class CardQueueActions(
         if (snapshot.isEmpty() || !_isAddingAllToWishlist.compareAndSet(expect = false, update = true)) return false
         scope.launch {
             try {
-                snapshot.forEach { entry -> onEntryAdded(entry, addToWishlist(entry.toWishlistEntry())) }
+                val batchWriter = wishlistBatchWriter
+                if (batchWriter != null) {
+                    val result = batchWriter.addAll(snapshot.map { it.toWishlistEntry() })
+                    snapshot.forEach { entry -> onEntryAdded(entry, result) }
+                } else {
+                    snapshot.forEach { entry -> onEntryAdded(entry, addToWishlist(entry.toWishlistEntry())) }
+                }
             } finally {
                 _isAddingAllToWishlist.value = false
             }

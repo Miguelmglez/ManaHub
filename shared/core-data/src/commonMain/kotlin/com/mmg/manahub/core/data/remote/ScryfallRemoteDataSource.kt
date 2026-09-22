@@ -297,6 +297,23 @@ class ScryfallRemoteDataSource(
         }
 
     /**
+     * One `/cards/collection` call over mixed [identifiers] (id, set + collector number, name + set,
+     * name). Found cards are returned as domain cards and cached; misses are echoed back.
+     */
+    suspend fun lookupCollection(
+        identifiers: List<CardIdentifierDto>,
+    ): Result<Pair<List<Card>, List<CardIdentifierDto>>> =
+        safeCall {
+            require(identifiers.size <= 75) { "Scryfall caps /cards/collection at 75 identifiers" }
+            val response = requestQueue.execute {
+                api.getCardCollection(CardCollectionRequestDto(identifiers))
+            }
+            val cards = response.data.toDomain()
+            cards.forEach { card -> cache.cards.put(card.scryfallId, card) }
+            cards to response.notFound
+        }
+
+    /**
      * Invalidates the in-memory [ScryfallCache.cards] entry for each of [scryfallIds] (Backend &
      * Performance Optimization plan, WS1+WS3 Part B item 7g). Call after writing fresh data for
      * these ids through a path that bypasses [cache] (e.g. [getCardCollection], used by price

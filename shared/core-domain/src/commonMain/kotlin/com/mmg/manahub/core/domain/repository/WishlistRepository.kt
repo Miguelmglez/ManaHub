@@ -15,6 +15,11 @@ interface WishlistRepository {
     fun observeVersionsByOracle(oracleId: String, name: String): Flow<List<WishlistEntry>>
     fun observeUnsyncedCount(): Flow<Int>
     suspend fun addLocal(entry: WishlistEntry): Result<Unit>
+
+    /** [addLocal] for every entry as one local write; rows stay unsynced until the next push. */
+    suspend fun addAllLocal(entries: List<WishlistEntry>): Result<Unit> = runCatching {
+        entries.forEach { addLocal(it).getOrThrow() }
+    }
     suspend fun removeLocal(id: String): Result<Unit>
     suspend fun updateQuantityLocal(id: String, quantity: Int): Result<Unit>
     suspend fun getRemote(userId: String): Result<List<WishlistEntry>>

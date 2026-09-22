@@ -200,7 +200,36 @@ interface CardRepository {
      * network calls. Best-effort: failures are silently swallowed so callers aren't blocked.
      */
     suspend fun warmCacheForIds(scryfallIds: List<String>)
+
+    /**
+     * Resolves up to [MAX_IDENTIFIERS_PER_LOOKUP] identifiers in ONE Scryfall `/cards/collection`
+     * call (through the shared request queue) and caches every returned card.
+     *
+     * @return the cards found plus the identifiers Scryfall reported `not_found`; an error message
+     *   carries the rate-limit sentinel when the queue exhausted its retries.
+     */
+    suspend fun lookupCardsByIdentifiers(identifiers: List<CardLookupIdentifier>): DataResult<CardLookupResult> =
+        DataResult.Error("UNSUPPORTED")
+
+    companion object {
+        /** Scryfall's hard cap on identifiers per `/cards/collection` request. */
+        const val MAX_IDENTIFIERS_PER_LOOKUP = 75
+    }
 }
+
+/** One Scryfall `/cards/collection` identifier; exactly one of the documented shapes is set. */
+data class CardLookupIdentifier(
+    val scryfallId: String? = null,
+    val name: String? = null,
+    val setCode: String? = null,
+    val collectorNumber: String? = null,
+)
+
+/** Result of [CardRepository.lookupCardsByIdentifiers]. */
+data class CardLookupResult(
+    val cards: List<Card>,
+    val notFound: List<CardLookupIdentifier>,
+)
 
 /** Carrier for a single card's price update. */
 data class CardPriceUpdate(

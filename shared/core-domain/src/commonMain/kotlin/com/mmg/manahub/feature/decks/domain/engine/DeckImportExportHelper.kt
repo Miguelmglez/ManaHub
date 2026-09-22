@@ -10,6 +10,7 @@ import com.mmg.manahub.core.model.DeckCard
  *   4 Lightning Bolt
  *   4 Lightning Bolt (M11) 163
  *   4 Lightning Bolt (M11) 163 *F*
+ *   1x Lightning Bolt *E*
  *
  * Section headers (case-insensitive): Commander, Deck, Mainboard, Sideboard, Companion
  */
@@ -22,6 +23,7 @@ object DeckImportExportHelper {
         val name: String,
         val setCode: String? = null,
         val collectorNumber: String? = null,
+        val isFoil: Boolean = false,
     )
 
     data class ParsedDeckList(
@@ -33,7 +35,7 @@ object DeckImportExportHelper {
     // ── Parser ────────────────────────────────────────────────────────────────
 
     private val CARD_LINE_REGEX = Regex(
-        """^(\d+)[x×]?\s+(.+?)(?:\s+\(([A-Za-z0-9]+)\)\s+(\S+))?(?:\s+\*F\*)?$"""
+        """^(\d+)[xX×]?\s+(.+?)(?:\s+\(([A-Za-z0-9]+)\)\s+(\S+))?(?:\s+\*([FfEe])\*)?$"""
     )
 
     private val SECTION_HEADERS = setOf(
@@ -66,7 +68,7 @@ object DeckImportExportHelper {
                 line.startsWith("//")                        -> continue
             }
 
-            val parsed = parseLine(line) ?: continue
+            val parsed = parseCardLine(line) ?: continue
 
             when (currentSection) {
                 Section.MAIN      -> mainboard.add(parsed)
@@ -81,13 +83,19 @@ object DeckImportExportHelper {
         return ParsedDeckList(mainboard, sideboard, commander)
     }
 
-    private fun parseLine(line: String): ParsedLine? {
-        val match = CARD_LINE_REGEX.matchEntire(line) ?: return null
+    /**
+     * Parses one `qty name [(SET) number] [*F*|*E*]` line; null when [line] is not a card line.
+     * Etched (`*E*`) is reported as foil: the collection has no separate etched finish.
+     */
+    fun parseCardLine(line: String): ParsedLine? {
+        val match = CARD_LINE_REGEX.matchEntire(line.trim()) ?: return null
         val qty    = match.groupValues[1].toIntOrNull() ?: return null
         val name   = match.groupValues[2].trim()
+        if (name.isEmpty()) return null
         val set    = match.groupValues[3].takeIf { it.isNotBlank() }
         val num    = match.groupValues[4].takeIf { it.isNotBlank() }
-        return ParsedLine(qty, name, set, num)
+        val isFoil = match.groupValues[5].isNotBlank()
+        return ParsedLine(qty, name, set, num, isFoil)
     }
 
     // ── Exporter ──────────────────────────────────────────────────────────────
@@ -131,15 +139,29 @@ object DeckImportExportHelper {
         }
     }.trimEnd()
 
-    private fun formatLine(qty: Int, card: Card, includeSet: Boolean): String = buildString {
+    /** Formats one `qty name (SET) number` line, appending ` *F*` when [isFoil]. */
+    fun formatLine(qty: Int, card: Card, includeSet: Boolean, isFoil: Boolean = false): String =
+        formatLine(qty, card.name, card.setCode, card.collectorNumber, includeSet, isFoil)
+
+    /** [formatLine] over raw fields, for callers that hold no [Card]. */
+    fun formatLine(
+        qty: Int,
+        name: String,
+        setCode: String,
+        collectorNumber: String,
+        includeSet: Boolean,
+        isFoil: Boolean,
+    ): String = buildString {
         append(qty)
         append(" ")
-        append(card.name)
-        if (includeSet && card.setCode.isNotBlank()) {
+        append(name)
+        // The set group only parses back when a collector number follows it.
+        if (includeSet && setCode.isNotBlank() && collectorNumber.isNotBlank()) {
             append(" (")
-            append(card.setCode.uppercase())
+            append(setCode.uppercase())
             append(") ")
-            append(card.collectorNumber)
+            append(collectorNumber)
         }
+        if (isFoil) append(" *F*")
     }
 }
