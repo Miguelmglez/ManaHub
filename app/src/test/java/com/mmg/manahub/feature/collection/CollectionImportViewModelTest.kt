@@ -259,6 +259,19 @@ class CollectionImportViewModelTest {
         assertFalse(queue.queue.value.any { it.card.scryfallId == "new" })
     }
 
+    @Test
+    fun `an oversized paste is rejected with the same ceiling as a picked file`() = runTest(testDispatcher) {
+        val vm = buildViewModel()
+        val oversized = "a".repeat((CollectionImportViewModel.MAX_FILE_BYTES / 2).toInt() + 1)
+
+        vm.onImportText(oversized)
+        advanceUntilIdle()
+
+        assertEquals(CollectionImportError.FileTooLarge, vm.uiState.value.inputError)
+        coVerify(exactly = 0) { resolveImport(any(), any()) }
+        assertTrue(queue.queue.value.isEmpty())
+    }
+
     // ── C2: resolution runs off the caller's thread ──────────────────────────
 
     @Test
