@@ -139,6 +139,34 @@ class ResolveCollectionImportUseCaseTest {
 
         assertEquals(2 to 2, progress.last())
     }
+
+    @Test
+    fun `copies the quantity cap drops while merging are reported back`() = runTest {
+        val forest = printing("forest", "Forest", "m21", "274")
+        val repo = FakeLookupRepository(listOf(forest))
+
+        val result = ResolveCollectionImportUseCase(repo)(
+            parsed(
+                line(name = "Forest", set = "m21", number = "274", quantity = 6_000),
+                line(name = "Forest", set = "m21", number = "274", quantity = 6_000),
+            )
+        )
+
+        val resolved = assertIs<CollectionImportResolution.Resolved>(result)
+        assertEquals(CollectionImportParser.MAX_QUANTITY_PER_LINE, resolved.entries.single().quantity)
+        assertEquals(2_001, resolved.clampedCopies)
+    }
+
+    @Test
+    fun `copies already clamped while parsing are carried into the resolution`() = runTest {
+        val repo = FakeLookupRepository(listOf(printing("opt", "Opt", "xln", "65")))
+
+        val result = ResolveCollectionImportUseCase(repo)(
+            ParsedCollectionImport(CollectionFileFormat.TEXT, listOf(line(name = "Opt")), emptyList(), clampedCopies = 7)
+        )
+
+        assertEquals(7, assertIs<CollectionImportResolution.Resolved>(result).clampedCopies)
+    }
 }
 
 /** [CardRepository] fake answering batched lookups from [cards] (by id, printing or name). */

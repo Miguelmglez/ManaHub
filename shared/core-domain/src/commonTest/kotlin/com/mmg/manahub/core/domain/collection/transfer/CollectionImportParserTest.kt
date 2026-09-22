@@ -74,6 +74,23 @@ class CollectionImportParserTest {
     }
 
     @Test
+    fun `copies dropped by the quantity cap are reported, never silent`() {
+        val parsed = CollectionImportParser.parse("6000 Forest (M21) 274\n6000 Forest (M21) 274")
+
+        assertEquals(1, parsed.lines.size)
+        assertEquals(CollectionImportParser.MAX_QUANTITY_PER_LINE, parsed.lines[0].quantity)
+        assertEquals(2_001, parsed.clampedCopies)
+    }
+
+    @Test
+    fun `a list inside the cap reports no clamped copies`() {
+        val parsed = CollectionImportParser.parse("4 Opt\n4 Opt")
+
+        assertEquals(8, parsed.lines[0].quantity)
+        assertEquals(0, parsed.clampedCopies)
+    }
+
+    @Test
     fun `moxfield csv is detected and handles quoted commas and quotes`() {
         val csv = listOf(
             "\"Count\",\"Tradelist Count\",\"Name\",\"Edition\",\"Condition\",\"Language\",\"Foil\",\"Tags\",\"Last Modified\",\"Collector Number\",\"Alter\",\"Proxy\",\"Purchase Price\"",

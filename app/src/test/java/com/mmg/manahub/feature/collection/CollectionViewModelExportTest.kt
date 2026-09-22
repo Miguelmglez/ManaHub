@@ -14,8 +14,10 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
+import com.mmg.manahub.core.model.CollectionSource
 import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.model.UserCardWithCard
+import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.util.AnalyticsHelper
@@ -78,12 +80,15 @@ class CollectionViewModelExportTest {
         unmockkStatic(FirebaseCrashlytics::class)
     }
 
-    private fun buildViewModel(entries: List<UserCardWithCard>): CollectionViewModel {
+    private fun buildViewModel(
+        entries: List<UserCardWithCard>,
+        wishlist: List<WishlistEntry> = emptyList(),
+    ): CollectionViewModel {
         every { getCollection() } returns flowOf(entries)
         coEvery { authRepository.getCurrentUser() } returns null
         every { authRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
         every { syncManager.syncState } returns MutableStateFlow(SyncState.IDLE)
-        every { getLocalWishlist() } returns flowOf(emptyList())
+        every { getLocalWishlist() } returns flowOf(wishlist)
         every { openForTradeRepository.observeLocal() } returns flowOf(emptyList())
         return CollectionViewModel(
             savedStateHandle = SavedStateHandle(),
@@ -184,6 +189,59 @@ class CollectionViewModelExportTest {
             CollectionExportMessage.Completed(CollectionExportAction.SHARE, rows = 1, skippedRows = 1),
             vm.uiState.value.export.message,
         )
+    }
+
+    @Test
+    fun `a large uncached wishlist hydrates in chunks below the sqlite bind limit`() = runTest(testDispatcher) {
+        val ids = (1..1_200).map { "w-$it" }
+        val entries = ids.map {
+            WishlistEntry(
+                id = "entry-$it",
+                userId = "user",
+                cardId = it,
+                matchAnyVariant = false,
+                condition = null,
+                language = null,
+                createdAt = 0L,
+                card = null,
+            )
+        }
+        val warmed = mutableListOf<List<String>>()
+        coEvery { cardRepository.warmCacheForIds(capture(warmed)) } returns Unit
+        coEvery { cardRepository.getCardsByIds(any()) } answers {
+            firstArg<List<String>>().map { TestFixtures.buildCard(scryfallId = it, name = "Card $it") }
+        }
+        coEvery { fileGateway.writeShareableFile(any(), any()) } returns "content://export"
+        val vm = buildViewModel(emptyList(), wishlist = entries)
+        advanceUntilIdle()
+        vm.setCollectionSource(CollectionSource.WISHLIST)
+        advanceUntilIdle()
+
+        vm.onExportShare()
+        advanceUntilIdle()
+
+        assertEquals(listOf(900, 300), warmed.map { it.size })
+        assertTrue(warmed.all { it.size <= 900 })
+        coVerify(exactly = 2) { cardRepository.getCardsByIds(any()) }
+        assertEquals(
+            CollectionExportMessage.Completed(CollectionExportAction.SHARE, rows = 1_200, skippedRows = 0),
+            vm.uiState.value.export.message,
+        )
+    }
+
+    @Test
+    fun `a chooser that never started reports a failed export instead of a silent success`() = runTest(testDispatcher) {
+        coEvery { fileGateway.writeShareableFile(any(), any()) } returns "content://export"
+        val vm = buildViewModel(listOf(row("a", "Lightning Bolt")))
+        advanceUntilIdle()
+        vm.onExportShare()
+        advanceUntilIdle()
+        vm.onExportMessageShown()
+
+        vm.onExportShareFailed()
+
+        assertEquals(CollectionExportMessage.Failed, vm.uiState.value.export.message)
+        assertEquals(null, vm.uiState.value.export.pendingShare)
     }
 
     @Test
