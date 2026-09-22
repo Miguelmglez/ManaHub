@@ -10,6 +10,7 @@ import com.mmg.manahub.core.domain.collection.transfer.CollectionImportUnresolve
 import com.mmg.manahub.core.domain.collection.transfer.FileTooLargeException
 import com.mmg.manahub.core.domain.collection.transfer.ParsedCollectionImport
 import com.mmg.manahub.core.domain.collection.transfer.ResolveCollectionImportUseCase
+import com.mmg.manahub.core.domain.collection.transfer.transferCountBucket
 import com.mmg.manahub.core.domain.repository.CardQueueRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
@@ -74,6 +75,9 @@ class CollectionImportViewModel(
     )
     val uiState: StateFlow<CollectionImportUiState> = _uiState.asStateFlow()
 
+    // App-lifetime, not viewModelScope: a commit cancelled halfway would leave already-written
+    // entries queued, to be written again next time. Its callbacks keep this ViewModel (and the
+    // state it holds) alive until the batch finishes, which is the price of that guarantee.
     private val commitScope = CoroutineScope(appScope.coroutineContext + mainDispatcher)
 
     private var resolveJob: Job? = null
@@ -186,6 +190,8 @@ class CollectionImportViewModel(
     }
 
     private fun startImport(source: ImportSource, readText: suspend () -> String) {
+        // A second tap while a resolution is running is dropped in silence on purpose: the input
+        // sheet already shows the progress row, so there is nothing new to tell the user.
         if (resolveJob?.isActive == true) return
         _uiState.update { it.copy(isResolving = true, inputError = null, progressProcessed = 0, progressTotal = 0) }
         resolveJob = viewModelScope.launch {
@@ -201,10 +207,14 @@ class CollectionImportViewModel(
                 failImport(source, CollectionImportError.FileUnreadable, "file_unreadable")
                 return@launch
             }
+            // The picker must accept */* (providers mislabel .csv), so a picked image only fails here.
+            if (withContext(parseDispatcher) { CollectionImportParser.looksBinary(text) }) {
+                failImport(source, CollectionImportError.FileUnreadable, "not_text")
+                return@launch
+            }
             val parsed = withContext(parseDispatcher) { CollectionImportParser.parse(text) }
             crashReporter.log("collection_import_started")
-            crashReporter.setCustomKey("collection_import_source", source.key)
-            crashReporter.setCustomKey("collection_import_format", parsed.format.name)
+            crashReporter.setCustomKey("collection_import_input", "${source.key}:${parsed.format.name}")
             crashReporter.setCustomKey("collection_import_lines_bucket", transferCountBucket(parsed.lines.size))
             if (parsed.lines.isEmpty()) {
                 failImport(source, CollectionImportError.NothingRecognized, "nothing_recognized")
@@ -325,10 +335,10 @@ class CollectionImportViewModel(
 
     private fun QueuedCard.mergeKey() = "${card.scryfallId}|$isFoil|$language|$condition"
 
+    // The reason rides in the breadcrumb name, not a fifth custom key (CLAUDE.md caps an op at 3-4).
     private fun failImport(source: ImportSource, error: CollectionImportError, reason: String) {
-        crashReporter.log("collection_import_failed")
-        crashReporter.setCustomKey("collection_import_source", source.key)
-        crashReporter.setCustomKey("collection_import_fail_reason", reason)
+        crashReporter.log("collection_import_failed_$reason")
+        crashReporter.setCustomKey("collection_import_input", source.key)
         _uiState.update { it.copy(isResolving = false, inputError = error) }
     }
 
@@ -403,8 +413,7 @@ class CollectionImportViewModel(
     fun onAddAllToCollection() {
         val entries = queueRepository.queue.value.size
         queueActions.addAllToCollection(commitScope) { result ->
-            crashReporter.log("collection_import_committed")
-            crashReporter.setCustomKey("collection_import_commit_target", "collection")
+            crashReporter.log("collection_import_committed_collection")
             crashReporter.setCustomKey("collection_import_commit_bucket", transferCountBucket(entries))
             when (result) {
                 is AddAllToCollectionResult.Success -> {
@@ -425,8 +434,7 @@ class CollectionImportViewModel(
             scope = commitScope,
             onEntryAdded = { _, result -> if (result.isFailure) failed++ },
         ) { total ->
-            crashReporter.log("collection_import_committed")
-            crashReporter.setCustomKey("collection_import_commit_target", "wishlist")
+            crashReporter.log("collection_import_committed_wishlist")
             crashReporter.setCustomKey("collection_import_commit_bucket", transferCountBucket(total))
             showToast(
                 if (failed == 0) CollectionImportToast.AddedAllToWishlist(total)
@@ -508,6 +516,13 @@ class CollectionImportViewModel(
 
     fun onCloseExpandedImage() {
         _uiState.update { it.copy(expandedVariantImageUrl = null) }
+    }
+
+    // The owned-card key set is collection-sized; drop it as soon as the screen is gone, since a
+    // commitScope callback can keep this ViewModel referenced past onCleared.
+    override fun onCleared() {
+        _uiState.update { it.copy(ownedCardIdentityKeys = emptySet()) }
+        super.onCleared()
     }
 
     // Parse/IO messages can echo file content: record the exception type only.

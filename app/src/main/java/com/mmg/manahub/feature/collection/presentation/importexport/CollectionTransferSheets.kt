@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -45,6 +44,11 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 
+// Material's minimum touch target and the cap that keeps a long list from filling the dialog;
+// neither is a spacing-grid value, so they are named here rather than pushed into Spacing.
+private val RowTouchTarget = 56.dp
+private val DialogListMaxHeight = 280.dp
+
 /** Overflow sheet of the Cards tab: "Export collection" and "Import to collection". */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +66,7 @@ fun CollectionTransferActionsSheet(
         containerColor = mc.backgroundSecondary,
         shape = BottomSheetShape,
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(bottom = sp.xl).navigationBarsPadding()) {
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = sp.xl)) {
             Text(
                 text = stringResource(R.string.collection_transfer_sheet_title),
                 style = MaterialTheme.magicTypography.titleMedium,
@@ -103,8 +107,10 @@ private fun TransferActionRow(
     Surface(
         onClick = onClick,
         enabled = enabled,
+        // Deliberately not a MagicColors token: this Surface is a click target, and the sheet
+        // behind it supplies the colour.
         color = Color.Transparent,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = RowTouchTarget),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = sp.lg, vertical = sp.md),
@@ -140,7 +146,7 @@ fun CollectionExportSheet(
         shape = BottomSheetShape,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = sp.lg).padding(bottom = sp.xl).navigationBarsPadding(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = sp.lg).padding(bottom = sp.xl),
             verticalArrangement = Arrangement.spacedBy(sp.sm),
         ) {
             Text(stringResource(R.string.collection_export_title), style = ty.titleLarge, color = mc.textPrimary)
@@ -151,7 +157,7 @@ fun CollectionExportSheet(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 56.dp)
+                            .heightIn(min = RowTouchTarget)
                             .selectable(
                                 selected = state.format == format,
                                 enabled = !state.isExporting,
@@ -180,6 +186,7 @@ fun CollectionExportSheet(
                 MagicCtaButton(
                     onClick = onShare,
                     enabled = !state.isExporting,
+                    isLoading = state.inFlightAction == CollectionExportAction.SHARE,
                     text = stringResource(R.string.collection_export_share),
                     style = MagicCtaStyle.Outlined,
                     icon = { Icon(Icons.Default.Share, contentDescription = null) },
@@ -188,7 +195,7 @@ fun CollectionExportSheet(
                 MagicCtaButton(
                     onClick = onSave,
                     enabled = !state.isExporting,
-                    isLoading = state.isExporting,
+                    isLoading = state.inFlightAction == CollectionExportAction.SAVE,
                     text = stringResource(R.string.collection_export_save),
                     color = MagicCtaColor.Primary,
                     icon = { Icon(Icons.Default.Save, contentDescription = null) },
@@ -278,7 +285,7 @@ fun UnresolvedLinesDialog(
                 color = mc.textSecondary,
             )
             LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp).padding(vertical = sp.sm),
+                modifier = Modifier.fillMaxWidth().heightIn(max = DialogListMaxHeight).padding(vertical = sp.sm),
                 verticalArrangement = Arrangement.spacedBy(sp.xs),
             ) {
                 itemsIndexed(lines, key = { index, _ -> index }) { _, line ->

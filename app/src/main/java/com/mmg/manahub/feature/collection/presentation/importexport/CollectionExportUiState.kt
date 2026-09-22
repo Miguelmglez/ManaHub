@@ -7,6 +7,8 @@ data class CollectionExportUiState(
     val isSheetVisible: Boolean = false,
     val format: CollectionFileFormat = CollectionFileFormat.TEXT,
     val isExporting: Boolean = false,
+    /** Which button is working, so the spinner lands on the one the user tapped. */
+    val inFlightAction: CollectionExportAction? = null,
     /** A written share file waiting for the screen to launch the chooser. */
     val pendingShare: PendingExportShare? = null,
     val message: CollectionExportMessage? = null,

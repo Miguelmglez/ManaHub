@@ -45,7 +45,7 @@ import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.collection.presentation.importexport.CollectionExportAction
 import com.mmg.manahub.feature.collection.presentation.importexport.CollectionExportMessage
 import com.mmg.manahub.feature.collection.presentation.importexport.CollectionExportUiState
-import com.mmg.manahub.feature.collection.presentation.importexport.transferCountBucket
+import com.mmg.manahub.core.domain.collection.transfer.transferCountBucket
 import com.mmg.manahub.feature.collection.presentation.importexport.PendingExportShare
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import kotlinx.coroutines.CancellationException
@@ -183,8 +183,6 @@ class CollectionViewModel(
         const val DEFAULT_CONDITION = "NM"
         const val DEFAULT_LANGUAGE = "en"
         const val PENDING_HYDRATION = "pending_hydration"
-        const val DATE_LENGTH = 10
-
         /** Below SQLITE_MAX_VARIABLE_NUMBER (999 on API <= 30). */
         const val HYDRATION_CHUNK = 900
     }
@@ -895,8 +893,7 @@ class CollectionViewModel(
 
     /** No app could take the chooser: report it instead of leaving a success toast standing. */
     fun onExportShareFailed() {
-        crashReporter.log("collection_export_failed")
-        crashReporter.setCustomKey("collection_export_fail_reason", "no_share_target")
+        crashReporter.log("collection_export_failed_no_share_target")
         updateExport { it.copy(pendingShare = null, message = CollectionExportMessage.Failed) }
     }
 
@@ -906,20 +903,23 @@ class CollectionViewModel(
         action: CollectionExportAction,
         write: suspend (content: String, format: CollectionFileFormat) -> Unit,
     ) {
+        // A second tap while an export is running is dropped in silence on purpose: the tapped
+        // button already shows its spinner, so there is nothing new to tell the user.
         if (exportJob?.isActive == true) return
         val state = _uiState.value
         val format = state.export.format
-        updateExport { it.copy(isExporting = true) }
+        updateExport { it.copy(isExporting = true, inFlightAction = action) }
         crashReporter.log("collection_export_started")
-        crashReporter.setCustomKey("collection_export_format", format.name)
-        crashReporter.setCustomKey("collection_export_source", state.collectionSource.name)
-        crashReporter.setCustomKey("collection_export_action", action.telemetryKey)
+        // One key, not three: CLAUDE.md caps an operation at 3-4 custom keys.
+        crashReporter.setCustomKey(
+            "collection_export_target",
+            "${action.telemetryKey}:${state.collectionSource.exportKey()}:${format.name}",
+        )
         exportJob = viewModelScope.launch {
             val message = try {
                 val (entries, skipped) = buildExportEntries(state)
                 if (entries.isEmpty()) {
-                    crashReporter.log("collection_export_failed")
-                    crashReporter.setCustomKey("collection_export_fail_reason", "nothing_to_export")
+                    crashReporter.log("collection_export_failed_nothing_to_export")
                     CollectionExportMessage.NothingToExport(skipped)
                 } else {
                     val header = "ManaHub ${state.collectionSource.exportKey()} export, ${exportDate()}"
@@ -937,8 +937,7 @@ class CollectionViewModel(
             } catch (c: CancellationException) {
                 throw c
             } catch (e: Exception) {
-                crashReporter.log("collection_export_failed")
-                crashReporter.setCustomKey("collection_export_fail_reason", "io_or_network")
+                crashReporter.log("collection_export_failed_io_or_network")
                 // Exception type only: IO messages can carry paths.
                 crashReporter.recordException(RuntimeException("[collection_export] ${e::class.simpleName}"))
                 CollectionExportMessage.Failed
@@ -946,6 +945,7 @@ class CollectionViewModel(
             updateExport {
                 it.copy(
                     isExporting = false,
+                    inFlightAction = null,
                     isSheetVisible = if (message is CollectionExportMessage.Completed) false else it.isSheetVisible,
                     message = message,
                 )
@@ -953,7 +953,7 @@ class CollectionViewModel(
         }
     }
 
-    private fun exportDate(): String = exportFileName().substringBeforeLast('.').takeLast(DATE_LENGTH)
+    private fun exportDate(): String = CollectionExportFormatter.exportDate(nowMillis()).toString()
 
     /**
      * The visible rows as export entries. Placeholder rows (ADR-008 `pending_hydration`) and, with no

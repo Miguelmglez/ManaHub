@@ -179,7 +179,7 @@ class CollectionImportViewModelTest {
         assertEquals(CollectionImportError.RateLimited(5), vm.uiState.value.inputError)
         assertFalse(vm.uiState.value.isResolving)
         assertTrue(queue.queue.value.isEmpty())
-        verify { crashReporter.setCustomKey("collection_import_fail_reason", "rate_limited") }
+        verify { crashReporter.log("collection_import_failed_rate_limited") }
     }
 
     @Test
@@ -204,8 +204,7 @@ class CollectionImportViewModelTest {
         advanceUntilIdle()
 
         coVerify { resolveImport(match { it.lines.single().name == "Opt" && it.lines.single().quantity == 2 }, any()) }
-        verify { crashReporter.setCustomKey("collection_import_source", "file") }
-        verify { crashReporter.setCustomKey("collection_import_format", "MOXFIELD_CSV") }
+        verify { crashReporter.setCustomKey("collection_import_input", "file:MOXFIELD_CSV") }
     }
 
     @Test
@@ -221,7 +220,7 @@ class CollectionImportViewModelTest {
         assertTrue(queue.queue.value.isEmpty())
         assertFalse(vm.uiState.value.isQueueSheetVisible)
         assertEquals(CollectionImportToast.AddedAllToCollection(2), vm.uiState.value.queueToast)
-        verify { crashReporter.log("collection_import_committed") }
+        verify { crashReporter.log("collection_import_committed_collection") }
     }
 
     // ── C1: the review queue is bounded ──────────────────────────────────────

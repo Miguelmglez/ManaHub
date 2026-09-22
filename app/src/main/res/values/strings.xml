@@ -4155,8 +4155,9 @@
         <item quantity="one">%d card ready to review</item>
         <item quantity="other">%d cards ready to review</item>
     </plurals>
+    <!-- Two-number plurals below select on the SECOND number, so the first stays plural in both. -->
     <plurals name="collection_import_resolved_with_unresolved">
-        <item quantity="one">%1$d card ready to review, %2$d line not found</item>
+        <item quantity="one">%1$d cards ready to review, %2$d line not found</item>
         <item quantity="other">%1$d cards ready to review, %2$d lines not found</item>
     </plurals>
     <plurals name="collection_import_resolved_with_capped">
