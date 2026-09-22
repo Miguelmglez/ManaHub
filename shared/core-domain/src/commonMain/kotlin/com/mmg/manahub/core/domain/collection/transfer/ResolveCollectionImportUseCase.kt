@@ -134,7 +134,7 @@ class ResolveCollectionImportUseCase(
         val entries = mutableListOf<QueuedCard>()
         val entryIndexByKey = HashMap<String, Int>()
         val timestamp = nowMillis()
-        var clampedCopies = parsed.clampedCopies
+        var clampedCopies = parsed.clampedCopies.toLong()
         lines.forEachIndexed { i, line ->
             val card = resolvedCards[i]
             if (card == null) {
@@ -166,7 +166,7 @@ class ResolveCollectionImportUseCase(
             entries = entries,
             unresolvedLines = parsed.rejectedLines + unresolved,
             resolvedLineCount = total - unresolvedCount,
-            clampedCopies = clampedCopies,
+            clampedCopies = clampedCopies.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
         )
     }
 
@@ -180,19 +180,19 @@ class ResolveCollectionImportUseCase(
         return CollectionImportResolution.Failed
     }
 
-    /** Returns the copies the per-row quantity cap had to drop. */
-    private fun MutableList<QueuedCard>.mergeOrAdd(indexByKey: MutableMap<String, Int>, entry: QueuedCard): Int {
+    /** Returns the copies the per-row quantity cap had to drop; Long, it can exceed Int.MAX_VALUE. */
+    private fun MutableList<QueuedCard>.mergeOrAdd(indexByKey: MutableMap<String, Int>, entry: QueuedCard): Long {
         val key = "${entry.card.scryfallId}|${entry.isFoil}|${entry.language}|${entry.condition}"
         val index = indexByKey[key]
         if (index == null) {
             indexByKey[key] = size
             add(entry)
-            return 0
+            return 0L
         }
         val wanted = this[index].quantity.toLong() + entry.quantity
         val capped = wanted.coerceAtMost(CollectionImportParser.MAX_QUANTITY_PER_LINE.toLong())
         this[index] = this[index].copy(quantity = capped.toInt())
-        return (wanted - capped).toInt()
+        return wanted - capped
     }
 
     /** Matches a returned card back to the identifier that asked for it. */

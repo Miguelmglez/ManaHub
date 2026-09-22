@@ -13,6 +13,15 @@ object CollectionImportParser {
 
     const val MAX_QUANTITY_PER_LINE = 9_999
 
+    /**
+     * Caps on what is reported BACK to the user. Both lines and CSV records are echoed verbatim —
+     * into UI state, a persisted preference file and a clipboard Intent — and none of those can
+     * take an arbitrary slice of a picked file: `CsvCodec` folds everything after an unterminated
+     * quote into ONE record, and a file of single-character lines yields one entry per line.
+     */
+    const val MAX_REJECTED_LINES = 200
+    const val MAX_REPORTED_LINE_LENGTH = 300
+
     private const val BINARY_SAMPLE_CHARS = 64 * 1024
     private const val BINARY_SUSPECT_PERCENT = 5
 
@@ -73,6 +82,15 @@ object CollectionImportParser {
         return suspect * 100 > sample.length * BINARY_SUSPECT_PERCENT
     }
 
+    /** A source line trimmed to what is safe to show, persist and copy. */
+    internal fun String.asReportedLine(): String =
+        if (length <= MAX_REPORTED_LINE_LENGTH) this else substring(0, MAX_REPORTED_LINE_LENGTH) + "…"
+
+    /** Records [line] as unusable, truncated, and stops collecting past [MAX_REJECTED_LINES]. */
+    private fun MutableList<String>.addRejected(line: String) {
+        if (size < MAX_REJECTED_LINES) this += line.asReportedLine()
+    }
+
     /** Drops the leading blank, comment and `sep=,` lines an exporter may put above the header. */
     private fun dropPreamble(text: String): String {
         val lines = text.lines()
@@ -115,7 +133,7 @@ object CollectionImportParser {
             if (isSectionHeader(line)) continue
             val parsed = DeckImportExportHelper.parseCardLine(line)
             if (parsed == null || parsed.quantity <= 0) {
-                rejected += line
+                rejected.addRejected(line)
                 continue
             }
             lines += CollectionImportLine(
@@ -127,7 +145,8 @@ object CollectionImportParser {
                 isFoil = parsed.isFoil,
                 condition = CollectionCardAttributes.DEFAULT_CONDITION,
                 language = CollectionCardAttributes.DEFAULT_LANGUAGE,
-                rawLine = line,
+                // rawLine is what reaches unresolvedLines, so it inherits the report cap too.
+                rawLine = line.asReportedLine(),
             )
         }
         val merged = merge(lines)
@@ -199,7 +218,7 @@ object CollectionImportParser {
             val scryfallId = csv.scryfallId?.lowercase()?.takeIf { SCRYFALL_ID_REGEX.matches(it) }
             val hasPrinting = !csv.setCode.isNullOrBlank() && !csv.collectorNumber.isNullOrBlank()
             if (quantity == null || quantity <= 0 || (csv.name == null && scryfallId == null && !hasPrinting)) {
-                rejected += record.raw.trim()
+                rejected.addRejected(record.raw.trim())
                 continue
             }
             lines += CollectionImportLine(
@@ -211,7 +230,7 @@ object CollectionImportParser {
                 isFoil = isFoilValue(csv.foil),
                 condition = CollectionCardAttributes.conditionCode(csv.condition),
                 language = CollectionCardAttributes.languageCode(csv.language),
-                rawLine = record.raw.trim(),
+                rawLine = record.raw.trim().asReportedLine(),
             )
         }
         val merged = merge(lines)
@@ -230,16 +249,18 @@ object CollectionImportParser {
     /** Merges lines sharing identifier + foil + condition + language, summing their quantity. */
     internal fun merge(lines: List<CollectionImportLine>): MergeResult {
         val merged = LinkedHashMap<String, CollectionImportLine>()
-        var clamped = 0
+        // Long: a CSV quantity is only bounded by Int.MAX_VALUE, so two rows overflow a clamp
+        // counted in Int, and the count reaches a plural resource and a telemetry key.
+        var clamped = 0L
         for (line in lines) {
             val key = mergeKey(line)
             val existing = merged[key]
             val wanted = (existing?.quantity?.toLong() ?: 0L) + line.quantity
             val capped = wanted.coerceAtMost(MAX_QUANTITY_PER_LINE.toLong())
-            clamped += (wanted - capped).toInt()
+            clamped += wanted - capped
             merged[key] = (existing ?: line).copy(quantity = capped.toInt())
         }
-        return MergeResult(merged.values.toList(), clamped)
+        return MergeResult(merged.values.toList(), clamped.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
     }
 
     private fun mergeKey(line: CollectionImportLine): String {

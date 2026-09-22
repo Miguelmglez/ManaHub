@@ -34,6 +34,12 @@ object DeckImportExportHelper {
 
     // ── Parser ────────────────────────────────────────────────────────────────
 
+    /**
+     * Longest line [parseCardLine] will even look at. No real card line comes close; the cap is
+     * there because this parser is fed arbitrary picked files, not only deck lists a user typed.
+     */
+    const val MAX_CARD_LINE_LENGTH = 512
+
     private val CARD_LINE_REGEX = Regex(
         """^(\d+)[xX×]?\s+(.+?)(?:\s+\(([A-Za-z0-9]+)\)\s+(\S+))?(?:\s+\*([FfEe])\*)?$"""
     )
@@ -88,7 +94,11 @@ object DeckImportExportHelper {
      * Etched (`*E*`) is reported as foil: the collection has no separate etched finish.
      */
     fun parseCardLine(line: String): ParsedLine? {
-        val match = CARD_LINE_REGEX.matchEntire(line.trim()) ?: return null
+        val trimmed = line.trim()
+        // Cost of CARD_LINE_REGEX is quadratic in the line length (lazy `.+?` before two optional
+        // `\s+`-led groups) and matchEntire ignores cancellation, so length is checked FIRST.
+        if (trimmed.length > MAX_CARD_LINE_LENGTH) return null
+        val match = CARD_LINE_REGEX.matchEntire(trimmed) ?: return null
         val qty    = match.groupValues[1].toIntOrNull() ?: return null
         val name   = match.groupValues[2].trim()
         if (name.isEmpty()) return null

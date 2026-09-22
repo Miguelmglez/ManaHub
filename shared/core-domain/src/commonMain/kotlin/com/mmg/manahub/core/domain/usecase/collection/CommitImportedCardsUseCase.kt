@@ -29,7 +29,7 @@ class CommitImportedCardsUseCase(
                 throw c
             } catch (t: Throwable) {
                 crashReporter?.log("collection_import_commit_slice_failed")
-                crashReporter?.recordException(RuntimeException("[collection_import_commit] ${t::class.simpleName}", t))
+                crashReporter?.recordException(RuntimeException("[collection_import_commit] ${t::class.simpleName}"))
                 false
             }
             repeat(slice.size) { succeeded += ok }
