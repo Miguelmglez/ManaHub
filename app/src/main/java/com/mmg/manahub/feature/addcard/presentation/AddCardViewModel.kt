@@ -771,6 +771,25 @@ class AddCardViewModel(
         AddCardTelemetry.selectAll(queueUnselected(state.results))
     }
 
+    /**
+     * Removes every visible deck card from the queue in one persist; cards hidden by the current
+     * filter stay queued, and cards with an entry being written are skipped (the write lands anyway).
+     */
+    fun onUnselectAllDeckCards() {
+        val state = _uiState.value
+        if (!state.isDeckMode) return
+        val visibleIds = state.results.mapTo(HashSet()) { it.scryfallId }
+        val inFlight = queueActions.inFlightIds.value
+        val lockedIds = queueRepository.queue.value
+            .filter { it.id in inFlight }
+            .mapTo(HashSet()) { it.card.scryfallId }
+        val toRemove = queueRepository.queue.value.selectedIds()
+            .filter { it in visibleIds && it !in lockedIds }
+        queueRepository.removeByScryfallIds(toRemove)
+        syncQueueSnapshot()
+        AddCardTelemetry.unselectAll(toRemove.size)
+    }
+
     /** Queues every visible deck card not owned under its oracleId or its exact name. */
     fun onSelectMissingDeckCards() {
         val candidates = _uiState.value.takeIf { it.isDeckMode }?.results ?: return

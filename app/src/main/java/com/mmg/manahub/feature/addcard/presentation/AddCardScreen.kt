@@ -47,7 +47,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.GridView
@@ -118,7 +117,10 @@ import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicProgressBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
-import com.mmg.manahub.core.ui.components.ManaCostImages
+import com.mmg.manahub.core.ui.components.CardRow
+import com.mmg.manahub.core.ui.components.CardRowSelectionStyle
+import com.mmg.manahub.core.ui.components.SubtleSelectionBorderWidth
+import com.mmg.manahub.core.ui.components.subtleSelectionBorderColor
 import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.VariantSelectorSheet
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -293,6 +295,7 @@ fun AddCardScreen(
                 extraBottomPadding = ctaReservedHeight,
                 onClearDeckCards = viewModel::onClearDeckCards,
                 onSelectAllDeckCards = viewModel::onSelectAllDeckCards,
+                onUnselectAllDeckCards = viewModel::onUnselectAllDeckCards,
                 onSelectMissingDeckCards = viewModel::onSelectMissingDeckCards,
                 onRetryDeckLoad = viewModel::onRetryDeckLoad,
             )
@@ -427,6 +430,7 @@ private fun SearchSurface(
     extraBottomPadding: Dp,
     onClearDeckCards: () -> Unit,
     onSelectAllDeckCards: () -> Unit,
+    onUnselectAllDeckCards: () -> Unit,
     onSelectMissingDeckCards: () -> Unit,
     onRetryDeckLoad: () -> Unit,
 ) {
@@ -733,9 +737,12 @@ private fun SearchSurface(
                                     .padding(bottom = MaterialTheme.spacing.sm),
                                 horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
                             ) {
+                                val allVisibleSelected = uiState.areAllVisibleDeckCardsSelected
                                 MagicCtaButton(
-                                    onClick = onSelectAllDeckCards,
-                                    text = stringResource(R.string.addcard_select_all),
+                                    onClick = if (allVisibleSelected) onUnselectAllDeckCards else onSelectAllDeckCards,
+                                    text = stringResource(
+                                        if (allVisibleSelected) R.string.addcard_unselect_all else R.string.addcard_select_all,
+                                    ),
                                     style = MagicCtaStyle.Outlined,
                                     modifier = Modifier.weight(1f),
                                 )
@@ -756,7 +763,7 @@ private fun SearchSurface(
                             hasMore = uiState.hasMore,
                             contentPaddingBottom = navBarBottom,
                             isMultiSelectMode = uiState.isMultiSelectMode,
-                            selectedScryfallIds = uiState.selectedScryfallIds,
+                            selectedScryfallIds = uiState.visibleSelectedScryfallIds,
                             onCardSelected = onCardSelected,
                             onCardLongClick = onCardLongClick,
                             onLoadNextPage = onLoadNextPage,
@@ -770,7 +777,7 @@ private fun SearchSurface(
                             hasMore = uiState.hasMore,
                             contentPaddingBottom = navBarBottom,
                             isMultiSelectMode = uiState.isMultiSelectMode,
-                            selectedScryfallIds = uiState.selectedScryfallIds,
+                            selectedScryfallIds = uiState.visibleSelectedScryfallIds,
                             onCardSelected = onCardSelected,
                             onCardLongClick = onCardLongClick,
                             onLoadNextPage = onLoadNextPage,
@@ -927,6 +934,8 @@ private fun ResultsList(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
+    val toggleLabel = stringResource(R.string.addcard_multi_select_toggle_action)
+    val detailsLabel = stringResource(R.string.addcard_multi_select_open_details)
 
     // Clear focus when scrolling results
     LaunchedEffect(listState.isScrollInProgress) {
@@ -943,16 +952,19 @@ private fun ResultsList(
         modifier = Modifier.fillMaxSize()
     ) {
         items(results, key = { it.scryfallId }, contentType = { "card" }) { card ->
-            SearchResultItem(
+            val frontFace = card.cardFaces?.firstOrNull()
+            CardRow(
                 card = card,
-                uiState = uiState,
-                isMultiSelectMode = isMultiSelectMode,
-                isSelected = card.scryfallId in selectedScryfallIds,
+                isInCollection = false,
                 onClick = {
                     focusManager.clearFocus(force = true)
                     keyboardController?.hide()
                     onCardSelected(card)
                 },
+                onRemove = null,
+                selected = card.scryfallId in selectedScryfallIds,
+                selectionStyle = CardRowSelectionStyle.Subtle,
+                exposeSelectedSemantics = isMultiSelectMode,
                 onLongClick = onCardLongClick?.let { longClick ->
                     {
                         focusManager.clearFocus(force = true)
@@ -960,6 +972,11 @@ private fun ResultsList(
                         longClick(card)
                     }
                 },
+                onClickLabel = if (isMultiSelectMode) toggleLabel else null,
+                onLongClickLabel = if (onCardLongClick != null) detailsLabel else null,
+                preferredCurrency = uiState.preferredCurrency,
+                displayName = frontFace?.name ?: card.printedName?.takeIf { it.isNotEmpty() },
+                displayTypeLine = frontFace?.typeLine ?: card.printedTypeLine?.takeIf { it.isNotEmpty() },
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
             )
@@ -1070,7 +1087,7 @@ private fun SearchResultGridItem(
     Surface(
         shape = CardShape,
         color = MaterialTheme.magicColors.surface,
-        border = if (isSelected) BorderStroke(SelectedBorderWidth, mc.primaryAccent) else null,
+        border = if (isSelected) BorderStroke(SubtleSelectionBorderWidth, subtleSelectionBorderColor()) else null,
         modifier = Modifier.resultClickable(isMultiSelectMode, isSelected, onClick, onLongClick),
     ) {
       Box {
@@ -1150,173 +1167,15 @@ private fun SearchResultGridItem(
 
 
         }
-        if (isSelected) {
-            SelectedCheckBadge(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(MaterialTheme.spacing.xs),
-            )
-        }
       }
     }
 
 }
 // ─────────────────────────────────────────────────────────────────────────────
-//  Search result row
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-private fun SearchResultItem(
-    card: Card,
-    uiState: AddCardUiState,
-    onClick: () -> Unit,
-    onLongClick: (() -> Unit)?,
-    isMultiSelectMode: Boolean,
-    isSelected: Boolean,
-    sharedTransitionScope: SharedTransitionScope?,
-    animatedVisibilityScope: AnimatedVisibilityScope?,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-
-    Surface(
-        shape = CardShape,
-        color = mc.surface,
-        border = if (isSelected) {
-            BorderStroke(SelectedBorderWidth, mc.primaryAccent)
-        } else {
-            BorderStroke(0.5.dp, mc.surfaceVariant)
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .resultClickable(isMultiSelectMode, isSelected, onClick, onLongClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            // Art thumbnail
-          Box {
-            AsyncImage(
-                model = card.imageNormal,
-                contentDescription = card.name,
-                placeholder = painterResource(Res.drawable.mtg_card_back),
-                error = painterResource(Res.drawable.mtg_card_back),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(width = 44.dp, height = 60.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .then(
-                        if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                            with(sharedTransitionScope) {
-                                Modifier.sharedBounds(
-                                    sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
-                                    animatedVisibilityScope = animatedVisibilityScope,
-                                    clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(6.dp)),
-                                    renderInOverlayDuringTransition = true,
-                                )
-                            }
-                        } else Modifier
-                    )
-                    .background(mc.surfaceVariant),
-            )
-            if (isSelected) {
-                SelectedCheckBadge(modifier = Modifier.align(Alignment.Center))
-            }
-          }
-
-            // Name / type / set
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                val frontFace = card.cardFaces?.firstOrNull()
-                val printedName = card.printedName
-                val printedTypeLine = card.printedTypeLine
-                CardName(
-                    name = frontFace?.name ?: if (printedName.isNullOrEmpty()) card.name else printedName,
-                    showFrontOnly = true,
-                    style = ty.bodyMedium,
-                    color = mc.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = frontFace?.typeLine ?: if (printedTypeLine.isNullOrEmpty()) card.typeLine else printedTypeLine,
-                    style = ty.bodySmall,
-                    color = mc.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(2.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    SetSymbol(
-                        setCode = card.setCode,
-                        rarity = CardRarity.fromString(card.rarity),
-                        size = 14.dp,
-                    )
-                    Text(
-                        text = card.setName,
-                        style = ty.labelSmall,
-                        color = mc.secondaryAccent,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-
-            // Mana cost + price
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                card.manaCost?.let { cost ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val costs = cost.split(" // ")
-                        costs.forEachIndexed { index, singleCost ->
-                            ManaCostImages(manaCost = singleCost, symbolSize = 20.dp)
-                            if (index < costs.size - 1) {
-                                Text(
-                                    " // ",
-                                    style = MaterialTheme.magicTypography.titleMedium,
-                                    color = MaterialTheme.magicColors.textSecondary,
-                                    modifier = Modifier.padding(horizontal = MaterialTheme.spacing.xxs)
-                                )
-                            }
-                        }
-                    }
-                }
-                val formattedPrice = PriceFormatter.formatFromScryfall(
-                    priceUsd = card.priceUsd,
-                    priceEur = card.priceEur,
-                    preferredCurrency = uiState.preferredCurrency
-                )
-                if (formattedPrice != "—") {
-                    Text(
-                        text = formattedPrice,
-                        style = ty.bodySmall,
-                        color = mc.goldMtg,
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 //  Multi-select helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-private val SelectedBorderWidth = 2.dp
-private val SelectedBadgeSize = 24.dp
-private val SelectedBadgeIconSize = 16.dp
-
-/** Tap / long-press handling shared by the grid tile and the list row, with selection semantics. */
+/** Tap / long-press handling of the grid tile, with selection semantics. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun Modifier.resultClickable(
@@ -1336,27 +1195,6 @@ private fun Modifier.resultClickable(
             onLongClick = onLongClick,
             onClick = onClick,
         )
-}
-
-/** Check badge marking a card that is in the shared queue; surface ring keeps it legible over art. */
-@Composable
-private fun SelectedCheckBadge(modifier: Modifier = Modifier) {
-    val mc = MaterialTheme.magicColors
-    Box(
-        modifier = modifier
-            .size(SelectedBadgeSize)
-            .background(mc.surface, CircleShape)
-            .padding(MaterialTheme.spacing.xxs)
-            .background(mc.primaryAccent, CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Default.Check,
-            contentDescription = null,
-            tint = mc.onAccent,
-            modifier = Modifier.size(SelectedBadgeIconSize),
-        )
-    }
 }
 
 @Composable

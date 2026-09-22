@@ -31,6 +31,9 @@ internal object AddCardTelemetry {
 
     fun selectAll(addedCount: Int) = log("addcard_multiselect_select_all: ${countBucket(addedCount)}")
 
+    fun unselectAll(removedCount: Int) =
+        log("addcard_multiselect_unselect_all: ${countBucket(removedCount)}")
+
     fun selectMissing(addedCount: Int) =
         log("addcard_multiselect_select_missing: ${countBucket(addedCount)}")
 

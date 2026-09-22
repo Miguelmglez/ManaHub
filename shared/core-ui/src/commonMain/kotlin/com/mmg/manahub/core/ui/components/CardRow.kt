@@ -7,9 +7,11 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,17 +38,21 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected as selectedSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.core.model.Card
@@ -151,7 +157,26 @@ fun CardRow(
     }
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+/** How a selected [CardRow] is drawn. */
+enum class CardRowSelectionStyle {
+    /** Accent glow + 2dp accent border (deck/wizard pickers). */
+    Glow,
+
+    /** Thin softened-accent outline only, for multi-select browsing where many rows are selected. */
+    Subtle,
+}
+
+/** Outline width of a subtly selected card surface (same as the unselected outline: no layout shift). */
+val SubtleSelectionBorderWidth: Dp = 1.dp
+
+private const val SubtleSelectionAlpha = 0.6f
+
+/** Softened accent for a subtly selected card surface; legible on every palette, dark and light. */
+@Composable
+@ReadOnlyComposable
+fun subtleSelectionBorderColor(): Color = MaterialTheme.magicColors.primaryAccent.copy(alpha = SubtleSelectionAlpha)
+
+@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun CardRow(
     card: Card,
@@ -170,6 +195,13 @@ fun CardRow(
     preferredCurrency: PreferredCurrency? = null,
     onImageClick: (() -> Unit)? = null,
     addEnabled: Boolean = true,
+    onLongClick: (() -> Unit)? = null,
+    onClickLabel: String? = null,
+    onLongClickLabel: String? = null,
+    selectionStyle: CardRowSelectionStyle = CardRowSelectionStyle.Glow,
+    exposeSelectedSemantics: Boolean = false,
+    displayName: String? = null,
+    displayTypeLine: String? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -187,15 +219,15 @@ fun CardRow(
     }
     val primaryAccentColor = cardColors.firstOrNull() ?: mc.surfaceVariant
 
-    Surface(
-        onClick = onClick,
-        shape = CardShape,
-        color = if (isCommander) mc.goldMtg.copy(alpha = 0.1f) else mc.surface,
-        modifier = modifier
+    val usesCombinedClick = onLongClick != null || onClickLabel != null
+    val subtleSelectionColor = subtleSelectionBorderColor()
+    val rowModifier = modifier
             .fillMaxWidth()
             .then(
                 if (isCommander) {
                     Modifier.border(1.dp, mc.goldMtg.copy(alpha = 0.4f), CardShape)
+                } else if (selected && selectionStyle == CardRowSelectionStyle.Subtle) {
+                    Modifier.border(SubtleSelectionBorderWidth, subtleSelectionColor, CardShape)
                 } else if (selected) {
                     Modifier.coloredShadow(
                         color = mc.primaryAccent,
@@ -207,8 +239,24 @@ fun CardRow(
                     Modifier.border(1.dp, mc.surfaceVariant.copy(alpha = 0.5f), CardShape)
                 }
             )
-            .semantics(mergeDescendants = true) {}
-    ) {
+            .then(
+                if (usesCombinedClick) {
+                    Modifier
+                        .clip(CardShape)
+                        .combinedClickable(
+                            onClickLabel = onClickLabel,
+                            onLongClickLabel = onLongClickLabel,
+                            onLongClick = onLongClick,
+                            onClick = onClick,
+                        )
+                } else {
+                    Modifier
+                }
+            )
+            .semantics(mergeDescendants = true) {
+                if (exposeSelectedSemantics) selectedSemantics = selected
+            }
+    val rowContent: @Composable () -> Unit = {
         Box(Modifier.fillMaxWidth().heightIn(min = 68.dp)) {
             if (card.imageArtCrop != null) {
                 AsyncImage(
@@ -317,7 +365,7 @@ fun CardRow(
                         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.TopStart) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 CardName(
-                                    name = card.name,
+                                    name = displayName ?: card.name,
                                     showFrontOnly = true,
                                     style = ty.titleMedium,
                                     color = mc.textPrimary,
@@ -339,7 +387,7 @@ fun CardRow(
 
                         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                             Text(
-                                card.typeLine,
+                                displayTypeLine ?: card.typeLine,
                                 style = ty.bodySmall,
                                 color = if (isCommander) mc.textPrimary else mc.textSecondary,
                                 maxLines = 1,
@@ -479,5 +527,11 @@ fun CardRow(
                 }
             }
         }
+    }
+    val surfaceColor = if (isCommander) mc.goldMtg.copy(alpha = 0.1f) else mc.surface
+    if (usesCombinedClick) {
+        Surface(shape = CardShape, color = surfaceColor, modifier = rowModifier, content = rowContent)
+    } else {
+        Surface(onClick = onClick, shape = CardShape, color = surfaceColor, modifier = rowModifier, content = rowContent)
     }
 }

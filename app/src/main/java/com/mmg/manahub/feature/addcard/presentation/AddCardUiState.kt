@@ -68,6 +68,14 @@ val AddCardUiState.queueCount: Int
 val AddCardUiState.showProceedCta: Boolean
     get() = isMultiSelectMode && queue.isNotEmpty()
 
+/** Ids drawn as selected: selection visuals exist only in multi-select mode; the queue itself is untouched. */
+val AddCardUiState.visibleSelectedScryfallIds: Set<String>
+    get() = if (isMultiSelectMode) selectedScryfallIds else emptySet()
+
+/** True when every card of the visible (filtered) deck list is queued; flips the CTA to "Unselect all". */
+val AddCardUiState.areAllVisibleDeckCardsSelected: Boolean
+    get() = isDeckMode && results.isNotEmpty() && results.all { it.scryfallId in selectedScryfallIds }
+
 /** One-shot queue feedback, resolved to a localized string by the screen. */
 sealed interface AddCardQueueToast {
     data class AddedToCollection(val cardName: String) : AddCardQueueToast

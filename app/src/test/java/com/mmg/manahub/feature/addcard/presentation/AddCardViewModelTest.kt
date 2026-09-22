@@ -605,6 +605,104 @@ class AddCardViewModelTest {
     }
 
     @Test
+    fun `all-visible-selected flips after select all and back after a single deselect`() = runTest(dispatcher) {
+        val vm = enterLocalDeckMode()
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.areAllVisibleDeckCardsSelected)
+
+        vm.onSelectAllDeckCards()
+        assertTrue(vm.uiState.value.areAllVisibleDeckCardsSelected)
+
+        vm.onToggleCardSelection(goblin)
+        assertFalse(vm.uiState.value.areAllVisibleDeckCardsSelected)
+    }
+
+    @Test
+    fun `all-visible-selected follows the local filter`() = runTest(dispatcher) {
+        val vm = enterLocalDeckMode()
+        advanceUntilIdle()
+        vm.onToggleCardSelection(sol)
+        assertFalse(vm.uiState.value.areAllVisibleDeckCardsSelected)
+
+        vm.onQueryChange("sol")
+        assertTrue(vm.uiState.value.areAllVisibleDeckCardsSelected)
+
+        vm.onQueryChange("")
+        assertFalse(vm.uiState.value.areAllVisibleDeckCardsSelected)
+    }
+
+    @Test
+    fun `all-visible-selected is false for an empty filtered list and outside deck mode`() = runTest(dispatcher) {
+        viewModel.onToggleMultiSelectMode()
+        viewModel.onToggleCardSelection(bolt)
+        assertFalse(viewModel.uiState.value.areAllVisibleDeckCardsSelected)
+
+        val vm = enterLocalDeckMode()
+        advanceUntilIdle()
+        vm.onSelectAllDeckCards()
+        vm.onQueryChange("no such card")
+        assertFalse(vm.uiState.value.areAllVisibleDeckCardsSelected)
+    }
+
+    @Test
+    fun `unselect all removes only the visible cards and logs the removed count bucket`() = runTest(dispatcher) {
+        val vm = enterLocalDeckMode()
+        advanceUntilIdle()
+        vm.onSelectAllDeckCards()
+        vm.onQueryChange("sol")
+
+        vm.onUnselectAllDeckCards()
+
+        assertEquals(setOf("bolt-1", "goblin-1"), queueRepository.queue.value.map { it.card.scryfallId }.toSet())
+        assertFalse(vm.uiState.value.areAllVisibleDeckCardsSelected)
+        verify(exactly = 1) { crashlytics.log("addcard_multiselect_unselect_all: 1") }
+    }
+
+    @Test
+    fun `unselect all removes scanned copies of visible cards and persists once`() = runTest(dispatcher) {
+        var writes = 0
+        val countingStore = object : CardQueueStore {
+            private var payload: String? = null
+            override fun read(): String? = payload
+            override fun write(payload: String) { writes++; this.payload = payload }
+        }
+        queueRepository = PersistentCardQueueRepository(store = countingStore)
+        val vm = enterLocalDeckMode()
+        advanceUntilIdle()
+        queueRepository.add(scannedEntry(boltWithOracle, isFoil = true))
+        vm.onSelectAllDeckCards()
+        writes = 0
+
+        vm.onUnselectAllDeckCards()
+
+        assertTrue(queueRepository.queue.value.isEmpty())
+        assertEquals(1, writes)
+    }
+
+    @Test
+    fun `unselect all is a no-op outside deck mode`() = runTest(dispatcher) {
+        viewModel.onToggleMultiSelectMode()
+        viewModel.onToggleCardSelection(bolt)
+
+        viewModel.onUnselectAllDeckCards()
+
+        assertEquals(1, queueRepository.queue.value.size)
+    }
+
+    @Test
+    fun `selection visuals are hidden outside multi-select mode while the queue is kept`() = runTest(dispatcher) {
+        viewModel.onToggleMultiSelectMode()
+        viewModel.onToggleCardSelection(bolt)
+        assertEquals(setOf("bolt-1"), viewModel.uiState.value.visibleSelectedScryfallIds)
+
+        viewModel.onToggleMultiSelectMode()
+
+        assertTrue(viewModel.uiState.value.visibleSelectedScryfallIds.isEmpty())
+        assertEquals(setOf("bolt-1"), viewModel.uiState.value.selectedScryfallIds)
+        assertEquals(1, queueRepository.queue.value.size)
+    }
+
+    @Test
     fun `select missing queues only cards owned under neither their oracleId nor their name`() = runTest(dispatcher) {
         val ownedBoltOtherPrinting = TestFixtures.buildCard(scryfallId = "bolt-2", name = "Lightning Bolt")
             .copy(oracleId = "oracle-bolt")

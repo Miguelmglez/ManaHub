@@ -136,6 +136,7 @@
     <string name="addcard_multi_select_open_details">Open card details</string>
     <string name="addcard_clear_deck_cards">Clear deck cards</string>
     <string name="addcard_select_all">Select all</string>
+    <string name="addcard_unselect_all">Unselect all</string>
     <string name="addcard_select_missing">Select missing</string>
     <string name="addcard_deck_load_error">Could not load the cards of this deck.</string>
     <string name="addcard_deck_empty_title">No cards in this deck</string>

@@ -10,7 +10,7 @@ is the flag emoji for the active search language (`CardConstants.getFlag`/`langu
 `SaveRecentSearchUseCase`/`ClearRecentSearchesUseCase` and `RecentSearchRepository` are gone: only
 delete a use case's Koin binding — always grep the feature's OWN `di/` module too (`AddCardKoinModule.kt`
 had its own reference the main task list didn't mention). Both the spotlight grid tiles and the
-results-list `SearchResultItem` thumbnails participate in the shared-element transition into
+results-list `CardRow` thumbnails (shared `core/ui/components/CardRow`, its default key) participate in the shared-element transition into
 `CardDetailScreen` via the shared key `"card-image-${card.scryfallId}"` — any new card-image surface
 in this screen must reuse that exact key format to stay connected to the transition.
 → memory: `project_addcard_redesign_2026-07-13`
@@ -21,6 +21,12 @@ normal mode keeps tap → CardDetail with no long-press. "Selected" means *the s
 queue*: tapping a selected card removes EVERY queue entry with that id, scanned ones included. The
 bottom `MagicCtaButton` ("Proceed with N selected") opens the shared `CardQueueSheet`
 (`core/ui/components/`, stateless — also used by the Scanner).
+- **Selected visuals.** A thin softened-accent outline only (`SubtleSelectionBorderWidth` +
+  `subtleSelectionBorderColor()`; list = `CardRow(selectionStyle = Subtle)`), no check badge. Drawn
+  only while multi mode is on: screens read `visibleSelectedScryfallIds`, never `selectedScryfallIds`.
+- **Select all ↔ Unselect all** (deck mode) is derived from `areAllVisibleDeckCardsSelected` (visible =
+  filtered `results`); "Unselect all" removes only the visible ids via one `removeByScryfallIds`,
+  skipping in-flight entries.
 - **One queue, one instance.** `CardQueueRepository` (commonMain) is a single `single<CardQueueRepository>`
   in `CoreBridgeKoinModule`, bridged into Hilt from `GlobalContext` so the Hilt `ScannerViewModel` and the
   Koin `AddCardViewModel` share it. Never construct a second one. It persists the legacy scanner payload
