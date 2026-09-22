@@ -159,7 +159,7 @@ class FriendCardSearchMapperTest {
 
     @Test
     fun `type and format arrays are capped at 10 while other arrays keep 50`() {
-        val types = (1..30).map { "Type$it" }.toSet()
+        val types = ('a'..'z').map { "Type$it" }.toSet()
         val formats = listOf("aa", "bb", "cc", "dd", "ee", "ff", "gg", "hh", "ii", "jj", "kk", "ll")
         val p = params(
             SearchCriterion.CardType(types, matchAll = true),
@@ -198,5 +198,35 @@ class FriendCardSearchMapperTest {
             name = "bolt",
         )
         assertEquals(2, p.activeFilterCount())
+    }
+
+    @Test
+    fun `type strings the server would reject are dropped`() {
+        val p = params(SearchCriterion.CardType(setOf("Assembly-Worker", "Time Lord", "Urza's", "B.O.B.", "human?", " Rat "), matchAll = false))
+        assertEquals(listOf("Assembly-Worker", "Time Lord", "Urza's", "Rat"), p.typesAny)
+        assertNull(params(SearchCriterion.CardType(setOf("b.o.b."), matchAll = true)).typesAll)
+    }
+
+    @Test
+    fun `supportedOnly trims invalid types out of card-type criteria and drops empty ones`() {
+        val query = AdvancedSearchQuery(
+            listOf(
+                SearchCriterion.CardType(setOf("Creature", "b.o.b."), matchAll = true),
+                SearchCriterion.CardType(setOf("nastiest,"), exclude = true),
+            )
+        )
+        assertEquals(
+            listOf<SearchCriterion>(SearchCriterion.CardType(setOf("Creature"), matchAll = true)),
+            FriendCardSearchMapper.supportedOnly(query).criteria,
+        )
+    }
+
+    @Test
+    fun `every picker type except the known Un-set joke types passes validation`() {
+        val rejected = com.mmg.manahub.core.model.CardTypeOption.allTypes
+            .map { it.scryfallValue }
+            .filterNot(FriendCardSearchMapper::isValidType)
+            .toSet()
+        assertEquals(setOf("b.o.b.", "baddest,", "biggest,", "elemental?", "human?", "nastiest,"), rejected)
     }
 }
