@@ -1279,7 +1279,10 @@ fun AppNavGraph(
                     },
                 ),
             ) {
-                TradesSharedListScreen(onBack = { navController.popBackStack() })
+                TradesSharedListScreen(
+                    onBack = { navController.popBackStack() },
+                    onCardClick = { scryfallId -> navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId)) },
+                )
             }
 
             // ── Trade proposal editor ─────────────────────────────────────────

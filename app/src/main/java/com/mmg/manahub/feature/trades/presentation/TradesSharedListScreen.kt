@@ -1,23 +1,22 @@
 package com.mmg.manahub.feature.trades.presentation
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,34 +28,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.model.SharedListType
+import com.mmg.manahub.core.ui.components.CardListItem
+import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
-import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.core.model.SharedListResult
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Screen
-// ─────────────────────────────────────────────────────────────────────────────
+import org.koin.androidx.compose.koinViewModel
 
 /**
- * Landing screen for shared trade-list deep links.
- *
- * Reached via [Screen.TradesSharedList] when a user taps a link of the form:
- * `https://miguelmglez.github.io/list/{shareId}`
- *
- * Phase 3 will render card images and enable "Add to my wishlist" actions.
- * In Phase 2, this screen renders raw card IDs from the resolved list.
+ * Landing screen for shared trade-list deep links
+ * (`https://miguelmglez.github.io/list/{shareId}`, reached via [Screen.TradesSharedList]).
  */
 @Composable
 fun TradesSharedListScreen(
     onBack: () -> Unit,
+    onCardClick: (scryfallId: String) -> Unit,
     viewModel: TradesSharedListViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -64,15 +55,12 @@ fun TradesSharedListScreen(
     val spacing = MaterialTheme.spacing
 
     Scaffold(
-        containerColor      = mc.background,
+        containerColor = mc.background,
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            Surface(
-                color    = mc.backgroundSecondary,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
+            Surface(color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
                 Row(
-                    modifier          = Modifier
+                    modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
                         .padding(horizontal = spacing.xs, vertical = spacing.xs),
@@ -80,15 +68,13 @@ fun TradesSharedListScreen(
                 ) {
                     IconButton(onClick = onBack) {
                         Icon(
-                            imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.action_back),
-                            tint               = mc.textPrimary,
+                            tint = mc.textPrimary,
                         )
                     }
-                    // Landing screen for a shared trade LIST link — was previously mislabeled
-                    // with the unrelated "Exploration" tab string (trades audit §5.9, 2026-07-10).
                     Text(
-                        text  = stringResource(R.string.trades_shared_list_title),
+                        text = stringResource(R.string.trades_shared_list_title),
                         style = MaterialTheme.magicTypography.titleLarge,
                         color = mc.textPrimary,
                     )
@@ -97,132 +83,120 @@ fun TradesSharedListScreen(
         },
     ) { innerPadding ->
         Box(
-            modifier        = Modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
             contentAlignment = Alignment.Center,
         ) {
             when (val state = uiState) {
-                SharedListUiState.Loading -> {
-                    MagicLoadingSpinner()
-                }
+                SharedListUiState.Loading -> MagicLoadingSpinner()
 
-                SharedListUiState.Private -> {
-                    MessageWithBack(
-                        message = stringResource(R.string.trades_shared_list_private),
-                        onBack  = onBack,
-                    )
-                }
+                SharedListUiState.Private -> EmptyState(
+                    title = stringResource(R.string.trades_shared_list_private),
+                    icon = Icons.Default.Lock,
+                    actionLabel = stringResource(R.string.action_back),
+                    onAction = onBack,
+                )
 
-                SharedListUiState.NotFound -> {
-                    MessageWithBack(
-                        message = stringResource(R.string.trades_shared_list_not_found),
-                        onBack  = onBack,
-                    )
-                }
+                SharedListUiState.NotFound -> EmptyState(
+                    title = stringResource(R.string.trades_shared_list_not_found),
+                    icon = Icons.Default.SearchOff,
+                    actionLabel = stringResource(R.string.action_back),
+                    onAction = onBack,
+                )
 
-                is SharedListUiState.Error -> {
-                    MessageWithBack(
-                        message = state.message ?: stringResource(R.string.error_unknown),
-                        onBack  = onBack,
-                    )
-                }
+                SharedListUiState.Error -> FullErrorState(
+                    message = stringResource(R.string.trades_shared_list_error),
+                    retryLabel = stringResource(R.string.action_retry),
+                    onRetry = viewModel::retry,
+                )
 
-                is SharedListUiState.Success -> {
-                    SharedListContent(
-                        result    = state.result,
-                        modifier  = Modifier.fillMaxSize(),
-                    )
-                }
+                is SharedListUiState.Success -> SharedListContent(
+                    state = state,
+                    onCardClick = onCardClick,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Private helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun MessageWithBack(
-    message: String,
-    onBack:  () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val spacing = MaterialTheme.spacing
-    Column(
-        modifier            = Modifier.padding(spacing.xxl),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(spacing.lg),
-    ) {
-        Text(
-            text      = message,
-            style     = MaterialTheme.magicTypography.bodyMedium,
-            color     = mc.textSecondary,
-            textAlign = TextAlign.Center,
-        )
-        Button(
-            onClick = onBack,
-            colors  = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-        ) {
-            Text(stringResource(R.string.action_back), color = mc.background)
         }
     }
 }
 
 @Composable
 private fun SharedListContent(
-    result:   SharedListResult.Ok,
+    state: SharedListUiState.Success,
+    onCardClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
     Column(modifier = modifier) {
         Text(
-            text = if (result.ownerNickname.isNotBlank())
-                stringResource(R.string.trades_shared_list_by, result.ownerNickname)
-            else
-                stringResource(R.string.trades_shared_list_title),
-            style    = MaterialTheme.magicTypography.titleMedium,
-            color    = mc.textPrimary,
+            text = if (state.ownerNickname.isNotBlank()) {
+                stringResource(R.string.trades_shared_list_by, state.ownerNickname)
+            } else {
+                stringResource(R.string.trades_shared_list_title)
+            },
+            style = MaterialTheme.magicTypography.titleMedium,
+            color = mc.textPrimary,
             modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md),
         )
         Text(
-            text     = result.listType.name,
-            style    = MaterialTheme.magicTypography.labelSmall,
-            color    = mc.textSecondary,
+            text = stringResource(
+                when (state.listType) {
+                    SharedListType.WISHLIST -> R.string.trades_shared_list_type_wishlist
+                    SharedListType.OPEN_FOR_TRADE -> R.string.trades_shared_list_type_open_for_trade
+                },
+            ),
+            style = MaterialTheme.magicTypography.labelMedium,
+            color = mc.textSecondary,
             modifier = Modifier.padding(horizontal = spacing.lg),
         )
-        Spacer(Modifier.height(spacing.sm))
 
-        // Phase 2: render raw map entries; Phase 3 will fetch card details.
-        LazyColumn(
-            contentPadding      = PaddingValues(horizontal = spacing.lg, vertical = spacing.xs),
-            verticalArrangement = Arrangement.spacedBy(spacing.xs + spacing.xxs),
-        ) {
-            // Each item is a Map<String,String?> with no stable unique field; index key is appropriate.
-            itemsIndexed(result.items) { idx, itemMap ->
-                Surface(
-                    shape = ChipShape,
-                    color = mc.surface,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(modifier = Modifier.padding(spacing.md)) {
-                        // `value` is a nullable String (`Map<String, String?>` — Phase 2 payload from
-                        // the server may omit fields); the elvis fallback is NOT dead code here
-                        // (verified against SharedListResult.Ok.items, trades audit §5.9 correction,
-                        // 2026-07-10 — the audit's claim that `value` is non-null did not match the
-                        // actual model).
-                        itemMap.forEach { (key, value) ->
-                            Text(
-                                text  = "$key: ${value ?: "—"}",
-                                style = MaterialTheme.magicTypography.bodySmall,
-                                color = mc.textPrimary,
-                            )
-                        }
-                    }
-                }
-            }
+        if (state.rows.isEmpty()) {
+            EmptyState(
+                title = stringResource(R.string.trades_shared_list_empty),
+                icon = Icons.Default.Style,
+            )
+        } else {
+            SharedListRows(state, onCardClick)
+        }
+    }
+}
+
+@Composable
+private fun SharedListRows(
+    state: SharedListUiState.Success,
+    onCardClick: (String) -> Unit,
+) {
+    val spacing = MaterialTheme.spacing
+    val unknownCard = stringResource(R.string.trades_unknown_card)
+    val anyVariant = stringResource(R.string.trades_shared_list_any_variant)
+    LazyColumn(
+        contentPadding = PaddingValues(vertical = spacing.sm),
+        modifier = Modifier
+            .fillMaxSize()
+            .navigationBarsPadding(),
+    ) {
+        items(state.rows, key = { it.key }) { row ->
+            val card = row.card
+            CardListItem(
+                name = card?.name ?: unknownCard,
+                imageUrl = card?.imageNormal,
+                priceUsd = if (row.item.isFoil == true) card?.priceUsdFoil ?: card?.priceUsd else card?.priceUsd,
+                priceEur = if (row.item.isFoil == true) card?.priceEurFoil ?: card?.priceEur else card?.priceEur,
+                onClick = { onCardClick(row.item.cardId) },
+                quantityText = "×${row.item.quantity}",
+                hasFoil = row.item.isFoil == true,
+                condition = if (row.item.matchAnyVariant) anyVariant else row.item.condition,
+                language = row.item.language,
+                isStale = card?.isStale ?: false,
+                setCode = card?.setCode,
+                setName = card?.setName,
+                rarity = card?.rarity,
+                typeLine = card?.typeLine,
+                manaCost = card?.manaCost,
+                scryfallId = row.item.cardId,
+            )
         }
     }
 }

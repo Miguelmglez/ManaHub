@@ -3091,6 +3091,12 @@
     <string name="trades_shared_list_not_found">Link not found</string>
     <string name="trades_shared_list_title">Shared list</string>
     <string name="trades_shared_list_by">Shared list from @%s</string>
+    <string name="trades_shared_list_type_wishlist">Wishlist</string>
+    <string name="trades_shared_list_type_open_for_trade">Open for trade</string>
+    <string name="trades_shared_list_empty">This list is empty</string>
+    <string name="trades_shared_list_error">Couldn\'t load this list</string>
+    <string name="trades_shared_list_any_variant">Any version</string>
+    <string name="trades_unknown_card">Unknown card</string>
     <string name="trades_migration_synced_n_cards">Synced %d cards from this device to your account.</string>
     <string name="trades_select_card_id_hint">Enter card Scryfall ID</string>
     <string name="trades_foil">Foil</string>

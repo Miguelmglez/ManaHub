@@ -115,7 +115,7 @@ class TradesRepositoryImplTest {
         // Arrange: populate cache with one active (PROPOSED) and one terminal (CANCELLED)
         val activeDto = buildProposalDto(id = "active-001", status = "PROPOSED")
         val terminalDto = buildProposalDto(id = "terminal-001", status = "CANCELLED")
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(activeDto, terminalDto))
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(activeDto, terminalDto))
 
         repository.refreshProposals(USER_ID)
 
@@ -134,7 +134,7 @@ class TradesRepositoryImplTest {
         // Arrange
         val statuses = listOf("CANCELLED", "DECLINED", "COUNTERED", "COMPLETED", "REVOKED")
         val dtos = statuses.mapIndexed { i, s -> buildProposalDto(id = "t-$i", status = s) }
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(dtos)
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(dtos)
         repository.refreshProposals(USER_ID)
 
         // Act + Assert
@@ -159,12 +159,12 @@ class TradesRepositoryImplTest {
     fun `given cache refreshed twice when observeActiveProposals then latest value is reflected`() = runTest {
         // First refresh: PROPOSED proposal
         val proposedDto = buildProposalDto(id = "p-001", status = "PROPOSED")
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(proposedDto))
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(proposedDto))
         repository.refreshProposals(USER_ID)
 
         // Second refresh: same proposal now ACCEPTED
         val acceptedDto = buildProposalDto(id = "p-001", status = "ACCEPTED")
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(acceptedDto))
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(acceptedDto))
         repository.refreshProposals(USER_ID)
 
         repository.observeActiveProposals().test {
@@ -184,7 +184,7 @@ class TradesRepositoryImplTest {
         // one belongs on observeActiveProposals()/observeAllProposals(), not here.
         val active = buildProposalDto(id = "a-001", status = "PROPOSED")
         val terminal = buildProposalDto(id = "t-001", status = "COMPLETED")
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(active, terminal))
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(active, terminal))
         repository.refreshProposals(USER_ID)
 
         // Act + Assert
@@ -214,7 +214,7 @@ class TradesRepositoryImplTest {
         val threadA1 = buildProposalDto(id = "a-1", rootProposalId = "root-A")
         val threadA2 = buildProposalDto(id = "a-2", rootProposalId = "root-A", parentProposalId = "a-1")
         val threadB1 = buildProposalDto(id = "b-1", rootProposalId = "root-B")
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(threadA1, threadA2, threadB1))
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(threadA1, threadA2, threadB1))
         repository.refreshProposals(USER_ID)
 
         // Act + Assert
@@ -229,7 +229,7 @@ class TradesRepositoryImplTest {
     @Test
     fun `given cache when observeProposalThread with unknown rootId then emits empty list`() = runTest {
         val dto = buildProposalDto(id = "p-001", rootProposalId = "root-A")
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto))
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(dto))
         repository.refreshProposals(USER_ID)
 
         repository.observeProposalThread("root-UNKNOWN").test {
@@ -242,7 +242,7 @@ class TradesRepositoryImplTest {
     fun `given single proposal where rootProposalId equals its own id when observeProposalThread then that proposal is included`() = runTest {
         // Root proposal: its rootProposalId == its own id
         val root = buildProposalDto(id = "root-001", rootProposalId = "root-001")
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(root))
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(root))
         repository.refreshProposals(USER_ID)
 
         repository.observeProposalThread("root-001").test {
@@ -263,7 +263,7 @@ class TradesRepositoryImplTest {
         // cache via observeAllProposals() rather than the terminal-only observeProposalHistory().
         val dto1 = buildProposalDto(id = "p-001")
         val dto2 = buildProposalDto(id = "p-002")
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto1, dto2))
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(dto1, dto2))
 
         // Act
         val result = repository.refreshProposals(USER_ID)
@@ -279,7 +279,7 @@ class TradesRepositoryImplTest {
     @Test
     fun `given remote fetchProposals fails when refreshProposals then returns Result failure without crashing`() = runTest {
         // Arrange
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.failure(RuntimeException("503"))
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.failure(RuntimeException("503"))
 
         // Act
         val result = repository.refreshProposals(USER_ID)
@@ -294,11 +294,11 @@ class TradesRepositoryImplTest {
         // unfiltered cache via observeAllProposals() rather than the terminal-only
         // observeProposalHistory().
         val dto = buildProposalDto(id = "p-001")
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto))
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(dto))
         repository.refreshProposals(USER_ID)
 
         // Now the remote fails
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.failure(RuntimeException("network error"))
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.failure(RuntimeException("network error"))
         repository.refreshProposals(USER_ID)
 
         // Cache must still hold the previous proposal
@@ -314,7 +314,7 @@ class TradesRepositoryImplTest {
         // permissive state (shows proposer Edit/Cancel). It falls back to the terminal/inert
         // CANCELLED instead, via toTradeStatusOrFallback().
         val dto = buildProposalDto(id = "p-001", status = "TOTALLY_UNKNOWN_STATUS")
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto))
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(dto))
 
         repository.refreshProposals(USER_ID)
 
@@ -468,7 +468,7 @@ class TradesRepositoryImplTest {
         runTest {
             // Arrange: populate the cache via refreshProposals first (metadata already fresh).
             val dto = buildProposalDto(id = "p-001", rootProposalId = "p-001")
-            coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto))
+            coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(dto))
             repository.refreshProposals(USER_ID)
 
             coEvery { remote.fetchProposalItems("p-001") } returns
@@ -482,7 +482,7 @@ class TradesRepositoryImplTest {
             coVerify(exactly = 1) { remote.fetchProposalItems("p-001") }
             // The whole point of refreshItemsForThread: it must NOT re-fetch proposal metadata --
             // fetchProposals is only ever called once, by the setup refreshProposals() above.
-            coVerify(exactly = 1) { remote.fetchProposals(USER_ID) }
+            coVerify(exactly = 1) { remote.fetchProposals(USER_ID, any()) }
         }
 
     @Test
@@ -499,7 +499,7 @@ class TradesRepositoryImplTest {
         runTest {
             val dto1 = buildProposalDto(id = "p-001", rootProposalId = "p-001")
             val dto2 = buildProposalDto(id = "p-002", rootProposalId = "p-002")
-            coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto1, dto2))
+            coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(dto1, dto2))
             repository.refreshProposals(USER_ID)
 
             coEvery { remote.fetchProposalItems("p-001") } returns
@@ -527,7 +527,7 @@ class TradesRepositoryImplTest {
     fun `given items loaded once when a later thread refresh fails to fetch them then prior items are kept and failure is returned`() =
         runTest {
             val dto = buildProposalDto(id = "p-001", rootProposalId = "p-001")
-            coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto))
+            coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(dto))
             coEvery { remote.fetchProposalItems("p-001") } returns
                 Result.success(listOf(tradeItemDto(id = "item-1", proposalId = "p-001")))
             assertTrue(repository.refreshProposalThread("p-001", USER_ID).isSuccess)
@@ -547,7 +547,7 @@ class TradesRepositoryImplTest {
     @Test
     fun `given items were never loaded when their fetch fails then the proposal reports itemsLoaded false`() = runTest {
         val dto = buildProposalDto(id = "p-001", rootProposalId = "p-001")
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto))
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(dto))
         coEvery { remote.fetchProposalItems("p-001") } returns Result.failure(RuntimeException("timeout"))
 
         val result = repository.refreshProposalThread("p-001", USER_ID)
@@ -563,7 +563,7 @@ class TradesRepositoryImplTest {
 
     @Test
     fun `given a metadata-only refresh then a proposal whose items were never fetched is not reported as loaded`() = runTest {
-        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(buildProposalDto(id = "p-001")))
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(listOf(buildProposalDto(id = "p-001")))
 
         repository.refreshProposals(USER_ID)
 
@@ -576,7 +576,7 @@ class TradesRepositoryImplTest {
     @Test
     fun `given an item fetch failure when refreshItemsForThread then failure is returned and the cache entry is untouched`() =
         runTest {
-            coEvery { remote.fetchProposals(USER_ID) } returns
+            coEvery { remote.fetchProposals(USER_ID, any()) } returns
                 Result.success(listOf(buildProposalDto(id = "p-001", rootProposalId = "p-001")))
             repository.refreshProposals(USER_ID)
             coEvery { remote.fetchProposalItems("p-001") } returns Result.failure(RuntimeException("timeout"))
@@ -589,4 +589,45 @@ class TradesRepositoryImplTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `given a thread refresh then only that thread is fetched and other threads stay cached`() = runTest {
+        coEvery { remote.fetchProposals(USER_ID, null) } returns Result.success(
+            listOf(buildProposalDto(id = "a-1", rootProposalId = "a-1"), buildProposalDto(id = "b-1", rootProposalId = "b-1")),
+        )
+        repository.refreshProposals(USER_ID)
+        coEvery { remote.fetchProposals(USER_ID, "a-1") } returns Result.success(
+            listOf(
+                buildProposalDto(id = "a-1", rootProposalId = "a-1", status = "COUNTERED"),
+                buildProposalDto(id = "a-2", rootProposalId = "a-1", parentProposalId = "a-1"),
+            ),
+        )
+
+        val result = repository.refreshProposalThread("a-1", USER_ID)
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 1) { remote.fetchProposals(USER_ID, "a-1") }
+        coVerify(exactly = 0) { remote.fetchProposalItems("b-1") }
+        repository.observeAllProposals().test {
+            val all = awaitItem()
+            assertEquals(setOf("a-1", "a-2", "b-1"), all.map { it.id }.toSet())
+            assertEquals(TradeStatus.COUNTERED, all.single { it.id == "a-1" }.status)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `given a thread fetch failure when refreshProposalThread then the cache is untouched`() = runTest {
+        coEvery { remote.fetchProposals(USER_ID, null) } returns Result.success(listOf(buildProposalDto(id = "a-1", rootProposalId = "a-1")))
+        repository.refreshProposals(USER_ID)
+        coEvery { remote.fetchProposals(USER_ID, "a-1") } returns Result.failure(RuntimeException("keyset_drain_page_cap"))
+
+        val result = repository.refreshProposalThread("a-1", USER_ID)
+
+        assertTrue(result.isFailure)
+        repository.observeAllProposals().test {
+            assertEquals(listOf("a-1"), awaitItem().map { it.id })
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

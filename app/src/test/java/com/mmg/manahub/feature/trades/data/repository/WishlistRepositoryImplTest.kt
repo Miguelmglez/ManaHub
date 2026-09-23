@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.local.entity.LocalWishlistEntity
 import com.mmg.manahub.core.data.remote.trades.WishlistRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.WishlistEntryDto
 import com.mmg.manahub.core.model.WishlistEntry
+import com.mmg.manahub.core.data.remote.trades.KeysetDrain
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -594,5 +595,43 @@ class WishlistRepositoryImplTest {
             remote.updateWishlistQuantity("exact", 2)
             dao.updateQuantity("exact", 2)
         }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  syncFromRemote: eviction only after a complete keyset drain
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun wishDto(id: String) =
+        WishlistEntryDto(id = id, userId = "user-1", cardId = "card-$id", matchAnyVariant = true, createdAt = "2024-01-01T00:00:00Z")
+
+    @Test
+    fun `given a partial drain when syncFromRemote then fetched rows are kept and nothing is evicted`() = runTest {
+        coEvery { remote.drainWishlist("user-1") } returns
+            KeysetDrain(listOf(wishDto("w1")), isComplete = false, failure = RuntimeException("page 2 failed"))
+        coEvery { dao.getSyncedIds() } returns listOf("w1", "w-old")
+
+        val result = repository.syncFromRemote("user-1")
+
+        assertTrue(result.isFailure)
+        coVerify { dao.upsertAll(match { rows -> rows.map { it.id } == listOf("w1") }) }
+        coVerify(exactly = 0) { dao.deleteSyncedByIds(any()) }
+        coVerify(exactly = 0) { dao.deleteSyncedNotIn(any()) }
+        coVerify(exactly = 0) { dao.clearSynced() }
+    }
+
+    @Test
+    fun `given a complete drain when syncFromRemote then stale synced rows are evicted in bounded chunks`() = runTest {
+        val remoteRows = (1..3).map { wishDto("w$it") }
+        coEvery { remote.drainWishlist("user-1") } returns KeysetDrain.complete(remoteRows)
+        val stale = (1..1200).map { "old-$it" }
+        coEvery { dao.getSyncedIds() } returns remoteRows.map { it.id } + stale
+
+        val result = repository.syncFromRemote("user-1")
+
+        assertTrue(result.isSuccess)
+        val chunks = mutableListOf<List<String>>()
+        coVerify { dao.deleteSyncedByIds(capture(chunks)) }
+        assertEquals(stale.toSet(), chunks.flatten().toSet())
+        assertTrue(chunks.all { it.size <= 500 })
     }
 }

@@ -70,29 +70,23 @@ class TradesRepositoryImpl(
     }
 
     override suspend fun refreshProposalThread(rootProposalId: String, userId: String): Result<Unit> {
-        // Fetch fresh proposal metadata for all of the user's proposals.
-        val proposalsResult = remote.fetchProposals(userId)
-        if (proposalsResult.isFailure) return Result.failure(proposalsResult.exceptionOrNull()!!)
+        // Only this thread's proposals: a whole-account fetch per thread open wastes the call budget.
+        val dtos = remote.fetchProposals(userId, rootProposalId)
+            .getOrElse { return Result.failure(it) }
+            .filter { it.rootProposalId == rootProposalId }
+            .distinctBy { it.id }
 
-        val dtos = proposalsResult.getOrThrow().distinctBy { it.id }
+        val threadItems = fetchItemsForProposals(dtos.map { it.id })
 
-        val threadItems = fetchItemsForProposals(
-            dtos.filter { it.rootProposalId == rootProposalId }.map { it.id }
-        )
-
-        // For proposals in this thread: use the freshly-fetched items. For others, and for a
-        // thread proposal whose item fetch failed: keep whatever the cache already had.
-        // Computed inside update() — see §2.8 note above.
+        // A thread proposal whose item fetch failed keeps whatever the cache already had; other
+        // threads are left untouched. Computed inside update() — see the §2.8 note above.
         cache.update { current ->
             val existingById = current.associateBy { it.id }
-            dtos.map { dto ->
+            val refreshed = dtos.map { dto ->
                 val fetched = threadItems[dto.id]?.getOrNull()
-                if (fetched != null) {
-                    dto.toDomain(fetched.first, fetched.second)
-                } else {
-                    dto.toDomain(existingById[dto.id])
-                }
+                if (fetched != null) dto.toDomain(fetched.first, fetched.second) else dto.toDomain(existingById[dto.id])
             }
+            current.filterNot { it.rootProposalId == rootProposalId } + refreshed
         }
         return threadItems.firstItemFailure()?.let { Result.failure(it) } ?: Result.success(Unit)
     }

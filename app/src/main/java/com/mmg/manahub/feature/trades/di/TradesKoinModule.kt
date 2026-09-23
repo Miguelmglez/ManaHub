@@ -206,6 +206,7 @@ fun tradesKoinModule(
         TradesSharedListViewModel(
             savedStateHandle = get(),
             sharedListsRepository = get(),
+            cardRepository = get(),
             ioDispatcher = get(named("io")),
         )
     }

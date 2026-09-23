@@ -148,6 +148,13 @@ interface LocalWishlistDao {
     @Query("UPDATE local_wishlists SET owner_user_id = :ownerUserId WHERE id IN (:ids) AND owner_user_id IS NULL")
     suspend fun stampOwner(ids: List<String>, ownerUserId: String)
 
+    @Query("SELECT id FROM local_wishlists WHERE synced = 1")
+    suspend fun getSyncedIds(): List<String>
+
+    // Callers chunk [ids]: API 29's SQLite caps a statement at 999 bind variables.
+    @Query("DELETE FROM local_wishlists WHERE synced = 1 AND id IN (:ids)")
+    suspend fun deleteSyncedByIds(ids: List<String>)
+
     @Query("DELETE FROM local_wishlists WHERE synced = 1 AND id NOT IN (:ids)")
     suspend fun deleteSyncedNotIn(ids: List<String>)
 

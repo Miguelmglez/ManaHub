@@ -7,6 +7,7 @@ import com.mmg.manahub.core.data.local.entity.LocalOpenForTradeEntity
 import com.mmg.manahub.core.data.local.entity.LocalWishlistEntity
 import com.mmg.manahub.core.data.remote.dto.OpenForTradeEntryDto
 import com.mmg.manahub.core.data.remote.dto.WishlistEntryDto
+import com.mmg.manahub.core.data.remote.trades.KeysetDrain
 import com.mmg.manahub.core.data.remote.trades.OpenForTradeRemoteDataSource
 import com.mmg.manahub.core.data.remote.trades.WishlistRemoteDataSource
 import com.mmg.manahub.core.model.WishlistEntry
@@ -90,7 +91,7 @@ class TradeListsAccountOwnershipTest {
 
     @Test
     fun `given a remote wishlist sync then downloaded rows are owned by that account`() = runTest {
-        coEvery { wishlistRemote.getWishlist("user-b") } returns Result.success(
+        coEvery { wishlistRemote.drainWishlist("user-b") } returns KeysetDrain.complete(
             listOf(WishlistEntryDto(id = "w1", userId = "user-b", cardId = "card-1", matchAnyVariant = true, createdAt = "2024-01-01T00:00:00Z")),
         )
         val saved = slot<List<LocalWishlistEntity>>()
@@ -104,7 +105,7 @@ class TradeListsAccountOwnershipTest {
 
     @Test
     fun `given a remote open-for-trade sync then downloaded rows are owned by that account`() = runTest {
-        coEvery { offerRemote.getOpenForTrade("user-b") } returns Result.success(
+        coEvery { offerRemote.drainOpenForTrade("user-b") } returns KeysetDrain.complete(
             listOf(OpenForTradeEntryDto(id = "o1", userId = "user-b", userCardId = "row-1", createdAt = "2024-01-01T00:00:00Z")),
         )
         val saved = slot<List<LocalOpenForTradeEntity>>()
