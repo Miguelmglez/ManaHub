@@ -3097,6 +3097,8 @@
     <string name="trades_shared_list_error">Couldn\'t load this list</string>
     <string name="trades_shared_list_any_variant">Any version</string>
     <string name="trades_unknown_card">Unknown card</string>
+    <string name="trades_friend_collection_load_error">Couldn\'t load more of their collection</string>
+    <string name="trades_scryfall_search_error">Search failed. Check your connection and try again.</string>
     <string name="trades_migration_synced_n_cards">Synced %d cards from this device to your account.</string>
     <string name="trades_select_card_id_hint">Enter card Scryfall ID</string>
     <string name="trades_foil">Foil</string>

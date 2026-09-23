@@ -76,6 +76,11 @@ import com.mmg.manahub.core.model.AddCardRow
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.CardSearchSheet
+import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
+import com.mmg.manahub.core.ui.components.MagicLoadingFooter
+import com.mmg.manahub.core.ui.components.InlineErrorState
+import com.mmg.manahub.core.data.network.RateLimitExhaustedException
+import androidx.compose.foundation.lazy.LazyListScope
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
@@ -509,6 +514,14 @@ fun CreateTradeProposalScreen(
                 focusManager.clearFocus()
                 viewModel.setNavigatingToDetail(true)
                 onNavigateToCardDetail(scryfallId)
+            },
+            offerResultsFooter = if (side == TradeSide.RECEIVER) {
+                { friendCollectionFooter(uiState, viewModel::onLoadMoreFriendCollection, viewModel::onRetryFriendCollection) }
+            } else {
+                null
+            },
+            scryfallErrorContent = uiState.scryfallError?.let { error ->
+                @Composable { ScryfallSearchError(error = error, onRetry = viewModel::retryScryfallSearch) }
             },
             onDismiss = {
                 focusManager.clearFocus()
@@ -1170,4 +1183,43 @@ private fun AddItemButton(
             style = MaterialTheme.magicTypography.labelLarge,
         )
     }
+}
+
+/** Paging footer of the friend's collection in the "You get" sheet: loads the next page when it scrolls into view. */
+private fun LazyListScope.friendCollectionFooter(
+    uiState: ProposalEditorUiState,
+    onLoadMore: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    when {
+        uiState.friendCollectionLoadFailed -> item(key = "friend_collection_error") {
+            InlineErrorState(
+                message = stringResource(R.string.trades_friend_collection_load_error),
+                retryLabel = stringResource(R.string.action_retry),
+                onRetry = onRetry,
+            )
+        }
+        uiState.friendCollectionHasMore -> item(key = "friend_collection_more") {
+            // Keyed on the row count so a footer still on screen after a page lands asks for the next one.
+            LaunchedEffect(uiState.offerResults.size) { onLoadMore() }
+            MagicLoadingFooter(label = null)
+        }
+    }
+}
+
+/** Failed Scryfall search in the "All cards" tab; a rate-limited failure disables retry until the cooldown ends. */
+@Composable
+private fun ScryfallSearchError(error: String, onRetry: () -> Unit) {
+    val retryAfterMs = RateLimitExhaustedException.retryAfterMsOrNull(error)
+    val remainingSeconds = rememberRateLimitCountdownSeconds(retryAfterMs)
+    InlineErrorState(
+        message = when {
+            retryAfterMs == null -> stringResource(R.string.trades_scryfall_search_error)
+            remainingSeconds > 0 -> stringResource(R.string.error_rate_limited_retry_countdown, remainingSeconds)
+            else -> stringResource(R.string.error_rate_limited_message)
+        },
+        retryLabel = stringResource(R.string.action_retry),
+        onRetry = onRetry,
+        enabled = remainingSeconds <= 0,
+    )
 }

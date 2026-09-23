@@ -32,14 +32,22 @@ import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CreateTradeProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.EditProposalUseCase
+import com.mmg.manahub.core.domain.search.FriendCardSearchMapper
+import com.mmg.manahub.core.model.FriendCardCursor
+import com.mmg.manahub.core.model.FriendCardSearchParams
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -185,6 +193,12 @@ data class ProposalEditorUiState(
     val isSearchingWishlist: Boolean = false,
     val scryfallResults: List<AddCardRow> = emptyList(),
     val isSearchingScryfall: Boolean = false,
+    /** Raw error of the last failed Scryfall search (it may carry a rate-limit sentinel); null otherwise. */
+    val scryfallError: String? = null,
+    /** More pages of the selected friend's collection exist for the current query. */
+    val friendCollectionHasMore: Boolean = false,
+    val isLoadingMoreFriendCollection: Boolean = false,
+    val friendCollectionLoadFailed: Boolean = false,
     val collectionIds: Set<String> = emptySet(),
 
     val friends: List<Friend> = emptyList(),
@@ -232,19 +246,14 @@ class TradeProposalViewModel(
     /**
      * Raw search-box text, decoupled from [ProposalEditorUiState.addCardsQuery] (audit §6.3).
      * The text field itself still echoes every keystroke synchronously via `addCardsQuery`
-     * (see [onAddCardsQueryChange]); only the expensive [updateSearchLists] rebuild — which
-     * filters + maps 4+ lists, potentially thousands of collection cards — is throttled
-     * through this flow's [kotlinx.coroutines.flow.debounce] collector in `init`.
+     * (see [onAddCardsQueryChange]); only the expensive list rebuild ([computeSearchLists]) is
+     * throttled through this flow's [kotlinx.coroutines.flow.debounce] collector in `init`.
      */
     private val searchQueryFlow = MutableStateFlow("")
 
     private var currentUserId: String = ""
 
-    // §6.3 fix: the debounced search-list rebuild (see `searchQueryFlow` below) now runs
-    // `updateSearchLists` on `defaultDispatcher`, off the Main thread these are written from
-    // (the `observe*` collectors). `@Volatile` guarantees the background reader sees the latest
-    // write without needing its own synchronization — the same reasoning already applied to
-    // `friendData` below, which is written on `ioDispatcher` and read from `updateSearchLists`.
+    // Written on Main by the observe* collectors, read by the rebuild on defaultDispatcher.
     @Volatile private var collectionCards: List<Card> = emptyList()
     @Volatile private var wishlistEntries: List<WishlistEntry> = emptyList()
     @Volatile private var offerEntries: List<OpenForTradeEntry> = emptyList()
@@ -252,6 +261,14 @@ class TradeProposalViewModel(
     private companion object {
         /** Matches the debounce window already used elsewhere in the app (News, Friend search). */
         const val SEARCH_DEBOUNCE_MS = 300L
+
+        /** `search_friend_cards` serves at most 100 rows per page. */
+        const val FRIEND_PAGE_SIZE = 100
+
+        /** Match suggestions read at most this many pages of a friend's wishlist / trade list. */
+        const val FRIEND_LIST_MAX_PAGES = 10
+
+        const val PENDING_HYDRATION = "pending_hydration"
     }
 
     // Captured at init so a failed prefill (§2.9) can be retried from the screen.
@@ -259,18 +276,43 @@ class TradeProposalViewModel(
     private var prefillRootProposalId: String = ""
     private var prefillReceiverId: String = ""
 
-    // Friend data fetched via get_friend_collection RPC (unified endpoint).
-    // Written on ioDispatcher and read on Main; @Volatile + single-copy assignment
-    // ensures no partial-update races between the two RPC calls.
-    private data class FriendData(
-        val collection: List<Card> = emptyList(),
-        val wishlist: List<FriendCard> = emptyList(),
-        val offers: List<FriendCard> = emptyList(),
-    )
-    @Volatile private var friendData: FriendData = FriendData()
+    // Friend lists from search_friend_cards, one owner job each so concurrent writers never overwrite
+    // each other's list. Written on ioDispatcher, read by the rebuild on defaultDispatcher.
+    @Volatile private var friendWishlist: List<FriendCard> = emptyList()
+    @Volatile private var friendOffers: List<FriendCard> = emptyList()
+    // Only the pages loaded for the current query, never the whole collection.
+    @Volatile private var friendCollection: List<Card> = emptyList()
     private var friendDataJob: Job? = null
+    private var friendCollectionJob: Job? = null
+    @Volatile private var friendCollectionCursor: FriendCardCursor? = null
+    private var friendCollectionKey: Pair<String, String?>? = null
+
+    private var scryfallJob: Job? = null
+
+    // The nav-arg receiver is auto-selected once; after that only the user picks (including "None").
+    private var receiverSelectionSettled = false
+
+    // Card ids already sent to the cache warm, so a still-missing card is not re-requested per emission.
+    private val warmRequestedIds = mutableSetOf<String>()
+
+    // One conflated rebuild request: a burst of changes produces one off-Main rebuild of the latest state.
+    private val rebuildRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    private fun requestRebuild() {
+        rebuildRequests.tryEmit(Unit)
+    }
 
     init {
+        // Launched first so it is subscribed before any collector below requests a rebuild.
+        // Every rebuild runs off Main on the latest state; collectLatest drops a superseded one.
+        viewModelScope.launch {
+            rebuildRequests.collectLatest {
+                val snapshot = _uiState.value
+                val lists = withContext(defaultDispatcher) { computeSearchLists(snapshot) }
+                // Inputs changed meanwhile: whoever changed them already queued a newer rebuild.
+                _uiState.update { s -> if (s.hasSameSearchInputs(snapshot)) lists.applyTo(s) else s }
+            }
+        }
         viewModelScope.launch {
             authRepository.sessionState.collect { state ->
                 var userId = ""
@@ -295,13 +337,13 @@ class TradeProposalViewModel(
         observeOffers()
         observeFriends()
 
-        // §6.3 fix: debounce the per-keystroke search-list rebuild and run it off Main.
-        // `collectLatest` also cancels any rebuild still in flight for a now-superseded query.
+        // Typing only rebuilds after the debounce; the friend collection query is re-run server side.
         viewModelScope.launch {
             searchQueryFlow
                 .debounce(SEARCH_DEBOUNCE_MS)
-                .collectLatest { query ->
-                    withContext(defaultDispatcher) { updateSearchLists(query) }
+                .collectLatest {
+                    requestRebuild()
+                    if (_uiState.value.searchingSide == TradeSide.RECEIVER) loadFriendCollection(append = false)
                 }
         }
 
@@ -392,7 +434,7 @@ class TradeProposalViewModel(
                 val card = imageMap[item.cardId]
                 TradeItemDraft(
                     cardId = item.cardId,
-                    cardName = item.cardName,
+                    cardName = card?.name?.takeIf { it.isNotBlank() } ?: item.cardName,
                     imageUrl = card?.imageArtCrop ?: card?.imageNormal,
                     typeLine = card?.typeLine,
                     setCode = card?.setCode,
@@ -412,7 +454,7 @@ class TradeProposalViewModel(
                 val card = imageMap[item.cardId]
                 TradeItemDraft(
                     cardId = item.cardId,
-                    cardName = item.cardName,
+                    cardName = card?.name?.takeIf { it.isNotBlank() } ?: item.cardName,
                     imageUrl = card?.imageArtCrop ?: card?.imageNormal,
                     typeLine = card?.typeLine,
                     setCode = card?.setCode,
@@ -439,6 +481,7 @@ class TradeProposalViewModel(
                 currentVersion = proposal.proposalVersion,
             )
         }
+        requestRebuild()
     }
 
     /** Retries the counter/edit prefill after a failure (§2.9); called from the screen's retry action. */
@@ -455,10 +498,14 @@ class TradeProposalViewModel(
                 .distinctUntilChanged()
                 .catch { e -> recordSafeNonFatal("trade_proposal_observe_collection_failed", e) }
                 .collect { collection ->
-                    collectionCards = collection.map { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
-                    val ids = collectionCards.map { it.scryfallId }.toSet()
+                    // Unhydrated placeholders have no name to show or search by.
+                    collectionCards = collection.map { it.card }
+                        .filter { it.name.isNotBlank() && it.staleReason != PENDING_HYDRATION }
+                        .distinctBy { it.scryfallId }
+                        .sortedBy { it.name }
+                    val ids = collection.mapTo(HashSet()) { it.card.scryfallId }
                     _uiState.update { it.copy(collectionIds = ids) }
-                    updateSearchLists(_uiState.value.addCardsQuery)
+                    requestRebuild()
                 }
         }
     }
@@ -470,7 +517,8 @@ class TradeProposalViewModel(
                 .catch { e -> recordSafeNonFatal("trade_proposal_observe_wishlist_failed", e) }
                 .collect { wishlist ->
                     wishlistEntries = wishlist.filter { it.card != null }.sortedBy { it.card?.name }
-                    updateSearchLists(_uiState.value.addCardsQuery)
+                    warmMissingCards(wishlist.filter { it.card == null }.map { it.cardId })
+                    requestRebuild()
                 }
         }
     }
@@ -482,8 +530,24 @@ class TradeProposalViewModel(
                 .catch { e -> recordSafeNonFatal("trade_proposal_observe_offers_failed", e) }
                 .collect { offers ->
                     offerEntries = offers.filter { it.card != null }.sortedBy { it.card?.name }
-                    updateSearchLists(_uiState.value.addCardsQuery)
+                    warmMissingCards(offers.filter { it.card == null }.map { it.scryfallId })
+                    requestRebuild()
                 }
+        }
+    }
+
+    /** Caches card metadata for list entries whose card is not cached yet; Room then re-emits them. */
+    private fun warmMissingCards(ids: List<String>) {
+        val fresh = ids.filter { it.isNotBlank() && warmRequestedIds.add(it) }.distinct()
+        if (fresh.isEmpty()) return
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                cardRepository.warmCacheForIds(fresh)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                recordSafeNonFatal("trade_proposal_warm_missing_cards_failed", e)
+            }
         }
     }
 
@@ -494,12 +558,9 @@ class TradeProposalViewModel(
                 .catch { e -> recordSafeNonFatal("trade_proposal_observe_friends_failed", e) }
                 .collect { friends ->
                     _uiState.update { it.copy(friends = friends) }
-                    // Auto-select receiver if they are a friend
+                    if (receiverSelectionSettled) return@collect
                     val receiverId = _uiState.value.receiverId
-                    val receiverFriend = friends.find { it.userId == receiverId }
-                    if (receiverFriend != null && _uiState.value.selectedFriend == null) {
-                        onFriendSelected(receiverFriend)
-                    }
+                    friends.find { it.userId == receiverId }?.let { onFriendSelected(it) }
                 }
         }
     }
@@ -509,6 +570,7 @@ class TradeProposalViewModel(
      * draft holds that friend's items asks for confirmation first ([ProposalEditorUiState.pendingFriendSwitch]).
      */
     fun onFriendSelected(friend: Friend?) {
+        receiverSelectionSettled = true
         val state = _uiState.value
         val previous = state.selectedFriend
         val isSwitch = previous != null && previous.userId != friend?.userId
@@ -546,60 +608,132 @@ class TradeProposalViewModel(
             fetchFriendData(friend.userId)
         } else {
             friendDataJob?.cancel()
-            friendData = FriendData()
-            updateSearchLists(_uiState.value.addCardsQuery)
+            resetFriendCollection()
+            friendWishlist = emptyList()
+            friendOffers = emptyList()
+            requestRebuild()
         }
     }
 
     /**
-     * Fetches the selected friend's wishlist, open-for-trade list, and public collection via
-     * the unified get_friend_collection RPC. This RPC is SECURITY DEFINER and enforces both
-     * friendship checks and per-list privacy flags (wishlist_public / trade_list_public),
-     * unlike direct table queries which only check friendship.
+     * Loads the selected friend's wishlist and trade list for match suggestions, draining at most
+     * [FRIEND_LIST_MAX_PAGES] keyset pages of `search_friend_cards` each (the RPC enforces friendship
+     * and per-list privacy). The friend's collection is never loaded eagerly: the "You get" sheet
+     * pages through it on demand ([loadFriendCollection]).
      *
-     * The previous [Job] is cancelled before starting a new fetch, and [friendData] is reset
-     * immediately (audit §6.2) so switching friends quickly never briefly shows the *previous*
-     * friend's lists while the new fetch is in flight. The three RPCs are launched concurrently
-     * with [async]/[coroutineScope] (previously sequential — the selector could take up to 3x
-     * as long as the slowest single call).
+     * The previous job is cancelled and the friend lists reset first, so a quick friend switch never
+     * briefly shows the previous friend's lists.
      */
     private fun fetchFriendData(userId: String) {
         friendDataJob?.cancel()
-        friendData = FriendData()
-        updateSearchLists(_uiState.value.addCardsQuery)
+        resetFriendCollection()
+        friendWishlist = emptyList()
+        friendOffers = emptyList()
+        requestRebuild()
+        if (_uiState.value.searchingSide == TradeSide.RECEIVER) loadFriendCollection(append = false)
 
         friendDataJob = viewModelScope.launch(ioDispatcher) {
             coroutineScope {
-                val wishlistDeferred = async { friendRepository.getFriendCollection(userId, "wishlist", "") }
-                val offersDeferred = async { friendRepository.getFriendCollection(userId, "trade", "") }
-                val collectionDeferred = async { friendRepository.getFriendCollection(userId, "collection", "") }
-
-                wishlistDeferred.await()
-                    .onSuccess { cards -> friendData = friendData.copy(wishlist = cards.sortedBy { it.name }) }
-                    .onFailure { e ->
-                        recordSafeNonFatal("trade_friend_wishlist_load_failed", e)
-                        friendData = friendData.copy(wishlist = emptyList())
-                    }
-
-                offersDeferred.await()
-                    .onSuccess { cards -> friendData = friendData.copy(offers = cards.sortedBy { it.name }) }
-                    .onFailure { e ->
-                        recordSafeNonFatal("trade_friend_offers_load_failed", e)
-                        friendData = friendData.copy(offers = emptyList())
-                    }
-
-                collectionDeferred.await()
-                    .onSuccess { cards ->
-                        friendData = friendData.copy(
-                            collection = cards.mapNotNull { it.toCard() }.sortedBy { it.name }
-                        )
-                    }
-                    .onFailure { e ->
-                        recordSafeNonFatal("trade_friend_collection_load_failed", e)
-                        friendData = friendData.copy(collection = emptyList())
-                    }
+                val wishlistDeferred = async { drainFriendList(userId, "wishlist") }
+                val offersDeferred = async { drainFriendList(userId, "trade") }
+                friendWishlist = wishlistDeferred.await().sortedBy { it.name }
+                friendOffers = offersDeferred.await().sortedBy { it.name }
             }
-            updateSearchLists(_uiState.value.addCardsQuery)
+            requestRebuild()
+        }
+    }
+
+    /**
+     * Pages through one of the friend's lists. A failed page keeps the rows already read: these
+     * rows only drive suggestions, so a partial list is better than none.
+     */
+    private suspend fun drainFriendList(friendUserId: String, list: String): List<FriendCard> {
+        val rows = LinkedHashMap<String, FriendCard>()
+        var cursor: FriendCardCursor? = null
+        repeat(FRIEND_LIST_MAX_PAGES) {
+            val page = friendRepository.searchFriendCards(friendUserId, list, FriendCardSearchParams(), cursor, FRIEND_PAGE_SIZE)
+                .getOrElse { e ->
+                    if (e is CancellationException) throw e
+                    recordSafeNonFatal("trade_friend_${list}_load_failed", e)
+                    return rows.values.toList()
+                }
+            page.cards.forEach { rows[it.rowId ?: "${it.scryfallId}_${it.isFoil}_${it.condition}_${it.language}"] = it }
+            cursor = page.nextCursor
+            if (!page.hasMore || cursor == null) return rows.values.toList()
+        }
+        FirebaseCrashlytics.getInstance().log("trade_friend_list_page_cap_reached")
+        return rows.values.toList()
+    }
+
+    private fun resetFriendCollection() {
+        friendCollectionJob?.cancel()
+        friendCollectionCursor = null
+        friendCollectionKey = null
+        friendCollection = emptyList()
+        _uiState.update {
+            it.copy(friendCollectionHasMore = false, isLoadingMoreFriendCollection = false, friendCollectionLoadFailed = false)
+        }
+    }
+
+    /**
+     * Loads the first ([append] = false) or the next keyset page of the selected friend's
+     * collection matching the current query. A first-page load for an unchanged friend + query
+     * is skipped, so re-opening the sheet or re-debouncing the same text costs no request.
+     */
+    private fun loadFriendCollection(append: Boolean) {
+        val friendId = _uiState.value.selectedFriend?.userId ?: return
+        val name = _uiState.value.addCardsQuery.trim().takeIf { it.length >= FriendCardSearchMapper.MIN_NAME_LENGTH }
+            ?.take(FriendCardSearchMapper.MAX_TEXT_LENGTH)
+        val key = friendId to name
+        if (append) {
+            val state = _uiState.value
+            if (key != friendCollectionKey || !state.friendCollectionHasMore || state.isLoadingMoreFriendCollection) return
+            if (friendCollectionJob?.isActive == true) return
+        } else {
+            if (key == friendCollectionKey && !_uiState.value.friendCollectionLoadFailed) return
+            resetFriendCollection()
+            friendCollectionKey = key
+        }
+        val cursor = if (append) friendCollectionCursor else null
+        _uiState.update {
+            if (append) it.copy(isLoadingMoreFriendCollection = true, friendCollectionLoadFailed = false)
+            else it.copy(isSearchingCards = true, friendCollectionLoadFailed = false)
+        }
+        friendCollectionJob = viewModelScope.launch(ioDispatcher) {
+            val result = friendRepository.searchFriendCards(friendId, "collection", FriendCardSearchParams(name = name), cursor, FRIEND_PAGE_SIZE)
+            ensureActive()
+            result.fold(
+                onSuccess = { page ->
+                    friendCollectionCursor = page.nextCursor
+                    val pageCards = page.cards.mapNotNull { it.toCard() }
+                    val merged = if (append) friendCollection + pageCards else pageCards
+                    friendCollection = merged.distinctBy { it.scryfallId }
+                    _uiState.update {
+                        it.copy(isSearchingCards = false, isLoadingMoreFriendCollection = false, friendCollectionHasMore = page.hasMore)
+                    }
+                    requestRebuild()
+                },
+                onFailure = { e ->
+                    if (e is CancellationException) throw e
+                    recordSafeNonFatal("trade_friend_collection_page_failed", e)
+                    _uiState.update {
+                        it.copy(isSearchingCards = false, isLoadingMoreFriendCollection = false, friendCollectionLoadFailed = true)
+                    }
+                },
+            )
+        }
+    }
+
+    /** Loads the next page of the friend's collection when the sheet scrolls to its end. */
+    fun onLoadMoreFriendCollection() = loadFriendCollection(append = true)
+
+    /** Retries the friend collection page that failed. */
+    fun onRetryFriendCollection() {
+        val appendRetry = friendCollectionCursor != null
+        _uiState.update { it.copy(friendCollectionLoadFailed = false) }
+        if (appendRetry) loadFriendCollection(append = true) else {
+            friendCollectionKey = null
+            loadFriendCollection(append = false)
         }
     }
 
@@ -613,177 +747,178 @@ class TradeProposalViewModel(
 
     fun onOpenSearch(side: TradeSide) {
         _uiState.update { it.copy(searchingSide = side, isNavigatingToDetail = false) }
-        updateSearchLists(_uiState.value.addCardsQuery)
+        requestRebuild()
+        if (side == TradeSide.RECEIVER) loadFriendCollection(append = false)
     }
 
     fun setNavigatingToDetail(isNavigating: Boolean) {
         _uiState.update { it.copy(isNavigatingToDetail = isNavigating) }
     }
 
+    /** The add-cards lists and match suggestions computed for one state snapshot. */
+    private data class SearchLists(
+        val offerResults: List<AddCardRow>?,
+        val addCardsResults: List<AddCardRow>?,
+        val wishlistResults: List<AddCardRow>?,
+        val proposerMatches: List<AddCardRow>,
+        val receiverMatches: List<AddCardRow>,
+    ) {
+        /** Null lists are the ones this snapshot does not own (no sheet open) and stay as they are. */
+        fun applyTo(state: ProposalEditorUiState) = state.copy(
+            offerResults = offerResults ?: state.offerResults,
+            addCardsResults = addCardsResults ?: state.addCardsResults,
+            wishlistResults = wishlistResults ?: state.wishlistResults,
+            proposerMatches = proposerMatches,
+            receiverMatches = receiverMatches,
+        )
+    }
+
+    private fun ProposalEditorUiState.hasSameSearchInputs(other: ProposalEditorUiState): Boolean =
+        addCardsQuery == other.addCardsQuery &&
+            searchingSide == other.searchingSide &&
+            selectedFriend?.userId == other.selectedFriend?.userId &&
+            collectionIds == other.collectionIds &&
+            proposerItems == other.proposerItems &&
+            receiverItems == other.receiverItems &&
+            pendingAddedItems == other.pendingAddedItems
+
     /**
-     * Rebuilds every add-cards search list ([ProposalEditorUiState.offerResults] /
-     * [ProposalEditorUiState.addCardsResults] / [ProposalEditorUiState.wishlistResults] /
-     * match suggestions) for the given [query].
-     *
-     * Filters + maps 4+ lists (the user's collection can be thousands of cards), so callers
-     * driven by user typing MUST go through the debounced [searchQueryFlow] (see
-     * [onAddCardsQueryChange]) rather than calling this directly — this function itself stays
-     * synchronous so programmatic callers (collection/wishlist/offer refresh, friend switch,
-     * item add/remove) keep updating the search lists immediately with no added latency
-     * (audit §6.3).
+     * Builds every add-cards list ([ProposalEditorUiState.offerResults] /
+     * [ProposalEditorUiState.addCardsResults] / [ProposalEditorUiState.wishlistResults]) and the
+     * match suggestions for [s]. Pure over [s] and the backing fields, so it runs off Main; the
+     * collection alone can be thousands of cards. Callers go through [requestRebuild].
      */
-    private fun updateSearchLists(query: String) {
-        // My collection is always the source for the addCardsResults (collection browser).
-        // Pure function of `query` + the plain backing fields below (none of which live in
-        // `_uiState`), so it's safe to compute once outside the atomic update.
+    private fun computeSearchLists(s: ProposalEditorUiState): SearchLists {
+        val query = s.addCardsQuery
         val filteredCollection = if (query.isBlank()) collectionCards
             else collectionCards.filter { it.name.contains(query, ignoreCase = true) }
 
-        // ── Correct side-aware mapping ─────────────────────────────────────────
-        // PROPOSER (A → B): A offers cards to B.
-        //   offerResults   → MY offers (offerEntries) — what I have available to give
-        //   wishlistResults → FRIEND's wishlist (friendWishlistCards) — what B wants
-        //   addCardsResults → MY collection (collectionCards) — fallback search
-        //
-        // RECEIVER (A ← B): A requests cards from B.
-        //   offerResults   → FRIEND's offers (friendOfferCards) — what B has available
-        //   wishlistResults → MY wishlist (wishlistEntries) — what I want
-        //   addCardsResults → MY collection (collectionCards) — fallback search
+        // PROPOSER (A → B): offerResults = MY offers, wishlistResults = FRIEND's wishlist.
+        // RECEIVER (A ← B): offerResults = FRIEND's offers + collection page, wishlistResults = MY wishlist.
+        // addCardsResults is always MY collection (fallback search).
+        val isFriendSelected = s.selectedFriend != null
+        val searchingSide = s.searchingSide
+        val ownedIds = s.collectionIds
 
-        _uiState.update { s ->
-            // §6.3 fix: `isFriendSelected` / `searchingSide` / `ownedIds` are derived from
-            // `_uiState` and MUST be read from this lambda's `s` snapshot, never captured in a
-            // `val` before `_uiState.update {}` — `update {}` retries its lambda against the
-            // latest value on contention, so a `val` captured beforehand can go stale mid-flight
-            // (e.g. a concurrent `onOpenSearch`/`onFriendSelected` changes `searchingSide`
-            // between the outer read and this lambda committing) and the results computed for
-            // the OLD side would be applied on top of the NEW state. This is the project's
-            // banned stale-snapshot pattern (CLAUDE.md's Deck Doctor `generateFromSeeds`
-            // atomic-capture precedent).
-            val isFriendSelected = s.selectedFriend != null
-            val searchingSide = s.searchingSide
-            val ownedIds = s.collectionIds
+        // Only count items from the active side so the "selected" indicator and
+        // over-limit warning reflect what's been added to THIS side of the trade.
+        val sideItems = when (searchingSide) {
+            TradeSide.PROPOSER -> s.proposerItems
+            TradeSide.RECEIVER -> s.receiverItems
+            null -> s.proposerItems + s.receiverItems
+        }
+        val allItems = sideItems + s.pendingAddedItems
 
-            // Only count items from the active side so the "selected" indicator and
-            // over-limit warning reflect what's been added to THIS side of the trade.
-            val sideItems = when (searchingSide) {
-                TradeSide.PROPOSER -> s.proposerItems
-                TradeSide.RECEIVER -> s.receiverItems
-                null -> s.proposerItems + s.receiverItems
-            }
-            val allItems = sideItems + s.pendingAddedItems
+        return when (searchingSide) {
+            TradeSide.PROPOSER -> {
+                // A is offering cards: show MY offers + FRIEND's wishlist
+                val filteredOffer = if (query.isBlank()) offerEntries
+                    else offerEntries.filter { it.card?.name?.contains(query, ignoreCase = true) == true }
+                val filteredFriendWishlist = if (query.isBlank()) friendWishlist
+                    else friendWishlist.filter { it.name.contains(query, ignoreCase = true) }
 
-            when (searchingSide) {
-                TradeSide.PROPOSER -> {
-                    // A is offering cards: show MY offers + FRIEND's wishlist
-                    val friendWishlist = friendData.wishlist
-                    val filteredOffer = if (query.isBlank()) offerEntries
-                        else offerEntries.filter { it.card?.name?.contains(query, ignoreCase = true) == true }
-                    val filteredFriendWishlist = if (query.isBlank()) friendWishlist
-                        else friendWishlist.filter { it.name.contains(query, ignoreCase = true) }
-
-                    s.copy(
-                        offerResults = filteredOffer.mapNotNull { entry ->
-                            val card = entry.card ?: return@mapNotNull null
-                            AddCardRow(
-                                card = card,
-                                quantityInDeck = allItems.filter { it.cardId == entry.scryfallId && it.isFoil == entry.isFoil && it.condition == entry.condition && it.language == entry.language }.sumOf { it.quantity },
-                                isOwned = entry.scryfallId in ownedIds,
-                                availableQuantity = entry.quantity,
-                                offerEntry = entry,
-                            )
-                        },
-                        addCardsResults = filteredCollection.map { card ->
-                            AddCardRow(
-                                card = card,
-                                quantityInDeck = allItems.filter { it.cardId == card.scryfallId && it.userCardIdRef == null }.sumOf { it.quantity },
-                                isOwned = card.scryfallId in ownedIds,
-                                availableQuantity = 0,
-                            )
-                        },
-                        wishlistResults = if (isFriendSelected) {
-                            filteredFriendWishlist.mapNotNull { fc ->
-                                val card = fc.toCard() ?: return@mapNotNull null
-                                AddCardRow(
-                                    card = card,
-                                    quantityInDeck = allItems.filter { it.cardId == fc.scryfallId && it.isFoil == fc.isFoil && it.condition == (fc.condition ?: "NM") && it.language == (fc.language ?: "en") }.sumOf { it.quantity },
-                                    isOwned = fc.scryfallId in ownedIds,
-                                    availableQuantity = fc.quantity,
-                                    wishlistEntry = fc.toSyntheticWishlistEntry(),
-                                )
-                            }
-                        } else emptyList(),
-                        proposerMatches = computeProposerMatches(s, ownedIds),
-                        receiverMatches = computeReceiverMatches(s, ownedIds),
-                    )
-                }
-
-                TradeSide.RECEIVER -> {
-                    // A is requesting cards: show FRIEND's offers + FRIEND's collection + MY wishlist
-                    val friendOffers = friendData.offers
-                    val friendCollection = friendData.collection
-                    val filteredWishlist = if (query.isBlank()) wishlistEntries
-                        else wishlistEntries.filter { it.card?.name?.contains(query, ignoreCase = true) == true }
-                    val filteredFriendOffers = if (query.isBlank()) friendOffers
-                        else friendOffers.filter { it.name.contains(query, ignoreCase = true) }
-                    // Friend's public collection — shown in the "Offer" tab (offerResults) alongside offers
-                    val filteredFriendCollection = if (query.isBlank()) friendCollection
-                        else friendCollection.filter { it.name.contains(query, ignoreCase = true) }
-                    // Merge friend offers + friend collection into offerResults, de-duplicating by scryfallId
-                    // (offer entries take precedence as they carry quantity/variant metadata)
-                    val offerIds = filteredFriendOffers.map { it.scryfallId }.toSet()
-                    val collectionRows = filteredFriendCollection
-                        .filter { it.scryfallId !in offerIds }
-                        .map { card ->
-                            AddCardRow(
-                                card = card,
-                                quantityInDeck = allItems.filter { it.cardId == card.scryfallId && it.userCardIdRef == null }.sumOf { it.quantity },
-                                isOwned = card.scryfallId in ownedIds,
-                                availableQuantity = 0,
-                            )
-                        }
-
-                    s.copy(
-                        offerResults = filteredFriendOffers.mapNotNull { fc ->
+                SearchLists(
+                    offerResults = filteredOffer.mapNotNull { entry ->
+                        val card = entry.card ?: return@mapNotNull null
+                        AddCardRow(
+                            card = card,
+                            quantityInDeck = allItems.filter { it.cardId == entry.scryfallId && it.isFoil == entry.isFoil && it.condition == entry.condition && it.language == entry.language }.sumOf { it.quantity },
+                            isOwned = entry.scryfallId in ownedIds,
+                            availableQuantity = entry.quantity,
+                            offerEntry = entry,
+                        )
+                    },
+                    addCardsResults = filteredCollection.map { card ->
+                        AddCardRow(
+                            card = card,
+                            quantityInDeck = allItems.filter { it.cardId == card.scryfallId && it.userCardIdRef == null }.sumOf { it.quantity },
+                            isOwned = card.scryfallId in ownedIds,
+                            availableQuantity = 0,
+                        )
+                    },
+                    wishlistResults = if (isFriendSelected) {
+                        filteredFriendWishlist.mapNotNull { fc ->
                             val card = fc.toCard() ?: return@mapNotNull null
                             AddCardRow(
                                 card = card,
                                 quantityInDeck = allItems.filter { it.cardId == fc.scryfallId && it.isFoil == fc.isFoil && it.condition == (fc.condition ?: "NM") && it.language == (fc.language ?: "en") }.sumOf { it.quantity },
                                 isOwned = fc.scryfallId in ownedIds,
                                 availableQuantity = fc.quantity,
-                                offerEntry = fc.toSyntheticOfferEntry(),
+                                wishlistEntry = fc.toSyntheticWishlistEntry(),
                             )
-                        } + collectionRows,
-                        addCardsResults = filteredCollection.map { card ->
-                            AddCardRow(
-                                card = card,
-                                quantityInDeck = allItems.filter { it.cardId == card.scryfallId && it.userCardIdRef == null }.sumOf { it.quantity },
-                                isOwned = card.scryfallId in ownedIds,
-                                availableQuantity = 0,
-                            )
-                        },
-                        wishlistResults = filteredWishlist.mapNotNull { entry ->
-                            val card = entry.card ?: return@mapNotNull null
-                            AddCardRow(
-                                card = card,
-                                quantityInDeck = allItems.filter { it.cardId == entry.cardId && it.isFoil == entry.isFoil && it.condition == entry.condition && it.language == entry.language }.sumOf { it.quantity },
-                                isOwned = entry.cardId in ownedIds,
-                                availableQuantity = entry.quantity,
-                                wishlistEntry = entry,
-                            )
-                        },
-                        proposerMatches = computeProposerMatches(s, ownedIds),
-                        receiverMatches = computeReceiverMatches(s, ownedIds),
-                    )
-                }
+                        }
+                    } else emptyList(),
+                    proposerMatches = computeProposerMatches(s, ownedIds),
+                    receiverMatches = computeReceiverMatches(s, ownedIds),
+                )
+            }
 
-                null -> {
-                    // No sheet open: only update the match suggestions (data may have refreshed)
-                    s.copy(
-                        proposerMatches = computeProposerMatches(s, ownedIds),
-                        receiverMatches = computeReceiverMatches(s, ownedIds),
-                    )
-                }
+            TradeSide.RECEIVER -> {
+                // A is requesting cards: show FRIEND's offers + FRIEND's collection + MY wishlist
+                val filteredWishlist = if (query.isBlank()) wishlistEntries
+                    else wishlistEntries.filter { it.card?.name?.contains(query, ignoreCase = true) == true }
+                val filteredFriendOffers = if (query.isBlank()) friendOffers
+                    else friendOffers.filter { it.name.contains(query, ignoreCase = true) }
+                // Friend's public collection — shown in the "Offer" tab (offerResults) alongside offers
+                val filteredFriendCollection = if (query.isBlank()) friendCollection
+                    else friendCollection.filter { it.name.contains(query, ignoreCase = true) }
+                // Merge friend offers + friend collection into offerResults, de-duplicating by scryfallId
+                // (offer entries take precedence as they carry quantity/variant metadata)
+                val offerIds = filteredFriendOffers.map { it.scryfallId }.toSet()
+                val collectionRows = filteredFriendCollection
+                    .filter { it.scryfallId !in offerIds }
+                    .map { card ->
+                        AddCardRow(
+                            card = card,
+                            quantityInDeck = allItems.filter { it.cardId == card.scryfallId && it.userCardIdRef == null }.sumOf { it.quantity },
+                            isOwned = card.scryfallId in ownedIds,
+                            availableQuantity = 0,
+                        )
+                    }
+
+                SearchLists(
+                    offerResults = filteredFriendOffers.mapNotNull { fc ->
+                        val card = fc.toCard() ?: return@mapNotNull null
+                        AddCardRow(
+                            card = card,
+                            quantityInDeck = allItems.filter { it.cardId == fc.scryfallId && it.isFoil == fc.isFoil && it.condition == (fc.condition ?: "NM") && it.language == (fc.language ?: "en") }.sumOf { it.quantity },
+                            isOwned = fc.scryfallId in ownedIds,
+                            availableQuantity = fc.quantity,
+                            offerEntry = fc.toSyntheticOfferEntry(),
+                        )
+                    } + collectionRows,
+                    addCardsResults = filteredCollection.map { card ->
+                        AddCardRow(
+                            card = card,
+                            quantityInDeck = allItems.filter { it.cardId == card.scryfallId && it.userCardIdRef == null }.sumOf { it.quantity },
+                            isOwned = card.scryfallId in ownedIds,
+                            availableQuantity = 0,
+                        )
+                    },
+                    wishlistResults = filteredWishlist.mapNotNull { entry ->
+                        val card = entry.card ?: return@mapNotNull null
+                        AddCardRow(
+                            card = card,
+                            quantityInDeck = allItems.filter { it.cardId == entry.cardId && it.isFoil == entry.isFoil && it.condition == entry.condition && it.language == entry.language }.sumOf { it.quantity },
+                            isOwned = entry.cardId in ownedIds,
+                            availableQuantity = entry.quantity,
+                            wishlistEntry = entry,
+                        )
+                    },
+                    proposerMatches = computeProposerMatches(s, ownedIds),
+                    receiverMatches = computeReceiverMatches(s, ownedIds),
+                )
+            }
+
+            null -> {
+                // No sheet open: only the match suggestions (data may have refreshed)
+                SearchLists(
+                    offerResults = null,
+                    addCardsResults = null,
+                    wishlistResults = null,
+                    proposerMatches = computeProposerMatches(s, ownedIds),
+                    receiverMatches = computeReceiverMatches(s, ownedIds),
+                )
             }
         }
     }
@@ -798,7 +933,7 @@ class TradeProposalViewModel(
         state: ProposalEditorUiState,
         ownedIds: Set<String>,
     ): List<AddCardRow> {
-        val currentFriendWishlist = friendData.wishlist
+        val currentFriendWishlist = friendWishlist
         if (state.selectedFriend == null || currentFriendWishlist.isEmpty()) return emptyList()
         val friendWishlistIds = currentFriendWishlist.map { it.scryfallId }.toSet()
         val allItems = state.proposerItems + state.receiverItems + state.pendingAddedItems
@@ -832,7 +967,7 @@ class TradeProposalViewModel(
         state: ProposalEditorUiState,
         ownedIds: Set<String>,
     ): List<AddCardRow> {
-        val currentFriendOffers = friendData.offers
+        val currentFriendOffers = friendOffers
         if (state.selectedFriend == null || currentFriendOffers.isEmpty()) return emptyList()
         val myWishlistIds = wishlistEntries.map { it.cardId }.toSet()
         val allItems = state.proposerItems + state.receiverItems + state.pendingAddedItems
@@ -857,53 +992,79 @@ class TradeProposalViewModel(
             }
     }
 
+    /**
+     * Searches Scryfall for the "All cards" tab. Each call cancels the previous search and waits
+     * out the typing debounce first, so only the last query reaches the rate-limited queue.
+     */
     fun searchScryfallDirect(query: String) {
         _uiState.update { it.copy(addCardsQuery = query) }
+        searchQueryFlow.value = query
+        scryfallJob?.cancel()
         if (query.isBlank()) {
-            _uiState.update { it.copy(scryfallResults = emptyList(), isSearchingScryfall = false) }
+            _uiState.update { it.copy(scryfallResults = emptyList(), isSearchingScryfall = false, scryfallError = null) }
             return
         }
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSearchingScryfall = true) }
-            try {
-                val cards = when (val result = cardRepository.searchCards(query)) {
-                    is DataResult.Success -> result.data
-                    is DataResult.Error -> emptyList()
-                }
-                val ownedIds = _uiState.value.collectionIds
-                _uiState.update { s ->
-                    val sideItems = when (s.searchingSide) {
-                        TradeSide.PROPOSER -> s.proposerItems
-                        TradeSide.RECEIVER -> s.receiverItems
-                        null -> s.proposerItems + s.receiverItems
-                    }
-                    val allItems = sideItems + s.pendingAddedItems
-                    s.copy(
-                    isSearchingScryfall = false,
-                    scryfallResults = cards.map { card ->
-                        AddCardRow(
-                            card = card,
-                            quantityInDeck = allItems.filter { it.cardId == card.scryfallId && it.userCardIdRef == null }.sumOf { it.quantity },
-                            isOwned = card.scryfallId in ownedIds,
-                            availableQuantity = 0,
-                        )
-                    },
-                )
-                }
+        _uiState.update { it.copy(isSearchingScryfall = true, scryfallError = null) }
+        scryfallJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_MS)
+            val outcome = try {
+                cardRepository.searchCards(query)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 FirebaseCrashlytics.getInstance().apply {
-                    log("trade_scryfall_search_failed: query_length=${query.length}")
+                    log("trade_scryfall_search_failed")
                     setCustomKey("scryfall_query_length", query.length)
                     setCustomKey("scryfall_error_type", e::class.simpleName ?: "Unknown")
                     recordException(RuntimeException("[TradeProposal] Scryfall search failed", e))
                 }
-                _uiState.update { it.copy(isSearchingScryfall = false) }
+                DataResult.Error(e::class.simpleName ?: "error")
+            }
+            when (outcome) {
+                is DataResult.Success -> {
+                    val cards = outcome.data
+                    _uiState.update { s ->
+                        val sideItems = when (s.searchingSide) {
+                            TradeSide.PROPOSER -> s.proposerItems
+                            TradeSide.RECEIVER -> s.receiverItems
+                            null -> s.proposerItems + s.receiverItems
+                        }
+                        val allItems = sideItems + s.pendingAddedItems
+                        s.copy(
+                            isSearchingScryfall = false,
+                            scryfallError = null,
+                            scryfallResults = cards.map { card ->
+                                AddCardRow(
+                                    card = card,
+                                    quantityInDeck = allItems.filter { it.cardId == card.scryfallId && it.userCardIdRef == null }.sumOf { it.quantity },
+                                    isOwned = card.scryfallId in s.collectionIds,
+                                    availableQuantity = 0,
+                                )
+                            },
+                        )
+                    }
+                }
+                // Scryfall answers "no match" with a 404: an empty result, not an error.
+                is DataResult.Error -> if (outcome.message == "SCRYFALL_404") {
+                    _uiState.update { it.copy(isSearchingScryfall = false, scryfallResults = emptyList(), scryfallError = null) }
+                } else {
+                    FirebaseCrashlytics.getInstance().log("trade_scryfall_search_error_result")
+                    _uiState.update { it.copy(isSearchingScryfall = false, scryfallResults = emptyList(), scryfallError = outcome.message) }
+                }
             }
         }
     }
 
+    /** Re-runs the Scryfall search that failed. */
+    fun retryScryfallSearch() = searchScryfallDirect(_uiState.value.addCardsQuery)
+
     fun clearAddCardsState() {
+        scryfallJob?.cancel()
+        resetFriendCollection()
         _uiState.update { it.copy(
+            scryfallError = null,
+            isSearchingScryfall = false,
+            isSearchingCards = false,
             addCardsQuery = "",
             addCardsResults = emptyList(),
             offerResults = emptyList(),
@@ -913,6 +1074,7 @@ class TradeProposalViewModel(
             searchingSide = null,
             isNavigatingToDetail = false,
         ) }
+        requestRebuild()
     }
 
     fun getCardById(scryfallId: String): Card? {
@@ -929,7 +1091,7 @@ class TradeProposalViewModel(
                 s.copy(pendingAddedItems = s.pendingAddedItems + item)
             }
         }
-        updateSearchLists(_uiState.value.addCardsQuery)
+        requestRebuild()
     }
 
     fun removeProposerItem(id: String) {
@@ -949,7 +1111,7 @@ class TradeProposalViewModel(
                 }
             }
         }
-        updateSearchLists(_uiState.value.addCardsQuery)
+        requestRebuild()
     }
 
     fun addReceiverItem(item: TradeItemDraft) {
@@ -961,7 +1123,7 @@ class TradeProposalViewModel(
                 s.copy(pendingAddedItems = s.pendingAddedItems + item)
             }
         }
-        updateSearchLists(_uiState.value.addCardsQuery)
+        requestRebuild()
     }
 
     fun removeReceiverItem(id: String) {
@@ -980,7 +1142,7 @@ class TradeProposalViewModel(
                 }
             }
         }
-        updateSearchLists(_uiState.value.addCardsQuery)
+        requestRebuild()
     }
 
     /**
@@ -1007,7 +1169,7 @@ class TradeProposalViewModel(
                 s.copy(proposerItems = s.proposerItems + item)
             }
         }
-        updateSearchLists(_uiState.value.addCardsQuery)
+        requestRebuild()
     }
 
     /**
@@ -1034,7 +1196,7 @@ class TradeProposalViewModel(
                 s.copy(receiverItems = s.receiverItems + item)
             }
         }
-        updateSearchLists(_uiState.value.addCardsQuery)
+        requestRebuild()
     }
 
     fun onConfirmPendingItems() {
@@ -1056,6 +1218,7 @@ class TradeProposalViewModel(
                 )
             }
         }
+        requestRebuild()
     }
 
     private fun mergeDraftItems(
@@ -1083,6 +1246,7 @@ class TradeProposalViewModel(
 
     fun onCancelPendingItems() {
         _uiState.update { it.copy(pendingAddedItems = emptyList()) }
+        requestRebuild()
     }
 
     fun toggleReviewCollectionProposer() {
@@ -1097,12 +1261,14 @@ class TradeProposalViewModel(
         _uiState.update {
             it.copy(proposerItems = it.proposerItems.map { i -> if (i.id == updated.id) reconcileEdit(i, updated) else i })
         }
+        requestRebuild()
     }
 
     fun updateReceiverItem(updated: TradeItemDraft) {
         _uiState.update {
             it.copy(receiverItems = it.receiverItems.map { i -> if (i.id == updated.id) reconcileEdit(i, updated) else i })
         }
+        requestRebuild()
     }
 
     /**
