@@ -188,7 +188,8 @@ class HomeBoardTest {
     fun `three recent trades fit the trades slide at the default font scale`() {
         val metrics = computeHomeWidgetMetrics(lineHeights(1f), Spacing())
         val sp = Spacing()
-        val threeRows = 16.dp + sp.xs + (sp.xs * 2 + 14.dp + 18.dp) * 3 + sp.xs * 3
+        // Each recent-trade row is a 48dp touch target.
+        val threeRows = 16.dp + sp.xs + 48.dp * 3 + sp.xs * 3
 
         assertTrue(metrics.tradesSlideHeight >= threeRows)
     }

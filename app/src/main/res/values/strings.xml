@@ -3622,6 +3622,7 @@
     <string name="quick_start_draft_guides">Draft Guides</string>
     <string name="quick_start_search_card">Search Card</string>
     <string name="quick_start_my_decks">My Decks</string>
+    <string name="quick_start_new_deck">New Deck</string>
     <string name="quick_start_news">News</string>
     <string name="quick_start_my_stats">My Stats</string>
     <string name="quick_start_friends">Friends</string>
@@ -3639,6 +3640,7 @@
     <string name="quick_start_sheet_draft_guide">Draft guide</string>
     <string name="quick_start_sheet_search_card">Search card</string>
     <string name="quick_start_sheet_decks">My decks</string>
+    <string name="quick_start_sheet_new_deck">New deck</string>
     <string name="quick_start_sheet_news">News</string>
     <string name="quick_start_sheet_stats">Stats</string>
     <string name="quick_start_sheet_friends">Friends</string>

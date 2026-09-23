@@ -34,7 +34,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -42,6 +41,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
@@ -73,24 +73,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.QuickStartAction
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.AvatarImage
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicFilterChip
-import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.coloredShadow
@@ -438,6 +437,8 @@ private fun EditWidgetsButton(onClick: () -> Unit, modifier: Modifier = Modifier
 
 private val HomeTopBarHeight = 56.dp
 
+private val HomeAvatarSize = 56.dp
+
 private const val GREETING_FADE_MS = 220
 
 @Composable
@@ -482,37 +483,35 @@ private fun HomeTopBar(
         }
         Spacer(Modifier.width(spacing.sm))
         
-        Surface(
+        val avatarUrl = uiState.avatarUrl?.takeIf { it.isNotBlank() }
+        val initials = playerName?.trim()?.firstOrNull()?.uppercase()
+        Box(
             modifier = Modifier
-                .size(56.dp)
+                .size(HomeAvatarSize)
                 .coloredShadow(
                     color = mc.primaryAccent.copy(alpha = 0.25f),
-                    borderRadius = 28.dp,
-                    blurRadius = 16.dp
+                    borderRadius = HomeAvatarSize / 2,
+                    blurRadius = spacing.lg,
                 )
                 .clip(CircleShape)
                 .border(BorderStroke(2.dp, mc.primaryAccent.copy(alpha = 0.5f)), CircleShape)
-                .clickable(onClick = onAvatarClick)
+                .clickable(onClickLabel = openProfileDescription, role = Role.Button, onClick = onAvatarClick)
                 .semantics { contentDescription = openProfileDescription },
-            color = mc.surface,
-            shape = CircleShape,
+            contentAlignment = Alignment.Center,
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                if (!uiState.avatarUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = uiState.avatarUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.AccountCircle,
-                        contentDescription = null,
-                        tint = mc.primaryAccent,
-                        modifier = Modifier.size(32.dp),
-                    )
-                }
+            if (avatarUrl != null || initials != null) {
+                AvatarImage(
+                    avatarUrl = avatarUrl,
+                    initials = initials.orEmpty(),
+                    size = HomeAvatarSize.value.toInt(),
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = null,
+                    tint = mc.primaryAccent,
+                    modifier = Modifier.size(32.dp),
+                )
             }
         }
     }
@@ -639,33 +638,23 @@ fun AccountNudgeCard(
                 style = ty.bodyMedium,
                 color = mc.textSecondary,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                Surface(
-                    color = mc.primaryAccent,
-                    shape = ButtonShape,
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 48.dp)
-                        .clip(ButtonShape)
-                        .clickable(onClick = onCreateAccount),
-                ) {
-                    Box(modifier = Modifier.padding(vertical = spacing.md), contentAlignment = Alignment.Center) {
-                        Text(stringResource(R.string.home_account_gated_cta), style = ty.labelMedium, color = mc.background, maxLines = 1)
-                    }
-                }
-                Surface(
-                    color = mc.surfaceVariant,
-                    shape = ButtonShape,
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .widthIn(min = 48.dp)
-                        .clip(ButtonShape)
-                        .clickable(onClick = onDismiss),
-                ) {
-                    Box(modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md), contentAlignment = Alignment.Center) {
-                        Text(stringResource(R.string.home_nudge_dismiss), style = ty.labelMedium, color = mc.textSecondary, maxLines = 1)
-                    }
-                }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(spacing.md),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MagicCtaButton(
+                    onClick = onCreateAccount,
+                    text = stringResource(R.string.home_account_gated_cta),
+                    style = MagicCtaStyle.Filled,
+                    color = MagicCtaColor.Primary,
+                    modifier = Modifier.weight(1f),
+                )
+                MagicCtaButton(
+                    onClick = onDismiss,
+                    text = stringResource(R.string.home_nudge_dismiss),
+                    style = MagicCtaStyle.Ghost,
+                    color = MagicCtaColor.Neutral,
+                )
             }
         }
     }
@@ -765,7 +754,7 @@ private val QuickStartAction.label: String
     @ReadOnlyComposable
     get() = when (this) {
         QuickStartAction.SCAN_CARD -> stringResource(R.string.quick_start_sheet_scan_card)
-        QuickStartAction.CREATE_DECK -> stringResource(R.string.quick_start_sheet_decks)
+        QuickStartAction.CREATE_DECK -> stringResource(R.string.quick_start_sheet_new_deck)
         QuickStartAction.DRAFT_GUIDE -> stringResource(R.string.quick_start_sheet_draft_guide)
         QuickStartAction.SEARCH_CARD -> stringResource(R.string.quick_start_sheet_search_card)
         QuickStartAction.DECKS -> stringResource(R.string.quick_start_sheet_decks)
@@ -782,7 +771,7 @@ private val QuickStartAction.label: String
 private val QuickStartAction.icon: androidx.compose.ui.graphics.vector.ImageVector
     get() = when (this) {
         QuickStartAction.SCAN_CARD -> Icons.Default.Camera
-        QuickStartAction.CREATE_DECK -> Icons.Default.Style
+        QuickStartAction.CREATE_DECK -> Icons.Default.AddCircle
         QuickStartAction.DRAFT_GUIDE -> Icons.Default.SportsEsports
         QuickStartAction.SEARCH_CARD -> Icons.Default.Search
         QuickStartAction.DECKS -> Icons.Default.Style

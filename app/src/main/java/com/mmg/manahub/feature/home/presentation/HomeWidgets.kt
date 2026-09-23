@@ -103,7 +103,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
@@ -125,7 +124,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -168,6 +166,11 @@ import com.mmg.manahub.core.util.TimeAgoFormatter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Lock
+import com.mmg.manahub.core.ui.components.CopyBadge
+import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.InlineErrorState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.semantics.role
@@ -185,22 +188,6 @@ import com.mmg.manahub.feature.communitydecks.presentation.displayResId
 //  Every size comes from [HomeWidgetMetrics]. All composables here are stateless; state lives in
 //  HomeScreen / HomeViewModel.
 // ═══════════════════════════════════════════════════════════════════════════════
-
-// ── F-12 (Home feature overhaul Phase 3 hygiene): named, documented font-size constants for the
-// few spots that don't fit an existing magicTypography token exactly. Hoisted here rather than
-// left as inline `9.sp`/`32.sp`/`17.sp` literals scattered through the file. ──
-
-/** Compact caption size for [StatBox]/[AnimatedStatKPI] labels — smaller than `labelSmall`'s
- * default, needed so a 2x2 stat grid's uppercase captions don't wrap on narrow devices. */
-private val CompactCaptionSize = 9.sp
-
-/** Large numeral size for [StatKPI]'s hero value — bigger than `displayMedium`'s default so a
- * single KPI number reads as the focal point of its row. */
-private val StatKpiValueSize = 32.sp
-
-/** Slightly taller line height for the Rules Tip body text (readability for multi-line tips
- * rendered through [OracleText], which can include inline mana-symbol icons). */
-private val RulesTipBodyLineHeight = 17.sp
 
 // surfaceVariant is ~1.1:1 on HallowedPrint; a low-alpha textDisabled fill stays visible on every palette.
 private const val SUBTLE_FILL_ALPHA = 0.10f
@@ -302,7 +289,6 @@ private fun WidgetSectionHeader(
                 text = title.uppercase(),
                 style = ty.labelLarge,
                 color = mc.textPrimary,
-                letterSpacing = 2.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -319,66 +305,30 @@ private fun WidgetEmptyBody(message: String) {
     Text(text = message, style = ty.bodySmall, color = mc.textSecondary)
 }
 
-/**
- * Empty body with a tap-to-retry affordance, used when a widget's data failed to load
- * (e.g. the Discover/Card-of-the-day fetch) so the user can re-trigger it instead of
- * staring at an endless spinner. The whole row is a ≥48dp tap target.
- */
+/** Retry body for a widget whose fetch failed, so the user can re-trigger it. */
 @Composable
 private fun WidgetRetryBody(message: String, onRetry: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clip(ChipShape)
-            .clickable(onClickLabel = stringResourceSafe(R.string.home_retry), role = Role.Button, onClick = onRetry)
-            .padding(vertical = spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-    ) {
-        Icon(
-            imageVector = Icons.Default.Refresh,
-            contentDescription = null,
-            tint = mc.primaryAccent,
-            modifier = Modifier.size(18.dp),
-        )
-        Text(
-            text = message,
-            style = ty.bodySmall,
-            color = mc.textSecondary,
-            modifier = Modifier.weight(1f),
-        )
-    }
+    InlineErrorState(
+        message = message,
+        retryLabel = stringResourceSafe(R.string.home_retry),
+        onRetry = onRetry,
+    )
 }
 
-/** Sign-in prompt used by account-gated widgets when the user is unauthenticated. */
+/**
+ * Sign-in prompt used by account-gated widgets when the user is signed out. It fills the widget's
+ * fixed body slot; the widget title is already in the section header.
+ */
 @Composable
-fun AccountGatedPlaceholder(
-    widgetTitle: String,
-    onSignIn: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    WidgetShell(onClick = onSignIn) {
-        Text(
-            text = widgetTitle,
-            style = ty.titleMedium,
-            color = mc.textPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        WidgetEmptyBody(message = stringResourceSafe(R.string.home_account_gated_lock))
-        Spacer(Modifier.height(spacing.xs))
-        Text(
-            text = stringResourceSafe(R.string.home_account_gated_cta),
-            style = ty.labelMedium,
-            color = mc.primaryAccent,
-        )
-    }
+fun AccountGatedPlaceholder(onSignIn: () -> Unit, modifier: Modifier = Modifier) {
+    EmptyState(
+        title = stringResourceSafe(R.string.home_account_gated_lock),
+        icon = Icons.Default.Lock,
+        actionLabel = stringResourceSafe(R.string.home_account_gated_cta),
+        onAction = onSignIn,
+        compact = true,
+        modifier = modifier.fillMaxSize(),
+    )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -962,20 +912,62 @@ private fun WidgetHeaderIconButton(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     iconModifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
+    val mc = MaterialTheme.magicColors
     Box(
-        modifier = Modifier
+        modifier = modifier
             .minimumInteractiveComponentSize()
             .clip(CircleShape)
-            .clickable(onClickLabel = contentDescription, role = Role.Button, onClick = onClick),
+            .clickable(
+                enabled = enabled,
+                onClickLabel = contentDescription,
+                role = Role.Button,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = MaterialTheme.magicColors.primaryAccent,
+            tint = if (enabled) mc.primaryAccent else mc.textDisabled,
             modifier = iconModifier.size(24.dp),
+        )
+    }
+}
+
+/**
+ * Previous / next chevrons overlaid on a pager, each a ≥48dp [WidgetHeaderIconButton]; offset
+ * outwards so the glyphs line up with the pager's edges.
+ */
+@Composable
+private fun PagerChevrons(
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    onBack: () -> Unit,
+    onForward: () -> Unit,
+) {
+    val spacing = MaterialTheme.spacing
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        WidgetHeaderIconButton(
+            icon = Icons.Default.ChevronLeft,
+            contentDescription = stringResourceSafe(R.string.home_carousel_previous),
+            onClick = onBack,
+            enabled = canGoBack,
+            modifier = Modifier.offset(x = -spacing.md),
+        )
+        WidgetHeaderIconButton(
+            icon = Icons.Default.ChevronRight,
+            contentDescription = stringResourceSafe(R.string.home_carousel_next),
+            onClick = onForward,
+            enabled = canGoForward,
+            modifier = Modifier.offset(x = spacing.md),
         )
     }
 }
@@ -1199,9 +1191,6 @@ private fun ContextHeroWidget(hero: HomeHeroState, onAction: (HomeAction) -> Uni
 //  First Steps carousel and completion card
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Alpha of a carousel chevron that has nowhere to go. */
-private const val DISABLED_CHEVRON_ALPHA = 0.38f
-
 /**
  * Auto-advancing onboarding carousel backed by a [HorizontalPager].
  *
@@ -1350,7 +1339,7 @@ internal fun FirstStepsCarousel(
                         // observeSkippedFirstSteps DataStore mechanism as before.
                         Box(
                             modifier = Modifier
-                                .align(Alignment.TopStart)
+                                .align(Alignment.TopEnd)
                                 .minimumInteractiveComponentSize()
                                 .clip(CircleShape)
                                 .clickable(
@@ -1371,42 +1360,12 @@ internal fun FirstStepsCarousel(
             }
 
             if (steps.size > 1) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronLeft,
-                        contentDescription = stringResourceSafe(R.string.home_carousel_previous),
-                        tint = mc.primaryAccent,
-                        modifier = Modifier
-                            .offset(x = (-12).dp)
-                            .size(24.dp)
-                            .alpha(if (pagerState.currentPage > 0) 1f else DISABLED_CHEVRON_ALPHA)
-                            .clip(CircleShape)
-                            .clickable(enabled = pagerState.currentPage > 0) {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(pagerState.currentPage - 1)
-                                }
-                            }
-                    )
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = stringResourceSafe(R.string.home_carousel_next),
-                        tint = mc.primaryAccent,
-                        modifier = Modifier
-                            .offset(x = 12.dp)
-                            .size(24.dp)
-                            .alpha(if (pagerState.currentPage < steps.size - 1) 1f else DISABLED_CHEVRON_ALPHA)
-                            .clip(CircleShape)
-                            .clickable(enabled = pagerState.currentPage < steps.size - 1) {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                                }
-                            }
-                    )
-                }
+                PagerChevrons(
+                    canGoBack = pagerState.currentPage > 0,
+                    canGoForward = pagerState.currentPage < steps.size - 1,
+                    onBack = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
+                    onForward = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
+                )
             }
         }
     }
@@ -1813,7 +1772,6 @@ private fun QuickActionTile(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
-                letterSpacing = 1.sp
             )
         }
     }
@@ -1906,42 +1864,12 @@ private fun <T> AutoSlideHub(
         }
 
         if (showNavigationIcons && slides.size > 1) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ChevronLeft,
-                    contentDescription = stringResourceSafe(R.string.home_carousel_previous),
-                    tint = mc.primaryAccent,
-                    modifier = Modifier
-                        .offset(x = (-12).dp)
-                        .size(24.dp)
-                        .alpha(if (pagerState.currentPage > 0) 1f else DISABLED_CHEVRON_ALPHA)
-                        .clip(CircleShape)
-                        .clickable(enabled = pagerState.currentPage > 0) {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(pagerState.currentPage - 1)
-                            }
-                        }
-                )
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = stringResourceSafe(R.string.home_carousel_next),
-                    tint = mc.primaryAccent,
-                    modifier = Modifier
-                        .offset(x = 12.dp)
-                        .size(24.dp)
-                        .alpha(if (pagerState.currentPage < slides.size - 1) 1f else DISABLED_CHEVRON_ALPHA)
-                        .clip(CircleShape)
-                        .clickable(enabled = pagerState.currentPage < slides.size - 1) {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                            }
-                        }
-                )
-            }
+            PagerChevrons(
+                canGoBack = pagerState.currentPage > 0,
+                canGoForward = pagerState.currentPage < slides.size - 1,
+                onBack = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
+                onForward = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
+            )
         }
     }
 }
@@ -2050,7 +1978,6 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                             text = stringResourceSafe(R.string.home_win_rate_record, stats.wins, stats.totalGames),
                             style = ty.labelSmall,
                             color = mc.textSecondary,
-                            letterSpacing = 1.sp
                         )
                         Text(
                             text = stringResourceSafe(R.string.home_win_rate_caption),
@@ -2102,7 +2029,6 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                                 text = stringResourceSafe(R.string.home_best_performer_caption),
                                 style = ty.labelSmall,
                                 color = mc.lifePositive,
-                                letterSpacing = 1.sp
                             )
                             Text(stats.deckName, style = ty.titleMedium.copy(fontWeight = FontWeight.Bold), color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
@@ -2142,7 +2068,6 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                                 text = stringResourceSafe(R.string.home_current_nemesis_caption),
                                 style = ty.labelSmall,
                                 color = mc.lifeNegative,
-                                letterSpacing = 1.sp
                             )
                             Text(stats.archetype, style = ty.titleMedium.copy(fontWeight = FontWeight.Bold), color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
@@ -2206,7 +2131,6 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                                 text = stringResourceSafe(R.string.home_latest_battle_caption),
                                 style = ty.labelSmall,
                                 color = mc.textSecondary,
-                                letterSpacing = 1.sp
                             )
                             Text(
                                 text = recap.deckName ?: recap.mode,
@@ -2310,9 +2234,10 @@ private fun AnimatedStatKPI(
             )
             Text(
                 text = label.uppercase(),
-                style = ty.labelSmall.copy(fontSize = CompactCaptionSize),
+                style = ty.labelSmall,
                 color = mc.textSecondary,
-                letterSpacing = 0.5.sp
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -2423,10 +2348,6 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
             }
         }
         is CollectionSlide.Colors -> {
-            // F-12: these hex values are the official, fixed MTG brand WUBRG colors (mirroring
-            // the Stats screen's own pie chart) — never tokenized, since they represent the game's
-            // color pie identity itself rather than app theming, and stay constant across all 12
-            // ManaHub themes by design.
             val colorWhite = stringResourceSafe(R.string.stats_color_white)
             val colorBlue = stringResourceSafe(R.string.stats_color_blue)
             val colorBlack = stringResourceSafe(R.string.stats_color_black)
@@ -2453,12 +2374,12 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
                             },
                         colorMapper = { label ->
                             when (label) {
-                                colorWhite -> Color(0xFFF9FAFA)
-                                colorBlue -> Color(0xFF0E68AB)
-                                colorBlack -> Color(0xFF150B00)
-                                colorRed -> Color(0xFFD3202A)
-                                colorGreen -> Color(0xFF00733E)
-                                colorColorless -> Color(0xFF90ADBB)
+                                colorWhite -> mc.manaW
+                                colorBlue -> mc.manaU
+                                colorBlack -> mc.manaB
+                                colorRed -> mc.manaR
+                                colorGreen -> mc.manaG
+                                colorColorless -> mc.manaC
                                 else -> mc.primaryAccent
                             }
                         },
@@ -2469,7 +2390,7 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
             }
         }
         is CollectionSlide.Rarity -> {
-            // F-12: fixed rarity brand colors (silver/steel/gold/orange), same rationale as above.
+            // Same rarity palette as the shared RarityDot.
             val rarityCommon = stringResourceSafe(R.string.home_rarity_common)
             val rarityUncommon = stringResourceSafe(R.string.home_rarity_uncommon)
             val rarityRare = stringResourceSafe(R.string.home_rarity_rare)
@@ -2490,11 +2411,11 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
                         },
                         colorMapper = { label ->
                             when (label) {
-                                rarityCommon -> Color(0xFFC0C0C0)
-                                rarityUncommon -> Color(0xFFB0C4DE)
-                                rarityRare -> Color(0xFFC9A84C)
-                                rarityMythic -> Color(0xFFE8A030)
-                                else -> Color(0xFF9B6EFF)
+                                rarityCommon -> mc.textDisabled
+                                rarityUncommon -> mc.textSecondary
+                                rarityRare -> mc.goldMtg
+                                rarityMythic -> mc.primaryAccent
+                                else -> mc.secondaryAccent
                             }
                         },
                         isCompact = true
@@ -2535,10 +2456,11 @@ private fun StatBox(
             )
             Text(
                 text = label.uppercase(),
-                style = ty.labelSmall.copy(fontSize = CompactCaptionSize),
+                style = ty.labelSmall,
                 color = mc.textSecondary,
                 textAlign = TextAlign.Center,
-                letterSpacing = 0.5.sp
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -2611,33 +2533,14 @@ private fun RecentlyAddedWidget(
                         sharedTransitionKey = uniqueKey
                     )
                     if (entry.quantity > 1) {
-                        QuantityBadge(
-                            quantity = entry.quantity,
+                        CopyBadge(
+                            label = stringResourceSafe(R.string.home_recently_added_quantity, entry.quantity),
                             modifier = Modifier.align(Alignment.TopEnd).padding(spacing.xxs),
                         )
                     }
                 }
             }
         }
-    }
-}
-
-/** Small accent-filled circular badge showing a copy count (e.g. "x3"), top-corner overlay. */
-@Composable
-private fun QuantityBadge(quantity: Int, modifier: Modifier = Modifier) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    Surface(
-        modifier = modifier,
-        color = mc.primaryAccent,
-        shape = ChipShape,
-    ) {
-        Text(
-            text = stringResourceSafe(R.string.home_recently_added_quantity, quantity),
-            style = ty.labelSmall,
-            color = mc.background,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-        )
     }
 }
 
@@ -2656,7 +2559,7 @@ private fun WishlistWidget(
 ) {
     // The body slot only renders this once auth has resolved, so signed out here is definitive.
     if (!isAuthenticated) {
-        AccountGatedPlaceholder(stringResourceSafe(R.string.widget_title_wishlist)) { onAction(HomeAction.CreateAccount) }
+        AccountGatedPlaceholder(onSignIn = { onAction(HomeAction.CreateAccount) })
         return
     }
     val mc = MaterialTheme.magicColors
@@ -3067,42 +2970,22 @@ private const val NEWS_TITLE_LINES = 2
  */
 @Composable
 private fun NewsEmptyWithReset(filtersActive: Boolean, onAction: (HomeAction) -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
         WidgetEmptyBody(stringResourceSafe(R.string.home_news_empty))
-        Surface(
-            color = mc.primaryAccent.copy(alpha = 0.15f),
-            shape = ButtonShape,
-            modifier = Modifier
-                .heightIn(min = 48.dp)
-                .clip(ButtonShape)
-                .clickable(
-                    onClickLabel = stringResourceSafe(R.string.home_news_reset_filters),
-                    role = Role.Button,
-                    onClick = { onAction(HomeAction.ResetNewsFilters) },
-                ),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-            ) {
+        MagicCtaButton(
+            onClick = { onAction(HomeAction.ResetNewsFilters) },
+            text = stringResourceSafe(R.string.home_news_reset_filters),
+            style = MagicCtaStyle.Outlined,
+            color = MagicCtaColor.Primary,
+            icon = {
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = null,
-                    tint = mc.primaryAccent,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(18.dp),
                 )
-                Text(
-                    text = stringResourceSafe(R.string.home_news_reset_filters),
-                    style = ty.labelSmall,
-                    color = mc.primaryAccent,
-                    maxLines = 1,
-                )
-            }
-        }
+            },
+        )
     }
 }
 
@@ -3119,7 +3002,7 @@ private const val RULES_TIP_CROSSFADE_MS = 180
 @Composable
 private fun rulesTipBodyStyle(): TextStyle {
     val mc = MaterialTheme.magicColors
-    return MaterialTheme.magicTypography.bodySmall.copy(color = mc.textSecondary, lineHeight = RulesTipBodyLineHeight)
+    return MaterialTheme.magicTypography.bodySmall.copy(color = mc.textSecondary)
 }
 
 /**
@@ -3247,7 +3130,6 @@ private fun RulesTipContent(tip: RuleTip) {
                 text = stringResourceSafe(tip.category.labelRes).uppercase(),
                 style = ty.labelSmall,
                 color = mc.primaryAccent,
-                letterSpacing = 1.sp,
                 maxLines = 1,
                 modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
             )
@@ -3278,7 +3160,7 @@ private fun FriendsWidget(
 ) {
     // The body slot only renders this once auth has resolved, so signed out here is definitive.
     if (!isAuthenticated) {
-        AccountGatedPlaceholder(stringResourceSafe(R.string.widget_title_friends)) { onAction(HomeAction.CreateAccount) }
+        AccountGatedPlaceholder(onSignIn = { onAction(HomeAction.CreateAccount) })
         return
     }
     if (friends == null) return
@@ -3590,7 +3472,7 @@ private sealed interface TradesSlide {
 private fun TradesHubWidget(uiState: HomeUiState, slideHeight: Dp, onAction: (HomeAction) -> Unit) {
     // The body slot only renders this once auth has resolved, so signed out here is definitive.
     if (!uiState.isAuthenticated) {
-        AccountGatedPlaceholder(stringResourceSafe(R.string.widget_title_trades_hub)) { onAction(HomeAction.CreateAccount) }
+        AccountGatedPlaceholder(onSignIn = { onAction(HomeAction.CreateAccount) })
         return
     }
     val suggestionPreviews = uiState.tradeSuggestionPreviews
@@ -3782,14 +3664,13 @@ private fun StatKPI(
             Column {
                 Text(
                     text = value,
-                    style = ty.displayMedium.copy(fontSize = StatKpiValueSize),
+                    style = ty.displayMedium,
                     color = mc.textPrimary
                 )
                 Text(
                     text = label.uppercase(),
                     style = ty.labelSmall,
                     color = mc.textSecondary,
-                    letterSpacing = 1.sp
                 )
             }
         }
@@ -3879,7 +3760,9 @@ private fun ReducedTradeProposalRow(
         color = mc.textDisabled.copy(alpha = SUBTLE_FILL_ALPHA),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .heightIn(min = 48.dp)
+            .clip(SmallCardShape)
+            .clickable(role = Role.Button, onClick = onClick)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xs),
@@ -3894,7 +3777,7 @@ private fun ReducedTradeProposalRow(
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = proposal.status.name.lowercase().replaceFirstChar { it.uppercase() },
+                    text = stringResourceSafe(proposal.status.labelRes),
                     style = ty.labelSmall,
                     color = statusTint
                 )
@@ -3915,51 +3798,18 @@ private fun ReducedTradeProposalRow(
     }
 }
 
-@Composable
-private fun FriendAvatarRow(friends: List<Friend>) {
-    val spacing = MaterialTheme.spacing
-    val mc = MaterialTheme.magicColors
-    Row(horizontalArrangement = Arrangement.spacedBy((-12).dp)) {
-        friends.take(4).forEach { friend ->
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(mc.background)
-                    .padding(1.dp)
-            ) {
-                AvatarImage(
-                    avatarUrl = friend.avatarUrl,
-                    initials = friend.nickname.take(1).uppercase(),
-                    size = 30
-                )
-            }
-        }
-        if (friends.size > 4) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(mc.background)
-                    .padding(1.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(mc.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "+${friends.size - 4}",
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.textSecondary
-                    )
-                }
-            }
-        }
+/** Display label of a trade status. */
+private val TradeStatus.labelRes: Int
+    get() = when (this) {
+        TradeStatus.DRAFT -> R.string.trades_status_draft
+        TradeStatus.PROPOSED -> R.string.trades_status_proposed
+        TradeStatus.CANCELLED -> R.string.trades_status_cancelled
+        TradeStatus.DECLINED -> R.string.trades_status_declined
+        TradeStatus.COUNTERED -> R.string.trades_status_countered
+        TradeStatus.ACCEPTED -> R.string.trades_status_accepted
+        TradeStatus.COMPLETED -> R.string.trades_status_completed
+        TradeStatus.REVOKED -> R.string.trades_status_revoked
     }
-}
 
 @Composable
 private fun PillButton(label: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -4050,7 +3900,7 @@ private const val MAX_NEWS_PREVIEW = 5
 private val QuickStartAction.navIcon: ImageVector
     get() = when (this) {
         QuickStartAction.SCAN_CARD -> Icons.Default.Camera
-        QuickStartAction.CREATE_DECK -> Icons.Default.Style
+        QuickStartAction.CREATE_DECK -> Icons.Default.AddCircle
         QuickStartAction.DRAFT_GUIDE -> Icons.Default.SportsEsports
         QuickStartAction.SEARCH_CARD -> Icons.Default.Search
         QuickStartAction.DECKS -> Icons.Default.Style
@@ -4069,7 +3919,7 @@ private val QuickStartAction.navLabel: String
     @ReadOnlyComposable
     get() = when (this) {
         QuickStartAction.SCAN_CARD -> stringResourceSafe(R.string.quick_start_scan_card)
-        QuickStartAction.CREATE_DECK -> stringResourceSafe(R.string.quick_start_my_decks)
+        QuickStartAction.CREATE_DECK -> stringResourceSafe(R.string.quick_start_new_deck)
         QuickStartAction.DRAFT_GUIDE -> stringResourceSafe(R.string.quick_start_draft_guides)
         QuickStartAction.SEARCH_CARD -> stringResourceSafe(R.string.quick_start_search_card)
         QuickStartAction.DECKS -> stringResourceSafe(R.string.quick_start_my_decks)
@@ -4085,7 +3935,7 @@ private val QuickStartAction.navLabel: String
 /** Maps a Quick Start action to its navigation intent. */
 private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
     QuickStartAction.SCAN_CARD -> HomeAction.ScanCard
-    QuickStartAction.CREATE_DECK -> HomeAction.OpenDecks
+    QuickStartAction.CREATE_DECK -> HomeAction.CreateDeck
     QuickStartAction.DRAFT_GUIDE -> HomeAction.DraftGuide
     QuickStartAction.SEARCH_CARD -> HomeAction.SearchCard
     QuickStartAction.DECKS -> HomeAction.OpenDecks

@@ -140,7 +140,7 @@ fun computeHomeWidgetMetrics(lh: HomeLineHeights, sp: Spacing): HomeWidgetMetric
     val statBox = sp.md * 2 + lh.titleMedium + lh.labelSmall
     val collectionSlide = maxOf(HubSlideMinHeight, statBox * 2 + sp.sm, CollectionRingSize) + SlotSlack
 
-    val tradeRow = sp.xs * 2 + lh.labelSmall + lh.bodySmall
+    val tradeRow = max(MinTouchTarget, sp.xs * 2 + lh.labelSmall + lh.bodySmall)
     val tradesSlide = maxOf(
         HubSlideMinHeight,
         lh.labelMedium + sp.xs + tradeRow * 3 + sp.xs * 3,
