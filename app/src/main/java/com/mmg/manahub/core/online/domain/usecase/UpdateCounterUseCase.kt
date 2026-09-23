@@ -6,7 +6,7 @@ import javax.inject.Inject
 class UpdateCounterUseCase @Inject constructor(
     private val repository: OnlineSessionRepository,
 ) {
-    suspend fun broadcast(sessionId: String, slotIndex: Int, counterType: String, newValue: Int) =
+    suspend fun broadcast(sessionId: String, slotIndex: Int, counterType: String, newValue: Int): Boolean =
         repository.broadcastCounterUpdate(sessionId, slotIndex, counterType, newValue)
 
     suspend operator fun invoke(

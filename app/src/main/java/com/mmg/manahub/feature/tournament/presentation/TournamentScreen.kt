@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -48,6 +51,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -64,8 +68,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.FullErrorState
+import com.mmg.manahub.core.ui.components.MagicLoadingFooter
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.model.TournamentMatch
 import com.mmg.manahub.core.model.TournamentPlayer
 import com.mmg.manahub.core.model.TournamentStanding
@@ -86,10 +102,30 @@ import java.util.Locale
 fun TournamentScreen(
     tournamentId:   Long,
     onNavigateBack: () -> Unit,
-    onStartMatch:   (matchId: Long, tournamentId: Long) -> Unit,
+    onStartMatch:   (matchId: Long, tournamentId: Long) -> Boolean,
     viewModel:      TournamentViewModel = koinViewModel(),
 ) {
     val uiState     by viewModel.uiState.collectAsStateWithLifecycle()
+    val toastState   = rememberMagicToastState()
+    val pausedMsg    = stringResource(R.string.tournament_paused_toast)
+    // A paused tournament accepts no match or result action until it is explicitly resumed
+    val guardPaused: (() -> Unit) -> Unit = { action ->
+        if (uiState.isPaused) toastState.show(pausedMsg, MagicToastType.INFO) else action()
+    }
+    // Returning from the game screen releases the launch guard so Start/Resume work again
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onGameNavigationConsumed() }
+
+    val actionFailedMsg = stringResource(R.string.tournament_action_failed)
+    val alreadyRecordedMsg = stringResource(R.string.tournament_result_already_recorded)
+    LaunchedEffect(Unit) {
+        viewModel.notices.collect { notice ->
+            val (msg, type) = when (notice) {
+                TournamentNotice.ACTION_FAILED -> actionFailedMsg to MagicToastType.ERROR
+                TournamentNotice.RESULT_ALREADY_RECORDED -> alreadyRecordedMsg to MagicToastType.INFO
+            }
+            toastState.show(msg, type)
+        }
+    }
     val mc           = MaterialTheme.magicColors
     var selectedTab  by rememberSaveable { mutableIntStateOf(0) }
     var recordResultForMatch by remember { mutableStateOf<TournamentMatch?>(null) }
@@ -98,7 +134,7 @@ fun TournamentScreen(
         HexGridBackground(modifier = Modifier.fillMaxSize(), color = mc.primaryAccent.copy(alpha = 0.05f))
 
         Scaffold(
-            contentWindowInsets = WindowInsets.statusBars,
+            contentWindowInsets = WindowInsets.statusBars.union(WindowInsets.navigationBars),
             topBar = {
                 TopAppBar(
                     title = {
@@ -118,13 +154,23 @@ fun TournamentScreen(
                         }
                     },
                     actions = {
-                        if (!uiState.isFinished && !uiState.isPaused) {
-                            IconButton(onClick = { viewModel.pause() }) {
-                                Icon(
-                                    Icons.Default.Pause,
-                                    contentDescription = stringResource(R.string.tournament_pause_cd),
-                                    tint = mc.textSecondary,
-                                )
+                        if (!uiState.isFinished) {
+                            if (uiState.isPaused) {
+                                IconButton(onClick = { viewModel.resumeTournament() }) {
+                                    Icon(
+                                        Icons.Default.PlayArrow,
+                                        contentDescription = stringResource(R.string.tournament_resume_cd),
+                                        tint = mc.primaryAccent,
+                                    )
+                                }
+                            } else {
+                                IconButton(onClick = { viewModel.pause() }) {
+                                    Icon(
+                                        Icons.Default.Pause,
+                                        contentDescription = stringResource(R.string.tournament_pause_cd),
+                                        tint = mc.textSecondary,
+                                    )
+                                }
                             }
                         }
                     },
@@ -160,51 +206,76 @@ fun TournamentScreen(
                                 Text(
                                     text  = title.uppercase(Locale.getDefault()),
                                     style = MaterialTheme.magicTypography.labelLarge,
-                                    color = if (selectedTab == i) mc.primaryAccent else mc.textDisabled,
+                                    color = if (selectedTab == i) mc.primaryAccent else mc.textSecondary,
                                 )
                             },
                         )
                     }
                 }
 
-                when (selectedTab) {
+                when {
+                    uiState.isLoading -> Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        MagicLoadingFooter(label = stringResource(R.string.tournament_loading))
+                    }
+                    uiState.tournament == null -> FullErrorState(
+                        message = stringResource(R.string.tournament_load_failed),
+                        retryLabel = stringResource(R.string.action_back),
+                        onRetry = onNavigateBack,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    else -> when (selectedTab) {
                     0 -> StandingsTab(
                         standings       = uiState.standings,
                         isFinished      = uiState.isFinished,
                         nextMatch       = uiState.nextMatch,
                         activeMatch     = uiState.activeMatch,
                         onStartNextMatch = {
-                            viewModel.startNextMatch { matchId ->
-                                onStartMatch(matchId, tournamentId)
+                            guardPaused {
+                                viewModel.startNextMatch { matchId ->
+                                    onStartMatch(matchId, tournamentId)
+                                }
                             }
                         },
                         onResumeActiveMatch = { matchId ->
-                            viewModel.resumeMatch(matchId) { id ->
-                                onStartMatch(id, tournamentId)
+                            guardPaused {
+                                viewModel.resumeMatch(matchId) { id ->
+                                    onStartMatch(id, tournamentId)
+                                }
                             }
                         },
                         mc = mc
                     )
-                    1 -> MatchesTab(
+                    else -> MatchesTab(
                         matches         = uiState.matches,
                         players         = uiState.players,
+                        activeMatch     = uiState.activeMatch,
                         onStartMatch    = { matchId ->
-                            viewModel.startMatch(matchId) { _ ->
-                                onStartMatch(matchId, tournamentId)
+                            guardPaused {
+                                viewModel.startMatch(matchId) { _ ->
+                                    onStartMatch(matchId, tournamentId)
+                                }
                             }
                         },
                         onResumeMatch   = { matchId ->
-                            viewModel.resumeMatch(matchId) { id ->
-                                onStartMatch(id, tournamentId)
+                            guardPaused {
+                                viewModel.resumeMatch(matchId) { id ->
+                                    onStartMatch(id, tournamentId)
+                                }
                             }
                         },
-                        onResetMatch    = { matchId -> viewModel.resetMatch(matchId) },
-                        onRecordResult  = { match -> recordResultForMatch = match },
+                        onResetMatch    = { matchId -> guardPaused { viewModel.resetMatch(matchId) } },
+                        onRecordResult  = { match -> guardPaused { recordResultForMatch = match } },
                         mc = mc
                     )
+                    }
                 }
             }
         }
+
+        MagicToastHost(state = toastState, modifier = Modifier.align(Alignment.BottomCenter))
     }
 
     // Manual result entry dialog
@@ -256,6 +327,7 @@ private fun StandingsTab(
         if (isFinished && standings.isNotEmpty()) {
             item {
                 val winner      = standings.first()
+                val sharedFirst = standings.filter { it.isSharedFirst }
                 val playerColor = parseColor(winner.player.playerColor)
                 Surface(
                     shape    = CardShape,
@@ -287,12 +359,21 @@ private fun StandingsTab(
                             )
                             Spacer(Modifier.height(MaterialTheme.spacing.sm))
                             Text(
-                                stringResource(R.string.tournament_winner_label).uppercase(),
+                                text = if (sharedFirst.size > 1) {
+                                    stringResource(R.string.tournament_shared_first_label).uppercase()
+                                } else {
+                                    stringResource(R.string.tournament_winner_label).uppercase()
+                                },
                                 style = MaterialTheme.magicTypography.labelLarge,
                                 color = mc.textSecondary,
                             )
                             Text(
-                                text  = winner.player.playerName,
+                                // Seed order alone separated a shared first place: name everyone, crown nobody
+                                text  = if (sharedFirst.size > 1) {
+                                    sharedFirst.joinToString(" · ") { it.player.playerName }
+                                } else {
+                                    winner.player.playerName
+                                },
                                 style = MaterialTheme.magicTypography.displayMedium,
                                 color = mc.textPrimary,
                                 textAlign = TextAlign.Center
@@ -349,19 +430,11 @@ private fun StandingsTab(
                                 color = mc.textPrimary,
                             )
                         }
-                        Button(
-                            onClick  = { onResumeActiveMatch(activeMatch.id) },
-                            colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                            shape    = ButtonShape,
-                            contentPadding = PaddingValues(
-                                horizontal = MaterialTheme.spacing.lg,
-                                vertical   = MaterialTheme.spacing.sm,
-                            )
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(MaterialTheme.spacing.sm))
-                            Text(stringResource(R.string.tournament_match_play), style = MaterialTheme.magicTypography.labelMedium)
-                        }
+                        MagicCtaButton(
+                            onClick = { onResumeActiveMatch(activeMatch.id) },
+                            text = stringResource(R.string.tournament_match_play),
+                            icon = { Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                        )
                     }
                 }
             }
@@ -370,16 +443,12 @@ private fun StandingsTab(
         // Next match button (only when no active match)
         if (!isFinished && nextMatch != null && activeMatch == null) {
             item {
-                Button(
-                    onClick  = onStartNextMatch,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape    = ButtonShape,
-                    colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null)
-                    Spacer(Modifier.width(MaterialTheme.spacing.md))
-                    Text(stringResource(R.string.tournament_start_next), style = MaterialTheme.magicTypography.labelLarge)
-                }
+                MagicCtaButton(
+                    onClick = onStartNextMatch,
+                    text = stringResource(R.string.tournament_start_next),
+                    icon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
 
@@ -400,7 +469,7 @@ private fun StandingsTab(
                     Text(
                         stringResource(R.string.tournament_standings_header_player).uppercase(),
                         style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.textDisabled
+                        color = mc.textSecondary
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xl)) {
                         listOf(
@@ -412,7 +481,7 @@ private fun StandingsTab(
                             Text(
                                 col.uppercase(),
                                 style = MaterialTheme.magicTypography.labelSmall,
-                                color = mc.textDisabled,
+                                color = mc.textSecondary,
                                 modifier = Modifier.width(20.dp),
                                 textAlign = TextAlign.Center
                             )
@@ -469,7 +538,7 @@ private fun StandingRow(
                         Text(
                             text     = when (standing.position) { 1 -> "🥇"; 2 -> "🥈"; 3 -> "🥉"; else -> "${standing.position}" },
                             fontSize = if (standing.position <= 3) 20.sp else 16.sp,
-                            color    = if (standing.position <= 3) Color.Unspecified else mc.textDisabled
+                            color    = if (standing.position <= 3) Color.Unspecified else mc.textSecondary
                         )
                     }
                     Box(
@@ -537,7 +606,9 @@ private fun StandingRow(
 @Composable
 private fun MatchesTab(
     matches:        List<TournamentMatch>,
+
     players:        List<TournamentPlayer>,
+    activeMatch:    TournamentMatch?,
     onStartMatch:   (Long) -> Unit,
     onResumeMatch:  (Long) -> Unit,
     onResetMatch:   (Long) -> Unit,
@@ -546,6 +617,16 @@ private fun MatchesTab(
 ) {
     val playerMap = remember(players) { players.associateBy { it.id } }
     val byRound   = remember(matches) { matches.groupBy { it.round }.toSortedMap() }
+
+    if (matches.isEmpty()) {
+        EmptyState(
+            icon = Icons.Default.EmojiEvents,
+            title = stringResource(R.string.tournament_no_matches_title),
+            subtitle = stringResource(R.string.tournament_no_matches_subtitle),
+            modifier = Modifier.fillMaxSize(),
+        )
+        return
+    }
 
     LazyColumn(
         modifier       = Modifier.fillMaxSize(),
@@ -574,7 +655,8 @@ private fun MatchesTab(
                 MatchRow(
                     match          = match,
                     playerMap      = playerMap,
-                    onStart        = if (match.status == "PENDING") ({ onStartMatch(match.id) }) else null,
+                    // Only one match can be in play: a PENDING row cannot start while another is ACTIVE
+                    onStart        = if (match.status == "PENDING" && activeMatch == null) ({ onStartMatch(match.id) }) else null,
                     onResume       = if (match.status == "ACTIVE") ({ onResumeMatch(match.id) }) else null,
                     onReset        = if (match.status == "ACTIVE") ({ onResetMatch(match.id) }) else null,
                     onRecordResult = if (match.status == "PENDING") ({ onRecordResult(match) }) else null,
@@ -661,30 +743,34 @@ private fun MatchRow(
 
                     if (onStart != null) {
                         Spacer(Modifier.height(MaterialTheme.spacing.sm))
-                        IconButton(
-                            onClick = onStart,
-                            modifier = Modifier.size(32.dp).background(mc.primaryAccent, CircleShape)
-                        ) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = stringResource(R.string.tournament_match_start_cd),
-                                tint = mc.onAccent,
-                                modifier = Modifier.size(16.dp),
-                            )
+                        IconButton(onClick = onStart) {
+                            Box(
+                                modifier = Modifier.size(32.dp).background(mc.primaryAccent, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = stringResource(R.string.tournament_match_start_cd),
+                                    tint = mc.onAccent,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
                         }
                     }
                     if (onResume != null) {
                         Spacer(Modifier.height(MaterialTheme.spacing.sm))
-                        IconButton(
-                            onClick = onResume,
-                            modifier = Modifier.size(32.dp).background(mc.primaryAccent, CircleShape)
-                        ) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = stringResource(R.string.tournament_match_resume_cd),
-                                tint = mc.onAccent,
-                                modifier = Modifier.size(16.dp),
-                            )
+                        IconButton(onClick = onResume) {
+                            Box(
+                                modifier = Modifier.size(32.dp).background(mc.primaryAccent, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = stringResource(R.string.tournament_match_resume_cd),
+                                    tint = mc.onAccent,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -700,32 +786,23 @@ private fun MatchRow(
                     horizontalArrangement = Arrangement.Center
                 ) {
                     if (onRecordResult != null && match.status == "PENDING") {
-                        TextButton(
-                            onClick        = onRecordResult,
-                            modifier       = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(vertical = MaterialTheme.spacing.md)
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(MaterialTheme.spacing.sm))
-                            Text(
-                                text  = stringResource(R.string.tournament_record_result_manual),
-                                style = ty.labelSmall,
-                                color = mc.textSecondary,
-                            )
-                        }
+                        MagicCtaButton(
+                            onClick = onRecordResult,
+                            text = stringResource(R.string.tournament_record_result_manual),
+                            style = MagicCtaStyle.Ghost,
+                            color = MagicCtaColor.Neutral,
+                            icon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                     if (onReset != null && match.status == "ACTIVE") {
-                        TextButton(
-                            onClick        = onReset,
-                            modifier       = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(vertical = MaterialTheme.spacing.md)
-                        ) {
-                            Text(
-                                text  = stringResource(R.string.tournament_reset_match),
-                                style = ty.labelSmall,
-                                color = mc.lifeNegative.copy(alpha = 0.8f),
-                            )
-                        }
+                        MagicCtaButton(
+                            onClick = onReset,
+                            text = stringResource(R.string.tournament_reset_match),
+                            style = MagicCtaStyle.Ghost,
+                            color = MagicCtaColor.Error,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             }
@@ -743,52 +820,56 @@ private fun RecordResultDialog(
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    AlertDialog(
+    var selectedWinner by remember { mutableStateOf<TournamentPlayer?>(null) }
+    MagicAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor   = mc.surface,
-        title = {
-            Text(
-                text  = stringResource(R.string.tournament_who_won),
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = mc.textPrimary,
-            )
-        },
-        text = {
+        title = stringResource(R.string.tournament_who_won),
+        dismissLabel = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        content = {
             Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
+                // Two-step: recording a result also advances the round, so it must not fire on one tap
                 listOfNotNull(p1, p2).forEach { player ->
                     val playerColor = parseColor(player.playerColor)
-                    Button(
-                        onClick  = { onConfirm(player.id) },
+                    val isSelected = selectedWinner?.id == player.id
+                    // Tonal fill + player-coloured border + theme ink (CardTagChip pattern):
+                    // mc.onAccent is paired with primaryAccent, not with a player colour
+                    Surface(
+                        onClick = { selectedWinner = player },
+                        shape = ButtonShape,
+                        color = playerColor.copy(alpha = if (isSelected) 0.28f else 0.12f),
+                        border = BorderStroke(if (isSelected) 2.dp else 1.dp, playerColor),
                         modifier = Modifier.fillMaxWidth(),
-                        colors   = ButtonDefaults.buttonColors(containerColor = playerColor.copy(alpha = 0.85f)),
                     ) {
                         Text(
                             text  = player.playerName,
                             style = MaterialTheme.magicTypography.labelLarge,
-                            color = mc.onAccent,
+                            color = mc.textPrimary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = MaterialTheme.spacing.md),
                         )
                     }
+                }
+                selectedWinner?.let { winner ->
+                    MagicCtaButton(
+                        onClick = { onConfirm(winner.id) },
+                        text = stringResource(R.string.tournament_confirm_winner, winner.playerName),
+                        color = MagicCtaColor.Success,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
                 // M4: Draw is hidden for SINGLE_ELIM (a knockout draw strands the bracket).
                 if (allowDraw) {
-                    OutlinedButton(
-                        onClick  = onDraw,
+                    MagicCtaButton(
+                        onClick = onDraw,
+                        text = stringResource(R.string.tournament_match_draw),
+                        style = MagicCtaStyle.Outlined,
+                        color = MagicCtaColor.Neutral,
                         modifier = Modifier.fillMaxWidth(),
-                        border   = BorderStroke(1.dp, mc.textSecondary.copy(alpha = 0.5f)),
-                    ) {
-                        Text(
-                            text  = stringResource(R.string.tournament_match_draw),
-                            style = MaterialTheme.magicTypography.labelLarge,
-                            color = mc.textSecondary,
-                        )
-                    }
+                    )
                 }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel), color = mc.textSecondary)
             }
         },
     )
@@ -848,10 +929,14 @@ private fun PlayerMatchSlot(
  * Fallback color used when a stored player color string fails to parse. A neutral violet;
  * not theme-derived because [parseColor] is a pure non-composable util with no theme access.
  */
-private val FALLBACK_PLAYER_COLOR = Color(0xFFC77DFF)
 
-private fun parseColor(hex: String): Color = try {
-    Color(android.graphics.Color.parseColor(hex))
-} catch (e: Exception) {
-    FALLBACK_PLAYER_COLOR
+@Composable
+private fun parseColor(hex: String): Color {
+    // Fall back to the THEME's accent: a hardcoded violet clashed with 11 of the 12 palettes
+    val fallback = MaterialTheme.magicColors.primaryAccent
+    return try {
+        Color(android.graphics.Color.parseColor(hex))
+    } catch (e: Exception) {
+        fallback
+    }
 }

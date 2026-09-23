@@ -159,6 +159,7 @@ class AuthRepositoryImpl(
                                 hasPassword = hasPassword,
                             )
                             syncToDataStore(enrichedUser)
+                            syncPrivacyFlagsToDataStore(profile)
                             emit(SessionState.Authenticated(enrichedUser))
                         } else {
                             // No profile row yet (e.g. email-confirmed user whose profile row
@@ -309,7 +310,7 @@ class AuthRepositoryImpl(
                 //
                 // LOCAL scope avoids a network call with a short-lived token. The auth.users
                 // row is harmless until profile_completed = true (RLS policies block access).
-                runCatching { supabaseAuth.signOut(SignOutScope.LOCAL) }
+                signOutLocally(SignOutScope.LOCAL)
                 return@runCatching AuthResult.Error(
                     AuthError.NoProfileFound(email = userInfo.email)
                 )
@@ -690,7 +691,7 @@ class AuthRepositoryImpl(
                 // preserving the clear-before-sign-out ordering documented above.
                 withContext(NonCancellable) {
                     runCatching { userPreferencesDataStore.clearPendingRecoveryMarker() }
-                    runCatching { supabaseAuth.signOut(SignOutScope.GLOBAL) }
+                    signOutLocally(SignOutScope.GLOBAL)
                 }
                 AuthResult.Success(Unit)
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
@@ -726,7 +727,7 @@ class AuthRepositoryImpl(
             // or an Activity recreation) must not be able to interrupt this cleanup partway through.
             withContext(NonCancellable) {
                 runCatching { userPreferencesDataStore.clearPendingRecoveryMarker() }
-                runCatching { supabaseAuth.signOut(SignOutScope.LOCAL) }
+                signOutLocally(SignOutScope.LOCAL)
             }
             AuthResult.Success(Unit)
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
@@ -767,7 +768,7 @@ class AuthRepositoryImpl(
             // potentially throw before clearing local state, and leave the session
             // alive — causing the background sync worker to keep hitting Supabase
             // with an invalid token until the JWT TTL expires.
-            runCatching { supabaseAuth.signOut(SignOutScope.LOCAL) }
+            signOutLocally(SignOutScope.LOCAL)
             AuthResult.Success(Unit)
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
     }
@@ -775,8 +776,30 @@ class AuthRepositoryImpl(
     override suspend fun signOut(): AuthResult<Unit> = withContext(ioDispatcher) {
         runCatching {
             supabaseAuth.signOut()
+            clearLocalPrivacyFlags()
             AuthResult.Success(Unit)
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+    }
+
+    /** Best-effort sign-out that also drops the account-scoped local caches (privacy flags). */
+    private suspend fun signOutLocally(scope: SignOutScope) {
+        runCatching { supabaseAuth.signOut(scope) }
+        clearLocalPrivacyFlags()
+    }
+
+    private suspend fun clearLocalPrivacyFlags() {
+        runCatching { userPreferencesDataStore.clearPrivacyFlags() }
+    }
+
+    /** Mirrors the user's own `user_profiles` privacy columns locally so Settings shows the server truth. */
+    private suspend fun syncPrivacyFlagsToDataStore(profile: UserProfileDto) {
+        runCatching {
+            userPreferencesDataStore.savePrivacyFlags(
+                collectionPublic = profile.collectionPublic,
+                wishlistPublic = profile.wishlistPublic,
+                tradeListPublic = profile.tradeListPublic,
+            )
+        }
     }
 
     override suspend fun getCurrentUser(): AuthUser? =
@@ -1058,7 +1081,7 @@ class AuthRepositoryImpl(
                         // surface a distinct result so the caller can tell the user their password
                         // WAS set — this must never read as a generic failure.
                         recordNonFatal("account_mgmt_set_password_session_revoked")
-                        runCatching { supabaseAuth.signOut(SignOutScope.LOCAL) }
+                        signOutLocally(SignOutScope.LOCAL)
                         AuthResult.Error(AuthError.PasswordUpdatedSessionRevoked)
                     }
                 } else {

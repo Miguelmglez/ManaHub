@@ -1558,6 +1558,14 @@
     <string name="game_mode_standard">STANDARD</string>
     <string name="game_mode_commander">COMMANDER</string>
     <string name="game_fallen_label">FALLEN</string>
+    <string name="game_turn_order_move_up">Move earlier in turn order</string>
+    <string name="game_turn_order_move_down">Move later in turn order</string>
+    <string name="game_counter_icon_picker">Choose counter icon</string>
+    <string name="game_end_turn_short">END</string>
+    <string name="game_commander_damage_dealt">Damage Dealt</string>
+    <string name="game_commander_damage_received">Damage Received</string>
+    <string name="game_online_session_abandoned">The host closed this game.</string>
+    <string name="game_action_leave">Leave</string>
     <string name="game_fallen_life">Ran out of life</string>
     <string name="game_fallen_poison">Poison</string>
     <string name="game_fallen_commander">Commander damage</string>
@@ -2027,6 +2035,23 @@
     <string name="tournament_empty_action">Create your first tournament</string>
     <string name="tournament_default_name">Tournament</string>
     <string name="tournament_pause_cd">Pause tournament</string>
+    <string name="tournament_resume_cd">Resume tournament</string>
+    <string name="tournament_action_failed">That action could not be completed. Try again.</string>
+    <string name="tournament_result_already_recorded">This match already has a result.</string>
+    <string name="tournament_load_failed">This tournament could not be loaded.</string>
+    <string name="tournament_loading">Loading tournament…</string>
+    <string name="tournament_list_loading">Loading tournaments…</string>
+    <string name="tournament_no_matches_title">No matches yet</string>
+    <string name="tournament_no_matches_subtitle">Matches appear here once the first round is generated.</string>
+    <string name="tournament_confirm_winner">Confirm %1$s won</string>
+    <string name="tournament_name_required">Enter a tournament name.</string>
+    <string name="tournament_create_failed">The tournament could not be created. Try again.</string>
+    <string name="tournament_paused_toast">Tournament is paused. Resume it to continue.</string>
+    <string name="tournament_delete_cd">Delete %1$s</string>
+    <string name="tournament_delete_title">Delete tournament?</string>
+    <string name="tournament_delete_body">%1$s and all its players and matches will be removed. This cannot be undone.</string>
+    <string name="tournament_delete_confirm">Delete</string>
+    <string name="tournament_shared_first_label">🏆 Tied for first</string>
     <string name="tournament_record_result_manual">Record result manually</string>
     <string name="tournament_who_won">Who won?</string>
     <string name="tournament_match_win">WIN</string>
@@ -2271,6 +2296,9 @@
     <string name="settings_privacy_trade_list">Public trade list</string>
     <string name="settings_privacy_trade_list_subtitle">Let friends see your trade offers</string>
     <string name="settings_privacy_error">Could not update privacy settings. Please try again.</string>
+    <string name="settings_notification_prefs_error">Could not save notification preferences. Please try again.</string>
+    <string name="settings_sign_in_required">Sign in to change this setting.</string>
+    <string name="settings_system_settings_unavailable">Notification settings are not available on this device.</string>
     <string name="settings_privacy_voice_title">Voice commands</string>
     <string name="settings_privacy_voice_subtitle">Microphone audio is processed on-device only. No audio is recorded or transmitted.</string>
 
@@ -3319,6 +3347,11 @@
     <string name="lobby_error_active_room">You already have an active room. Close it before creating another.</string>
     <string name="lobby_error_full">The room is full.</string>
     <string name="lobby_error_not_found">Room not found or already started.</string>
+    <string name="lobby_error_connection">No connection. Check your network and try again.</string>
+    <string name="lobby_error_timeout">The server took too long to respond. Try again.</string>
+    <string name="lobby_error_server">The server is unavailable right now. Try again in a moment.</string>
+    <string name="lobby_error_sign_in">Your session expired. Sign in again to continue.</string>
+    <string name="lobby_error_display_name">Enter a name between 1 and 32 characters.</string>
     <string name="lobby_header_subtitle">Multiplayer session</string>
     <string name="lobby_existing_session_title">You already have an active room</string>
     <string name="lobby_existing_session_subtitle">Code: %1$s · %2$s · %3$d players</string>
@@ -3327,6 +3360,10 @@
     <string name="lobby_existing_session_abandon">Abandon &amp; create new</string>
     <string name="lobby_session_finished_msg">The game has ended.</string>
     <string name="lobby_session_abandoned_msg">The host closed the room.</string>
+    <string name="tournament_game_in_progress_title">A game is in progress</string>
+    <string name="tournament_game_in_progress_body">Another game is still running. Abandon it and start this match?</string>
+    <string name="tournament_game_in_progress_confirm">Abandon and start</string>
+    <string name="tournament_game_in_progress_cancel">Keep playing</string>
     <string name="lobby_action_close_room">Close room</string>
     <string name="lobby_action_leave_room">Leave room</string>
 

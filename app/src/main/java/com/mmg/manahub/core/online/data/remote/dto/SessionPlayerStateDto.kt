@@ -15,8 +15,10 @@ data class SessionPlayerStateDto(
     @SerialName("poison")                    val poison: Int,
     @SerialName("energy")                    val energy: Int,
     @SerialName("experience")                val experience: Int,
-    @SerialName("commander_damage_json")     val commanderDamageJson: JsonObject = JsonObject(emptyMap()),
-    @SerialName("custom_counters_json")      val customCountersJson: JsonObject = JsonObject(emptyMap()),
+    // Nullable: the column's NOT NULL/DEFAULT state is not verifiable from this repo, and a NULL
+    // would fail decoding for the whole snapshot
+    @SerialName("commander_damage_json")     val commanderDamageJson: JsonObject? = null,
+    @SerialName("custom_counters_json")      val customCountersJson: JsonObject? = null,
     @SerialName("pending_defeat")            val pendingDefeat: Boolean = false,
     @SerialName("defeated")                  val defeated: Boolean = false,
     @SerialName("has_played_land")           val hasPlayedLand: Boolean = false,
@@ -29,10 +31,10 @@ data class SessionPlayerStateDto(
         poison          = poison,
         energy          = energy,
         experience      = experience,
-        commanderDamage = commanderDamageJson.entries.associate { (k, v) ->
+        commanderDamage = commanderDamageJson.orEmpty().entries.associate { (k, v) ->
             k to runCatching { v.jsonPrimitive.int }.getOrDefault(0)
         },
-        customCounters  = customCountersJson.entries.associate { (k, v) ->
+        customCounters  = customCountersJson.orEmpty().entries.associate { (k, v) ->
             k to runCatching { v.jsonPrimitive.int }.getOrDefault(0)
         },
         pendingDefeat   = pendingDefeat,

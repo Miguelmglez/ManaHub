@@ -199,7 +199,7 @@ class HomeViewModelTest {
         every { gameSessionRepository.observeLocalSessionHistory(any()) } returns flowOf(emptyList())
         every { gameSessionRepository.observeDeckStats() } returns flowOf(emptyList())
         every { gameSessionRepository.observeMostFrequentElimination() } returns flowOf(null)
-        every { gameSessionRepository.observeAvgWinTurn(any()) } returns flowOf(null)
+        every { gameSessionRepository.observeAvgWinTurn() } returns flowOf(null)
         every { gameSessionRepository.observeAvgLifeOnWin() } returns flowOf(null)
         every { gameSessionRepository.observeAvgLifeOnLoss() } returns flowOf(null)
 

@@ -48,6 +48,8 @@ import com.mmg.manahub.core.data.remote.push.PushTokenRemoteDataSource
 import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
 import com.mmg.manahub.core.di.cardStrategyTagsKoinModule
 import com.mmg.manahub.core.di.sharedDomainKoinModule
+import com.mmg.manahub.core.config.di.remoteConfigKoinModule
+import com.mmg.manahub.core.domain.config.RemoteConfigRepository
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.repository.CardRepository
@@ -172,6 +174,9 @@ class ManaHubApp : Application(), KoinComponent {
     // (`authRepository.sessionState.collect { }`) runs from an `appScope.launch { }` block strictly
     // AFTER `startKoin()` returns in `onCreate()`, so lazy resolution is safe.
     private val authRepository: AuthRepository by inject()
+
+    // Lazy Koin resolution: read only from appScope after startKoin() in onCreate().
+    private val remoteConfigRepository: RemoteConfigRepository by inject()
 
     @Inject lateinit var tagDictionaryRepo: TagDictionaryRepository
     @Inject lateinit var workManager: WorkManager
@@ -565,6 +570,7 @@ class ManaHubApp : Application(), KoinComponent {
                     nearbyRepository = nearbySessionRepository,
                     voiceCommandRecognizer = voiceCommandRecognizer,
                 ),
+                remoteConfigKoinModule(),
             )
         }
 
@@ -590,6 +596,8 @@ class ManaHubApp : Application(), KoinComponent {
                 }
                 .build()
         }
+
+        appScope.launch { remoteConfigRepository.refresh() }
 
         appScope.launch {
             runCatching { syncManaSymbols() }

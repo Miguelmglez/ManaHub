@@ -15,11 +15,15 @@ import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import com.mmg.manahub.feature.tournament.domain.usecase.CalculateStandingsUseCase
 import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCase
+import com.mmg.manahub.core.util.recordNonFatal
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -104,7 +108,7 @@ class TournamentViewModel(
                         isLoading   = false,
                     )
                 }
-            }.distinctUntilChanged().collect {}
+            }.collect {}
         }
     }
 
@@ -112,6 +116,7 @@ class TournamentViewModel(
         viewModelScope.launch {
             runCatching { repository.pauseTournament(tournamentId) }
                 .onSuccess { _uiState.update { it.copy(isPaused = true) } }
+                .onFailure { e -> reportFailure("tournament_pause_failed", e) }
         }
     }
 
@@ -123,10 +128,29 @@ class TournamentViewModel(
         viewModelScope.launch {
             runCatching { repository.startTournament(tournamentId) }
                 .onSuccess { _uiState.update { it.copy(isPaused = false) } }
+                .onFailure { e -> reportFailure("tournament_resume_failed", e) }
         }
     }
 
-    fun startNextMatch(onNavigateToGame: (matchId: Long) -> Unit) {
+    /** One-shot notice for the screen (paused-state changes, an ignored manual result, failures). */
+    private val _notices = MutableSharedFlow<TournamentNotice>(extraBufferCapacity = 4)
+    val notices: SharedFlow<TournamentNotice> = _notices.asSharedFlow()
+
+    private fun reportFailure(tag: String, e: Throwable) {
+        if (e is CancellationException) throw e
+        FirebaseCrashlytics.getInstance().apply {
+            setCustomKey("tournament_id", tournamentId)
+            recordException(e)
+        }
+        recordNonFatal(tag, e)
+        _notices.tryEmit(TournamentNotice.ACTION_FAILED)
+    }
+
+    /**
+     * [onNavigateToGame] returns whether navigation actually happened; a declined launch (e.g. the
+     * user kept a different in-progress game) releases the guard immediately.
+     */
+    fun startNextMatch(onNavigateToGame: (matchId: Long) -> Boolean) {
         if (_uiState.value.isNavigatingToGame) return
         _uiState.update { it.copy(isNavigatingToGame = true) }
         viewModelScope.launch {
@@ -139,7 +163,7 @@ class TournamentViewModel(
                 .onSuccess {
                     // Guard stays SET across navigation; cleared by onGameNavigationConsumed() when the
                     // screen returns (audit M6) so a second match can't be launched mid-navigation.
-                    onNavigateToGame(match.id)
+                    if (!onNavigateToGame(match.id)) onGameNavigationConsumed()
                 }
                 .onFailure { e ->
                     _uiState.update { it.copy(isNavigatingToGame = false) }
@@ -152,12 +176,12 @@ class TournamentViewModel(
         }
     }
 
-    fun startMatch(matchId: Long, onNavigateToGame: (matchId: Long) -> Unit) {
+    fun startMatch(matchId: Long, onNavigateToGame: (matchId: Long) -> Boolean) {
         if (_uiState.value.isNavigatingToGame) return
         _uiState.update { it.copy(isNavigatingToGame = true) }
         viewModelScope.launch {
             runCatching { repository.startMatch(matchId) }
-                .onSuccess { onNavigateToGame(matchId) }
+                .onSuccess { if (!onNavigateToGame(matchId)) onGameNavigationConsumed() }
                 .onFailure { e ->
                     _uiState.update { it.copy(isNavigatingToGame = false) }
                     FirebaseCrashlytics.getInstance().apply {
@@ -174,10 +198,10 @@ class TournamentViewModel(
      * Now also covered by the single nav guard (audit M6) so it cannot launch a second match in parallel
      * with startNextMatch/startMatch.
      */
-    fun resumeMatch(matchId: Long, onNavigateToGame: (matchId: Long) -> Unit) {
+    fun resumeMatch(matchId: Long, onNavigateToGame: (matchId: Long) -> Boolean) {
         if (_uiState.value.isNavigatingToGame) return
         _uiState.update { it.copy(isNavigatingToGame = true) }
-        onNavigateToGame(matchId)
+        if (!onNavigateToGame(matchId)) onGameNavigationConsumed()
     }
 
     /**
@@ -218,7 +242,8 @@ class TournamentViewModel(
                 id        = index,
                 name      = player?.playerName ?: "Wizard ${index + 1}",
                 theme     = PlayerTheme.ALL[(player?.seed ?: index) % PlayerTheme.ALL.size],
-                isAppUser = index == 0,
+                // No local-seat concept in tournaments: seat 0 is not the device owner (ADR-001)
+                isAppUser = false,
             )
         }
         return Pair(ids, configs)
@@ -244,11 +269,13 @@ class TournamentViewModel(
                 val outcome = recordMatchResultUseCase.recordDraw(matchId, null, emptyMap())
                 refreshAfterResult(outcome)
             }.onFailure { e ->
+                if (e is CancellationException) throw e
                 FirebaseCrashlytics.getInstance().apply {
                     log("tournament_draw_save_failed: matchId=$matchId")
                     setCustomKey("tournament_id", tournamentId)
                     recordException(e)
                 }
+                _notices.tryEmit(TournamentNotice.ACTION_FAILED)
             }
         }
     }
@@ -264,11 +291,13 @@ class TournamentViewModel(
                 val outcome = recordMatchResultUseCase.recordWin(matchId, winnerId, sessionId, lifeTotals)
                 refreshAfterResult(outcome)
             }.onFailure { e ->
+                if (e is CancellationException) throw e
                 FirebaseCrashlytics.getInstance().apply {
                     log("tournament_match_result_save_failed: matchId=$matchId winnerId=$winnerId")
                     setCustomKey("tournament_id", tournamentId)
                     recordException(e)
                 }
+                _notices.tryEmit(TournamentNotice.ACTION_FAILED)
             }
         }
     }
@@ -280,6 +309,9 @@ class TournamentViewModel(
      * itself. The observe* DB flows will re-emit the new round / FINISHED status into the combine.
      */
     private suspend fun refreshAfterResult(outcome: MatchResultOutcome) {
+        // NoOp = the match was already FINISHED (the game path recorded it first); say so rather
+        // than leaving the user staring at an unchanged dialog result.
+        if (outcome == MatchResultOutcome.NoOp) _notices.tryEmit(TournamentNotice.RESULT_ALREADY_RECORDED)
         val standings = calculateStandings(tournamentId)
         _uiState.update { state ->
             state.copy(
@@ -289,3 +321,6 @@ class TournamentViewModel(
         }
     }
 }
+
+/** One-shot notices the tournament screen shows as a MagicToast. */
+enum class TournamentNotice { ACTION_FAILED, RESULT_ALREADY_RECORDED }

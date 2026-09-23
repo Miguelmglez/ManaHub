@@ -1,17 +1,41 @@
 {
-  "index_version": "6",
-  "last_updated": "2026-09-07",
+  "index_version": "13",
+  "last_updated": "2026-09-23",
   "sets": [
+    {
+      "code": "hob",
+      "name": "The Hobbit",
+      "released_at": "2026-08-14",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/hob.svg?1789358400",
+      "content_versions": {
+        "guide": "2026-09-17",
+        "tier_list": "2026-09-17",
+        "booster": "2026-09-17",
+        "engine": "2026-09-17"
+      }
+    },
+    {
+      "code": "msh",
+      "name": "Marvel Super Heroes",
+      "released_at": "2026-06-26",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/msh.svg?1789358400",
+      "content_versions": {
+        "guide": "2026-09-17",
+        "tier_list": "2026-09-16",
+        "booster": "2026-09-16",
+        "engine": "2026-09-16"
+      }
+    },
     {
       "code": "sos",
       "name": "Secrets of Strixhaven",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/sos.svg?1778472000",
       "released_at": "2026-04-24",
       "content_versions": {
-        "guide": "May 2026",
-        "tier_list": "May 2026",
-        "booster": "2026-07-10",
-        "engine": "2026-07-10"
+        "guide": "2026-09-22",
+        "tier_list": "2026-09-22",
+        "booster": "2026-09-22",
+        "engine": "2026-09-22"
       }
     },
     {
@@ -20,8 +44,10 @@
       "icon_svg_uri": "https://svgs.scryfall.io/sets/tmt.svg?1778472000",
       "released_at": "2026-03-06",
       "content_versions": {
-        "guide": "2026-05-22",
-        "tier_list": "2026-05-22"
+        "guide": "2026-09-17",
+        "tier_list": "2026-09-16",
+        "booster": "2026-09-16",
+        "engine": "2026-09-16"
       }
     },
     {
@@ -30,8 +56,10 @@
       "icon_svg_uri": "https://svgs.scryfall.io/sets/ecl.svg?1778472000",
       "released_at": "2026-01-23",
       "content_versions": {
-        "guide": "2026-05-16",
-        "tier_list": "2026-05-16"
+        "guide": "2026-09-17",
+        "tier_list": "2026-09-16",
+        "booster": "2026-09-16",
+        "engine": "2026-09-16"
       }
     },
     {
@@ -40,8 +68,10 @@
       "icon_svg_uri": "https://svgs.scryfall.io/sets/tla.svg?1778472000",
       "released_at": "2025-11-21",
       "content_versions": {
-        "guide": "December 3, 2025",
-        "tier_list": "December 17, 2025"
+        "guide": "2026-09-23",
+        "tier_list": "2026-09-23",
+        "booster": "2026-09-23",
+        "engine": "2026-09-23"
       }
     },
     {

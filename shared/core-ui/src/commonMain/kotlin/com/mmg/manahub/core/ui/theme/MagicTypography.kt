@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.ui.theme
 
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
@@ -63,6 +64,18 @@ data class MagicTypography(
         fontSize      = 16.sp,
         lineHeight    = 24.sp,
         letterSpacing = 1.sp,
+    ),
+
+    /**
+     * Monospace, wide-tracked style for codes the user reads out or types back (session codes,
+     * game tags). Kept in the scale so no screen re-invents its own `letterSpacing`.
+     */
+    val codeDisplay: TextStyle = TextStyle(
+        fontFamily    = FontFamily.Monospace,
+        fontWeight    = FontWeight.SemiBold,
+        fontSize      = 16.sp,
+        lineHeight    = 24.sp,
+        letterSpacing = 4.sp,
     ),
 
     // ── Labels ────────────────────────────────────────────────────────────────

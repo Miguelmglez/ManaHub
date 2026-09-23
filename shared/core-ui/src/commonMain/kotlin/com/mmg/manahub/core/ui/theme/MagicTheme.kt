@@ -64,20 +64,7 @@ fun MagicTheme(
     typography: MagicTypography = MagicTypography(),
     content:    @Composable () -> Unit,
 ) {
-    val magicColors = when (theme) {
-        is AppTheme.NeonVoid         -> NeonVoidColors
-        is AppTheme.MedievalGrimoire -> MedievalGrimoireColors
-        is AppTheme.ArcaneCosmos     -> ArcaneCosmosColors
-        is AppTheme.ForestMurmur     -> ForestMurmurColors
-        is AppTheme.AncientOak       -> AncientOakColors
-        is AppTheme.HallowedPrint    -> HallowedPrintColors
-        is AppTheme.AzureFlux        -> AzureFluxColors
-        is AppTheme.PlanarVeil       -> PlanarVeilColors
-        is AppTheme.VenomShade       -> VenomShadeColors
-        is AppTheme.GlacialEdge      -> GlacialEdgeColors
-        is AppTheme.DuskEmber        -> DuskEmberColors
-        is AppTheme.OnyxNoir         -> OnyxNoirColors
-    }
+    val magicColors = theme.colors()
 
     // TODO(v2.1): give themes that warrant it their own typography instance.
     // For now every theme still inherits the same typography.
@@ -191,3 +178,25 @@ private fun magicMaterial3Shapes() = Shapes(
     large      = CardShape,
     extraLarge = BottomSheetShape,
 )
+
+/**
+ * The [MagicColors] token set backing [this] theme.
+ *
+ * Exposed so UI that must show a theme OTHER than the active one (the Settings theme picker's
+ * preview swatches) derives from the real palette instead of a hand-copied hex list that silently
+ * drifts whenever a palette is retuned.
+ */
+fun AppTheme.colors(): MagicColors = when (this) {
+    is AppTheme.NeonVoid         -> NeonVoidColors
+    is AppTheme.MedievalGrimoire -> MedievalGrimoireColors
+    is AppTheme.ArcaneCosmos     -> ArcaneCosmosColors
+    is AppTheme.ForestMurmur     -> ForestMurmurColors
+    is AppTheme.AncientOak       -> AncientOakColors
+    is AppTheme.HallowedPrint    -> HallowedPrintColors
+    is AppTheme.AzureFlux        -> AzureFluxColors
+    is AppTheme.PlanarVeil       -> PlanarVeilColors
+    is AppTheme.VenomShade       -> VenomShadeColors
+    is AppTheme.GlacialEdge      -> GlacialEdgeColors
+    is AppTheme.DuskEmber        -> DuskEmberColors
+    is AppTheme.OnyxNoir         -> OnyxNoirColors
+}

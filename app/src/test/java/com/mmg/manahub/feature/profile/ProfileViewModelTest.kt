@@ -25,6 +25,8 @@ import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.core.domain.update.AppUpdateState
+import com.mmg.manahub.core.domain.update.AppUpdateStatusProvider
 import com.mmg.manahub.feature.profile.presentation.PlayStyle
 import com.mmg.manahub.feature.profile.presentation.ProfileViewModel
 import com.mmg.manahub.util.TestFixtures
@@ -32,6 +34,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -89,6 +92,10 @@ class ProfileViewModelTest {
     private val gamificationRepository   = mockk<GamificationRepository>(relaxed = true)
     private val claimQuestRewardUseCase  = mockk<ClaimQuestRewardUseCase>()
     private val shareInviteUseCase       = mockk<ShareInviteUseCase>()
+    private val appUpdateStateFlow       = MutableStateFlow<AppUpdateState>(AppUpdateState.None)
+    private val appUpdateStatusProvider  = mockk<AppUpdateStatusProvider>(relaxed = true) {
+        every { state } returns appUpdateStateFlow
+    }
 
     // Mutable state flows used to drive ViewModel state changes in tests
     private val playerNameFlow    = MutableStateFlow("Wizard")
@@ -186,17 +193,17 @@ class ProfileViewModelTest {
 
         every { statsRepo.observeCollectionStats(any()) }   returns flowOf(collectionStats)
         every { gameSessionRepo.observeTotalGames() }       returns flowOf(totalGames)
-        every { gameSessionRepo.observeWins(any()) }        returns flowOf(totalWins)
+        every { gameSessionRepo.observeLocalWins() }        returns flowOf(totalWins)
         every { gameSessionRepo.observeAvgLifeOnWin() }     returns flowOf(null)
         every { gameSessionRepo.observeAvgLifeOnLoss() }    returns flowOf(null)
-        every { gameSessionRepo.observeCurrentStreak(any()) } returns flowOf(0)
+        every { gameSessionRepo.observeCurrentStreak() }    returns flowOf(0)
         every { gameSessionRepo.observeFavoriteMode() }     returns flowOf(null)
         every { gameSessionRepo.observeAvgDurationMs() }    returns flowOf(null)
         every { gameSessionRepo.observeMostFrequentElimination() } returns flowOf(
             if (favoriteElim.isBlank()) null
             else mockk { every { eliminationReason } returns favoriteElim }
         )
-        every { gameSessionRepo.observeAvgWinTurn(any()) }  returns flowOf(avgWinTurn)
+        every { gameSessionRepo.observeAvgWinTurn() }       returns flowOf(avgWinTurn)
         every { gameSessionRepo.observeDeckStats() }        returns flowOf(emptyList())
         every { gameSessionRepo.observeRecentSessions(any()) } returns flowOf(emptyList())
 
@@ -219,6 +226,7 @@ class ProfileViewModelTest {
         gamificationRepository   = gamificationRepository,
         claimQuestRewardUseCase  = claimQuestRewardUseCase,
         shareInviteUseCase       = shareInviteUseCase,
+        appUpdateStatusProvider  = appUpdateStatusProvider,
     )
 
     // ── Setup / Teardown ─────────────────────────────────────────────────────
@@ -762,5 +770,29 @@ class ProfileViewModelTest {
             assertTrue(awaitItem() is ProfileViewModel.Event.QuestClaimFailed)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // ── App update ───────────────────────────────────────────────────────────
+
+    @Test
+    fun `appUpdateState mirrors the app update controller state`() = runTest {
+        wireDefaultMocks()
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        assertEquals(AppUpdateState.None, viewModel.appUpdateState.value)
+        appUpdateStateFlow.value = AppUpdateState.Downloaded
+        assertEquals(AppUpdateState.Downloaded, viewModel.appUpdateState.value)
+    }
+
+    @Test
+    fun `onUpdateClick delegates to the app update controller`() = runTest {
+        wireDefaultMocks()
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.onUpdateClick()
+
+        verify(exactly = 1) { appUpdateStatusProvider.requestUpdate() }
     }
 }

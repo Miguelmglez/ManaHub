@@ -22,12 +22,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,6 +59,9 @@ import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Tournament
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.MagicLoadingFooter
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
@@ -76,6 +80,7 @@ fun TournamentListScreen(
     viewModel:          TournamentListViewModel = koinViewModel(),
 ) {
     val tournaments by viewModel.tournaments.collectAsStateWithLifecycle()
+    var tournamentPendingDelete by remember { mutableStateOf<Tournament?>(null) }
     val mc           = MaterialTheme.magicColors
 
     Box(modifier = Modifier.fillMaxSize().background(mc.background)) {
@@ -115,7 +120,15 @@ fun TournamentListScreen(
             },
             containerColor = Color.Transparent,
         ) { padding ->
-            if (tournaments.isEmpty()) {
+            val loaded = tournaments
+            if (loaded == null) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(padding),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    MagicLoadingFooter(label = stringResource(R.string.tournament_list_loading))
+                }
+            } else if (loaded.isEmpty()) {
                 EmptyState(
                     icon        = Icons.Default.EmojiEvents,
                     title       = stringResource(R.string.tournament_empty_title),
@@ -135,29 +148,34 @@ fun TournamentListScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
                 ) {
-                    itemsIndexed(tournaments, key = { _, t -> t.id }) { index, tournament ->
-                        var visible by rememberSaveable(key = tournament.id.toString()) { mutableStateOf(false) }
-                        LaunchedEffect(tournament.id) { visible = true }
-                        val delay = (index % 10) * 40
-                        
-                        // Wrap in a Box with min height to prevent LazyColumn collapse/scroll reset
-                        // when returning to this screen and animations are re-triggered.
-                        Box(modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp)) {
-                            AnimatedVisibility(
-                                visible = visible,
-                                enter = fadeIn(tween(400, delayMillis = delay)) +
-                                        scaleIn(tween(400, delayMillis = delay), initialScale = 0.95f),
-                            ) {
-                                TournamentListItem(
-                                    tournament = tournament,
-                                    onClick = { onOpenTournament(tournament.id) },
-                                )
-                            }
-                        }
+                    items(loaded, key = { it.id }) { tournament ->
+                        // animateItem() replaces the per-item rememberSaveable + heightIn hack that
+                        // existed to stop the LazyColumn collapsing when the animation re-ran
+                        TournamentListItem(
+                            tournament = tournament,
+                            onClick = { onOpenTournament(tournament.id) },
+                            onDelete = { tournamentPendingDelete = tournament },
+                            modifier = Modifier.animateItem(),
+                        )
                     }
                 }
             }
         }
+    }
+    tournamentPendingDelete?.let { target ->
+        MagicAlertDialog(
+            onDismissRequest = { tournamentPendingDelete = null },
+            title = stringResource(R.string.tournament_delete_title),
+            text = stringResource(R.string.tournament_delete_body, target.name),
+            confirmLabel = stringResource(R.string.tournament_delete_confirm),
+            confirmColor = MagicCtaColor.Error,
+            onConfirm = {
+                tournamentPendingDelete = null
+                viewModel.delete(target.id)
+            },
+            dismissLabel = stringResource(R.string.action_cancel),
+            onDismiss = { tournamentPendingDelete = null },
+        )
     }
 }
 
@@ -165,6 +183,8 @@ fun TournamentListScreen(
 private fun TournamentListItem(
     tournament: Tournament,
     onClick:    () -> Unit,
+    onDelete:   () -> Unit,
+    modifier:   Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -190,7 +210,8 @@ private fun TournamentListItem(
         shape    = CardShape,
         color    = mc.surface.copy(alpha = 0.8f),
         border   = BorderStroke(0.5.dp, mc.surfaceVariant),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        onClick  = onClick,
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             modifier              = Modifier.padding(MaterialTheme.spacing.lg),
@@ -216,7 +237,7 @@ private fun TournamentListItem(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text  = tournament.format,
+                        text  = tournamentFormatLabel(tournament.format),
                         style = ty.labelSmall,
                         color = mc.primaryAccent,
                     )
@@ -226,6 +247,14 @@ private fun TournamentListItem(
                         color = mc.textSecondary,
                     )
                 }
+            }
+
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = stringResource(R.string.tournament_delete_cd, tournament.name),
+                    tint = mc.textSecondary,
+                )
             }
 
             // Status Chip
@@ -271,6 +300,18 @@ internal fun tournamentStatusLabel(status: String): String = when (status) {
     "PAUSED"   -> stringResource(R.string.tournament_status_paused)
     "PENDING"  -> stringResource(R.string.tournament_status_pending)
     else       -> status
+}
+
+/**
+ * Maps a raw tournament format code to its display label, mirroring the Setup screen's chips.
+ * Falls back to a human-readable form of the raw code for any unrecognized value.
+ */
+@Composable
+internal fun tournamentFormatLabel(format: String): String = when (format) {
+    "COMMANDER" -> stringResource(R.string.format_commander)
+    "STANDARD"  -> stringResource(R.string.format_standard)
+    "DRAFT"     -> stringResource(R.string.format_draft)
+    else        -> format.lowercase().replaceFirstChar { it.uppercase() }
 }
 
 /**

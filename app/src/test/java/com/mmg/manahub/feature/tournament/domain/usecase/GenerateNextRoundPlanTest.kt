@@ -3,6 +3,8 @@ package com.mmg.manahub.feature.tournament.domain.usecase
 import com.mmg.manahub.core.model.Tournament
 import com.mmg.manahub.core.model.TournamentMatch
 import com.mmg.manahub.core.model.TournamentPlayer
+import com.mmg.manahub.feature.tournament.domain.engine.StandingsCalculator
+import com.mmg.manahub.feature.tournament.domain.engine.SwissEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -138,6 +140,53 @@ class GenerateNextRoundPlanTest {
         assertTrue(plan.result is NextRoundResult.RoundGenerated)
         assertEquals(1, plan.matchesToInsert.size) // a single final between the two winners
         assertEquals(2, plan.matchesToInsert[0].round)
+    }
+
+    @Test
+    fun `SINGLE_ELIM semifinals ending in draws report finished instead of an empty round`() {
+        // A knockout draw leaves no winner to advance: the old code returned RoundGenerated with an
+        // EMPTY match list, soft-locking the bracket on a round nobody could play.
+        val players = (1L..4L).map { player(it) }
+        val drawnSemis = listOf(
+            match(1, 1, 2, winnerId = null, status = "FINISHED", round = 1, order = 0),
+            match(2, 3, 4, winnerId = null, status = "FINISHED", round = 1, order = 1),
+        )
+
+        val plan = useCase.plan(tournament("SINGLE_ELIM"), players, drawnSemis)
+
+        assertEquals(NextRoundResult.TournamentFinished, plan.result)
+        assertTrue(plan.tournamentFinished)
+        assertTrue(plan.matchesToInsert.isEmpty())
+    }
+
+    @Test
+    fun `SWISS pairing that must repeat a matchup reports it as a forced rematch`() {
+        // Two players who have already met: the only legal pairing repeats their matchup.
+        val players = (1L..2L).map { player(it) }
+        val played = listOf(match(1, 1, 2, winnerId = 1, status = "FINISHED", round = 1, order = 0))
+        val standings = StandingsCalculator.calculate(players, played)
+
+        val result = SwissEngine.generateNextRoundWithDiagnostics(standings, played)
+
+        assertEquals(1, result.pairings.size)
+        assertEquals(1, result.forcedRematches)
+    }
+
+    @Test
+    fun `SWISS pairing with fresh opponents reports no forced rematch`() {
+        val players = (1L..4L).map { player(it) }
+        val r1 = listOf(
+            match(1, 1, 2, winnerId = 1, status = "FINISHED", round = 1, order = 0),
+            match(2, 3, 4, winnerId = 3, status = "FINISHED", round = 1, order = 1),
+        )
+
+        val plan = useCase.plan(tournament("SWISS"), players, r1)
+
+        assertTrue(plan.result is NextRoundResult.RoundGenerated)
+        assertEquals(0, plan.forcedRematches)
+
+        val standings = StandingsCalculator.calculate(players, r1)
+        assertEquals(0, SwissEngine.generateNextRoundWithDiagnostics(standings, r1).forcedRematches)
     }
 
     @Test

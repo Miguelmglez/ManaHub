@@ -24,6 +24,8 @@ import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.core.domain.update.AppUpdateState
+import com.mmg.manahub.core.domain.update.AppUpdateStatusProvider
 import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
 import com.mmg.manahub.feature.settings.presentation.PreferencesState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -64,6 +66,7 @@ class ProfileViewModel(
     private val gamificationRepository: GamificationRepository,
     private val claimQuestRewardUseCase: ClaimQuestRewardUseCase,
     private val shareInviteUseCase: ShareInviteUseCase,
+    private val appUpdateStatusProvider: AppUpdateStatusProvider,
 ) : ViewModel() {
 
     data class UiState(
@@ -140,6 +143,12 @@ class ProfileViewModel(
 
     private val _prefsState = MutableStateFlow(PreferencesState())
     val prefsState: StateFlow<PreferencesState> = _prefsState.asStateFlow()
+
+    /** App-wide update status owned by the single app update controller. */
+    val appUpdateState: StateFlow<AppUpdateState> = appUpdateStatusProvider.state
+
+    /** Starts the update path matching [appUpdateState] (download, restart to install, or store). */
+    fun onUpdateClick() = appUpdateStatusProvider.requestUpdate()
 
     init {
         // ── Preferences ───────────────────────────────────────────────────────
@@ -233,8 +242,7 @@ class ProfileViewModel(
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
-        resolvedNameFlow
-            .flatMapLatest { name -> gameSessionRepo.observeWins(name) }
+        gameSessionRepo.observeLocalWins()
             .onEach { wins -> _uiState.update { it.copy(totalWins = wins) } }
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
@@ -249,8 +257,7 @@ class ProfileViewModel(
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
-        resolvedNameFlow
-            .flatMapLatest { name -> gameSessionRepo.observeCurrentStreak(name) }
+        gameSessionRepo.observeCurrentStreak()
             .onEach { streak -> _uiState.update { it.copy(currentStreak = streak) } }
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
@@ -276,8 +283,7 @@ class ProfileViewModel(
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
-        resolvedNameFlow
-            .flatMapLatest { name -> gameSessionRepo.observeAvgWinTurn(name) }
+        gameSessionRepo.observeAvgWinTurn()
             .onEach { v -> _uiState.update { it.copy(avgWinTurn = v ?: 0.0) } }
             .catch { /* ignore */ }
             .launchIn(viewModelScope)

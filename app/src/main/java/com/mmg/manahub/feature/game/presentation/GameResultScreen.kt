@@ -189,11 +189,7 @@ private fun VictoryHeader(gameResult: GameResult, winnerColor: Color) {
 private fun StandingsSection(gameResult: GameResult) {
     val mc = MaterialTheme.magicColors
 
-    val ordered = listOf(gameResult.winner) +
-        gameResult.playerResults
-            .filter { it.player.id != gameResult.winner.id }
-            .sortedByDescending { it.finalLife }
-            .map { it.player }
+    val ordered = orderedStandings(gameResult)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -270,8 +266,7 @@ private fun HighlightsSection(gameResult: GameResult) {
     val results  = gameResult.playerResults
     val mostDmg  = results.maxByOrNull { it.totalCommanderDamageDealt }
     val hasPoison = results.any { it.eliminationReason == EliminationReason.POISON }
-    val lifeDiffs = results.map { it.finalLife }.sorted()
-    val closestGap = if (lifeDiffs.size >= 2) lifeDiffs[1] - lifeDiffs[0] else null
+    val closestGap = closestGap(gameResult)
 
     val hasHighlights = (mostDmg != null && mostDmg.totalCommanderDamageDealt > 0)
         || hasPoison || (closestGap != null && closestGap <= 5)

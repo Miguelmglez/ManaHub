@@ -1,6 +1,8 @@
 package com.mmg.manahub.core.data.local
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
@@ -20,6 +22,8 @@ import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.ScoreWeightOverrides
 import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.model.UserPreferences
+import com.mmg.manahub.core.util.recordNonFatal
+import kotlinx.coroutines.CancellationException
 import com.mmg.manahub.core.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
@@ -235,9 +239,8 @@ class UserPreferencesDataStore @Inject constructor(
 
     override suspend fun setAppLanguage(language: AppLanguage) {
         context.userPrefsDataStore.edit { it[KEY_APP_LANGUAGE] = language.code }
-        // Use commit() (blocking) instead of apply() so the write is guaranteed to
-        // be on disk before SettingsViewModel emits appLanguageChanged and the
-        // Activity restarts and reads the value in attachBaseContext.
+        // Legacy mirror kept only so an older install's stored value can still be read/cleared;
+        // MainActivity no longer honours it (the app is English-only).
         context.getSharedPreferences("user_prefs_lang_sync", Context.MODE_PRIVATE)
             .edit()
             .putString("app_language_sync", language.code)
@@ -405,11 +408,25 @@ class UserPreferencesDataStore @Inject constructor(
                 preferences[AVATAR_URL_KEY] = url
         }
     }
-    val playerNameFlow: Flow<String> = context.userPrefsDataStore.data
-        .map { prefs -> prefs[KEY_PLAYER_NAME] ?: "Wizard" }
-        .catch { emit("Wizard") }
+    /**
+     * [DataStore.data] with read failures absorbed UPSTREAM of every `map`.
+     *
+     * `catch {}` placed after a `map` terminates the collector: one transient `IOException`
+     * (corrupt file, no disk space) permanently froze the screen observing it. Emitting empty
+     * preferences instead keeps the flow alive and falls back to defaults, and the failure is
+     * recorded rather than silently swallowed.
+     */
+    private val safeData: Flow<Preferences>
+        get() = context.userPrefsDataStore.data.catch { e ->
+            if (e is CancellationException) throw e
+            recordNonFatal("user_prefs_read_failed", e)
+            emit(emptyPreferences())
+        }
 
-    val themeFlow: Flow<AppTheme> = context.userPrefsDataStore.data
+    val playerNameFlow: Flow<String> = safeData
+        .map { prefs -> prefs[KEY_PLAYER_NAME] ?: "Wizard" }
+
+    val themeFlow: Flow<AppTheme> = safeData
         .map { prefs ->
             when (prefs[KEY_APP_THEME]) {
                 "ARCANE_COSMOS"     -> AppTheme.ArcaneCosmos
@@ -437,10 +454,9 @@ class UserPreferencesDataStore @Inject constructor(
                 "PYROMANCER"        -> AppTheme.MedievalGrimoire
                 "HYDROMANCY"        -> AppTheme.GlacialEdge
 
-                else                -> AppTheme.ArcaneCosmos
+                else                -> AppTheme.Default
             }
         }
-        .catch { emit(AppTheme.ArcaneCosmos) }
 
     suspend fun savePlayerName(name: String) {
         context.userPrefsDataStore.edit { it[KEY_PLAYER_NAME] = name }
@@ -835,9 +851,8 @@ class UserPreferencesDataStore @Inject constructor(
     // Defaults: collection, wishlist, and trade list are all public (true) by default.
     // These match the Supabase column defaults in the `user_profiles` table.
 
-    val collectionPublicFlow: Flow<Boolean> = context.userPrefsDataStore.data
+    val collectionPublicFlow: Flow<Boolean> = safeData
         .map { prefs -> prefs[KEY_COLLECTION_PUBLIC] ?: true }
-        .catch { emit(true) }
 
     val wishlistPublicFlow: Flow<Boolean> = context.userPrefsDataStore.data
         .map { prefs -> prefs[KEY_WISHLIST_PUBLIC] ?: true }
@@ -855,27 +870,31 @@ class UserPreferencesDataStore @Inject constructor(
         context.userPrefsDataStore.edit { it[KEY_WISHLIST_PUBLIC] = value }
     }
 
+    /** Mirrors the server-side privacy columns after a profile load; a null flag leaves its key untouched. */
+    suspend fun savePrivacyFlags(collectionPublic: Boolean?, wishlistPublic: Boolean?, tradeListPublic: Boolean?) {
+        if (collectionPublic == null && wishlistPublic == null && tradeListPublic == null) return
+        context.userPrefsDataStore.edit { prefs ->
+            collectionPublic?.let { prefs[KEY_COLLECTION_PUBLIC] = it }
+            wishlistPublic?.let { prefs[KEY_WISHLIST_PUBLIC] = it }
+            tradeListPublic?.let { prefs[KEY_TRADE_LIST_PUBLIC] = it }
+        }
+    }
+
+    /** Drops the cached privacy flags so the next account starts from the server defaults. */
+    suspend fun clearPrivacyFlags() {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs.remove(KEY_COLLECTION_PUBLIC)
+            prefs.remove(KEY_WISHLIST_PUBLIC)
+            prefs.remove(KEY_TRADE_LIST_PUBLIC)
+        }
+    }
+
     suspend fun saveTradeListPublic(value: Boolean) {
         context.userPrefsDataStore.edit { it[KEY_TRADE_LIST_PUBLIC] = value }
     }
 
     suspend fun saveTheme(theme: AppTheme) {
-        context.userPrefsDataStore.edit { prefs ->
-            prefs[KEY_APP_THEME] = when (theme) {
-                AppTheme.NeonVoid         -> "NEON_VOID"
-                AppTheme.MedievalGrimoire -> "MEDIEVAL_GRIMOIRE"
-                AppTheme.ArcaneCosmos     -> "ARCANE_COSMOS"
-                AppTheme.ForestMurmur     -> "FOREST_MURMUR"
-                AppTheme.AncientOak       -> "ANCIENT_OAK"
-                AppTheme.HallowedPrint    -> "HALLOWED_PRINT"
-                AppTheme.AzureFlux        -> "AZURE_FLUX"
-                AppTheme.PlanarVeil       -> "PLANAR_VEIL"
-                AppTheme.VenomShade       -> "VENOM_SHADE"
-                AppTheme.GlacialEdge      -> "GLACIAL_EDGE"
-                AppTheme.DuskEmber        -> "DUSK_EMBER"
-                AppTheme.OnyxNoir         -> "ONYX_NOIR"
-            }
-        }
+        context.userPrefsDataStore.edit { prefs -> prefs[KEY_APP_THEME] = theme.persistKey }
     }
 
     // ── Home dashboard: Quick Start customization ──────────────────────────────

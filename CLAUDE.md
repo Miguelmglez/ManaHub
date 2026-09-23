@@ -54,9 +54,7 @@ output; do not restore `es`/`de` locale branches. → memory: `feedback_language
 // StateFlow self-assignment is a no-op on cold flow, safe to call
 ```
 
-**Removing stale comments is mandatory:** `android-kotlin-architect` + `kmp-web-fullstack-dev` agents MUST, on first touch of a file, delete all outdated/obvious/multi-line comments. **Mark the file with a gitignored `.comments-reviewed` tag** (add `// COMMENTS_REVIEWED: 2026-09-06` as the first line after the package declaration) so agents skip it on future edits — never re-review a marked file unless the comment itself changes.
-
-→ memory: `feedback_comment_precision_2026-09-06`
+No mandatory comment-review pass: do not audit or strip a file's existing comments just because you touched it, and do not add `// COMMENTS_REVIEWED` markers (rule removed 2026-09-22). Apply the rules above only to comments you write or directly modify.
 
 ## Build commands
 
@@ -279,8 +277,10 @@ When working on any Composable/screen/visual element, follow these non-negotiabl
 - Accessibility: meaningful `contentDescription` (or `null` if decorative), AA contrast, correct
   semantics, edge-to-edge insets.
 
-To build/redesign UI use the **`compose-ui`** skill; to audit/polish, delegate to the
-**`compose-design-reviewer`** subagent (`mobile-game-ui-designer` is the generative counterpart).
+To build/redesign UI use the **`compose-ui`** skill (`mobile-game-ui-designer` is the generative
+design counterpart). There is no separate design-review agent: UI/design audits (tokens, 12 palettes,
+accessibility, states, lazy-list keys) are part of the **`android-edge-case-tester`** audit, done while
+it reviews the implementation.
 
 ## Feature notes
 
@@ -413,11 +413,12 @@ The goal: no agent should hit the same bug or repeat the same design mistake twi
 ### Agent configuration source of truth
 
 Codex loads the active roster from `.codex/agents/`; `.claude/agents/` is the aligned mirror for
-Claude-based runs. Keep the same ten roles and concise routing descriptions in both locations:
+Claude-based runs. Keep the same nine roles and concise routing descriptions in both locations:
 `agent-team-orchestrator`, `android-kotlin-architect`, `kmp-web-fullstack-dev`,
 `android-edge-case-tester`, `android-security-auditor`, `android-unit-test-writer`,
-`backend-supabase-expert`, `compose-design-reviewer`, `crashlytics-ux-auditor`, and
-`mobile-game-ui-designer`. The two Kotlin owners are deliberately asymmetric: Android/pure shared
+`backend-supabase-expert`, `crashlytics-ux-auditor`, and `mobile-game-ui-designer`
+(`compose-design-reviewer` was retired 2026-09-22; its UI audit now belongs to
+`android-edge-case-tester`). The two Kotlin owners are deliberately asymmetric: Android/pure shared
 work belongs to the architect; web-target and web-driven shared work belongs directly to the web
 developer. Reviewers and auditors supply precise implementation briefs rather than editing Kotlin.
 

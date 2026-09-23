@@ -40,7 +40,7 @@ data class PlayerSessionEntity(
     val playerName:              String,
     val finalLife:               Int,
     val finalPoison:             Int,
-    val eliminationReason:       String?,   // "LIFE"|"POISON"|"COMMANDER_DAMAGE"|null
+    val eliminationReason:       String?,   // EliminationReason.name, null when the seat was not eliminated
     val commanderDamageDealt:    Int     = 0,
     val commanderDamageReceived: Int     = 0,
 

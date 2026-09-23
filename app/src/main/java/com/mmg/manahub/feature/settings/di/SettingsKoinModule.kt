@@ -18,12 +18,12 @@ import org.koin.dsl.module
  * instead of as a single big-bang PR.
  *
  * ## Bridge pattern (the key Spike-D deliverable)
- * [SettingsViewModel] depends on eight singletons that are still owned by the Hilt object graph
+ * [SettingsViewModel] depends on 3 singletons that are still owned by the Hilt object graph
  * (repositories / data sources / helpers). Rather than re-providing them in Koin — which would
  * duplicate construction and risk two divergent singleton instances (e.g. two `UserPreferencesDataStore`
  * pointing at the same file) — this module is built by [settingsKoinModule], which receives the
  * already-constructed Hilt instances and re-exposes them to Koin as `single { }`. `ManaHubApp` is the
- * bridge: it `@Inject`s the eight Hilt singletons (they are part of its Hilt graph) and passes them
+ * bridge: it `@Inject`s those Hilt singletons (they are part of its Hilt graph) and passes them
  * into [settingsKoinModule] when it calls `startKoin`.
  *
  * As features migrate in Phase 1, each dependency's `single { }` here is replaced by a real Koin

@@ -50,6 +50,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,6 +77,22 @@ import com.mmg.manahub.core.model.CardLanguage
 import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.UserPreferences
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import android.content.pm.PackageManager
+import com.mmg.manahub.core.util.recordSafeNonFatal
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.core.ui.theme.colors
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -105,8 +124,11 @@ fun SettingsScreen(
     val scrollState = rememberScrollState()
     val context = LocalContext.current
     val activity = context as? Activity
-    val privacyToastState = rememberMagicToastState()
+    val toastState = rememberMagicToastState()
     val privacyErrorMsg = stringResource(R.string.settings_privacy_error)
+    val notificationErrorMsg = stringResource(R.string.settings_notification_prefs_error)
+    val systemSettingsUnavailableMsg = stringResource(R.string.settings_system_settings_unavailable)
+    val signInRequiredMsg = stringResource(R.string.settings_sign_in_required)
 
     // POST_NOTIFICATIONS is a runtime permission only on Android 13+ (API 33). On older
     // devices notifications are granted at install time, so the rationale banner is skipped.
@@ -117,17 +139,30 @@ fun SettingsScreen(
             null
         }
 
+    // The user can grant the permission in system settings (deep link above) and come back:
+    // Accompanist's snapshot is taken at composition, so re-read the real OS state on resume.
+    var permissionGrantedOnResume by remember { mutableStateOf(true) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        permissionGrantedOnResume = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+    }
+
     LaunchedEffect(Unit) {
         viewModel.appLanguageChanged.collect { activity?.recreate() }
     }
 
-    LaunchedEffect(uiState.privacyToastMessage) {
-        val msg = uiState.privacyToastMessage ?: return@LaunchedEffect
-        privacyToastState.show(
-            msg,
-            if (uiState.privacyToastIsError) MagicToastType.ERROR else MagicToastType.SUCCESS,
-        )
-        viewModel.clearPrivacyToast()
+    LaunchedEffect(uiState.toastMessage) {
+        val toast = uiState.toastMessage ?: return@LaunchedEffect
+        val msg = when (toast) {
+            SettingsToast.PRIVACY_SAVE_FAILED      -> privacyErrorMsg
+            SettingsToast.NOTIFICATION_SAVE_FAILED -> notificationErrorMsg
+            SettingsToast.SIGN_IN_REQUIRED         -> signInRequiredMsg
+        }
+        toastState.show(msg, if (uiState.toastIsError) MagicToastType.ERROR else MagicToastType.SUCCESS)
+        viewModel.clearToast()
     }
 
     Scaffold(
@@ -175,6 +210,40 @@ fun SettingsScreen(
                 onCurrency = viewModel::setPreferredCurrency,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
+            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+            Text(
+                stringResource(R.string.settings_section_news),
+                style = MaterialTheme.magicTypography.titleMedium,
+                color = mc.textPrimary,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onManageNewsSources)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.settings_manage_news_sources),
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                        color = mc.textPrimary,
+                    )
+                    Text(
+                        stringResource(R.string.settings_manage_news_sources_subtitle),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textSecondary,
+                    )
+                }
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = mc.textSecondary,
+                )
+            }
+
             /* HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
              Text(
                  stringResource(R.string.settings_section_prices),
@@ -296,30 +365,43 @@ fun SettingsScreen(
                 )
             }
 
-            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
-            PrivacySection(
-                collectionPublic = uiState.collectionPublic,
-                wishlistPublic = uiState.wishlistPublic,
-                tradeListPublic = uiState.tradeListPublic,
-                onCollectionPublicChange = { viewModel.setCollectionPublic(it, privacyErrorMsg) },
-                onWishlistPublicChange = { viewModel.setWishlistPublic(it, privacyErrorMsg) },
-                onTradeListPublicChange = { viewModel.setTradeListPublic(it, privacyErrorMsg) },
-            )
+            // Privacy flags live on the user's own `user_profiles` row: nothing to edit without an account
+            if (isAuthenticated) {
+                HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+                PrivacySection(
+                    collectionPublic = uiState.collectionPublic,
+                    wishlistPublic = uiState.wishlistPublic,
+                    tradeListPublic = uiState.tradeListPublic,
+                    pendingKeys = uiState.pendingPrivacyKeys,
+                    onCollectionPublicChange = viewModel::setCollectionPublic,
+                    onWishlistPublicChange = viewModel::setWishlistPublic,
+                    onTradeListPublicChange = viewModel::setTradeListPublic,
+                )
+            }
 
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
             NotificationsSection(
                 pushEnabled = pushEnabled,
+                showEventToggles = isAuthenticated,
                 prefs = notificationPrefs,
-                permissionGranted = notificationPermissionState?.status?.isGranted ?: true,
+                permissionGranted = permissionGrantedOnResume ||
+                    (notificationPermissionState?.status?.isGranted ?: true),
                 showRationale = notificationPermissionState?.status?.shouldShowRationale ?: false,
                 onPushEnabledChange = viewModel::setPushNotificationsEnabled,
                 onGroupChange = viewModel::setNotificationGroupEnabled,
                 onRequestPermission = { notificationPermissionState?.launchPermissionRequest() },
                 onOpenSystemSettings = {
-                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    // Not every ROM ships this activity; an unguarded start crashes the app
+                    runCatching {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            }
+                        )
+                    }.onFailure { e ->
+                        recordSafeNonFatal("settings_open_notification_settings_failed", e)
+                        toastState.show(systemSettingsUnavailableMsg, MagicToastType.ERROR)
                     }
-                    context.startActivity(intent)
                 },
             )
 
@@ -347,7 +429,7 @@ fun SettingsScreen(
             )
         }
         MagicToastHost(
-            state = privacyToastState,
+            state = toastState,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
         } // Box
@@ -360,11 +442,18 @@ private fun SettingsToggleItem(
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
 ) {
     val mc = MaterialTheme.magicColors
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .toggleable(
+                value = checked,
+                enabled = enabled,
+                role = Role.Switch,
+                onValueChange = onCheckedChange,
+            )
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -377,9 +466,11 @@ private fun SettingsToggleItem(
                 color = mc.textSecondary
             )
         }
+        // The whole Row owns the toggle semantics, so the Switch must not be a second a11y node
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = null,
+            enabled = enabled,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = mc.surface,
                 checkedTrackColor = mc.primaryAccent,
@@ -400,6 +491,7 @@ private fun PrivacySection(
     collectionPublic: Boolean,
     wishlistPublic: Boolean,
     tradeListPublic: Boolean,
+    pendingKeys: Set<String>,
     onCollectionPublicChange: (Boolean) -> Unit,
     onWishlistPublicChange: (Boolean) -> Unit,
     onTradeListPublicChange: (Boolean) -> Unit,
@@ -420,18 +512,21 @@ private fun PrivacySection(
             subtitle = stringResource(R.string.settings_privacy_collection_subtitle),
             checked = collectionPublic,
             onCheckedChange = onCollectionPublicChange,
+            enabled = "collection_public" !in pendingKeys,
         )
         SettingsToggleItem(
             title = stringResource(R.string.settings_privacy_wishlist),
             subtitle = stringResource(R.string.settings_privacy_wishlist_subtitle),
             checked = wishlistPublic,
             onCheckedChange = onWishlistPublicChange,
+            enabled = "wishlist_public" !in pendingKeys,
         )
         SettingsToggleItem(
             title = stringResource(R.string.settings_privacy_trade_list),
             subtitle = stringResource(R.string.settings_privacy_trade_list_subtitle),
             checked = tradeListPublic,
             onCheckedChange = onTradeListPublicChange,
+            enabled = "trade_list_public" !in pendingKeys,
         )
         Spacer(Modifier.height(8.dp))
         Text(
@@ -484,6 +579,7 @@ private fun Map<String, Boolean>.isGroupEnabled(eventTypes: List<String>): Boole
 @Composable
 private fun NotificationsSection(
     pushEnabled: Boolean,
+    showEventToggles: Boolean,
     prefs: Map<String, Boolean>,
     permissionGranted: Boolean,
     showRationale: Boolean,
@@ -524,8 +620,9 @@ private fun NotificationsSection(
             onCheckedChange = onPushEnabledChange,
         )
 
-        // Per-event-type toggles are only meaningful while the master switch is ON.
-        if (pushEnabled) {
+        // Per-event-type toggles are only meaningful while the master switch is ON, and they are
+        // stored on the user's backend row, so they need a real account.
+        if (pushEnabled && showEventToggles) {
             NotificationToggleRow(
                 icon = Icons.Filled.SwapHoriz,
                 title = stringResource(R.string.settings_push_trade_proposals),
@@ -607,6 +704,7 @@ private fun NotificationToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -628,7 +726,7 @@ private fun NotificationToggleRow(
         }
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = null,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = mc.surface,
                 checkedTrackColor = mc.primaryAccent,
@@ -957,7 +1055,13 @@ private fun PreferencesSection(
                         val selected = currency == prefs.preferredCurrency
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { onCurrency(currency) },
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .selectable(
+                                    selected = selected,
+                                    role = Role.RadioButton,
+                                    onClick = { onCurrency(currency) },
+                                ),
                         ) {
                             RadioButton(
                                 selected = selected,
@@ -1003,64 +1107,57 @@ private fun ThemeSelectorSection(
 
         // Organizamos los temas en filas de 3 para evitar desbordamientos
         val themes = listOf(
-            Triple(stringResource(R.string.theme_cosmos),         "✨", AppTheme.ArcaneCosmos),
-            Triple(stringResource(R.string.theme_neon_void),      "⚡", AppTheme.NeonVoid),
-            Triple(stringResource(R.string.theme_grimoire),       "📜", AppTheme.MedievalGrimoire),
-            Triple(stringResource(R.string.theme_forest_murmur),  "🍃", AppTheme.ForestMurmur),
-            Triple(stringResource(R.string.theme_ancient_oak),    "🪵", AppTheme.AncientOak),
-            Triple(stringResource(R.string.theme_hallowed_print), "📖", AppTheme.HallowedPrint),
-            Triple(stringResource(R.string.theme_azure_flux),     "🌐", AppTheme.AzureFlux),
-            Triple(stringResource(R.string.theme_planar_veil),    "🌌", AppTheme.PlanarVeil),
-            Triple(stringResource(R.string.theme_venom_shade),    "🧪", AppTheme.VenomShade),
-            Triple(stringResource(R.string.theme_glacial_edge),   "❄️", AppTheme.GlacialEdge),
-            Triple(stringResource(R.string.theme_dusk_ember),     "🌅", AppTheme.DuskEmber),
-            Triple(stringResource(R.string.theme_onyx_noir),      "🍸", AppTheme.OnyxNoir),
+            stringResource(R.string.theme_cosmos)         to AppTheme.ArcaneCosmos,
+            stringResource(R.string.theme_neon_void)      to AppTheme.NeonVoid,
+            stringResource(R.string.theme_grimoire)       to AppTheme.MedievalGrimoire,
+            stringResource(R.string.theme_forest_murmur)  to AppTheme.ForestMurmur,
+            stringResource(R.string.theme_ancient_oak)    to AppTheme.AncientOak,
+            stringResource(R.string.theme_hallowed_print) to AppTheme.HallowedPrint,
+            stringResource(R.string.theme_azure_flux)     to AppTheme.AzureFlux,
+            stringResource(R.string.theme_planar_veil)    to AppTheme.PlanarVeil,
+            stringResource(R.string.theme_venom_shade)    to AppTheme.VenomShade,
+            stringResource(R.string.theme_glacial_edge)   to AppTheme.GlacialEdge,
+            stringResource(R.string.theme_dusk_ember)     to AppTheme.DuskEmber,
+            stringResource(R.string.theme_onyx_noir)      to AppTheme.OnyxNoir,
         )
 
-        themes.chunked(3).forEach { rowThemes ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                rowThemes.forEach { (name, emoji, theme) ->
-                    ThemeTile(
-                        name = name,
-                        emoji = emoji,
-                        previewColors = getPreviewColorsForTheme(theme),
-                        isSelected = currentTheme == theme,
-                        onClick = { onThemeSelected(theme) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                // Rellenar con espacios vacíos si la fila no está completa para mantener el peso uniforme
-                repeat(3 - rowThemes.size) {
-                    Spacer(modifier = Modifier.weight(1f))
+        Column(
+            modifier = Modifier.selectableGroup(),
+            verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
+        ) {
+            themes.chunked(3).forEach { rowThemes ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
+                ) {
+                    rowThemes.forEach { (name, theme) ->
+                        ThemeTile(
+                            name = name,
+                            previewColors = previewColorsFor(theme),
+                            isSelected = currentTheme == theme,
+                            onClick = { onThemeSelected(theme) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    // Keep the last row's tiles the same width as a full row's
+                    repeat(3 - rowThemes.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }
     }
 }
 
-private fun getPreviewColorsForTheme(theme: AppTheme): List<Color> = when (theme) {
-    AppTheme.NeonVoid         -> listOf(Color(0xFF14020D), Color(0xFFFF6AD5), Color(0xFF00E5FF))
-    AppTheme.MedievalGrimoire -> listOf(Color(0xFF140202), Color(0xFFFF3131), Color(0xFFC9A55C))
-    AppTheme.ArcaneCosmos     -> listOf(Color(0xFF010C14), Color(0xFF00F5FF), Color(0xFFFF7F50))
-    AppTheme.ForestMurmur     -> listOf(Color(0xFF010A03), Color(0xFFF2FAEC), Color(0xFF2E7D32))
-    AppTheme.AncientOak       -> listOf(Color(0xFF140D02), Color(0xFFE0B038), Color(0xFFC68A1F))
-    AppTheme.HallowedPrint    -> listOf(Color(0xFFF5F1E5), Color(0xFF1F1B16), Color(0xFF7A1F2B))
-    AppTheme.AzureFlux        -> listOf(Color(0xFF02061F), Color(0xFF3B82F6), Color(0xFFFF6AD5))
-    AppTheme.PlanarVeil       -> listOf(Color(0xFF110524), Color(0xFF9B5DE5), Color(0xFFFFC857))
-    AppTheme.VenomShade       -> listOf(Color(0xFF0B0814), Color(0xFFB4FF1A), Color(0xFFC24DFF))
-    AppTheme.GlacialEdge      -> listOf(Color(0xFF050B1A), Color(0xFFB8E0FF), Color(0xFFC7A7FF))
-    AppTheme.DuskEmber        -> listOf(Color(0xFF1F0A14), Color(0xFFFF9B6A), Color(0xFFE8B85F))
-    AppTheme.OnyxNoir         -> listOf(Color(0xFF08080C), Color(0xFFD8D8E0), Color(0xFFE8C988))
+/** Preview swatches read straight off the theme's own palette, so they can never drift from it. */
+private fun previewColorsFor(theme: AppTheme): List<Color> = theme.colors().let { c ->
+    listOf(c.background, c.primaryAccent, c.secondaryAccent)
 }
 
 
 @Composable
 private fun ThemeTile(
     name: String,
-    emoji: String,
     previewColors: List<Color>,
     isSelected: Boolean,
     onClick: () -> Unit,
@@ -1069,23 +1166,27 @@ private fun ThemeTile(
     val mc = MaterialTheme.magicColors
     Surface(
         onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
+        modifier = modifier.semantics {
+            selected = isSelected
+            role = Role.RadioButton
+        },
+        shape = CardShape,
         color = if (isSelected) mc.primaryAccent.copy(0.1f) else mc.surface,
+        // An unselected tile's border must stay visible on HallowedPrint AND on the darkest palettes
         border = BorderStroke(
-            width = if (isSelected) 2.dp else 0.5.dp,
-            color = if (isSelected) mc.primaryAccent else mc.surfaceVariant,
+            width = if (isSelected) 2.dp else 1.dp,
+            color = if (isSelected) mc.primaryAccent else mc.textDisabled,
         ),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
+                .padding(MaterialTheme.spacing.md),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center, // Center content vertically
+            verticalArrangement = Arrangement.Center,
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 previewColors.forEachIndexed { index, color ->
@@ -1094,19 +1195,12 @@ private fun ThemeTile(
                             .size(if (index == 0) 28.dp else 18.dp)
                             .clip(CircleShape)
                             .background(color)
-                            .then(
-                                if (index == 0)
-                                    Modifier.border(
-                                        1.5.dp,
-                                        previewColors.getOrElse(1) { Color.White }.copy(0.5f),
-                                        CircleShape,
-                                    )
-                                else Modifier
-                            ),
+                            // Every dot needs its own ring: a near-surface swatch is invisible without it
+                            .border(1.dp, mc.textDisabled, CircleShape),
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(MaterialTheme.spacing.sm))
             Text(
                 text = name,
                 style = MaterialTheme.magicTypography.labelSmall,

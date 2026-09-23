@@ -125,13 +125,6 @@ abstract class GameSessionDao {
     @Query("SELECT COUNT(*) FROM game_sessions")
     abstract fun observeTotalGames(): Flow<Int>
 
-    @Query("""
-        SELECT COUNT(*) FROM game_sessions gs
-        INNER JOIN player_sessions ps ON ps.sessionId = gs.id
-        WHERE ps.isWinner = 1 AND ps.playerName = :playerName
-    """)
-    abstract fun observeWins(playerName: String): Flow<Int>
-
     /**
      * Count of sessions where the local seat (`is_local = 1`) won.
      *
@@ -217,6 +210,16 @@ abstract class GameSessionDao {
     @Query("UPDATE player_sessions SET isWinner = CASE WHEN is_local = 1 THEN :localIsWinner ELSE isWinner END WHERE sessionId = :sessionId")
     abstract suspend fun updateLocalSeatWinner(sessionId: Long, localIsWinner: Boolean)
 
+    /**
+     * Writes the deck UUID onto the LOCAL seat only (`is_local = 1`).
+     *
+     * Per-deck stats group by `player_sessions.deck_id`, so the survey's deck pick has to land on
+     * the seat row, not just on `game_sessions.deckId`. A session with no local seat (a tournament
+     * game, ADR-001) matches no row and correctly writes nothing.
+     */
+    @Query("UPDATE player_sessions SET deck_id = :deckId WHERE sessionId = :sessionId AND is_local = 1")
+    abstract suspend fun updateLocalSeatDeck(sessionId: Long, deckId: String?)
+
     /** Sets the deck archetype on a specific opponent seat (matched by playerId). */
     @Query("UPDATE player_sessions SET archetype = :archetype WHERE sessionId = :sessionId AND playerId = :playerId")
     abstract suspend fun updateSeatArchetype(sessionId: Long, playerId: Int, archetype: String)
@@ -225,19 +228,6 @@ abstract class GameSessionDao {
     abstract fun observePendingSurveyCount(): Flow<Int>
 
     // ── Per-deck stats (new UUID-based) ────────────────────────────────────────
-
-    @Query("""
-        SELECT gs.deckId AS deckId,
-               COUNT(*)   AS totalGames,
-               COALESCE(SUM(CASE WHEN ps.isWinner = 1 THEN 1 ELSE 0 END), 0) AS wins,
-               COALESCE(AVG(gs.durationMs), 0.0) AS avgDurationMs
-        FROM game_sessions gs
-        INNER JOIN player_sessions ps ON ps.sessionId = gs.id
-        WHERE gs.deckId IS NOT NULL
-        AND ps.playerName = :playerName
-        GROUP BY gs.deckId
-    """)
-    abstract fun observeDeckGameStats(playerName: String): Flow<List<DeckGameStatsRow>>
 
     /**
      * Per-deck win/loss resolved against the local seat (`is_local = 1`) instead of a
@@ -278,17 +268,17 @@ abstract class GameSessionDao {
     """)
     abstract fun observeArchetypeMatchups(): Flow<List<ArchetypeMatchupRow>>
 
+    /** Win/loss/duration for ONE deck resolved against the local seat (`is_local = 1`, ADR-001). */
     @Query("""
         SELECT gs.deckId AS deckId,
                COUNT(*)   AS totalGames,
                COALESCE(SUM(CASE WHEN ps.isWinner = 1 THEN 1 ELSE 0 END), 0) AS wins,
                COALESCE(AVG(gs.durationMs), 0.0) AS avgDurationMs
         FROM game_sessions gs
-        INNER JOIN player_sessions ps ON ps.sessionId = gs.id
+        INNER JOIN player_sessions ps ON ps.sessionId = gs.id AND ps.is_local = 1
         WHERE gs.deckId = :deckId
-        AND ps.playerName = :playerName
     """)
-    abstract fun observeSingleDeckStats(deckId: String, playerName: String): Flow<DeckGameStatsRow?>
+    abstract fun observeLocalSingleDeckStats(deckId: String): Flow<DeckGameStatsRow?>
 
     // ── Profile statistics ─────────────────────────────────────────────────────
 
@@ -314,13 +304,23 @@ abstract class GameSessionDao {
     """)
     abstract fun observeMostFrequentElimination(): Flow<EliminationCount?>
 
+    /** Average turn count of the games the local seat (`is_local = 1`) won. */
     @Query("""
         SELECT AVG(gs.totalTurns)
         FROM game_sessions gs
         INNER JOIN player_sessions ps ON ps.sessionId = gs.id
-        WHERE ps.isWinner = 1 AND ps.playerName = :playerName
+        WHERE ps.is_local = 1 AND ps.isWinner = 1
     """)
-    abstract fun observeAvgWinTurn(playerName: String): Flow<Double?>
+    abstract fun observeLocalAvgWinTurn(): Flow<Double?>
+
+    /** Local-seat outcome of every session, most-recent first (sessions with no local seat are skipped). */
+    @Query("""
+        SELECT ps.isWinner
+        FROM game_sessions gs
+        INNER JOIN player_sessions ps ON ps.sessionId = gs.id AND ps.is_local = 1
+        ORDER BY gs.playedAt DESC
+    """)
+    abstract fun observeLocalSessionOutcomes(): Flow<List<Boolean>>
 
     @Query("SELECT id, playedAt, mode, durationMs, winnerName, surveyStatus, surveyCompletedAt, deckId FROM game_sessions ORDER BY playedAt DESC")
     abstract fun observeAllSessionSummaries(): Flow<List<SessionSummary>>

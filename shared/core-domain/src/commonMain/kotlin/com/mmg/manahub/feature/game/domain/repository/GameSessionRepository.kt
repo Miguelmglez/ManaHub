@@ -43,9 +43,6 @@ interface GameSessionRepository {
     /** Total number of finished sessions. */
     fun observeTotalGames(): Flow<Int>
 
-    /** Count of sessions won by [playerName] (name-match, legacy). Prefer [observeLocalWins]. */
-    fun observeWins(playerName: String): Flow<Int>
-
     /** Count of sessions won by the local seat (`is_local = 1`); name-agnostic. */
     fun observeLocalWins(): Flow<Int>
 
@@ -67,9 +64,11 @@ interface GameSessionRepository {
     /** The elimination reason that most frequently ended the local seat's games. */
     fun observeMostFrequentElimination(): Flow<EliminationStats?>
 
-    fun observeAvgWinTurn(playerName: String): Flow<Double?>
+    /** Average turn count of the local seat's wins (`is_local = 1`, ADR-001). */
+    fun observeAvgWinTurn(): Flow<Double?>
 
-    fun observeCurrentStreak(playerName: String): Flow<Int>
+    /** Consecutive most-recent wins of the local seat (`is_local = 1`, ADR-001). */
+    fun observeCurrentStreak(): Flow<Int>
 
     /** Count of sessions with PENDING or PARTIAL survey status. */
     fun observePendingSurveyCount(): Flow<Int>
@@ -80,8 +79,8 @@ interface GameSessionRepository {
     /** Win-rate breakdown grouped by the opponent's classified archetype. */
     fun observeArchetypeMatchups(): Flow<List<ArchetypeMatchupData>>
 
-    /** Win/loss/duration stats for ONE deck, keyed by [playerName] (legacy name-match, mirrors [observeWins]). */
-    fun observeSingleDeckStats(deckId: String, playerName: String): Flow<SingleDeckStats?>
+    /** Win/loss/duration stats for ONE deck, resolved against the local seat (`is_local = 1`, ADR-001). */
+    fun observeSingleDeckStats(deckId: String): Flow<SingleDeckStats?>
 
     /** Top [limit] best-scoring cards (by post-game survey impact) for [deckId]. */
     fun observeTopCardImpactsForDeck(deckId: String, limit: Int): Flow<List<CardImpactScore>>

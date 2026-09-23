@@ -26,7 +26,7 @@ class OnlineSessionRepositoryImpl @Inject constructor(
             .map { dto -> dto?.let { ActiveSession(it.sessionId, it.code, it.status, it.gameMode, it.playerCount) } }
             .onFailure { throwable ->
                 crashlytics.apply {
-                    log("repo_get_my_active_session_failed: ${throwable.message}")
+                    log("repo_get_my_active_session_failed: type=${throwable::class.simpleName}")
                     setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
                     recordException(throwable)
                 }
@@ -37,7 +37,7 @@ class OnlineSessionRepositoryImpl @Inject constructor(
             .map { list -> list.map { ActiveSession(it.sessionId, it.code, it.status, it.gameMode, it.playerCount) } }
             .onFailure { throwable ->
                 crashlytics.apply {
-                    log("repo_get_my_active_sessions_failed: ${throwable.message}")
+                    log("repo_get_my_active_sessions_failed: type=${throwable::class.simpleName}")
                     setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
                     recordException(throwable)
                 }
@@ -47,7 +47,7 @@ class OnlineSessionRepositoryImpl @Inject constructor(
         remoteDataSource.abandonMyActiveSession(sessionId, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
-                    log("repo_abandon_active_session_failed: ${throwable.message}")
+                    log("repo_abandon_active_session_failed: type=${throwable::class.simpleName}")
                     setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
                     recordException(throwable)
                 }
@@ -81,7 +81,7 @@ class OnlineSessionRepositoryImpl @Inject constructor(
             .map { JoinSessionResult(it.sessionId, it.slotIndex, it.guestToken) }
             .onFailure { throwable ->
                 crashlytics.apply {
-                    log("repo_join_session_failed: ${throwable.message}")
+                    log("repo_join_session_failed: type=${throwable::class.simpleName}")
                     setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
                     recordException(throwable)
                 }
@@ -91,7 +91,7 @@ class OnlineSessionRepositoryImpl @Inject constructor(
         remoteDataSource.getSnapshot(sessionId, guestToken).map { it.toDomain() }
             .onFailure { throwable ->
                 crashlytics.apply {
-                    log("repo_get_snapshot_failed: ${throwable.message}")
+                    log("repo_get_snapshot_failed: type=${throwable::class.simpleName}")
                     setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
                     recordException(throwable)
                 }
@@ -101,7 +101,7 @@ class OnlineSessionRepositoryImpl @Inject constructor(
         remoteDataSource.startSession(sessionId, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
-                    log("repo_start_session_failed: ${throwable.message}")
+                    log("repo_start_session_failed: type=${throwable::class.simpleName}")
                     setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
                     recordException(throwable)
                 }
@@ -112,7 +112,7 @@ class OnlineSessionRepositoryImpl @Inject constructor(
             .onFailure { throwable ->
                 // Non-fatal: leave failures are silent to the user but indicate a Realtime/RPC problem
                 crashlytics.apply {
-                    log("repo_leave_session_failed: ${throwable.message}")
+                    log("repo_leave_session_failed: type=${throwable::class.simpleName}")
                     setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
                     recordException(throwable)
                 }
@@ -168,7 +168,7 @@ class OnlineSessionRepositoryImpl @Inject constructor(
         remoteDataSource.advancePhase(sessionId, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
-                    log("repo_advance_phase_failed: ${throwable.message}")
+                    log("repo_advance_phase_failed: type=${throwable::class.simpleName}")
                     setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
                     recordException(throwable)
                 }
@@ -178,7 +178,7 @@ class OnlineSessionRepositoryImpl @Inject constructor(
         remoteDataSource.nextTurn(sessionId, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
-                    log("repo_next_turn_failed: ${throwable.message}")
+                    log("repo_next_turn_failed: type=${throwable::class.simpleName}")
                     setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
                     recordException(throwable)
                 }
@@ -188,7 +188,7 @@ class OnlineSessionRepositoryImpl @Inject constructor(
         remoteDataSource.confirmDefeat(sessionId, slotIndex, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
-                    log("repo_confirm_defeat_failed: slot=$slotIndex ${throwable.message}")
+                    log("repo_confirm_defeat_failed: slot=$slotIndex type=${throwable::class.simpleName}")
                     setCustomKey("online_session_slot_index", slotIndex)
                     setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
                     recordException(throwable)
@@ -199,7 +199,7 @@ class OnlineSessionRepositoryImpl @Inject constructor(
         remoteDataSource.revokeDefeat(sessionId, slotIndex, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
-                    log("repo_revoke_defeat_failed: slot=$slotIndex ${throwable.message}")
+                    log("repo_revoke_defeat_failed: slot=$slotIndex type=${throwable::class.simpleName}")
                     setCustomKey("online_session_slot_index", slotIndex)
                     setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
                     recordException(throwable)
@@ -210,7 +210,7 @@ class OnlineSessionRepositoryImpl @Inject constructor(
         remoteDataSource.setReady(sessionId, isReady, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
-                    log("repo_set_ready_failed: is_ready=$isReady ${throwable.message}")
+                    log("repo_set_ready_failed: is_ready=$isReady type=${throwable::class.simpleName}")
                     setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
                     recordException(throwable)
                 }
@@ -225,21 +225,24 @@ class OnlineSessionRepositoryImpl @Inject constructor(
     override suspend fun disconnectRealtime(sessionId: String) =
         realtimeClient.disconnect(sessionId)
 
-    override suspend fun broadcastLifeDelta(sessionId: String, slotIndex: Int, newLife: Int) =
+    override fun clearReplay(sessionId: String) =
+        realtimeClient.clearReplay(sessionId)
+
+    override suspend fun broadcastLifeDelta(sessionId: String, slotIndex: Int, newLife: Int): Boolean =
         realtimeClient.broadcastLifeDelta(sessionId, slotIndex, newLife)
 
-    override suspend fun broadcastPhaseChange(sessionId: String, newPhase: String, activePlayerSlot: Int, turnNumber: Int) =
+    override suspend fun broadcastPhaseChange(sessionId: String, newPhase: String, activePlayerSlot: Int, turnNumber: Int): Boolean =
         realtimeClient.broadcastPhaseChange(sessionId, newPhase, activePlayerSlot, turnNumber)
 
-    override suspend fun broadcastCounterUpdate(sessionId: String, slotIndex: Int, counterType: String, newValue: Int) =
+    override suspend fun broadcastCounterUpdate(sessionId: String, slotIndex: Int, counterType: String, newValue: Int): Boolean =
         realtimeClient.broadcastCounterUpdate(sessionId, slotIndex, counterType, newValue)
 
-    override suspend fun broadcastCommanderDamage(sessionId: String, targetSlot: Int, sourceSlot: Int, newDamage: Int) =
+    override suspend fun broadcastCommanderDamage(sessionId: String, targetSlot: Int, sourceSlot: Int, newDamage: Int): Boolean =
         realtimeClient.broadcastCommanderDamage(sessionId, targetSlot, sourceSlot, newDamage)
 
-    override suspend fun broadcastDefeatConfirmed(sessionId: String, slotIndex: Int) =
+    override suspend fun broadcastDefeatConfirmed(sessionId: String, slotIndex: Int): Boolean =
         realtimeClient.broadcastDefeatConfirmed(sessionId, slotIndex)
 
-    override suspend fun broadcastLandToggled(sessionId: String, slotIndex: Int, played: Boolean) =
+    override suspend fun broadcastLandToggled(sessionId: String, slotIndex: Int, played: Boolean): Boolean =
         realtimeClient.broadcastLandToggled(sessionId, slotIndex, played)
 }

@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.coloredShadow
+import com.mmg.manahub.core.ui.theme.onBrightSurface
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
@@ -447,7 +448,7 @@ private fun QuickActionCircle(
         Text(
             text = label,
             style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 10.sp),
-            color = tint.copy(alpha = 0.8f)
+            color = tint
         )
     }
 }
@@ -588,7 +589,7 @@ fun AnimatedCoin(
                 Icon(
                     painter = painterResource(R.drawable.ic_heads),
                     contentDescription = stringResource(R.string.game_tools_coin_heads_desc),
-                    tint = Color.Black.copy(alpha = 0.6f),
+                    tint = mc.onBrightSurface,
                     modifier = Modifier.size(44.dp),
                 )
             }
@@ -597,7 +598,7 @@ fun AnimatedCoin(
                 Icon(
                     painter = painterResource(R.drawable.ic_counter),
                     contentDescription = stringResource(R.string.game_tools_coin_tails_desc),
-                    tint = Color.Black.copy(alpha = 0.6f),
+                    tint = mc.onBrightSurface,
                     modifier = Modifier.size(44.dp),
                 )
             }

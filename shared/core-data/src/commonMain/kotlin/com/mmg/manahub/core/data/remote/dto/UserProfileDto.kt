@@ -17,6 +17,10 @@ data class UserProfileDto(
     @SerialName("avatar_url") val avatarUrl: String? = null,
     @SerialName("provider") val provider: String? = null,
     @SerialName("profile_completed") val profileCompleted: Boolean = false,
+    // Privacy flags are part of the public-column allowlist; null when the response omits them (RPCs)
+    @SerialName("collection_public") val collectionPublic: Boolean? = null,
+    @SerialName("wishlist_public") val wishlistPublic: Boolean? = null,
+    @SerialName("trade_list_public") val tradeListPublic: Boolean? = null,
 )
 
 /**

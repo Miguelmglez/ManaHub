@@ -74,13 +74,14 @@ class GameSetupViewModel(
         viewModelScope.launch {
             val profileName = userPreferencesDataStore.playerNameFlow.first()
             val defaultPlayerName = appContext.getString(R.string.game_setup_default_player_name)
-            val defaultNames = setOf(defaultPlayerName, "Wizard", "Player 1", "Jugador 1", "Spieler 1")
+            val defaultNames = setOf(defaultPlayerName, "Wizard", "Player 1")
             val isDefault   = profileName.isBlank() || profileName in defaultNames
             _uiState.update { state ->
                 val configs = state.playerConfigs.toMutableList()
                 if (configs.isNotEmpty()) {
                     configs[0] = configs[0].copy(
-                        name          = profileName,
+                        // Blank profile name would reach the game as "" and be renamed "Wizard 1" there
+                        name          = profileName.ifBlank { defaultPlayerName },
                         isAppUser     = true,
                         isDefaultName = isDefault,
                     )

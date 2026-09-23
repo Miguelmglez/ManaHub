@@ -131,6 +131,40 @@ class GameResultStripViewModelTest {
     }
 
     @Test
+    fun `given a second game in the same entry when observed then the previous outcome is replaced`() = runTest {
+        // The strip VM outlives one game inside a back-stack entry; a new id must not keep showing
+        // the previous game's XP.
+        val vm = buildViewModel()
+        vm.observe(sessionId = 42L)
+        advanceUntilIdle()
+        outcomes.emit(ProcessedOutcome(gameFinished(42L), outcome(50)))
+        advanceUntilIdle()
+        assertEquals(50, vm.outcome.value?.xpGranted)
+
+        vm.observe(sessionId = 43L)
+        advanceUntilIdle()
+        assertNull("A new session must clear the stale outcome", vm.outcome.value)
+
+        outcomes.emit(ProcessedOutcome(gameFinished(43L), outcome(11)))
+        advanceUntilIdle()
+        assertEquals(11, vm.outcome.value?.xpGranted)
+    }
+
+    @Test
+    fun `given the same sessionId observed twice then the collector is not restarted`() = runTest {
+        val vm = buildViewModel()
+        vm.observe(sessionId = 42L)
+        advanceUntilIdle()
+        outcomes.emit(ProcessedOutcome(gameFinished(42L), outcome(50)))
+        advanceUntilIdle()
+
+        vm.observe(sessionId = 42L)
+        advanceUntilIdle()
+
+        assertEquals(50, vm.outcome.value?.xpGranted)
+    }
+
+    @Test
     fun `given non-positive sessionId when observe then it is ignored`() = runTest {
         val vm = buildViewModel()
         vm.observe(sessionId = 0L)

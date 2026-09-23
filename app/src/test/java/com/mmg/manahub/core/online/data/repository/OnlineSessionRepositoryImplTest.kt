@@ -368,7 +368,7 @@ class OnlineSessionRepositoryImplTest {
         assertEquals(SESSION_ID, snapshot.session.id)
         assertEquals("COMMANDER", snapshot.session.gameMode)
         assertEquals(4, snapshot.session.playerCount)
-        assertEquals("UNTAP", snapshot.sessionState.currentPhase)
+        assertEquals("UNTAP", snapshot.sessionState?.currentPhase)
     }
 
     @Test

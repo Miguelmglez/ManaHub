@@ -13,7 +13,7 @@ data class SessionStateDto(
     @SerialName("current_phase")        val currentPhase: String,
     @SerialName("active_player_slot")   val activePlayerSlot: Int,
     @SerialName("turn_number")          val turnNumber: Int,
-    @SerialName("phase_stops_json")     val phaseStopsJson: JsonObject = JsonObject(emptyMap()),
+    @SerialName("phase_stops_json")     val phaseStopsJson: JsonObject? = null,
     @SerialName("last_dice_result")     val lastDiceResult: Int? = null,
     @SerialName("last_coin_result")     val lastCoinResult: String? = null,
     @SerialName("updated_at")           val updatedAt: String,
@@ -23,7 +23,7 @@ data class SessionStateDto(
         currentPhase    = currentPhase,
         activePlayerSlot = activePlayerSlot,
         turnNumber      = turnNumber,
-        phaseStops      = phaseStopsJson.entries.associate { (k, v) ->
+        phaseStops      = phaseStopsJson.orEmpty().entries.associate { (k, v) ->
             k to runCatching { v.jsonPrimitive.boolean }.getOrDefault(false)
         },
         lastDiceResult  = lastDiceResult,

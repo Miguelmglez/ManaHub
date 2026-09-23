@@ -25,6 +25,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -77,7 +78,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -96,6 +96,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -103,6 +104,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.runtime.key
+import com.mmg.manahub.core.ui.components.InlineErrorState
+import com.mmg.manahub.core.ui.theme.spacing
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.PlatformTextStyle
@@ -132,6 +141,8 @@ import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.coloredShadow
+import com.mmg.manahub.core.ui.theme.overlayScrim
+import com.mmg.manahub.core.ui.theme.overlayScrimSoft
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -187,6 +198,7 @@ fun GamePlayScreen(
             onSurvey = onSurvey,
             onTournamentClick = onTournamentClick,
             onResetGame = viewModel::resetGame,
+            onFinishGame = viewModel::finishGame,
             onAbandonGame = onAbandonGame,
             onExitGame = onExitGame,
             onLifeChange = viewModel::changeLife,
@@ -225,6 +237,7 @@ private fun GamePlayContent(
     onSurvey: (sessionId: Long) -> Unit,
     onTournamentClick: (() -> Unit)?,
     onResetGame: () -> Unit,
+    onFinishGame: () -> Unit,
     onAbandonGame: () -> Unit,
     onExitGame: () -> Unit,
     onLifeChange: (playerId: Int, delta: Int) -> Unit,
@@ -350,6 +363,10 @@ private fun GamePlayContent(
                     onConfirmDefeat(playerId)
                     confirmDefeatPlayerId = null
                 },
+                onStayAlive = {
+                    onRevokeDefeat(playerId)
+                    confirmDefeatPlayerId = null
+                },
                 onDismiss = { confirmDefeatPlayerId = null }
             )
         }
@@ -386,9 +403,34 @@ private fun GamePlayContent(
 
         }
 
+    if (uiState.isOnlineSessionAbandoned && uiState.winner == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(mc.overlayScrim),
+            contentAlignment = Alignment.Center,
+        ) {
+            InlineErrorState(
+                message = stringResource(R.string.game_online_session_abandoned),
+                retryLabel = stringResource(R.string.game_action_leave),
+                onRetry = {
+                    onFinishGame()
+                    onBackHome()
+                },
+                modifier = Modifier.padding(MaterialTheme.spacing.lg),
+            )
+        }
+    }
+
     uiState.winner?.let { winner ->
+        // System back must clear the finished game, never pop back into a stale "won" state
+        BackHandler {
+            onFinishGame()
+            onBackHome()
+        }
+        val resultTransition = remember { MutableTransitionState(false).apply { targetState = true } }
         AnimatedVisibility(
-            visible = true,
+            visibleState = resultTransition,
             enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { it / 3 },
         ) {
             uiState.gameResult?.let { result ->
@@ -713,10 +755,12 @@ private fun PlayerCard(
     val theme = player.theme
     val startingLife = gameMode.startingLife
 
+    // Ink derived from the slot's own fixed background, not the app theme: mc.textPrimary is
+    // ~1:1 on HallowedPrint's light player cards
     val lifeColor = when {
         player.life <= 0 -> mc.lifeNegative
         player.life > startingLife -> player.theme.accent
-        else -> mc.textPrimary
+        else -> player.theme.onBackground
     }
 
     BoxWithConstraints(
@@ -937,7 +981,7 @@ private fun PlayerCard(
                                     Icon(
                                         imageVector = Icons.Default.Add,
                                         contentDescription = null,
-                                        tint = theme.accent.copy(alpha = 0.5f),
+                                        tint = theme.accent,
                                         modifier = Modifier
                                             .size(iconSize * 0.9f)
                                             .clickable(
@@ -1001,7 +1045,7 @@ private fun PlayerCard(
                                     Icon(
                                         imageVector = Icons.Default.Remove,
                                         contentDescription = null,
-                                        tint = theme.accent.copy(alpha = 0.5f),
+                                        tint = theme.accent,
                                         modifier = Modifier
                                             .size(iconSize * 0.9f)
                                             .clickable(
@@ -1134,23 +1178,33 @@ private fun PlayerCard(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (gameMode == GameMode.COMMANDER) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_battle),
-                                contentDescription = stringResource(R.string.game_commander_damage_desc),
-                                tint = theme.accent,
+                            Box(
                                 modifier = Modifier
-                                    .size(actionSize)
-                                    .clickable { onCmdPanel() },
+                                    .minimumInteractiveComponentSize()
+                                    .clickable(role = Role.Button) { onCmdPanel() },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_battle),
+                                    contentDescription = stringResource(R.string.game_commander_damage_desc),
+                                    tint = theme.accent,
+                                    modifier = Modifier.size(actionSize),
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .clickable(role = Role.Button) { onCtrPanel() },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_counter),
+                                contentDescription = stringResource(R.string.game_counters_desc),
+                                tint = theme.accent,
+                                modifier = Modifier.size(actionSize),
                             )
                         }
-                        Icon(
-                            painter = painterResource(R.drawable.ic_counter),
-                            contentDescription = stringResource(R.string.game_counters_desc),
-                            tint = theme.accent,
-                            modifier = Modifier
-                                .size(actionSize)
-                                .clickable { onCtrPanel() },
-                        )
                     }
                 }
                 if (tier != CardTier.TINY) {
@@ -1179,7 +1233,9 @@ private fun PlayerCard(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.80f)),
+                        .background(mc.overlayScrim)
+                        // Consume taps so the life zones underneath cannot be hit through the overlay
+                        .pointerInput(Unit) { detectTapGestures { } },
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1328,7 +1384,8 @@ private fun EndTurnButton(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = if (tier == CardTier.TINY) "END" else stringResource(R.string.game_end_turn),
+                text = if (tier == CardTier.TINY) stringResource(R.string.game_end_turn_short)
+                       else stringResource(R.string.game_end_turn),
                 style = when(tier) {
                     CardTier.LARGE -> MaterialTheme.magicTypography.labelLarge
                     CardTier.SMALL -> MaterialTheme.magicTypography.labelMedium
@@ -1404,7 +1461,7 @@ private fun PlayerCounterChips(
                 Spacer(modifier = Modifier.width(3.dp))
                 Text(
                     text = "$value",
-                    color = mc.textPrimary,
+                    color = theme.onBackground,
                     style = (if (tier == CardTier.LARGE) mt.labelLarge else mt.labelSmall).copy(
                         platformStyle = PlatformTextStyle(includeFontPadding = false),
                         lineHeightStyle = LineHeightStyle(
@@ -1507,13 +1564,14 @@ private fun EliminatedOverlay(player: Player, mode: GameMode) {
             R.string.game_fallen_commander
         )
 
-        else -> null
+        else -> stringResource(R.string.survey_lose_conceded)
     }
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.72f)),
+            .background(mc.overlayScrimSoft)
+            .pointerInput(Unit) { detectTapGestures { } },
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -1526,14 +1584,12 @@ private fun EliminatedOverlay(player: Player, mode: GameMode) {
                 style = mt.displayMedium.copy(letterSpacing = 6.sp),
                 textAlign = TextAlign.Center,
             )
-            if (reason != null) {
-                Text(
-                    text = reason,
-                    color = Color.White.copy(alpha = 0.70f),
-                    style = mt.labelSmall,
-                    textAlign = TextAlign.Center,
-                )
-            }
+            Text(
+                text = reason,
+                color = player.theme.onBackgroundMuted,
+                style = mt.labelSmall,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
@@ -1554,7 +1610,6 @@ private fun CmdDamagePanel(
     val mt = MaterialTheme.magicTypography
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden }
     )
     
     ModalBottomSheet(
@@ -1601,7 +1656,7 @@ private fun CmdDamagePanel(
                 // Damage Dealt
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "Damage Dealt",
+                        stringResource(R.string.game_commander_damage_dealt),
                         style = mt.titleMedium,
                         color = mc.textSecondary,
                         modifier = Modifier.padding(horizontal = 4.dp)
@@ -1662,7 +1717,7 @@ private fun CmdDamagePanel(
                 // Damage Received
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "Damage Received",
+                        stringResource(R.string.game_commander_damage_received),
                         style = mt.titleMedium,
                         color = mc.textSecondary,
                         modifier = Modifier.padding(horizontal = 4.dp)
@@ -1752,7 +1807,6 @@ private fun CountersPanel(
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden }
     )
 
     ModalBottomSheet(
@@ -1843,7 +1897,7 @@ private fun CountersPanel(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        player.customCounters.forEachIndexed { index, counter ->
+                        player.customCounters.forEachIndexed { index, counter -> key(counter.id) {
                             if (index > 0) {
                                 HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
                             }
@@ -1882,7 +1936,7 @@ private fun CountersPanel(
                                 )
                             }
                         }
-                    }
+                    } }
                 }
             }
 
@@ -1910,13 +1964,16 @@ private fun CountersPanel(
                     ) {
                         // Dropdown logic for Icon Picker
                         Box {
+                            run {
+                            val counterIconPickerLabel = stringResource(R.string.game_counter_icon_picker)
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 color = mc.backgroundSecondary,
                                 border = BorderStroke(1.dp, theme.accent.copy(alpha = 0.4f)),
                                 modifier = Modifier
                                     .size(54.dp)
-                                    .clickable { isIconDropdownExpanded = true },
+                                    .clickable(role = Role.Button) { isIconDropdownExpanded = true }
+                                    .semantics { contentDescription = counterIconPickerLabel },
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     CounterIconView(
@@ -1931,6 +1988,7 @@ private fun CountersPanel(
                                         modifier = Modifier.align(Alignment.BottomEnd).size(14.dp).padding(2.dp)
                                     )
                                 }
+                            }
                             }
                             
                             androidx.compose.material3.DropdownMenu(
@@ -2089,12 +2147,18 @@ private fun CounterRow(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(theme.accent.copy(alpha = 0.15f))
-                .clickable(onClick = onDecrement),
+                .minimumInteractiveComponentSize()
+                .clickable(role = Role.Button, onClick = onDecrement),
         ) {
-            Text(stringResource(R.string.action_remove_symbol), style = MaterialTheme.magicTypography.titleLarge, color = theme.accent)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(theme.accent.copy(alpha = 0.15f)),
+            ) {
+                Text(stringResource(R.string.action_remove_symbol), style = MaterialTheme.magicTypography.titleLarge, color = theme.accent)
+            }
         }
         Text(
             value.toString(),
@@ -2106,12 +2170,18 @@ private fun CounterRow(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(theme.accent.copy(alpha = 0.15f))
-                .clickable(onClick = onIncrement),
+                .minimumInteractiveComponentSize()
+                .clickable(role = Role.Button, onClick = onIncrement),
         ) {
-            Text(stringResource(R.string.action_add_symbol), style = MaterialTheme.magicTypography.titleLarge, color = theme.accent)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(theme.accent.copy(alpha = 0.15f)),
+            ) {
+                Text(stringResource(R.string.action_add_symbol), style = MaterialTheme.magicTypography.titleLarge, color = theme.accent)
+            }
         }
     }
 }
@@ -2128,13 +2198,12 @@ private fun CounterRow(
 private fun ConfirmDefeatSheet(
     player: Player,
     onConfirm: () -> Unit,
+    onStayAlive: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    val sheetState = rememberModalBottomSheetState(
-        confirmValueChange = { it != SheetValue.Hidden }
-    )
+    val sheetState = rememberModalBottomSheetState()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -2189,7 +2258,7 @@ private fun ConfirmDefeatSheet(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     MagicCtaButton(
-                        onClick = onDismiss,
+                        onClick = onStayAlive,
                         text = stringResource(R.string.game_confirm_defeat_alive),
                         style = MagicCtaStyle.Outlined,
                         color = MagicCtaColor.Success,
@@ -2681,7 +2750,8 @@ private fun TurnOrderTab(
 ) {
     val mc = MaterialTheme.magicColors
     // Local draft of the order — initialized from current players list
-    var draftOrder by remember(players) { mutableStateOf(players.toList()) }
+    // Key on the id SET: a remote event rebuilding `players` must not discard an in-progress drag
+    var draftOrder by remember(players.map { it.id }) { mutableStateOf(players.toList()) }
 
     Column(
         modifier = Modifier
@@ -2695,7 +2765,7 @@ private fun TurnOrderTab(
             style = MaterialTheme.magicTypography.titleMedium,
             color = mc.textPrimary,
         )
-        draftOrder.forEachIndexed { index, player ->
+        draftOrder.forEachIndexed { index, player -> key(player.id) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -2727,7 +2797,7 @@ private fun TurnOrderTab(
                 ) {
                     Icon(
                         Icons.Default.ArrowUpward,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.game_turn_order_move_up),
                         tint = if (index > 0) mc.textPrimary else mc.textDisabled,
                         modifier = Modifier.size(18.dp),
                     )
@@ -2746,7 +2816,7 @@ private fun TurnOrderTab(
                 ) {
                     Icon(
                         Icons.Default.ArrowDownward,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.game_turn_order_move_down),
                         tint = if (index < draftOrder.lastIndex) mc.textPrimary else mc.textDisabled,
                         modifier = Modifier.size(18.dp),
                     )
@@ -2764,7 +2834,7 @@ private fun TurnOrderTab(
                 color = mc.background,
             )
         }
-    }
+    } }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -73,7 +75,7 @@ import org.koin.androidx.compose.koinViewModel
  * @param onDismiss Called when this sheet should close.
  * @param onCreateLocal Called when the user taps "Create local tournament".
  * @param onOpenTournament Called with the tournament ID when the user taps a recent tournament.
- * @param onNavigateToTournamentList Called when the user taps the fallback "View all" button.
+ * @param onNavigateToTournamentList Called when the user taps "View all tournaments".
  * @param onOnlineJoinGameStart Called when an online game successfully starts from this sheet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -84,7 +86,7 @@ fun TournamentsSheet(
     onDismiss: () -> Unit,
     onCreateLocal: () -> Unit,
     onOpenTournament: (Long) -> Unit,
-    onNavigateToTournamentList: () -> Unit = {},
+    onNavigateToTournamentList: () -> Unit,
     onOnlineJoinGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int, guestToken: String?) -> Unit,
     viewModel: TournamentListViewModel = koinViewModel(),
 ) {
@@ -197,18 +199,18 @@ fun TournamentsSheet(
                     )
                 }
 
-                if (tournaments.isNotEmpty()) {
+                val recent = tournaments.orEmpty()
+                if (recent.isNotEmpty()) {
                     // Intentionally capped at take(3): a bounded list inside a verticalScroll Column.
                     // Keep it bounded — nesting a LazyColumn in a scrollable Column would crash.
                     Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md)) {
-                        tournaments.take(3).forEach { tournament ->
+                        recent.take(3).forEach { tournament ->
                             Surface(
+                                onClick = { onOpenTournament(tournament.id) },
                                 color = mc.surface.copy(alpha = 0.5f),
                                 shape = CardShape,
-                                border = androidx.compose.foundation.BorderStroke(0.5.dp, mc.surfaceVariant),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onOpenTournament(tournament.id) },
+                                border = androidx.compose.foundation.BorderStroke(1.dp, mc.surfaceVariant),
+                                modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Row(
                                     modifier = Modifier.padding(
@@ -240,23 +242,15 @@ fun TournamentsSheet(
                             }
                         }
                     }
-                } else {
-                    OutlinedButton(
-                        onClick = onNavigateToTournamentList,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = mc.primaryAccent,
-                        ),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
-                        shape = ButtonShape,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.tournaments_sheet_view_all),
-                            style = ty.labelLarge,
-                            color = mc.primaryAccent,
-                        )
-                    }
                 }
+
+                // Always offered: the recent list is capped at 3, so the rest are only reachable here
+                MagicCtaButton(
+                    onClick = onNavigateToTournamentList,
+                    text = stringResource(R.string.tournaments_sheet_view_all),
+                    style = MagicCtaStyle.Outlined,
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
                 Spacer(Modifier.height(MaterialTheme.spacing.xl))
             }

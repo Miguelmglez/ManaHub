@@ -27,7 +27,7 @@ data class SessionParticipantDto(
         themeKey    = themeKey,
         isHost      = isHost,
         isReady     = isReady,
-        status      = runCatching { ParticipantStatus.valueOf(status) }.getOrDefault(ParticipantStatus.LEFT),
+        status      = parseStatusOrUnknown(status, ParticipantStatus.entries, ParticipantStatus.UNKNOWN, "online_participant_status_unknown"),
         lastSeenAt  = lastSeenAt,
     )
 }

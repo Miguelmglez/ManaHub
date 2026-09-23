@@ -80,6 +80,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.update.AppUpdateState
 import com.mmg.manahub.core.model.CollectionStats
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.components.MagicCtaButton
@@ -131,20 +132,7 @@ fun ProfileScreen(
 
     val context = LocalContext.current
     val activity = context as? androidx.activity.ComponentActivity
-    val appUpdateManager = remember { com.google.android.play.core.appupdate.AppUpdateManagerFactory.create(context) }
-    var updateAvailable by remember { mutableStateOf(false) }
-    var appUpdateInfo by remember { mutableStateOf<com.google.android.play.core.appupdate.AppUpdateInfo?>(null) }
-
-    LaunchedEffect(Unit) {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == com.google.android.play.core.install.model.UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(com.google.android.play.core.install.model.AppUpdateType.FLEXIBLE)
-            ) {
-                updateAvailable = true
-                appUpdateInfo = info
-            }
-        }
-    }
+    val appUpdateState by viewModel.appUpdateState.collectAsStateWithLifecycle()
 
     if (showProfileEdit) {
         ProfileEditSheet(
@@ -384,21 +372,10 @@ fun ProfileScreen(
                         sessionState = sessionState,
                         viewModel = viewModel,
                         contentPadding = bottomInset,
-                        updateAvailable = updateAvailable,
+                        appUpdateState = appUpdateState,
                         onFriendsClick = onFriendsClick,
                         onStatsClick = onStatsClick,
-                        onUpdateClick = {
-                            appUpdateInfo?.let { info ->
-                                activity?.let {
-                                    appUpdateManager.startUpdateFlowForResult(
-                                        info,
-                                        com.google.android.play.core.install.model.AppUpdateType.FLEXIBLE,
-                                        it,
-                                        500,
-                                    )
-                                }
-                            }
-                        },
+                        onUpdateClick = viewModel::onUpdateClick,
                         onRateClick = {
                             val reviewManager = com.google.android.play.core.review.ReviewManagerFactory.create(context)
                             val request = reviewManager.requestReviewFlow()
@@ -497,7 +474,7 @@ private fun OverviewTabContent(
     sessionState: SessionState,
     viewModel: ProfileViewModel,
     contentPadding: PaddingValues,
-    updateAvailable: Boolean,
+    appUpdateState: AppUpdateState,
     onFriendsClick: () -> Unit,
     onStatsClick: () -> Unit,
     onUpdateClick: () -> Unit,
@@ -548,9 +525,16 @@ private fun OverviewTabContent(
         }
 
         // ── App Update ────────────────────────────────────────────────────
-        if (updateAvailable) {
+        val updateRowLabel = when (appUpdateState) {
+            is AppUpdateState.Available -> "New app update available"
+            AppUpdateState.Downloading -> "Downloading update…"
+            AppUpdateState.Downloaded -> "Update ready — tap to restart"
+            AppUpdateState.None, is AppUpdateState.Forced -> null
+        }
+        if (updateRowLabel != null) {
             item {
                 AppUpdateRow(
+                    label = updateRowLabel,
                     onClick = onUpdateClick,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
@@ -1191,6 +1175,7 @@ private fun SendFeedbackRow(
 
 @Composable
 private fun AppUpdateRow(
+    label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1215,7 +1200,7 @@ private fun AppUpdateRow(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "New app update available",
+                text = label,
                 style = MaterialTheme.magicTypography.bodyMedium,
                 color = mc.textPrimary,
                 modifier = Modifier.weight(1f),

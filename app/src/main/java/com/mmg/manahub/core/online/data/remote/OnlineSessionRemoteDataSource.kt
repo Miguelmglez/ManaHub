@@ -17,6 +17,9 @@ import javax.inject.Singleton
 // Validates session join code matches backend format: 6 digits.
 private val SESSION_CODE_REGEX = Regex("^[0-9]{6}$")
 
+/** Server-side `display_name` limit; validated client-side so the RPC is never called with junk. */
+private const val MAX_DISPLAY_NAME_LENGTH = 32
+
 /**
  * Remote data source for online session RPCs.
  *
@@ -69,13 +72,17 @@ class OnlineSessionRemoteDataSource @Inject constructor(
         themeKey: String,
     ): Result<CreateSessionResponseDto> = withContext(ioDispatcher) {
         runCatching {
+            val sanitizedName = displayName.trim()
+            require(sanitizedName.isNotBlank() && sanitizedName.length <= MAX_DISPLAY_NAME_LENGTH) {
+                "Display name must be 1-$MAX_DISPLAY_NAME_LENGTH characters"
+            }
             supabaseClient.postgrest.rpc(
                 "create_online_session",
                 buildJsonObject {
                     put("p_mode", mode)
                     put("p_player_count", playerCount)
                     layoutKey?.let { put("p_layout_key", it) }
-                    put("p_display_name", displayName)
+                    put("p_display_name", sanitizedName)
                     put("p_theme_key", themeKey)
                 },
             ).decodeAs<CreateSessionResponseDto>()
@@ -91,12 +98,16 @@ class OnlineSessionRemoteDataSource @Inject constructor(
         runCatching {
             val sanitized = code.trim()
             require(SESSION_CODE_REGEX.matches(sanitized)) { "Invalid session code format" }
-            require(displayName.isNotBlank() && displayName.length <= 32) { "Display name must be 1–32 characters" }
+            // Validate the TRIMMED value: "   " passed the old check and reached the RPC as ""
+            val sanitizedName = displayName.trim()
+            require(sanitizedName.isNotBlank() && sanitizedName.length <= MAX_DISPLAY_NAME_LENGTH) {
+                "Display name must be 1-$MAX_DISPLAY_NAME_LENGTH characters"
+            }
             supabaseClient.postgrest.rpc(
                 "join_session",
                 buildJsonObject {
                     put("p_code", sanitized)
-                    put("p_display_name", displayName.trim())
+                    put("p_display_name", sanitizedName)
                     put("p_theme_key", themeKey)
                     guestToken?.let { put("p_guest_token", it) }
                 },

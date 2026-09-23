@@ -82,6 +82,7 @@ fun profileKoinModule(
             // depends on the bridged FriendRepository) — resolved here via get() since both
             // modules load together in ManaHubApp's single modules(...) call.
             shareInviteUseCase = get(),
+            appUpdateStatusProvider = get(),
         )
     }
 

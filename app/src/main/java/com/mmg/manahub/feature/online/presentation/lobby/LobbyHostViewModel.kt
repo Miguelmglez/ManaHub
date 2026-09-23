@@ -19,6 +19,7 @@ import com.mmg.manahub.core.online.domain.usecase.GetMyActiveSessionsUseCase
 import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.StartSessionUseCase
+import com.mmg.manahub.core.online.data.remote.SupabaseRealtimeClient
 import com.mmg.manahub.core.online.presentation.mapOnlineBackendError
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -178,7 +179,7 @@ class LobbyHostViewModel @Inject constructor(
             repository.setReady(sessionId, ready, guestToken).onFailure { throwable ->
                 crashlytics.log("online_session_host_ready_failed: type=${throwable::class.simpleName}")
                 crashlytics.recordException(throwable)
-                _uiState.update { it.copy(isHostReady = !ready, error = mapOnlineBackendError(appContext, throwable.message)) }
+                _uiState.update { it.copy(isHostReady = !ready, error = mapOnlineBackendError(appContext, throwable)) }
             }
         }
     }
@@ -226,7 +227,7 @@ class LobbyHostViewModel @Inject constructor(
                     crashlytics.log("online_session_rejoin_failed: type=${throwable::class.simpleName}")
                     crashlytics.setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
                     crashlytics.recordException(throwable)
-                    _uiState.update { it.copy(isLoading = false, error = mapOnlineBackendError(appContext, throwable.message)) }
+                    _uiState.update { it.copy(isLoading = false, error = mapOnlineBackendError(appContext, throwable)) }
                 },
             )
         }
@@ -252,7 +253,7 @@ class LobbyHostViewModel @Inject constructor(
                 onFailure = { throwable ->
                     crashlytics.log("online_session_abandon_failed: type=${throwable::class.simpleName}")
                     crashlytics.recordException(throwable)
-                    _uiState.update { it.copy(isLoading = false, error = mapOnlineBackendError(appContext, throwable.message)) }
+                    _uiState.update { it.copy(isLoading = false, error = mapOnlineBackendError(appContext, throwable)) }
                 },
             )
         }
@@ -314,7 +315,7 @@ class LobbyHostViewModel @Inject constructor(
                             crashlytics.log("online_session_host_ready_failed: type=${throwable::class.simpleName}")
                             crashlytics.recordException(throwable)
                             _uiState.update {
-                                it.copy(isHostReady = false, error = mapOnlineBackendError(appContext, throwable.message))
+                                it.copy(isHostReady = false, error = mapOnlineBackendError(appContext, throwable))
                             }
                         }
                 },
@@ -326,7 +327,7 @@ class LobbyHostViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            error = mapOnlineBackendError(appContext, throwable.message),
+                            error = mapOnlineBackendError(appContext, throwable),
                         )
                     }
                     if (isLimitReached) checkForExistingSession()
@@ -368,7 +369,7 @@ class LobbyHostViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            error = mapOnlineBackendError(appContext, throwable.message),
+                            error = mapOnlineBackendError(appContext, throwable),
                         )
                     }
                 },
@@ -516,9 +517,10 @@ class LobbyHostViewModel @Inject constructor(
         when (event) {
             is SessionEvent.ParticipantUpdated -> {
                 _uiState.update { state ->
+                    val incoming = event.participant.keepingKnownStatusFrom(state.participants)
                     val updated = state.participants
-                        .filterNot { it.id == event.participant.id }
-                        .plus(event.participant)
+                        .filterNot { it.id == incoming.id }
+                        .plus(incoming)
                         .filter { it.status != ParticipantStatus.LEFT }
                         .sortedBy { it.slotIndex }
                     val allReady = updated.isNotEmpty() && updated.all { it.isReady }
@@ -539,6 +541,8 @@ class LobbyHostViewModel @Inject constructor(
 
             is SessionEvent.Error -> {
                 crashlytics.log("online_session_event_error: host type=${event::class.simpleName}")
+                // A Realtime reset is recoverable and invisible to the user: polling keeps the lobby correct
+                if (event.message == SupabaseRealtimeClient.REALTIME_RESET) return
                 _uiState.update { it.copy(error = mapOnlineBackendError(appContext, event.message)) }
             }
 

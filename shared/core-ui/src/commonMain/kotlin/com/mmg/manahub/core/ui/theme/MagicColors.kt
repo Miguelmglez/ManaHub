@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  PlayerThemeColors — identity tokens for a single player slot
@@ -14,7 +15,28 @@ data class PlayerThemeColors(
     val background: Color,
     val glow:       Color,
     val name:       String,
-)
+) {
+    /**
+     * Ink for text drawn directly on [background].
+     *
+     * A player slot paints a FIXED per-slot background that does not follow the app theme, so
+     * `magicColors.textPrimary` is wrong there: on HallowedPrint (light theme, light player
+     * backgrounds) a light `textPrimary` on a light slot is ~1:1. Derived from the background's own
+     * luminance, so every current and future palette self-corrects.
+     */
+    val onBackground: Color
+        get() = if (background.luminance() > LIGHT_BACKGROUND_THRESHOLD) InkOnLight else InkOnDark
+
+    /** Secondary ink on [background] (labels, overlay captions). */
+    val onBackgroundMuted: Color
+        get() = onBackground.copy(alpha = 0.72f)
+
+    private companion object {
+        const val LIGHT_BACKGROUND_THRESHOLD = 0.5f
+        val InkOnLight = Color(0xFF14110C)
+        val InkOnDark = Color(0xFFF7F5F0)
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  MagicColors — full semantic token set
@@ -568,3 +590,20 @@ internal val OnyxNoirColors = MagicColors(
         PlayerThemeColors(Color(0xFF08080C), Color(0xFF030304), Color(0x66D8D8E0), "Void"),
     ),
 )
+
+/**
+ * Scrim for overlays drawn ON TOP of a player card or the game board.
+ *
+ * Deliberately NOT derived from the app theme: these overlays cover the fixed per-slot player
+ * background, so a light-theme scrim would wash out instead of dimming.
+ */
+val MagicColors.overlayScrim: Color get() = Color(0xFF000000).copy(alpha = 0.80f)
+
+/** Lighter variant of [overlayScrim] for a non-blocking "eliminated" veil. */
+val MagicColors.overlayScrimSoft: Color get() = Color(0xFF000000).copy(alpha = 0.72f)
+
+/** Ink for icons/text drawn on a bright accent-filled surface (dice/coin faces, badges). */
+val MagicColors.onBrightSurface: Color get() = Color(0xFF000000).copy(alpha = 0.60f)
+
+/** Hairline used to separate a swatch from an equally bright neighbour. */
+val MagicColors.swatchOutline: Color get() = textDisabled.copy(alpha = 0.60f)

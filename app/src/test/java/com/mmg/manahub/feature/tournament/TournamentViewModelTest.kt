@@ -166,7 +166,8 @@ class TournamentViewModelTest {
     }
 
     @Test
-    fun `given match with 2 players when buildPlayerConfigsForMatch then first config is app user`() = runTest {
+    fun `given match with 2 players when buildPlayerConfigsForMatch then no seat is the app user`() = runTest {
+        // ADR-001: tournaments have no local-seat concept, so no seat may pollute personal stats/XP
         val p1 = buildPlayer(id = 10L, name = "Alice")
         val p2 = buildPlayer(id = 20L, name = "Bob")
         val match = buildMatch(id = 100L, playerIds = "[10,20]")
@@ -175,8 +176,7 @@ class TournamentViewModelTest {
         advanceUntilIdle()
 
         val (_, configs) = vm.buildPlayerConfigsForMatch(100L)
-        assertTrue("First config must be isAppUser=true",   configs[0].isAppUser)
-        assertFalse("Second config must be isAppUser=false", configs[1].isAppUser)
+        assertTrue("No tournament seat may be isAppUser", configs.none { it.isAppUser })
     }
 
     @Test
@@ -476,7 +476,7 @@ class TournamentViewModelTest {
         advanceUntilIdle()
 
         var navigatedMatchId: Long? = null
-        vm.startNextMatch { navigatedMatchId = it }
+        vm.startNextMatch { navigatedMatchId = it; true }
         advanceUntilIdle()
 
         coVerify(exactly = 1) { repository.startMatch(55L) }
@@ -488,7 +488,7 @@ class TournamentViewModelTest {
         val vm = buildViewModel(matches = emptyList())
         advanceUntilIdle()
 
-        vm.startNextMatch { }
+        vm.startNextMatch { true }
         advanceUntilIdle()
 
         coVerify(exactly = 0) { repository.startMatch(any()) }
@@ -500,7 +500,7 @@ class TournamentViewModelTest {
         advanceUntilIdle()
 
         var navigated: Long? = null
-        vm.startMatch(77L) { navigated = it }
+        vm.startMatch(77L) { navigated = it; true }
         advanceUntilIdle()
 
         coVerify(exactly = 1) { repository.startMatch(77L) }
@@ -514,9 +514,9 @@ class TournamentViewModelTest {
         val vm = buildViewModel()
         advanceUntilIdle()
 
-        vm.startMatch(77L) { }
+        vm.startMatch(77L) { true }
         advanceUntilIdle()
-        vm.startMatch(88L) { }   // blocked — guard still set (no onGameNavigationConsumed yet)
+        vm.startMatch(88L) { true }   // blocked — guard still set (no onGameNavigationConsumed yet)
         advanceUntilIdle()
 
         coVerify(exactly = 1) { repository.startMatch(77L) }
@@ -528,14 +528,57 @@ class TournamentViewModelTest {
         val vm = buildViewModel()
         advanceUntilIdle()
 
-        vm.startMatch(77L) { }
+        vm.startMatch(77L) { true }
         advanceUntilIdle()
         vm.onGameNavigationConsumed()    // screen returned from the game
-        vm.startMatch(88L) { }
+        vm.startMatch(88L) { true }
         advanceUntilIdle()
 
         coVerify(exactly = 1) { repository.startMatch(77L) }
         coVerify(exactly = 1) { repository.startMatch(88L) }
+    }
+
+    @Test
+    fun `given navigation accepted when startMatch then guard stays set until consumed`() = runTest {
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        vm.startMatch(77L) { true }
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.isNavigatingToGame)
+
+        vm.onGameNavigationConsumed()
+        assertFalse(vm.uiState.value.isNavigatingToGame)
+    }
+
+    @Test
+    fun `given navigation declined when startMatch then guard is released without consumption`() = runTest {
+        // The nav layer declines (e.g. a different game is running and the user kept it): Start must
+        // work again immediately, without waiting for a screen resume that never comes.
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        vm.startMatch(77L) { false }
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isNavigatingToGame)
+
+        vm.startMatch(88L) { true }
+        advanceUntilIdle()
+        coVerify(exactly = 1) { repository.startMatch(88L) }
+    }
+
+    @Test
+    fun `given navigation declined when resumeMatch then guard is released`() = runTest {
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        vm.resumeMatch(77L) { false }
+        assertFalse(vm.uiState.value.isNavigatingToGame)
+
+        var resumed: Long? = null
+        vm.resumeMatch(77L) { resumed = it; true }
+        assertEquals(77L, resumed)
+        assertTrue(vm.uiState.value.isNavigatingToGame)
     }
 
     @Test

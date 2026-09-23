@@ -49,6 +49,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.online.domain.model.OnlineSessionStatus
 import com.mmg.manahub.core.ui.components.MagicToastHost
@@ -185,26 +188,13 @@ fun OnlineJoinSheet(
                             onThemeSelected = viewModel::onThemeChanged,
                         )
 
-                        Button(
+                        MagicCtaButton(
                             onClick = { viewModel.joinSession(onGameStart) },
+                            text = stringResource(R.string.lobby_join_button),
                             enabled = uiState.codeInput.length == 6 && !uiState.isLoading,
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = mc.primaryAccent,
-                                contentColor = mc.background,
-                                disabledContainerColor = mc.surfaceVariant,
-                                disabledContentColor = mc.textDisabled,
-                            ),
-                            shape = ButtonShape,
-                        ) {
-                            if (uiState.isLoading) {
-                                MagicLoadingSpinner(
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            } else {
-                                Text(text = stringResource(R.string.lobby_join_button), style = ty.labelLarge)
-                            }
-                        }
+                            isLoading = uiState.isLoading,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     } else {
                         // ── Waiting room ───────────────────────────────────────────
                         Text(
@@ -242,18 +232,14 @@ fun OnlineJoinSheet(
                         // inside the waiting room itself, and no way to un-ready either (the
                         // retired LobbyJoinScreen's ready-toggle was already dead — audit
                         // finding #6/#10).
-                        OutlinedButton(
+                        MagicCtaButton(
                             onClick = handleDismiss,
+                            text = stringResource(R.string.lobby_action_leave_room),
                             enabled = !uiState.isLoading && uiState.sessionStatus != OnlineSessionStatus.ACTIVE,
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = mc.textSecondary,
-                            ),
-                            border = BorderStroke(1.dp, mc.surfaceVariant),
-                            shape = ButtonShape,
-                        ) {
-                            Text(text = stringResource(R.string.lobby_action_leave_room), style = ty.labelLarge)
-                        }
+                            style = MagicCtaStyle.Outlined,
+                            color = MagicCtaColor.Neutral,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             }

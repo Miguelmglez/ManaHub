@@ -116,8 +116,10 @@ fun gameKoinModule(
     single { revokeDefeat }
     single { leaveSession }
     single { toggleLandPlayed }
-    single { nearbyRepository }
-    single { voiceCommandRecognizer }
+    // Interface types MUST be explicit: a bare single{} registers under the CONCRETE class and the
+    // consumer's interface-typed get() then fails at runtime (feedback_koin_single_concrete_type_mismatch)
+    single<NearbySessionRepository> { nearbyRepository }
+    single<VoiceCommandRecognizer> { voiceCommandRecognizer }
 
     // ── EvaluatePlayerEliminationUseCase: natively Koin-constructed (KMP migration batch 4; Hilt
     //    `GameModule` deleted). No ctor deps — game-only. ──

@@ -58,11 +58,11 @@ class GetDeckGameStatsUseCase(
 
     /**
      * Returns a cold [Flow] that emits a fresh [Result] whenever any of the
-     * underlying repository queries change for [deckId] or [playerName].
+     * underlying repository queries change for [deckId].
      */
-    operator fun invoke(deckId: String, playerName: String): Flow<Result> =
+    operator fun invoke(deckId: String): Flow<Result> =
         combine(
-            gameSessionRepository.observeSingleDeckStats(deckId, playerName),
+            gameSessionRepository.observeSingleDeckStats(deckId),
             gameSessionRepository.observeTopCardImpactsForDeck(deckId, TOP_CARDS_LIMIT),
             gameSessionRepository.observeWeakestCardImpactsForDeck(deckId, WEAK_CARDS_LIMIT),
             gameSessionRepository.observeSessionSummariesForDeck(deckId).map { it.take(RECENT_SESSIONS_LIMIT) },

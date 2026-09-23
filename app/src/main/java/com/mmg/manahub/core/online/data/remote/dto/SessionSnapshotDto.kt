@@ -14,16 +14,9 @@ data class SessionSnapshotDto(
 ) {
     fun toDomain() = SessionSnapshot(
         session      = session.toDomain(),
-        sessionState = sessionState?.toDomain() ?: SessionState(
-            sessionId        = session.id,
-            currentPhase     = "LOBBY",
-            activePlayerSlot = 0,
-            turnNumber       = 0,
-            phaseStops       = emptyMap(),
-            lastDiceResult   = null,
-            lastCoinResult   = null,
-            updatedAt        = "",
-        ),
+        // Null while the session is still in the lobby: "LOBBY" is not a GamePhase, and
+        // synthesising one forced every caller through getOrDefault(UNTAP)
+        sessionState = sessionState?.toDomain(),
         playerStates = playerStates.map { it.toDomain() },
         participants = participants.map { it.toDomain() },
     )

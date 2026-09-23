@@ -7,7 +7,7 @@ class UpdateLifeUseCase @Inject constructor(
     private val repository: OnlineSessionRepository,
 ) {
     // Sends optimistic broadcast immediately; RPC should be called after debounce.
-    suspend fun broadcast(sessionId: String, slotIndex: Int, newLife: Int) =
+    suspend fun broadcast(sessionId: String, slotIndex: Int, newLife: Int): Boolean =
         repository.broadcastLifeDelta(sessionId, slotIndex, newLife)
 
     suspend fun persist(sessionId: String, slotIndex: Int, newLife: Int, guestToken: String? = null): Result<Unit> =

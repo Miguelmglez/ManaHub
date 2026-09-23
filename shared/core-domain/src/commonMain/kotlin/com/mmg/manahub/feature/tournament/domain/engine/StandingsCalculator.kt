@@ -13,6 +13,12 @@ import kotlin.math.max
  *   2. OMW%    (Opponent Match Win %, floor 33%, bye opponents excluded)
  *   3. GW%     (Game Win %, floor 33%)
  *   4. OGW%    (Opponent Game Win %, floor 33%)
+ *   5. Head-to-head wins among the players still tied after 1-4
+ *   6. Seed (ascending) — terminal, so the order never depends on DB row order
+ *
+ * When more than one player survives criteria 1-5 at the top, each is flagged
+ * [TournamentStanding.isSharedFirst]: seed alone separated them, so the UI must present a tie
+ * rather than crowning `standings.first()`.
  *
  * Life totals are retained in the model for display but NOT used for sorting.
  * A draw is a finished match with winnerId == null (and status == "FINISHED").
@@ -72,14 +78,80 @@ object StandingsCalculator {
             )
         }
 
-        return standings
-            .sortedWith(
-                compareByDescending<TournamentStanding> { it.points }
-                    .thenByDescending { it.omwPercent }
-                    .thenByDescending { it.gwPercent }
-                    .thenByDescending { it.ogwPercent }
-            )
-            .mapIndexed { index, standing -> standing.copy(position = index + 1) }
+        val byDciCriteria = standings.sortedWith(
+            compareByDescending<TournamentStanding> { it.points }
+                .thenByDescending { it.omwPercent }
+                .thenByDescending { it.gwPercent }
+                .thenByDescending { it.ogwPercent }
+        )
+
+        // Players sharing all four DCI criteria form one tie group, resolved by head-to-head then seed
+        val tieGroups = mutableListOf<MutableList<TournamentStanding>>()
+        for (standing in byDciCriteria) {
+            val currentGroup = tieGroups.lastOrNull()
+            if (currentGroup != null && sharesDciCriteria(currentGroup.first(), standing)) {
+                currentGroup.add(standing)
+            } else {
+                tieGroups.add(mutableListOf(standing))
+            }
+        }
+
+        val sharedFirstIds = sharedFirstPlayerIds(tieGroups.firstOrNull().orEmpty(), finishedMatches)
+
+        return tieGroups
+            .flatMap { group -> resolveTieGroup(group, finishedMatches) }
+            .mapIndexed { index, standing ->
+                standing.copy(position = index + 1, isSharedFirst = standing.player.id in sharedFirstIds)
+            }
+    }
+
+    /** True when both standings are equal on every DCI criterion, i.e. they need a terminal tiebreak. */
+    private fun sharesDciCriteria(a: TournamentStanding, b: TournamentStanding): Boolean =
+        a.points == b.points &&
+            a.omwPercent == b.omwPercent &&
+            a.gwPercent == b.gwPercent &&
+            a.ogwPercent == b.ogwPercent
+
+    private fun resolveTieGroup(
+        group: List<TournamentStanding>,
+        finishedMatches: List<TournamentMatch>,
+    ): List<TournamentStanding> {
+        if (group.size == 1) return group
+        val headToHead = headToHeadWins(group.map { it.player.id }.toSet(), finishedMatches)
+        return group.sortedWith(
+            compareByDescending<TournamentStanding> { headToHead[it.player.id] ?: 0 }
+                .thenBy { it.player.seed }
+        )
+    }
+
+    /**
+     * Ids sharing first place: the top tie group's best head-to-head record held by more than one
+     * player. Returns an empty set whenever a single player is genuinely first.
+     */
+    private fun sharedFirstPlayerIds(
+        topGroup: List<TournamentStanding>,
+        finishedMatches: List<TournamentMatch>,
+    ): Set<Long> {
+        if (topGroup.size <= 1) return emptySet()
+        val headToHead = headToHeadWins(topGroup.map { it.player.id }.toSet(), finishedMatches)
+        val bestRecord = topGroup.maxOf { headToHead[it.player.id] ?: 0 }
+        val leaders = topGroup.filter { (headToHead[it.player.id] ?: 0) == bestRecord }.map { it.player.id }
+        return if (leaders.size > 1) leaders.toSet() else emptySet()
+    }
+
+    /** Wins counted ONLY in matches played between two members of [groupIds]; byes are excluded. */
+    private fun headToHeadWins(
+        groupIds: Set<Long>,
+        finishedMatches: List<TournamentMatch>,
+    ): Map<Long, Int> {
+        val wins = mutableMapOf<Long, Int>()
+        for (match in finishedMatches) {
+            val ids = parseIds(match.playerIds)
+            if (ids.size < 2 || !groupIds.containsAll(ids)) continue
+            val winnerId = match.winnerId ?: continue
+            wins[winnerId] = (wins[winnerId] ?: 0) + 1
+        }
+        return wins
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

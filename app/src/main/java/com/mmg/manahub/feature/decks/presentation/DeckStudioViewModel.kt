@@ -473,7 +473,7 @@ class DeckStudioViewModel(
             .distinctUntilChanged()
             .filterNotNull()
             .flatMapLatest { id ->
-                userPreferences.playerNameFlow.flatMapLatest { name -> getDeckGameStatsUseCase(id, name) }
+                getDeckGameStatsUseCase(id)
             }
             .stateIn(
                 scope = viewModelScope,

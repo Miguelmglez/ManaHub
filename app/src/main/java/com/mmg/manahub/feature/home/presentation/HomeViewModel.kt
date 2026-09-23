@@ -348,7 +348,7 @@ class HomeViewModel(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val performanceFlow: Flow<PerformanceDetails> = combine(
-        gameSessionRepository.observeAvgWinTurn(GLOBAL_SEAT).catch { emit(null) },
+        gameSessionRepository.observeAvgWinTurn().catch { emit(null) },
         gameSessionRepository.observeAvgLifeOnWin().catch { emit(null) },
         gameSessionRepository.observeAvgLifeOnLoss().catch { emit(null) },
         historyFlow,
@@ -2062,7 +2062,6 @@ class HomeViewModel(
         private const val LATEST_SETS_LIMIT = 8
         private const val WIN_SPARK_COUNT = 5
         private const val DAY_MS = 24L * 60L * 60L * 1000L
-        private const val GLOBAL_SEAT = "Wizard"
 
         /**
          * Scryfall query used to surface random cards in the Discover widget. A bare

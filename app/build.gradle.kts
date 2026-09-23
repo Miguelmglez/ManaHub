@@ -345,6 +345,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.messaging)
+    // Remote Config: kill switches + force-update policy (version from firebase-bom).
+    implementation(libs.firebase.config)
     implementation(libs.youtube.player)
 
     // Nearby Connections — peer-to-peer in-person game state sync

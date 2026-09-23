@@ -15,6 +15,7 @@ import com.mmg.manahub.core.online.domain.usecase.JoinSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
 import com.mmg.manahub.core.online.presentation.classifyOnlineJoinError
+import com.mmg.manahub.core.online.data.remote.SupabaseRealtimeClient
 import com.mmg.manahub.core.online.presentation.mapOnlineBackendError
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -227,7 +228,7 @@ class LobbyJoinViewModel @Inject constructor(
                     startLobbyPolling(sessionId, onGameStart)
                 },
                 onFailure = { throwable ->
-                    val errorToken = classifyOnlineJoinError(throwable.message)
+                    val errorToken = classifyOnlineJoinError(throwable)
                     crashlytics.log("online_session_join_failed: $errorToken")
                     crashlytics.setCustomKey("online_session_join_error", errorToken)
                     crashlytics.setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
@@ -235,7 +236,7 @@ class LobbyJoinViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            error = mapOnlineBackendError(appContext, throwable.message),
+                            error = mapOnlineBackendError(appContext, throwable),
                         )
                     }
                 },
@@ -263,7 +264,7 @@ class LobbyJoinViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isReady = !ready,
-                        error = mapOnlineBackendError(appContext, throwable.message),
+                        error = mapOnlineBackendError(appContext, throwable),
                     )
                 }
             }
@@ -408,9 +409,10 @@ class LobbyJoinViewModel @Inject constructor(
         when (event) {
             is SessionEvent.ParticipantUpdated -> {
                 _uiState.update { state ->
+                    val incoming = event.participant.keepingKnownStatusFrom(state.participants)
                     val updated = state.participants
-                        .filterNot { it.id == event.participant.id }
-                        .plus(event.participant)
+                        .filterNot { it.id == incoming.id }
+                        .plus(incoming)
                         .filter { it.status != ParticipantStatus.LEFT }
                         .sortedBy { it.slotIndex }
                     state.copy(
@@ -422,6 +424,8 @@ class LobbyJoinViewModel @Inject constructor(
 
             is SessionEvent.SessionStatusChanged -> {
                 crashlytics.log("online_session_status_changed: joiner ${event.status.name}")
+                // UNKNOWN is a value this build cannot parse: keep the previous status untouched
+                if (event.status == OnlineSessionStatus.UNKNOWN) return
                 // Capture the PREVIOUS status before updating state, and gate the ACTIVE branch
                 // on it — otherwise a poll-detected ACTIVE (which already fired onGameStart) can
                 // be immediately re-fired by a lagging Realtime CDC event for the same
@@ -442,6 +446,8 @@ class LobbyJoinViewModel @Inject constructor(
 
             is SessionEvent.Error -> {
                 crashlytics.log("online_session_event_error: joiner type=${event::class.simpleName}")
+                // A Realtime reset is recoverable and invisible to the user: polling keeps the lobby correct
+                if (event.message == SupabaseRealtimeClient.REALTIME_RESET) return
                 _uiState.update { it.copy(error = mapOnlineBackendError(appContext, event.message)) }
             }
 

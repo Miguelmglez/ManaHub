@@ -54,6 +54,8 @@ import com.mmg.manahub.core.model.PlaytestSetup
 import com.mmg.manahub.core.push.ForegroundScreenTracker
 import com.mmg.manahub.core.push.PushDeeplinkRouter
 import com.mmg.manahub.core.ui.components.FullErrorState
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicBottomBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
@@ -1392,30 +1394,62 @@ fun AppNavGraph(
                 // entry's CreationExtras (carrying the `tournamentId` nav arg) — the exact equivalent of
                 // the old hiltViewModel(entry).
                 val tournamentVm: TournamentViewModel = koinViewModel(viewModelStoreOwner = entry)
+                var conflictingMatch by remember { mutableStateOf<Pair<Long, Long>?>(null) }
+                val launchTournamentMatch: (Long, Long) -> Boolean = { matchId, tId ->
+                    val (playerIds, configs) = tournamentVm.buildPlayerConfigsForMatch(matchId)
+                    if (configs.isEmpty()) {
+                        false
+                    } else {
+                        val mode = tournamentVm.getGameMode()
+                        pendingPlayerConfigs = configs
+                        pendingLayout = LayoutTemplates.getDefaultLayout(configs.size)
+                        pendingGameSettings = GameSettings()
+                        pendingTournamentMatchId = matchId
+                        pendingTournamentId = tId
+                        pendingTournamentPlayers = playerIds
+                        pendingTournamentMode = mode
+                        navController.navigate(Screen.GamePlay.createRoute(mode.name, configs.size))
+                        true
+                    }
+                }
                 TournamentScreen(
                     tournamentId = tournamentId,
                     onNavigateBack = { navController.popBackStack() },
                     onStartMatch = { matchId, tId ->
-                        val (playerIds, configs) = tournamentVm.buildPlayerConfigsForMatch(matchId)
-                        if (configs.isNotEmpty()) {
-                            val mode = tournamentVm.getGameMode()
-                            val layout = LayoutTemplates.getDefaultLayout(configs.size)
-                            pendingPlayerConfigs = configs
-                            pendingLayout = layout
-                            pendingTournamentMatchId = matchId
-                            pendingTournamentId = tId
-                            pendingTournamentPlayers = playerIds
-                            pendingTournamentMode = mode
-                            navController.navigate(
-                                Screen.GamePlay.createRoute(
-                                    mode.name,
-                                    configs.size
-                                )
-                            )
+                        val running = gameUiState
+                        when {
+                            // Resume in place (same as the Play FAB): re-initialising would reset every life total
+                            running.isGameRunning && running.activeTournamentMatchId == matchId -> {
+                                navController.navigate(
+                                    Screen.GamePlay.createRoute(running.mode.name, running.players.size)
+                                ) { launchSingleTop = true }
+                                true
+                            }
+                            running.isGameRunning -> {
+                                conflictingMatch = matchId to tId
+                                false
+                            }
+                            else -> launchTournamentMatch(matchId, tId)
                         }
                     },
                     viewModel = tournamentVm,
                 )
+                conflictingMatch?.let { (matchId, tId) ->
+                    MagicAlertDialog(
+                        onDismissRequest = { conflictingMatch = null },
+                        title = stringResource(R.string.tournament_game_in_progress_title),
+                        text = stringResource(R.string.tournament_game_in_progress_body),
+                        confirmLabel = stringResource(R.string.tournament_game_in_progress_confirm),
+                        confirmColor = MagicCtaColor.Error,
+                        onConfirm = {
+                            conflictingMatch = null
+                            gameVm.finishGame()
+                            launchTournamentMatch(matchId, tId)
+                        },
+                        dismissLabel = stringResource(R.string.tournament_game_in_progress_cancel),
+                        onDismiss = { conflictingMatch = null },
+                    )
+                }
             }
 
             // ── Game flow ─────────────────────────────────────────────────────
@@ -1480,6 +1514,7 @@ fun AppNavGraph(
                     },
                     onNavigateToTournamentSetup = { navController.navigate(Screen.TournamentSetup.route) },
                     onNavigateToTournamentDetail = { id -> navController.navigate(Screen.TournamentDetail.route(id)) },
+                    onNavigateToTournamentList = { navController.navigate(Screen.TournamentList.route) },
                     prefilledJoinCode = joinCode,
                 )
             }
