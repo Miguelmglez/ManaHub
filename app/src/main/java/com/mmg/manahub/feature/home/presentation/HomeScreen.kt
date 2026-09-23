@@ -88,7 +88,6 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import org.koin.androidx.compose.koinViewModel
-import java.util.Calendar
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Home dashboard — fully customizable widget board.
@@ -176,6 +175,8 @@ fun HomeScreen(
                 HomeAction.RefreshRandomCard,
                 is HomeAction.SelectDiscoverSet,
                 is HomeAction.SelectCommunityDecksCategory,
+                is HomeAction.SelectCommunityDecksFormat,
+                HomeAction.RollRulesTip,
                 HomeAction.ResetNewsFilters,
                 -> viewModel.onAction(action)
                 // RateApp needs an Activity context to launch the store; resolve it upstream.
@@ -438,7 +439,8 @@ private fun HomeTopBar(
 }
 
 /** Milliseconds in a day — used to derive the deterministic daily greeting-variant index. */
-private const val GREETING_DAY_MS = 24L * 60L * 60L * 1000L
+private const val GREETING_HOUR_MS = 60L * 60L * 1000L
+private const val GREETING_DAY_MS = 24L * GREETING_HOUR_MS
 
 /** Morning band (05:00–11:59): 4 MTG-flavored variants (Home widget board overhaul, TASK 2). */
 private val MORNING_GREETINGS = intArrayOf(
@@ -484,7 +486,7 @@ private val SIGNED_OUT_GREETINGS = intArrayOf(
  *
  * Pure and non-`@Composable` on purpose (Home widget board overhaul, TASK 2) so it is unit
  * testable without Compose UI test infra — see `HomeScreenGreetingTest`. Selection is
- * DETERMINISTIC — seeded by [epochDay], mirroring [RulesTipWidget]'s `RULES_TIP_SHUFFLE_SEED`
+ * DETERMINISTIC — seeded by [epochDay], mirroring the Rules Tip daily order
  * pattern — so the greeting is stable across recompositions and within the same day, but varies
  * day to day. Never uses an unseeded `Random()` per call.
  */
@@ -506,12 +508,23 @@ internal fun resolveGreetingVariant(hour: Int, epochDay: Long, hasName: Boolean)
 /** Picks a time-of-day-appropriate, MTG-flavored greeting variant (Home widget board overhaul, TASK 2). */
 @Composable
 private fun greetingText(name: String?): String {
-    val epochDay = remember { System.currentTimeMillis() / GREETING_DAY_MS }
+    val (hour, epochDay) = remember {
+        localGreetingClock(System.currentTimeMillis(), java.util.TimeZone.getDefault())
+    }
     if (name.isNullOrBlank()) {
         return stringResource(resolveGreetingVariant(hour = 0, epochDay = epochDay, hasName = false))
     }
-    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
     return stringResource(resolveGreetingVariant(hour = hour, epochDay = epochDay, hasName = true), name)
+}
+
+/**
+ * The local hour (0..23) and local epoch day for [nowMs] in [timeZone], taken from ONE instant so
+ * the greeting's time band and its daily variant always agree on the same local day.
+ */
+internal fun localGreetingClock(nowMs: Long, timeZone: java.util.TimeZone): Pair<Int, Long> {
+    val localMs = nowMs + timeZone.getOffset(nowMs)
+    val hour = Math.floorMod(localMs / GREETING_HOUR_MS, 24L).toInt()
+    return hour to Math.floorDiv(localMs, GREETING_DAY_MS)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -494,6 +494,8 @@ fun AppNavGraph(
                                     is HomeAction.UpdateLayout,
                                     is HomeAction.SkipFirstStep,
                                     is HomeAction.SelectCommunityDecksCategory,
+                                    is HomeAction.SelectCommunityDecksFormat,
+                                    HomeAction.RollRulesTip,
                                     -> Unit
                                 }
                             },

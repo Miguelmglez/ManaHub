@@ -147,7 +147,6 @@ import com.mmg.manahub.core.util.TimeAgoFormatter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
-import kotlin.random.Random
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Home widget host + container + shared chrome
@@ -177,13 +176,6 @@ private val StatKpiValueSize = 32.sp
 /** Slightly taller line height for the Rules Tip body text (readability for multi-line tips
  * rendered through [OracleText], which can include inline mana-symbol icons). */
 private val RulesTipBodyLineHeight = 17.sp
-
-/**
- * Fixed seed for the Rules Tip catalog's daily-order shuffle (Home feature overhaul Phase 2.4).
- * A hardcoded, constant seed keeps the permutation stable across app restarts/recompositions and
- * identical for every user — only the epoch-day index into it changes.
- */
-private const val RULES_TIP_SHUFFLE_SEED = 20260713L
 
 /**
  * Minimal container for widgets. Removes the solid background box to let the
@@ -2810,9 +2802,13 @@ private fun SeeAllTile(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun LatestSetsWidget(sets: List<DraftSet>, onAction: (HomeAction) -> Unit) {
+private fun LatestSetsWidget(sets: List<DraftSet>?, onAction: (HomeAction) -> Unit) {
     val spacing = MaterialTheme.spacing
     WidgetShell(onClick = { onAction(HomeAction.OpenDraftGuide) }) {
+        if (sets == null) {
+            WidgetLoading()
+            return@WidgetShell
+        }
         if (sets.isEmpty()) {
             WidgetEmptyBody(stringResourceSafe(R.string.home_latest_sets_empty))
             return@WidgetShell
@@ -2932,8 +2928,8 @@ private fun RulesTipWidget() {
     // fixed-seed shuffle avoids long same-category streaks (the catalog is grouped by category)
     // while staying stable across recompositions and identical for every user on a given UTC day.
     // Cycle length = catalog size; today's index is the epoch-day modulus INTO the shuffled list.
-    val shuffledTips = remember { MTG_TIPS_CATALOG.shuffled(Random(RULES_TIP_SHUFFLE_SEED)) }
-    val tipIndex = remember(shuffledTips) { (System.currentTimeMillis() / 86_400_000L % shuffledTips.size).toInt() }
+    val shuffledTips = RULES_TIPS_DAILY_ORDER
+    val tipIndex = remember { dailyRulesTipIndex(System.currentTimeMillis()) }
     val pagerState = rememberPagerState(initialPage = tipIndex, pageCount = { shuffledTips.size })
 
     WidgetShell {

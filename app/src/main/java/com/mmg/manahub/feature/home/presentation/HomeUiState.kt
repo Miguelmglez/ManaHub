@@ -19,24 +19,25 @@ import com.mmg.manahub.core.model.news.NewsItem
  * offline with cached/local data.
  */
 data class HomeUiState(
-    val isLoading: Boolean = true,
+    /**
+     * True once the board can render: the persisted layout has been decoded AND the auth gate has
+     * resolved. Individual widgets may still be loading — see [HomeWidgetType.isReady].
+     */
+    val boardReady: Boolean = false,
+    /** The single auth source for the board; see [AuthGate]. */
+    val auth: AuthGate = AuthGate.Unknown,
     val hero: HomeHeroState = HomeHeroState.Welcome(steps = emptyList()),
     val quickStartActions: List<QuickStartAction> = QuickStartAction.defaults,
+    /** True once [quickStartActions] reflects the persisted choice rather than the defaults. */
+    val quickStartLoaded: Boolean = false,
     val libraryStats: LibraryStats? = null,
     /** Up to 3 latest news/video items. Null while the initial DB query is still pending. */
     val recentNews: List<NewsItem>? = null,
     /** True when the persisted news filters differ from the English-only default (drives the Reset CTA). */
     val newsFiltersActive: Boolean = false,
     val accountNudge: AccountNudge? = null,
-    val isAuthenticated: Boolean = false,
-    /**
-     * True once the FIRST real auth-session emission (Authenticated or Unauthenticated, never
-     * [com.mmg.manahub.core.domain.auth.SessionState.Loading]) has landed (Home widget board
-     * overhaul, TASK 7a). Account-gated widgets must render [isAuthenticated] as a definitive
-     * "signed out" state ONLY once this is true — otherwise a still-resolving session is
-     * mistaken for signed-out and the account-gated placeholder flashes before real content.
-     */
-    val authResolved: Boolean = false,
+    /** True once [accountNudge] is definitive (null then means "no nudge", not "not computed yet"). */
+    val accountNudgeResolved: Boolean = false,
     /** User's display name from DataStore. */
     val playerName: String? = null,
     /** User avatar URL from DataStore; null while not set. */
@@ -53,6 +54,8 @@ data class HomeUiState(
     val bestDeck: BestDeckStats? = null,
     val nemesis: NemesisStats? = null,
     val performanceDetails: PerformanceDetails? = null,
+    /** True once the game-stats slice (history, records, active tournament) has resolved. */
+    val gameStatsLoaded: Boolean = false,
     val collectionByColor: Map<String, Int> = emptyMap(),
     val collectionByRarity: Map<String, Int> = emptyMap(),
     val discoverCards: List<DiscoverCard> = emptyList(),
@@ -69,7 +72,8 @@ data class HomeUiState(
      * when unfiltered. Drives the set-icon + code affordance in the widget header.
      */
     val discoverSet: com.mmg.manahub.core.model.MagicSet? = null,
-    val latestSets: List<DraftSet> = emptyList(),
+    /** Newest draftable sets; null while loading. */
+    val latestSets: List<DraftSet>? = null,
     val wishlistStats: WishlistStats? = null,
     /**
      * All of the user's decks, newest-first. Drives the Your Decks shelf widget. Null until the
@@ -119,7 +123,18 @@ data class HomeUiState(
     val gamificationEnabled: Boolean = true,
     /** Level / XP / streak / quest summary for the Home gamification widgets; null until loaded. */
     val gamification: HomeGamification? = null,
-)
+    /** True once the gamification slice (toggle + snapshot) has resolved. */
+    val gamificationLoaded: Boolean = false,
+) {
+    /** True until [boardReady]; kept for callers that still branch on a board-level loading flag. */
+    val isLoading: Boolean get() = !boardReady
+
+    /** True for a real (non-anonymous) signed-in account. */
+    val isAuthenticated: Boolean get() = auth is AuthGate.SignedIn
+
+    /** True once the auth gate is no longer [AuthGate.Unknown]. */
+    val authResolved: Boolean get() = auth !is AuthGate.Unknown
+}
 
 /**
  * Compact gamification snapshot for the Home dashboard widgets (Phase 2).

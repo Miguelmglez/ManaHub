@@ -1,7 +1,19 @@
 ### Home dashboard (`feature/home/`)
 Free-first, account-enhanced start screen. Fully implemented (2026-06-08). Must-know:
 - **Start destination is `Screen.Home`** (not `Screen.Collection`). BottomBar is 3-slot: [Home] [⚔ FAB] [Library].
-- `HomeViewModel` uses `combine(8 flows).stateIn(WhileSubscribed(5_000))` — no new DB tables. `avatarUrlFlow` MUST be subscribed/mocked in tests (blocks `accountFlow` combine if missing).
+- **Loading contract (2026-09-23, Home audit H1):** every widget source is its own `StateFlow` whose
+  ONLY null is the `stateIn` initial value — never `onStart { emit(null) }` / `flow { emit(null) … }` in a
+  restartable upstream (a `WhileSubscribed` restart would flash loading on every return to Home).
+  Auth-dependent sources key off ONE `AuthGate` (Unknown/SignedOut/SignedIn(userId)) via
+  `userScopedFlow`, which reads null only until data lands for the CURRENT gate (user switch = loading,
+  resume = cached). Network one-shots (latest sets, trending, community decks, trade suggestions, daily
+  puzzle) live in VM-owned `OneShotCache`s with a max age, and only load while their widget is on the
+  board (ADR-005); the trades warm-up re-runs per newly signed-in user while TRADES_HUB is placed. The UI
+  renders per widget from `HomeViewModel.widgetReadiness` / `HomeWidgetType.isReady(state, extras)`, and
+  the board from `HomeUiState.boardReady` (layout decoded && auth resolved). Layout mutations are
+  transforms applied inside `UserPreferencesDataStore.updateHomeLayout`, serialized by a VM mutex.
+- `avatarUrlFlow` and every other prefs flow the VM reads MUST be stubbed in tests (a relaxed mock's
+  unstubbed Flow never emits, so that slice never resolves).
 - Quick Start: 4 shortcuts persisted in DataStore via `UserPreferencesDataStore.observeQuickStartActions()`; partial-restore pads with defaults rather than discarding valid entries.
 - Account nudge: 5-priority system (ACTION_REQUIRED > COLLECTION_MILESTONE ≥10 > DECK_MILESTONE ≥2 > GAME_MILESTONE ≥3 > SYNC_PENDING); 48h cooldown; ACTION_REQUIRED bypasses cooldown.
 - `onBackHome`: `popUpTo(0) { inclusive = true }` (not `popUpTo(Screen.Collection.route)`) to avoid back-stack corruption on fresh install.
@@ -29,19 +41,19 @@ content). Must-know:
   owns add/remove/reorder via its own local drag state, the board itself is static. Removing
   `WidgetSize` from `WidgetInstance`/`PersistedWidget` entirely (and making the decoder legacy-token
   tolerant) is DEFERRED — do this as its own tested pass, not bundled into a larger change.
-- **ViewModel combine arity**: slices are bundled (`CoreSnapshot` 7 flows, `DataBundle{layout,stats,
-  discover,social,gamification,recentlyAdded}` 6 flows) via the vararg-destructure `combine(vararg){
-  args -> @Suppress("UNCHECKED_CAST") ... }` pattern once a bundle exceeds 5 flows (Kotlin's typed
-  combine overloads cap at 5); inner sub-bundles (`socialSnapshotFlow`'s `TradesSnapshot`/
-  `SocialExtras`) stay on the typed non-vararg overloads. `performanceFlow` MUST be declared before
-  `statsSnapshotFlow` (property init order). Every data flow is `.catch{emit(empty/null)}`-isolated
-  so one source failing never collapses the board.
+- **ViewModel combine shape**: every input of the `uiState` combine is a `StateFlow` (never a cold
+  flow that can block the combine until it first emits), bundled into typed ≤5-arity combines
+  (`CoreSnapshot`, `GameStatsBundle`, `TradesSnapshot`, `SocialSnapshot`, `DataBundle`). Properties
+  are initialised top-down and the `init` block sits after every property: with
+  `Dispatchers.Main.immediate` its launches run during construction. Every source is
+  `.catch{}`-isolated (reporting `home_flow_<source>`) so one failure never collapses the board.
 - **Every data source is real** (2026-07-13 overhaul, Phase 1); Trades Hub wired to
   `TradesRepository`/`OpenForTradeRepository`/`TradeSuggestionsRepository`; `friendCount` wired to
   `FriendRepository.observeFriendCount()`; tournament round wired to a read-only
-  `TournamentRepository.observeCurrentRound()`. Account-gated widgets gate on
-  `HomeUiState.authResolved` FIRST (never flash the placeholder while the session is still
-  `SessionState.Loading`), then `AccountGatedPlaceholder` (→ `CreateAccount`) when `!isAuthenticated`.
+  `TournamentRepository.observeCurrentRound()`. Account-gated widgets render nothing definitive while
+  `HomeUiState.auth` is `AuthGate.Unknown`, then `AccountGatedPlaceholder` (→ `CreateAccount`) when
+  signed out. `AuthRepositoryImpl` keeps a session Authenticated through `SessionStatus.RefreshFailure`
+  (only `NotAuthenticated` signs out), so a resume with no network never flips the board to signed out.
   `CommunityStatsRepositoryImpl`/`ArchidektTrendingRepository` are DORMANT Koin registrations since the
   2026-07-18 widget board overhaul (see below) — Home no longer consumes either.
 - `HomeWidgetHost` dispatches type→composable; `HomeWidgetContainer` just wraps it (no bounds

@@ -34,10 +34,13 @@ import com.mmg.manahub.core.model.PersistedWidget
 import com.mmg.manahub.core.model.QuickStartAction
 import com.mmg.manahub.core.model.WidgetSize
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.transformLatest
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -96,6 +99,7 @@ private val KEY_FIRST_STEPS_SKIPPED = stringPreferencesKey("home_first_steps_ski
 private val KEY_FIRST_STEPS_COMPLETION_SEEN = booleanPreferencesKey("home_first_steps_completion_seen")
 /** Persisted category selection for the Home COMMUNITY_DECKS widget (Home widget board overhaul, TASK 5b). */
 private val KEY_HOME_COMMUNITY_DECKS_CATEGORY = stringPreferencesKey("home_community_decks_category")
+private val KEY_HOME_COMMUNITY_DECKS_FORMAT = stringPreferencesKey("home_community_decks_format")
 
 // ── Password-recovery marker (password-recovery-hardening-plan-2026-08-18, §3.1) ──────────
 //
@@ -396,9 +400,8 @@ class UserPreferencesDataStore @Inject constructor(
 
     // ── Avatar URL ────────────────────────────────────────────────────────────
 
-    val avatarUrlFlow: Flow<String?> = context.userPrefsDataStore.data
+    val avatarUrlFlow: Flow<String?> = safeData
         .map { it[AVATAR_URL_KEY] }
-        .catch { emit(null) }
 
     suspend fun saveAvatarUrl(url: String?) {
         context.userPrefsDataStore.edit { preferences ->
@@ -657,9 +660,8 @@ class UserPreferencesDataStore @Inject constructor(
      * progress silently so re-enabling restores the user's true state (ADR-002 §"opt-out
      * first-class"). To restore the feature, flip the default back to true / emit(true).
      */
-    val gamificationEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
+    val gamificationEnabledFlow: Flow<Boolean> = safeData
         .map { prefs -> prefs[KEY_GAMIFICATION_ENABLED] ?: false }
-        .catch { emit(false) }
 
     /** Persists the master gamification switch. */
     suspend fun setGamificationEnabled(enabled: Boolean) {
@@ -676,9 +678,8 @@ class UserPreferencesDataStore @Inject constructor(
      * result while this is off, same pattern as `CommunityAggregateRepositoryImpl`. To enable,
      * flip the default to true / emit(true).
      */
-    val competitiveEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
+    val competitiveEnabledFlow: Flow<Boolean> = safeData
         .map { prefs -> prefs[KEY_COMPETITIVE_ENABLED] ?: false }
-        .catch { emit(false) }
 
     /** Persists the master Competitive feature switch. */
     suspend fun setCompetitiveEnabled(enabled: Boolean) {
@@ -911,7 +912,7 @@ class UserPreferencesDataStore @Inject constructor(
      * is padded with items from [QuickStartAction.defaults] (in defaults order, skipping
      * duplicates) so the grid always shows exactly 4 shortcuts. */
     fun observeQuickStartActions(): Flow<List<QuickStartAction>> =
-        context.userPrefsDataStore.data
+        safeData
             .map { prefs ->
                 val raw = prefs[KEY_QUICK_START_ORDER]
                 val parsed = raw
@@ -919,6 +920,8 @@ class UserPreferencesDataStore @Inject constructor(
                     ?.map { it.trim() }
                     ?.filter { it.isNotEmpty() }
                     ?.mapNotNull { QuickStartAction.fromPersistedId(it) }
+                    // A corrupt/legacy string could repeat an id, which would also collide on the grid's stable key.
+                    ?.distinct()
                     ?: emptyList()
                 if (parsed.size >= 4) {
                     parsed
@@ -931,7 +934,6 @@ class UserPreferencesDataStore @Inject constructor(
                     result
                 }
             }
-            .catch { emit(QuickStartAction.defaults) }
 
     /** Persists the chosen Quick Start actions as an ordered persistedId string. */
     suspend fun saveQuickStartActions(actions: List<QuickStartAction>) {
@@ -949,14 +951,24 @@ class UserPreferencesDataStore @Inject constructor(
         }
     }
 
-    /** Emits true while the account nudge is still within its 48-hour cooldown. */
+    /**
+     * Emits true while the account nudge is still within its 48-hour cooldown, and flips to false
+     * by itself when the cooldown elapses (not only on the next preference write).
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun isNudgeCoolingDown(): Flow<Boolean> =
-        context.userPrefsDataStore.data
-            .map { prefs ->
-                val dismissedAt = prefs[KEY_ACCOUNT_NUDGE_DISMISSED_AT] ?: 0L
-                System.currentTimeMillis() - dismissedAt < ACCOUNT_NUDGE_COOLDOWN_MS
+        safeData
+            .map { prefs -> prefs[KEY_ACCOUNT_NUDGE_DISMISSED_AT] ?: 0L }
+            .distinctUntilChanged()
+            .transformLatest { dismissedAt ->
+                val remainingMs = ACCOUNT_NUDGE_COOLDOWN_MS - (System.currentTimeMillis() - dismissedAt)
+                if (remainingMs > 0) {
+                    emit(true)
+                    delay(remainingMs)
+                }
+                emit(false)
             }
-            .catch { emit(false) }
+            .distinctUntilChanged()
 
     // ── Home widget layout ────────────────────────────────────────────────────
     //
@@ -979,32 +991,50 @@ class UserPreferencesDataStore @Inject constructor(
      *  this DataStore stays unaware of which default applies.
      */
     fun homeLayoutFlow(defaultLayout: List<PersistedWidget>): Flow<List<PersistedWidget>> =
-        context.userPrefsDataStore.data
-            .map { prefs ->
-                val raw = prefs[KEY_HOME_LAYOUT]
-                val parsed = raw
-                    ?.split(",")
-                    ?.mapNotNull { token -> decodeWidgetToken(token) }
-                    ?: emptyList()
-                // Deduplicate by persistedId: a corrupt stored string could produce two
-                // widgets with the same key, crashing the LazyVerticalGrid.
-                parsed.distinctBy { it.persistedId }.ifEmpty { defaultLayout.distinctBy { it.persistedId } }
-            }
-            .catch { emit(defaultLayout) }
+        safeData.map { prefs -> decodeHomeLayout(prefs[KEY_HOME_LAYOUT], defaultLayout) }
 
     /** Persists [layout] as an ordered "persistedId:SIZE_NAME" token string. */
     suspend fun saveHomeLayout(layout: List<PersistedWidget>) {
         context.userPrefsDataStore.edit { prefs ->
-            prefs[KEY_HOME_LAYOUT] = layout.joinToString(",") { widget ->
-                "${widget.persistedId}:${widget.size.name}"
-            }
+            prefs[KEY_HOME_LAYOUT] = encodeHomeLayout(layout)
         }
     }
 
+    /**
+     * Atomically rewrites the persisted layout from its CURRENT stored value: [transform] runs
+     * inside the DataStore edit on the decoded layout (or [defaultLayout] when nothing is stored),
+     * so two rapid mutations can never both start from the same stale snapshot and lose one.
+     */
+    suspend fun updateHomeLayout(
+        defaultLayout: List<PersistedWidget>,
+        transform: (List<PersistedWidget>) -> List<PersistedWidget>,
+    ) {
+        context.userPrefsDataStore.edit { prefs ->
+            val current = decodeHomeLayout(prefs[KEY_HOME_LAYOUT], defaultLayout)
+            val updated = transform(current).distinctBy { it.persistedId }
+            if (updated != current) prefs[KEY_HOME_LAYOUT] = encodeHomeLayout(updated)
+        }
+    }
+
+    private fun decodeHomeLayout(
+        raw: String?,
+        defaultLayout: List<PersistedWidget>,
+    ): List<PersistedWidget> {
+        val parsed = raw
+            ?.split(",")
+            ?.mapNotNull { token -> decodeWidgetToken(token) }
+            ?: emptyList()
+        // A corrupt stored string could produce two widgets with the same key, crashing the grid.
+        return parsed.distinctBy { it.persistedId }
+            .ifEmpty { defaultLayout.distinctBy { it.persistedId } }
+    }
+
+    private fun encodeHomeLayout(layout: List<PersistedWidget>): String =
+        layout.joinToString(",") { widget -> "${widget.persistedId}:${widget.size.name}" }
+
     /** Emits whether the customization coach-mark has already been shown. */
-    val homeCoachmarkSeenFlow: Flow<Boolean> = context.userPrefsDataStore.data
+    val homeCoachmarkSeenFlow: Flow<Boolean> = safeData
         .map { it[KEY_HOME_COACHMARK_SEEN] ?: false }
-        .catch { emit(false) }
 
     /** Marks the customization coach-mark as seen so it never shows again. */
     suspend fun markHomeCoachmarkSeen() {
@@ -1015,9 +1045,8 @@ class UserPreferencesDataStore @Inject constructor(
      * Emits whether the First Steps "You're all set!" completion card has already been shown
      * once (Home widget board overhaul, TASK 3).
      */
-    val firstStepsCompletionSeenFlow: Flow<Boolean> = context.userPrefsDataStore.data
+    val firstStepsCompletionSeenFlow: Flow<Boolean> = safeData
         .map { it[KEY_FIRST_STEPS_COMPLETION_SEEN] ?: false }
-        .catch { emit(false) }
 
     /** Marks the First Steps completion card as seen so it stops occupying the hero slot. */
     suspend fun markFirstStepsCompletionSeen() {
@@ -1029,13 +1058,28 @@ class UserPreferencesDataStore @Inject constructor(
      * never chosen (the caller defaults to [com.mmg.manahub.feature.home.presentation
      * .HomeCommunityDeckCategory.POPULAR]).
      */
-    val homeCommunityDecksCategoryFlow: Flow<String?> = context.userPrefsDataStore.data
+    val homeCommunityDecksCategoryFlow: Flow<String?> = safeData
         .map { it[KEY_HOME_COMMUNITY_DECKS_CATEGORY] }
-        .catch { emit(null) }
 
     /** Persists [categoryId] (a [com.mmg.manahub.feature.home.presentation.HomeCommunityDeckCategory.persistedId]). */
     suspend fun saveHomeCommunityDecksCategory(categoryId: String) {
         context.userPrefsDataStore.edit { it[KEY_HOME_COMMUNITY_DECKS_CATEGORY] = categoryId }
+    }
+
+    /**
+     * Emits the persisted format filter of the Home COMMUNITY_DECKS widget as the enum name of
+     * `CommunityDeckFormatFilter`, or null when never chosen / cleared (= every format). The caller
+     * resolves unknown names to that same default.
+     */
+    val homeCommunityDecksFormatFlow: Flow<String?> = safeData
+        .map { it[KEY_HOME_COMMUNITY_DECKS_FORMAT] }
+
+    /** Persists [formatName] (a `CommunityDeckFormatFilter` enum name); null clears the filter. */
+    suspend fun saveHomeCommunityDecksFormat(formatName: String?) {
+        context.userPrefsDataStore.edit { prefs ->
+            if (formatName == null) prefs.remove(KEY_HOME_COMMUNITY_DECKS_FORMAT)
+            else prefs[KEY_HOME_COMMUNITY_DECKS_FORMAT] = formatName
+        }
     }
 
     /**
@@ -1063,7 +1107,7 @@ class UserPreferencesDataStore @Inject constructor(
      * carousel. An empty set means no steps have been skipped yet.
      */
     fun observeSkippedFirstSteps(): Flow<Set<String>> =
-        context.userPrefsDataStore.data
+        safeData
             .map { prefs ->
                 prefs[KEY_FIRST_STEPS_SKIPPED]
                     ?.split(",")
@@ -1071,7 +1115,6 @@ class UserPreferencesDataStore @Inject constructor(
                     ?.toSet()
                     ?: emptySet()
             }
-            .catch { emit(emptySet()) }
 
     /**
      * Persists [stepId] as skipped. Idempotent: adding an already-present id is a no-op.
