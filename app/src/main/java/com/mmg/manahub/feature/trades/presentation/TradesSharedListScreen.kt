@@ -185,7 +185,7 @@ private fun SharedListRows(
                 priceUsd = if (row.item.isFoil == true) card?.priceUsdFoil ?: card?.priceUsd else card?.priceUsd,
                 priceEur = if (row.item.isFoil == true) card?.priceEurFoil ?: card?.priceEur else card?.priceEur,
                 onClick = { onCardClick(row.item.cardId) },
-                quantityText = "×${row.item.quantity}",
+                quantityText = stringResource(R.string.trades_quantity_multiplier, row.item.quantity),
                 hasFoil = row.item.isFoil == true,
                 condition = if (row.item.matchAnyVariant) anyVariant else row.item.condition,
                 language = row.item.language,

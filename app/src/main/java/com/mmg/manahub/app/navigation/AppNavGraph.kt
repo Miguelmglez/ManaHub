@@ -539,6 +539,9 @@ fun AppNavGraph(
                                     Screen.TradeNegotiationDetail.createRoute(proposalId, rootProposalId)
                                 )
                             },
+                            onNavigateToAddFriends = {
+                                navController.navigate(Screen.FriendsList.route)
+                            },
                             onBrowseCommunityDecks = {
                                 navController.navigate(Screen.CommunityDecks.route)
                             },

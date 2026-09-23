@@ -150,6 +150,7 @@ fun CollectionScreen(
     onBrowseCommunityDecks:   () -> Unit = {},
     onNavigateToTradeProposal: (receiverId: String?) -> Unit = {},
     onNavigateToTradeThread:   (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
+    onNavigateToAddFriends:    () -> Unit = {},
     viewModel:                CollectionViewModel = koinViewModel(),
     advancedSearchViewModel:  AdvancedSearchViewModel = koinViewModel(),
     importViewModel:          CollectionImportViewModel = koinViewModel(),
@@ -215,6 +216,7 @@ fun CollectionScreen(
         onSnackbarDismissed        = viewModel::onSnackbarDismissed,
         onNavigateToTradeProposal  = onNavigateToTradeProposal,
         onNavigateToTradeThread    = onNavigateToTradeThread,
+        onNavigateToAddFriends     = onNavigateToAddFriends,
         gridState                  = viewModel.gridState,
         listState                  = viewModel.listState,
         sharedTransitionScope      = sharedTransitionScope,
@@ -314,6 +316,7 @@ private fun CollectionContent(
     onSnackbarDismissed:  () -> Unit,
     onNavigateToTradeProposal: (String?) -> Unit = {},
     onNavigateToTradeThread:   (String, String) -> Unit = { _, _ -> },
+    onNavigateToAddFriends:    () -> Unit = {},
     gridState:            LazyGridState,
     listState:            LazyListState,
     sharedTransitionScope:    SharedTransitionScope? = null,
@@ -430,6 +433,7 @@ private fun CollectionContent(
                         onCardClick           = { onCardClick(it, null) },
                         onNavigateToProposal  = onNavigateToTradeProposal,
                         onNavigateToThread    = onNavigateToTradeThread,
+                        onNavigateToAddFriends = onNavigateToAddFriends,
                     )
                 }
             }
