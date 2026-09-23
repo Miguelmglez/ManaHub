@@ -233,7 +233,6 @@ fun HomeScreen(
             competitiveEnabled = competitiveEnabled,
             onAddWidget = { type -> viewModel.onAction(HomeAction.AddWidget(type)) },
             onRemoveWidget = { type -> viewModel.onAction(HomeAction.RemoveWidget(type)) },
-            onMoveWidget = { from, to -> viewModel.onAction(HomeAction.MoveWidget(from, to)) },
             onUpdateLayout = { layout -> viewModel.onAction(HomeAction.UpdateLayout(layout)) },
             onCreateAccount = {
                 showGallerySheet = false

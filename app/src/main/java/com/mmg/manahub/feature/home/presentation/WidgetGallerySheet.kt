@@ -1,7 +1,10 @@
 package com.mmg.manahub.feature.home.presentation
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,7 +19,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -37,46 +42,63 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.mmg.manahub.R
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.core.ui.components.MagicCtaButton
-import com.mmg.manahub.core.ui.theme.ButtonShape
-import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.core.FeatureFlags
-import com.mmg.manahub.core.ui.theme.SmallCardShape
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /**
- * Unified catalog for managing the dashboard layout.
+ * Unified catalog for managing the dashboard layout: widgets grouped by category, with add/remove
+ * per row, long-press drag to reorder rows within a category or whole categories, and "Move up" /
+ * "Move down" accessibility actions for both.
  *
- * This version integrates reordering directly into the category-grouped list,
- * removing the separate "Current Layout" section. Reordering happens at two
- * levels: entire categories can be moved, and items can be moved within or
- * between categories.
+ * The sheet edits ONE optimistic working copy of the layout synchronously (so a row never vanishes
+ * for a frame) and commits each change to the ViewModel, which serializes the writes. An incoming
+ * layout replaces the working copy only when it differs and no commit of ours is still in flight.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,7 +109,6 @@ fun WidgetGallerySheet(
     competitiveEnabled: Boolean,
     onAddWidget: (HomeWidgetType) -> Unit,
     onRemoveWidget: (HomeWidgetType) -> Unit,
-    onMoveWidget: (from: Int, to: Int) -> Unit,
     onUpdateLayout: (List<WidgetInstance>) -> Unit,
     onCreateAccount: () -> Unit,
     onDismiss: () -> Unit,
@@ -95,63 +116,24 @@ fun WidgetGallerySheet(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
-    
+    val gapPx = with(LocalDensity.current) { spacing.sm.toPx() }
+
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val editor = remember { GalleryEditor(currentLayout, listState, scope) }
+    editor.isVisible = { type -> isGalleryVisible(type, gamificationEnabled, competitiveEnabled) }
+    editor.onAddWidget = onAddWidget
+    editor.onRemoveWidget = onRemoveWidget
+    editor.onUpdateLayout = onUpdateLayout
+
+    LaunchedEffect(currentLayout) { editor.onIncomingLayout(currentLayout) }
+
+    // Back and the scrim close the sheet unless a drag is in progress.
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden }
+        confirmValueChange = { it != SheetValue.Hidden || !editor.gestureActive },
     )
-
-    // Derive the initial category order from the current layout.
-    val initialCategories = remember(currentLayout) {
-        val inOrder = currentLayout.map { it.type.category }.distinct()
-        val others = WidgetCategory.entries.filter { it !in inOrder }
-        inOrder + others
-    }
-
-    val localCategoryOrder = remember { mutableStateListOf<WidgetCategory>() }
-    LaunchedEffect(initialCategories) {
-        if (localCategoryOrder.isEmpty()) {
-            localCategoryOrder.addAll(initialCategories.distinct())
-        } else {
-            // Defensive: ensure any new categories added to the app are picked up,
-            // but never introduce duplicates.
-            val current = localCategoryOrder.toSet()
-            val missing = initialCategories.filter { it !in current }
-            if (missing.isNotEmpty()) {
-                localCategoryOrder.addAll(missing)
-            }
-        }
-    }
-
-    var draggedId by remember { mutableStateOf<String?>(null) }
-    var draggedCategory by remember { mutableStateOf<WidgetCategory?>(null) }
-    var dragAccumY by remember { mutableStateOf(0f) }
-
-    // Local working copy of the layout, mutated in place during an item drag so each threshold
-    // crossing is a cheap in-memory swap (NOT a DataStore write). We commit to the source of truth
-    // via onUpdateLayout only on drag END, avoiding mid-drag re-emission/recomposition that breaks
-    // multi-position drags.
-    val localLayout = remember { mutableStateListOf<WidgetInstance>() }
-    LaunchedEffect(currentLayout) {
-        // Sync from source-of-truth only when NOT actively dragging an item.
-        if (draggedId == null) {
-            localLayout.clear()
-            // Defensive: ensure we don't pick up duplicates from the source of truth
-            // if a race condition occurs in the ViewModel's state emission.
-            localLayout.addAll(currentLayout.distinctBy { it.type.persistedId })
-        }
-    }
-
-    val rowHeightPx = with(density) { (72.dp + spacing.sm).toPx() }
-    val categoryHeaderHeightPx = with(density) { (40.dp + spacing.md).toPx() }
-
-    // No remember(key) — localLayout is snapshot state, so Compose tracks reads here automatically.
-    // Recomputing map{}.toSet() over a ~15-item list each recomposition is trivial.
-    // Use currentLayout (source of truth) for added status to ensure UI responsiveness 
-    // when adding/removing, as localLayout is primarily for drag reordering.
-    val addedTypes = remember(currentLayout) { currentLayout.map { it.type }.toSet() }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -168,19 +150,18 @@ fun WidgetGallerySheet(
                 .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
-            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(
                     onClick = onDismiss,
-                    modifier = Modifier.offset(x = (-12).dp)
+                    modifier = Modifier.offset(x = -spacing.md),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = stringResource(R.string.action_cancel),
-                        tint = mc.textSecondary
+                        tint = mc.textSecondary,
                     )
                 }
                 Text(
@@ -191,217 +172,402 @@ fun WidgetGallerySheet(
                 )
             }
 
+            val visibleCategories = editor.visibleCategories()
             LazyColumn(
+                state = listState,
                 contentPadding = PaddingValues(vertical = spacing.xs),
                 verticalArrangement = Arrangement.spacedBy(spacing.sm),
                 modifier = Modifier.weight(1f, fill = false),
             ) {
-                localCategoryOrder.forEach { category ->
-                    // Order the gallery rows by the live working copy (localLayout), not enum
-                    // declaration order, so a within-category drag (which mutates localLayout in place)
-                    // is reflected visibly without a DataStore round-trip. ADDED widgets come first in
-                    // their layout order, followed by NOT-ADDED widgets in enum order.
-                    // Hidden for release — see docs/gamification-hidden-for-release.md.
-                    // When gamification is off, omit its widget types from the gallery entirely
-                    // (instead of showing them as greyed/disabled rows).
-                    // Same treatment for the Daily Puzzle (docs/hidden-features/daily-puzzle.md):
-                    // DAILY_PUZZLE is gallery-only/opt-in to begin with (never in a default layout),
-                    // so omitting it here is the sole gate its "add" door needs.
-                    // Same treatment for the Competitive feature (Phase 5): COMPETITIVE is gallery-
-                    // only/opt-in to begin with (never in a default layout), gated by the runtime
-                    // `competitiveEnabledFlow` DataStore flag rather than a compile-time constant —
-                    // see HomeWidgetType.COMPETITIVE's KDoc.
-                    val addedInOrder = localLayout
-                        .filter { it.type.category == category }
-                        .map { it.type }
-                        .filter { gamificationEnabled || !it.isGamification }
-                        .filter { FeatureFlags.Puzzle.PUZZLE_ENABLED || it != HomeWidgetType.DAILY_PUZZLE }
-                        .filter { competitiveEnabled || it != HomeWidgetType.COMPETITIVE }
-                        .distinct()
+                visibleCategories.forEach { category ->
+                    val rows = editor.rows(category)
+                    val blockLifted = editor.draggedCategory == category
+                    val blockDragging = blockLifted && editor.gestureActive
 
-                    val notAdded = HomeWidgetType.entries
-                        .filter { it.category == category }
-                        .filter { gamificationEnabled || !it.isGamification }
-                        .filter { FeatureFlags.Puzzle.PUZZLE_ENABLED || it != HomeWidgetType.DAILY_PUZZLE }
-                        .filter { competitiveEnabled || it != HomeWidgetType.COMPETITIVE }
-                        .filter { it !in addedTypes }
-
-                    val widgets = (addedInOrder + notAdded).distinctBy { it.persistedId }
-                    // Skip categories with no visible widget types (e.g. TOURNAMENT / COMMUNITY have
-                    // no types assigned, and gamification-only categories vanish when the toggle is off)
-                    // so we never render an orphaned header.
-                    if (widgets.isEmpty()) return@forEach
-                    val isDraggingCategory = draggedCategory == category
-                    
-                    val categoryZIndex = if (isDraggingCategory) 10f else 1f
-                    
-                    item(key = "header_${category.name}") {
+                    item(key = galleryHeaderKey(category)) {
                         CategoryHeader(
                             category = category,
+                            canMoveUp = galleryCategoryNeighbor(category, GalleryMoveDirection.UP, visibleCategories) != null,
+                            canMoveDown = galleryCategoryNeighbor(category, GalleryMoveDirection.DOWN, visibleCategories) != null,
+                            onMove = { direction -> editor.stepCategory(category, direction) },
                             modifier = Modifier
-                                .then(if (isDraggingCategory) Modifier else Modifier.animateItem())
-                                .zIndex(categoryZIndex)
-                                .graphicsLayer {
-                                    translationY = if (isDraggingCategory) dragAccumY else 0f
-                                },
+                                .animateItem(placementSpec = if (blockDragging) null else GalleryPlacementSpec)
+                                .zIndex(if (blockLifted) LIFTED_Z else RESTING_Z)
+                                .graphicsLayer { translationY = if (blockLifted) editor.dragOffset else 0f },
                             dragHandleModifier = if (category != WidgetCategory.ACTIVITY) {
-                                Modifier.pointerInput(category.name) {
+                                Modifier.pointerInput(category) {
                                     detectDragGesturesAfterLongPress(
                                         onDragStart = {
-                                            draggedCategory = category
-                                            draggedId = null
-                                            dragAccumY = 0f
+                                            editor.startCategoryDrag(category)
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         },
                                         onDrag = { change, amount ->
                                             change.consume()
-                                            dragAccumY += amount.y
-                                            
-                                            val currentIdx = localCategoryOrder.indexOf(category)
-                                            val blockHeight = categoryHeaderHeightPx + (widgets.size * rowHeightPx)
-                                            
-                                            if (dragAccumY <= -blockHeight && currentIdx > 1) {
-                                                val to = currentIdx - 1
-                                                localCategoryOrder.add(to, localCategoryOrder.removeAt(currentIdx))
-                                                val newLayout = localLayout.sortedBy { localCategoryOrder.indexOf(it.type.category) }
-                                                onUpdateLayout(newLayout)
-                                                dragAccumY += blockHeight
-                                            } else if (dragAccumY >= blockHeight && currentIdx < localCategoryOrder.lastIndex) {
-                                                val to = currentIdx + 1
-                                                localCategoryOrder.add(to, localCategoryOrder.removeAt(currentIdx))
-                                                val newLayout = localLayout.sortedBy { localCategoryOrder.indexOf(it.type.category) }
-                                                onUpdateLayout(newLayout)
-                                                dragAccumY -= blockHeight
+                                            if (editor.dragCategory(category, amount.y, gapPx)) {
+                                                haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                                             }
                                         },
-                                        onDragEnd = { draggedCategory = null; dragAccumY = 0f },
-                                        onDragCancel = { draggedCategory = null; dragAccumY = 0f },
+                                        onDragEnd = { editor.endCategoryDrag(commit = true) },
+                                        onDragCancel = { editor.endCategoryDrag(commit = false) },
                                     )
                                 }
-                            } else Modifier
+                            } else {
+                                Modifier
+                            },
                         )
                     }
 
-                    items(widgets, key = { "gallery_${it.persistedId}" }) { type ->
-                        val isAdded = type in addedTypes
+                    items(rows, key = ::galleryRowKey) { type ->
+                        val isAdded = type in editor.placedTypes
                         val isFixed = type.isAlwaysPresent
-                        val isDraggingItem = draggedId == type.persistedId
-                        val isDraggingInBlock = isDraggingCategory
+                        val draggable = isAdded && !isFixed && category != WidgetCategory.ACTIVITY
+                        val rowLifted = editor.draggedType == type || blockLifted
+                        val rowDragging = rowLifted && editor.gestureActive
 
                         CatalogRow(
                             type = type,
                             isAdded = isAdded,
                             isFixed = isFixed,
                             isLocked = type.audience == WidgetAudience.ACCOUNT_GATED && !isAuthenticated,
-                            isGamificationDisabled = type.isGamification && !gamificationEnabled,
-                            isDragging = isDraggingItem || isDraggingInBlock,
+                            isDragging = rowDragging,
+                            canMoveUp = draggable && editor.canStepWidget(type, GalleryMoveDirection.UP),
+                            canMoveDown = draggable && editor.canStepWidget(type, GalleryMoveDirection.DOWN),
+                            onMove = { direction -> editor.stepWidget(type, direction) },
                             modifier = Modifier
-                                .then(if (isDraggingItem || isDraggingInBlock) Modifier else Modifier.animateItem())
-                                .zIndex(if (isDraggingItem) 11f else (if (draggedCategory == category) 10f else 1f))
-                                .graphicsLayer {
-                                    translationY = if (isDraggingItem || isDraggingInBlock) dragAccumY else 0f
-                                },
-                            onAdd = { onAddWidget(type) },
-                            onRemove = { onRemoveWidget(type) },
+                                .animateItem(placementSpec = if (rowDragging) null else GalleryPlacementSpec)
+                                .zIndex(
+                                    when {
+                                        editor.draggedType == type -> LIFTED_ROW_Z
+                                        blockLifted -> LIFTED_Z
+                                        else -> RESTING_Z
+                                    },
+                                )
+                                .graphicsLayer { translationY = if (rowLifted) editor.dragOffset else 0f },
+                            onAdd = { editor.add(type) },
+                            onRemove = { editor.remove(type) },
                             onUnlock = onCreateAccount,
-                            dragHandleModifier = if (isAdded && !isFixed && category != WidgetCategory.ACTIVITY) {
-                                Modifier.pointerInput(type.persistedId) {
+                            dragHandleModifier = if (draggable) {
+                                Modifier.pointerInput(type) {
                                     detectDragGesturesAfterLongPress(
                                         onDragStart = {
-                                            draggedId = type.persistedId
-                                            draggedCategory = null
-                                            dragAccumY = 0f
+                                            editor.startWidgetDrag(type)
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         },
                                         onDrag = { change, amount ->
                                             change.consume()
-                                            dragAccumY += amount.y
-
-                                            val currentIdx = localLayout.indexOfFirst { it.type == type }
-                                            if (currentIdx != -1) {
-                                                // Items may ONLY be reordered WITHIN their own category run:
-                                                // a move is rejected if the neighbour it would swap with belongs
-                                                // to a different category (that keeps the category-grouped
-                                                // invariant the ViewModel relies on).
-                                                // The swap is LOCAL (in-memory) — committed to the source of
-                                                // truth only on drag end (see onDragEnd).
-                                                if (dragAccumY <= -rowHeightPx && currentIdx > 0) {
-                                                    val target = currentIdx - 1
-                                                    if (localLayout[target].type.category == category) {
-                                                        val item = localLayout.removeAt(currentIdx)
-                                                        localLayout.add(target, item)
-                                                    }
-                                                    dragAccumY += rowHeightPx
-                                                } else if (dragAccumY >= rowHeightPx && currentIdx < localLayout.lastIndex) {
-                                                    val target = currentIdx + 1
-                                                    if (localLayout[target].type.category == category) {
-                                                        val item = localLayout.removeAt(currentIdx)
-                                                        localLayout.add(target, item)
-                                                    }
-                                                    dragAccumY -= rowHeightPx
-                                                }
+                                            if (editor.dragWidget(type, amount.y, gapPx)) {
+                                                haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                                             }
                                         },
-                                        onDragEnd = {
-                                            // Commit the reordered working copy once.
-                                            onUpdateLayout(localLayout.toList())
-                                            draggedId = null
-                                            dragAccumY = 0f
-                                        },
-                                        onDragCancel = {
-                                            // Revert the working copy to the source of truth.
-                                            localLayout.clear()
-                                            localLayout.addAll(currentLayout)
-                                            draggedId = null
-                                            dragAccumY = 0f
-                                        },
+                                        onDragEnd = { editor.endWidgetDrag(commit = true) },
+                                        onDragCancel = { editor.endWidgetDrag(commit = false) },
                                     )
                                 }
-                            } else Modifier
+                            } else {
+                                Modifier
+                            },
                         )
                     }
                 }
             }
 
-            // Footer
             MagicCtaButton(
                 onClick = onDismiss,
                 text = stringResource(R.string.home_widget_gallery_done),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Working-copy editor
+// ─────────────────────────────────────────────────────────────────────────────
+
+private val GalleryPlacementSpec = spring(
+    stiffness = Spring.StiffnessMediumLow,
+    visibilityThreshold = IntOffset.VisibilityThreshold,
+)
+
+private const val RESTING_Z = 1f
+private const val LIFTED_Z = 10f
+private const val LIFTED_ROW_Z = 11f
+
+private const val GALLERY_ROW_KEY_PREFIX = "gallery_"
+private const val GALLERY_HEADER_KEY_PREFIX = "header_"
+
+private fun galleryRowKey(type: HomeWidgetType): String = GALLERY_ROW_KEY_PREFIX + type.persistedId
+
+private fun galleryHeaderKey(category: WidgetCategory): String = GALLERY_HEADER_KEY_PREFIX + category.name
+
+/** Whether [type] is offered in the gallery at all under the current feature flags. */
+private fun isGalleryVisible(type: HomeWidgetType, gamificationEnabled: Boolean, competitiveEnabled: Boolean): Boolean =
+    (gamificationEnabled || !type.isGamification) &&
+        (FeatureFlags.Puzzle.PUZZLE_ENABLED || type != HomeWidgetType.DAILY_PUZZLE) &&
+        (competitiveEnabled || type != HomeWidgetType.COMPETITIVE)
+
+/**
+ * Holds the sheet's optimistic layout, the gallery category order and the drag state. Every
+ * mutation keeps the first visible row at the same index and offset, so adding, removing or
+ * reordering never scrolls the list under the user's finger.
+ */
+@Stable
+private class GalleryEditor(
+    initialLayout: List<WidgetInstance>,
+    private val listState: LazyListState,
+    private val scope: CoroutineScope,
+) {
+    val working = mutableStateListOf<WidgetInstance>().apply {
+        addAll(initialLayout.distinctBy { it.type.persistedId })
+    }
+    val categoryOrder = mutableStateListOf<WidgetCategory>().apply {
+        addAll(reconcileGalleryCategoryOrder(emptyList(), working))
+    }
+    val placedTypes: Set<HomeWidgetType> by derivedStateOf { working.mapTo(HashSet()) { it.type } }
+
+    var draggedType by mutableStateOf<HomeWidgetType?>(null)
+        private set
+    var draggedCategory by mutableStateOf<WidgetCategory?>(null)
+        private set
+    var gestureActive by mutableStateOf(false)
+        private set
+    var dragOffset by mutableFloatStateOf(0f)
+        private set
+
+    var isVisible: (HomeWidgetType) -> Boolean = { true }
+    var onAddWidget: (HomeWidgetType) -> Unit = {}
+    var onRemoveWidget: (HomeWidgetType) -> Unit = {}
+    var onUpdateLayout: (List<WidgetInstance>) -> Unit = {}
+
+    // The last layout we committed whose echo has not come back yet; older echoes are ignored.
+    private var pendingLayout: List<WidgetInstance>? = null
+    private var layoutBeforeDrag: List<WidgetInstance> = emptyList()
+    private var orderBeforeDrag: List<WidgetCategory> = emptyList()
+    private var settleJob: Job? = null
+
+    fun rows(category: WidgetCategory): List<HomeWidgetType> = galleryRowsFor(category, working, isVisible)
+
+    fun visibleCategories(): List<WidgetCategory> = categoryOrder.filter { rows(it).isNotEmpty() }
+
+    fun canStepWidget(type: HomeWidgetType, direction: GalleryMoveDirection): Boolean =
+        working.galleryStepNeighbor(type, direction, isVisible) != null
+
+    /** Adopts a layout emitted by the ViewModel unless it is an echo of an older commit of ours. */
+    fun onIncomingLayout(layout: List<WidgetInstance>) {
+        val incoming = layout.distinctBy { it.type.persistedId }
+        val pending = pendingLayout
+        if (pending != null) {
+            if (incoming == pending) pendingLayout = null
+            return
+        }
+        if (gestureActive || incoming == working.toList()) return
+        anchored { replaceWorking(incoming) }
+    }
+
+    fun add(type: HomeWidgetType) {
+        val next = working.withWidgetAdded(type)
+        if (next.size == working.size) return
+        anchored { replaceWorking(next) }
+        pendingLayout = next
+        onAddWidget(type)
+    }
+
+    fun remove(type: HomeWidgetType) {
+        if (type.isAlwaysPresent) return
+        val next = working.filterNot { it.type == type }
+        if (next.size == working.size) return
+        anchored { replaceWorking(next) }
+        pendingLayout = next
+        onRemoveWidget(type)
+    }
+
+    /** One-step move (accessibility action); commits immediately. */
+    fun stepWidget(type: HomeWidgetType, direction: GalleryMoveDirection): Boolean {
+        val next = working.withWidgetStepped(type, direction, isVisible) ?: return false
+        anchored { replaceWorking(next) }
+        commit(next)
+        return true
+    }
+
+    /** One-step category move (accessibility action); commits immediately. */
+    fun stepCategory(category: WidgetCategory, direction: GalleryMoveDirection): Boolean {
+        val order = categoryOrder.withCategoryStepped(category, direction, visibleCategories()) ?: return false
+        anchored {
+            categoryOrder.setAll(order)
+            replaceWorking(working.sortedByCategoryOrder(order))
+        }
+        commit(working.toList())
+        return true
+    }
+
+    fun startWidgetDrag(type: HomeWidgetType) {
+        beginGesture()
+        draggedType = type
+    }
+
+    /** Applies a drag delta; returns true when the row swapped with a neighbour. */
+    fun dragWidget(type: HomeWidgetType, deltaY: Float, gapPx: Float): Boolean {
+        if (draggedType != type || !gestureActive) return false
+        dragOffset += deltaY
+        val direction = if (dragOffset > 0f) GalleryMoveDirection.DOWN else GalleryMoveDirection.UP
+        val neighbor = working.galleryStepNeighbor(type, direction, isVisible) ?: return false
+        val neighborSize = itemSizePx(galleryRowKey(neighbor)) ?: itemSizePx(galleryRowKey(type)) ?: return false
+        val stepPx = neighborSize + gapPx
+        if (abs(dragOffset) < stepPx / 2f) return false
+        val next = working.withWidgetStepped(type, direction, isVisible) ?: return false
+        anchored { replaceWorking(next) }
+        dragOffset -= direction.step * stepPx
+        return true
+    }
+
+    fun endWidgetDrag(commit: Boolean) {
+        if (!gestureActive) return
+        if (!commit) {
+            anchored { replaceWorking(layoutBeforeDrag) }
+        } else if (working.toList() != layoutBeforeDrag) {
+            commit(working.toList())
+        }
+        settle()
+    }
+
+    fun startCategoryDrag(category: WidgetCategory) {
+        beginGesture()
+        draggedCategory = category
+    }
+
+    /** Applies a drag delta to a whole category block; returns true when it swapped with a neighbour. */
+    fun dragCategory(category: WidgetCategory, deltaY: Float, gapPx: Float): Boolean {
+        if (draggedCategory != category || !gestureActive) return false
+        dragOffset += deltaY
+        val direction = if (dragOffset > 0f) GalleryMoveDirection.DOWN else GalleryMoveDirection.UP
+        val visible = visibleCategories()
+        val neighbor = galleryCategoryNeighbor(category, direction, visible) ?: return false
+        val stepPx = blockHeightPx(neighbor, gapPx) + gapPx
+        if (abs(dragOffset) < stepPx / 2f) return false
+        val order = categoryOrder.withCategoryStepped(category, direction, visible) ?: return false
+        anchored { categoryOrder.setAll(order) }
+        dragOffset -= direction.step * stepPx
+        return true
+    }
+
+    fun endCategoryDrag(commit: Boolean) {
+        if (!gestureActive) return
+        if (!commit) {
+            anchored { categoryOrder.setAll(orderBeforeDrag) }
+        } else {
+            val regrouped = working.sortedByCategoryOrder(categoryOrder)
+            if (regrouped != layoutBeforeDrag) {
+                anchored { replaceWorking(regrouped) }
+                commit(regrouped)
+            }
+        }
+        settle()
+    }
+
+    private fun beginGesture() {
+        settleJob?.cancel()
+        layoutBeforeDrag = working.toList()
+        orderBeforeDrag = categoryOrder.toList()
+        draggedType = null
+        draggedCategory = null
+        dragOffset = 0f
+        gestureActive = true
+    }
+
+    // The dropped row glides from the finger to its slot instead of snapping.
+    private fun settle() {
+        gestureActive = false
+        settleJob = scope.launch {
+            animate(initialValue = dragOffset, targetValue = 0f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { value, _ ->
+                dragOffset = value
+            }
+            draggedType = null
+            draggedCategory = null
+        }
+    }
+
+    private fun commit(layout: List<WidgetInstance>) {
+        pendingLayout = layout
+        onUpdateLayout(layout)
+    }
+
+    private fun replaceWorking(layout: List<WidgetInstance>) {
+        working.setAll(layout)
+        categoryOrder.setAll(reconcileGalleryCategoryOrder(categoryOrder, layout))
+    }
+
+    // requestScrollToItem pins the viewport by index, overriding the default follow-the-key anchoring.
+    private fun anchored(mutation: () -> Unit) {
+        val index = listState.firstVisibleItemIndex
+        val offset = listState.firstVisibleItemScrollOffset
+        mutation()
+        listState.requestScrollToItem(index, offset)
+    }
+
+    private fun itemSizePx(key: String): Int? =
+        listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }?.size
+
+    // Off-screen parts of a block are estimated from the measured on-screen rows and headers.
+    private fun blockHeightPx(category: WidgetCategory, gapPx: Float): Float {
+        val visibleItems = listState.layoutInfo.visibleItemsInfo
+        val sizes = visibleItems.associate { it.key to it.size }
+        val rowSizes = visibleItems.filter { (it.key as? String)?.startsWith(GALLERY_ROW_KEY_PREFIX) == true }.map { it.size }
+        val headerSizes = visibleItems.filter { (it.key as? String)?.startsWith(GALLERY_HEADER_KEY_PREFIX) == true }.map { it.size }
+        val rowFallback = rowSizes.average().takeIf { !it.isNaN() }?.toFloat() ?: 0f
+        val headerFallback = headerSizes.average().takeIf { !it.isNaN() }?.toFloat() ?: rowFallback
+        val rowKeys = rows(category).map(::galleryRowKey)
+        val header = sizes[galleryHeaderKey(category)]?.toFloat() ?: headerFallback
+        return header + rowKeys.sumOf { (sizes[it]?.toFloat() ?: rowFallback).toDouble() }.toFloat() + gapPx * rowKeys.size
+    }
+
+    private fun <T> MutableList<T>.setAll(items: List<T>) {
+        if (this == items) return
+        clear()
+        addAll(items)
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Rows
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun CategoryHeader(
     category: WidgetCategory,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMove: (GalleryMoveDirection) -> Boolean,
     modifier: Modifier = Modifier,
     dragHandleModifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
+    val moveUpLabel = stringResource(R.string.home_widget_move_up)
+    val moveDownLabel = stringResource(R.string.home_widget_move_down)
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = spacing.sm, bottom = spacing.xs),
+            .heightIn(min = HeaderMinHeight)
+            .padding(top = spacing.xs)
+            .semantics(mergeDescendants = true) {
+                heading()
+                customActions = moveActions(canMoveUp, canMoveDown, moveUpLabel, moveDownLabel, onMove)
+            },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
-        // Categories WITH a drag handle (everything except ACTIVITY) show the ≡ grip.
-        // ACTIVITY has no handle AND no leading spacer, so its title is flush-left.
+        // ACTIVITY is pinned: no handle and no leading spacer, so its title sits flush-left.
         if (category != WidgetCategory.ACTIVITY) {
             Box(
-                modifier = dragHandleModifier
-                    .size(32.dp),
-                contentAlignment = Alignment.Center
+                modifier = dragHandleModifier.minimumInteractiveComponentSize(),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Default.DragHandle,
                     contentDescription = null,
-                    tint = mc.secondaryAccent.copy(alpha = 0.6f),
-                    modifier = Modifier.size(20.dp)
+                    tint = mc.secondaryAccent,
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }
@@ -409,7 +575,7 @@ private fun CategoryHeader(
             imageVector = category.icon,
             contentDescription = null,
             tint = mc.secondaryAccent,
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(16.dp),
         )
         Text(
             text = category.displayName.uppercase(),
@@ -419,14 +585,18 @@ private fun CategoryHeader(
     }
 }
 
+private val HeaderMinHeight = 48.dp
+
 @Composable
 private fun CatalogRow(
     type: HomeWidgetType,
     isAdded: Boolean,
     isFixed: Boolean,
     isLocked: Boolean,
-    isGamificationDisabled: Boolean = false,
     isDragging: Boolean,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMove: (GalleryMoveDirection) -> Boolean,
     modifier: Modifier = Modifier,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
@@ -436,34 +606,41 @@ private fun CatalogRow(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
+    val moveUpLabel = stringResource(R.string.home_widget_move_up)
+    val moveDownLabel = stringResource(R.string.home_widget_move_down)
 
     Surface(
-        color = if (isFixed) mc.surfaceVariant.copy(alpha = 0.5f) else mc.surface,
+        color = if (isFixed) mc.textDisabled.copy(alpha = SUBTLE_ROW_FILL_ALPHA) else mc.surface,
         shape = SmallCardShape,
-        // The whole added row is the long-press drag target now (the standalone ≡ handle icon
-        // was removed) — dragHandleModifier carries the pointerInput when draggable.
+        // The whole placed row is the long-press drag target; dragHandleModifier carries the gesture.
         modifier = modifier
             .fillMaxWidth()
             .then(dragHandleModifier)
-            .alpha(if (isDragging) 0.6f else 1f)
+            .semantics {
+                customActions = moveActions(canMoveUp, canMoveDown, moveUpLabel, moveDownLabel, onMove)
+            }
+            .alpha(if (isDragging) DRAGGING_ROW_ALPHA else 1f),
     ) {
         Row(
-            modifier = Modifier.padding(spacing.md),
+            modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
-            // Widget Icon
             Box(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(ChipShape)
-                    .background(mc.surfaceVariant),
+                    .background(mc.textDisabled.copy(alpha = SUBTLE_ROW_FILL_ALPHA)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = if (isLocked) Icons.Default.Lock else type.icon,
                     contentDescription = null,
-                    tint = if (isLocked) mc.secondaryAccent else if (isFixed) mc.primaryAccent.copy(alpha = 0.5f) else mc.primaryAccent,
+                    tint = when {
+                        isLocked -> mc.secondaryAccent
+                        isFixed -> mc.textSecondary
+                        else -> mc.primaryAccent
+                    },
                     modifier = Modifier.size(24.dp),
                 )
             }
@@ -474,87 +651,96 @@ private fun CatalogRow(
                     style = ty.titleMedium,
                     color = if (isFixed) mc.textSecondary else mc.textPrimary,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = type.description,
                     style = ty.bodySmall,
                     color = mc.textSecondary,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
 
             when {
-                // Gamification off: the widget cannot be added/shown — render a disabled note.
-                isGamificationDisabled -> Text(
-                    text = stringResource(R.string.home_gamification_disabled),
-                    style = ty.labelSmall,
-                    color = mc.textDisabled,
-                    modifier = Modifier.padding(end = spacing.sm),
-                )
                 isFixed -> Text(
                     text = stringResource(R.string.home_widget_fixed),
                     style = ty.labelSmall,
-                    color = mc.textDisabled,
-                    modifier = Modifier.padding(end = spacing.sm)
+                    color = mc.textSecondary,
+                    modifier = Modifier.padding(end = spacing.sm),
                 )
-                isAdded -> ActionChip(
-                    label = stringResource(R.string.home_widget_remove),
-                    icon = Icons.Default.Close,
-                    onClick = onRemove,
-                    isDestructive = true,
-                )
-                isLocked -> ActionChip(
-                    label = stringResource(R.string.home_account_gated_lock),
-                    onClick = onUnlock
-                )
-                else -> ActionChip(
-                    label = stringResource(R.string.home_widget_add),
-                    icon = Icons.Default.Add,
-                    onClick = onAdd
+                isAdded || !isLocked -> AddRemoveButton(isAdded = isAdded, onAdd = onAdd, onRemove = onRemove)
+                else -> MagicCtaButton(
+                    onClick = onUnlock,
+                    text = stringResource(R.string.home_account_gated_lock),
+                    style = MagicCtaStyle.Outlined,
+                    color = MagicCtaColor.Primary,
+                    contentPadding = PaddingValues(horizontal = spacing.md, vertical = spacing.md),
                 )
             }
         }
     }
 }
 
+/**
+ * The row's Add / Remove toggle. Both labels are laid out invisibly underneath so the button keeps
+ * one size when it flips, and the row's text never re-flows.
+ */
 @Composable
-private fun ActionChip(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
-    onClick: () -> Unit,
-    isDestructive: Boolean = false,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    val bgColor = if (isDestructive) mc.lifeNegative.copy(alpha = 0.15f) else mc.primaryAccent.copy(alpha = 0.15f)
-    val fgColor = if (isDestructive) mc.lifeNegative else mc.primaryAccent
-    
-    Surface(
-        color = bgColor,
-        shape = ButtonShape,
-        modifier = Modifier
-            .heightIn(min = 40.dp)
-            .clip(ButtonShape)
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-        ) {
-            if (icon != null) Icon(icon, contentDescription = null, tint = fgColor, modifier = Modifier.size(16.dp))
-            Text(
-                text = label.uppercase(),
-                style = ty.labelSmall,
-                color = fgColor,
-                maxLines = 1
-            )
-        }
+private fun AddRemoveButton(isAdded: Boolean, onAdd: () -> Unit, onRemove: () -> Unit) {
+    val ghost = Modifier.alpha(0f).clearAndSetSemantics { }
+    Box {
+        GalleryActionButton(isAdded = true, onClick = {}, enabled = false, modifier = ghost)
+        GalleryActionButton(isAdded = false, onClick = {}, enabled = false, modifier = ghost)
+        GalleryActionButton(
+            isAdded = isAdded,
+            onClick = if (isAdded) onRemove else onAdd,
+            modifier = Modifier.matchParentSize(),
+        )
     }
 }
+
+@Composable
+private fun GalleryActionButton(
+    isAdded: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val spacing = MaterialTheme.spacing
+    MagicCtaButton(
+        onClick = onClick,
+        text = stringResource(if (isAdded) R.string.home_widget_remove else R.string.home_widget_add),
+        enabled = enabled,
+        style = MagicCtaStyle.Outlined,
+        color = if (isAdded) MagicCtaColor.Error else MagicCtaColor.Primary,
+        contentPadding = PaddingValues(horizontal = spacing.md, vertical = spacing.md),
+        icon = {
+            Icon(
+                imageVector = if (isAdded) Icons.Default.Close else Icons.Default.Add,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+            )
+        },
+        modifier = modifier,
+    )
+}
+
+private fun moveActions(
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    moveUpLabel: String,
+    moveDownLabel: String,
+    onMove: (GalleryMoveDirection) -> Boolean,
+): List<CustomAccessibilityAction> = buildList {
+    if (canMoveUp) add(CustomAccessibilityAction(moveUpLabel) { onMove(GalleryMoveDirection.UP) })
+    if (canMoveDown) add(CustomAccessibilityAction(moveDownLabel) { onMove(GalleryMoveDirection.DOWN) })
+}
+
+// surfaceVariant is ~1.1:1 on HallowedPrint; a low-alpha textDisabled fill stays visible on every palette.
+private const val SUBTLE_ROW_FILL_ALPHA = 0.10f
+
+private const val DRAGGING_ROW_ALPHA = 0.85f
 
 private val WidgetCategory.displayName: String
     @Composable
@@ -569,7 +755,7 @@ private val WidgetCategory.displayName: String
         WidgetCategory.COMMUNITY -> stringResource(R.string.home_gallery_category_community)
     }
 
-private val WidgetCategory.icon: androidx.compose.ui.graphics.vector.ImageVector
+private val WidgetCategory.icon: ImageVector
     get() = when (this) {
         WidgetCategory.ACTIVITY -> Icons.Default.Timeline
         WidgetCategory.STATS -> Icons.Default.AutoAwesome
@@ -605,6 +791,4 @@ private val HomeWidgetType.description: String
         HomeWidgetType.COMMUNITY_DECKS -> stringResource(R.string.home_widget_desc_community_decks)
         HomeWidgetType.DAILY_PUZZLE -> stringResource(R.string.home_widget_desc_daily_puzzle)
         HomeWidgetType.COMPETITIVE -> stringResource(R.string.home_widget_desc_competitive)
-       // HomeWidgetType.MULTI_CARD_ADD -> stringResource(R.string.home_widget_desc_multiple_add)
-
     }
