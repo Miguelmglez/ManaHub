@@ -48,6 +48,7 @@ import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -68,7 +69,7 @@ private val FabClearance = 88.dp
 @Composable
 fun TradesScreen(
     onCardClick: (scryfallId: String) -> Unit,
-    onNavigateToProposal: (receiverId: String) -> Unit = {},
+    onNavigateToProposal: (receiverId: String?) -> Unit = {},
     onNavigateToThread: (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
     viewModel: TradesViewModel = koinViewModel(),
     authViewModel: AuthViewModel = koinViewModel(),
@@ -82,7 +83,7 @@ fun TradesScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is TradesEvent.ShowMessage -> event.message?.let { toastState.show(it) }
-                TradesEvent.SyncFailed -> toastState.show(syncFailedMessage)
+                TradesEvent.SyncFailed -> toastState.show(syncFailedMessage, MagicToastType.ERROR)
             }
         }
     }
@@ -134,7 +135,7 @@ fun TradesScreen(
         if (uiState.isLoggedIn) {
             val mc = MaterialTheme.magicColors
             FloatingActionButton(
-                onClick = { onNavigateToProposal("") },
+                onClick = { onNavigateToProposal(null) },
                 containerColor = mc.primaryAccent,
                 contentColor = mc.background,
                 modifier = Modifier
@@ -424,7 +425,7 @@ private fun WishlistEntryRow(
     val card = entry.card
 
     CardListItem(
-        name = card?.name ?: entry.cardId,
+        name = card?.name ?: stringResource(R.string.trades_unknown_card),
         imageUrl =  card?.imageNormal,
         priceUsd = if (entry.isFoil == true) card?.priceUsdFoil else card?.priceUsd,
         priceEur = if (entry.isFoil == true) card?.priceEurFoil else card?.priceEur,
@@ -458,7 +459,7 @@ private fun OfferEntryRow(
     val card = entry.card
 
     CardListItem(
-        name = card?.name ?: entry.scryfallId,
+        name = card?.name ?: stringResource(R.string.trades_unknown_card),
         imageUrl = card?.imageNormal,
         priceUsd = if (entry.isFoil) card?.priceUsdFoil else card?.priceUsd,
         priceEur = if (entry.isFoil) card?.priceEurFoil else card?.priceEur,

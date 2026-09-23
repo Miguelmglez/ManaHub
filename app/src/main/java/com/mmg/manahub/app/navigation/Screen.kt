@@ -375,13 +375,15 @@ sealed class Screen(val route: String) {
 
     // ── Trade proposal flow ───────────────────────────────────────────────────
     object CreateTradeProposal : Screen(
-        "trades/proposal/create/{receiverId}?parentProposalId={parentProposalId}&editingProposalId={editingProposalId}&rootProposalId={rootProposalId}"
+        "trades/proposal/create?receiverId={receiverId}&parentProposalId={parentProposalId}&editingProposalId={editingProposalId}&rootProposalId={rootProposalId}"
     ) {
-        fun createRoute(receiverId: String) = "trades/proposal/create/$receiverId"
+        /** A new proposal; a null [receiverId] opens the editor with no counterparty picked. */
+        fun createRoute(receiverId: String?) =
+            if (receiverId.isNullOrBlank()) "trades/proposal/create" else "trades/proposal/create?receiverId=${Uri.encode(receiverId)}"
         fun createCounterRoute(receiverId: String, parentProposalId: String, rootProposalId: String) =
-            "trades/proposal/create/${Uri.encode(receiverId)}?parentProposalId=${Uri.encode(parentProposalId)}&rootProposalId=${Uri.encode(rootProposalId)}"
+            "trades/proposal/create?receiverId=${Uri.encode(receiverId)}&parentProposalId=${Uri.encode(parentProposalId)}&rootProposalId=${Uri.encode(rootProposalId)}"
         fun createEditRoute(receiverId: String, editingProposalId: String, rootProposalId: String) =
-            "trades/proposal/create/${Uri.encode(receiverId)}?editingProposalId=${Uri.encode(editingProposalId)}&rootProposalId=${Uri.encode(rootProposalId)}"
+            "trades/proposal/create?receiverId=${Uri.encode(receiverId)}&editingProposalId=${Uri.encode(editingProposalId)}&rootProposalId=${Uri.encode(rootProposalId)}"
     }
 
     object TradeNegotiationDetail : Screen("trades/proposal/{proposalId}/thread/{rootProposalId}") {

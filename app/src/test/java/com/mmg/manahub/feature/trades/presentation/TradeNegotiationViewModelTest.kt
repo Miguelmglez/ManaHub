@@ -285,7 +285,7 @@ class TradeNegotiationViewModelTest {
         advanceUntilIdle()
 
         coVerify(exactly = 1) { acceptProposal("p1") }
-        verify { analyticsHelper.logEvent("trade_accepted", mapOf("root_proposal_id" to ROOT_PROPOSAL_ID)) }
+        verify { analyticsHelper.logEvent("trade_accepted", emptyMap()) }
         assertFalse(vm.uiState.value.isProcessing)
     }
 
@@ -645,7 +645,7 @@ class TradeNegotiationViewModelTest {
         verify {
             analyticsHelper.logEvent(
                 "trade_completed",
-                mapOf("root_proposal_id" to ROOT_PROPOSAL_ID, "added_to_collection" to true),
+                mapOf("added_to_collection" to true),
             )
         }
     }
@@ -989,5 +989,98 @@ class TradeNegotiationViewModelTest {
         advanceUntilIdle()
 
         coVerify(exactly = 0) { updateTradeCollection(any(), any(), any(), any(), any()) }
+    }
+
+    // =========================================================================
+    // Refresh: single flight, first-load state, account switch
+    // =========================================================================
+
+    @Test
+    fun `given the session trigger and the screen entry fire together then the thread is refreshed once`() = runTest {
+        sessionFlow.value = authenticated(USER_A)
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        coEvery { refreshTradeThread(any(), any()) } coAnswers { gate.await(); Result.success(Unit) }
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onScreenEntered()
+        vm.refresh()
+        advanceUntilIdle()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { refreshTradeThread(ROOT_PROPOSAL_ID, USER_A) }
+        assertFalse(vm.uiState.value.isRefreshing)
+    }
+
+    @Test
+    fun `given a return to the screen then the thread is refreshed again`() = runTest {
+        sessionFlow.value = authenticated(USER_A)
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.onScreenEntered()
+        advanceUntilIdle()
+        vm.onScreenEntered()
+        advanceUntilIdle()
+
+        coVerify(exactly = 2) { refreshTradeThread(ROOT_PROPOSAL_ID, USER_A) }
+    }
+
+    @Test
+    fun `given an empty cache then the thread stays loading until the first refresh finishes`() = runTest {
+        sessionFlow.value = authenticated(USER_A)
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        coEvery { refreshTradeThread(any(), any()) } coAnswers { gate.await(); Result.success(Unit) }
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.isLoading)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isLoading)
+        assertFalse(vm.uiState.value.refreshFailed)
+    }
+
+    @Test
+    fun `given the first refresh fails with nothing cached then refreshFailed is set`() = runTest {
+        sessionFlow.value = authenticated(USER_A)
+        coEvery { refreshTradeThread(any(), any()) } returns Result.failure(RuntimeException("offline"))
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.isLoading)
+        assertTrue(vm.uiState.value.refreshFailed)
+        assertTrue(vm.uiState.value.thread.isEmpty())
+    }
+
+    @Test
+    fun `given the account switches then the new account's thread is refreshed and old dialogs are dropped`() = runTest {
+        threadFlow.value = listOf(buildProposal(id = "p1", status = TradeStatus.PROPOSED))
+        sessionFlow.value = authenticated(USER_A)
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onCancelRequested("p1")
+
+        sessionFlow.value = authenticated(USER_B)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { refreshTradeThread(ROOT_PROPOSAL_ID, USER_B) }
+        assertEquals(USER_B, vm.uiState.value.currentUserId)
+        assertNull(vm.uiState.value.pendingCancelProposalId)
+    }
+
+    @Test
+    fun `given a user without a nickname then no blank participant name is stored`() = runTest {
+        sessionFlow.value = SessionState.Authenticated(
+            AuthUser(id = USER_A, email = "a@test.com", nickname = null, gameTag = "#TAG", avatarUrl = null, provider = "email"),
+        )
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        assertFalse(USER_A in vm.uiState.value.participantNames)
     }
 }

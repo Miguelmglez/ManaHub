@@ -3242,6 +3242,8 @@
     <string name="trades_proposal_version">Proposal v%d</string>
     <string name="trades_review_collection_placeholder">Review my collection</string>
     <string name="trades_no_proposals_yet">No proposals in this thread yet.</string>
+    <string name="trades_thread_load_error">Couldn\'t load this trade</string>
+    <string name="trades_history_load_error">Couldn\'t load your trades</string>
     <string name="trades_action_accept">Accept</string>
     <string name="trades_action_decline">Decline</string>
     <string name="trades_action_cancel">Cancel</string>

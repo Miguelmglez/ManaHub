@@ -1289,7 +1289,9 @@ fun AppNavGraph(
             composable(
                 route     = Screen.CreateTradeProposal.route,
                 arguments = listOf(
-                    navArgument("receiverId") { type = NavType.StringType },
+                    navArgument("receiverId") {
+                        type = NavType.StringType; nullable = true; defaultValue = null
+                    },
                     navArgument("parentProposalId") {
                         type = NavType.StringType; nullable = true; defaultValue = null
                     },

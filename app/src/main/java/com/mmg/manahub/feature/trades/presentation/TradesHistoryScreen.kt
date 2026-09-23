@@ -44,6 +44,8 @@ import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.PullRefreshHeader
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.rememberPullRefreshState
@@ -76,7 +78,7 @@ fun TradesHistoryScreen(
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                is TradesHistoryEvent.ShowMessage -> event.message?.let { toastState.show(it) }
+                is TradesHistoryEvent.ShowMessage -> event.message?.let { toastState.show(it, MagicToastType.ERROR) }
                 is TradesHistoryEvent.NavigateToThread ->
                     onOpenThread(event.proposalId, event.rootProposalId)
             }
@@ -144,7 +146,7 @@ private fun HistoryContent(
 
             // ── Main content ──────────────────────────────────────────────────
             when {
-                uiState.isLoading -> item(key = "loading") {
+                uiState.isLoading && uiState.proposals.isEmpty() -> item(key = "loading") {
                     Box(
                         modifier        = Modifier
                             .fillMaxWidth()
@@ -155,6 +157,15 @@ private fun HistoryContent(
                             modifier   = Modifier.size(32.dp),
                         )
                     }
+                }
+
+                uiState.refreshFailed && uiState.proposals.isEmpty() -> item(key = "error") {
+                    InlineErrorState(
+                        message = stringResource(R.string.trades_history_load_error),
+                        retryLabel = stringResource(R.string.action_retry),
+                        onRetry = onRefresh,
+                        enabled = !uiState.isRefreshing,
+                    )
                 }
 
                 uiState.filtered.isEmpty() -> item(key = "empty") {

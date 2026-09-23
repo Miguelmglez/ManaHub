@@ -70,6 +70,8 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.components.FullErrorState
+import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.PullRefreshHeader
@@ -100,7 +102,7 @@ fun TradeNegotiationDetailScreen(
     val mc = MaterialTheme.magicColors
     val context = LocalContext.current
 
-    LaunchedEffect(Unit) { viewModel.refresh() }
+    LaunchedEffect(Unit) { viewModel.onScreenEntered() }
 
     // §5.2 fix: one-shot navigation/toast effects are delivered through a buffered
     // Channel (viewModel.events), never a nullable StateFlow field — a StateFlow
@@ -211,7 +213,7 @@ fun TradeNegotiationDetailScreen(
             },
         ) { innerPadding ->
             when {
-                uiState.isLoading -> Box(
+                uiState.thread.isEmpty() && uiState.isLoading -> Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
@@ -220,18 +222,21 @@ fun TradeNegotiationDetailScreen(
                     MagicLoadingSpinner()
                 }
 
-                uiState.thread.isEmpty() -> Box(
+                uiState.thread.isEmpty() && uiState.refreshFailed -> FullErrorState(
+                    message = stringResource(R.string.trades_thread_load_error),
+                    retryLabel = stringResource(R.string.action_retry),
+                    onRetry = viewModel::refresh,
+                    enabled = !uiState.isRefreshing,
+                    modifier = Modifier.padding(innerPadding),
+                )
+
+                uiState.thread.isEmpty() -> EmptyState(
+                    title = stringResource(R.string.trades_no_proposals_yet),
+                    icon = Icons.Default.SwapHoriz,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = stringResource(R.string.trades_no_proposals_yet),
-                        style = MaterialTheme.magicTypography.bodyMedium,
-                        color = mc.textSecondary,
-                    )
-                }
+                )
 
                 else -> LazyColumn(
                     modifier = Modifier
@@ -325,7 +330,7 @@ private fun ProposalCard(
         stringResource(R.string.trades_you_offer_section)
     } else {
         val name = participantNames[proposal.proposerId]
-        if (name != null) stringResource(R.string.trades_named_sends, name)
+        if (!name.isNullOrBlank()) stringResource(R.string.trades_named_sends, name)
         else stringResource(R.string.trades_they_offer_section)
     }
     // receiverItems = cards FROM the receiver → label shows the receiver as the sender
@@ -333,7 +338,7 @@ private fun ProposalCard(
         stringResource(R.string.trades_you_offer_section)
     } else {
         val name = participantNames[proposal.receiverId]
-        if (name != null) stringResource(R.string.trades_named_sends, name)
+        if (!name.isNullOrBlank()) stringResource(R.string.trades_named_sends, name)
         else stringResource(R.string.trades_they_offer_section)
     }
 
@@ -604,9 +609,10 @@ private fun ItemsSection(
             }
         }
     }
+    val unknownCard = stringResource(R.string.trades_unknown_card)
     items.filter { !it.isReviewCollectionPlaceholder }.forEach { item ->
         CardListItem(
-            name = item.cardName.ifBlank { item.cardId },
+            name = item.cardName.ifBlank { unknownCard },
             imageUrl = item.imageUrl,
             priceUsd = null,
             priceEur = null,
@@ -776,11 +782,12 @@ private fun MarkCompleteDialog(
 ) {
     val mc = MaterialTheme.magicColors
     val hasItems = sentItems.isNotEmpty() || receivedItems.isNotEmpty()
+    val unknownCard = stringResource(R.string.trades_unknown_card)
 
     /** Formats up to 5 items as bullet points, appending "…and N more" when needed. */
     fun formatItems(items: List<TradeItem>): String {
         val shown = items.take(5).joinToString("\n") { item ->
-            "• ${item.cardName.ifBlank { item.cardId }} ×${item.quantity ?: 1}"
+            "• ${item.cardName.ifBlank { unknownCard }} ×${item.quantity ?: 1}"
         }
         return if (items.size > 5) "$shown\n…and ${items.size - 5} more" else shown
     }
