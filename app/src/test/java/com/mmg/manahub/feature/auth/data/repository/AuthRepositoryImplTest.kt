@@ -817,13 +817,123 @@ class AuthRepositoryImplTest {
     }
 
     @Test
-    fun `given SessionStatus RefreshFailure when sessionState collected then emits Unauthenticated`() = runTest {
+    fun `given RefreshFailure with no prior session and nothing stored when sessionState collected then emits Unauthenticated`() = runTest {
+        val sessionManager = mockk<io.github.jan.supabase.auth.SessionManager>(relaxed = true)
+        coEvery { sessionManager.loadSession() } returns null
+        every { supabaseAuth.sessionManager } returns sessionManager
         sessionStatusFlow.value = SessionStatus.RefreshFailure(cause = mockk(relaxed = true))
 
         repository.sessionState.test {
             assertEquals(SessionState.Unauthenticated, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `given Authenticated then RefreshFailure when sessionState observed then stays Authenticated`() = runTest {
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val sessionMock = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+        }
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        val emitted = mutableListOf<SessionState>()
+        sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
+        val collectJob = launch { repoForTest.sessionState.collect { emitted += it } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        sessionStatusFlow.value = SessionStatus.RefreshFailure(cause = mockk(relaxed = true))
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        val state = repoForTest.sessionState.value
+        collectJob.cancel()
+
+        assertTrue(state is SessionState.Authenticated)
+        assertEquals("user-uuid-001", (state as SessionState.Authenticated).user.id)
+        assertTrue(emitted.none { it is SessionState.Unauthenticated })
+    }
+
+    @Test
+    fun `given Authenticated then explicit sign-out when sessionState observed then emits Unauthenticated`() = runTest {
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val sessionMock = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+        }
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
+        val collectJob = launch { repoForTest.sessionState.collect { } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        sessionStatusFlow.value = SessionStatus.NotAuthenticated(isSignOut = true)
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+        // A refresh failure after a real sign-out must not resurrect the previous user.
+        val sessionManager = mockk<io.github.jan.supabase.auth.SessionManager>(relaxed = true)
+        coEvery { sessionManager.loadSession() } returns null
+        every { supabaseAuth.sessionManager } returns sessionManager
+        sessionStatusFlow.value = SessionStatus.RefreshFailure(cause = mockk(relaxed = true))
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        val state = repoForTest.sessionState.value
+        collectJob.cancel()
+
+        assertEquals(SessionState.Unauthenticated, state)
+    }
+
+    @Test
+    fun `given cold-start RefreshFailure with a stored session when sessionState collected then emits Authenticated`() = runTest {
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val storedSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+        }
+        val sessionManager = mockk<io.github.jan.supabase.auth.SessionManager>(relaxed = true)
+        coEvery { sessionManager.loadSession() } returns storedSession
+        every { supabaseAuth.sessionManager } returns sessionManager
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        sessionStatusFlow.value = SessionStatus.RefreshFailure(cause = mockk(relaxed = true))
+
+        val collectJob = launch { repoForTest.sessionState.collect { } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        val state = repoForTest.sessionState.value
+        collectJob.cancel()
+
+        assertTrue(state is SessionState.Authenticated)
+        assertEquals("user-uuid-001", (state as SessionState.Authenticated).user.id)
     }
 
     @Test
