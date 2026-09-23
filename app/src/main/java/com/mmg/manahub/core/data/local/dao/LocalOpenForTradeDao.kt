@@ -52,6 +52,20 @@ interface LocalOpenForTradeDao {
     @Query("SELECT * FROM local_open_for_trade WHERE local_collection_id = :collectionId LIMIT 1")
     suspend fun getByCollectionId(collectionId: String): LocalOpenForTradeEntity?
 
+    @Query("""
+        SELECT * FROM local_open_for_trade
+        WHERE scryfall_id = :scryfallId AND is_foil = :isFoil
+          AND condition = :condition AND language = :language
+        ORDER BY created_at ASC
+        LIMIT 1
+    """)
+    suspend fun getByAttributes(
+        scryfallId: String,
+        isFoil: Boolean,
+        condition: String,
+        language: String,
+    ): LocalOpenForTradeEntity?
+
     @Query("SELECT * FROM local_open_for_trade WHERE synced = 0")
     suspend fun getUnsynced(): List<LocalOpenForTradeEntity>
 
