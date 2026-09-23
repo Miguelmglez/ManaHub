@@ -168,6 +168,14 @@ import com.mmg.manahub.core.util.TimeAgoFormatter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import com.mmg.manahub.core.ui.components.MagicFilterChip
+import com.mmg.manahub.core.ui.components.MagicSelectionItem
+import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckFormatFilter
+import com.mmg.manahub.feature.communitydecks.presentation.displayResId
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Home widget host + body slot + shared chrome
@@ -565,6 +573,7 @@ fun HomeWidgetHost(
     trending: com.mmg.manahub.core.model.TrendingSnapshot? = null,
     communityDecks: List<com.mmg.manahub.core.model.CommunityDeckSummary>? = null,
     communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
+    communityDecksFormat: CommunityDeckFormatFilter? = null,
     dailyPuzzle: DailyPuzzleWidgetState? = null,
     rulesTipIndex: Int = 0,
 ) {
@@ -584,6 +593,7 @@ fun HomeWidgetHost(
                     uiState = uiState,
                     onAction = onAction,
                     communityDecksCategory = communityDecksCategory,
+                    communityDecksFormat = communityDecksFormat,
                 ),
             )
         }
@@ -849,6 +859,7 @@ private fun widgetHeaderTrailingContent(
     uiState: HomeUiState,
     onAction: (HomeAction) -> Unit,
     communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
+    communityDecksFormat: CommunityDeckFormatFilter? = null,
 ): (@Composable () -> Unit)? = when (type) {
     HomeWidgetType.QUICK_ACTIONS -> {
         {
@@ -920,15 +931,19 @@ private fun widgetHeaderTrailingContent(
             var showCategoryPicker by remember { mutableStateOf(false) }
             CommunityDecksCategoryAffordance(
                 category = communityDecksCategory,
+                format = communityDecksFormat,
                 onClick = { showCategoryPicker = true },
             )
             if (showCategoryPicker) {
                 CommunityDecksCategoryPickerSheet(
                     selected = communityDecksCategory,
+                    selectedFormat = communityDecksFormat,
                     onSelect = { category ->
                         onAction(HomeAction.SelectCommunityDecksCategory(category))
                         showCategoryPicker = false
                     },
+                    // A format pick keeps the sheet open so the category can be chosen next.
+                    onSelectFormat = { format -> onAction(HomeAction.SelectCommunityDecksFormat(format)) },
                     onDismiss = { showCategoryPicker = false },
                 )
             }
@@ -3382,21 +3397,30 @@ private fun com.mmg.manahub.core.model.CommunityDeckSummary.toDeckSummary(): Dec
 )
 
 /**
- * Community-decks widget category selector affordance. Shows the active category's title
- * + a chevron. The whole row is a ≥48dp tap target that re-opens the category picker.
+ * Community-decks widget selector affordance: "FORMAT · CATEGORY" on one line (ellipsized, capped
+ * at half the header so the widget title stays readable) + a chevron. The whole row is a ≥48dp
+ * tap target that opens the picker sheet.
  */
 @Composable
 private fun CommunityDecksCategoryAffordance(
     category: HomeCommunityDeckCategory,
+    format: CommunityDeckFormatFilter?,
     onClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    val label = stringResource(category.titleRes)
+    val formatLabel = format?.let { stringResource(it.displayResId) }
+        ?: stringResource(R.string.community_deck_filter_all_formats)
+    val label = stringResource(R.string.home_community_decks_selection, formatLabel, stringResource(category.titleRes))
 
     Row(
         modifier = Modifier
+            .layout { measurable, constraints ->
+                val cap = (constraints.maxWidth * HEADER_AFFORDANCE_MAX_WIDTH_FRACTION).toInt()
+                val placeable = measurable.measure(constraints.copy(maxWidth = minOf(constraints.maxWidth, cap)))
+                layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+            }
             .heightIn(min = 48.dp)
             .clip(ChipShape)
             .clickable(
@@ -3413,7 +3437,8 @@ private fun CommunityDecksCategoryAffordance(
             style = ty.labelMedium,
             color = mc.primaryAccent,
             maxLines = 1,
-            letterSpacing = 1.sp
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
         )
         Icon(
             imageVector = Icons.Default.ChevronRight,
@@ -3424,12 +3449,20 @@ private fun CommunityDecksCategoryAffordance(
     }
 }
 
-/** Category picker for the COMMUNITY_DECKS widget (TASK 5b), mirroring [SetPickerSheet]'s pattern. */
+/** Share of the header row the COMMUNITY_DECKS selector may take before it ellipsizes. */
+private const val HEADER_AFFORDANCE_MAX_WIDTH_FRACTION = 0.5f
+
+/**
+ * "Browse by" sheet for the COMMUNITY_DECKS widget: a single-select format row (picking one keeps
+ * the sheet open) above the category list (picking one closes it).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CommunityDecksCategoryPickerSheet(
     selected: HomeCommunityDeckCategory,
+    selectedFormat: CommunityDeckFormatFilter?,
     onSelect: (HomeCommunityDeckCategory) -> Unit,
+    onSelectFormat: (CommunityDeckFormatFilter?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -3443,7 +3476,7 @@ private fun CommunityDecksCategoryPickerSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = spacing.lg)
+                .verticalScroll(rememberScrollState())
                 .padding(top = spacing.xl, bottom = spacing.xl),
             verticalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
@@ -3451,92 +3484,95 @@ private fun CommunityDecksCategoryPickerSheet(
                 text = stringResourceSafe(R.string.home_community_decks_category_sheet_title),
                 style = ty.titleLarge,
                 color = mc.textPrimary,
-                modifier = Modifier.padding(bottom = spacing.xs),
+                modifier = Modifier.padding(horizontal = spacing.lg),
             )
 
-            // 2x2 Grid of category cards.
-            Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                HomeCommunityDeckCategory.entries.chunked(2).forEach { rowCategories ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(spacing.sm)
-                    ) {
-                        rowCategories.forEach { category ->
-                            CategorySelectionCard(
-                                category = category,
-                                isSelected = category == selected,
-                                onClick = { onSelect(category) },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
+            PickerSectionLabel(stringResourceSafe(R.string.home_community_decks_format_section))
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = spacing.lg),
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                item(key = COMMUNITY_DECKS_ALL_FORMATS_KEY) {
+                    FormatChip(
+                        label = stringResourceSafe(R.string.community_deck_filter_all_formats),
+                        selected = selectedFormat == null,
+                        onClick = { onSelectFormat(null) },
+                    )
+                }
+                items(CommunityDeckFormatFilter.entries, key = { it.name }) { format ->
+                    FormatChip(
+                        label = stringResource(format.displayResId),
+                        selected = format == selectedFormat,
+                        onClick = { onSelectFormat(format) },
+                    )
                 }
             }
 
-            Spacer(Modifier.height(spacing.sm))
+            PickerSectionLabel(stringResourceSafe(R.string.home_community_decks_category_section))
+            Column(
+                modifier = Modifier.padding(horizontal = spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                HomeCommunityDeckCategory.entries.forEach { category ->
+                    val isSelected = category == selected
+                    MagicSelectionItem(
+                        title = stringResource(category.titleRes),
+                        description = stringResource(category.descriptionRes),
+                        isSelected = isSelected,
+                        onClick = { onSelect(category) },
+                        icon = {
+                            Icon(
+                                imageVector = category.icon,
+                                contentDescription = null,
+                                tint = if (isSelected) mc.primaryAccent else mc.textSecondary,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        },
+                        modifier = Modifier.semantics {
+                            role = Role.RadioButton
+                            this.selected = isSelected
+                        },
+                    )
+                }
+            }
         }
     }
 }
 
-@Composable
-private fun CategorySelectionCard(
-    category: HomeCommunityDeckCategory,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
+private const val COMMUNITY_DECKS_ALL_FORMATS_KEY = "all_formats"
 
-    val icon = when (category) {
+@Composable
+private fun PickerSectionLabel(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.magicTypography.labelMedium,
+        color = MaterialTheme.magicColors.textSecondary,
+        modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg),
+    )
+}
+
+@Composable
+private fun FormatChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    MagicFilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = label,
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .semantics {
+                role = Role.RadioButton
+                this.selected = selected
+            },
+    )
+}
+
+private val HomeCommunityDeckCategory.icon: ImageVector
+    get() = when (this) {
         HomeCommunityDeckCategory.POPULAR -> Icons.Default.Whatshot
         HomeCommunityDeckCategory.RECENT -> Icons.Default.History
         HomeCommunityDeckCategory.UPDATED -> Icons.Default.Refresh
         HomeCommunityDeckCategory.PRIMERS -> Icons.AutoMirrored.Filled.MenuBook
     }
-
-    Surface(
-        color = if (isSelected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface.copy(alpha = 0.4f),
-        shape = SmallCardShape,
-        border = if (isSelected) BorderStroke(1.5.dp, mc.primaryAccent.copy(alpha = 0.5f)) else null,
-        modifier = modifier
-            .heightIn(min = 120.dp)
-            .clip(SmallCardShape)
-            .clickable(
-                onClickLabel = stringResource(category.titleRes),
-                role = Role.Button,
-                onClick = onClick
-            ),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(spacing.md),
-            verticalArrangement = Arrangement.spacedBy(spacing.xs)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (isSelected) mc.primaryAccent else mc.textSecondary,
-                modifier = Modifier.size(24.dp)
-            )
-            Text(
-                text = stringResource(category.titleRes),
-                style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = if (isSelected) mc.primaryAccent else mc.textPrimary,
-                maxLines = 1,
-            )
-            Text(
-                text = stringResource(category.descriptionRes),
-                style = ty.bodySmall,
-                color = mc.textSecondary,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  TRADES_HUB (account-gated)

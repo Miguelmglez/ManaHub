@@ -126,6 +126,7 @@ fun HomeScreen(
     // HomeViewModel.communityDecksFlow's KDoc.
     val communityDecks by viewModel.communityDecksFlow.collectAsStateWithLifecycle()
     val communityDecksCategory by viewModel.communityDecksCategoryFlow.collectAsStateWithLifecycle()
+    val communityDecksFormat by viewModel.communityDecksFormatFlow.collectAsStateWithLifecycle()
     // Daily Puzzle (ADR-006), Batch B2 — kept OUTSIDE HomeUiState for the same reason, see
     // HomeViewModel.dailyPuzzleFlow's KDoc.
     val dailyPuzzle by viewModel.dailyPuzzleFlow.collectAsStateWithLifecycle()
@@ -163,6 +164,7 @@ fun HomeScreen(
         trending = trending,
         communityDecks = communityDecks,
         communityDecksCategory = communityDecksCategory,
+        communityDecksFormat = communityDecksFormat,
         dailyPuzzle = dailyPuzzle,
         widgetReadiness = widgetReadiness,
         widgetExtras = widgetExtras,
@@ -258,6 +260,7 @@ fun HomeScreen(
     trending: com.mmg.manahub.core.model.TrendingSnapshot? = null,
     communityDecks: List<com.mmg.manahub.core.model.CommunityDeckSummary>? = null,
     communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
+    communityDecksFormat: com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckFormatFilter? = null,
     dailyPuzzle: DailyPuzzleWidgetState? = null,
     widgetReadiness: Map<HomeWidgetType, Boolean> = emptyMap(),
     widgetExtras: HomeWidgetExtras = HomeWidgetExtras(),
@@ -358,6 +361,7 @@ fun HomeScreen(
                     trending = trending,
                     communityDecks = communityDecks,
                     communityDecksCategory = communityDecksCategory,
+                    communityDecksFormat = communityDecksFormat,
                     dailyPuzzle = dailyPuzzle,
                     rulesTipIndex = rulesTipIndex,
                 )

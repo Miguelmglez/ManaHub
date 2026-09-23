@@ -3535,7 +3535,10 @@
 
     <!-- Home widget board overhaul, TASK 5b — Community Decks widget -->
     <string name="home_community_decks_empty">No community decks available right now.</string>
-    <string name="home_community_decks_category_a11y">Choose category</string>
+    <string name="home_community_decks_category_a11y">Choose format and category</string>
+    <string name="home_community_decks_selection">%1$s · %2$s</string>
+    <string name="home_community_decks_format_section">Format</string>
+    <string name="home_community_decks_category_section">Category</string>
     <string name="home_community_decks_category_sheet_title">Browse by</string>
     <string name="home_community_decks_category_popular">Popular</string>
     <string name="home_community_decks_category_popular_desc">Trending decks the community is brewing.</string>
