@@ -259,7 +259,7 @@ fun AppNavGraph(
         }
     }
 
-    // Toast for invite results — shown at the global level so it is visible regardless of
+    // Global toast (invite results, exit prompt) — shown at the global level so it is visible regardless of
     // which screen the user ends up on after the InviteDispatcherScreen navigates away.
     val inviteToastState = rememberMagicToastState()
 
@@ -293,6 +293,21 @@ fun AppNavGraph(
     }
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
+
+    // Composed before the NavHost so screen/sheet/overlay back handlers registered later win.
+    val exitGuard = remember { AppExitBackGuard(clock = android.os.SystemClock::elapsedRealtime) }
+    AppExitBackHandler(
+        atRoot = backStack != null && navController.previousBackStackEntry == null,
+        guard = exitGuard,
+        onShowPrompt = {
+            FirebaseCrashlytics.getInstance().log("app_exit_back_prompt_shown")
+            inviteToastState.show(
+                message = context.getString(R.string.app_exit_back_prompt),
+                type = MagicToastType.INFO,
+                durationMs = AppExitBackGuard.DEFAULT_WINDOW_MS,
+            )
+        },
+    )
 
     var pendingPlaytestSetup by remember { mutableStateOf<PlaytestSetup?>(null) }
     var pendingPlayerConfigs by remember { mutableStateOf<List<PlayerConfig>?>(null) }
