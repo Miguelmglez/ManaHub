@@ -821,4 +821,65 @@ class TradeNegotiationViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    // =========================================================================
+    // GROUP 8: unloaded items never drive collection changes (trades audit H3)
+    // =========================================================================
+
+    @Test
+    fun `given the proposal's items are not loaded when onUpdateCollection then nothing is applied`() = runTest {
+        threadFlow.value = listOf(buildProposal(id = "p1", status = TradeStatus.COMPLETED).copy(itemsLoaded = false))
+        sessionFlow.value = authenticated(USER_A)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onUpdateCollection("p1")
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { updateTradeCollection(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `given the proposal's items are not loaded when onMarkCompleted then no confirmation opens`() = runTest {
+        threadFlow.value = listOf(buildProposal(id = "p1", status = TradeStatus.ACCEPTED).copy(itemsLoaded = false))
+        sessionFlow.value = authenticated(USER_A)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onMarkCompleted("p1")
+
+        assertNull(vm.uiState.value.pendingMarkCompletedProposalId)
+    }
+
+    @Test
+    fun `given the proposal's items are not loaded when a revoke with reversal is confirmed then nothing runs`() = runTest {
+        threadFlow.value = listOf(buildProposal(id = "p1", status = TradeStatus.ACCEPTED).copy(itemsLoaded = false))
+        sessionFlow.value = authenticated(USER_A)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onRevoke("p1")
+        assertFalse(vm.uiState.value.pendingRevokeCanReverse)
+        vm.onRevokeConfirmed(reverseCollection = true)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { revokeAcceptance(any()) }
+        coVerify(exactly = 0) { updateTradeCollection(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `given the proposal's items are not loaded when onCounter then no editor navigation happens`() = runTest {
+        threadFlow.value = listOf(buildProposal(id = "p1").copy(itemsLoaded = false))
+        sessionFlow.value = authenticated(USER_B)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.events.test {
+            vm.onCounter("p1")
+            vm.onEdit("p1")
+            advanceUntilIdle()
+            expectNoEvents()
+        }
+    }
 }

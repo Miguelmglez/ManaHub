@@ -518,4 +518,75 @@ class TradesRepositoryImplTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 8 — item load state (trades audit 2026-09-23, H3)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given items loaded once when a later thread refresh fails to fetch them then prior items are kept and failure is returned`() =
+        runTest {
+            val dto = buildProposalDto(id = "p-001", rootProposalId = "p-001")
+            coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto))
+            coEvery { remote.fetchProposalItems("p-001") } returns
+                Result.success(listOf(tradeItemDto(id = "item-1", proposalId = "p-001")))
+            assertTrue(repository.refreshProposalThread("p-001", USER_ID).isSuccess)
+
+            coEvery { remote.fetchProposalItems("p-001") } returns Result.failure(RuntimeException("timeout"))
+            val result = repository.refreshProposalThread("p-001", USER_ID)
+
+            assertTrue(result.isFailure)
+            repository.observeAllProposals().test {
+                val proposal = awaitItem().single()
+                assertEquals(1, proposal.items.size)
+                assertTrue(proposal.itemsLoaded)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `given items were never loaded when their fetch fails then the proposal reports itemsLoaded false`() = runTest {
+        val dto = buildProposalDto(id = "p-001", rootProposalId = "p-001")
+        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto))
+        coEvery { remote.fetchProposalItems("p-001") } returns Result.failure(RuntimeException("timeout"))
+
+        val result = repository.refreshProposalThread("p-001", USER_ID)
+
+        assertTrue(result.isFailure)
+        repository.observeAllProposals().test {
+            val proposal = awaitItem().single()
+            assertTrue(proposal.items.isEmpty())
+            assertEquals(false, proposal.itemsLoaded)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `given a metadata-only refresh then a proposal whose items were never fetched is not reported as loaded`() = runTest {
+        coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(buildProposalDto(id = "p-001")))
+
+        repository.refreshProposals(USER_ID)
+
+        repository.observeAllProposals().test {
+            assertEquals(false, awaitItem().single().itemsLoaded)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `given an item fetch failure when refreshItemsForThread then failure is returned and the cache entry is untouched`() =
+        runTest {
+            coEvery { remote.fetchProposals(USER_ID) } returns
+                Result.success(listOf(buildProposalDto(id = "p-001", rootProposalId = "p-001")))
+            repository.refreshProposals(USER_ID)
+            coEvery { remote.fetchProposalItems("p-001") } returns Result.failure(RuntimeException("timeout"))
+
+            val result = repository.refreshItemsForThread("p-001")
+
+            assertTrue(result.isFailure)
+            repository.observeAllProposals().test {
+                assertEquals(false, awaitItem().single().itemsLoaded)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

@@ -99,6 +99,8 @@ data class NegotiationUiState(
     val pendingRevokeProposalId: String? = null,
     /** True if the user already synced the collection for the pending-revoke proposal. */
     val pendingRevokeHasSynced: Boolean = false,
+    /** False when the pending-revoke proposal's items are not loaded, so nothing can be reversed. */
+    val pendingRevokeCanReverse: Boolean = true,
     val pendingCancelProposalId: String? = null,
     /**
      * Set when the user taps Accept on a proposal where the other party has only included
@@ -336,26 +338,30 @@ class TradeNegotiationViewModel(
 
     fun onRevoke(proposalId: String) {
         if (_uiState.value.isProcessing) return
+        val proposal = _uiState.value.thread.find { it.id == proposalId }
         val hasSynced = proposalId in _uiState.value.syncedCollectionProposalIds
         _uiState.update { it.copy(
             pendingRevokeProposalId = proposalId,
             pendingRevokeHasSynced = hasSynced,
+            pendingRevokeCanReverse = proposal?.itemsLoaded == true,
         )}
     }
 
     fun onRevokeDismissed() {
-        _uiState.update { it.copy(pendingRevokeProposalId = null, pendingRevokeHasSynced = false) }
+        _uiState.update { it.copy(pendingRevokeProposalId = null, pendingRevokeHasSynced = false, pendingRevokeCanReverse = true) }
     }
 
     fun onRevokeConfirmed(reverseCollection: Boolean) {
         val proposalId = _uiState.value.pendingRevokeProposalId ?: return
-        _uiState.update { it.copy(pendingRevokeProposalId = null, pendingRevokeHasSynced = false) }
+        _uiState.update { it.copy(pendingRevokeProposalId = null, pendingRevokeHasSynced = false, pendingRevokeCanReverse = true) }
         doRevoke(proposalId, reverseCollection)
     }
 
     private fun doRevoke(proposalId: String, reverseCollection: Boolean) {
         val userId = _uiState.value.currentUserId
         val proposal = _uiState.value.thread.find { it.id == proposalId } ?: return
+        // Reversing from an unloaded item list would reverse nothing yet still drop the sync record.
+        if (reverseCollection && !proposal.itemsLoaded) return
         var acquired = false
         _uiState.update { state ->
             if (state.isProcessing) state else { acquired = true; state.copy(isProcessing = true) }
@@ -399,6 +405,7 @@ class TradeNegotiationViewModel(
     fun onMarkCompleted(proposalId: String) {
         if (_uiState.value.isProcessing) return
         val proposal = _uiState.value.thread.find { it.id == proposalId } ?: return
+        if (!proposal.itemsLoaded) return
         val currentUserId = _uiState.value.currentUserId
         val sentItems = proposal.items.filter { it.fromUserId == currentUserId && !it.isReviewCollectionPlaceholder }
         val receivedItems = proposal.items.filter { it.toUserId == currentUserId && !it.isReviewCollectionPlaceholder }
@@ -482,7 +489,7 @@ class TradeNegotiationViewModel(
     }
 
     fun onCounter(proposalId: String) {
-        val proposal = _uiState.value.thread.find { it.id == proposalId } ?: return
+        val proposal = _uiState.value.thread.find { it.id == proposalId }?.takeIf { it.itemsLoaded } ?: return
         val currentUserId = _uiState.value.currentUserId
         val otherUserId = if (proposal.proposerId == currentUserId) proposal.receiverId else proposal.proposerId
         _events.trySend(NegotiationEvent.NavigateToEditor(EditorNavArgs(
@@ -494,7 +501,7 @@ class TradeNegotiationViewModel(
     }
 
     fun onEdit(proposalId: String) {
-        val proposal = _uiState.value.thread.find { it.id == proposalId } ?: return
+        val proposal = _uiState.value.thread.find { it.id == proposalId }?.takeIf { it.itemsLoaded } ?: return
         val currentUserId = _uiState.value.currentUserId
         val otherUserId = if (proposal.proposerId == currentUserId) proposal.receiverId else proposal.proposerId
         _events.trySend(NegotiationEvent.NavigateToEditor(EditorNavArgs(
@@ -513,7 +520,7 @@ class TradeNegotiationViewModel(
      * static "Collection updated" label on subsequent renders.
      */
     fun onUpdateCollection(proposalId: String) {
-        val proposal = _uiState.value.thread.find { it.id == proposalId } ?: return
+        val proposal = _uiState.value.thread.find { it.id == proposalId }?.takeIf { it.itemsLoaded } ?: return
         val userId = _uiState.value.currentUserId
         if (userId.isBlank()) return
         var acquired = false

@@ -68,6 +68,7 @@ import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardListItem
+import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
@@ -159,6 +160,7 @@ fun TradeNegotiationDetailScreen(
     if (uiState.pendingRevokeProposalId != null) {
         RevokeConfirmationDialog(
             hasSynced = uiState.pendingRevokeHasSynced,
+            canReverse = uiState.pendingRevokeCanReverse,
             onRevokeAndReverse = { viewModel.onRevokeConfirmed(reverseCollection = true) },
             onJustRevoke = { viewModel.onRevokeConfirmed(reverseCollection = false) },
             onDismiss = viewModel::onRevokeDismissed,
@@ -262,6 +264,7 @@ fun TradeNegotiationDetailScreen(
                             onCounter = { viewModel.onCounter(proposal.id) },
                             onEdit = { viewModel.onEdit(proposal.id) },
                             onUpdateCollection = { viewModel.onUpdateCollection(proposal.id) },
+                            onRetryItems = viewModel::refresh,
                             onCardClick = onNavigateToCardDetail,
                         )
                     }
@@ -302,6 +305,7 @@ private fun ProposalCard(
     onCounter: () -> Unit,
     onEdit: () -> Unit,
     onUpdateCollection: () -> Unit,
+    onRetryItems: () -> Unit,
     onCardClick: (String) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -359,6 +363,16 @@ private fun ProposalCard(
 
             Spacer(Modifier.height(MaterialTheme.spacing.lg))
 
+            if (!proposal.itemsLoaded) {
+                InlineErrorState(
+                    message = stringResource(R.string.trades_items_load_failed),
+                    retryLabel = stringResource(R.string.action_retry),
+                    onRetry = onRetryItems,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(MaterialTheme.spacing.sm))
+            }
+
             val proposerItems = proposal.items.filter { it.fromUserId == proposal.proposerId }
             val receiverItems = proposal.items.filter { it.fromUserId == proposal.receiverId }
 
@@ -412,25 +426,14 @@ private fun ProposalCard(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else {
-                    Button(
+                    MagicCtaButton(
                         onClick = onUpdateCollection,
-                        enabled = !isSyncingCollection,
+                        text = stringResource(R.string.trades_update_collection),
+                        enabled = proposal.itemsLoaded,
+                        isLoading = isSyncingCollection,
+                        color = MagicCtaColor.Primary,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                        shape = ButtonShape,
-                    ) {
-                        if (isSyncingCollection) {
-                            MagicLoadingSpinner(
-                                modifier = Modifier.size(18.dp),
-                            )
-                        } else {
-                            Text(
-                                text = stringResource(R.string.trades_update_collection),
-                                color = mc.background,
-                                style = MaterialTheme.magicTypography.labelLarge,
-                            )
-                        }
-                    }
+                    )
                 }
             }
         }
@@ -614,7 +617,7 @@ private fun ProposalActions(
                 Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
                     OutlinedButton(
                         onClick = onEdit,
-                        enabled = !isProcessing,
+                        enabled = !isProcessing && proposal.itemsLoaded,
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(stringResource(R.string.trades_action_edit), color = mc.textPrimary)
@@ -656,7 +659,7 @@ private fun ProposalActions(
                     }
                     OutlinedButton(
                         onClick = onCounter,
-                        enabled = !isProcessing,
+                        enabled = !isProcessing && proposal.itemsLoaded,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(stringResource(R.string.trades_action_counter), color = mc.textPrimary)
@@ -677,7 +680,7 @@ private fun ProposalActions(
                 if (!alreadyMarked) {
                     Button(
                         onClick = onMarkCompleted,
-                        enabled = !isProcessing,
+                        enabled = !isProcessing && proposal.itemsLoaded,
                         colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
@@ -838,6 +841,7 @@ private fun MarkCompleteDialog(
 @Composable
 private fun RevokeConfirmationDialog(
     hasSynced: Boolean,
+    canReverse: Boolean,
     onRevokeAndReverse: () -> Unit,
     onJustRevoke: () -> Unit,
     onDismiss: () -> Unit,
@@ -853,6 +857,7 @@ private fun RevokeConfirmationDialog(
         buttons = {
             MagicCtaButton(
                 onClick = if (hasSynced) onRevokeAndReverse else onJustRevoke,
+                enabled = !hasSynced || canReverse,
                 text = stringResource(
                     if (hasSynced) R.string.trades_revoke_and_reverse
                     else R.string.trades_revoke_just_revoke

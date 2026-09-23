@@ -64,7 +64,7 @@ class TradesRepositoryImpl(
         cache.update { current ->
             val existingById = current.associateBy { it.id }
             // Preserve items already loaded for any proposal in the cache.
-            dtos.map { dto -> dto.toDomain(existingById[dto.id]?.items ?: emptyList()) }
+            dtos.map { dto -> dto.toDomain(existingById[dto.id]) }
         }
         return Result.success(Unit)
     }
@@ -80,20 +80,21 @@ class TradesRepositoryImpl(
             dtos.filter { it.rootProposalId == rootProposalId }.map { it.id }
         )
 
-        // For proposals in this thread: use the freshly-fetched items. For others: preserve
-        // whatever items are in the cache. Computed inside update() — see §2.8 note above.
+        // For proposals in this thread: use the freshly-fetched items. For others, and for a
+        // thread proposal whose item fetch failed: keep whatever the cache already had.
+        // Computed inside update() — see §2.8 note above.
         cache.update { current ->
             val existingById = current.associateBy { it.id }
             dtos.map { dto ->
-                val fetched = threadItems[dto.id]
+                val fetched = threadItems[dto.id]?.getOrNull()
                 if (fetched != null) {
                     dto.toDomain(fetched.first, fetched.second)
                 } else {
-                    dto.toDomain(existingById[dto.id]?.items ?: emptyList())
+                    dto.toDomain(existingById[dto.id])
                 }
             }
         }
-        return Result.success(Unit)
+        return threadItems.firstItemFailure()?.let { Result.failure(it) } ?: Result.success(Unit)
     }
 
     override suspend fun refreshItemsForThread(rootProposalId: String): Result<Unit> {
@@ -109,12 +110,15 @@ class TradesRepositoryImpl(
 
         cache.update { current ->
             current.map { proposal ->
-                val fetched = threadItems[proposal.id] ?: return@map proposal
-                proposal.copy(items = fetched.first.map { it.toDomain(fetched.second) })
+                val fetched = threadItems[proposal.id]?.getOrNull() ?: return@map proposal
+                proposal.copy(items = fetched.first.map { it.toDomain(fetched.second) }, itemsLoaded = true)
             }
         }
-        return Result.success(Unit)
+        return threadItems.firstItemFailure()?.let { Result.failure(it) } ?: Result.success(Unit)
     }
+
+    private fun Map<String, Result<*>>.firstItemFailure(): Throwable? =
+        values.firstNotNullOfOrNull { it.exceptionOrNull() }
 
     /**
      * Fetches [TradeItemDto]s + a Room card lookup map for each of [proposalIds], CONCURRENTLY.
@@ -128,11 +132,13 @@ class TradesRepositoryImpl(
      */
     private suspend fun fetchItemsForProposals(
         proposalIds: List<String>,
-    ): Map<String, Pair<List<TradeItemDto>, Map<String, CardEntity>>> = coroutineScope {
+    ): Map<String, Result<Pair<List<TradeItemDto>, Map<String, CardEntity>>>> = coroutineScope {
         proposalIds.map { proposalId ->
             async {
-                val itemsResult = remote.fetchProposalItems(proposalId)
-                val itemDtos = if (itemsResult.isSuccess) itemsResult.getOrThrow() else emptyList()
+                // A failed fetch must never read as "this proposal has no cards".
+                val itemDtos = remote.fetchProposalItems(proposalId).getOrElse { e ->
+                    return@async proposalId to Result.failure<Pair<List<TradeItemDto>, Map<String, CardEntity>>>(e)
+                }
                 val cardIds = itemDtos.map { it.cardId }.distinct()
                 if (cardIds.isNotEmpty()) {
                     // Pre-warm Room for any card the user never cached (typically the
@@ -144,7 +150,7 @@ class TradesRepositoryImpl(
                 val cardMap: Map<String, CardEntity> = if (cardIds.isNotEmpty()) {
                     cardDao.getByIds(cardIds).associateBy { it.scryfallId }
                 } else emptyMap()
-                proposalId to (itemDtos to cardMap)
+                proposalId to Result.success(itemDtos to cardMap)
             }
         }.awaitAll().toMap()
     }
@@ -204,7 +210,8 @@ class TradesRepositoryImpl(
         cache.value = emptyList()
     }
 
-    private fun TradeProposalDto.toDomain(existingItems: List<TradeItem>) = TradeProposal(
+    /** Metadata-only mapping that keeps [existing]'s items and their loaded state. */
+    private fun TradeProposalDto.toDomain(existing: TradeProposal?) = TradeProposal(
         id = id,
         status = status.toTradeStatusOrFallback(),
         proposerId = proposerId,
@@ -217,9 +224,10 @@ class TradesRepositoryImpl(
         proposerMarkedCompletedAt = proposerMarkedCompletedAt?.parseIso(),
         receiverMarkedCompletedAt = receiverMarkedCompletedAt?.parseIso(),
         cancellationReason = cancellationReason,
-        items = existingItems,
+        items = existing?.items ?: emptyList(),
         createdAt = createdAt.parseIso() ?: 0L,
         updatedAt = updatedAt.parseIso() ?: 0L,
+        itemsLoaded = existing?.itemsLoaded ?: false,
     )
 
     private fun TradeProposalDto.toDomain(items: List<TradeItemDto>, cardMap: Map<String, CardEntity> = emptyMap()) = TradeProposal(

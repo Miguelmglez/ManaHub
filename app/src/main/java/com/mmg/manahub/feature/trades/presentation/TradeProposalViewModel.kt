@@ -345,8 +345,9 @@ class TradeProposalViewModel(
     private suspend fun loadPrefillProposal(proposalToPreFill: String, rootProposalId: String, receiverId: String) {
         _uiState.update { it.copy(isPrefillLoading = true, prefillFailed = false) }
 
+        // A cached proposal whose items never loaded is a miss: saving it would wipe the real items.
         var proposal = tradesRepository.observeProposalThread(rootProposalId).first()
-            .find { it.id == proposalToPreFill }
+            .find { it.id == proposalToPreFill && it.itemsLoaded }
 
         if (proposal == null) {
             val userId = (authRepository.sessionState.value as? SessionState.Authenticated)?.user?.id
@@ -364,7 +365,7 @@ class TradeProposalViewModel(
             }
 
             proposal = tradesRepository.observeProposalThread(rootProposalId).first()
-                .find { it.id == proposalToPreFill }
+                .find { it.id == proposalToPreFill && it.itemsLoaded }
             if (proposal == null) {
                 recordNonFatal("trade_proposal_prefill_not_found_after_refresh")
                 _uiState.update { it.copy(isPrefillLoading = false, prefillFailed = true) }
