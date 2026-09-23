@@ -606,27 +606,8 @@ private fun ProposalActions(
 ) {
     val mc = MaterialTheme.magicColors
     when (proposal.status) {
-        TradeStatus.DRAFT -> {
-            if (isProposer) {
-                Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
-                    OutlinedButton(
-                        onClick = onEdit,
-                        enabled = !isProcessing,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(stringResource(R.string.trades_action_edit), color = mc.textPrimary)
-                    }
-                    Button(
-                        onClick = onCancel,
-                        enabled = !isProcessing,
-                        colors = ButtonDefaults.buttonColors(containerColor = mc.lifeNegative),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.trades_action_cancel), color = mc.background)
-                    }
-                }
-            }
-        }
+        // Drafts can no longer be created; legacy ones get no actions because the server rejects them.
+        TradeStatus.DRAFT -> Unit
 
         TradeStatus.PROPOSED -> {
             if (isProposer) {

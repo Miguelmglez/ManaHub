@@ -81,6 +81,8 @@ import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.HexGridBackground
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -213,21 +215,6 @@ fun CreateTradeProposalScreen(
                             )
                         }
                     }
-                    if (!uiState.isCounterMode && uiState.editingProposalId == null) {
-                        OutlinedButton(
-                            onClick  = viewModel::onSaveDraft,
-                            enabled  = !uiState.isSaving,
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
-                            shape    = ButtonShape,
-                            border   = BorderStroke(1.dp, mc.textDisabled.copy(alpha = 0.2f)),
-                            colors   = ButtonDefaults.outlinedButtonColors(contentColor = mc.textSecondary)
-                        ) {
-                            Text(
-                                stringResource(R.string.trades_save_draft),
-                                style = MaterialTheme.magicTypography.bodyLarge,
-                            )
-                        }
-                    }
                 }
             },
         ) { innerPadding ->
@@ -290,27 +277,8 @@ fun CreateTradeProposalScreen(
                             matches = uiState.proposerMatches,
                             onCardClick = onNavigateToCardDetail,
                             onAdd   = { row ->
-                                val card = row.card
                                 viewModel.addSuggestionToProposer(
-                                    TradeItemDraft(
-                                        cardId       = card.scryfallId,
-                                        cardName     = card.name,
-                                        imageUrl     = card.imageArtCrop ?: card.imageNormal,
-                                        typeLine     = card.typeLine,
-                                        setCode      = card.setCode,
-                                        setName      = card.setName,
-                                        rarity       = card.rarity,
-                                        priceUsd     = card.priceUsd,
-                                        priceUsdFoil = card.priceUsdFoil,
-                                        priceEur     = card.priceEur,
-                                        priceEurFoil = card.priceEurFoil,
-                                        quantity     = 1,
-                                        isFoil       = row.wishlistEntry?.isFoil ?: row.offerEntry?.isFoil ?: false,
-                                        condition    = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM",
-                                        language     = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en",
-                                        userCardIdRef = row.offerEntry?.userCardId,
-                                        isInCollection = row.isOwned || row.offerEntry != null,
-                                    )
+                                    row.toTradeItemDraft(isInCollection = row.isOwned || row.offerEntry != null)
                                 )
                             },
                         )
@@ -410,27 +378,8 @@ fun CreateTradeProposalScreen(
                             matches = uiState.receiverMatches,
                             onCardClick = onNavigateToCardDetail,
                             onAdd   = { row ->
-                                val card = row.card
                                 viewModel.addSuggestionToReceiver(
-                                    TradeItemDraft(
-                                        cardId       = card.scryfallId,
-                                        cardName     = card.name,
-                                        imageUrl     = card.imageArtCrop ?: card.imageNormal,
-                                        typeLine     = card.typeLine,
-                                        setCode      = card.setCode,
-                                        setName      = card.setName,
-                                        rarity       = card.rarity,
-                                        priceUsd     = card.priceUsd,
-                                        priceUsdFoil = card.priceUsdFoil,
-                                        priceEur     = card.priceEur,
-                                        priceEurFoil = card.priceEurFoil,
-                                        quantity     = 1,
-                                        isFoil       = row.offerEntry?.isFoil ?: false,
-                                        condition    = row.offerEntry?.condition ?: "NM",
-                                        language     = row.offerEntry?.language ?: "en",
-                                        userCardIdRef = row.offerEntry?.userCardId,
-                                        isInCollection = row.offerEntry != null,
-                                    )
+                                    row.toTradeItemDraft(isInCollection = row.offerEntry != null)
                                 )
                             },
                         )
@@ -531,25 +480,9 @@ fun CreateTradeProposalScreen(
             ),
             onAdd = { row ->
                 focusManager.clearFocus()
-                val card = row.card
-                val draft = TradeItemDraft(
-                    cardId = card.scryfallId,
-                    cardName = card.name,
-                    imageUrl = card.imageArtCrop ?: card.imageNormal,
-                    typeLine = card.typeLine,
-                    setCode = card.setCode,
-                    setName = card.setName,
-                    rarity = card.rarity,
-                    priceUsd = card.priceUsd,
-                    priceUsdFoil = card.priceUsdFoil,
-                    priceEur = card.priceEur,
-                    priceEurFoil = card.priceEurFoil,
-                    quantity = 1,
-                    isFoil = row.wishlistEntry?.isFoil ?: row.offerEntry?.isFoil ?: false,
-                    condition = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM",
-                    language = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en",
-                    userCardIdRef = row.offerEntry?.userCardId,
+                val draft = row.toTradeItemDraft(
                     isInCollection = row.isOwned || row.offerEntry != null || row.wishlistEntry != null,
+                    fromFriendList = side == TradeSide.PROPOSER && row.offerEntry == null && row.wishlistEntry != null,
                 )
                 when (side) {
                     TradeSide.PROPOSER -> viewModel.addProposerItem(draft)
@@ -558,22 +491,8 @@ fun CreateTradeProposalScreen(
             },
             onRemove = { row ->
                 focusManager.clearFocus()
-                // Derive the same normalized variant fields that onAdd uses when building the
-                // TradeItemDraft, so the findLast predicate matches the stored item exactly.
-                // WishlistEntry.condition / .language are nullable; if null, onAdd falls back to
-                // "NM" / "en" — we must apply the same fallback here or the comparison fails.
-                val resolvedIsFoil = row.wishlistEntry?.isFoil ?: row.offerEntry?.isFoil ?: false
-                val resolvedCondition = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM"
-                val resolvedLanguage = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en"
-                val resolvedUserCardIdRef = row.offerEntry?.userCardId
-
-                val predicate: (TradeItemDraft) -> Boolean = { item ->
-                    item.cardId == row.card.scryfallId &&
-                        item.isFoil == resolvedIsFoil &&
-                        item.condition == resolvedCondition &&
-                        item.language == resolvedLanguage &&
-                            item.userCardIdRef == resolvedUserCardIdRef
-                }
+                // Same variant resolution as onAdd, so the removed item is the one that was added.
+                val predicate: (TradeItemDraft) -> Boolean = { item -> row.matchesDraft(item) }
 
                 when (side) {
                     TradeSide.PROPOSER ->
@@ -607,6 +526,12 @@ fun CreateTradeProposalScreen(
         editingItem?.let { item ->
             AddCardSheet(
                 cardName = item.cardName,
+                initialFoil = item.isFoil,
+                initialCondition = item.condition,
+                initialLanguage = item.language,
+                initialQty = item.quantity,
+                maxQty = item.maxQuantity ?: 99,
+                variantLocked = item.isVariantLocked,
                 onConfirm = { isFoil, condition, language, qty ->
                     val updated = item.copy(
                         quantity = qty,
@@ -630,6 +555,22 @@ fun CreateTradeProposalScreen(
                 confirmButtonText = stringResource(R.string.scanner_edit_save)
             )
         }
+    }
+
+    uiState.pendingFriendSwitch?.let { pending ->
+        MagicAlertDialog(
+            onDismissRequest = viewModel::onDismissFriendSwitch,
+            title = stringResource(R.string.trades_friend_switch_title),
+            text = stringResource(R.string.trades_friend_switch_body),
+            confirmLabel = stringResource(
+                if (pending.friend == null) R.string.trades_friend_switch_confirm_none
+                else R.string.trades_friend_switch_confirm
+            ),
+            onConfirm = viewModel::onConfirmFriendSwitch,
+            dismissLabel = stringResource(R.string.action_cancel),
+            onDismiss = viewModel::onDismissFriendSwitch,
+            confirmColor = MagicCtaColor.Error,
+        )
     }
 
     if (showLoginSheet) {

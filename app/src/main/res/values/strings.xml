@@ -3103,7 +3103,10 @@
     <string name="trades_add_card">Add card</string>
     <string name="trades_review_collection_chip">Review my collection</string>
     <string name="trades_review_collection_warning">Proposals with \'Review my collection\' cannot be accepted directly — only declined or countered.</string>
-    <string name="trades_save_draft">Save draft</string>
+    <string name="trades_friend_switch_title">Change trade partner?</string>
+    <string name="trades_friend_switch_body">Cards from the current friend\'s lists will be removed from this proposal.</string>
+    <string name="trades_friend_switch_confirm">Change friend</string>
+    <string name="trades_friend_switch_confirm_none">Remove friend</string>
     <string name="trades_send_proposal">Send proposal</string>
     <string name="trades_discard">Discard</string>
     <string name="trades_quantity">Qty</string>

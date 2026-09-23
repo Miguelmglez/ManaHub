@@ -1269,4 +1269,140 @@ class TradeProposalViewModelMatchesTest {
         val row = vm.uiState.value.proposerMatches.first()
         assertTrue("isExactMatch must be false when foil flags differ", !row.isExactMatch)
     }
+
+    // =========================================================================
+    // GROUP 9: trades audit 2026-09-23 regressions (C2, H9, H10, H11)
+    // =========================================================================
+
+    @Test
+    fun `given friend wishes foil and non-foil of one card then the wishlist rows have distinct keys`() = runTest {
+        val friend = buildFriend()
+        stubFriendWishlist(
+            FRIEND_USER_ID,
+            listOf(
+                buildFriendCard(CARD_ID_LIGHTNING_BOLT, isFoil = false),
+                buildFriendCard(CARD_ID_LIGHTNING_BOLT, isFoil = true),
+            ),
+        )
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(friend)
+        advanceUntilIdle()
+
+        vm.onOpenSearch(TradeSide.PROPOSER)
+        advanceUntilIdle()
+
+        val keys = vm.uiState.value.wishlistResults.map { it.uniqueKey }
+        assertEquals(2, keys.size)
+        assertEquals("LazyColumn keys must never collide", 2, keys.toSet().size)
+    }
+
+    @Test
+    fun `given friend wishes a foil and I offer a non-foil then the suggested item uses my copy`() = runTest {
+        offerFlow.value = listOf(buildOfferEntry(CARD_ID_LIGHTNING_BOLT, isFoil = false, condition = "LP", language = "de", quantity = 3))
+        val friend = buildFriend()
+        stubFriendWishlist(FRIEND_USER_ID, listOf(buildFriendCard(CARD_ID_LIGHTNING_BOLT, isFoil = true, condition = "NM", language = "en")))
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(friend)
+        advanceUntilIdle()
+
+        val draft = vm.uiState.value.proposerMatches.single().toTradeItemDraft(isInCollection = true)
+
+        assertEquals(false, draft.isFoil)
+        assertEquals("LP", draft.condition)
+        assertEquals("de", draft.language)
+        assertEquals("uc-$CARD_ID_LIGHTNING_BOLT", draft.userCardIdRef)
+        assertEquals(3, draft.maxQuantity)
+        assertTrue(vm.uiState.value.proposerMatches.single().matchesDraft(draft))
+    }
+
+    @Test
+    fun `given an offered item at its cap when added again then the quantity never exceeds the offer`() = runTest {
+        offerFlow.value = listOf(buildOfferEntry(CARD_ID_LIGHTNING_BOLT, quantity = 2))
+        val friend = buildFriend()
+        stubFriendWishlist(FRIEND_USER_ID, listOf(buildFriendCard(CARD_ID_LIGHTNING_BOLT)))
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(friend)
+        advanceUntilIdle()
+        val row = vm.uiState.value.proposerMatches.single()
+
+        repeat(3) { vm.addSuggestionToProposer(row.toTradeItemDraft(isInCollection = true)) }
+
+        assertEquals(2, vm.uiState.value.proposerItems.single().quantity)
+    }
+
+    @Test
+    fun `given an item tied to a row when its variant is edited then the ref and cap are dropped and quantity stays valid`() = runTest {
+        val vm = createViewModel()
+        advanceUntilIdle()
+        val item = TradeItemDraft(cardId = CARD_ID_LIGHTNING_BOLT, userCardIdRef = "uc-1", maxQuantity = 2)
+        vm.addSuggestionToProposer(item)
+        val stored = vm.uiState.value.proposerItems.single()
+
+        vm.updateProposerItem(stored.copy(quantity = 5))
+        assertEquals("quantity is clamped while the ref holds", 2, vm.uiState.value.proposerItems.single().quantity)
+
+        vm.updateProposerItem(stored.copy(isFoil = true, quantity = 5))
+        val edited = vm.uiState.value.proposerItems.single()
+        assertEquals(null, edited.userCardIdRef)
+        assertEquals(null, edited.maxQuantity)
+        assertEquals(5, edited.quantity)
+    }
+
+    @Test
+    fun `given the draft holds friend items when switching friend then confirmation is required and items survive until confirmed`() = runTest {
+        val friend = buildFriend()
+        val other = buildFriend(userId = "user-friend-003", nickname = "Other")
+        stubFriendWishlist(FRIEND_USER_ID, emptyList())
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+        stubFriendWishlist("user-friend-003", emptyList())
+        stubFriendOffers("user-friend-003", emptyList())
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(friend)
+        advanceUntilIdle()
+        vm.addSuggestionToReceiver(TradeItemDraft(cardId = CARD_ID_COUNTERSPELL))
+        vm.addSuggestionToProposer(TradeItemDraft(cardId = CARD_ID_DARK_RITUAL, fromFriendList = true))
+        vm.addSuggestionToProposer(TradeItemDraft(cardId = CARD_ID_LIGHTNING_BOLT, userCardIdRef = "uc-mine"))
+
+        vm.onFriendSelected(other)
+        advanceUntilIdle()
+
+        assertEquals(FRIEND_USER_ID, vm.uiState.value.selectedFriend?.userId)
+        assertEquals(other, vm.uiState.value.pendingFriendSwitch?.friend)
+        assertEquals(1, vm.uiState.value.receiverItems.size)
+
+        vm.onConfirmFriendSwitch()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals("user-friend-003", state.selectedFriend?.userId)
+        assertTrue(state.receiverItems.isEmpty())
+        assertEquals(listOf(CARD_ID_LIGHTNING_BOLT), state.proposerItems.map { it.cardId })
+        assertEquals(null, state.pendingFriendSwitch)
+    }
+
+    @Test
+    fun `given a pending friend switch when dismissed then the original friend and items stay`() = runTest {
+        val friend = buildFriend()
+        stubFriendWishlist(FRIEND_USER_ID, emptyList())
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(friend)
+        advanceUntilIdle()
+        vm.addSuggestionToReceiver(TradeItemDraft(cardId = CARD_ID_COUNTERSPELL))
+
+        vm.onFriendSelected(null)
+        vm.onDismissFriendSwitch()
+        advanceUntilIdle()
+
+        assertEquals(FRIEND_USER_ID, vm.uiState.value.selectedFriend?.userId)
+        assertEquals(1, vm.uiState.value.receiverItems.size)
+    }
 }

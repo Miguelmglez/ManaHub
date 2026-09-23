@@ -75,7 +75,58 @@ data class TradeItemDraft(
     val isReviewCollectionPlaceholder: Boolean = false,
     /** True if this card was found in the user's registered collection or offer list when added. */
     val isInCollection: Boolean = true,
-)
+    /** Copies available on the offer this item was picked from; null when unbounded. */
+    val maxQuantity: Int? = null,
+    /** True when the item came from the selected friend's own lists (their wishlist). */
+    val fromFriendList: Boolean = false,
+) {
+    /** True when the item is tied to a concrete collection row, so its variant must not change. */
+    val isVariantLocked: Boolean get() = !userCardIdRef.isNullOrBlank()
+
+    /** Returns a copy whose quantity is [newQuantity] clamped to 1..[maxQuantity]. */
+    fun withQuantity(newQuantity: Int): TradeItemDraft =
+        copy(quantity = newQuantity.coerceIn(1, maxQuantity?.coerceAtLeast(1) ?: Int.MAX_VALUE))
+}
+
+/**
+ * Builds the draft for a picked [AddCardRow]. The offered copy's variant wins over the wished one:
+ * the offer is the physical card that changes hands, the wish only says what the other side wants.
+ */
+internal fun AddCardRow.toTradeItemDraft(isInCollection: Boolean, fromFriendList: Boolean = false): TradeItemDraft =
+    TradeItemDraft(
+        cardId = card.scryfallId,
+        cardName = card.name,
+        imageUrl = card.imageArtCrop ?: card.imageNormal,
+        typeLine = card.typeLine,
+        setCode = card.setCode,
+        setName = card.setName,
+        rarity = card.rarity,
+        priceUsd = card.priceUsd,
+        priceUsdFoil = card.priceUsdFoil,
+        priceEur = card.priceEur,
+        priceEurFoil = card.priceEurFoil,
+        quantity = 1,
+        isFoil = offerEntry?.isFoil ?: wishlistEntry?.isFoil ?: false,
+        condition = offerEntry?.condition ?: wishlistEntry?.condition ?: "NM",
+        language = offerEntry?.language ?: wishlistEntry?.language ?: "en",
+        userCardIdRef = offerEntry?.userCardId?.takeIf { it.isNotBlank() },
+        isInCollection = isInCollection,
+        maxQuantity = offerEntry?.quantity?.takeIf { it > 0 },
+        fromFriendList = fromFriendList,
+    )
+
+/** True when [draft] is the item [toTradeItemDraft] builds for this row (same card, variant and ref). */
+internal fun AddCardRow.matchesDraft(draft: TradeItemDraft): Boolean {
+    val expected = toTradeItemDraft(isInCollection = true)
+    return draft.cardId == expected.cardId &&
+        draft.isFoil == expected.isFoil &&
+        draft.condition == expected.condition &&
+        draft.language == expected.language &&
+        draft.userCardIdRef == expected.userCardIdRef
+}
+
+/** A friend change waiting for confirmation because it would drop friend-specific items. */
+data class PendingFriendSwitch(val friend: Friend?)
 
 /**
  * One-shot events emitted by [TradeProposalViewModel].
@@ -88,7 +139,7 @@ data class TradeItemDraft(
  * ViewModel never carries a raw literal sentinel key like the old `errorMessage = "NO_RECEIVER"`.
  */
 sealed class ProposalEvent {
-    /** A draft was saved, or a proposal was sent/countered — navigate to its thread. */
+    /** A proposal was sent/countered — navigate to its thread. */
     data class NavigateToThread(val proposalId: String, val rootProposalId: String) : ProposalEvent()
 
     /** An edit/counter was submitted successfully — pop back to the previous screen. */
@@ -138,6 +189,8 @@ data class ProposalEditorUiState(
 
     val friends: List<Friend> = emptyList(),
     val selectedFriend: Friend? = null,
+    /** Set while a friend change that would drop the current friend's items awaits confirmation. */
+    val pendingFriendSwitch: PendingFriendSwitch? = null,
     val sessionState: SessionState = SessionState.Loading,
     val currentUserId: String = "",
     val currentUserNickname: String = "",
@@ -450,8 +503,44 @@ class TradeProposalViewModel(
         }
     }
 
+    /**
+     * Selects [friend] as the counterparty. Switching away from an already-selected friend while the
+     * draft holds that friend's items asks for confirmation first ([ProposalEditorUiState.pendingFriendSwitch]).
+     */
     fun onFriendSelected(friend: Friend?) {
-        _uiState.update { it.copy(selectedFriend = friend, receiverId = friend?.userId ?: "") }
+        val state = _uiState.value
+        val previous = state.selectedFriend
+        val isSwitch = previous != null && previous.userId != friend?.userId
+        val holdsFriendItems = state.receiverItems.isNotEmpty() || state.proposerItems.any { it.fromFriendList }
+        if (isSwitch && holdsFriendItems) {
+            _uiState.update { it.copy(pendingFriendSwitch = PendingFriendSwitch(friend)) }
+            return
+        }
+        applyFriendSelection(friend, clearFriendItems = isSwitch)
+    }
+
+    /** Confirms the pending friend switch, dropping the previous friend's items. */
+    fun onConfirmFriendSwitch() {
+        val pending = _uiState.value.pendingFriendSwitch ?: return
+        _uiState.update { it.copy(pendingFriendSwitch = null) }
+        applyFriendSelection(pending.friend, clearFriendItems = true)
+    }
+
+    /** Keeps the current friend and items. */
+    fun onDismissFriendSwitch() {
+        _uiState.update { it.copy(pendingFriendSwitch = null) }
+    }
+
+    private fun applyFriendSelection(friend: Friend?, clearFriendItems: Boolean) {
+        _uiState.update { s ->
+            val base = s.copy(selectedFriend = friend, receiverId = friend?.userId ?: "")
+            if (!clearFriendItems) base else base.copy(
+                receiverItems = emptyList(),
+                proposerItems = s.proposerItems.filterNot { it.fromFriendList },
+                pendingAddedItems = emptyList(),
+                includesReviewFromReceiver = false,
+            )
+        }
         if (friend != null) {
             fetchFriendData(friend.userId)
         } else {
@@ -834,7 +923,7 @@ class TradeProposalViewModel(
         _uiState.update { s ->
             val existing = s.pendingAddedItems.find { it.cardId == item.cardId && it.isFoil == item.isFoil && it.condition == item.condition && it.language == item.language && it.userCardIdRef == item.userCardIdRef }
             if (existing != null) {
-                s.copy(pendingAddedItems = s.pendingAddedItems.map { if (it.id == existing.id) it.copy(quantity = it.quantity + 1) else it })
+                s.copy(pendingAddedItems = s.pendingAddedItems.map { if (it.id == existing.id) it.withQuantity(it.quantity + 1) else it })
             } else {
                 s.copy(pendingAddedItems = s.pendingAddedItems + item)
             }
@@ -866,7 +955,7 @@ class TradeProposalViewModel(
         _uiState.update { s ->
             val existing = s.pendingAddedItems.find { it.cardId == item.cardId && it.isFoil == item.isFoil && it.condition == item.condition && it.language == item.language && it.userCardIdRef == item.userCardIdRef }
             if (existing != null) {
-                s.copy(pendingAddedItems = s.pendingAddedItems.map { if (it.id == existing.id) it.copy(quantity = it.quantity + 1) else it })
+                s.copy(pendingAddedItems = s.pendingAddedItems.map { if (it.id == existing.id) it.withQuantity(it.quantity + 1) else it })
             } else {
                 s.copy(pendingAddedItems = s.pendingAddedItems + item)
             }
@@ -910,7 +999,7 @@ class TradeProposalViewModel(
             if (existing != null) {
                 s.copy(
                     proposerItems = s.proposerItems.map {
-                        if (it.id == existing.id) it.copy(quantity = it.quantity + 1) else it
+                        if (it.id == existing.id) it.withQuantity(it.quantity + 1) else it
                     }
                 )
             } else {
@@ -937,7 +1026,7 @@ class TradeProposalViewModel(
             if (existing != null) {
                 s.copy(
                     receiverItems = s.receiverItems.map {
-                        if (it.id == existing.id) it.copy(quantity = it.quantity + 1) else it
+                        if (it.id == existing.id) it.withQuantity(it.quantity + 1) else it
                     }
                 )
             } else {
@@ -983,7 +1072,7 @@ class TradeProposalViewModel(
             }
             if (duplicate != null) {
                 val idx = result.indexOf(duplicate)
-                result[idx] = duplicate.copy(quantity = duplicate.quantity + addition.quantity)
+                result[idx] = duplicate.withQuantity(duplicate.quantity + addition.quantity)
             } else {
                 result.add(addition)
             }
@@ -1005,79 +1094,36 @@ class TradeProposalViewModel(
 
     fun updateProposerItem(updated: TradeItemDraft) {
         _uiState.update {
-            it.copy(proposerItems = it.proposerItems.map { i -> if (i.id == updated.id) updated else i })
+            it.copy(proposerItems = it.proposerItems.map { i -> if (i.id == updated.id) reconcileEdit(i, updated) else i })
         }
     }
 
     fun updateReceiverItem(updated: TradeItemDraft) {
         _uiState.update {
-            it.copy(receiverItems = it.receiverItems.map { i -> if (i.id == updated.id) updated else i })
+            it.copy(receiverItems = it.receiverItems.map { i -> if (i.id == updated.id) reconcileEdit(i, updated) else i })
         }
+    }
+
+    /**
+     * A ref names one concrete collection row, so an edit that changes the variant can no longer
+     * point at it: the ref and its availability cap are dropped. The quantity always stays in range.
+     */
+    private fun reconcileEdit(original: TradeItemDraft, edited: TradeItemDraft): TradeItemDraft {
+        val variantChanged = edited.isFoil != original.isFoil ||
+            edited.condition != original.condition ||
+            edited.language != original.language
+        val detached = if (variantChanged && original.isVariantLocked) {
+            edited.copy(userCardIdRef = null, maxQuantity = null)
+        } else {
+            edited
+        }
+        return detached.withQuantity(edited.quantity)
     }
 
     private fun validateInitialProposal(state: ProposalEditorUiState): Boolean {
         val proposerCovered = state.proposerItems.isNotEmpty() || state.includesReviewFromProposer
         val receiverCovered = state.receiverItems.isNotEmpty() || state.includesReviewFromReceiver
         return proposerCovered && receiverCovered
-    }
-
-    fun onSaveDraft() {
-        val state = _uiState.value
-        // A missing receiver ID would send an empty string to the RPC, which
-        // either fails with a cryptic server error or creates a malformed proposal.
-        if (!state.isCounterMode && state.receiverId.isBlank()) {
-            _events.trySend(ProposalEvent.ShowValidationError(R.string.trades_error_no_receiver))
-            return
-        }
-        if (!state.isCounterMode && state.receiverId == state.currentUserId) {
-            _events.trySend(ProposalEvent.ShowValidationError(R.string.trades_error_self_trade))
-            return
-        }
-        if (!validateInitialProposal(state)) {
-            _events.trySend(ProposalEvent.ShowValidationError(R.string.trades_error_initial_asymmetry))
-            return
-        }
-
-        // Atomic capture-and-flip: bail if a save/send is already in flight so a fast
-        // double-tap can never create two proposals (audit §2.7). The button's
-        // `enabled = !isSaving` alone is not sufficient — it updates asynchronously and
-        // leaves a window between two taps. Mirrors the DeckStudioViewModel.generateFromSeeds
-        // precedent (CLAUDE.md).
-        var captured: ProposalEditorUiState? = null
-        _uiState.update { s ->
-            if (s.isSaving) return@update s
-            captured = s
-            s.copy(isSaving = true)
-        }
-        val snapshot = captured ?: return
-
-        viewModelScope.launch(ioDispatcher) {
-            val result = createProposal(
-                receiverId = snapshot.receiverId,
-                items = buildItemRequestDtos(snapshot),
-                includesReviewFromProposer = snapshot.includesReviewFromProposer,
-                includesReviewFromReceiver = snapshot.includesReviewFromReceiver,
-                autoSend = false,
-            )
-            result.fold(
-                onSuccess = { proposalId ->
-                    _uiState.update { it.copy(isSaving = false) }
-                    _events.trySend(ProposalEvent.NavigateToThread(proposalId, proposalId))
-                },
-                onFailure = { e ->
-                    FirebaseCrashlytics.getInstance().apply {
-                        log("trade_proposal_save_draft_failed")
-                        setCustomKey("trade_proposer_item_count", snapshot.proposerItems.size)
-                        recordException(e)
-                    }
-                    _uiState.update { it.copy(isSaving = false) }
-                    // Only a typed TradeError's pre-resolved friendly text reaches the user;
-                    // any other exception's raw message is never shown (audit §5.1) — the
-                    // screen falls back to a generic string when this is null.
-                    _events.trySend(ProposalEvent.ShowRemoteError(if (e is TradeError) e.toUserFacingMessage() else null))
-                }
-            )
-        }
     }
 
     fun onSendProposal() {
@@ -1103,7 +1149,8 @@ class TradeProposalViewModel(
             return
         }
 
-        // Atomic capture-and-flip — see onSaveDraft() for rationale (audit §2.7).
+        // Atomic capture-and-flip: a fast double-tap must never create two proposals (audit §2.7);
+        // `enabled = !isSaving` alone updates asynchronously and leaves a window between taps.
         var captured: ProposalEditorUiState? = null
         _uiState.update { s ->
             if (s.isSaving) return@update s
@@ -1262,7 +1309,8 @@ class TradeProposalViewModel(
 
     /** Synthetic [WishlistEntry] carrying the friend's metadata into [TradeItemDraft]. */
     private fun FriendCard.toSyntheticWishlistEntry() = WishlistEntry(
-        id = scryfallId,
+        // One scryfallId can be wished in several variants; the id feeds LazyColumn keys.
+        id = rowId ?: "${scryfallId}_${isFoil}_${condition}_${language}",
         userId = "",
         cardId = scryfallId,
         quantity = quantity,
