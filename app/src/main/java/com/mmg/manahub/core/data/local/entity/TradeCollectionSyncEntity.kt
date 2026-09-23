@@ -18,4 +18,9 @@ data class TradeCollectionSyncEntity(
     @ColumnInfo(name = "proposal_id") val proposalId: String,
     @ColumnInfo(name = "user_id") val userId: String,
     @ColumnInfo(name = "synced_at") val syncedAt: Long = System.currentTimeMillis(),
+    /**
+     * True when the user chose to update the collection but the trade was not COMPLETED yet: the
+     * collection is untouched and the change is applied once COMPLETED is observed.
+     */
+    @ColumnInfo(name = "pending_apply", defaultValue = "0") val pendingApply: Boolean = false,
 )

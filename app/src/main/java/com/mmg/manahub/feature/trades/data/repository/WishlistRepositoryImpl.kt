@@ -31,6 +31,8 @@ import java.util.UUID
 class WishlistRepositoryImpl(
     private val dao: LocalWishlistDao,
     private val remote: WishlistRemoteDataSource,
+    // Signed-in account id, stamped on new rows so they never migrate into another account.
+    private val currentUserId: suspend () -> String? = { null },
 ) : WishlistRepository {
 
     // Serialises concurrent addLocal calls to prevent the TOCTOU race on the
@@ -63,13 +65,16 @@ class WishlistRepositoryImpl(
             if (existing != null) {
                 dao.update(existing.copy(quantity = existing.quantity + entry.quantity))
             } else {
-                dao.insert(entry.toEntity())
+                dao.insert(entry.toEntity(currentUserId()))
             }
         }
     }
 
     override suspend fun addAllLocal(entries: List<WishlistEntry>): Result<Unit> = addMutex.withLock {
-        runCatching { dao.addOrMergeAll(entries.map { it.toEntity() }) }
+        runCatching {
+            val owner = currentUserId()
+            dao.addOrMergeAll(entries.map { it.toEntity(owner) })
+        }
     }
 
     override suspend fun removeLocal(id: String): Result<Unit> = runCatching {
@@ -110,7 +115,13 @@ class WishlistRepositoryImpl(
     override suspend fun removeRemote(id: String): Result<Unit> =
         remote.removeWishlistEntry(id)
 
+    override suspend fun evictForeignAccountRows(userId: String): Result<Unit> = runCatching {
+        dao.deleteForeignAccountRows(userId)
+    }
+
     override suspend fun migrateLocalToRemote(userId: String): Result<Int> = runCatching {
+        // A previous account's unsynced rows must never be pushed into this account.
+        dao.deleteForeignAccountRows(userId)
         val unsynced = dao.getUnsynced()
         if (unsynced.isEmpty()) return@runCatching 0
 
@@ -124,10 +135,12 @@ class WishlistRepositoryImpl(
         // observeLocal() continues to show them without re-downloading from remote.
         remote.batchAddWishlistEntries(dtos).getOrThrow()
         dao.markSynced(unsynced.map { it.id })
+        dao.stampOwner(unsynced.map { it.id }, userId)
         unsynced.size
     }
 
     override suspend fun syncFromRemote(userId: String): Result<Unit> = runCatching {
+        dao.deleteForeignAccountRows(userId)
         val dtos = remote.getWishlist(userId).getOrThrow()
         val remoteIds = dtos.map { it.id }.toSet()
         val entities = dtos.map { dto ->
@@ -147,6 +160,7 @@ class WishlistRepositoryImpl(
                 // and TradesRepositoryImpl.parseIso().
                 createdAt = runCatching { Instant.parse(dto.createdAt).toEpochMilliseconds() }
                     .getOrDefault(0L),
+                ownerUserId = userId,
             )
         }
         dao.upsertAll(entities)
@@ -231,7 +245,7 @@ class WishlistRepositoryImpl(
                     existing.copy(quantity = existing.quantity + entry.quantity)
                         .also { dao.update(it) }
                 } else {
-                    entry.toEntity().also { dao.insert(it) }
+                    entry.toEntity(currentUserId()).also { dao.insert(it) }
                 }
             }
         }.getOrElse { return Result.failure(it) }
@@ -401,7 +415,7 @@ class WishlistRepositoryImpl(
         card = card?.toDomainCard()
     )
 
-    private fun WishlistEntry.toEntity() = LocalWishlistEntity(
+    private fun WishlistEntry.toEntity(ownerUserId: String?) = LocalWishlistEntity(
         id = id.ifBlank { UUID.randomUUID().toString() },
         scryfallId = cardId,
         quantity = quantity,
@@ -411,6 +425,7 @@ class WishlistRepositoryImpl(
         language = language,
         synced = false,
         createdAt = createdAt,
+        ownerUserId = ownerUserId,
     )
 
     private fun LocalWishlistEntity.toDto(userId: String) = WishlistEntryDto(

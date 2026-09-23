@@ -31,6 +31,8 @@ import java.util.UUID
 class OpenForTradeRepositoryImpl(
     private val dao: LocalOpenForTradeDao,
     private val remote: OpenForTradeRemoteDataSource,
+    // Signed-in account id, stamped on new rows so they never migrate into another account.
+    private val currentUserId: suspend () -> String? = { null },
 ) : OpenForTradeRepository {
 
     // Serialises concurrent addLocal/addAndSync calls to prevent the TOCTOU race on the
@@ -121,6 +123,7 @@ class OpenForTradeRepositoryImpl(
                         language = language,
                         synced = false,
                         createdAt = System.currentTimeMillis(),
+                        ownerUserId = currentUserId(),
                     )
                 )
             }
@@ -153,7 +156,13 @@ class OpenForTradeRepositoryImpl(
     override suspend fun removeRemote(id: String): Result<Unit> =
         remote.removeOpenForTradeEntry(id)
 
+    override suspend fun evictForeignAccountRows(userId: String): Result<Unit> = runCatching {
+        dao.deleteForeignAccountRows(userId)
+    }
+
     override suspend fun migrateLocalToRemote(userId: String): Result<Int> = runCatching {
+        // A previous account's unsynced rows must never be pushed into this account.
+        dao.deleteForeignAccountRows(userId)
         val unsynced = dao.getUnsynced()
         if (unsynced.isEmpty()) return@runCatching 0
 
@@ -162,6 +171,7 @@ class OpenForTradeRepositoryImpl(
         // observeLocal() continues to show them without re-downloading from remote.
         remote.batchAddOpenForTradeEntries(unsynced.map { it.localCollectionId }).getOrThrow()
         dao.markSynced(unsynced.map { it.id })
+        dao.stampOwner(unsynced.map { it.id }, userId)
         unsynced.size
     }
 
@@ -195,6 +205,7 @@ class OpenForTradeRepositoryImpl(
                     language = language,
                     synced = false,
                     createdAt = System.currentTimeMillis(),
+                    ownerUserId = userId,
                 ).also { dao.upsert(it) }
             }
             // localCollectionId == user_card_collection.id in Supabase — no lookup needed.
@@ -204,6 +215,7 @@ class OpenForTradeRepositoryImpl(
     }
 
     override suspend fun syncFromRemote(userId: String): Result<Unit> = runCatching {
+        dao.deleteForeignAccountRows(userId)
         val dtos = remote.getOpenForTrade(userId).getOrThrow()
         val remoteIds = dtos.map { it.id }.toSet()
         val entities = dtos.map { dto ->
@@ -223,6 +235,7 @@ class OpenForTradeRepositoryImpl(
                 // and TradesRepositoryImpl.parseIso().
                 createdAt = runCatching { Instant.parse(dto.createdAt).toEpochMilliseconds() }
                     .getOrDefault(0L),
+                ownerUserId = userId,
             )
         }
         dao.upsertAll(entities)

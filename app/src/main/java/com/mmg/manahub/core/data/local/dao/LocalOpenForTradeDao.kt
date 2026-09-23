@@ -96,6 +96,22 @@ interface LocalOpenForTradeDao {
     @Query("DELETE FROM local_open_for_trade WHERE synced = 1")
     suspend fun clearSynced()
 
+    /**
+     * Removes rows that belong to an account other than [userId]: rows owned by someone else, and
+     * server-backed rows not proven to be [userId]'s (they re-download on the next sync). Guest
+     * rows (null owner, unsynced) survive and migrate to [userId].
+     */
+    @Query("""
+        DELETE FROM local_open_for_trade
+        WHERE (owner_user_id IS NOT NULL AND owner_user_id != :userId)
+           OR (synced = 1 AND (owner_user_id IS NULL OR owner_user_id != :userId))
+    """)
+    suspend fun deleteForeignAccountRows(userId: String)
+
+    /** Claims ownerless rows [ids] for [ownerUserId] (guest rows just migrated to that account). */
+    @Query("UPDATE local_open_for_trade SET owner_user_id = :ownerUserId WHERE id IN (:ids) AND owner_user_id IS NULL")
+    suspend fun stampOwner(ids: List<String>, ownerUserId: String)
+
     @Query("DELETE FROM local_open_for_trade WHERE synced = 1 AND id NOT IN (:ids)")
     suspend fun deleteSyncedNotIn(ids: List<String>)
 

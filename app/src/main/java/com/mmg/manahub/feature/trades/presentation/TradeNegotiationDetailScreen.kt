@@ -125,6 +125,11 @@ fun TradeNegotiationDetailScreen(
                         )
                     }
                 }
+                NegotiationEvent.CollectionApplyDeferred ->
+                    toastState.show(
+                        context.getString(R.string.trades_collection_apply_deferred),
+                        MagicToastType.INFO,
+                    )
                 is NegotiationEvent.ShowError -> {
                     val msg = event.message ?: context.getString(R.string.trades_error_generic_body)
                     toastState.show(msg, MagicToastType.ERROR)
@@ -255,6 +260,7 @@ fun TradeNegotiationDetailScreen(
                             participantNames = uiState.participantNames,
                             isProcessing = uiState.isProcessing,
                             syncedCollectionProposalIds = uiState.syncedCollectionProposalIds,
+                            pendingApplyProposalIds = uiState.pendingApplyProposalIds,
                             isSyncingCollection = uiState.isSyncingCollection,
                             onAccept = { viewModel.onAccept(proposal.id) },
                             onDecline = { viewModel.onDecline(proposal.id) },
@@ -264,6 +270,7 @@ fun TradeNegotiationDetailScreen(
                             onCounter = { viewModel.onCounter(proposal.id) },
                             onEdit = { viewModel.onEdit(proposal.id) },
                             onUpdateCollection = { viewModel.onUpdateCollection(proposal.id) },
+                            onUndoCollectionChanges = { viewModel.onUndoCollectionChanges(proposal.id) },
                             onRetryItems = viewModel::refresh,
                             onCardClick = onNavigateToCardDetail,
                         )
@@ -296,6 +303,7 @@ private fun ProposalCard(
     participantNames: Map<String, String>,
     isProcessing: Boolean,
     syncedCollectionProposalIds: Set<String>,
+    pendingApplyProposalIds: Set<String>,
     isSyncingCollection: Boolean,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
@@ -305,6 +313,7 @@ private fun ProposalCard(
     onCounter: () -> Unit,
     onEdit: () -> Unit,
     onUpdateCollection: () -> Unit,
+    onUndoCollectionChanges: () -> Unit,
     onRetryItems: () -> Unit,
     onCardClick: (String) -> Unit,
 ) {
@@ -410,6 +419,28 @@ private fun ProposalCard(
                     onMarkCompleted = onMarkCompleted,
                     onCounter = onCounter,
                     onEdit = onEdit,
+                )
+            }
+
+            if (proposal.status == TradeStatus.ACCEPTED && proposal.id in pendingApplyProposalIds) {
+                Spacer(Modifier.height(MaterialTheme.spacing.md))
+                Text(
+                    text = stringResource(R.string.trades_collection_apply_deferred),
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.textSecondary,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            if (proposal.status == TradeStatus.REVOKED && proposal.id in syncedCollectionProposalIds) {
+                Spacer(Modifier.height(MaterialTheme.spacing.md))
+                MagicCtaButton(
+                    onClick = onUndoCollectionChanges,
+                    text = stringResource(R.string.trades_undo_collection_changes),
+                    enabled = proposal.itemsLoaded,
+                    isLoading = isSyncingCollection,
+                    color = MagicCtaColor.Error,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
 

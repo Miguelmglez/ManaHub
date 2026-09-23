@@ -56,6 +56,9 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.card.ResolveCardStrategyTagsUseCase
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager
@@ -182,6 +185,8 @@ class ManaHubApp : Application(), KoinComponent {
 
     // Lazy Koin resolution: read only from appScope after startKoin() in onCreate().
     private val remoteConfigRepository: RemoteConfigRepository by inject()
+    private val wishlistRepository: WishlistRepository by inject()
+    private val openForTradeRepository: OpenForTradeRepository by inject()
 
     @Inject lateinit var tagDictionaryRepo: TagDictionaryRepository
     @Inject lateinit var workManager: WorkManager
@@ -747,6 +752,14 @@ class ManaHubApp : Application(), KoinComponent {
                         if (previousUserId != state.user.id) {
                             previousUserId = state.user.id
                             CollectionSyncWorker.enqueueFirstLoginSync(workManager)
+                            val userId = state.user.id
+                            // Another account's wishlist/offers must not show up or migrate here.
+                            appScope.launch {
+                                wishlistRepository.evictForeignAccountRows(userId)
+                                    .onFailure { e -> recordNonFatal("trade_lists_evict_foreign_rows_failed", e) }
+                                openForTradeRepository.evictForeignAccountRows(userId)
+                                    .onFailure { e -> recordNonFatal("trade_lists_evict_foreign_rows_failed", e) }
+                            }
                         }
                         appScope.launch {
                             runCatching {

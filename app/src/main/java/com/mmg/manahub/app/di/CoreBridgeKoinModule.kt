@@ -197,15 +197,19 @@ fun coreBridgeKoinModule(
         )
     }
     single<WishlistRepository> {
+        val authRepository = get<AuthRepository>()
         WishlistRepositoryImpl(
             dao = get(),
             remote = get(),
+            currentUserId = { authRepository.getCurrentUser()?.id },
         )
     }
     single<OpenForTradeRepository> {
+        val authRepository = get<AuthRepository>()
         OpenForTradeRepositoryImpl(
             dao = get(),
             remote = get(),
+            currentUserId = { authRepository.getCurrentUser()?.id },
         )
     }
 

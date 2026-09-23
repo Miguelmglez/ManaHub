@@ -40,4 +40,8 @@ data class LocalWishlistEntity(
 
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),
+
+    // Account that created or downloaded the row; null = guest row, migrated to whoever signs in.
+    @ColumnInfo(name = "owner_user_id")
+    val ownerUserId: String? = null,
 )

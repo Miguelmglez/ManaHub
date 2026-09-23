@@ -159,6 +159,10 @@ object DatabaseModule {
                 // Deck Wizard Commander v3 plan, Phase 0 / E3: additive decks.posture_override
                 // column (the persisted posture pin, fixes F3).
                 MIGRATION_53_54,
+                // v54 → v55 lives as a top-level `val` in Migration_54_55.kt (same reason).
+                // Trades audit H4/H8: trade_collection_sync.pending_apply and owner_user_id on
+                // local_wishlists / local_open_for_trade (all additive).
+                MIGRATION_54_55,
             )
             .build()
 

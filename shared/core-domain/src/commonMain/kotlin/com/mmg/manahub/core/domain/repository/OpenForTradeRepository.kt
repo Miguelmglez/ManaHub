@@ -31,6 +31,13 @@ interface OpenForTradeRepository {
     suspend fun migrateLocalToRemote(userId: String): Result<Int>
 
     /**
+     * Removes local rows that belong to an account other than [userId] (a previous account's rows
+     * after an account switch), keeping guest rows so they migrate to [userId]. Call before any
+     * migrate/sync for [userId].
+     */
+    suspend fun evictForeignAccountRows(userId: String): Result<Unit> = Result.success(Unit)
+
+    /**
      * Inserts or updates an Open-For-Trade entry in local Room and immediately pushes it
      * to Supabase using [localCollectionId] as the remote `user_card_id`, then marks it
      * as synced without deleting the local row.
