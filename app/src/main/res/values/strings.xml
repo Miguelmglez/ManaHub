@@ -3299,6 +3299,14 @@
     <string name="trades_history_your_turn">Your turn</string>
     <string name="trades_history_refreshing">Updating…</string>
     <string name="trades_history_pull_to_refresh">Pull to refresh</string>
+    <string name="trades_quantity_multiplier">×%1$d</string>
+    <string name="trades_list_bullet">•</string>
+    <plurals name="trades_items_more">
+        <item quantity="one">…and %1$d more</item>
+        <item quantity="other">…and %1$d more</item>
+    </plurals>
+    <string name="trades_section_state_expanded">Expanded</string>
+    <string name="trades_section_state_collapsed">Collapsed</string>
 
     <!-- ══════════════════════════════════════════
          SCANNER — language names + wishlist button

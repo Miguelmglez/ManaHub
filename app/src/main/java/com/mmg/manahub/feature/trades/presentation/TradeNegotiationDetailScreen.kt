@@ -20,31 +20,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
@@ -56,18 +44,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardListItem
+import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.FullErrorState
@@ -77,10 +65,8 @@ import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.PullRefreshHeader
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.rememberPullRefreshState
-import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
-import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -354,7 +340,7 @@ private fun ProposalCard(
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                ProposalStatusBadge(status = proposal.status, mc = mc)
+                TradeStatusBadge(status = proposal.status)
 
                 val relativeTime = TimeAgoFormatter.format(proposal.updatedAt)
                 if (relativeTime.isNotBlank()) {
@@ -362,14 +348,14 @@ private fun ProposalCard(
                         Icon(
                             imageVector = Icons.Default.History,
                             contentDescription = null,
-                            tint = mc.textDisabled,
+                            tint = mc.textSecondary,
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(Modifier.width(MaterialTheme.spacing.xs))
                         Text(
                             text = relativeTime,
                             style = MaterialTheme.magicTypography.labelSmall,
-                            color = mc.textDisabled,
+                            color = mc.textSecondary,
                         )
                     }
                 }
@@ -477,87 +463,6 @@ private fun ProposalCard(
 }
 
 @Composable
-private fun ProposalStatusBadge(status: TradeStatus, mc: MagicColors) {
-    val color: Color
-    val icon: ImageVector
-    val labelRes: Int
-
-    when (status) {
-        TradeStatus.COMPLETED -> {
-            color = mc.lifePositive
-            icon = Icons.Default.CheckCircle
-            labelRes = R.string.trades_status_completed
-        }
-
-        TradeStatus.ACCEPTED -> {
-            color = mc.primaryAccent
-            icon = Icons.Default.Check
-            labelRes = R.string.trades_status_accepted
-        }
-
-        TradeStatus.CANCELLED -> {
-            color = mc.lifeNegative
-            icon = Icons.Default.Cancel
-            labelRes = R.string.trades_status_cancelled
-        }
-
-        TradeStatus.REVOKED -> {
-            color = mc.lifeNegative
-            icon = Icons.AutoMirrored.Filled.Undo
-            labelRes = R.string.trades_status_revoked
-        }
-
-        TradeStatus.DECLINED -> {
-            color = mc.goldMtg
-            icon = Icons.Default.Block
-            labelRes = R.string.trades_status_declined
-        }
-
-        TradeStatus.COUNTERED -> {
-            color = mc.secondaryAccent
-            icon = Icons.Default.SwapHoriz
-            labelRes = R.string.trades_status_countered
-        }
-
-        TradeStatus.PROPOSED -> {
-            color = mc.primaryAccent
-            icon = Icons.AutoMirrored.Filled.Send
-            labelRes = R.string.trades_status_proposed
-        }
-
-        TradeStatus.DRAFT -> {
-            color = mc.textSecondary
-            icon = Icons.Default.Edit
-            labelRes = R.string.trades_status_draft
-        }
-    }
-
-    Surface(
-        shape = ChipShape,
-        color = color.copy(alpha = 0.12f),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.2f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.sm, vertical = MaterialTheme.spacing.xs),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(14.dp)
-            )
-            Text(
-                text = stringResource(labelRes),
-                style = MaterialTheme.magicTypography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = color,
-            )
-        }
-    }
-}
-
-@Composable
 private fun ItemsSection(
     label: String,
     items: List<TradeItem>,
@@ -604,7 +509,7 @@ private fun ItemsSection(
                 Text(
                     text = stringResource(R.string.trades_review_collection_placeholder),
                     style = MaterialTheme.magicTypography.labelMedium,
-                    color = mc.secondaryAccent,
+                    color = mc.textPrimary,
                 )
             }
         }
@@ -617,7 +522,7 @@ private fun ItemsSection(
             priceUsd = null,
             priceEur = null,
             onClick = { onCardClick(item.cardId) },
-            quantityText = item.quantity?.let { "×$it" },
+            quantityText = item.quantity?.let { stringResource(R.string.trades_quantity_multiplier, it) },
             hasFoil = item.isFoil == true,
             condition = item.condition?.takeIf { it.isNotBlank() },
             language = item.language?.takeIf { it.isNotBlank() },
@@ -644,7 +549,6 @@ private fun ProposalActions(
     onCounter: () -> Unit,
     onEdit: () -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
     when (proposal.status) {
         // Drafts can no longer be created; legacy ones get no actions because the server rejects them.
         TradeStatus.DRAFT -> Unit
@@ -652,55 +556,48 @@ private fun ProposalActions(
         TradeStatus.PROPOSED -> {
             if (isProposer) {
                 Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
-                    OutlinedButton(
+                    MagicCtaButton(
                         onClick = onEdit,
+                        text = stringResource(R.string.trades_action_edit),
                         enabled = !isProcessing && proposal.itemsLoaded,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(stringResource(R.string.trades_action_edit), color = mc.textPrimary)
-                    }
-                    Button(
-                        onClick = onCancel,
-                        enabled = !isProcessing,
-                        colors = ButtonDefaults.buttonColors(containerColor = mc.lifeNegative),
+                        style = MagicCtaStyle.Outlined,
+                        color = MagicCtaColor.Neutral,
                         modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.trades_action_cancel), color = mc.background)
-                    }
+                    )
+                    MagicCtaButton(
+                        onClick = onCancel,
+                        text = stringResource(R.string.trades_action_cancel),
+                        enabled = !isProcessing,
+                        color = MagicCtaColor.Error,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
-                        Button(
+                        MagicCtaButton(
                             onClick = onAccept,
+                            text = stringResource(R.string.trades_action_accept),
                             enabled = !isProcessing,
-                            colors = ButtonDefaults.buttonColors(containerColor = mc.lifePositive),
+                            color = MagicCtaColor.Success,
                             modifier = Modifier.weight(1f),
-                        ) {
-                            Text(
-                                stringResource(R.string.trades_action_accept),
-                                color = mc.background
-                            )
-                        }
-                        Button(
+                        )
+                        MagicCtaButton(
                             onClick = onDecline,
+                            text = stringResource(R.string.trades_action_decline),
                             enabled = !isProcessing,
-                            colors = ButtonDefaults.buttonColors(containerColor = mc.lifeNegative),
+                            color = MagicCtaColor.Error,
                             modifier = Modifier.weight(1f),
-                        ) {
-                            Text(
-                                stringResource(R.string.trades_action_decline),
-                                color = mc.background
-                            )
-                        }
+                        )
                     }
-                    OutlinedButton(
+                    MagicCtaButton(
                         onClick = onCounter,
+                        text = stringResource(R.string.trades_action_counter),
                         enabled = !isProcessing && proposal.itemsLoaded,
+                        style = MagicCtaStyle.Outlined,
+                        color = MagicCtaColor.Primary,
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.trades_action_counter), color = mc.textPrimary)
-                    }
+                    )
                 }
             }
         }
@@ -715,25 +612,22 @@ private fun ProposalActions(
             }
             Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
                 if (!alreadyMarked) {
-                    Button(
+                    MagicCtaButton(
                         onClick = onMarkCompleted,
+                        text = stringResource(R.string.trades_action_mark_completed),
                         enabled = !isProcessing && proposal.itemsLoaded,
-                        colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+                        color = MagicCtaColor.Primary,
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            stringResource(R.string.trades_action_mark_completed),
-                            color = mc.background
-                        )
-                    }
+                    )
                 }
-                TextButton(
+                MagicCtaButton(
                     onClick = onRevoke,
+                    text = stringResource(R.string.trades_action_revoke),
                     enabled = !isProcessing,
+                    style = MagicCtaStyle.Ghost,
+                    color = MagicCtaColor.Error,
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.trades_action_revoke), color = mc.lifeNegative)
-                }
+                )
             }
         }
 
@@ -782,15 +676,6 @@ private fun MarkCompleteDialog(
 ) {
     val mc = MaterialTheme.magicColors
     val hasItems = sentItems.isNotEmpty() || receivedItems.isNotEmpty()
-    val unknownCard = stringResource(R.string.trades_unknown_card)
-
-    /** Formats up to 5 items as bullet points, appending "…and N more" when needed. */
-    fun formatItems(items: List<TradeItem>): String {
-        val shown = items.take(5).joinToString("\n") { item ->
-            "• ${item.cardName.ifBlank { unknownCard }} ×${item.quantity ?: 1}"
-        }
-        return if (items.size > 5) "$shown\n…and ${items.size - 5} more" else shown
-    }
 
     MagicAlertDialog(
         onDismissRequest = onDismiss,
@@ -810,11 +695,7 @@ private fun MarkCompleteDialog(
                             style = MaterialTheme.magicTypography.labelLarge.copy(fontWeight = FontWeight.Bold),
                             color = mc.textPrimary,
                         )
-                        Text(
-                            formatItems(sentItems),
-                            style = MaterialTheme.magicTypography.bodyMedium,
-                            color = mc.textSecondary,
-                        )
+                        TradeItemSummaryList(sentItems)
                         Text(
                             stringResource(R.string.trades_complete_dialog_send_note),
                             style = MaterialTheme.magicTypography.labelSmall,
@@ -827,11 +708,7 @@ private fun MarkCompleteDialog(
                             style = MaterialTheme.magicTypography.labelLarge.copy(fontWeight = FontWeight.Bold),
                             color = mc.textPrimary,
                         )
-                        Text(
-                            formatItems(receivedItems),
-                            style = MaterialTheme.magicTypography.bodyMedium,
-                            color = mc.textSecondary,
-                        )
+                        TradeItemSummaryList(receivedItems)
                         Text(
                             stringResource(R.string.trades_complete_dialog_receive_note),
                             style = MaterialTheme.magicTypography.labelSmall,
@@ -864,6 +741,45 @@ private fun MarkCompleteDialog(
             )
         }
     )
+}
+
+private const val SUMMARY_VISIBLE_ITEMS = 5
+
+/** Bulleted summary of up to [SUMMARY_VISIBLE_ITEMS] trade items, with an "…and N more" overflow line. */
+@Composable
+private fun TradeItemSummaryList(items: List<TradeItem>) {
+    val mc = MaterialTheme.magicColors
+    val style = MaterialTheme.magicTypography.bodyMedium
+    val unknownCard = stringResource(R.string.trades_unknown_card)
+    val bullet = stringResource(R.string.trades_list_bullet)
+    Column {
+        items.take(SUMMARY_VISIBLE_ITEMS).forEach { item ->
+            Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)) {
+                Text(text = bullet, style = style, color = mc.textSecondary)
+                CardName(
+                    name = item.cardName.ifBlank { unknownCard },
+                    style = style,
+                    color = mc.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Text(
+                    text = stringResource(R.string.trades_quantity_multiplier, item.quantity ?: 1),
+                    style = style,
+                    color = mc.textSecondary,
+                )
+            }
+        }
+        val hidden = items.size - SUMMARY_VISIBLE_ITEMS
+        if (hidden > 0) {
+            Text(
+                text = pluralStringResource(R.plurals.trades_items_more, hidden, hidden),
+                style = style,
+                color = mc.textSecondary,
+            )
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
