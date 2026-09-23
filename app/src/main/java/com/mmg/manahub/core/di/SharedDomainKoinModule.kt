@@ -1,6 +1,9 @@
 package com.mmg.manahub.core.di
 // COMMENTS_REVIEWED: 2026-09-16
 
+import com.mmg.manahub.core.domain.collection.transfer.ResolveCollectionImportUseCase
+import com.mmg.manahub.core.domain.usecase.collection.CommitImportedCardsUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.AddAllToWishlistUseCase
 import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.cache.ManaSymbolStore
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
@@ -199,12 +202,17 @@ fun sharedDomainKoinModule(
     }
     // App-wide so its commit guard covers the shared queue from every screen (also bridged to Hilt).
     single {
-        CardQueueActions(
+        CardQueueActions.forScannedCards(
             queueRepository = get(),
             commitScannedCards = get(),
             addToWishlist = get(),
         )
     }
+
+    // Collection import: batched resolution, no-XP commits and batched wishlist writes.
+    single { ResolveCollectionImportUseCase(cardRepository = get(), crashReporter = get()) }
+    single { CommitImportedCardsUseCase(userCardRepository = get(), crashReporter = get()) }
+    single { AddAllToWishlistUseCase(repo = get(), authRepo = get()) }
 
     // ── Deck use cases. ──
     single { GetDeckGameStatsUseCase(gameSessionRepository = get(), cardRepository = get()) }

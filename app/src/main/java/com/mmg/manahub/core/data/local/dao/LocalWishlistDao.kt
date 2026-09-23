@@ -97,6 +97,29 @@ interface LocalWishlistDao {
         language: String?,
     ): LocalWishlistEntity?
 
+    /** Inserts or merges every entry in one transaction; merged rows go back to unsynced. */
+    @Transaction
+    suspend fun addOrMergeAll(entries: List<LocalWishlistEntity>) {
+        entries.forEach { entry ->
+            val existing = getByAttributes(
+                scryfallId = entry.scryfallId,
+                matchAnyVariant = entry.matchAnyVariant,
+                isFoil = entry.isFoil,
+                condition = entry.condition,
+                language = entry.language,
+            )
+            if (existing != null) {
+                // Summed as Long first, like the collection path: an Int overflow here would
+                // write a negative wanted quantity.
+                val merged = (existing.quantity.toLong() + entry.quantity)
+                    .coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+                update(existing.copy(quantity = merged, synced = false))
+            } else {
+                insert(entry)
+            }
+        }
+    }
+
     @Delete
     suspend fun delete(entry: LocalWishlistEntity)
 

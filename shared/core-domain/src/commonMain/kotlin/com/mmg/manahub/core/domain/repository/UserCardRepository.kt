@@ -33,6 +33,15 @@ enum class UpdateEntryOutcome {
     ENTRY_NOT_FOUND,
 }
 
+/** One row of [UserCardRepository.addOrIncrementBatch]. */
+data class CollectionAddRequest(
+    val scryfallId: String,
+    val isFoil: Boolean,
+    val condition: String,
+    val language: String,
+    val quantity: Int,
+)
+
 /**
  * Contract for all collection (user card) persistence operations.
  *
@@ -112,6 +121,17 @@ interface UserCardRepository {
         userId: String?,
         quantity: Int = 1,
     ): AddOutcome
+
+    /**
+     * [addOrIncrement] for every entry of [entries] as ONE atomic write (a single Room transaction
+     * on Android), so a bulk add invalidates collection observers once instead of per row.
+     *
+     * @return one [AddOutcome] per entry, in order. Throws when the batch failed; nothing is written.
+     */
+    suspend fun addOrIncrementBatch(entries: List<CollectionAddRequest>, userId: String?): List<AddOutcome> =
+        entries.map {
+            addOrIncrement(it.scryfallId, it.isFoil, it.condition, it.language, isForTrade = false, userId, it.quantity)
+        }
 
     /**
      * Updates the trade flag and quantity for an existing row.

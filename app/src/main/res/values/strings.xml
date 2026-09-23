@@ -4158,4 +4158,83 @@
     <string name="home_daily_puzzle_unavailable">Today\'s puzzle isn\'t available right now</string>
     <string name="home_daily_puzzle_cta">Play</string>
 
+    <!-- Collection import / export -->
+    <string name="collection_transfer_sheet_title">Collection file tools</string>
+    <string name="collection_export_option">Export collection</string>
+    <string name="collection_export_option_desc">Save or share the cards currently shown</string>
+    <string name="collection_export_option_disabled">Nothing is shown to export</string>
+    <string name="collection_import_option">Import to collection</string>
+    <string name="collection_import_option_desc">Paste a list or pick a Moxfield, ManaBox or text file</string>
+    <string name="collection_import_title">Import to collection</string>
+    <string name="collection_import_hint">Paste a Moxfield or MTG Arena list such as 4 Lightning Bolt (2X2) 117 *F*, or import a Moxfield or ManaBox CSV. Section headers are ignored and every card goes into one review list.</string>
+    <string name="collection_import_placeholder">4 Lightning Bolt (2X2) 117 *F*\n1x Sol Ring\n2 Counterspell</string>
+    <string name="collection_import_from_file">Import from file</string>
+    <string name="collection_import_progress">Resolving cards: %1$d / %2$d lines</string>
+    <string name="collection_import_error_nothing_recognized">No card lines were recognized.</string>
+    <string name="collection_import_error_nothing_resolved">None of these cards could be found.</string>
+    <string name="collection_import_error_rate_limited">Scryfall is busy. Try again in %1$d s.</string>
+    <string name="collection_import_error_lookup_failed">Couldn\'t reach Scryfall. Check your connection and try again.</string>
+    <string name="collection_import_error_file_too_large">This file is too large (5 MB maximum).</string>
+    <string name="collection_import_error_file_unreadable">Couldn\'t read this file.</string>
+    <string name="collection_import_error_too_many_lines">This list is too long. Import up to %1$d cards at a time.</string>
+    <string name="collection_import_resume_title">Import waiting for review</string>
+    <plurals name="collection_import_resume_text">
+        <item quantity="one">%d card from a previous import is still waiting for review.</item>
+        <item quantity="other">%d cards from a previous import are still waiting for review.</item>
+    </plurals>
+    <string name="collection_import_resume_review">Review queue</string>
+    <string name="collection_import_resume_import_more">Import more</string>
+    <plurals name="collection_import_show_unresolved">
+        <item quantity="one">Show %d line not found</item>
+        <item quantity="other">Show %d lines not found</item>
+    </plurals>
+    <plurals name="collection_import_resolved">
+        <item quantity="one">%d card ready to review</item>
+        <item quantity="other">%d cards ready to review</item>
+    </plurals>
+    <!-- Two-number plurals below select on the SECOND number, so the first stays plural in both. -->
+    <plurals name="collection_import_resolved_with_unresolved">
+        <item quantity="one">%1$d cards ready to review, %2$d line not found</item>
+        <item quantity="other">%1$d cards ready to review, %2$d lines not found</item>
+    </plurals>
+    <plurals name="collection_import_resolved_with_capped">
+        <item quantity="one">%1$d cards ready to review; %2$d copy over the %3$d limit was dropped</item>
+        <item quantity="other">%1$d cards ready to review; %2$d copies over the %3$d limit were dropped</item>
+    </plurals>
+    <string name="collection_import_unresolved_title">Lines not found</string>
+    <plurals name="collection_import_unresolved_text">
+        <item quantity="one">%d line could not be matched to a card:</item>
+        <item quantity="other">%d lines could not be matched to a card:</item>
+    </plurals>
+    <plurals name="collection_import_unresolved_text_capped">
+        <item quantity="one">Showing %1$d of %2$d line that could not be matched to a card:</item>
+        <item quantity="other">Showing %1$d of %2$d lines that could not be matched to a card:</item>
+    </plurals>
+    <string name="collection_import_unresolved_copy">Copy lines</string>
+    <string name="collection_import_unresolved_copied">Lines copied</string>
+    <string name="collection_export_title">Export collection</string>
+    <string name="collection_export_format_label">Format</string>
+    <string name="collection_export_format_text">Text (.txt)</string>
+    <string name="collection_export_format_text_desc">Moxfield / MTG Arena list — condition and language are not included</string>
+    <string name="collection_export_format_moxfield">Moxfield CSV (.csv)</string>
+    <string name="collection_export_format_moxfield_desc">Moxfield collection import</string>
+    <string name="collection_export_format_manabox">ManaBox CSV (.csv)</string>
+    <string name="collection_export_format_manabox_desc">Includes Scryfall IDs</string>
+    <string name="collection_export_save">Save to device</string>
+    <string name="collection_export_share">Share file</string>
+    <string name="collection_export_share_chooser">Share collection export</string>
+    <plurals name="collection_export_saved">
+        <item quantity="one">Exported %d row</item>
+        <item quantity="other">Exported %d rows</item>
+    </plurals>
+    <plurals name="collection_export_saved_with_skipped">
+        <item quantity="one">Exported %1$d rows; %2$d row skipped (card data not available yet)</item>
+        <item quantity="other">Exported %1$d rows; %2$d rows skipped (card data not available yet)</item>
+    </plurals>
+    <plurals name="collection_export_saved_with_loose_printings">
+        <item quantity="one">Exported %1$d rows; %2$d row has no printing details and will re-import as any version</item>
+        <item quantity="other">Exported %1$d rows; %2$d rows have no printing details and will re-import as any version</item>
+    </plurals>
+    <string name="collection_export_nothing">Nothing to export</string>
+    <string name="collection_export_failed">Export failed. Try again.</string>
 </resources>

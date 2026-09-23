@@ -87,6 +87,7 @@ private class FakeWishlistRepository(
     override fun observeVersionsByOracle(oracleId: String, name: String): Flow<List<WishlistEntry>> = error("unused")
     override fun observeUnsyncedCount(): Flow<Int> = error("unused")
     override suspend fun addLocal(entry: WishlistEntry): Result<Unit> = error("unused")
+    override suspend fun addAllLocal(entries: List<WishlistEntry>): Result<Unit> = error("unused")
     override suspend fun removeLocal(id: String): Result<Unit> = error("unused")
     override suspend fun updateQuantityLocal(id: String, quantity: Int): Result<Unit> = error("unused")
     override suspend fun getRemote(userId: String): Result<List<WishlistEntry>> = error("unused")

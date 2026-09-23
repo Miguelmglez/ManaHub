@@ -44,6 +44,8 @@ Search and manage your entire collection with real-time Scryfall data.
 - "Select multiple" in Add Card: tap cards across searches (or browse a deck's cards from Deck Studio or a Community deck, with "Select all" / "Select missing"), then add them all to the collection or wishlist
 - Wishlist mode (a card can live in both collection and wishlist)
 - Batch price refresh via the Scryfall collection endpoint; stale-cache indicator
+- Import a collection from a pasted Moxfield / MTG Arena list or a Moxfield / ManaBox CSV file, reviewed in its own queue before anything is written
+- Export what the Cards tab currently shows (collection, wishlist or for-trade, with search and filters applied) as text, Moxfield CSV or ManaBox CSV, saved to the device or shared as a file
 
 ### 🏷 Automatic Card Tagging
 Cards are tagged automatically as they enter your collection, via English oracle-text analysis.

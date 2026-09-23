@@ -1,5 +1,14 @@
 package com.mmg.manahub.feature.collection.presentation
 
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
+import com.mmg.manahub.core.ui.components.MagicToastState
+import com.mmg.manahub.feature.collection.presentation.importexport.CollectionExportHost
+import com.mmg.manahub.feature.collection.presentation.importexport.CollectionImportHost
+import com.mmg.manahub.feature.collection.presentation.importexport.CollectionImportViewModel
+import com.mmg.manahub.feature.collection.presentation.importexport.CollectionTransferActionsSheet
 import com.mmg.manahub.feature.collection.presentation.components.CollectionMergeConflictSheet
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -143,6 +152,7 @@ fun CollectionScreen(
     onNavigateToTradeThread:   (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
     viewModel:                CollectionViewModel = koinViewModel(),
     advancedSearchViewModel:  AdvancedSearchViewModel = koinViewModel(),
+    importViewModel:          CollectionImportViewModel = koinViewModel(),
     sharedTransitionScope:    SharedTransitionScope? = null,
     animatedVisibilityScope:  AnimatedVisibilityScope? = null,
     /**
@@ -161,7 +171,13 @@ fun CollectionScreen(
     initialTabArg:            String? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val importState by importViewModel.uiState.collectAsStateWithLifecycle()
     var showAdvancedSearch by remember { mutableStateOf(false) }
+    var showTransferActions by remember { mutableStateOf(false) }
+    val toastState = rememberMagicToastState()
+    // Sheets render in their own window above the NavHost: unmount them while navigating away.
+    val isResumed = LocalLifecycleOwner.current.lifecycle
+        .currentStateAsState().value.isAtLeast(Lifecycle.State.RESUMED)
 
     LaunchedEffect(initialTabArg) {
         val forcedTab = when (initialTabArg?.lowercase()) {
@@ -175,6 +191,8 @@ fun CollectionScreen(
 
     CollectionContent(
         uiState               = uiState,
+        toastState            = toastState,
+        onOverflowClick       = { showTransferActions = true },
         onCardClick           = onCardClick,
         onAddCardClick        = onAddCardClick,
         onDeckClick           = { id ->
@@ -201,6 +219,43 @@ fun CollectionScreen(
         listState                  = viewModel.listState,
         sharedTransitionScope      = sharedTransitionScope,
         animatedVisibilityScope    = animatedVisibilityScope,
+    )
+
+    if (showTransferActions && isResumed) {
+        CollectionTransferActionsSheet(
+            canExport = uiState.canExport,
+            onExport = {
+                showTransferActions = false
+                viewModel.onExportRequested()
+            },
+            onImport = {
+                showTransferActions = false
+                importViewModel.onImportRequested()
+            },
+            onDismiss = { showTransferActions = false },
+        )
+    }
+
+    CollectionImportHost(
+        state = importState,
+        viewModel = importViewModel,
+        isResumed = isResumed,
+        toastState = toastState,
+        onCardClick = { entry -> onCardClick(entry.card.scryfallId, null) },
+    )
+
+    CollectionExportHost(
+        state = uiState.export,
+        isResumed = isResumed,
+        toastState = toastState,
+        fileName = viewModel::exportFileName,
+        onFormatSelected = viewModel::onExportFormatSelected,
+        onSaveTo = viewModel::onExportSave,
+        onShare = viewModel::onExportShare,
+        onShareLaunched = viewModel::onExportShareLaunched,
+        onShareFailed = viewModel::onExportShareFailed,
+        onMessageShown = viewModel::onExportMessageShown,
+        onDismiss = viewModel::onExportSheetDismissed,
     )
 
     if (showAdvancedSearch) {
@@ -241,6 +296,8 @@ fun CollectionScreen(
 @Composable
 private fun CollectionContent(
     uiState:              CollectionUiState,
+    toastState:           MagicToastState,
+    onOverflowClick:      () -> Unit,
     onCardClick:          (String, String?) -> Unit,
     onAddCardClick:       () -> Unit,
     onDeckClick:          (String) -> Unit,
@@ -263,7 +320,6 @@ private fun CollectionContent(
     animatedVisibilityScope:  AnimatedVisibilityScope? = null,
 ) {
     val mc = MaterialTheme.magicColors
-    val toastState = rememberMagicToastState()
     val syncErrorMsg       = stringResource(R.string.collection_sync_error)
     val migrationMsgFmt    = stringResource(R.string.trades_migration_synced_n_cards)
 
@@ -292,7 +348,10 @@ private fun CollectionContent(
             containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets(0),
             topBar = {
-                CollectionTopBar()
+                CollectionTopBar(
+                    showOverflow = uiState.selectedTab == CollectionTab.CARDS,
+                    onOverflowClick = onOverflowClick,
+                )
             },
             floatingActionButton = {
                 if (uiState.selectedTab == CollectionTab.CARDS) {
@@ -656,7 +715,10 @@ private fun CardsTabContent(
 }
 
 @Composable
-private fun CollectionTopBar() {
+private fun CollectionTopBar(
+    showOverflow: Boolean,
+    onOverflowClick: () -> Unit,
+) {
     val mc = MaterialTheme.magicColors
 
     Surface(
@@ -678,6 +740,15 @@ private fun CollectionTopBar() {
                 color    = mc.textPrimary,
                 modifier = Modifier.weight(1f)
             )
+            if (showOverflow) {
+                IconButton(onClick = onOverflowClick) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.action_more_options),
+                        tint = mc.textSecondary,
+                    )
+                }
+            }
         }
     }
 }

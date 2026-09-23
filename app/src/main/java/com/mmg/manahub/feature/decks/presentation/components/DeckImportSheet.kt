@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,17 +40,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
 /**
- * Bottom sheet where the user can paste a Moxfield/Arena deck list to import.
+ * Bottom sheet where the user can paste a Moxfield/Arena list to import (decks and the Collection
+ * import reuse it).
  *
  * @param isLoading   True while cards are being resolved in the background.
  * @param error       Non-null if the last import finished with an error/warning message.
  * @param onImport    Called with the raw pasted text when the user confirms.
  * @param onDismiss   Called when the sheet is dismissed.
+ * @param loadingText Replaces the generic loading label (e.g. a "resolved X / N" progress line).
+ * @param onImportFromFile When set, shows an "Import from file" action; the file is parsed by the
+ *   caller, never loaded into the text field.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +66,11 @@ fun DeckImportSheet(
     error: String?,
     onImport:  (text: String) -> Unit,
     onDismiss: () -> Unit,
+    title: String = stringResource(R.string.deck_import_title),
+    hint: String = stringResource(R.string.deck_import_hint),
+    placeholder: String = stringResource(R.string.deck_import_placeholder),
+    loadingText: String? = null,
+    onImportFromFile: (() -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -97,13 +110,13 @@ fun DeckImportSheet(
                 }
             }
             Text(
-                text  = stringResource(R.string.deck_import_title),
+                text  = title,
                 style = ty.titleMedium,
                 color = mc.textPrimary,
             )
 
             Text(
-                text  = stringResource(R.string.deck_import_hint),
+                text  = hint,
                 style = ty.bodySmall,
                 color = mc.textSecondary,
             )
@@ -113,7 +126,7 @@ fun DeckImportSheet(
                 onValueChange = { pastedText = it },
                 placeholder   = {
                     Text(
-                        text  = stringResource(R.string.deck_import_placeholder),
+                        text  = placeholder,
                         color = mc.textDisabled,
                         style = ty.bodySmall,
                     )
@@ -131,6 +144,18 @@ fun DeckImportSheet(
                 textStyle = ty.bodySmall,
                 maxLines  = 30,
             )
+
+            if (onImportFromFile != null) {
+                MagicCtaButton(
+                    onClick = onImportFromFile,
+                    enabled = !isLoading,
+                    text = stringResource(R.string.collection_import_from_file),
+                    style = MagicCtaStyle.Outlined,
+                    color = MagicCtaColor.Primary,
+                    icon = { Icon(Icons.Default.FileOpen, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             // Error / warning banner
             error?.let { msg ->
@@ -158,7 +183,7 @@ fun DeckImportSheet(
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        text  = stringResource(R.string.deck_import_loading),
+                        text  = loadingText ?: stringResource(R.string.deck_import_loading),
                         style = ty.bodySmall,
                         color = mc.textSecondary,
                     )

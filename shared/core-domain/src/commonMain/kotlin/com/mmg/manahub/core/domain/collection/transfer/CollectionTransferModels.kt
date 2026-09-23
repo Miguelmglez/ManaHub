@@ -1,0 +1,63 @@
+package com.mmg.manahub.core.domain.collection.transfer
+
+/** File formats the collection importer reads and the exporter writes. */
+enum class CollectionFileFormat(val fileExtension: String, val mimeType: String) {
+    /** Moxfield / MTG Arena `qty name (SET) number *F*` lines. */
+    TEXT("txt", "text/plain"),
+
+    /** Moxfield collection CSV export. */
+    MOXFIELD_CSV("csv", "text/csv"),
+
+    /** ManaBox collection CSV export (carries the Scryfall id). */
+    MANABOX_CSV("csv", "text/csv"),
+}
+
+/**
+ * One parsed import line, before Scryfall resolution. At least one of [scryfallId], [name] or
+ * ([setCode] + [collectorNumber]) is present.
+ *
+ * @property rawLine the source line as the user wrote it, shown back when it cannot be resolved.
+ */
+data class CollectionImportLine(
+    val quantity: Int,
+    val name: String?,
+    val setCode: String?,
+    val collectorNumber: String?,
+    val scryfallId: String?,
+    val isFoil: Boolean,
+    val condition: String,
+    val language: String,
+    val rawLine: String,
+)
+
+/**
+ * Result of [CollectionImportParser.parse].
+ *
+ * @property rejectedLines non-blank lines that are neither a card, a header nor a comment, capped
+ *   at [CollectionImportParser.MAX_REJECTED_LINES] so a hostile file cannot become the payload.
+ * @property clampedCopies copies dropped by the [CollectionImportParser.MAX_QUANTITY_PER_LINE] cap
+ *   while merging identical lines; reported so the cap is never silent.
+ * @property rejectedCount how many lines were rejected in total — NOT capped, so the UI can say
+ *   "showing 200 of N" rather than reporting the truncated list's size as the truth.
+ */
+data class ParsedCollectionImport(
+    val format: CollectionFileFormat,
+    val lines: List<CollectionImportLine>,
+    val rejectedLines: List<String>,
+    val clampedCopies: Int = 0,
+    val rejectedCount: Int = rejectedLines.size,
+)
+
+/** One per-printing collection row to export. */
+data class CollectionExportEntry(
+    val quantity: Int,
+    val name: String,
+    val setCode: String,
+    val setName: String,
+    val collectorNumber: String,
+    val scryfallId: String,
+    val rarity: String,
+    val isFoil: Boolean,
+    val condition: String,
+    val language: String,
+)

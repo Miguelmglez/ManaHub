@@ -5,10 +5,14 @@ import com.mmg.manahub.core.domain.repository.CardQueueRepository
 import com.mmg.manahub.core.model.QueuedCard
 import com.mmg.manahub.core.model.hasSameAttributesAs
 import com.mmg.manahub.core.model.newQueuedCardId
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 
 /**
@@ -17,16 +21,30 @@ import kotlinx.datetime.Clock
  *
  * Must be a single app-wide instance: two instances over the same [store] would overwrite each
  * other's writes.
+ *
+ * @param persistenceScope when set, encoding + writing move to this scope through a conflated
+ *   channel, so a caller on the main thread never pays for them. Required for a queue that can hold
+ *   thousands of rows (the Collection import review); a mutation racing process death may then be
+ *   lost, which is the trade for not blocking the UI thread on an MB-scale re-encode per tap.
+ *   Leave null for a small queue that needs the write to land before the call returns.
  */
 class PersistentCardQueueRepository(
     private val store: CardQueueStore,
     private val crashReporter: CrashReporter? = null,
     private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    persistenceScope: CoroutineScope? = null,
 ) : CardQueueRepository {
 
     private val _queue = MutableStateFlow(restore())
 
     override val queue: StateFlow<List<QueuedCard>> = _queue.asStateFlow()
+
+    // Conflated: a burst of mutations collapses into one encode of the latest list.
+    private val writeSignals: SendChannel<Unit>? = persistenceScope?.let { scope ->
+        Channel<Unit>(Channel.CONFLATED).also { channel ->
+            scope.launch { for (signal in channel) persist() }
+        }
+    }
 
     private fun restore(): List<QueuedCard> {
         val payload = store.read() ?: return emptyList()
@@ -47,9 +65,12 @@ class PersistentCardQueueRepository(
         crashReporter?.recordException(RuntimeException("[CardQueueRepository] Queue deserialization failed", e))
     }
 
+    private fun persist() = store.write(CardQueueJsonCodec.encode(_queue.value))
+
     private inline fun mutate(transform: (List<QueuedCard>) -> List<QueuedCard>) {
         _queue.update(transform)
-        store.write(CardQueueJsonCodec.encode(_queue.value))
+        val signals = writeSignals
+        if (signals == null) persist() else signals.trySend(Unit)
     }
 
     override fun add(entry: QueuedCard) = mutate { it + entry }

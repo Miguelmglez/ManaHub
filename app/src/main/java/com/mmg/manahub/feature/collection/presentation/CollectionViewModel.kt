@@ -7,7 +7,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.collection.transfer.CollectionExportEntry
+import com.mmg.manahub.core.domain.collection.transfer.CollectionExportFormatter
+import com.mmg.manahub.core.domain.collection.transfer.CollectionFileFormat
+import com.mmg.manahub.core.domain.collection.transfer.CollectionFileGateway
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
@@ -37,7 +42,17 @@ import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
+import com.mmg.manahub.feature.collection.presentation.importexport.CollectionExportAction
+import com.mmg.manahub.feature.collection.presentation.importexport.CollectionExportMessage
+import com.mmg.manahub.feature.collection.presentation.importexport.CollectionExportUiState
+import com.mmg.manahub.core.domain.collection.transfer.transferCountBucket
+import com.mmg.manahub.feature.collection.presentation.importexport.PendingExportShare
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -73,6 +88,10 @@ class CollectionViewModel(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val analyticsHelper: AnalyticsHelper,
     private val collectionMergeConflictResolver: CollectionMergeConflictResolver,
+    private val fileGateway: CollectionFileGateway,
+    private val crashReporter: CrashReporter,
+    private val exportDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val nowMillis: () -> Long = { System.currentTimeMillis() },
 ) : ViewModel() {
 
     val gridState = LazyGridState()
@@ -120,6 +139,10 @@ class CollectionViewModel(
     // same established remedy in this codebase).
     private val searchQueryFlow = MutableStateFlow("")
 
+    // Per-printing rows behind the currently visible groups (the export source).
+    private var visibleRows: List<UserCardWithCard> = emptyList()
+    private var exportJob: Job? = null
+
     init {
         // Initialize tab from SavedStateHandle ("tab" nav arg)
         val tabArg = savedStateHandle.get<String>("tab")?.lowercase()
@@ -159,6 +182,9 @@ class CollectionViewModel(
         // Wishlist entries carry these as nullable (a wishlist can want "any printing").
         const val DEFAULT_CONDITION = "NM"
         const val DEFAULT_LANGUAGE = "en"
+        const val PENDING_HYDRATION = "pending_hydration"
+        /** Below SQLITE_MAX_VARIABLE_NUMBER (999 on API <= 30). */
+        const val HYDRATION_CHUNK = 900
     }
 
     private fun observeUserPreferences() {
@@ -669,29 +695,8 @@ class CollectionViewModel(
 
     private fun applyFilters() {
         val state = _uiState.value
-        var result = baseListFor(state.collectionSource)
-
-        // Text search
-        if (state.searchQuery.isNotBlank()) {
-            result = result.filter {
-                it.card.name.contains(state.searchQuery, ignoreCase = true)
-            }
-        }
-
-        // Advanced criteria
-        state.activeQuery?.let { query ->
-            if (!query.isEmpty()) {
-                // Computed once per pass, not per (card, criterion) pair — avoids an O(cards x
-                // criteria x wishlistSize) linear scan on every applyFilters() call.
-                val wishlistIds = _wishlistEntries.value.mapTo(HashSet()) { it.cardId }
-                val forTradeIds = _openForTradeEntries.value.mapTo(HashSet()) { it.scryfallId }
-                result = result.filter { card ->
-                    query.criteria.all { criterion ->
-                        matchesCriterion(card, criterion, wishlistIds, forTradeIds)
-                    }
-                }
-            }
-        }
+        val result = filterRows(baseListFor(state.collectionSource), state)
+        visibleRows = result
 
         // Group copies of the same card into one entry, then override each non-English group's
         // image with its cached English sibling's (broken-image fix, 2026-07-17).
@@ -752,6 +757,30 @@ class CollectionViewModel(
         }
     }
 
+    /** Text search + advanced criteria over [rows]; the per-printing rows behind the visible groups. */
+    private fun filterRows(rows: List<UserCardWithCard>, state: CollectionUiState): List<UserCardWithCard> {
+        var result = rows
+        if (state.searchQuery.isNotBlank()) {
+            result = result.filter {
+                it.card.name.contains(state.searchQuery, ignoreCase = true)
+            }
+        }
+        state.activeQuery?.let { query ->
+            if (!query.isEmpty()) {
+                // Computed once per pass, not per (card, criterion) pair — avoids an O(cards x
+                // criteria x wishlistSize) linear scan on every applyFilters() call.
+                val wishlistIds = _wishlistEntries.value.mapTo(HashSet()) { it.cardId }
+                val forTradeIds = _openForTradeEntries.value.mapTo(HashSet()) { it.scryfallId }
+                result = result.filter { card ->
+                    query.criteria.all { criterion ->
+                        matchesCriterion(card, criterion, wishlistIds, forTradeIds)
+                    }
+                }
+            }
+        }
+        return result
+    }
+
     /**
      * The rows the Cards tab is filtering, chosen by [CollectionSource].
      *
@@ -769,42 +798,42 @@ class CollectionViewModel(
     private fun baseListFor(source: CollectionSource): List<UserCardWithCard> = when (source) {
         CollectionSource.COLLECTION -> _allCards.value
         CollectionSource.WISHLIST -> _wishlistEntries.value.projectToRows { entry ->
-            entry.card?.let { card ->
-                UserCardWithCard(
-                    userCard = UserCard(
-                        id = entry.id,
-                        scryfallId = entry.cardId,
-                        quantity = entry.quantity,
-                        isFoil = entry.isFoil,
-                        condition = entry.condition ?: DEFAULT_CONDITION,
-                        language = entry.language ?: DEFAULT_LANGUAGE,
-                        isForTrade = false,
-                        createdAt = entry.createdAt,
-                        updatedAt = entry.createdAt,
-                    ),
-                    card = card,
-                )
-            }
+            entry.card?.let { card -> entry.toRow(card) }
         }
         CollectionSource.FOR_TRADE -> _openForTradeEntries.value.projectToRows { entry ->
-            entry.card?.let { card ->
-                UserCardWithCard(
-                    userCard = UserCard(
-                        id = entry.id,
-                        scryfallId = entry.scryfallId,
-                        quantity = entry.quantity,
-                        isFoil = entry.isFoil,
-                        condition = entry.condition,
-                        language = entry.language,
-                        isForTrade = true,
-                        createdAt = entry.createdAt,
-                        updatedAt = entry.createdAt,
-                    ),
-                    card = card,
-                )
-            }
+            entry.card?.let { card -> entry.toRow(card) }
         }
     }
+
+    private fun WishlistEntry.toRow(card: Card) = UserCardWithCard(
+        userCard = UserCard(
+            id = id,
+            scryfallId = cardId,
+            quantity = quantity,
+            isFoil = isFoil,
+            condition = condition ?: DEFAULT_CONDITION,
+            language = language ?: DEFAULT_LANGUAGE,
+            isForTrade = false,
+            createdAt = createdAt,
+            updatedAt = createdAt,
+        ),
+        card = card,
+    )
+
+    private fun OpenForTradeEntry.toRow(card: Card) = UserCardWithCard(
+        userCard = UserCard(
+            id = id,
+            scryfallId = scryfallId,
+            quantity = quantity,
+            isFoil = isFoil,
+            condition = condition,
+            language = language,
+            isForTrade = true,
+            createdAt = createdAt,
+            updatedAt = createdAt,
+        ),
+        card = card,
+    )
 
     // Uncached-row count is reported via setCollectionSourceTelemetry (on source switch), not here.
     private fun <T> List<T>.projectToRows(map: (T) -> UserCardWithCard?): List<UserCardWithCard> =
@@ -825,6 +854,173 @@ class CollectionViewModel(
             // Never `userCard.isForTrade`: that column is never written true anywhere in the app.
             isForTrade = card.userCard.scryfallId in forTradeIds,
         )
+
+    // ── Export ────────────────────────────────────────────────────────────────
+
+    fun onExportRequested() {
+        if (!_uiState.value.canExport) return
+        updateExport { it.copy(isSheetVisible = true) }
+    }
+
+    fun onExportSheetDismissed() {
+        updateExport { it.copy(isSheetVisible = false) }
+    }
+
+    fun onExportFormatSelected(format: CollectionFileFormat) {
+        updateExport { it.copy(format = format) }
+    }
+
+    /** Suggested document name for the "Save to device" picker. */
+    fun exportFileName(): String {
+        val state = _uiState.value
+        return CollectionExportFormatter.fileName(state.collectionSource.exportKey(), state.export.format, nowMillis())
+    }
+
+    /** Writes the export into the document the user picked. */
+    fun onExportSave(location: String) {
+        runExport(CollectionExportAction.SAVE) { content, _ -> fileGateway.writeText(location, content) }
+    }
+
+    /** Writes the export to a private share file and asks the screen to open the share chooser. */
+    fun onExportShare() {
+        runExport(CollectionExportAction.SHARE) { content, format ->
+            val location = fileGateway.writeShareableFile(exportFileName(), content)
+            updateExport { it.copy(pendingShare = PendingExportShare(location, format.mimeType)) }
+        }
+    }
+
+    fun onExportShareLaunched() = updateExport { it.copy(pendingShare = null) }
+
+    /** No app could take the chooser: report it instead of leaving a success toast standing. */
+    fun onExportShareFailed() {
+        crashReporter.log("collection_export_failed_no_share_target")
+        updateExport { it.copy(pendingShare = null, message = CollectionExportMessage.Failed) }
+    }
+
+    fun onExportMessageShown() = updateExport { it.copy(message = null) }
+
+    private fun runExport(
+        action: CollectionExportAction,
+        write: suspend (content: String, format: CollectionFileFormat) -> Unit,
+    ) {
+        // A second tap while an export is running is dropped in silence on purpose: the tapped
+        // button already shows its spinner, so there is nothing new to tell the user.
+        if (exportJob?.isActive == true) return
+        val state = _uiState.value
+        val format = state.export.format
+        updateExport { it.copy(isExporting = true, inFlightAction = action) }
+        crashReporter.log("collection_export_started")
+        // One key, not three: CLAUDE.md caps an operation at 3-4 custom keys.
+        crashReporter.setCustomKey(
+            "collection_export_target",
+            "${action.telemetryKey}:${state.collectionSource.exportKey()}:${format.name}",
+        )
+        exportJob = viewModelScope.launch {
+            val message = try {
+                val (entries, skipped) = buildExportEntries(state)
+                if (entries.isEmpty()) {
+                    crashReporter.log("collection_export_failed_nothing_to_export")
+                    CollectionExportMessage.NothingToExport(skipped)
+                } else {
+                    val header = "ManaHub ${state.collectionSource.exportKey()} export, ${exportDate()}"
+                    val content = withContext(exportDispatcher) {
+                        CollectionExportFormatter.format(entries, format, header)
+                    }
+                    write(content, format)
+                    val loosePrintings = CollectionExportFormatter.countLoosePrintings(entries, format)
+                    crashReporter.log("collection_export_completed")
+                    crashReporter.setCustomKey("collection_export_rows_bucket", transferCountBucket(entries.size))
+                    crashReporter.setCustomKey("collection_export_skipped_bucket", transferCountBucket(skipped))
+                    crashReporter.setCustomKey("collection_export_loose_bucket", transferCountBucket(loosePrintings))
+                    CollectionExportMessage.Completed(action, entries.size, skipped, loosePrintings)
+                }
+            } catch (c: CancellationException) {
+                throw c
+            } catch (e: Exception) {
+                crashReporter.log("collection_export_failed_io_or_network")
+                // Exception type only: IO messages can carry paths.
+                crashReporter.recordException(RuntimeException("[collection_export] ${e::class.simpleName}"))
+                CollectionExportMessage.Failed
+            }
+            updateExport {
+                it.copy(
+                    isExporting = false,
+                    inFlightAction = null,
+                    isSheetVisible = if (message is CollectionExportMessage.Completed) false else it.isSheetVisible,
+                    message = message,
+                )
+            }
+        }
+    }
+
+    private fun exportDate(): String = CollectionExportFormatter.exportDate(nowMillis()).toString()
+
+    /**
+     * The visible rows as export entries. Placeholder rows (ADR-008 `pending_hydration`) and, with no
+     * search/filter active, the wishlist/trade rows whose card is not cached are hydrated in batches
+     * first; rows that still have no card are counted as skipped, never silently dropped.
+     */
+    private suspend fun buildExportEntries(state: CollectionUiState): Pair<List<CollectionExportEntry>, Int> {
+        val rows = visibleRows
+        val isUnfiltered = state.searchQuery.isBlank() &&
+            (state.activeQuery?.criteria.orEmpty().all { it is SearchCriterion.CollectionStatus })
+        val uncachedWishlist = if (isUnfiltered && state.collectionSource == CollectionSource.WISHLIST) {
+            _wishlistEntries.value.filter { it.card == null }
+        } else emptyList()
+        val uncachedForTrade = if (isUnfiltered && state.collectionSource == CollectionSource.FOR_TRADE) {
+            _openForTradeEntries.value.filter { it.card == null }
+        } else emptyList()
+
+        val idsToHydrate = (
+            rows.filter { it.card.isPendingHydration() }.map { it.card.scryfallId } +
+                uncachedWishlist.map { it.cardId } +
+                uncachedForTrade.map { it.scryfallId }
+            ).distinct()
+        // Chunked below SQLITE_MAX_VARIABLE_NUMBER (999 on API <= 30): a whole uncached wishlist is
+        // thousands of ids, and an oversized IN (:ids) throws instead of returning rows.
+        val hydrated: Map<String, Card> = idsToHydrate.chunked(HYDRATION_CHUNK)
+            .flatMap { chunk ->
+                cardRepository.warmCacheForIds(chunk)
+                cardRepository.getCardsByIds(chunk)
+            }
+            .filterNot { it.isPendingHydration() }
+            .associateBy { it.scryfallId }
+
+        val fromRows = rows.mapNotNull { row ->
+            if (row.card.isPendingHydration()) hydrated[row.card.scryfallId]?.let { row.copy(card = it) } else row
+        }
+        val fromUncached = uncachedWishlist.mapNotNull { entry -> hydrated[entry.cardId]?.let { entry.toRow(it) } } +
+            uncachedForTrade.mapNotNull { entry -> hydrated[entry.scryfallId]?.let { entry.toRow(it) } }
+        val skipped = (rows.size - fromRows.size) +
+            (uncachedWishlist.size + uncachedForTrade.size - fromUncached.size)
+        val entries = (fromRows + fromUncached).map { it.toExportEntry() }
+        return CollectionExportFormatter.sorted(entries) to skipped
+    }
+
+    private fun Card.isPendingHydration() = staleReason == PENDING_HYDRATION
+
+    private fun UserCardWithCard.toExportEntry() = CollectionExportEntry(
+        quantity = userCard.quantity,
+        name = card.name,
+        setCode = card.setCode,
+        setName = card.setName,
+        collectorNumber = card.collectorNumber,
+        scryfallId = card.scryfallId,
+        rarity = card.rarity,
+        isFoil = userCard.isFoil,
+        condition = userCard.condition,
+        language = userCard.language,
+    )
+
+    private fun CollectionSource.exportKey(): String = when (this) {
+        CollectionSource.COLLECTION -> "collection"
+        CollectionSource.WISHLIST -> "wishlist"
+        CollectionSource.FOR_TRADE -> "for-trade"
+    }
+
+    private inline fun updateExport(transform: (CollectionExportUiState) -> CollectionExportUiState) {
+        _uiState.update { it.copy(export = transform(it.export)) }
+    }
 
     private fun rarityWeight(rarity: String) = when (rarity.lowercase()) {
         "mythic" -> 4
