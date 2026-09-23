@@ -23,6 +23,8 @@ import com.mmg.manahub.core.model.QueuedCard
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -112,7 +114,11 @@ class CollectionImportViewModel(
         viewModelScope.launch {
             val restored = withContext(ioDispatcher) { runCatching { unresolvedStore.read() }.getOrDefault(emptyList()) }
             if (restored.isEmpty()) return@launch
-            _uiState.update { if (it.unresolvedLines.isEmpty()) it.copy(unresolvedLines = restored) else it }
+            _uiState.update {
+                if (it.unresolvedLines.isEmpty()) {
+                    it.copy(unresolvedLines = restored, unresolvedTotal = restored.size)
+                } else it
+            }
         }
     }
 
@@ -218,7 +224,12 @@ class CollectionImportViewModel(
                 failImport(source, CollectionImportError.FileUnreadable, "not_text")
                 return@launch
             }
-            val parsed = withContext(parseDispatcher) { CollectionImportParser.parse(text) }
+            val parsed = withContext(parseDispatcher) {
+                // Parsing is a long non-suspending loop: without this probe, dismissing the sheet
+                // leaves it running the whole document on a Default thread.
+                val context = currentCoroutineContext()
+                CollectionImportParser.parse(text) { context.ensureActive() }
+            }
             crashReporter.log("collection_import_started")
             crashReporter.setCustomKey("collection_import_input", "${source.key}:${parsed.format.name}")
             crashReporter.setCustomKey("collection_import_lines_bucket", transferCountBucket(parsed.lines.size))
@@ -269,13 +280,14 @@ class CollectionImportViewModel(
 
     private fun onResolved(source: ImportSource, resolution: CollectionImportResolution.Resolved) {
         crashReporter.log("collection_import_resolved")
-        crashReporter.setCustomKey("collection_import_unresolved_bucket", transferCountBucket(resolution.unresolvedLines.size))
+        crashReporter.setCustomKey("collection_import_unresolved_bucket", transferCountBucket(resolution.unresolvedCount))
         if (resolution.entries.isEmpty()) {
             _uiState.update {
                 it.copy(
                     isResolving = false,
                     inputError = CollectionImportError.NothingResolved,
                     unresolvedLines = resolution.unresolvedLines,
+                    unresolvedTotal = resolution.unresolvedCount,
                 )
             }
             persistUnresolvedLines(resolution.unresolvedLines)
@@ -296,10 +308,11 @@ class CollectionImportViewModel(
                 progressProcessed = 0,
                 progressTotal = 0,
                 unresolvedLines = resolution.unresolvedLines,
+                unresolvedTotal = resolution.unresolvedCount,
                 isUnresolvedDialogVisible = resolution.unresolvedLines.isNotEmpty(),
                 queueToast = CollectionImportToast.Resolved(
                     entries = resolution.entries.size,
-                    unresolved = resolution.unresolvedLines.size,
+                    unresolved = resolution.unresolvedCount,
                     clampedCopies = clampedCopies,
                 ),
             )
@@ -375,7 +388,12 @@ class CollectionImportViewModel(
     fun onClearQueue() {
         queueRepository.clear()
         _uiState.update {
-            it.copy(isQueueSheetVisible = false, unresolvedLines = emptyList(), isUnresolvedDialogVisible = false)
+            it.copy(
+                isQueueSheetVisible = false,
+                unresolvedLines = emptyList(),
+                unresolvedTotal = 0,
+                isUnresolvedDialogVisible = false,
+            )
         }
         persistUnresolvedLines(emptyList())
     }

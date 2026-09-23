@@ -42,6 +42,8 @@ class AndroidCollectionFileGateway(
             // A blocking read into another process honours neither the timeout nor cancellation, so
             // the only way to free the thread is to close the stream from outside it.
             withTimeout(READ_TIMEOUT_MS) {
+                // Requires ioDispatcher to stay elastic: bound it (or limitedParallelism(1)) and
+                // this closer queues behind the blocking read it exists to interrupt.
                 val closer = launch {
                     try {
                         awaitCancellation()

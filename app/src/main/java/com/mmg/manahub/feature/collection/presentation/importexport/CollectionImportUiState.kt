@@ -25,6 +25,8 @@ data class CollectionImportUiState(
     val ownedCardIdentityKeys: Set<String> = emptySet(),
     val queueToast: CollectionImportToast? = null,
     val unresolvedLines: List<String> = emptyList(),
+    /** How many lines really failed; [unresolvedLines] is capped, this is not. */
+    val unresolvedTotal: Int = 0,
     val isUnresolvedDialogVisible: Boolean = false,
     val editingEntry: QueuedCard? = null,
     val availablePrints: List<Card> = emptyList(),

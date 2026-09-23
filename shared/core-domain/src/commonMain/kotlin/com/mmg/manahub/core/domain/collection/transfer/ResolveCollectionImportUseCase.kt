@@ -13,7 +13,9 @@ sealed interface CollectionImportResolution {
 
     /**
      * @property entries queue-ready cards, identical printings + attributes merged.
-     * @property unresolvedLines source lines no card could be found for, in input order.
+     * @property unresolvedLines source lines no card could be found for, in input order. Capped:
+     *   the parser only reports the first [CollectionImportParser.MAX_REJECTED_LINES].
+     * @property unresolvedCount how many there really were, so the UI reports "200 of N".
      * @property clampedCopies copies dropped by the per-row quantity cap, parsing and merging
      *   combined; surfaced to the user so the cap is never silent.
      */
@@ -22,6 +24,7 @@ sealed interface CollectionImportResolution {
         val unresolvedLines: List<String>,
         val resolvedLineCount: Int,
         val clampedCopies: Int = 0,
+        val unresolvedCount: Int = unresolvedLines.size,
     ) : CollectionImportResolution
 
     /** Scryfall's shared cooldown is active; nothing was resolved. */
@@ -62,6 +65,7 @@ class ResolveCollectionImportUseCase(
                 unresolvedLines = parsed.rejectedLines,
                 resolvedLineCount = 0,
                 clampedCopies = parsed.clampedCopies,
+                unresolvedCount = parsed.rejectedCount,
             )
         }
 
@@ -167,6 +171,7 @@ class ResolveCollectionImportUseCase(
             unresolvedLines = parsed.rejectedLines + unresolved,
             resolvedLineCount = total - unresolvedCount,
             clampedCopies = clampedCopies.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            unresolvedCount = parsed.rejectedCount + unresolvedCount,
         )
     }
 

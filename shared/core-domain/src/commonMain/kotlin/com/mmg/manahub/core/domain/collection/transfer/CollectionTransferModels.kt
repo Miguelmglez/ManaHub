@@ -33,19 +33,20 @@ data class CollectionImportLine(
 /**
  * Result of [CollectionImportParser.parse].
  *
- * @property rejectedLines non-blank lines that are neither a card, a header nor a comment.
+ * @property rejectedLines non-blank lines that are neither a card, a header nor a comment, capped
+ *   at [CollectionImportParser.MAX_REJECTED_LINES] so a hostile file cannot become the payload.
  * @property clampedCopies copies dropped by the [CollectionImportParser.MAX_QUANTITY_PER_LINE] cap
  *   while merging identical lines; reported so the cap is never silent.
+ * @property rejectedCount how many lines were rejected in total — NOT capped, so the UI can say
+ *   "showing 200 of N" rather than reporting the truncated list's size as the truth.
  */
 data class ParsedCollectionImport(
     val format: CollectionFileFormat,
     val lines: List<CollectionImportLine>,
     val rejectedLines: List<String>,
     val clampedCopies: Int = 0,
-) {
-    /** Total card copies across [lines]. */
-    val totalCopies: Int get() = lines.sumOf { it.quantity }
-}
+    val rejectedCount: Int = rejectedLines.size,
+)
 
 /** One per-printing collection row to export. */
 data class CollectionExportEntry(

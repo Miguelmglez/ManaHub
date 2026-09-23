@@ -269,6 +269,7 @@ fun CollectionImportResumeDialog(
 @Composable
 fun UnresolvedLinesDialog(
     lines: List<String>,
+    totalCount: Int,
     onCopy: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -280,7 +281,17 @@ fun UnresolvedLinesDialog(
         title = stringResource(R.string.collection_import_unresolved_title),
         content = {
             Text(
-                pluralStringResource(R.plurals.collection_import_unresolved_text, lines.size, lines.size),
+                // The list is capped, the count is not: say so instead of reporting the cap.
+                if (totalCount > lines.size) {
+                    pluralStringResource(
+                        R.plurals.collection_import_unresolved_text_capped,
+                        totalCount,
+                        lines.size,
+                        totalCount,
+                    )
+                } else {
+                    pluralStringResource(R.plurals.collection_import_unresolved_text, lines.size, lines.size)
+                },
                 style = ty.bodyMedium,
                 color = mc.textSecondary,
             )

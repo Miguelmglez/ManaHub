@@ -3,6 +3,7 @@ package com.mmg.manahub.core.domain.collection.transfer
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -223,10 +224,42 @@ class CollectionImportParserTest {
     }
 
     @Test
-    fun `the rejected list stops growing at its cap`() {
+    fun `the rejected list stops growing at its cap but the count does not`() {
         val parsed = CollectionImportParser.parse((1..5_000).joinToString("\n") { "not a card line $it" })
 
         assertEquals(CollectionImportParser.MAX_REJECTED_LINES, parsed.rejectedLines.size)
+        assertEquals(5_000, parsed.rejectedCount)
+    }
+
+    @Test
+    fun `scanning stops at the line ceiling instead of materialising the document`() {
+        val beyond = DeckImportExportHelper.MAX_SCANNED_LINES + 10_000
+        val parsed = CollectionImportParser.parse((1..beyond).joinToString("\n") { "x" })
+
+        // Every line is junk, so the count is exactly what was scanned before giving up.
+        assertEquals(DeckImportExportHelper.MAX_SCANNED_LINES, parsed.rejectedCount)
+        assertEquals(CollectionImportParser.MAX_REJECTED_LINES, parsed.rejectedLines.size)
+    }
+
+    @Test
+    fun `the parse loop honours its caller's cancellation probe`() {
+        var calls = 0
+
+        assertFailsWith<IllegalStateException> {
+            CollectionImportParser.parse((1..50_000).joinToString("\n") { "junk $it" }) {
+                calls++
+                if (calls == 2) error("cancelled")
+            }
+        }
+    }
+
+    @Test
+    fun `a short list never pays for the cancellation probe`() {
+        var calls = 0
+
+        CollectionImportParser.parse("4 Lightning Bolt\n1 Opt") { calls++ }
+
+        assertEquals(0, calls)
     }
 
     @Test

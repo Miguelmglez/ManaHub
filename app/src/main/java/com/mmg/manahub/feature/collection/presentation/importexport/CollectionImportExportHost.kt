@@ -82,7 +82,7 @@ fun CollectionImportHost(
     if (state.isResumePromptVisible) {
         CollectionImportResumeDialog(
             queuedCount = state.queue.size,
-            unresolvedCount = state.unresolvedLines.size,
+            unresolvedCount = state.unresolvedTotal,
             onReview = viewModel::onResumeReview,
             onImportMore = viewModel::onImportMore,
             onShowUnresolved = {
@@ -148,6 +148,7 @@ fun CollectionImportHost(
     if (state.isUnresolvedDialogVisible && state.unresolvedLines.isNotEmpty()) {
         UnresolvedLinesDialog(
             lines = state.unresolvedLines,
+            totalCount = state.unresolvedTotal,
             onCopy = {
                 clipboard.setText(AnnotatedString(state.unresolvedLines.joinToString("\n")))
                 toastState.show(copiedMessage, MagicToastType.SUCCESS)

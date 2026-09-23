@@ -25,6 +25,8 @@ object CollectionImportParser {
     private const val BINARY_SAMPLE_CHARS = 64 * 1024
     private const val BINARY_SUSPECT_PERCENT = 5
 
+    private const val CANCELLATION_CHECK_LINES = 1_000
+
     private val SECTION_HEADERS = setOf(
         "commander", "commanders", "deck", "mainboard", "main", "sideboard", "side", "sb",
         "maybeboard", "maybe", "companion", "companions", "tokens", "considering",
@@ -51,17 +53,23 @@ object CollectionImportParser {
         const val LANGUAGE = "language"
     }
 
-    fun parse(text: String): ParsedCollectionImport {
+    /**
+     * @param ensureActive called every [CANCELLATION_CHECK_LINES] lines. Parsing a picked file is
+     *   CPU-bound and not itself suspending, so this is the only way dismissing the sheet frees the
+     *   thread instead of running the whole document to completion. Callers inside a coroutine pass
+     *   their context's `ensureActive`.
+     */
+    fun parse(text: String, ensureActive: () -> Unit = {}): ParsedCollectionImport {
         val clean = dropPreamble(text.removePrefix("﻿"))
         // A CSV re-saved by Excel starts with `sep=,` and some exporters add a title row, either of
         // which would otherwise push the real header out of view and reject every row as TEXT.
         val header = clean.lineSequence().filter { it.isNotBlank() }.take(2)
             .firstOrNull { detectFormat(it) != CollectionFileFormat.TEXT }
-            ?: return parseText(clean)
+            ?: return parseText(clean, ensureActive)
         val csv = dropLinesBefore(clean, header)
         return when (detectFormat(header)) {
-            CollectionFileFormat.MANABOX_CSV -> parseManaBoxCsv(csv)
-            else -> parseMoxfieldCsv(csv)
+            CollectionFileFormat.MANABOX_CSV -> parseManaBoxCsv(csv, ensureActive)
+            else -> parseMoxfieldCsv(csv, ensureActive)
         }
     }
 
@@ -86,27 +94,50 @@ object CollectionImportParser {
     internal fun String.asReportedLine(): String =
         if (length <= MAX_REPORTED_LINE_LENGTH) this else substring(0, MAX_REPORTED_LINE_LENGTH) + "…"
 
-    /** Records [line] as unusable, truncated, and stops collecting past [MAX_REJECTED_LINES]. */
-    private fun MutableList<String>.addRejected(line: String) {
-        if (size < MAX_REJECTED_LINES) this += line.asReportedLine()
+    /**
+     * The lines worth showing back, plus how many there really were. The list is bounded by
+     * [MAX_REJECTED_LINES]; [total] is not, so the UI can say "showing 200 of N" instead of
+     * quietly reporting 200.
+     */
+    private class RejectedLines {
+        val lines = mutableListOf<String>()
+        var total = 0
+            private set
+
+        fun add(line: String) {
+            total++
+            if (lines.size < MAX_REJECTED_LINES) lines += line.asReportedLine()
+        }
     }
 
-    /** Drops the leading blank, comment and `sep=,` lines an exporter may put above the header. */
+    /**
+     * Drops the leading blank, comment and `sep=,` lines an exporter may put above the header.
+     * Walks the source by index: `lines()` here would materialise the whole document.
+     */
     private fun dropPreamble(text: String): String {
-        val lines = text.lines()
-        val start = lines.indexOfFirst { line ->
-            val trimmed = line.trim()
-            trimmed.isNotEmpty() && !trimmed.startsWith("//") && !trimmed.startsWith("#") &&
-                !SEP_PREAMBLE_REGEX.matches(trimmed)
+        var start = 0
+        while (start < text.length) {
+            val lineEnd = text.indexOf('\n', start).let { if (it < 0) text.length else it }
+            val trimmed = text.substring(start, lineEnd).trim()
+            val isPreamble = trimmed.isEmpty() || trimmed.startsWith("//") || trimmed.startsWith("#") ||
+                SEP_PREAMBLE_REGEX.matches(trimmed)
+            if (!isPreamble) return if (start == 0) text else text.substring(start)
+            start = lineEnd + 1
         }
-        return if (start <= 0) text else lines.drop(start).joinToString("\n")
+        return text
     }
 
     /** Everything from [header] onwards, so the CSV reader sees the header as its first record. */
     private fun dropLinesBefore(text: String, header: String): String {
-        val lines = text.lines()
-        val index = lines.indexOf(header)
-        return if (index <= 0) text else lines.drop(index).joinToString("\n")
+        var from = 0
+        while (from < text.length) {
+            val index = text.indexOf(header, from)
+            if (index <= 0) return text
+            // Only a match at a line boundary is the header line itself.
+            if (text[index - 1] == '\n' || text[index - 1] == '\r') return text.substring(index)
+            from = index + 1
+        }
+        return text
     }
 
     internal fun detectFormat(firstLine: String): CollectionFileFormat {
@@ -124,16 +155,19 @@ object CollectionImportParser {
         }
     }
 
-    private fun parseText(text: String): ParsedCollectionImport {
+    private fun parseText(text: String, ensureActive: () -> Unit): ParsedCollectionImport {
         val lines = mutableListOf<CollectionImportLine>()
-        val rejected = mutableListOf<String>()
-        for (raw in text.lines()) {
+        val rejected = RejectedLines()
+        var scanned = 0
+        for (raw in text.lineSequence()) {
+            if (++scanned > DeckImportExportHelper.MAX_SCANNED_LINES) break
+            if (scanned % CANCELLATION_CHECK_LINES == 0) ensureActive()
             val line = raw.trim()
             if (line.isEmpty() || line.startsWith("//") || line.startsWith("#")) continue
             if (isSectionHeader(line)) continue
             val parsed = DeckImportExportHelper.parseCardLine(line)
             if (parsed == null || parsed.quantity <= 0) {
-                rejected.addRejected(line)
+                rejected.add(line)
                 continue
             }
             lines += CollectionImportLine(
@@ -150,7 +184,13 @@ object CollectionImportParser {
             )
         }
         val merged = merge(lines)
-        return ParsedCollectionImport(CollectionFileFormat.TEXT, merged.lines, rejected, merged.clampedCopies)
+        return ParsedCollectionImport(
+            format = CollectionFileFormat.TEXT,
+            lines = merged.lines,
+            rejectedLines = rejected.lines,
+            clampedCopies = merged.clampedCopies,
+            rejectedCount = rejected.total,
+        )
     }
 
     // "Sideboard", "SIDEBOARD:" and Arena's "Commander (1)" style headers.
@@ -159,8 +199,8 @@ object CollectionImportParser {
         return key in SECTION_HEADERS
     }
 
-    private fun parseMoxfieldCsv(text: String): ParsedCollectionImport =
-        parseCsv(text, CollectionFileFormat.MOXFIELD_CSV) { row ->
+    private fun parseMoxfieldCsv(text: String, ensureActive: () -> Unit): ParsedCollectionImport =
+        parseCsv(text, CollectionFileFormat.MOXFIELD_CSV, ensureActive) { row ->
             val name = row[MoxfieldColumns.NAME]
             val setCode = row[MoxfieldColumns.EDITION]
             CsvLine(
@@ -175,8 +215,8 @@ object CollectionImportParser {
             )
         }
 
-    private fun parseManaBoxCsv(text: String): ParsedCollectionImport =
-        parseCsv(text, CollectionFileFormat.MANABOX_CSV) { row ->
+    private fun parseManaBoxCsv(text: String, ensureActive: () -> Unit): ParsedCollectionImport =
+        parseCsv(text, CollectionFileFormat.MANABOX_CSV, ensureActive) { row ->
             CsvLine(
                 quantity = row[ManaBoxColumns.QUANTITY]?.toIntOrNull(),
                 name = row[ManaBoxColumns.NAME],
@@ -203,14 +243,18 @@ object CollectionImportParser {
     private inline fun parseCsv(
         text: String,
         format: CollectionFileFormat,
+        ensureActive: () -> Unit,
         read: (Map<String, String>) -> CsvLine,
     ): ParsedCollectionImport {
         val records = CsvCodec.parse(text)
         if (records.isEmpty()) return ParsedCollectionImport(format, emptyList(), emptyList())
         val header = records.first().fields.map { it.trim().lowercase() }
         val lines = mutableListOf<CollectionImportLine>()
-        val rejected = mutableListOf<String>()
+        val rejected = RejectedLines()
+        var scanned = 0
         for (record in records.drop(1)) {
+            if (++scanned > DeckImportExportHelper.MAX_SCANNED_LINES) break
+            if (scanned % CANCELLATION_CHECK_LINES == 0) ensureActive()
             val row = header.indices.associate { i -> header[i] to record.fields.getOrElse(i) { "" }.trim() }
                 .filterValues { it.isNotEmpty() }
             val csv = read(row)
@@ -218,7 +262,7 @@ object CollectionImportParser {
             val scryfallId = csv.scryfallId?.lowercase()?.takeIf { SCRYFALL_ID_REGEX.matches(it) }
             val hasPrinting = !csv.setCode.isNullOrBlank() && !csv.collectorNumber.isNullOrBlank()
             if (quantity == null || quantity <= 0 || (csv.name == null && scryfallId == null && !hasPrinting)) {
-                rejected.addRejected(record.raw.trim())
+                rejected.add(record.raw.trim())
                 continue
             }
             lines += CollectionImportLine(
@@ -234,7 +278,13 @@ object CollectionImportParser {
             )
         }
         val merged = merge(lines)
-        return ParsedCollectionImport(format, merged.lines, rejected, merged.clampedCopies)
+        return ParsedCollectionImport(
+            format = format,
+            lines = merged.lines,
+            rejectedLines = rejected.lines,
+            clampedCopies = merged.clampedCopies,
+            rejectedCount = rejected.total,
+        )
     }
 
     // Moxfield writes "foil"/"etched"/"", ManaBox "normal"/"foil"/"etched"; etched counts as foil.

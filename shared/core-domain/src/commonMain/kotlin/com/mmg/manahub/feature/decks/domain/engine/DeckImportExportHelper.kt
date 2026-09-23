@@ -40,6 +40,13 @@ object DeckImportExportHelper {
      */
     const val MAX_CARD_LINE_LENGTH = 512
 
+    /**
+     * Lines either parser will look at before giving up. `String.lines()` over a picked 5 MB file
+     * of one-character lines retains ~131 MB in the returned List alone, so both parsers stream
+     * with `lineSequence()` and stop here rather than materialising the document.
+     */
+    const val MAX_SCANNED_LINES = 100_000
+
     private val CARD_LINE_REGEX = Regex(
         """^(\d+)[xX×]?\s+(.+?)(?:\s+\(([A-Za-z0-9]+)\)\s+(\S+))?(?:\s+\*([FfEe])\*)?$"""
     )
@@ -58,7 +65,9 @@ object DeckImportExportHelper {
 
         var currentSection = Section.MAIN
 
-        for (raw in text.lines()) {
+        var scanned = 0
+        for (raw in text.lineSequence()) {
+            if (++scanned > MAX_SCANNED_LINES) break
             val line = raw.trim()
             if (line.isBlank()) continue
 
