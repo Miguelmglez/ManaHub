@@ -21,6 +21,12 @@ Free-first, account-enhanced start screen. Fully implemented (2026-06-08). Must-
   VM) never replays on return. Widgets that draw nothing are dropped by `boardWidgetsToRender`, never
   inside the item. Grid state is hoisted, every item keyed, and `animateItem` is off while a shared
   transition runs; card-image transitions use the single `CardSharedBoundsTransform`.
+- **Widget gallery sheet (2026-09-24, H2b):** `WidgetGallerySheet` edits ONE optimistic working
+  copy (`GalleryEditor`) mutated synchronously with the VM's `withWidgetAdded` rule; it adopts an
+  incoming layout only when no commit of its own is still pending (echo = the exact list it sent).
+  Every mutation re-pins the first visible row with `requestScrollToItem(index, offset)` (the default
+  key anchoring is what made the list jump). Drag steps use measured item sizes; category drags
+  commit on drop only. Pure reorder rules live in `WidgetGalleryModel.kt` (tested).
 - `avatarUrlFlow` and every other prefs flow the VM reads MUST be stubbed in tests (a relaxed mock's
   unstubbed Flow never emits, so that slice never resolves).
 - Quick Start: 4 shortcuts persisted in DataStore via `UserPreferencesDataStore.observeQuickStartActions()`; partial-restore pads with defaults rather than discarding valid entries.
