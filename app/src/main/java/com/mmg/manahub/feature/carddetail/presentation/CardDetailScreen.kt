@@ -3,12 +3,10 @@ package com.mmg.manahub.feature.carddetail.presentation
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -122,6 +120,7 @@ import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.tagging.label
+import com.mmg.manahub.core.ui.CardSharedBoundsTransform
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardName
@@ -644,11 +643,6 @@ private fun CardDetailContent(
         ) + fadeIn(tween(400))
     }
 
-    // High-quality curve for the shared element bounds
-    val sharedBoundsTransform: BoundsTransform = BoundsTransform { _, _ ->
-        tween(durationMillis = 380, easing = LinearOutSlowInEasing)
-    }
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -675,7 +669,7 @@ private fun CardDetailContent(
                                     ),
                                     animatedVisibilityScope = animatedVisibilityScope,
                                     clipInOverlayDuringTransition = OverlayClip(CardShape),
-                                    boundsTransform = sharedBoundsTransform,
+                                    boundsTransform = CardSharedBoundsTransform,
                                     renderInOverlayDuringTransition = true,
                                 )
                             }

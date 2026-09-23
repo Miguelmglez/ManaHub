@@ -1,6 +1,17 @@
 package com.mmg.manahub.feature.home.presentation
 
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.max
+import com.mmg.manahub.core.FeatureFlags
+import com.mmg.manahub.core.ui.components.rememberMagicSkeletonPulse
+import com.mmg.manahub.core.ui.isReducedMotionEnabled
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.BorderStroke
@@ -27,7 +38,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
@@ -87,6 +97,7 @@ import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -121,6 +132,9 @@ fun HomeScreen(
     // Competitive feature, Phase 5 — kept OUTSIDE HomeUiState for the same reason, see
     // HomeViewModel.competitiveEnabledFlow's KDoc.
     val competitiveEnabled by viewModel.competitiveEnabledFlow.collectAsStateWithLifecycle()
+    val widgetReadiness by viewModel.widgetReadiness.collectAsStateWithLifecycle()
+    val widgetExtras by viewModel.widgetExtrasFlow.collectAsStateWithLifecycle()
+    val rulesTipIndex by viewModel.rulesTipIndexFlow.collectAsStateWithLifecycle()
     var showCustomizeSheet by remember { mutableStateOf(false) }
     var showGallerySheet by remember { mutableStateOf(false) }
 
@@ -140,7 +154,9 @@ fun HomeScreen(
     }
 
     // The active game override is disabled for now (user request: only show Welcome and Loading).
-    val effectiveState = uiState.copy(quickStartActions = effectiveQuickStartActions)
+    val effectiveState = remember(uiState, effectiveQuickStartActions) {
+        uiState.copy(quickStartActions = effectiveQuickStartActions)
+    }
 
     HomeScreen(
         uiState = effectiveState,
@@ -148,7 +164,10 @@ fun HomeScreen(
         communityDecks = communityDecks,
         communityDecksCategory = communityDecksCategory,
         dailyPuzzle = dailyPuzzle,
-        competitiveEnabled = competitiveEnabled,
+        widgetReadiness = widgetReadiness,
+        widgetExtras = widgetExtras,
+        rulesTipIndex = rulesTipIndex,
+        revealTracker = viewModel.revealTracker,
         onAction = { action ->
             when (action) {
                 HomeAction.CustomizeQuickStart -> showCustomizeSheet = true
@@ -237,43 +256,56 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
-    // Deck Doctor Community/Archetype plan, Phase 5.
     trending: com.mmg.manahub.core.model.TrendingSnapshot? = null,
-    // Home widget board overhaul, TASK 5b.
     communityDecks: List<com.mmg.manahub.core.model.CommunityDeckSummary>? = null,
     communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
-    // Daily Puzzle (ADR-006), Batch B2.
     dailyPuzzle: DailyPuzzleWidgetState? = null,
-    // Competitive feature, Phase 5.
-    competitiveEnabled: Boolean = false,
+    widgetReadiness: Map<HomeWidgetType, Boolean> = emptyMap(),
+    widgetExtras: HomeWidgetExtras = HomeWidgetExtras(),
+    rulesTipIndex: Int = 0,
+    revealTracker: WidgetRevealTracker = remember { WidgetRevealTracker() },
 ) {
     val spacing = MaterialTheme.spacing
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
+    // Hoisted above every branch so the board keeps its scroll position through loading and the
+    // Card Detail round trip.
+    val gridState = rememberLazyGridState()
+    val reducedMotion = isReducedMotionEnabled()
+    val pulse = rememberMagicSkeletonPulse(reducedMotion)
+    val metrics = rememberHomeWidgetMetrics()
+    val motion = remember(revealTracker, reducedMotion, pulse, gridState) {
+        HomeBoardMotion(revealTracker, reducedMotion, pulse, gridState)
+    }
+    // Keeps the hero slot while a just-emptied welcome plays its completion card, then releases it.
+    val heroHasSteps = (uiState.hero as? HomeHeroState.Welcome)?.steps?.isNotEmpty() == true
+    var holdCompletedHero by remember { mutableStateOf(false) }
+    LaunchedEffect(heroHasSteps) {
+        if (heroHasSteps) {
+            holdCompletedHero = true
+        } else if (holdCompletedHero) {
+            delay(HERO_COMPLETION_HOLD_MS)
+            holdCompletedHero = false
+        }
+    }
+    val widgets = remember(uiState, widgetExtras, trending, holdCompletedHero) {
+        boardWidgetsToRender(
+            state = uiState,
+            extras = widgetExtras,
+            trendingEmpty = trending?.topCommanders.isNullOrEmpty(),
+            puzzleEnabled = FeatureFlags.Puzzle.PUZZLE_ENABLED,
+            holdCompletedHero = holdCompletedHero,
+        )
+    }
+    // The board holds still while a shared-element transition runs, so the source bounds never move.
+    val boardFrozen = sharedTransitionScope?.isTransitionActive == true
+
     Box(modifier = modifier.fillMaxSize()) {
         ThemeBackground(modifier = Modifier.fillMaxSize())
 
-        // TASK 1: while the board's first combine emission is still pending, render a skeleton
-        // instead of an empty/partial grid so the transition to real content is smooth (no giant
-        // pop-in once everything resolves at once). The top bar stays visible throughout.
-        if (uiState.isLoading) {
-            Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-                HomeTopBar(
-                    uiState = uiState,
-                    onAvatarClick = { onAction(HomeAction.OpenProfile) },
-                    modifier = Modifier.padding(horizontal = spacing.lg),
-                )
-                HomeBoardSkeleton(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = spacing.lg),
-                )
-            }
-            return@Box
-        }
-
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
+            state = gridState,
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding(),
@@ -286,64 +318,96 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(spacing.lg),
             horizontalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
+            item(key = HOME_KEY_TOP_BAR, span = { GridItemSpan(maxLineSpan) }) {
                 HomeTopBar(
                     uiState = uiState,
                     onAvatarClick = { onAction(HomeAction.OpenProfile) },
                 )
             }
 
+            if (!uiState.boardReady) {
+                // Same grid, padding and top bar as the real board, so resolving it shifts nothing.
+                items(
+                    count = HOME_BOARD_SKELETON_COUNT,
+                    key = { "$HOME_KEY_SKELETON_PREFIX$it" },
+                    span = { GridItemSpan(maxLineSpan) },
+                ) {
+                    HomeBoardSkeletonItem(
+                        pulse = pulse,
+                        modifier = if (boardFrozen) Modifier else Modifier.animateItem(),
+                    )
+                }
+                return@LazyVerticalGrid
+            }
+
             // Every widget is MEDIUM (full width) after the consolidation.
-            // Defensive distinctBy to prevent fatal key collisions if a race condition
-            // occurs during rapid add/remove/move actions.
             items(
-                items = uiState.layout.distinctBy { it.type.persistedId },
-                key = { "widget_${it.type.persistedId}" },
+                items = widgets,
+                key = { homeWidgetKey(it.type) },
                 span = { GridItemSpan(maxLineSpan) },
             ) { widget ->
-                HomeWidgetContainer(
+                HomeWidgetHost(
                     widget = widget,
                     uiState = uiState,
+                    ready = widgetReadiness[widget.type] == true,
+                    metrics = metrics,
+                    motion = motion,
                     onAction = onAction,
+                    modifier = if (boardFrozen) Modifier else Modifier.animateItem(),
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
-                    modifier = Modifier,
                     trending = trending,
                     communityDecks = communityDecks,
                     communityDecksCategory = communityDecksCategory,
                     dailyPuzzle = dailyPuzzle,
-                    competitiveEnabled = competitiveEnabled,
+                    rulesTipIndex = rulesTipIndex,
                 )
             }
 
             if (uiState.layout.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
+                item(key = HOME_KEY_EMPTY, span = { GridItemSpan(maxLineSpan) }) {
                     EmptyState(
                         title = stringResource(R.string.home_empty_title),
                         subtitle = stringResource(R.string.home_empty_message),
                         actionLabel = stringResource(R.string.home_add_widgets),
                         onAction = { onAction(HomeAction.OpenWidgetGallery) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(if (boardFrozen) Modifier else Modifier.animateItem()),
                     )
                 }
             }
 
             uiState.accountNudge?.let { nudge ->
-                item(span = { GridItemSpan(maxLineSpan) }) {
+                item(key = HOME_KEY_NUDGE, span = { GridItemSpan(maxLineSpan) }) {
                     AccountNudgeCard(
                         nudge = nudge,
                         onCreateAccount = { onAction(HomeAction.CreateAccount) },
                         onDismiss = { onAction(HomeAction.DismissAccountNudge) },
+                        modifier = if (boardFrozen) Modifier else Modifier.animateItem(),
                     )
                 }
             }
 
             // Entry point to the widget gallery (add / remove / reorder) at the bottom.
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                EditWidgetsButton(onClick = { onAction(HomeAction.OpenWidgetGallery) })
+            item(key = HOME_KEY_EDIT_WIDGETS, span = { GridItemSpan(maxLineSpan) }) {
+                EditWidgetsButton(
+                    onClick = { onAction(HomeAction.OpenWidgetGallery) },
+                    modifier = if (boardFrozen) Modifier else Modifier.animateItem(),
+                )
             }
         }
     }
 }
+
+/** Completion card time (ContextHeroWidget waits 1.5 s, then plays its exit) before the slot goes. */
+private const val HERO_COMPLETION_HOLD_MS = 2_000L
+
+private const val HOME_KEY_TOP_BAR = "home_top_bar"
+private const val HOME_KEY_EMPTY = "home_empty"
+private const val HOME_KEY_NUDGE = "home_nudge"
+private const val HOME_KEY_EDIT_WIDGETS = "home_edit_widgets"
+private const val HOME_KEY_SKELETON_PREFIX = "home_skeleton_"
 
 @Composable
 private fun EditWidgetsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -371,6 +435,8 @@ private fun EditWidgetsButton(onClick: () -> Unit, modifier: Modifier = Modifier
 
 private val HomeTopBarHeight = 56.dp
 
+private const val GREETING_FADE_MS = 220
+
 @Composable
 private fun HomeTopBar(
     uiState: HomeUiState,
@@ -384,23 +450,34 @@ private fun HomeTopBar(
     val playerName = uiState.playerName
     val greeting = greetingText(playerName)
     val openProfileDescription = stringResource(R.string.home_open_profile_a11y)
+    val greetingStyle = ty.displayMedium.copy(fontWeight = FontWeight.Bold)
+    val greetingTwoLines = with(LocalDensity.current) { greetingStyle.lineHeight.toDp() * 2 }
+    // Hidden until auth resolves so a signed-in user never sees the signed-out greeting first.
+    val greetingAlpha by animateFloatAsState(
+        targetValue = if (uiState.authResolved) 1f else 0f,
+        animationSpec = tween(GREETING_FADE_MS),
+        label = "greeting-alpha",
+    )
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(HomeTopBarHeight + 24.dp)
+            .heightIn(min = max(HomeTopBarHeight, greetingTwoLines))
             .padding(horizontal = spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = greeting,
-                style = ty.displayMedium.copy(fontWeight = FontWeight.Bold),
+                style = greetingStyle,
                 color = mc.textPrimary,
+                minLines = 2,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.graphicsLayer { alpha = greetingAlpha },
             )
         }
+        Spacer(Modifier.width(spacing.sm))
         
         Surface(
             modifier = Modifier

@@ -3655,6 +3655,7 @@
 
     <!-- Rules tips (rotated by day) -->
     <string name="home_rules_tip_label">Did you know?</string>
+    <string name="home_rules_tip_roll_a11y">Roll another tip</string>
 
     <!-- Rules tip categories (Home feature overhaul Phase 2.4) -->
     <string name="tip_category_fundamentals">Fundamentals</string>

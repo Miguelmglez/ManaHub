@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.home.presentation
 
 import androidx.annotation.StringRes
+import androidx.compose.runtime.Immutable
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DraftSet
@@ -18,6 +19,7 @@ import com.mmg.manahub.core.model.news.NewsItem
  * new Room tables and no network calls solely for startup. The screen is useful
  * offline with cached/local data.
  */
+@Immutable
 data class HomeUiState(
     /**
      * True once the board can render: the persisted layout has been decoded AND the auth gate has
@@ -27,6 +29,8 @@ data class HomeUiState(
     /** The single auth source for the board; see [AuthGate]. */
     val auth: AuthGate = AuthGate.Unknown,
     val hero: HomeHeroState = HomeHeroState.Welcome(steps = emptyList()),
+    /** Whether the first steps were completed before; null until the preference has been read. */
+    val firstStepsCompletionSeen: Boolean? = null,
     val quickStartActions: List<QuickStartAction> = QuickStartAction.defaults,
     /** True once [quickStartActions] reflects the persisted choice rather than the defaults. */
     val quickStartLoaded: Boolean = false,
@@ -151,6 +155,7 @@ data class HomeUiState(
  * @param claimableCount completed-but-unclaimed quests across daily + weekly.
  * @param topQuests up to 3 in-progress/claimable quests for the Quests widget (claimable first).
  */
+@Immutable
 data class HomeGamification(
     val level: Int,
     val xpIntoLevel: Long,
@@ -168,6 +173,7 @@ data class HomeGamification(
 }
 
 /** A single quest preview row for the Home Quests widget. */
+@Immutable
 data class HomeQuest(
     val instanceId: String,
     val title: String,
@@ -248,6 +254,7 @@ data class PerformanceDetails(
 )
 
 /** A discover/spotlight card surfaced from Scryfall or a cached pool. */
+@Immutable
 data class DiscoverCard(
     val id: String,
     val scryfallId: String,
@@ -264,6 +271,7 @@ data class DiscoverCard(
  * @param card The resolved card image/name/typeLine for display + tap-through to Card Detail.
  * @param quantity Quantity on the row; drives the small badge when > 1.
  */
+@Immutable
 data class RecentlyAddedCard(
     val rowId: String,
     val card: DiscoverCard,
@@ -271,6 +279,7 @@ data class RecentlyAddedCard(
 )
 
 /** Wishlist summary (account-gated). */
+@Immutable
 data class WishlistStats(
     val count: Int,
     val estimatedValueDisplay: String,
@@ -300,6 +309,7 @@ data class TradeSummary(
  * @param counterpartyName The friend's nickname on the other side of the match, or null when it
  *   could not be resolved locally (never omit the row for this reason — degrade the name instead).
  */
+@Immutable
 data class TradeSuggestionPreview(
     val id: String,
     val card: DiscoverCard,
@@ -310,6 +320,7 @@ data class TradeSuggestionPreview(
  * Open-for-trade summary with real card thumbnails (Home widget board overhaul, TASK 4b —
  * replaces the old count-only slide).
  */
+@Immutable
 data class OpenForTradePreview(
     val count: Int,
     val valueDisplay: String?,
@@ -361,6 +372,7 @@ sealed interface HomeHeroState {
 }
 
 /** Snapshot of the user's local library for the summary card. */
+@Immutable
 data class LibraryStats(
     val totalCards: Int,
     val uniqueCards: Int,

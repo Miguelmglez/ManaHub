@@ -213,6 +213,9 @@ class HomeViewModel(
      */
     val rulesTipIndexFlow: StateFlow<Int> = rulesTipIndex.asStateFlow()
 
+    /** Widgets that already played their first reveal; outlives the screen so a return never replays it. */
+    val revealTracker = WidgetRevealTracker()
+
     // ── Flow helpers ──────────────────────────────────────────────────────────
 
     /** `stateIn` whose ONLY null is the initial value: a restart keeps the last emitted value. */
@@ -1532,6 +1535,7 @@ class HomeViewModel(
             boardReady = boardReady,
             auth = gate,
             hero = hero,
+            firstStepsCompletionSeen = prefs?.firstStepsCompletionSeen,
             quickStartActions = prefs?.quickStart ?: QuickStartAction.defaults,
             quickStartLoaded = prefs != null,
             libraryStats = libraryStats,

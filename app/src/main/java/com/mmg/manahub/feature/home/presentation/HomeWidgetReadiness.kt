@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.home.presentation
 
+import androidx.compose.runtime.Immutable
 import com.mmg.manahub.core.model.CommunityDeckSummary
 
 /**
@@ -11,6 +12,7 @@ import com.mmg.manahub.core.model.CommunityDeckSummary
  * @param dailyPuzzle the DAILY_PUZZLE preview state.
  * @param competitiveEnabled the COMPETITIVE flag; null until the persisted value is read.
  */
+@Immutable
 data class HomeWidgetExtras(
     val trendingLoaded: Boolean = false,
     val communityDecks: List<CommunityDeckSummary>? = null,
@@ -39,7 +41,9 @@ fun HomeWidgetType.isReady(state: HomeUiState, extras: HomeWidgetExtras): Boolea
         HomeWidgetType.YOUR_DECKS_SHELF -> state.decks != null
         HomeWidgetType.WISHLIST_PROGRESS -> state.wishlistStats != null
         HomeWidgetType.RECENTLY_ADDED -> state.recentlyAdded != null
-        HomeWidgetType.DISCOVER_CARDS -> state.discoverLoadState != DiscoverLoadState.LOADING
+        // A refresh keeps the current row on screen, so existing cards are always ready.
+        HomeWidgetType.DISCOVER_CARDS ->
+            state.discoverCards.isNotEmpty() || state.discoverLoadState != DiscoverLoadState.LOADING
         // A re-roll keeps the previous card on screen, so an existing card is always ready.
         HomeWidgetType.CARD_OF_THE_DAY ->
             state.cardOfTheDay != null || state.randomCardLoadState == DiscoverLoadState.FAILED

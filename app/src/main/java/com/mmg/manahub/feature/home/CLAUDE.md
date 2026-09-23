@@ -12,6 +12,15 @@ Free-first, account-enhanced start screen. Fully implemented (2026-06-08). Must-
   renders per widget from `HomeViewModel.widgetReadiness` / `HomeWidgetType.isReady(state, extras)`, and
   the board from `HomeUiState.boardReady` (layout decoded && auth resolved). Layout mutations are
   transforms applied inside `UserPreferencesDataStore.updateHomeLayout`, serialized by a VM mutex.
+- **Board motion + sizing contract (2026-09-23, H2a):** the grid renders at once (top bar + headers);
+  every widget body sits in a `WidgetBodySlot` whose height comes from `HomeWidgetMetrics`
+  (`computeHomeWidgetMetrics`, line heights via `lineHeight.toDp()` so it scales with font size) and
+  is shared by skeleton, gated placeholder, empty, error and content — they swap by `graphicsLayer`
+  alpha only. Never put `animateContentSize`/`AnimatedContent`/a spinner of its own size in a board
+  item. First reveal per widget per process (lift + 45 ms stagger, `WidgetRevealTracker` held by the
+  VM) never replays on return. Widgets that draw nothing are dropped by `boardWidgetsToRender`, never
+  inside the item. Grid state is hoisted, every item keyed, and `animateItem` is off while a shared
+  transition runs; card-image transitions use the single `CardSharedBoundsTransform`.
 - `avatarUrlFlow` and every other prefs flow the VM reads MUST be stubbed in tests (a relaxed mock's
   unstubbed Flow never emits, so that slice never resolves).
 - Quick Start: 4 shortcuts persisted in DataStore via `UserPreferencesDataStore.observeQuickStartActions()`; partial-restore pads with defaults rather than discarding valid entries.
@@ -56,8 +65,8 @@ content). Must-know:
   (only `NotAuthenticated` signs out), so a resume with no network never flips the board to signed out.
   `CommunityStatsRepositoryImpl`/`ArchidektTrendingRepository` are DORMANT Koin registrations since the
   2026-07-18 widget board overhaul (see below) — Home no longer consumes either.
-- `HomeWidgetHost` dispatches type→composable; `HomeWidgetContainer` just wraps it (no bounds
-  registry, see above); all widgets share `WidgetShell` (flat Column, no card surface). No
+- `HomeWidgetHost` dispatches type→composable (the old `HomeWidgetContainer` wrapper is gone); all
+  widgets share `WidgetShell` (flat Column, no card surface). No
   `success`/`error` tokens exist — win=`lifePositive`, loss=`lifeNegative`. `WidgetSectionHeader`'s
   icon+label area is an optional ≥48dp tap target (`onClick`/`onClickLabel`) resolved per widget type
   by `widgetHeaderTitleClickAction` — same destination as that widget's internal "See more" tile.
@@ -71,7 +80,7 @@ content). Must-know:
   (2026-07-18 overhaul, TASK 5b — a category-selectable Archidekt deck browser, `WidgetAudience.ALL`):
   both keep their data OUTSIDE the `HomeUiState` combine chain (independent `HomeViewModel.trendingFlow`
   / `communityDecksFlow`+`communityDecksCategoryFlow` `stateIn`s, threaded as extra params through
-  `HomeScreen`→`HomeWidgetContainer`→`HomeWidgetHost`) — see `project_community_hub_seedbuild_trending`
+  `HomeScreen`→`HomeWidgetHost`) — see `project_community_hub_seedbuild_trending`
   memory for why. `TRENDING_COMMANDERS` is silently hidden (never an error state) on any
   failure/flag-off. Distinct backends: Cloudflare Worker (`TRENDING_COMMANDERS`) vs. Archidekt search API
   directly via `SearchCommunityDecksUseCase` (`COMMUNITY_DECKS`) — never conflate the two.
@@ -92,11 +101,14 @@ content). Must-know:
   (see `ALL_FIRST_STEPS` in `FirstStepItem.kt` for the per-step DATA-DRIVEN/DISMISS-ONLY doc). The
   "You're all set!" completion card (empty-`Welcome` hero) shows ONCE — gated by
   `UserPreferencesDataStore.firstStepsCompletionSeenFlow`/`markFirstStepsCompletionSeen()` — then the
-  hero falls through to `Summary` permanently (2026-07-18).
+  hero item leaves the board (`heroTakesSlot`; a loading hero only reserves a slot while
+  `firstStepsCompletionSeen == false`, so returning users never see a vanishing placeholder).
 - Top bar = deterministic, MTG-flavored greeting pool (4 time bands × 3-4 variants, seeded by epoch
-  day — `HomeScreen.resolveGreetingVariant`, 2026-07-18) + avatar (→ `OpenProfile`). A board-level
-  loading skeleton (`HomeBoardSkeleton`) renders while `HomeUiState.isLoading`, replacing the old
-  empty/partial-grid flash.
+  day — `HomeScreen.resolveGreetingVariant`, 2026-07-18) + avatar (→ `OpenProfile`); the greeting
+  reserves two lines and fades in once auth resolves. While `!boardReady` the SAME grid shows
+  `HomeBoardSkeletonItem`s under the real top bar.
+- **Rules Tip** shows one tip; the header's roll button (`RollRulesTip`) picks another. The card's
+  height is the tallest body in the catalog (measured once per width/font scale) + one line.
 - → memory: `project_home_widget_board`, `project_home_feature_overhaul_2026-07-13`,
   `feedback_home_dashboard_audit_fixes_2026-07-13`, `feedback_archidekt_trending_stale_cache_bug`,
   `project_home_widget_board_overhaul_2026-07`, `feedback_trades_refresh_proposals_metadata_only`

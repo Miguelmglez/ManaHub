@@ -628,10 +628,13 @@ fun AppNavGraph(
                                 defaultValue = null
                             }
                         ),
-                        enterTransition = { 
+                        enterTransition = {
                             fadeIn(tween(500))
                         },
-                        exitTransition = { fadeOut(tween(500)) }
+                        exitTransition = { fadeOut(tween(500)) },
+                        // The default pop exit slides the screen, which drags the shared card
+                        // image's source bounds sideways on the way back.
+                        popExitTransition = { fadeOut(tween(500)) },
                     ) { backStackEntry ->
                         val sharedTransitionKey = backStackEntry.arguments?.getString("sharedTransitionKey")
                         CardDetailScreen(
