@@ -116,7 +116,7 @@ sealed class Screen(val route: String) {
      * INTO an existing Deck Studio draft, never creates a fresh one of its own anymore.
      */
     object DeckWizard : Screen(
-        "deck/wizard?archetype={archetype}&theme={theme}&tribe={tribe}&colors={colors}&seeds={seeds}&format={format}&deckId={deckId}&replaceConfirmed={replaceConfirmed}"
+        "deck/wizard?archetype={archetype}&theme={theme}&tribe={tribe}&colors={colors}&seeds={seeds}&seedCards={seedCards}&format={format}&deckId={deckId}&replaceConfirmed={replaceConfirmed}"
     ) {
         const val baseRoute = "deck/wizard"
 
@@ -152,6 +152,8 @@ sealed class Screen(val route: String) {
             tribe: String? = null,
             colors: String? = null,
             seeds: List<String>? = null,
+            // Exact picks (scryfallId + copies) from Browse inspirations; lands directly on the STRATEGY step.
+            seedCards: List<Pair<String, Int>>? = null,
             replaceConfirmed: Boolean,
         ): String {
             val params = mutableListOf(
@@ -164,6 +166,9 @@ sealed class Screen(val route: String) {
             if (!tribe.isNullOrEmpty()) params += "tribe=${Uri.encode(tribe)}"
             if (!colors.isNullOrEmpty()) params += "colors=${Uri.encode(colors)}"
             if (!seeds.isNullOrEmpty()) params += "seeds=${Uri.encode(seeds.joinToString("|"))}"
+            if (!seedCards.isNullOrEmpty()) {
+                params += "seedCards=${Uri.encode(seedCards.joinToString("|") { (id, quantity) -> "$id:$quantity" })}"
+            }
             return "$baseRoute?${params.joinToString("&")}"
         }
     }

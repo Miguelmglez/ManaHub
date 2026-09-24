@@ -113,10 +113,6 @@ class DeckStudioViewModelTest {
     private val preferredCurrency = MutableStateFlow(PreferredCurrency.EUR)
     private val crashReporter = mockk<CrashReporter>(relaxed = true)
     private val appContext = mockk<Context>()
-    // Deck Engine Unification plan D7 (Phase 4.3) — Combos tab.
-    private val findCombosUseCase = mockk<com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase>()
-    // Deck Engine Unification plan D7 (4.1/4.2) — Strategies tab search.
-    private val discoverSynergiesV2UseCase = mockk<com.mmg.manahub.feature.decks.domain.template.DiscoverSynergiesV2UseCase>()
 
     // ── Real engine + use cases (deterministic fixed PowerResolver) ───────────
     private val scorer = DeckScorer(RoleClassifier(), fixedPower(normalized = 0.6f))
@@ -165,9 +161,6 @@ class DeckStudioViewModelTest {
         // batch-resolve-specific tests below override getCardsByIds to return real cards.
         coEvery { cardRepository.warmCacheForIds(any()) } just Runs
         coEvery { cardRepository.getCardsByIds(any()) } returns emptyList()
-        // Inspirations (Phase 4): init loadDiscoveries() calls discoverSynergiesV2UseCase when
-        // wired (createVm()'s default is null -> loadDiscoveries takes its null-degrade branch,
-        // no stub needed).
     }
 
     @After
@@ -492,55 +485,6 @@ class DeckStudioViewModelTest {
         assertEquals(0.0, summary.sideboard.knownTotal, 0.001)
         assertEquals(0, summary.sideboard.missingPriceCopies)
     }
-
-    /** Creates the ViewModel with a mocked [findCombosUseCase] wired (Deck Engine Unification plan
-     * D7, Phase 4.3 Combos-tab tests) — every other new Phase-4-and-earlier dependency stays at its
-     * nullable default (`discoverSynergiesV2UseCase = null` -> legacy `discoveries` path). */
-    private fun createVmWithFindCombos(deckId: String? = null): DeckStudioViewModel =
-        DeckStudioViewModel(
-            deckRepository = deckRepository,
-            cardRepository = cardRepository,
-            userCardRepository = userCardRepository,
-            searchCardsUseCase = searchCardsUseCase,
-            suggestTagsUseCase = suggestTagsUseCase,
-            evaluateDeckUseCase = evaluateDeckUseCase,
-            inferDeckIdentityUseCase = inferDeckIdentityUseCase,
-            getDeckGameStatsUseCase = getDeckGameStatsUseCase,
-            importDeckUseCase = importDeckUseCase,
-            wishlistRepository = wishlistRepository,
-            userPreferences = userPreferences,
-            crashReporter = crashReporter,
-            appContext = appContext,
-            savedStateHandle = SavedStateHandle(
-                if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
-            ),
-            findCombosUseCase = findCombosUseCase,
-        )
-
-    /** Creates the ViewModel with BOTH [discoverSynergiesV2UseCase] and [findCombosUseCase] mocked
-     * (the full v2 synergy browser -- Strategies search + Combos tab, Deck Engine Unification
-     * plan D7 Phase 4). */
-    private fun createVmWithInspirationsV2(deckId: String? = null): DeckStudioViewModel =
-        DeckStudioViewModel(
-            deckRepository = deckRepository,
-            cardRepository = cardRepository,
-            userCardRepository = userCardRepository,
-            searchCardsUseCase = searchCardsUseCase,
-            suggestTagsUseCase = suggestTagsUseCase,
-            evaluateDeckUseCase = evaluateDeckUseCase,
-            inferDeckIdentityUseCase = inferDeckIdentityUseCase,
-            getDeckGameStatsUseCase = getDeckGameStatsUseCase,
-            importDeckUseCase = importDeckUseCase,
-            wishlistRepository = wishlistRepository,
-            userPreferences = userPreferences,
-            crashReporter = crashReporter,
-            appContext = appContext,
-            savedStateHandle = SavedStateHandle(
-                if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
-            ),
-            discoverSynergiesV2UseCase = discoverSynergiesV2UseCase,
-            findCombosUseCase = findCombosUseCase,
-        )
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Group 1 — Init: draft creation vs. existing deck
@@ -2754,222 +2698,215 @@ class DeckStudioViewModelTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Group 16 — loadDiscoveries on init (Phase 4). Groups 16-20's original seed-build
-    //  (openSeedSheet/closeSeedSheet, addSeed/removeSeed, onSeedQueryChange, generateFromSeeds,
-    //  startFromDiscovery) and the legacy discoverSynergies-specific tests were REMOVED in the
-    //  Deck Wizard & Engine Rework plan, WS7.2 (2026-07-28) along with the production code they
-    //  exercised (`SeedsContent`/`BuildDeckFromSeedsUseCase`/`DeckMagicEngine.discoverSynergies`).
-    //  See Group 21b below for the surviving v2 synergy-browser coverage.
+    //  Group 16 — Browse inspirations (60-card empty decks): collection synergies, owned-card
+    //  pins, per-card combos and the shared selection handed to the wizard.
     // ─────────────────────────────────────────────────────────────────────────
 
-    @Test
-    fun `given any init outcome when VM initialises then isLoadingDiscoveries is false after completion`() =
-        runTest(dispatcher) {
-            // Arrange — test the success path (isLoadingDiscoveries transitions to false). No
-            // discoverSynergiesV2UseCase wired (createVm() defaults it to null), so loadDiscoveries
-            // takes its null-degrade branch -- isLoadingDiscoveries still flips false.
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
+    private val findCombosWithCardUseCase = mockk<com.mmg.manahub.feature.decks.domain.inspirations.FindCombosWithCardUseCase>()
 
-            // Act
-            val vm = createVm()
-            advanceUntilIdle()
+    private fun roleTag(key: String) = CardTag(key, com.mmg.manahub.core.model.TagCategory.ROLE)
 
-            // Assert — loading flag is cleared regardless of success/failure.
-            assertFalse("isLoadingDiscoveries must be false after loadDiscoveries completes",
-                vm.uiState.value.isLoadingDiscoveries)
-        }
+    private val outletCard = card(id = "outlet-1", name = "Carrion Feeder", typeLine = "Creature", tags = listOf(roleTag("sac_outlet")))
+    private val payoffCard = card(id = "payoff-1", name = "Blood Artist", typeLine = "Creature", tags = listOf(roleTag("death_payoff")))
+    private val healerCard = card(id = "healer-1", name = "Soul Warden", typeLine = "Creature", tags = listOf(roleTag("lifegain_source")))
+    private val lifePayoffCard = card(id = "lifepay-1", name = "Ajani's Pridemate", typeLine = "Creature", tags = listOf(roleTag("lifegain_payoff")))
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Group 21b — Synergy browser: Strategies search + Combos tab
-    //  (Deck Engine Unification plan D7, Phase 4)
-    // ─────────────────────────────────────────────────────────────────────────
+    private fun ownedCopies(card: Card, quantity: Int = 1) = UserCardWithCard(
+        userCard = UserCard(id = "uc-${card.scryfallId}", scryfallId = card.scryfallId, quantity = quantity),
+        card = card,
+    )
 
-    private fun discoveryV2(label: String, tag: CardTag, memberName: String) =
-        com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2(
-            key = com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.Strategy(tag),
-            label = label,
-            memberCount = 8,
-            dominantColors = emptySet(),
-            members = listOf(card(id = "id-$memberName", name = memberName, tags = listOf(tag))),
-            archetype = null,
-            theme = null,
-            tribe = null,
+    private fun combo(id: String, vararg names: String) =
+        com.mmg.manahub.feature.decks.domain.model.CardCombo(id, names.toList(), "desc", listOf("Infinite mana"), false, emptyMap())
+
+    private fun createVmWithInspirations(
+        format: String = "casual",
+        collection: List<UserCardWithCard> = listOf(ownedCopies(outletCard), ownedCopies(payoffCard), ownedCopies(healerCard), ownedCopies(lifePayoffCard)),
+    ): DeckStudioViewModel {
+        every { userCardRepository.observeCollection() } returns flowOf(collection)
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+            DeckWithCards(deck = Deck(id = DECK_ID, name = DEFAULT_DECK_NAME, format = format), mainboard = emptyList(), sideboard = emptyList()),
         )
+        return DeckStudioViewModel(
+            deckRepository = deckRepository,
+            cardRepository = cardRepository,
+            userCardRepository = userCardRepository,
+            searchCardsUseCase = searchCardsUseCase,
+            suggestTagsUseCase = suggestTagsUseCase,
+            evaluateDeckUseCase = evaluateDeckUseCase,
+            inferDeckIdentityUseCase = inferDeckIdentityUseCase,
+            getDeckGameStatsUseCase = getDeckGameStatsUseCase,
+            importDeckUseCase = importDeckUseCase,
+            wishlistRepository = wishlistRepository,
+            userPreferences = userPreferences,
+            crashReporter = crashReporter,
+            appContext = appContext,
+            savedStateHandle = SavedStateHandle(mapOf("deckId" to DECK_ID)),
+            discoverCollectionSynergiesUseCase = com.mmg.manahub.feature.decks.domain.inspirations.DiscoverCollectionSynergiesUseCase(dispatcher),
+            findCombosWithCardUseCase = findCombosWithCardUseCase,
+        )
+    }
 
     @Test
-    fun `given discoveriesV2 loaded when VM initialises then filteredDiscoveriesV2 starts equal to the full list`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            val ramp = discoveryV2("Ramp", CardTag.RAMP, "Sol Ring")
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns listOf(ramp)
+    fun `opening inspirations computes every collection engine in the Synergy vocabulary`() = runTest(dispatcher) {
+        val vm = createVmWithInspirations()
+        advanceUntilIdle()
 
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
+        vm.openInspirations()
+        advanceUntilIdle()
 
-            assertEquals(listOf(ramp), vm.uiState.value.discoveriesV2)
-            assertEquals(listOf(ramp), vm.uiState.value.filteredDiscoveriesV2)
-        }
-
-    @Test
-    fun `given two discoveries when search query matches one label then filteredDiscoveriesV2 narrows to it`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            val ramp = discoveryV2("Ramp", CardTag.RAMP, "Sol Ring")
-            val tokens = discoveryV2("Tokens", CardTag.TOKENS, "Anointed Procession")
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns listOf(ramp, tokens)
-
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
-
-            vm.onDiscoverySearchQueryChange("ramp")
-
-            assertEquals(listOf(ramp), vm.uiState.value.filteredDiscoveriesV2)
-            // The full, unfiltered list is untouched -- only the derived view narrows.
-            assertEquals(2, vm.uiState.value.discoveriesV2.size)
-        }
+        val state = vm.uiState.value.inspirations
+        assertTrue(state.isOpen)
+        assertFalse(state.isLoadingSynergies)
+        val axes = state.synergies!!.engines.map { it.axis }
+        assertTrue("DEATH" in axes)
+        assertTrue("LIFE" in axes)
+    }
 
     @Test
-    fun `given a search-by-card pick when it matches only one discovery then filteredDiscoveriesV2 narrows to it`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            val ramp = discoveryV2("Ramp", CardTag.RAMP, "Sol Ring")
-            val tokens = discoveryV2("Tokens", CardTag.TOKENS, "Anointed Procession")
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns listOf(ramp, tokens)
+    fun `the owned-card search lists only legal cards and a pin narrows the synergies`() = runTest(dispatcher) {
+        val banned = card(id = "banned-1", name = "Carrion Banned", typeLine = "Creature", legalityModern = "banned")
+        val vm = createVmWithInspirations(
+            format = "modern",
+            collection = listOf(ownedCopies(outletCard), ownedCopies(payoffCard), ownedCopies(healerCard), ownedCopies(lifePayoffCard), ownedCopies(banned)),
+        )
+        advanceUntilIdle()
+        vm.openInspirations()
+        advanceUntilIdle()
 
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
+        vm.onInspirationsQueryChange(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.STRATEGIES, "carrion")
+        assertEquals(listOf("Carrion Feeder"), vm.uiState.value.inspirations.strategiesPicker.results.map { it.name })
 
-            vm.onToggleDiscoverySearchCard("Sol Ring")
-            assertEquals(listOf(ramp), vm.uiState.value.filteredDiscoveriesV2)
-
-            // Toggling the SAME card again clears the pick back to the unfiltered list.
-            vm.onToggleDiscoverySearchCard("Sol Ring")
-            assertEquals(listOf(ramp, tokens), vm.uiState.value.filteredDiscoveriesV2)
-        }
-
-    @Test
-    fun `onClearDiscoverySearch resets both search inputs and filteredDiscoveriesV2`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            val ramp = discoveryV2("Ramp", CardTag.RAMP, "Sol Ring")
-            val tokens = discoveryV2("Tokens", CardTag.TOKENS, "Anointed Procession")
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns listOf(ramp, tokens)
-
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
-            vm.onDiscoverySearchQueryChange("ramp")
-            vm.onToggleDiscoverySearchCard("Sol Ring")
-
-            vm.onClearDiscoverySearch()
-
-            assertEquals("", vm.uiState.value.discoverySearchQuery)
-            assertTrue(vm.uiState.value.discoverySelectedCardNames.isEmpty())
-            assertEquals(listOf(ramp, tokens), vm.uiState.value.filteredDiscoveriesV2)
-        }
+        vm.onPinInspirationsCard(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.STRATEGIES, outletCard)
+        val state = vm.uiState.value.inspirations
+        assertEquals("", state.strategiesPicker.query)
+        assertEquals(outletCard, state.strategiesPicker.pinned)
+        assertTrue(state.visibleSynergies!!.engines.all { it.contains("Carrion Feeder") })
+        assertTrue(state.visibleSynergies!!.engines.none { it.axis == "LIFE" })
+        assertTrue("a pin only filters, it never selects", state.selection.isEmpty())
+    }
 
     @Test
-    fun `given the Combos tab has never been selected when VM initialises then loadCombos is never called`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns emptyList()
+    fun `the selection applies the wizard copy cap by name`() = runTest(dispatcher) {
+        every { appContext.getString(any(), *anyVararg()) } returns "capped"
+        val vm = createVmWithInspirations()
+        advanceUntilIdle()
+        vm.openInspirations()
 
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
+        repeat(5) { vm.addToInspirationSelection(outletCard, com.mmg.manahub.feature.decks.presentation.inspirations.InspirationSelectionSource.THUMBNAIL) }
 
-            assertNull("combos must not be fetched just from opening Inspirations", vm.uiState.value.comboResult)
-            coVerify(exactly = 0) { findCombosUseCase(any(), any()) }
-        }
-
-    @Test
-    fun `given selecting the Combos tab for the first time then loadCombos fetches and populates comboResult`() =
-        runTest(dispatcher) {
-            val userCardWithCard = userCardWith(elfCard)
-            every { userCardRepository.observeCollection() } returns flowOf(listOf(userCardWithCard))
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns emptyList()
-            val expected = DataResult.Success(
-                com.mmg.manahub.feature.decks.domain.model.ComboResult(complete = emptyList(), almostThere = emptyList())
-            )
-            coEvery { findCombosUseCase(any(), any()) } returns expected
-
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
-
-            vm.onSelectInspirationsTab(InspirationsTab.COMBOS)
-            advanceUntilIdle()
-
-            assertEquals(InspirationsTab.COMBOS, vm.uiState.value.inspirationsTab)
-            assertEquals(expected.data, vm.uiState.value.comboResult)
-            assertFalse(vm.uiState.value.isLoadingCombos)
-            assertTrue(vm.uiState.value.combosLoaded)
-            coVerify(exactly = 1) { findCombosUseCase(any(), any()) }
-        }
+        assertEquals(4, vm.uiState.value.inspirations.quantityOf(outletCard))
+        vm.decrementInspirationSelection(outletCard)
+        assertEquals(3, vm.uiState.value.inspirations.quantityOf(outletCard))
+    }
 
     @Test
-    fun `given the Combos tab already loaded when reselected then loadCombos is not called again`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns emptyList()
-            coEvery { findCombosUseCase(any(), any()) } returns DataResult.Success(
-                com.mmg.manahub.feature.decks.domain.model.ComboResult(complete = emptyList(), almostThere = emptyList())
-            )
+    fun `closing the sheet wipes the selection pins and searches but keeps the synergies`() = runTest(dispatcher) {
+        val vm = createVmWithInspirations()
+        advanceUntilIdle()
+        vm.openInspirations()
+        advanceUntilIdle()
+        vm.addToInspirationSelection(payoffCard, com.mmg.manahub.feature.decks.presentation.inspirations.InspirationSelectionSource.BROWSE)
+        vm.onPinInspirationsCard(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.STRATEGIES, outletCard)
 
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
-            vm.onSelectInspirationsTab(InspirationsTab.COMBOS)
-            advanceUntilIdle()
-            vm.onSelectInspirationsTab(InspirationsTab.STRATEGIES)
-            vm.onSelectInspirationsTab(InspirationsTab.COMBOS)
-            advanceUntilIdle()
+        vm.closeInspirations()
 
-            coVerify(exactly = 1) { findCombosUseCase(any(), any()) }
-        }
+        val state = vm.uiState.value.inspirations
+        assertFalse(state.isOpen)
+        assertTrue(state.selection.isEmpty())
+        assertNull(state.strategiesPicker.pinned)
+        assertNotNull(state.synergies)
+    }
 
     @Test
-    fun `given findCombosUseCase throws when the Combos tab is selected then comboResult degrades to EMPTY, never crashes`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns emptyList()
-            coEvery { findCombosUseCase(any(), any()) } throws RuntimeException("Spellbook down")
+    fun `combos are never fetched until a card is pinned in the Combos tab`() = runTest(dispatcher) {
+        val vm = createVmWithInspirations()
+        advanceUntilIdle()
+        vm.openInspirations()
+        vm.onSelectInspirationsTab(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.COMBOS)
+        vm.onInspirationsQueryChange(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.COMBOS, "blood")
+        advanceUntilIdle()
 
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
-            vm.onSelectInspirationsTab(InspirationsTab.COMBOS)
-            advanceUntilIdle()
-
-            assertEquals(
-                com.mmg.manahub.feature.decks.domain.model.ComboResult.EMPTY,
-                vm.uiState.value.comboResult,
-            )
-            assertTrue(vm.uiState.value.combosLoaded)
-            assertFalse(vm.uiState.value.isLoadingCombos)
-        }
+        coVerify(exactly = 0) { findCombosWithCardUseCase(any(), any(), any()) }
+        assertEquals(listOf("Blood Artist"), vm.uiState.value.inspirations.combosPicker.results.map { it.name })
+    }
 
     @Test
-    fun `given findCombosUseCase is null when the Combos tab is selected then comboResult degrades to EMPTY without a crash`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
+    fun `pinning a card fetches its combos and resolves unowned pieces in one batched lookup`() = runTest(dispatcher) {
+        val missingPiece = card(id = "zulaport-1", name = "Zulaport Cutthroat", typeLine = "Creature")
+        coEvery { findCombosWithCardUseCase("Blood Artist", DeckFormat.CASUAL, 0) } returns DataResult.Success(
+            com.mmg.manahub.feature.decks.domain.model.CardComboPage(
+                combos = listOf(combo("owned", "Blood Artist", "Carrion Feeder"), combo("near", "Blood Artist", "Zulaport Cutthroat")),
+                totalCount = 2,
+                hasMore = false,
+            ),
+        )
+        coEvery { cardRepository.lookupCardsByIdentifiers(any()) } returns DataResult.Success(
+            com.mmg.manahub.core.domain.repository.CardLookupResult(cards = listOf(missingPiece), notFound = emptyList()),
+        )
+        val vm = createVmWithInspirations()
+        advanceUntilIdle()
+        vm.openInspirations()
 
-            val vm = createVm() // findCombosUseCase defaults to null here
-            advanceUntilIdle()
-            vm.onSelectInspirationsTab(InspirationsTab.COMBOS)
-            advanceUntilIdle()
+        vm.onPinInspirationsCard(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.COMBOS, payoffCard)
+        advanceUntilIdle()
 
-            assertEquals(
-                com.mmg.manahub.feature.decks.domain.model.ComboResult.EMPTY,
-                vm.uiState.value.comboResult,
-            )
-            assertTrue(vm.uiState.value.combosLoaded)
+        val state = vm.uiState.value.inspirations
+        assertEquals(listOf("owned", "near"), state.combos.map { it.combo.id })
+        assertEquals(emptyList<String>(), state.combos.first().missingCardNames)
+        assertEquals(listOf("Zulaport Cutthroat"), state.combos.last().missingCardNames)
+        assertEquals(missingPiece, state.comboCard("zulaport cutthroat"))
+        coVerify(exactly = 1) {
+            cardRepository.lookupCardsByIdentifiers(listOf(com.mmg.manahub.core.domain.repository.CardLookupIdentifier(name = "Zulaport Cutthroat")))
         }
+    }
+
+    @Test
+    fun `a combo with a piece illegal in the deck format is hidden`() = runTest(dispatcher) {
+        val bannedPiece = card(id = "banned-2", name = "Banned Piece", typeLine = "Creature", legalityModern = "banned")
+        coEvery { findCombosWithCardUseCase(any(), DeckFormat.MODERN, 0) } returns DataResult.Success(
+            com.mmg.manahub.feature.decks.domain.model.CardComboPage(
+                combos = listOf(combo("legal", "Blood Artist", "Carrion Feeder"), combo("illegal", "Blood Artist", "Banned Piece")),
+                totalCount = 2,
+                hasMore = false,
+            ),
+        )
+        coEvery { cardRepository.lookupCardsByIdentifiers(any()) } returns DataResult.Success(
+            com.mmg.manahub.core.domain.repository.CardLookupResult(cards = listOf(bannedPiece), notFound = emptyList()),
+        )
+        val vm = createVmWithInspirations(format = "modern")
+        advanceUntilIdle()
+        vm.openInspirations()
+
+        vm.onPinInspirationsCard(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.COMBOS, payoffCard)
+        advanceUntilIdle()
+
+        assertEquals(listOf("legal"), vm.uiState.value.inspirations.combos.map { it.combo.id })
+    }
+
+    @Test
+    fun `adding combos to the selection never bumps a shared piece and the seeds carry exact copies`() = runTest(dispatcher) {
+        coEvery { findCombosWithCardUseCase(any(), any(), 0) } returns DataResult.Success(
+            com.mmg.manahub.feature.decks.domain.model.CardComboPage(
+                combos = listOf(combo("a", "Blood Artist", "Carrion Feeder"), combo("b", "Blood Artist", "Soul Warden")),
+                totalCount = 2,
+                hasMore = false,
+            ),
+        )
+        val vm = createVmWithInspirations()
+        advanceUntilIdle()
+        vm.openInspirations()
+        vm.onPinInspirationsCard(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.COMBOS, payoffCard)
+        advanceUntilIdle()
+        repeat(3) { vm.addToInspirationSelection(payoffCard, com.mmg.manahub.feature.decks.presentation.inspirations.InspirationSelectionSource.PINNED) }
+
+        vm.uiState.value.inspirations.combos.forEach(vm::addComboToInspirationSelection)
+        val seeds = vm.consumeInspirationSeedCards()
+
+        assertEquals(mapOf("payoff-1" to 3, "outlet-1" to 1, "healer-1" to 1), seeds.toMap())
+        assertTrue(vm.uiState.value.inspirations.selection.isEmpty())
+        assertFalse(vm.uiState.value.inspirations.isOpen)
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Group 22 — changeFormat (Group B / B1)

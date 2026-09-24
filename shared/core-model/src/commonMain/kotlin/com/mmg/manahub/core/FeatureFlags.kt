@@ -22,11 +22,11 @@ object FeatureFlags {
          * see `docs/deck-wizard-state.md` for the durable record. */
         const val DECK_BUILDER_V2_ENABLED = true
 
-        /** Deck Builder v2 Discoveries clustering. */
-        const val DISCOVERIES_V2_ENABLED = false
+        /** Deck Studio "Browse inspirations" (60-card formats, empty decks only): collection synergies + per-card combos. */
+        const val DISCOVERIES_V2_ENABLED = true
 
-        /** Discoveries "Build this" and Combos "Use as seed" CTAs. */
-        const val DISCOVERY_BUILD_HANDOFF_ENABLED = false
+        /** Browse inspirations "Start building the deck" hand-off into the wizard's Pick a strategy step. */
+        const val DISCOVERY_BUILD_HANDOFF_ENABLED = true
     }
 
     /** Flags for the Draft Simulator and Guides. */

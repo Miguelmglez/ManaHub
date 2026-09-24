@@ -592,6 +592,47 @@ class DeckWizardViewModelTest {
         assertEquals(setOf("Urza, Lord High Artificer", "Sol Ring"), vm.uiState.value.seeds.map { it.card.name }.toSet())
     }
 
+    // ── Browse inspirations "Start building the deck" hand-off (seedCards) ──
+
+    @Test
+    fun `a seedCards nav arg lands on STRATEGY in the cards flow before the collection loads`() = runTest(dispatcher) {
+        val vm = viewModel(mapOf("format" to "MODERN", "seedCards" to "sol-ring:2"))
+
+        assertEquals(WizardEntryFlow.CARDS, vm.uiState.value.entryFlow)
+        assertEquals(WizardPhase.STRATEGY, vm.uiState.value.phase)
+    }
+
+    @Test
+    fun `seedCards seed every pick with its copies, owned from the snapshot and unowned by id`() = runTest(dispatcher) {
+        val bolt = card(id = "bolt-1", name = "Lightning Bolt")
+        val guide = card(id = "guide-1", name = "Goblin Guide")
+        every { userCardRepository.observeCollection() } returns flowOf(
+            listOf(com.mmg.manahub.core.model.UserCardWithCard(
+                userCard = com.mmg.manahub.core.model.UserCard(id = "uc-1", scryfallId = "bolt-1", quantity = 4),
+                card = bolt,
+            ))
+        )
+        coEvery { cardRepository.getCardById("guide-1") } returns DataResult.Success(guide)
+
+        val vm = viewModel(mapOf("format" to "MODERN", "seedCards" to "bolt-1:3|guide-1:1"))
+        advanceUntilIdle()
+
+        val seeds = vm.uiState.value.seeds.associate { it.card.name to it.quantity }
+        assertEquals(mapOf("Lightning Bolt" to 3, "Goblin Guide" to 1), seeds)
+        assertEquals(WizardPhase.STRATEGY, vm.uiState.value.phase)
+    }
+
+    @Test
+    fun `seedCards that resolve nowhere fall back to the pick-your-cards step`() = runTest(dispatcher) {
+        coEvery { cardRepository.getCardById(any()) } returns DataResult.Error("not found")
+
+        val vm = viewModel(mapOf("format" to "MODERN", "seedCards" to "ghost-1:2"))
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.seeds.isEmpty())
+        assertEquals(WizardPhase.SEED_PICK, vm.uiState.value.phase)
+    }
+
     @Test
     fun `a combo card that resolves nowhere is silently skipped, never blocking the others`() = runTest(dispatcher) {
         val solRing = card(id = "sol-ring", name = "Sol Ring")

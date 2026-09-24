@@ -9,16 +9,24 @@ import com.mmg.manahub.core.data.remote.dto.CardInDeckRequestDto
 import com.mmg.manahub.core.data.remote.dto.FindMyCombosRequestDto
 import com.mmg.manahub.core.data.remote.dto.FindMyCombosResponseDto
 import com.mmg.manahub.core.data.remote.dto.VariantDto
+import com.mmg.manahub.core.data.remote.dto.VariantsPageDto
 import com.mmg.manahub.core.domain.repository.CommanderSpellbookRepository
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.feature.decks.domain.model.AlmostCombo
+import com.mmg.manahub.feature.decks.domain.model.CardCombo
+import com.mmg.manahub.feature.decks.domain.model.CardComboPage
 import com.mmg.manahub.feature.decks.domain.model.Combo
 import com.mmg.manahub.feature.decks.domain.model.ComboResult
 import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 
 private val comboJson = Json { ignoreUnknownKeys = true; coerceInputValues = true }
+
+/** Variants per `GET /variants/` page for the per-card lookup. */
+private const val CARD_COMBOS_PAGE_SIZE = 50
 
 /** 7-day freshness window for cached combo results -- matches [CommunityAggregateRepositoryImpl]'s
  * `AGGREGATE_FRESH_MS` convention (plan D7: "~7 days"). */
@@ -75,6 +83,67 @@ class CommanderSpellbookRepositoryImpl(
             val stale = cached?.let { decode(it.json, cardNames, commanderNames) }
             if (stale != null) DataResult.Success(stale, isStale = true) else DataResult.Success(ComboResult.EMPTY, isStale = true)
         }
+    }
+
+    override suspend fun findCombosWithCard(cardName: String, page: Int): DataResult<CardComboPage> =
+        withContext(dispatcherProvider.io) {
+            val name = cardName.trim()
+            if (name.isEmpty() || page < 0) return@withContext DataResult.Success(CardComboPage.EMPTY)
+
+            val key = ComboCacheKeys.cardCacheKey(name, page)
+            val cached = cache.get(key)
+            if (cached != null && isFresh(cached.cachedAt)) {
+                val decoded = decodePage(cached.json, name)
+                return@withContext if (decoded != null) DataResult.Success(decoded) else DataResult.Error("Corrupt combo cache entry")
+            }
+
+            try {
+                val dto = api.findVariants(cardQuery = cardQuery(name), limit = CARD_COMBOS_PAGE_SIZE, offset = page * CARD_COMBOS_PAGE_SIZE)
+                cache.insert(key, comboJson.encodeToString(VariantsPageDto.serializer(), dto), now())
+                DataResult.Success(toCardComboPage(dto, name))
+            } catch (e: Exception) {
+                recordFailure(e)
+                val stale = cached?.let { decodePage(it.json, name) }
+                DataResult.Success(stale ?: CardComboPage.EMPTY, isStale = true)
+            }
+        }
+
+    private fun decodePage(json: String, cardName: String): CardComboPage? =
+        try {
+            toCardComboPage(comboJson.decodeFromString(VariantsPageDto.serializer(), json), cardName)
+        } catch (e: Exception) {
+            null
+        }
+
+    // `card=` is exact; a "Front // Back" name falls back to a front-face `card:` match, re-checked in toCardComboPage.
+    private fun cardQuery(cardName: String): String {
+        val front = cardName.substringBefore(" // ").replace("\"", "")
+        return if (cardName.contains(" // ")) "card:\"$front\"" else "card=\"$front\""
+    }
+
+    private fun toCardComboPage(dto: VariantsPageDto, cardName: String): CardComboPage {
+        val wanted = cardName.lowercase()
+        val wantedFront = wanted.substringBefore(" // ")
+        val combos = dto.results
+            .filter { variant ->
+                variant.uses.any { use ->
+                    val piece = use.card.name.lowercase()
+                    piece == wanted || piece.substringBefore(" // ") == wantedFront
+                }
+            }
+            .map { variant ->
+                CardCombo(
+                    id = variant.id,
+                    cardNames = variant.uses.map { it.card.name },
+                    description = variant.description,
+                    produces = variant.produces.map { it.feature.name },
+                    requiresCommandZone = variant.uses.any { it.mustBeCommander },
+                    legalities = variant.legalities.orEmpty().mapNotNull { (format, value) ->
+                        (value as? JsonPrimitive)?.booleanOrNull?.let { format.lowercase() to it }
+                    }.toMap(),
+                )
+            }
+        return CardComboPage(combos = combos, totalCount = dto.count, hasMore = dto.next != null)
     }
 
     private fun isFresh(cachedAt: Long): Boolean = now() - cachedAt < COMBO_FRESH_MS

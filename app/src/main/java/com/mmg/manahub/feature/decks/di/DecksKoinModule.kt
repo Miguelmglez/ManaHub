@@ -27,8 +27,7 @@ import com.mmg.manahub.feature.decks.domain.usecase.RecommendWizardStrategiesUse
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildWizardDeckUseCase
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
-import com.mmg.manahub.feature.decks.domain.template.DiscoverSynergiesV2UseCase
-import com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase
+import com.mmg.manahub.feature.decks.domain.inspirations.DiscoverCollectionSynergiesUseCase
 import com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckViewModel
@@ -176,10 +175,8 @@ fun decksKoinModule(): Module = module {
     // `the deleted Motor A wizard build use case` (the legacy Motor A wizard build engine, Casual's own build
     // path until this phase) were deleted along with their Koin bindings here -- every format now
     // builds through the single `BuildWizardDeckUseCase` registered above.
-    // Deck Builder v2, Phase 5 (docs/plans/deck-builder-v2-plan.md §3.5) -- Discoveries v2. Flag
-    // -gated OFF by default until DeckFeatureFlags.DISCOVERIES_V2_ENABLED flips (this batch flips
-    // it to true -- see that flag's KDoc).
-    single { DiscoverSynergiesV2UseCase(deckScorer = get()) }
+    // Browse inspirations (Deck Studio, 60-card empty decks): the collection-wide Synergy discovery.
+    single { DiscoverCollectionSynergiesUseCase() }
 
     // ── ViewModels (the Decks island) ──────────────────────────────────────────────
     // DeckViewModel: backs the deck list.
@@ -205,8 +202,8 @@ fun decksKoinModule(): Module = module {
             savedStateHandle = get(),
             findSimilarDecksUseCase = get(),
             importDeckCardsUseCase = get(),
-            discoverSynergiesV2UseCase = get(),
-            findCombosUseCase = get(),
+            discoverCollectionSynergiesUseCase = get(),
+            findCombosWithCardUseCase = get(),
             manaBaseAnalyzer = get(),
             // Suggestions Tab UI Polish plan (W11 bug-fix pass, 2026-08-25) -- already a `single`
             // in SharedDomainKoinModule (shared with AdvancedSearchViewModel/AddCardViewModel).

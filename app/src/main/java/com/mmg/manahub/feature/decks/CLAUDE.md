@@ -333,6 +333,10 @@ must-know invariants live here:
   are never dropped (Run 4a F5). `ManaColor.C` is UI-only state for the
   exclusive Colorless chip — `DeckWizardUiState.engineIdentity` strips it; the engine sees `{}` and
   fills basics with Wastes. Never let `C` reach `BuildAnchor`.
+- **`seedCards` hand-off (Browse inspirations).** `Screen.DeckWizard.createRoute(seedCards = [(id, qty)])`
+  lands on `WizardPhase.STRATEGY` in the CARDS flow; each pick goes through `onAddSeed` `qty` times
+  (same validation as a manual pick), Back returns to SEED_PICK; zero resolved seeds ⇒ SEED_PICK + toast.
+  The legacy name-based `seeds` arg is untouched.
 - **No format step (R13/R14); four step maps (v6 S20).** `Screen.DeckWizard.createRoute` requires
   `format` and `deckId`. Commander: `COMMANDER_PICK → STRATEGY → PLAN_SECTIONS → REVIEW`; Cards:
   `ENTRY → SEED_PICK → STRATEGY → PLAN_SECTIONS → REVIEW`; Colors: `ENTRY → COLOR_PICK → PLAN_SECTIONS →
@@ -423,6 +427,19 @@ empty-state, Collection/Stats/Home/CardDetail deck-open, and Home → "Build dec
 `Screen.DeckStudio.createRoute(deckId?)` (null ⇒ fresh draft). The old `CreateDeckBottomSheet` + the
 `DeckViewModel.createDeck`/`showCreateDialog`/`createdDeckId` state are GONE — DeckStudio creates its own
 draft. Fuses manual editing + inline Deck Doctor suggestions + seed-build + Discoveries on ONE **live deck**.
+- **Browse inspirations (rework 2026-09-24, `docs/plans/browse-inspirations-rework-plan.md`).**
+  Offered only for 60-card formats on an EMPTY deck (`isBrowseInspirationsAvailable`). Strategies =
+  `DiscoverCollectionSynergiesUseCase` (commonMain `domain/inspirations/`): per-card
+  `SynergyGraph.cardAxisProfile` over the owned, format-legal pool + `SynergyEngineState.resolve`
+  (the D3 rule, now shared with `AnalysisEngine`); ids are the Analysis vocabulary
+  (`engine:<AXIS>:producers|payoffs`, `tribe:<x>`), so "Browse for X" reuses `SectionSearchQuery`/
+  `SectionMembership` untouched — a corpus parity test guards it. Combos = Spellbook `GET variants/`
+  for ONE pinned card (never the whole collection), pieces resolved from the collection then one
+  batched `lookupCardsByIdentifiers` per 75 names; combos with a resolved piece illegal in the format
+  or needing a command zone are hidden. ONE selection shared by both tabs, rules =
+  `InspirationSelection` (mirrors `onAddSeed`), wiped on dismiss; "Start building the deck" hands off
+  through the wizard's `seedCards` nav arg. `DiscoverSynergiesV2UseCase`/`FindCombosUseCase`/
+  `DiscoveryRow`/`ComboRow` are DELETED — do not resurrect the tag-cluster discoveries.
 - **Format + Import live INSIDE Studio:** `DeckFormatChipRow` (empty-state + `EditDeckSheet`) → `changeFormat`
   (writes through repo + `invalidateSuggestions()`). Import via `ImportDeckUseCase` (`domain/usecase/`,
   shared extraction — writes into the live draft, renames from a parsed header; `DeckViewModel.importDeck`

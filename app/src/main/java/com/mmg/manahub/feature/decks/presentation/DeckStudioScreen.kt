@@ -149,15 +149,15 @@ import com.mmg.manahub.feature.decks.domain.engine.ScoreLimiter
 import com.mmg.manahub.feature.decks.domain.engine.SectionQueryContext
 import com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
-import com.mmg.manahub.feature.decks.domain.model.ComboResult
 import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
-import com.mmg.manahub.feature.decks.domain.template.DiscoverySearchFilter
-import com.mmg.manahub.feature.decks.domain.template.partitionByAxis
 import com.mmg.manahub.feature.decks.domain.usecase.DeckValueSummary
 import com.mmg.manahub.feature.decks.domain.usecase.SimilarDeckResult
 import com.mmg.manahub.feature.decks.presentation.components.AddBasicLandsRow
 import com.mmg.manahub.feature.decks.presentation.components.BasicLandsSheet
 import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
+import com.mmg.manahub.feature.decks.presentation.inspirations.BrowseInspirationsActions
+import com.mmg.manahub.feature.decks.presentation.inspirations.BrowseInspirationsSheet
+import com.mmg.manahub.feature.decks.presentation.inspirations.InspirationSelectionSource
 import com.mmg.manahub.feature.decks.presentation.components.CardSectionRow
 import com.mmg.manahub.feature.decks.presentation.components.CuratedStrategyPickerSheet
 import com.mmg.manahub.feature.decks.presentation.components.DeckAddCardsMethod
@@ -177,7 +177,6 @@ import com.mmg.manahub.feature.decks.presentation.components.ScoreLimiterHint
 import com.mmg.manahub.feature.decks.presentation.components.StrategyPlanChip
 import com.mmg.manahub.feature.decks.presentation.components.StrategyPlanHint
 import com.mmg.manahub.feature.decks.presentation.components.SynergyAlignmentCaption
-import com.mmg.manahub.feature.decks.presentation.components.SynergyCardTile
 import com.mmg.manahub.feature.decks.presentation.components.SynergyPackagesSection
 import com.mmg.manahub.feature.decks.presentation.components.TribeOption
 import com.mmg.manahub.feature.decks.presentation.components.WarningOverlay
@@ -241,6 +240,8 @@ fun DeckStudioScreen(
     // atomic write targets it directly instead of creating a second deck (D12). Unlike
     // [onNavigateToWizard] above (always a FRESH draft), this always carries a real deckId.
     onNavigateToWizardFromDraft: (deckId: String, format: String) -> Unit = {_, _->},
+    // Browse inspirations "Start building the deck": the picked cards as (scryfallId, copies) seeds.
+    onNavigateToWizardWithSeeds: (deckId: String, format: String, seedCards: List<Pair<String, Int>>) -> Unit = {_, _, _->},
     // Visual-overhaul pass: non-null only when the hosting nav destination is inside a
     // `SharedTransitionLayout` -- drives the Combos-tab card tiles' shared-element transition
     // into the real CardDetailScreen (mirrors AddCardScreen/CollectionScreen's own optional
@@ -260,6 +261,7 @@ fun DeckStudioScreen(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val toastState = rememberMagicToastState()
+    val inspirationsToastState = rememberMagicToastState()
 
     // Deck Analysis Category Sections rework (W7): color identity + format + dominant tribe for
     // the Analysis tab's "Browse for <Category>" buttons (SectionSearchQuery.buildFor). Neither
@@ -316,6 +318,8 @@ fun DeckStudioScreen(
     // SearchCriterion sealed hierarchy (14+ subtypes) -- simpler, and they now recompute correctly
     // for free on the same post-navigation recomposition that restores sectionBrowseSectionId.
     var sectionBrowseSectionId by rememberSaveable {mutableStateOf<String?>(null)}
+    // True while the add-cards sheet serves Browse inspirations: +/- edit the inspirations selection, not the deck.
+    var inspirationsBrowseActive by rememberSaveable {mutableStateOf(false)}
     // Suggestions Tab UI Polish plan (W11): structured, not a raw Scryfall string --
     // SectionSearchQuery.toAdvancedQuery's output, opened straight into the sheet's own
     // onAdvancedSearch callback via CardSearchSheet's initialAdvancedQuery param.
@@ -385,7 +389,10 @@ fun DeckStudioScreen(
         viewModel.events.collect {event->
             when (event) {
                 DeckStudioEvent.NavigateBack -> Unit // navigation is invoked in the VM callback
-                is DeckStudioEvent.ShowToast -> toastState.show(event.message, MagicToastType.INFO)
+                is DeckStudioEvent.ShowToast -> {
+                    val target = if (viewModel.uiState.value.inspirations.isOpen) inspirationsToastState else toastState
+                    target.show(event.message, MagicToastType.INFO)
+                }
                 is DeckStudioEvent.CardAdded -> toastState.show(
                     String.format(
                         cardAddedMsg,
@@ -426,6 +433,7 @@ fun DeckStudioScreen(
             showAddCardsSheet -> {
                 showAddCardsSheet = false
                 sectionBrowseSectionId = null
+                inspirationsBrowseActive = false
                 addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
                 // clearAddCardsState() also resets activeStructuredSearchFragment (W11 bug fix).
                 viewModel.clearAddCardsState()
@@ -444,7 +452,6 @@ fun DeckStudioScreen(
     }
     BackHandler(onBack = handleBack)
 
-    val inspirationsEnabled = FeatureFlags.Decks.DISCOVERIES_V2_ENABLED
     val seedEnabled = FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED
     val isCommanderFormat = uiState.deck?.format?.let {fmt->
             DeckFormat.entries.firstOrNull {
@@ -507,6 +514,12 @@ fun DeckStudioScreen(
             WizardNavDecision.NO_OP -> Unit
         }
     }
+
+    val inspirationsAvailable = isBrowseInspirationsAvailable(
+        flagEnabled = FeatureFlags.Decks.DISCOVERIES_V2_ENABLED,
+        format = uiState.deck?.format?.let {fmt-> DeckFormat.entries.firstOrNull {it.name.equals(fmt, ignoreCase = true)}},
+        isEmptyDeck = uiState.isEmptyDeck,
+    )
 
     val shareChooserTitle = stringResource(R.string.deckbuilder_share_chooser)
 
@@ -641,6 +654,7 @@ fun DeckStudioScreen(
                                 uiState = uiState,
                                 isCommanderFormat = isCommanderFormat,
                                 wizardAvailable = wizardAvailableForFormat,
+                                inspirationsAvailable = inspirationsAvailable,
                                 deckStats = deckStats,
                                 preferredCurrency = uiState.preferredCurrency,
                                 deckValueSummary = uiState.deckValueSummary,
@@ -820,83 +834,53 @@ fun DeckStudioScreen(
 
     // ── Sheets ──────────────────────────────────────────────────────────────────
 
-    // Inspirations (Discoveries) sheet (Phase 4): VM-state driven (uiState.showInspirations).
-    if (uiState.showInspirations) {
-        val inspirationsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = {viewModel.closeInspirations()},
-            sheetState = inspirationsSheetState,
-            shape = BottomSheetShape,
-            containerColor = mc.background,
-        ) {
-            // Deck Builder v2 Phase 5 (plan D10/§3.7): Discoveries v2 clusters (identity-only,
-            // color-coherent) hand off to the v2 wizard pre-filled (D11). The legacy content
-            // (ANY-tag-category clustering, seeding the old seed sheet) was RETIRED in the Deck
-            // Wizard & Engine Rework plan, WS7.2 (2026-07-28) -- this is reachable only when
-            // `DeckFeatureFlags.DISCOVERIES_V2_ENABLED` is on (see `inspirationsEnabled` below,
-            // the entry point's own visibility gate), so there is exactly one content branch left.
-            InspirationsSheetContentV2(
-                discoveries = uiState.discoveriesV2,
-                filteredDiscoveries = uiState.filteredDiscoveriesV2,
-                matchingCards = uiState.discoveryMatchingCards,
-                isLoading = uiState.isLoadingDiscoveries,
-                onBuildThis = {discovery->
-                    val deckId = uiState.deck?.id
-                    val format = uiState.deck?.format
-                    if (deckId != null && format != null) {
-                        viewModel.closeInspirations()
-                        // R15 structural guard: this hand-off never confirmed a replace before
-                        // either -- replaceConfirmed=false lets DeckWizardViewModel's persist-time
-                        // re-check refuse safely if the draft has gained cards since this screen
-                        // loaded, instead of silently overwriting them.
-                        onNavigateToWizard(
-                            deckId,
-                            format,
-                            discovery.archetype?.name,
-                            discovery.theme?.name,
-                            discovery.tribe,
-                            discovery.dominantColors.joinToString("") {it.symbol},
-                            null,
-                            false,
-                        )
-                    }
-                },
-                inspirationsTab = uiState.inspirationsTab,
-                onSelectTab = viewModel::onSelectInspirationsTab,
-                searchQuery = uiState.discoverySearchQuery,
-                onSearchQueryChange = viewModel::onDiscoverySearchQueryChange,
-                selectedCardNames = uiState.discoverySelectedCardNames,
-                onToggleSearchCard = viewModel::onToggleDiscoverySearchCard,
-                onClearSearch = viewModel::onClearDiscoverySearch,
-                comboResult = uiState.comboResult,
-                comboCardsByName = uiState.comboCardsByName,
-                isLoadingCombos = uiState.isLoadingCombos,
-                onUseComboAsSeed = {cardNames->
-                    val deckId = uiState.deck?.id
-                    val format = uiState.deck?.format
-                    if (deckId != null && format != null) {
-                        viewModel.closeInspirations()
-                        // R15 structural guard: see the onBuildThis comment just above.
-                        onNavigateToWizard(deckId, format, null, null, null, null, cardNames, false)
-                    }
-                },
-                // Combos tab only -- Strategies-tab card taps open the inline zoom overlay
-                // (self-contained inside InspirationsSheetContentV2) and never call this.
-                // Close the sheet BEFORE navigating (same sequencing as `onBuildThis`/
-                // `onUseComboAsSeed` just above, and the coordination pattern in
-                // `ScannerScreen.kt`'s `ScanQueueSheet` -- `onOpenCardDetail(fromQueue = true)`
-                // flips `showQueueSheet` off in the SAME state update as opening the detail
-                // overlay): otherwise the sheet's own show/hide animation is still playing
-                // when CardDetailScreen's entry transition starts, and the two race visibly.
-                onNavigateToCardDetail = {id->
+    // Gated on RESUMED like CardSearchSheet so a card-detail nav never leaves it above the NavHost; state lives in the VM.
+    if (uiState.inspirations.isOpen && isDestinationResumed) {
+        BrowseInspirationsSheet(
+            state = uiState.inspirations,
+            format = uiState.deck?.format?.let {fmt-> DeckFormat.entries.firstOrNull {it.name.equals(fmt, ignoreCase = true)}},
+            ownedCardIds = uiState.collectionIds,
+            toastState = inspirationsToastState,
+            actions = BrowseInspirationsActions(
+                onDismiss = {
                     focusManager.clearFocus()
                     viewModel.closeInspirations()
-                    onCardClick(id)
                 },
-                sharedTransitionScope = null,
-                animatedVisibilityScope = null,
-            )
-        }
+                onSelectTab = viewModel::onSelectInspirationsTab,
+                onQueryChange = viewModel::onInspirationsQueryChange,
+                onPinCard = {tab, card->
+                    focusManager.clearFocus()
+                    viewModel.onPinInspirationsCard(tab, card)
+                },
+                onClearPin = viewModel::onClearInspirationsPin,
+                onAddCard = viewModel::addToInspirationSelection,
+                onDecrementCard = viewModel::decrementInspirationSelection,
+                onRemoveCard = viewModel::removeFromInspirationSelection,
+                onClearSelection = viewModel::clearInspirationSelection,
+                onToggleQueue = viewModel::onToggleInspirationsQueue,
+                onBrowseSection = {sectionId->
+                    focusManager.clearFocus()
+                    viewModel.onInspirationsBrowseOpened(sectionId)
+                    sectionBrowseSectionId = sectionId
+                    inspirationsBrowseActive = true
+                    addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
+                    showAddCardsSheet = true
+                },
+                onRetrySynergies = viewModel::retryInspirationsSynergies,
+                onAddCombo = viewModel::addComboToInspirationSelection,
+                onLoadMoreCombos = viewModel::onLoadMoreCombos,
+                onRetryCombos = viewModel::retryCombos,
+                onStartBuilding = {
+                    val deckId = uiState.deck?.id
+                    val format = uiState.deck?.format
+                    if (deckId != null && format != null && !hasTriggeredWizardNav) {
+                        hasTriggeredWizardNav = true
+                        val seedCards = viewModel.consumeInspirationSeedCards()
+                        onNavigateToWizardWithSeeds(deckId, format, seedCards)
+                    }
+                },
+            ),
+        )
     }
 
     if (showEditDeckSheet) {
@@ -1023,7 +1007,7 @@ fun DeckStudioScreen(
             onEdit = { showEditDeckSheet = true },
             showRebuildWithWizard = FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED && !uiState.isEmptyDeck && wizardAvailableForFormat,
             onRebuildWithWizard = handleRebuildWithWizard,
-            showInspirations = FeatureFlags.Decks.DISCOVERIES_V2_ENABLED,
+            showInspirations = inspirationsAvailable,
             onBrowseInspirations = { viewModel.openInspirations() },
             shareEnabled = !uiState.isEmptyDeck,
             onShare = {
@@ -1047,11 +1031,20 @@ fun DeckStudioScreen(
     }
 
     if (showAddCardsSheet && isDestinationResumed) {
+        val inspirations = uiState.inspirations
         CardSearchSheet(
             query = uiState.addCardsQuery,
             offerResults = emptyList(),
-            addCardsResults = uiState.addCardsResults,
-            scryfallResults = uiState.scryfallResults,
+            addCardsResults = if (inspirationsBrowseActive) {
+                uiState.addCardsResults.map {it.copy(quantityInDeck = inspirations.quantityOf(it.card))}
+            } else {
+                uiState.addCardsResults
+            },
+            scryfallResults = if (inspirationsBrowseActive) {
+                uiState.scryfallResults.map {it.copy(quantityInDeck = inspirations.quantityOf(it.card))}
+            } else {
+                uiState.scryfallResults
+            },
             isSearchingCards = uiState.isSearchingCards,
             isSearchingScryfall = uiState.isSearchingScryfall,
             isCommanderMode = false,
@@ -1060,19 +1053,27 @@ fun DeckStudioScreen(
             allCardsTabLabel = stringResource(R.string.deckdetail_tab_scryfall),
             onQueryChange = viewModel::onAddCardsQueryChange,
             onScryfallSearch = viewModel::searchScryfallDirect,
+            title = if (inspirationsBrowseActive) stringResource(R.string.deck_inspirations_browse_sheet_title) else stringResource(R.string.deckbuilder_add_cards),
             onAdd = {row->
-                viewModel.addCardToDeck(row.card.scryfallId)
-                // Deck Analysis Category Sections rework (W8 telemetry): only when this add came
-                // through the Analysis tab's section-driven sheet preset (sectionBrowseSectionId
-                // non-null), not the normal Build-tab FAB add flow this same sheet instance also
-                // serves. Additive -- does not touch the existing deck_studio_add_failed error path.
-                sectionBrowseSectionId?.let {sectionId->
-                    FirebaseCrashlytics.getInstance()
-                        .setCustomKey("deck_analysis_section_id", sectionId)
-                    FirebaseCrashlytics.getInstance().log("deck_analysis_section_card_added")
+                if (inspirationsBrowseActive) {
+                    viewModel.addToInspirationSelection(row.card, InspirationSelectionSource.BROWSE)
+                } else {
+                    viewModel.addCardToDeck(row.card.scryfallId)
+                    // Deck Analysis Category Sections rework (W8 telemetry): only when this add came
+                    // through the Analysis tab's section-driven sheet preset (sectionBrowseSectionId
+                    // non-null), not the normal Build-tab FAB add flow this same sheet instance also
+                    // serves. Additive -- does not touch the existing deck_studio_add_failed error path.
+                    sectionBrowseSectionId?.let {sectionId->
+                        FirebaseCrashlytics.getInstance()
+                            .setCustomKey("deck_analysis_section_id", sectionId)
+                        FirebaseCrashlytics.getInstance().log("deck_analysis_section_card_added")
+                    }
                 }
             },
-            onRemove = {row-> viewModel.removeCardFromDeck(row.card.scryfallId)},
+            onRemove = {row->
+                if (inspirationsBrowseActive) viewModel.decrementInspirationSelection(row.card)
+                else viewModel.removeCardFromDeck(row.card.scryfallId)
+            },
             onCardClick = {id->
                 focusManager.clearFocus()
                 onCardClick(id)
@@ -1104,6 +1105,7 @@ fun DeckStudioScreen(
                 focusManager.clearFocus()
                 showAddCardsSheet = false
                 sectionBrowseSectionId = null
+                inspirationsBrowseActive = false
                 addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
                 viewModel.clearAddCardsState()
             },
@@ -1233,6 +1235,7 @@ private fun BuildTab(
     // a SEPARATE concern from [isCommanderFormat] above, which stays Commander-only for this
     // function's own commander-card section.
     wizardAvailable: Boolean,
+    inspirationsAvailable: Boolean,
     deckStats: GetDeckGameStatsUseCase.Result?,
     preferredCurrency: PreferredCurrency,
     deckValueSummary: DeckValueSummary,
@@ -1290,6 +1293,7 @@ private fun BuildTab(
         } else if (uiState.isEmptyDeck) {
             EmptyDeckState(
                 wizardAvailable = wizardAvailable,
+                inspirationsAvailable = inspirationsAvailable,
                 onBuildFromSeed = onBuildFromSeed,
                 onBrowseInspirations = onBrowseInspirations,
                 onImportDeck = onImportDeck,
@@ -1686,6 +1690,10 @@ internal data class EmptyDeckStateOptions(
     val importIsPrimary: Boolean,
 )
 
+/** Browse inspirations builds a 60-card deck from scratch, so it is offered only for 60-card formats and empty decks. */
+internal fun isBrowseInspirationsAvailable(flagEnabled: Boolean, format: DeckFormat?, isEmptyDeck: Boolean): Boolean =
+    flagEnabled && isEmptyDeck && format?.isSixtyCardConstructed == true
+
 /**
  * "Build from seed" availability is controlled by [seedEnabled]. Exactly one card is primary in
  * every combination: seed (when available) always wins, else inspirations (when enabled), else
@@ -1718,6 +1726,7 @@ private fun EmptyDeckState(
     // this now gates "Build from seed" for every wizard-supported format (all but Draft), not just
     // Commander.
     wizardAvailable: Boolean,
+    inspirationsAvailable: Boolean,
     onBuildFromSeed: () -> Unit,
     onBrowseInspirations: () -> Unit,
     onImportDeck: () -> Unit,
@@ -1734,7 +1743,7 @@ private fun EmptyDeckState(
     // in the Deck Wizard & Engine Rework plan, WS7.2 (2026-07-28).
     val options = resolveEmptyDeckStateOptions(
         seedEnabled = FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED && wizardAvailable,
-        inspirationsEnabled = FeatureFlags.Decks.DISCOVERIES_V2_ENABLED,
+        inspirationsEnabled = inspirationsAvailable,
     )
 
     LazyColumn(
@@ -1928,481 +1937,6 @@ private fun SectionHeader(
         )
     }
 }
-
-/**
- * Deck Builder v2 Phase 5 (plan §3.5) sheet content over the [DeckDiscoveryV2] cluster model,
- * shown when `DeckFeatureFlags.DISCOVERIES_V2_ENABLED` is on (D10/§3.7). "Build this" hands off
- * to the v2 wizard pre-filled (D11). The legacy `InspirationsSheetContent` (ANY-tag-category
- * clustering, seed-sheet handoff) was RETIRED in the Deck Wizard & Engine Rework plan, WS7.2
- * (2026-07-28) -- this is the sheet's only content now.
- *
- * Deck Engine Unification plan D7 (Phase 4) redesign: this is now a two-tab synergy browser
- * (Strategies / Combos) with free-text + search-by-card filtering on the Strategies tab (4.1/4.2)
- * and a Commander Spellbook combos tab (4.3). Stateless per the file's own convention -- every
- * input is a param, every mutation a callback to [DeckStudioViewModel]; the one exception is the
- * Strategies tab's inline card-inspection overlay (visual-overhaul pass), which is ephemeral UI
- * state, not business state, and is hosted here (not lifted to the VM) for the same reason every
- * other `MagicCardInspectionOverlay` trigger in this codebase keeps its session state local.
- *
- * @param discoveries the FULL unfiltered cluster list -- only used to derive the search-by-card
- *   pickable pool ([DiscoverySearchFilter.pickableCardNames]); the Strategies tab itself renders
- *   [filteredDiscoveries].
- * @param filteredDiscoveries [discoveries] narrowed by [searchQuery]/[selectedCardNames]
- *   ([DeckStudioViewModel.filteredDiscoveriesV2] -- the VM is the single source of truth for the
- *   filter, this Composable stays a dumb reader).
- * @param matchingCards the flat "matching cards" preview -- [discoveries]' members narrowed by
- *   the SAME [searchQuery]/[selectedCardNames] filter ([DeckStudioViewModel.discoveryMatchingCards]).
- * @param comboCardsByName every Combos-tab card name resolved to a full [Card]
- *   ([DeckStudioViewModel.comboCardsByName]) so the Combos tab can render image tiles.
- * @param onNavigateToCardDetail Combos-tab ONLY -- opens the real card detail screen for a
- *   resolved scryfallId. The Strategies tab never calls this; its taps open the inline overlay.
- * @param sharedTransitionScope / @param animatedVisibilityScope threaded straight through to the
- *   Combos tab's card tiles for the shared-element transition into card detail.
- */
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-private fun InspirationsSheetContentV2(
-    discoveries: List<com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2>,
-    filteredDiscoveries: List<com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2>,
-    matchingCards: List<Card>,
-    isLoading: Boolean,
-    onBuildThis: (com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2) -> Unit,
-    inspirationsTab: InspirationsTab,
-    onSelectTab: (InspirationsTab) -> Unit,
-    searchQuery: String,
-    onSearchQueryChange: (String) -> Unit,
-    selectedCardNames: Set<String>,
-    onToggleSearchCard: (String) -> Unit,
-    onClearSearch: () -> Unit,
-    comboResult: ComboResult?,
-    comboCardsByName: Map<String, Card>,
-    isLoadingCombos: Boolean,
-    onUseComboAsSeed: (List<String>) -> Unit,
-    onNavigateToCardDetail: (String) -> Unit,
-    sharedTransitionScope: SharedTransitionScope?,
-    animatedVisibilityScope: AnimatedVisibilityScope?,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    // Strategies-tab inline card inspection (visual-overhaul pass): a tap on any card tile --
-    // the search-matches preview or a per-category DiscoveryRowV2 row -- flies the card to a
-    // zoomed overlay in place, mirroring `PlaytestSetupScreen`'s single-card
-    // MagicCardInspectionOverlay pattern. rootCoordinates anchors every tile's captured Rect to
-    // THIS Box so the overlay's flight animation lines up regardless of scroll position.
-    var rootCoordinates by remember {mutableStateOf<LayoutCoordinates?>(null)}
-    var inspectionCard by remember {mutableStateOf<Card?>(null)}
-    var inspectionRect by remember {mutableStateOf(Rect.Zero)}
-    var isDismissingInspection by remember {mutableStateOf(false)}
-
-    Box(
-        modifier = Modifier
-            .fillMaxHeight(0.92f)
-            .onGloballyPositioned {rootCoordinates = it},
-    ) {
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = spacing.lg)) {
-            Text(
-                text = stringResource(R.string.deck_studio_inspirations_title),
-                style = ty.titleLarge,
-                color = mc.textPrimary,
-                modifier = Modifier.padding(top = spacing.md),
-            )
-            Text(
-                text = stringResource(R.string.deck_studio_inspirations_subtitle),
-                style = ty.bodySmall,
-                color = mc.textSecondary,
-                modifier = Modifier.padding(top = spacing.xxs, bottom = spacing.sm),
-            )
-
-            TabRow(
-                selectedTabIndex = inspirationsTab.ordinal,
-                containerColor = mc.backgroundSecondary,
-                contentColor = mc.primaryAccent,
-            ) {
-                Tab(
-                    selected = inspirationsTab == InspirationsTab.STRATEGIES,
-                    onClick = {onSelectTab(InspirationsTab.STRATEGIES)},
-                    text = {
-                        Text(
-                            stringResource(R.string.deck_studio_inspirations_tab_strategies),
-                            style = ty.labelLarge,
-                        )
-                    },
-                )
-                Tab(
-                    selected = inspirationsTab == InspirationsTab.COMBOS,
-                    onClick = {onSelectTab(InspirationsTab.COMBOS)},
-                    text = {
-                        Text(
-                            stringResource(R.string.deck_studio_inspirations_tab_combos),
-                            style = ty.labelLarge,
-                        )
-                    },
-                )
-            }
-            Spacer(Modifier.height(spacing.sm))
-
-            when (inspirationsTab) {
-                InspirationsTab.STRATEGIES -> StrategiesTabContent(
-                    discoveries = discoveries,
-                    filteredDiscoveries = filteredDiscoveries,
-                    matchingCards = matchingCards,
-                    isLoading = isLoading,
-                    rootCoordinates = rootCoordinates,
-                    onCardTap = {card, rect->
-                        isDismissingInspection = false
-                        inspectionCard = card
-                        inspectionRect = rect
-                    },
-                    onBuildThis = onBuildThis,
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = onSearchQueryChange,
-                    selectedCardNames = selectedCardNames,
-                    onToggleSearchCard = onToggleSearchCard,
-                    onClearSearch = onClearSearch,
-                )
-
-                InspirationsTab.COMBOS -> CombosTabContent(
-                    comboResult = comboResult,
-                    cardsByName = comboCardsByName,
-                    isLoading = isLoadingCombos,
-                    onCardClick = onNavigateToCardDetail,
-                    onUseComboAsSeed = onUseComboAsSeed,
-                    sharedTransitionScope = sharedTransitionScope,
-                    animatedVisibilityScope = animatedVisibilityScope,
-                )
-            }
-        }
-
-        inspectionCard?.let {card->
-            MagicCardInspectionOverlay(
-                card = card,
-                initialRect = inspectionRect,
-                isVisible = true,
-                isDismissing = isDismissingInspection,
-                onDismissRequest = {isDismissingInspection = true},
-                onDismiss = {
-                    inspectionCard = null
-                    isDismissingInspection = false
-                },
-            )
-        }
-    }
-}
-
-/**
- * The Strategies tab (4.1 strictness lives entirely in [com.mmg.manahub.feature.decks.domain
- * .template.DiscoverSynergiesV2UseCase]; this composable is 4.2's search UI only).
- *
- * @param matchingCards the search-driven flat card preview shown directly under the search bar
- *   (visual-overhaul pass) -- populated only while a query/card-pick is active, so the SAME
- *   search input narrows both which clusters show ([filteredDiscoveries]) and which individual
- *   cards show here, instead of the query only ever affecting the cluster list.
- * @param rootCoordinates / @param onCardTap forwarded to every [SynergyCardTile] (both this tab's
- *   own preview row and each [DiscoveryRowV2]'s member row) so a tap opens the inline inspection
- *   overlay hosted by [InspirationsSheetContentV2].
- */
-@Composable
-private fun StrategiesTabContent(
-    discoveries: List<com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2>,
-    filteredDiscoveries: List<com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2>,
-    matchingCards: List<Card>,
-    isLoading: Boolean,
-    rootCoordinates: LayoutCoordinates?,
-    onCardTap: (Card, Rect) -> Unit,
-    onBuildThis: (com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2) -> Unit,
-    searchQuery: String,
-    onSearchQueryChange: (String) -> Unit,
-    selectedCardNames: Set<String>,
-    onToggleSearchCard: (String) -> Unit,
-    onClearSearch: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    // Pure derivation of the pickable pool from the (small, already-loaded) cluster list -- not
-    // worth VM state, mirrors this screen's own `tabs = buildList { ... }` local-derivation
-    // precedent above.
-    val pickableCardNames =
-        remember(discoveries) {DiscoverySearchFilter.pickableCardNames(discoveries)}
-    // Every discovery member is already a resolved Card (DeckDiscoveryV2.members) -- these are
-    // owned collection cards, unlike the Combos tab's comboCardsByName which may miss unowned
-    // names. Same remember(discoveries) key as pickableCardNames above; last-write-wins on a
-    // duplicate name across clusters is fine, they're the same printing.
-    val cardsByPickableName = remember(discoveries) {
-        discoveries.flatMap {it.members}.associateBy {it.name}
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        if (!isLoading && discoveries.isNotEmpty()) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchQueryChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = spacing.xs),
-                placeholder = {
-                    Text(
-                        stringResource(R.string.deck_studio_inspirations_search_hint),
-                        style = ty.bodyMedium
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.Search,
-                        contentDescription = null,
-                        tint = mc.textSecondary
-                    )
-                },
-                trailingIcon = if (searchQuery.isNotEmpty() || selectedCardNames.isNotEmpty()) {
-                    {
-                        IconButton(onClick = onClearSearch, modifier = Modifier.size(48.dp)) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = stringResource(R.string.deck_studio_inspirations_search_clear),
-                                tint = mc.textSecondary,
-                            )
-                        }
-                    }
-                } else null,
-                singleLine = true,
-                shape = ChipShape,
-            )
-
-            if (pickableCardNames.isNotEmpty()) {
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = spacing.sm),
-                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                ) {
-                    items(pickableCardNames, key = {it}) {name->
-                        val card = cardsByPickableName[name]
-                        if (card != null) {
-                            com.mmg.manahub.feature.decks.presentation.components.PickableSynergyCardTile(
-                                card = card,
-                                isSelected = name in selectedCardNames,
-                                rootCoordinates = rootCoordinates,
-                                onToggleSelect = {onToggleSearchCard(name)},
-                                onZoom = onCardTap,
-                            )
-                        } else {
-                            // Defensive fallback -- every name in pickableCardNames comes from a
-                            // DeckDiscoveryV2 member, which always carries a resolved Card, but
-                            // keep a text chip so an unresolved name never silently vanishes.
-                            MagicFilterChip(
-                                selected = name in selectedCardNames,
-                                onClick = {onToggleSearchCard(name)},
-                                label = name,
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Matching-cards preview (visual-overhaul pass): only while a search/pick is active,
-            // so it never duplicates the full unfiltered pool.
-            if (matchingCards.isNotEmpty()) {
-                Text(
-                    text = stringResource(
-                        R.string.deck_studio_inspirations_matching_cards,
-                        matchingCards.size
-                    ),
-                    style = ty.labelMedium,
-                    color = mc.textSecondary,
-                    modifier = Modifier.padding(bottom = spacing.xs),
-                )
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = spacing.sm),
-                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                ) {
-                    items(matchingCards.take(20), key = {"match_${it.scryfallId}"}) {card->
-                        SynergyCardTile(
-                            card = card,
-                            rootCoordinates = rootCoordinates,
-                            onTap = onCardTap,
-                        )
-                    }
-                }
-            }
-        }
-
-        when {
-            isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                MagicLoadingSpinner()
-            }
-
-            discoveries.isEmpty() -> EmptyState(
-                title = stringResource(R.string.deck_studio_inspirations_empty_title),
-                subtitle = stringResource(R.string.deck_studio_inspirations_empty_subtitle),
-                icon = Icons.Default.AutoAwesome,
-            )
-
-            filteredDiscoveries.isEmpty() -> EmptyState(
-                title = stringResource(R.string.deck_studio_inspirations_search_empty_title),
-                subtitle = stringResource(R.string.deck_studio_inspirations_search_empty_subtitle),
-                icon = Icons.Default.Search,
-            )
-
-            else -> {
-                // Deck Wizard & Engine Rework plan (WS 1.3, plan §0 F1): Strategy and Tribe are
-                // disjoint taxonomy axes -- they used to render as ONE mixed labeled list here
-                // ("Spirits"/"Humans" read as strategies), which is exactly the "descompensado"
-                // asymmetry the plan calls out. Split into two headed sections, each keeping the
-                // use case's own best-fit-first ordering within its half.
-                val (strategyDiscoveries, tribeDiscoveries) = filteredDiscoveries.partitionByAxis()
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    state = rememberLazyListState(),
-                    contentPadding = PaddingValues(vertical = spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(spacing.md),
-                ) {
-                    if (strategyDiscoveries.isNotEmpty()) {
-                        item(key = "section_strategies") {
-                            Text(
-                                text = stringResource(R.string.deck_studio_inspirations_section_strategies),
-                                style = ty.labelLarge,
-                                color = mc.primaryAccent,
-                            )
-                        }
-                        // Keyed by the cluster's own stable identity (tag key) -- distinct from the
-                        // legacy MagicDiscovery key shape (no primaryTag on this model).
-                        items(strategyDiscoveries.take(20), key = {it.key.stableKey()}) {discovery->
-                            com.mmg.manahub.feature.decks.presentation.components.DiscoveryRowV2(
-                                discovery = discovery,
-                                rootCoordinates = rootCoordinates,
-                                onCardTap = onCardTap,
-                                onBuildThis = {onBuildThis(discovery)},
-                            )
-                        }
-                    }
-                    if (tribeDiscoveries.isNotEmpty()) {
-                        item(key = "section_tribes") {
-                            Text(
-                                text = stringResource(R.string.deck_studio_inspirations_section_tribes),
-                                style = ty.labelLarge,
-                                color = mc.primaryAccent,
-                                modifier = Modifier.padding(top = if (strategyDiscoveries.isNotEmpty()) spacing.sm else 0.dp),
-                            )
-                        }
-                        items(tribeDiscoveries.take(20), key = {it.key.stableKey()}) {discovery->
-                            com.mmg.manahub.feature.decks.presentation.components.DiscoveryRowV2(
-                                discovery = discovery,
-                                rootCoordinates = rootCoordinates,
-                                onCardTap = onCardTap,
-                                onBuildThis = {onBuildThis(discovery)},
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * The Combos tab (Deck Engine Unification plan D7, 4.3). Unlike the Strategies tab, card taps
- * here navigate to the real card detail screen (with a shared-element transition when
- * [sharedTransitionScope]/[animatedVisibilityScope] are non-null) rather than opening an inline
- * overlay -- combo cards may include cards the user doesn't own yet (the missing card in an
- * "almost there" combo), so jumping to the full detail screen (buy/wishlist actions) is more
- * useful here than a bare zoom.
- */
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-private fun CombosTabContent(
-    comboResult: ComboResult?,
-    cardsByName: Map<String, Card>,
-    isLoading: Boolean,
-    onCardClick: (String) -> Unit,
-    onUseComboAsSeed: (List<String>) -> Unit,
-    sharedTransitionScope: SharedTransitionScope?,
-    animatedVisibilityScope: AnimatedVisibilityScope?,
-) {
-    val mc = MaterialTheme.magicColors
-    val spacing = MaterialTheme.spacing
-
-    when {
-        isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            MagicLoadingSpinner()
-        }
-
-        comboResult == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            MagicLoadingSpinner()
-        }
-
-        comboResult.complete.isEmpty() && comboResult.almostThere.isEmpty() -> EmptyState(
-            title = stringResource(R.string.deck_studio_combos_empty_title),
-            subtitle = stringResource(R.string.deck_studio_combos_empty_subtitle),
-            icon = Icons.Default.AutoAwesome,
-        )
-
-        else -> LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            state = rememberLazyListState(),
-            contentPadding = PaddingValues(vertical = spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(spacing.md),
-        ) {
-            if (comboResult.complete.isNotEmpty()) {
-                item(key = "combos_complete_header") {
-                    Text(
-                        text = stringResource(
-                            R.string.deck_studio_combos_complete_header,
-                            comboResult.complete.size
-                        ),
-                        style = MaterialTheme.magicTypography.labelLarge,
-                        color = mc.textSecondary,
-                    )
-                }
-                items(comboResult.complete, key = {"combo_${it.id}"}) {combo->
-                    com.mmg.manahub.feature.decks.presentation.components.ComboRow(
-                        combo = combo,
-                        cardsByName = cardsByName,
-                        onCardClick = onCardClick,
-                        onUseAsSeed = {onUseComboAsSeed(combo.cardNames)},
-                        sharedTransitionScope = sharedTransitionScope,
-                        animatedVisibilityScope = animatedVisibilityScope,
-                    )
-                }
-            }
-            if (comboResult.almostThere.isNotEmpty()) {
-                item(key = "combos_almost_header") {
-                    Text(
-                        text = stringResource(
-                            R.string.deck_studio_combos_almost_header,
-                            comboResult.almostThere.size
-                        ),
-                        style = MaterialTheme.magicTypography.labelLarge,
-                        color = mc.textSecondary,
-                        modifier = Modifier.padding(top = spacing.sm),
-                    )
-                }
-                items(comboResult.almostThere, key = {"almost_${it.id}"}) {almost->
-                    com.mmg.manahub.feature.decks.presentation.components.AlmostComboRow(
-                        almostCombo = almost,
-                        cardsByName = cardsByName,
-                        onCardClick = onCardClick,
-                        onUseAsSeed = {onUseComboAsSeed(almost.ownedCardNames + almost.missingCardName)},
-                        sharedTransitionScope = sharedTransitionScope,
-                        animatedVisibilityScope = animatedVisibilityScope,
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.stableKey(): String =
-    when (this) {
-        is com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.Strategy -> "strategy_${tag.key}"
-        is com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.Tribe -> "tribe_$tribeKey"
-    }
 
 /**
  * The Suggestions surface (Deck Doctor inline, Phase 1/2): a Health summary, the Cut list, and

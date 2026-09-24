@@ -4,7 +4,7 @@ package com.mmg.manahub.feature.decks.domain.model
  * A single named combo, fully found within the queried card set (Deck Engine Unification plan
  * D7, Phase 4.3 — Commander Spellbook `find-my-combos`). All card names are the exact Scryfall
  * (Oracle) names as returned by the Spellbook API — matched case-insensitively against the
- * user's own collection by [com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase]'s
+ * user's own collection by the whole-list lookup's
  * callers when handing seeds to the wizard.
  *
  * @param id the Spellbook variant id — stable, used as the Compose list key.
@@ -29,7 +29,7 @@ data class Combo(
  * @param missingCardName the one card the user doesn't have. Defensive: if the Spellbook API's
  *   `almostIncluded` classification ever includes more than one missing card for a given variant
  *   (not expected per its documented semantics, but this is an unofficial-adjacent third party --
- *   see [com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase]), only the first missing
+ *   see the whole-list lookup), only the first missing
  *   card is surfaced here and the variant is otherwise treated normally rather than dropped.
  */
 data class AlmostCombo(
@@ -50,5 +50,32 @@ data class ComboResult(
 ) {
     companion object {
         val EMPTY = ComboResult(complete = emptyList(), almostThere = emptyList())
+    }
+}
+
+/**
+ * A Commander Spellbook variant that includes a queried card, independent of what the user owns.
+ *
+ * @param requiresCommandZone some piece must start in the command zone (Spellbook `mustBeCommander`).
+ * @param legalities Spellbook's per-format verdicts keyed by its lowercase format ids (e.g. `modern`);
+ *   a missing key means "unknown", never "illegal".
+ */
+data class CardCombo(
+    val id: String,
+    val cardNames: List<String>,
+    val description: String,
+    val produces: List<String>,
+    val requiresCommandZone: Boolean,
+    val legalities: Map<String, Boolean>,
+)
+
+/** One page of [CardCombo]s; [totalCount] is Spellbook's own count before any client-side filter. */
+data class CardComboPage(
+    val combos: List<CardCombo>,
+    val totalCount: Int?,
+    val hasMore: Boolean,
+) {
+    companion object {
+        val EMPTY = CardComboPage(combos = emptyList(), totalCount = 0, hasMore = false)
     }
 }

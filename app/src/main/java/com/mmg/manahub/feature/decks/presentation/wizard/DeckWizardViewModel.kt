@@ -640,6 +640,7 @@ class DeckWizardViewModel(
                 ?.map { it.trim() }
                 ?.filter { it.isNotEmpty() }
                 .orEmpty()
+            val seedCardsArg = parseSeedCards(savedStateHandle.get<String?>("seedCards"))
 
             // Deck Wizard 60-card wave (v6), plan §5 Phase 5.1: pre-fill routes to the matching NEW
             // first step (SEED_PICK / COLOR_PICK / STRATEGY_PICK) — the pre-v6 shared DIRECTION
@@ -658,6 +659,10 @@ class DeckWizardViewModel(
                     } else if (archetypeArg != null || themeArg != null || tribeArg != null) {
                         crashReporter.log("deck_wizard_commander_prefill_strategy_unresolved")
                     }
+                }
+                seedCardsArg.isNotEmpty() -> {
+                    logStep("strategy")
+                    _uiState.update { it.copy(entryFlow = WizardEntryFlow.CARDS, phase = WizardPhase.STRATEGY, isLoadingCommanderStrategies = true) }
                 }
                 seedsArg.isNotEmpty() -> _uiState.update { it.copy(entryFlow = WizardEntryFlow.CARDS, phase = WizardPhase.SEED_PICK) }
                 colorsArg != null -> _uiState.update {
@@ -704,9 +709,21 @@ class DeckWizardViewModel(
                     logFailure("deck_wizard_profile_load_failed", t)
                     _uiState.update { it.copy(isLoadingProfile = false) }
                 }
+                if (seedCardsArg.isNotEmpty() && !resolvedFormat.isCommanderFormat) {
+                    comboSeedResolveJob = viewModelScope.launch { resolveSeedCards(seedCardsArg) }
+                }
             }
         }
     }
+
+    // "scryfallId:copies|..." as built by Screen.DeckWizard.createRoute; malformed entries are dropped.
+    private fun parseSeedCards(raw: String?): List<Pair<String, Int>> =
+        raw.orEmpty().split("|").mapNotNull { entry ->
+            val separator = entry.lastIndexOf(':')
+            if (separator <= 0) return@mapNotNull null
+            val quantity = entry.substring(separator + 1).toIntOrNull()?.takeIf { it > 0 } ?: return@mapNotNull null
+            entry.substring(0, separator).trim().takeIf { it.isNotEmpty() }?.let { it to quantity }
+        }
 
     private fun parseColorString(raw: String): Set<ManaColor> =
         raw.mapNotNull { ch -> ManaColor.entries.firstOrNull { it.symbol == ch.toString() } }.toSet()
@@ -1686,6 +1703,34 @@ class DeckWizardViewModel(
      * pieces the user already has), (2) a [searchCardsUseCase] lookup for names not owned. Best-
      * effort: a name that resolves to nothing is silently skipped rather than blocking the rest.
      */
+    /** Browse inspirations hand-off: seeds every pick through [onAddSeed] (same validation as a manual pick), then scores STRATEGY. */
+    private suspend fun resolveSeedCards(seedCards: List<Pair<String, Int>>) {
+        val ownedById = collectionSnapshot.associateBy { it.card.scryfallId }
+        var unresolved = 0
+        for ((scryfallId, quantity) in seedCards) {
+            val card = ownedById[scryfallId]?.card ?: runCatching {
+                (cardRepository.getCardById(scryfallId) as? DataResult.Success)?.data
+            }.getOrElse { t ->
+                if (t is CancellationException) throw t
+                null
+            }
+            if (card == null) {
+                unresolved++
+                continue
+            }
+            repeat(quantity) { onAddSeed(card) }
+        }
+        crashReporter.setCustomKey("deck_wizard_seed_cards_count", seedCards.size.toString())
+        crashReporter.setCustomKey("deck_wizard_seed_cards_unresolved", unresolved.toString())
+        crashReporter.log("deck_wizard_seed_cards_handoff")
+        if (_uiState.value.seeds.isEmpty()) {
+            _uiState.update { it.copy(phase = WizardPhase.SEED_PICK, isLoadingCommanderStrategies = false) }
+            _events.send(DeckWizardEvent.ShowToast(appContext.getString(R.string.deck_wizard_seed_cards_handoff_failed), MagicToastType.ERROR))
+            return
+        }
+        recomputeStrategyRecommendations()
+    }
+
     private suspend fun resolveComboSeeds(names: List<String>) {
         val ownedByLowerName = collectionSnapshot.associateBy { it.card.name.lowercase() }
         for (name in names) {

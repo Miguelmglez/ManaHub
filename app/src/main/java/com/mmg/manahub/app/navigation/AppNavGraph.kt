@@ -807,6 +807,12 @@ fun AppNavGraph(
                             )
                         )
                     },
+                    // Browse inspirations "Start building the deck": only offered on an empty deck, so nothing to replace.
+                    onNavigateToWizardWithSeeds = { deckId, format, seedCards ->
+                        navController.navigate(
+                            Screen.DeckWizard.createRoute(format = format, deckId = deckId, seedCards = seedCards, replaceConfirmed = false)
+                        )
+                    },
                     // R15: onNavigateToWizardFromDraft is ONLY reached from Deck Studio's "Rebuild
                     // with the Wizard" confirm dialog (see DeckStudioScreen.kt) -- always confirmed
                     // by construction, so replaceConfirmed is hardcoded true here rather than
@@ -842,6 +848,7 @@ fun AppNavGraph(
                     navArgument("tribe") { type = NavType.StringType; defaultValue = ""; nullable = false },
                     navArgument("colors") { type = NavType.StringType; defaultValue = ""; nullable = false },
                     navArgument("seeds") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                    navArgument("seedCards") { type = NavType.StringType; defaultValue = ""; nullable = false },
                     navArgument("format") { type = NavType.StringType; defaultValue = ""; nullable = false },
                     navArgument("deckId") { type = NavType.StringType; defaultValue = ""; nullable = false },
                     navArgument("replaceConfirmed") { type = NavType.BoolType; defaultValue = false },

@@ -147,5 +147,15 @@ class DeckStudioScreenLogicTest {
         )
     }
 
+    // -- isBrowseInspirationsAvailable ---------------------------------------------------------
 
+    @Test
+    fun `browse inspirations is offered only for empty 60-card decks with the flag on`() {
+        DeckFormat.entries.forEach { format ->
+            assertEquals(format.isSixtyCardConstructed, isBrowseInspirationsAvailable(flagEnabled = true, format = format, isEmptyDeck = true))
+            assertFalse(isBrowseInspirationsAvailable(flagEnabled = true, format = format, isEmptyDeck = false))
+            assertFalse(isBrowseInspirationsAvailable(flagEnabled = false, format = format, isEmptyDeck = true))
+        }
+        assertFalse(isBrowseInspirationsAvailable(flagEnabled = true, format = null, isEmptyDeck = true))
+    }
 }

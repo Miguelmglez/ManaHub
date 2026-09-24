@@ -1159,8 +1159,6 @@
     <string name="deck_studio_expand_section">Expand section</string>
     <string name="deck_studio_collapse_section">Collapse section</string>
     <!-- Inspirations (Discoveries) surface (Phase 4) -->
-    <string name="deck_studio_inspirations_title">Inspirations</string>
-    <string name="deck_studio_inspirations_subtitle">Synergies found in your collection. Tap one to seed a new deck.</string>
     <string name="deck_studio_inspirations_empty_title">No inspirations yet</string>
     <string name="deck_studio_inspirations_empty_subtitle">Add more cards to your collection and we\'ll surface synergies you can build around.</string>
     <string name="deck_studio_inspiration_fit">%1$d cards</string>
@@ -1172,24 +1170,52 @@
     <!-- Deck Wizard & Engine Rework plan, WS 1.3: the Strategies tab splits into two sections:
          Strategy clusters and Tribe (creature-type) clusters are disjoint taxonomy axes and must
          never render as one mixed labeled list. -->
-    <string name="deck_studio_inspirations_section_strategies">Strategies</string>
-    <string name="deck_studio_inspirations_section_tribes">Tribes (creature types)</string>
-    <string name="deck_studio_inspirations_search_hint">Search strategies or pick a card…</string>
     <string name="deck_studio_inspirations_search_clear">Clear search</string>
-    <string name="deck_studio_inspirations_search_empty_title">No matches</string>
-    <string name="deck_studio_inspirations_search_empty_subtitle">Try a different search term or card.</string>
-    <string name="deck_studio_inspirations_matching_cards">Matching cards (%1$d)</string>
     <string name="deck_studio_combos_empty_title">No combos found</string>
-    <string name="deck_studio_combos_empty_subtitle">We didn\'t find any known combos in your collection yet.</string>
     <string name="deck_studio_combos_complete_header">Ready to build (%1$d)</string>
     <string name="deck_studio_combos_almost_header">One card away (%1$d)</string>
-    <string name="deck_studio_combos_missing_card">Missing: %1$s</string>
+    <!-- Browse inspirations (60-card empty decks) -->
+    <string name="deck_inspirations_subtitle">Explore the synergies and combos in your collection, pick the cards you like and start a deck from them.</string>
+    <string name="deck_inspirations_search_owned_hint">Search your collection</string>
+    <string name="deck_inspirations_pinned_strategies">Synergies with this card</string>
+    <string name="deck_inspirations_pinned_combos">Combos with this card</string>
+    <string name="deck_inspirations_clear_pinned_a11y">Choose another card</string>
+    <string name="deck_inspirations_pick_card_a11y">Explore this card</string>
+    <string name="deck_inspirations_search_empty">No card in your collection matches your search</string>
+    <string name="deck_inspirations_section_engines">Engines (%1$d)</string>
+    <string name="deck_inspirations_section_tribes">Tribes (%1$d)</string>
+    <string name="deck_inspirations_card_no_synergies_title">No synergies for this card</string>
+    <string name="deck_inspirations_card_no_synergies_subtitle">This card isn\'t part of any engine or tribe in your collection yet. Try another one.</string>
+    <string name="deck_inspirations_synergies_error">We couldn\'t analyze your collection.</string>
+    <string name="deck_inspirations_tribe_counts">%1$d creatures · %2$d payoffs</string>
+    <string name="deck_inspirations_producers_only_counts">%1$d producers</string>
+    <string name="deck_inspirations_combos_idle_title">Explore combos</string>
+    <string name="deck_inspirations_combos_idle_subtitle">Search for a card in your collection to explore possible combos</string>
+    <string name="deck_inspirations_combos_empty_subtitle">Commander Spellbook has no combos with this card for this format.</string>
+    <string name="deck_inspirations_combos_error">We couldn\'t load combos right now.</string>
+    <string name="deck_inspirations_combos_more_away_header">2+ cards away (%1$d)</string>
+    <string name="deck_inspirations_combos_loading_more">Loading more combos…</string>
+    <string name="deck_inspirations_combo_untitled">Combo</string>
+    <string name="deck_inspirations_combo_ready_badge">Ready</string>
+    <string name="deck_inspirations_combo_missing_badge">%1$d missing</string>
+    <string name="deck_inspirations_combo_missing_piece">Missing</string>
+    <string name="deck_inspirations_combo_how_it_works">How it works</string>
+    <string name="deck_inspirations_combo_added">Added to selection</string>
+    <string name="deck_inspirations_combo_pieces_unresolved">Some combo pieces couldn\'t be loaded and were skipped.</string>
+    <string name="deck_inspirations_add_to_selection">Add to selection</string>
+    <string name="deck_inspirations_in_selection">In your selection: %1$d</string>
+    <string name="deck_inspirations_selected_pill">%1$d cards selected</string>
+    <string name="deck_inspirations_selected_pill_a11y">%1$d cards selected, opens the list</string>
+    <string name="deck_inspirations_start_building">Start building the deck</string>
+    <string name="deck_inspirations_queue_title">Selected cards (%1$d)</string>
+    <string name="deck_inspirations_queue_empty_title">No cards selected yet</string>
+    <string name="deck_inspirations_queue_empty_subtitle">Add cards from the synergies or combos to start your deck.</string>
+    <string name="deck_inspirations_browse_sheet_title">Add to your selection</string>
 
     <!-- Deck Builder v2 — wizard (docs/plans/deck-builder-v2-plan.md §3.4) -->
     <string name="deck_wizard_title">Build a Deck</string>
     <string name="deck_wizard_step_of">Step %1$d of %2$d</string>
     <string name="deck_wizard_next">Next</string>
-    <string name="deck_wizard_build_this">Build this</string>
     <!-- Format rules copy, reused by DeckCreationSheet's format picker (the wizard itself has no format step, Deck Wizard v4 R13) -->
     <string name="deck_wizard_format_desc_commander">100-card singleton deck: 99 cards plus a legendary commander that sets your color identity. Starts at 40 life — 21+ combat damage from one commander is also a loss.</string>
     <string name="deck_wizard_format_desc_casual">60-card minimum deck with up to 4 copies of any card (basic lands excluded). Starts at 20 life under standard 2-player rules.</string>
@@ -1223,6 +1249,7 @@
     <string name="deck_wizard_seed_copy_cap">Up to %1$d copies of a card</string>
     <string name="deck_wizard_seed_cap_reached">Your deck can hold %1$d cards</string>
     <string name="deck_wizard_seeds_required">Add at least one card to continue.</string>
+    <string name="deck_wizard_seed_cards_handoff_failed">We couldn\'t load the cards you picked. Add them again to continue.</string>
     <string name="deck_wizard_strategy_subtitle_seeds">for your %1$d cards</string>
     <string name="deck_wizard_unsupported_format_toast">The wizard can\'t build this format yet.</string>
     <!-- Step 2 — Direction -->

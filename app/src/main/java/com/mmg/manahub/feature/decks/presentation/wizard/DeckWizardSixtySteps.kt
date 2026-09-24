@@ -400,7 +400,12 @@ internal fun SeedPickStepContent(
 /** The sticky "N cards added" pill above SEED_PICK's Next button -- animates in/out at the 0 boundary
  * and slides its count on every change. */
 @Composable
-private fun SeedsAddedPill(seedCopies: Int, onClick: () -> Unit) {
+internal fun SeedsAddedPill(
+    seedCopies: Int,
+    onClick: () -> Unit,
+    label: @Composable (Int) -> String = { stringResource(R.string.deck_wizard_seeds_added_pill, it) },
+    contentDescription: @Composable (Int) -> String = { stringResource(R.string.deck_wizard_seeds_added_pill_a11y, it) },
+) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
@@ -410,7 +415,7 @@ private fun SeedsAddedPill(seedCopies: Int, onClick: () -> Unit) {
         exit = shrinkVertically() + fadeOut(),
     ) {
         // The visible text alone does not tell TalkBack that tapping opens the seed queue list.
-        val pillDescription = stringResource(R.string.deck_wizard_seeds_added_pill_a11y, seedCopies)
+        val pillDescription = contentDescription(seedCopies)
         Surface(
             onClick = onClick,
             shape = ChipShape,
@@ -429,7 +434,7 @@ private fun SeedsAddedPill(seedCopies: Int, onClick: () -> Unit) {
                     label = "SeedsAddedCount",
                 ) { count ->
                     Text(
-                        text = stringResource(R.string.deck_wizard_seeds_added_pill, count),
+                        text = label(count),
                         style = ty.labelLarge,
                         color = mc.primaryAccent,
                     )

@@ -732,12 +732,8 @@ object AnalysisEngine {
                 val producerCopies = breakdown.producers.sumOf { it.quantity }
                 val payoffCopies = breakdown.payoffs.sumOf { it.quantity }
                 val payoffIdeal = axisIdeals[axisState.axis]?.payoffIdeal ?: return@mapNotNull null
-                val state = when {
-                    producerCopies >= 1 && payoffCopies >= 1 -> SynergyEngineState.COMPLETE
-                    producerCopies >= 1 && producerCopies * 2 >= axisState.producerIdeal -> SynergyEngineState.MISSING_PAYOFFS
-                    payoffCopies >= 1 && payoffCopies * 2 >= payoffIdeal -> SynergyEngineState.MISSING_PRODUCERS
-                    else -> null
-                } ?: return@mapNotNull null
+                val state = SynergyEngineState.resolve(producerCopies, payoffCopies, axisState.producerIdeal, payoffIdeal)
+                    ?: return@mapNotNull null
                 SynergyEngine(
                     axis = axisState.axis,
                     label = axisLabel(axisState.axis),

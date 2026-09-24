@@ -2,8 +2,11 @@ package com.mmg.manahub.core.data.remote
 
 import com.mmg.manahub.core.data.remote.dto.FindMyCombosRequestDto
 import com.mmg.manahub.core.data.remote.dto.FindMyCombosResponseDto
+import com.mmg.manahub.core.data.remote.dto.VariantsPageDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -16,6 +19,9 @@ import io.ktor.http.contentType
  */
 interface CommanderSpellbookApiContract {
     suspend fun findMyCombos(request: FindMyCombosRequestDto): FindMyCombosResponseDto
+
+    /** One page of the variants whose pieces match [cardQuery] (Spellbook search syntax, e.g. `card="Sol Ring"`). */
+    suspend fun findVariants(cardQuery: String, limit: Int, offset: Int): VariantsPageDto
 }
 
 /**
@@ -37,5 +43,12 @@ class CommanderSpellbookApi(
         httpClient.post("${baseUrl}find-my-combos") {
             contentType(ContentType.Application.Json)
             setBody(request)
+        }.body()
+
+    override suspend fun findVariants(cardQuery: String, limit: Int, offset: Int): VariantsPageDto =
+        httpClient.get("${baseUrl}variants/") {
+            parameter("q", cardQuery)
+            parameter("limit", limit)
+            parameter("offset", offset)
         }.body()
 }

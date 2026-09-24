@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.domain.repository
 
 import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.feature.decks.domain.model.CardComboPage
 import com.mmg.manahub.feature.decks.domain.model.ComboResult
 
 /**
@@ -23,8 +24,7 @@ interface CommanderSpellbookRepository {
      * is exactly one card away from completing ([ComboResult.almostThere]).
      *
      * @param cardNames every non-commander card name to check (deduplicated, capped by the
-     *   caller to the API's 600-card limit — see
-     *   [com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase]).
+     *   caller to the API's 600-card limit).
      * @param commanderNames optional commander name(s), sent separately (Spellbook distinguishes
      *   commander-zone cards from the rest of the list for identity/`mustBeCommander` purposes).
      */
@@ -32,4 +32,10 @@ interface CommanderSpellbookRepository {
         cardNames: List<String>,
         commanderNames: List<String> = emptyList(),
     ): DataResult<ComboResult>
+
+    /**
+     * One page ([page] is 0-based) of every combo that includes [cardName], whatever the user owns.
+     * Same cache/degrade contract as [findCombos]: never throws, stale cache then empty on failure.
+     */
+    suspend fun findCombosWithCard(cardName: String, page: Int): DataResult<CardComboPage>
 }

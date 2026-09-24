@@ -1,6 +1,7 @@
 # Browse Inspirations rework — implementation plan
 
-Branch: `feature/deck-wizard`. Status: APPROVED (Q&A with the product owner, 2026-09-24).
+Branch: `feature/deck-wizard`. Status: IMPLEMENTED 2026-09-24 — Runs 1-4 landed; NOT yet compiled or
+tested (see §5), owner must run the local gate before merging.
 This file is gitignored (`/docs/plans/*`, AI-planning-doc rule). The durable record goes to
 `app/src/main/java/com/mmg/manahub/feature/decks/CLAUDE.md` once shipped.
 

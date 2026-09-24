@@ -9,7 +9,7 @@ import com.mmg.manahub.core.data.remote.CommanderSpellbookApiContract
 import com.mmg.manahub.core.data.repository.CommanderSpellbookRepositoryImpl
 import com.mmg.manahub.core.domain.repository.CommanderSpellbookRepository
 import com.mmg.manahub.feature.decks.data.ComboCacheImpl
-import com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase
+import com.mmg.manahub.feature.decks.domain.inspirations.FindCombosWithCardUseCase
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -69,7 +69,7 @@ fun commanderSpellbookKoinModule(
         )
     }
 
-    single { FindCombosUseCase(commanderSpellbookRepository = get()) }
+    single { FindCombosWithCardUseCase(commanderSpellbookRepository = get()) }
 }
 
 /**

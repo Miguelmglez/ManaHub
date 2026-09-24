@@ -322,7 +322,19 @@ data class PillarResult(
  * [MISSING_PRODUCERS] when only one side is present but that side alone already reaches half its
  * own ideal (a real, half-built engine worth surfacing, flagged incomplete); otherwise the axis is
  * not an engine yet and emits no [SynergyEngine] at all. */
-enum class SynergyEngineState { COMPLETE, MISSING_PAYOFFS, MISSING_PRODUCERS }
+enum class SynergyEngineState {
+    COMPLETE, MISSING_PAYOFFS, MISSING_PRODUCERS;
+
+    companion object {
+        /** The D3 rule, shared with the collection-wide inspirations discovery; `null` = not an engine yet. */
+        fun resolve(producerCopies: Int, payoffCopies: Int, producerIdeal: Int, payoffIdeal: Int): SynergyEngineState? = when {
+            producerCopies >= 1 && payoffCopies >= 1 -> COMPLETE
+            producerCopies >= 1 && producerCopies * 2 >= producerIdeal -> MISSING_PAYOFFS
+            payoffCopies >= 1 && payoffCopies * 2 >= payoffIdeal -> MISSING_PRODUCERS
+            else -> null
+        }
+    }
+}
 
 /** One producer -> payoff pair for the SYNERGY "Engines" list (D2/D3). [producerIdeal]/
  * [payoffIdeal] are this axis's already deck-size-scaled ideals ([SynergyGraph.axisIdeals]) —

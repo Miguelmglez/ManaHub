@@ -124,12 +124,13 @@ fun SynergyPackagesSection(
 
 /** One axis' engine card: title, a plain-language sentence, real "N producers -> M payoffs"
  * counts, an incomplete badge when [SynergyEngine.state] isn't [SynergyEngineState.COMPLETE], then
- * the producers row, a directional arrow, and the payoffs row -- both with Browse. */
+ * the producers row, a directional arrow, and the payoffs row -- both with Browse. A null
+ * [payoffSection] renders a producers-only engine (payoff-optional axes such as MILL_OPP/LOCK). */
 @Composable
-private fun SynergyEngineCard(
+internal fun SynergyEngineCard(
     engine: SynergyEngine,
     producerSection: CardSection,
-    payoffSection: CardSection,
+    payoffSection: CardSection?,
     resolveCard: (String) -> Card?,
     onCardClick: (String) -> Unit,
     onBrowseProducers: () -> Unit,
@@ -183,7 +184,11 @@ private fun SynergyEngineCard(
                 modifier = Modifier.padding(top = spacing.xxs, bottom = spacing.xs),
             )
             Text(
-                text = stringResource(R.string.deck_analysis_engine_counts, producerSection.realCount, payoffSection.realCount),
+                text = if (payoffSection != null) {
+                    stringResource(R.string.deck_analysis_engine_counts, producerSection.realCount, payoffSection.realCount)
+                } else {
+                    stringResource(R.string.deck_inspirations_producers_only_counts, producerSection.realCount)
+                },
                 style = ty.labelSmall,
                 color = mc.textSecondary,
                 modifier = Modifier.padding(bottom = spacing.xs),
@@ -199,26 +204,28 @@ private fun SynergyEngineCard(
                     onToggleExpanded = { producersExpanded = !producersExpanded },
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xxs),
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        tint = mc.textDisabled,
-                        modifier = Modifier.padding(vertical = 2.dp).rotate(90f),
+                if (payoffSection != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xxs),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = mc.textDisabled,
+                            modifier = Modifier.padding(vertical = 2.dp).rotate(90f),
+                        )
+                    }
+
+                    CardSectionRow(
+                        section = payoffSection.copy(label = stringResource(R.string.deck_analysis_axis_payoffs_label)),
+                        resolveCard = resolveCard,
+                        onCardClick = onCardClick,
+                        onBrowse = onBrowsePayoffs,
+                        expanded = payoffsExpanded,
+                        onToggleExpanded = { payoffsExpanded = !payoffsExpanded },
                     )
                 }
-
-                CardSectionRow(
-                    section = payoffSection.copy(label = stringResource(R.string.deck_analysis_axis_payoffs_label)),
-                    resolveCard = resolveCard,
-                    onCardClick = onCardClick,
-                    onBrowse = onBrowsePayoffs,
-                    expanded = payoffsExpanded,
-                    onToggleExpanded = { payoffsExpanded = !payoffsExpanded },
-                )
             }
         }
     }

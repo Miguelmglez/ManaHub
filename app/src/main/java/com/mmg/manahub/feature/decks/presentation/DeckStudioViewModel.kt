@@ -69,18 +69,26 @@ import com.mmg.manahub.feature.decks.domain.usecase.ImportOutcome
 import com.mmg.manahub.feature.decks.domain.usecase.ImportSource
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SimilarDeckResult
-import com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2
-import com.mmg.manahub.feature.decks.domain.template.DiscoverSynergiesV2UseCase
-import com.mmg.manahub.feature.decks.domain.template.DiscoverySearchFilter
-import com.mmg.manahub.feature.decks.domain.model.ComboResult
-import com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase
+import com.mmg.manahub.core.domain.repository.CardLookupIdentifier
+import com.mmg.manahub.core.model.UserCardWithCard
+import com.mmg.manahub.feature.decks.domain.engine.isLegalForFormat
+import com.mmg.manahub.feature.decks.domain.inspirations.CollectionSynergies
+import com.mmg.manahub.feature.decks.domain.inspirations.ComboOwnership
+import com.mmg.manahub.feature.decks.domain.inspirations.DiscoverCollectionSynergiesUseCase
+import com.mmg.manahub.feature.decks.domain.inspirations.FindCombosWithCardUseCase
+import com.mmg.manahub.feature.decks.domain.inspirations.InspirationSelection
+import com.mmg.manahub.feature.decks.domain.inspirations.OwnedComboView
+import com.mmg.manahub.feature.decks.domain.inspirations.SelectionOutcome
+import com.mmg.manahub.feature.decks.domain.inspirations.SelectionResult
+import com.mmg.manahub.feature.decks.presentation.inspirations.CollectionCardPickerState
+import com.mmg.manahub.feature.decks.presentation.inspirations.InspirationSelectionSource
+import com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab
+import com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsUiState
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -133,8 +141,6 @@ sealed interface DeckStudioEvent {
  */
 enum class DeckStudioTab { BUILD, SUGGESTIONS }
 
-/** Tabs of the v2 synergy browser (Deck Engine Unification plan D7, Phase 4). */
-enum class InspirationsTab { STRATEGIES, COMBOS }
 
 /**
  * A single basic-land count adjustment recommended by [BasicLandCalculator] against a deck's
@@ -284,49 +290,8 @@ data class DeckStudioUiState(
     /** "Decks like yours" carousel. */
     val similarDecks: List<SimilarDeckResult> = emptyList(),
 
-    // ── Inspirations (Discoveries, Phase 4) ───────────────────────────────────
-    /** Discoveries (identity-only clustering: STRATEGY/ARCHETYPE tags + derived `tribe:<x>` keys)
-     * populated by [discoverSynergiesV2UseCase]. The legacy ANY-tag-category `discoveries` field
-     * (backed by `DeckMagicEngine.discoverSynergies`) was RETIRED in the Deck Wizard & Engine
-     * Rework plan, WS7.2 (2026-07-28) — this is the only discoveries list now. */
-    val discoveriesV2: List<DeckDiscoveryV2> = emptyList(),
-    /** Whether the Inspirations (Discoveries) bottom sheet is visible. */
-    val showInspirations: Boolean = false,
-    /** True while discoveries are being computed off the collection. */
-    val isLoadingDiscoveries: Boolean = false,
-    /** Which tab of the v2 synergy browser is active (Deck Engine Unification plan D7, Phase 4). */
-    val inspirationsTab: InspirationsTab = InspirationsTab.STRATEGIES,
-    /** Free-text label search (4.2) — filters [discoveriesV2] client-side, no recomputation. */
-    val discoverySearchQuery: String = "",
-    /** Search-by-card picks (4.2) — a cluster survives only if it contains at least one of these
-     * (by name). Populated from [DiscoverySearchFilter.pickableCardNames]. */
-    val discoverySelectedCardNames: Set<String> = emptySet(),
-    /** [discoveriesV2] narrowed by [discoverySearchQuery]/[discoverySelectedCardNames] — the list
-     * the Strategies tab actually renders. Recomputed by [recomputeFilteredDiscoveries] whenever
-     * any of the three inputs change (kept in state, not computed in the Composable, so the pure
-     * [DiscoverySearchFilter] stays the single source of truth and is unit-testable via the VM). */
-    val filteredDiscoveriesV2: List<DeckDiscoveryV2> = emptyList(),
-    /** [discoveriesV2]'s members narrowed by the SAME [discoverySearchQuery]/
-     * [discoverySelectedCardNames] filter (via [DiscoverySearchFilter.matchingCards]) -- the flat
-     * "matching cards" preview shown directly under the Strategies tab search bar, kept in sync
-     * with [filteredDiscoveriesV2] by [recomputeFilteredDiscoveries] so the query filters both the
-     * cluster list AND this card-level preview. Empty when no search is active. */
-    val discoveryMatchingCards: List<Card> = emptyList(),
-    /** Commander Spellbook combo results (Deck Engine Unification plan D7, Phase 4.3). Null until
-     * [loadCombos] has run at least once (lazy: only fetched on first Combos-tab selection, never
-     * on sheet open, so opening Inspirations never fires a network call by itself). */
-    val comboResult: ComboResult? = null,
-    /** Every combo card name (across [comboResult]'s complete + almost-there variants, including
-     * each [com.mmg.manahub.feature.decks.domain.model.AlmostCombo.missingCardName]) resolved to a
-     * full [Card] via [CardRepository.getCardByExactName] -- populated once alongside
-     * [comboResult] so the Combos tab can render real card-art tiles instead of name-only chips.
-     * A name absent from this map (resolution failed/timed out) falls back to a text chip. */
-    val comboCardsByName: Map<String, Card> = emptyMap(),
-    /** True while [loadCombos] is in flight. */
-    val isLoadingCombos: Boolean = false,
-    /** True once [loadCombos] has completed at least once (success OR degraded-empty) — guards
-     * against re-fetching on every tab re-selection within the same sheet session. */
-    val combosLoaded: Boolean = false,
+    // ── Browse inspirations (60-card formats, empty deck only) ────────────────
+    val inspirations: InspirationsUiState = InspirationsUiState(),
 
     // ── Import (Group B) ──────────────────────────────────────────────────────
     /** True while a pasted deck list is being resolved + written into the live draft. */
@@ -394,14 +359,9 @@ class DeckStudioViewModel(
     // SAME paste-a-deck-list text field the Studio already has — a pasted deckstats.net URL is
     // detected and routed through the unified pipeline instead of the plain-text parser.
     private val importDeckCardsUseCase: ImportDeckCardsUseCase? = null,
-    // Deck Builder v2, Phase 5 (docs/plans/deck-builder-v2-plan.md §3.5) -- appended last,
-    // nullable-defaulted so no existing test call site needs to change; null behaves exactly as
-    // before Phase 5 (discoveriesV2 never populates, loadDiscoveries falls back to the legacy path).
-    private val discoverSynergiesV2UseCase: DiscoverSynergiesV2UseCase? = null,
-    // Deck Engine Unification plan D7 (Phase 4.3) -- appended last, nullable-defaulted so no
-    // existing test call site needs to change; null means the Combos tab always degrades to an
-    // empty result (never a crash -- mirrors every other optional community-data dependency here).
-    private val findCombosUseCase: FindCombosUseCase? = null,
+    // Browse inspirations; null degrades both tabs to their empty states (test constructors).
+    private val discoverCollectionSynergiesUseCase: DiscoverCollectionSynergiesUseCase? = null,
+    private val findCombosWithCardUseCase: FindCombosWithCardUseCase? = null,
     private val manaBaseAnalyzer: ManaBaseAnalyzer = ManaBaseAnalyzer(),
     // Suggestions Tab UI Polish plan (W11 bug-fix pass, 2026-08-25) -- appended last,
     // nullable-defaulted so no existing test call site needs to change. Builds the raw Scryfall
@@ -509,6 +469,13 @@ class DeckStudioViewModel(
     /** The user's collection, used to populate the "owned" search tab. */
     private var collectionCards: List<Card> = emptyList()
 
+    // Declared before init: observeCollection() may emit synchronously during construction.
+    private var latestCollection: List<UserCardWithCard>? = null
+    private var synergiesSource: List<UserCardWithCard>? = null
+    private var synergiesFormat: DeckFormat? = null
+    private var synergiesJob: Job? = null
+    private var combosJob: Job? = null
+
     /** The resolved [DeckFormat] of the live deck (never via [DeckFormat.valueOf]). */
     private val deckFormat: DeckFormat?
         get() = _uiState.value.deck?.format?.let { fmt ->
@@ -608,51 +575,6 @@ class DeckStudioViewModel(
             }
             observeDeck()
             observeCollection()
-            // Inspirations (Phase 4): compute collection-synergy discoveries on a SEPARATE
-            // launch so they never block the (more important) deck load above. Gated on a
-            // successfully resolved `deckId` — a failed draft creation returns early above,
-            // so discoveries must NOT run for a deck that never came into existence.
-            if (::deckId.isInitialized) loadDiscoveries()
-        }
-    }
-
-    /**
-     * Computes collection-synergy discoveries off the user's collection for the Inspirations
-     * surface, via [discoverSynergiesV2UseCase] (identity-only clustering — STRATEGY/ARCHETYPE
-     * tags + derived `tribe:<x>` keys). A failure logs + records and leaves the discovery list
-     * empty — never fatal.
-     *
-     * The legacy `DeckMagicEngine.discoverSynergies` path (ANY-tag-category clustering, mixing
-     * STRATEGY/TYPE/KEYWORD indiscriminately — the exact "presentation mixes the axes" bug the v2
-     * clustering was built to fix) was RETIRED in the Deck Wizard & Engine Rework plan, WS7.2
-     * (2026-07-28), together with `DeckFeatureFlags.DISCOVERIES_V2_ENABLED` (v2 is now the only
-     * path). [discoverSynergiesV2UseCase] stays nullable/defaulted for test-constructor
-     * convenience only — a `null` value degrades to an empty [DeckStudioUiState.discoveriesV2]
-     * (never a crash), mirroring every other optional community-data dependency here.
-     */
-    private fun loadDiscoveries() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingDiscoveries = true) }
-            val v2UseCase = discoverSynergiesV2UseCase
-            if (v2UseCase == null) {
-                _uiState.update { it.copy(isLoadingDiscoveries = false) }
-                return@launch
-            }
-            runCatching {
-                val collection = userCardRepository.observeCollection().first()
-                v2UseCase(collection)
-            }.onSuccess { discoveries ->
-                // 4.2: filteredDiscoveriesV2 starts equal to the full list (no search active
-                // yet) -- recomputeFilteredDiscoveries() re-derives it from state whenever the
-                // user actually searches, so this is just the correct initial value.
-                _uiState.update { it.copy(discoveriesV2 = discoveries, filteredDiscoveriesV2 = discoveries, isLoadingDiscoveries = false) }
-            }.onFailure { t ->
-                FirebaseCrashlytics.getInstance().apply {
-                    log("deck_studio_discovery_v2_seeding_failed")
-                    recordException(RuntimeException("[DeckStudio] deck_studio_discovery_v2_seeding_failed", t))
-                }
-                _uiState.update { it.copy(isLoadingDiscoveries = false) }
-            }
         }
     }
 
@@ -732,6 +654,7 @@ class DeckStudioViewModel(
         userCardRepository.observeCollection()
             .distinctUntilChanged()
             .onEach { collection ->
+                latestCollection = collection
                 collectionCards = collection.map { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
                 _uiState.update { it.copy(collectionIds = collectionCards.map { c -> c.scryfallId }.toSet()) }
             }
@@ -2013,135 +1936,300 @@ class DeckStudioViewModel(
         }
     }
 
-    // ── Inspirations (Discoveries, Phase 4) ───────────────────────────────────
+    // ── Browse inspirations ─────────────────────────────────────────────────────
 
-    /** Opens the Inspirations (Discoveries) bottom sheet. */
-    fun openInspirations() {
-        FirebaseCrashlytics.getInstance().log("deck_studio_inspirations_opened")
-        _uiState.update { it.copy(showInspirations = true) }
+    private fun updateInspirations(transform: (InspirationsUiState) -> InspirationsUiState) {
+        _uiState.update { it.copy(inspirations = transform(it.inspirations)) }
     }
 
-    /** Closes the Inspirations (Discoveries) bottom sheet. */
-    fun closeInspirations() {
-        _uiState.update { it.copy(showInspirations = false) }
-    }
-
-    // ── Synergy browser: tabs + search (Deck Engine Unification plan D7, 4.1-4.2) ──────────────
-
-    /** Switches the v2 synergy browser's active tab. Lazily kicks off [loadCombos] the FIRST
-     * time [InspirationsTab.COMBOS] is selected — opening Inspirations never fires a network call
-     * by itself; only actually looking at the Combos tab does. */
-    fun onSelectInspirationsTab(tab: InspirationsTab) {
-        _uiState.update { it.copy(inspirationsTab = tab) }
-        if (tab == InspirationsTab.COMBOS && !_uiState.value.combosLoaded && !_uiState.value.isLoadingCombos) {
-            loadCombos()
-        }
-    }
-
-    /** Updates the free-text label search (4.2) and re-derives [DeckStudioUiState.filteredDiscoveriesV2]. */
-    fun onDiscoverySearchQueryChange(query: String) {
-        _uiState.update { it.copy(discoverySearchQuery = query) }
-        recomputeFilteredDiscoveries()
-    }
-
-    /** Toggles one card in/out of the search-by-card pick set (4.2). */
-    fun onToggleDiscoverySearchCard(cardName: String) {
-        _uiState.update {
-            val selected = it.discoverySelectedCardNames
-            it.copy(discoverySelectedCardNames = if (cardName in selected) selected - cardName else selected + cardName)
-        }
-        recomputeFilteredDiscoveries()
-    }
-
-    /** Clears both search inputs (4.2) back to the unfiltered [DeckStudioUiState.discoveriesV2] list. */
-    fun onClearDiscoverySearch() {
-        _uiState.update { it.copy(discoverySearchQuery = "", discoverySelectedCardNames = emptySet()) }
-        recomputeFilteredDiscoveries()
-    }
-
-    /** Pure re-derivation via [DiscoverySearchFilter] -- the single source of truth for what the
-     * Strategies tab renders, kept in state (not computed in the Composable) so it stays unit
-     * testable from the VM and Compose stays a dumb `uiState.filteredDiscoveriesV2` reader. */
-    private fun recomputeFilteredDiscoveries() {
-        _uiState.update { state ->
-            state.copy(
-                filteredDiscoveriesV2 = DiscoverySearchFilter.apply(
-                    discoveries = state.discoveriesV2,
-                    query = state.discoverySearchQuery,
-                    selectedCardNames = state.discoverySelectedCardNames,
-                ),
-                discoveryMatchingCards = DiscoverySearchFilter.matchingCards(
-                    discoveries = state.discoveriesV2,
-                    query = state.discoverySearchQuery,
-                    selectedCardNames = state.discoverySelectedCardNames,
-                ),
-            )
-        }
-    }
-
-    // ── Combos tab (Deck Engine Unification plan D7, 4.3) ──────────────────────────────────────
-
-    /**
-     * Finds Commander Spellbook combos over the user's OWNED collection (the SAME
-     * `observeCollection()` snapshot [loadDiscoveries] uses -- this tab answers "what combos
-     * could I already build with what I own," not "what combos exist in this deck"). Never
-     * throws: [findCombosUseCase] is null-safe (degrades to [ComboResult.EMPTY]) and every
-     * failure inside it already degrades per [com.mmg.manahub.core.data.repository
-     * .CommanderSpellbookRepositoryImpl]'s own cache-then-empty contract -- this function's
-     * `runCatching` is defense-in-depth only (e.g. a Room read failure before the network call).
-     */
-    fun loadCombos() {
-        val useCase = findCombosUseCase
-        if (useCase == null) {
-            _uiState.update { it.copy(comboResult = ComboResult.EMPTY, combosLoaded = true, isLoadingCombos = false) }
-            return
-        }
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingCombos = true) }
-            runCatching {
-                val collection = userCardRepository.observeCollection().first()
-                val cardNames = collection.map { it.card.name }.distinct()
-                useCase(cardNames = cardNames)
-            }.onSuccess { result ->
-                val combos = (result as? DataResult.Success)?.data ?: ComboResult.EMPTY
-                val cardsByName = resolveComboCards(combos)
-                _uiState.update {
-                    it.copy(
-                        comboResult = combos,
-                        comboCardsByName = cardsByName,
-                        isLoadingCombos = false,
-                        combosLoaded = true,
-                    )
-                }
-            }.onFailure { t ->
-                crashReporter.log("deck_studio_combos_load_failed")
-                crashReporter.recordException(RuntimeException("[DeckStudio] deck_studio_combos_load_failed", t))
-                _uiState.update { it.copy(comboResult = ComboResult.EMPTY, isLoadingCombos = false, combosLoaded = true) }
+    private fun updatePicker(tab: InspirationsTab, transform: (CollectionCardPickerState) -> CollectionCardPickerState) {
+        updateInspirations { state ->
+            when (tab) {
+                InspirationsTab.STRATEGIES -> state.copy(strategiesPicker = transform(state.strategiesPicker))
+                InspirationsTab.COMBOS -> state.copy(combosPicker = transform(state.combosPicker))
             }
         }
     }
 
-    /**
-     * Resolves every distinct card name referenced by [combos] (complete + almost-there,
-     * including each [com.mmg.manahub.feature.decks.domain.model.AlmostCombo.missingCardName]) to
-     * a full [Card] in parallel, mirroring the established
-     * [com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksSearchViewModel
-     * .resolveTrendingCards] pattern -- concurrent [CardRepository.getCardByExactName] calls
-     * (already rate-limited/cached by the Scryfall request queue underneath), unresolved names
-     * dropped rather than surfaced as an error so the Combos tab degrades to its text-chip
-     * fallback per-card instead of failing the whole tab. Capped at [MAX_COMBO_CARDS_TO_RESOLVE]
-     * distinct names to bound the burst of concurrent network calls for a large combo result.
-     */
-    private suspend fun resolveComboCards(combos: ComboResult): Map<String, Card> = coroutineScope {
-        val names = (
-            combos.complete.flatMap { it.cardNames } +
-                combos.almostThere.flatMap { it.ownedCardNames + it.missingCardName }
-            ).distinct().take(MAX_COMBO_CARDS_TO_RESOLVE)
+    fun openInspirations() {
+        FirebaseCrashlytics.getInstance().log("deck_inspirations_opened")
+        updateInspirations { it.copy(isOpen = true) }
+        loadCollectionSynergies(force = false)
+    }
 
-        names
-            .map { name -> name to async { runCatching { cardRepository.getCardByExactName(name) }.getOrNull()?.getOrNull() } }
-            .mapNotNull { (name, deferred) -> deferred.await()?.let { name to it } }
-            .toMap()
+    /** Dismissal wipes the selection, pins and searches; only the computed synergies survive for the session. */
+    fun closeInspirations() {
+        val state = _uiState.value.inspirations
+        if (state.selection.isNotEmpty()) {
+            FirebaseCrashlytics.getInstance().apply {
+                setCustomKey("deck_inspirations_selected_copies", state.selectedCopies)
+                log("deck_inspirations_dismissed_with_selection")
+            }
+        }
+        resetInspirations()
+    }
+
+    private fun resetInspirations() {
+        combosJob?.cancel()
+        updateInspirations { InspirationsUiState(synergies = it.synergies) }
+    }
+
+    fun onSelectInspirationsTab(tab: InspirationsTab) {
+        FirebaseCrashlytics.getInstance().apply {
+            setCustomKey("deck_inspirations_tab", tab.name)
+            log("deck_inspirations_tab_selected")
+        }
+        updateInspirations { it.copy(tab = tab) }
+    }
+
+    fun retryInspirationsSynergies() = loadCollectionSynergies(force = true)
+
+    private fun loadCollectionSynergies(force: Boolean) {
+        val useCase = discoverCollectionSynergiesUseCase
+        val format = deckFormat
+        if (useCase == null || format == null) {
+            updateInspirations { it.copy(synergies = it.synergies ?: CollectionSynergies.EMPTY) }
+            return
+        }
+        if (synergiesJob?.isActive == true) return
+        synergiesJob = viewModelScope.launch {
+            try {
+                val collection = latestCollection ?: userCardRepository.observeCollection().first()
+                if (!force && collection === synergiesSource && format == synergiesFormat && _uiState.value.inspirations.synergies != null) return@launch
+                updateInspirations { it.copy(isLoadingSynergies = true, synergiesFailed = false) }
+                val synergies = useCase(collection, format)
+                synergiesSource = collection
+                synergiesFormat = format
+                updateInspirations { it.copy(synergies = synergies, isLoadingSynergies = false) }
+                FirebaseCrashlytics.getInstance().apply {
+                    setCustomKey("deck_inspirations_engine_count", synergies.engines.size)
+                    setCustomKey("deck_inspirations_tribe_count", synergies.tribes.size)
+                    log("deck_inspirations_synergies_loaded")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                crashReporter.log("deck_inspirations_synergies_failed")
+                crashReporter.recordException(RuntimeException("[DeckStudio] deck_inspirations_synergies_failed", e))
+                updateInspirations { it.copy(isLoadingSynergies = false, synergiesFailed = true) }
+            }
+        }
+    }
+
+    fun onInspirationsQueryChange(tab: InspirationsTab, query: String) {
+        val results = if (query.isBlank()) emptyList() else ownedLegalCardsMatching(query)
+        updatePicker(tab) { it.copy(query = query, results = results) }
+    }
+
+    // Owned + legal only: these are the cards a pick can seed without the wizard rejecting them.
+    private fun ownedLegalCardsMatching(query: String): List<Card> {
+        val format = deckFormat ?: return emptyList()
+        val needle = query.trim()
+        return collectionCards
+            .filter { it.name.contains(needle, ignoreCase = true) && isLegalForFormat(it, format) }
+            .distinctBy { it.name }
+            .sortedBy { !it.name.startsWith(needle, ignoreCase = true) }
+            .take(MAX_INSPIRATION_SEARCH_RESULTS)
+    }
+
+    fun onPinInspirationsCard(tab: InspirationsTab, card: Card) {
+        FirebaseCrashlytics.getInstance().apply {
+            setCustomKey("deck_inspirations_tab", tab.name)
+            log("deck_inspirations_card_pinned")
+        }
+        updatePicker(tab) { CollectionCardPickerState(pinned = card) }
+        if (tab == InspirationsTab.COMBOS) loadCombosForCard(card, page = 0)
+    }
+
+    fun onClearInspirationsPin(tab: InspirationsTab) {
+        updatePicker(tab) { CollectionCardPickerState() }
+        if (tab == InspirationsTab.COMBOS) {
+            combosJob?.cancel()
+            updateInspirations {
+                it.copy(
+                    combos = emptyList(),
+                    combosTotalCount = null,
+                    combosPage = 0,
+                    combosHasMore = false,
+                    isLoadingCombos = false,
+                    isLoadingMoreCombos = false,
+                    combosFailed = false,
+                )
+            }
+        }
+    }
+
+    fun onLoadMoreCombos() {
+        val state = _uiState.value.inspirations
+        val card = state.combosPicker.pinned ?: return
+        if (!state.combosHasMore || state.isLoadingCombos || state.isLoadingMoreCombos) return
+        loadCombosForCard(card, state.combosPage + 1)
+    }
+
+    fun retryCombos() {
+        _uiState.value.inspirations.combosPicker.pinned?.let { loadCombosForCard(it, page = 0) }
+    }
+
+    private fun loadCombosForCard(card: Card, page: Int) {
+        val useCase = findCombosWithCardUseCase
+        val format = deckFormat
+        if (useCase == null || format == null) {
+            updateInspirations { it.copy(combos = emptyList(), isLoadingCombos = false, combosHasMore = false) }
+            return
+        }
+        combosJob?.cancel()
+        updateInspirations {
+            if (page == 0) {
+                it.copy(isLoadingCombos = true, combosFailed = false, combos = emptyList(), combosPage = 0, combosHasMore = false, combosTotalCount = null)
+            } else {
+                it.copy(isLoadingMoreCombos = true)
+            }
+        }
+        combosJob = viewModelScope.launch {
+            try {
+                val pageData = (useCase(card.name, format, page) as? DataResult.Success)?.data
+                if (pageData == null) {
+                    crashReporter.log("deck_inspirations_combos_failed")
+                    updateInspirations { it.copy(isLoadingCombos = false, isLoadingMoreCombos = false, combosFailed = page == 0) }
+                    return@launch
+                }
+                val cardsByName = _uiState.value.inspirations.comboCardsByName +
+                    resolveComboCards(pageData.combos.flatMap { it.cardNames })
+                val ownedIndex = ComboOwnership.ownedNameIndex(collectionCards)
+                // The ONE legality predicate: a combo with a resolved piece illegal in this format can never be seeded.
+                val views = pageData.combos
+                    .filter { combo ->
+                        combo.cardNames.all { name -> comboCardIn(cardsByName, name)?.let { isLegalForFormat(it, format) } ?: true }
+                    }
+                    .map { ComboOwnership.view(it, ownedIndex) }
+                updateInspirations { state ->
+                    state.copy(
+                        combos = if (page == 0) views else state.combos + views.filter { view -> state.combos.none { it.combo.id == view.combo.id } },
+                        comboCardsByName = cardsByName,
+                        combosPage = page,
+                        combosHasMore = pageData.hasMore,
+                        combosTotalCount = pageData.totalCount,
+                        isLoadingCombos = false,
+                        isLoadingMoreCombos = false,
+                    )
+                }
+                FirebaseCrashlytics.getInstance().apply {
+                    setCustomKey("deck_inspirations_combo_count", views.size)
+                    setCustomKey("deck_inspirations_combo_page", page)
+                    log("deck_inspirations_combos_loaded")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                crashReporter.log("deck_inspirations_combos_failed")
+                crashReporter.recordException(RuntimeException("[DeckStudio] deck_inspirations_combos_failed", e))
+                updateInspirations { it.copy(isLoadingCombos = false, isLoadingMoreCombos = false, combosFailed = page == 0) }
+            }
+        }
+    }
+
+    private fun comboCardIn(cardsByName: Map<String, Card>, name: String): Card? =
+        cardsByName[name.lowercase()] ?: cardsByName[name.lowercase().substringBefore(" // ")]
+
+    /** Owned pieces resolve locally; the rest in batched `/cards/collection` lookups (75 names each), never one request per card. */
+    private suspend fun resolveComboCards(names: List<String>): Map<String, Card> {
+        val known = _uiState.value.inspirations.comboCardsByName
+        val wanted = names.distinctBy { it.lowercase() }.filter { comboCardIn(known, it) == null }
+        if (wanted.isEmpty()) return emptyMap()
+
+        val resolved = mutableMapOf<String, Card>()
+        fun record(card: Card) {
+            val full = card.name.lowercase()
+            resolved.putIfAbsent(full, card)
+            resolved.putIfAbsent(full.substringBefore(" // "), card)
+        }
+        val ownedByName = collectionCards.associateBy { it.name.lowercase() } +
+            collectionCards.associateBy { it.name.lowercase().substringBefore(" // ") }
+        val missing = wanted.filter { name ->
+            val owned = ownedByName[name.lowercase()] ?: ownedByName[name.lowercase().substringBefore(" // ")]
+            owned?.let(::record)
+            owned == null
+        }
+        missing.chunked(CardRepository.MAX_IDENTIFIERS_PER_LOOKUP).forEach { chunk ->
+            val result = cardRepository.lookupCardsByIdentifiers(chunk.map { CardLookupIdentifier(name = it) })
+            (result as? DataResult.Success)?.data?.cards?.forEach(::record)
+        }
+        val unresolved = missing.count { comboCardIn(resolved, it) == null }
+        if (unresolved > 0) {
+            crashReporter.setCustomKey("deck_inspirations_unresolved_count", unresolved.toString())
+            crashReporter.log("deck_inspirations_combo_cards_unresolved")
+        }
+        return resolved
+    }
+
+    fun onInspirationsBrowseOpened(sectionId: String) {
+        FirebaseCrashlytics.getInstance().apply {
+            setCustomKey("deck_analysis_section_id", sectionId)
+            log("deck_inspirations_browse_opened")
+        }
+        showCollectionCards()
+    }
+
+    fun addToInspirationSelection(card: Card, source: InspirationSelectionSource) {
+        val format = deckFormat ?: return
+        applySelectionResult(InspirationSelection.add(_uiState.value.inspirations.selection, card, format), source)
+    }
+
+    fun decrementInspirationSelection(card: Card) {
+        updateInspirations { it.copy(selection = InspirationSelection.decrement(it.selection, card)) }
+    }
+
+    fun removeFromInspirationSelection(card: Card) {
+        updateInspirations { it.copy(selection = InspirationSelection.remove(it.selection, card)) }
+    }
+
+    fun clearInspirationSelection() {
+        updateInspirations { it.copy(selection = emptyList(), showSelectionQueue = false) }
+    }
+
+    /** Adds the combo's unselected pieces at one copy each; already-selected pieces keep their quantity. */
+    fun addComboToInspirationSelection(view: OwnedComboView) {
+        val format = deckFormat ?: return
+        val state = _uiState.value.inspirations
+        val cards = view.combo.cardNames.mapNotNull { state.comboCard(it) }
+        if (cards.size < view.combo.cardNames.size) {
+            _events.trySend(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_inspirations_combo_pieces_unresolved)))
+        }
+        applySelectionResult(InspirationSelection.addMissing(state.selection, cards, format), InspirationSelectionSource.COMBO)
+    }
+
+    fun onToggleInspirationsQueue() {
+        updateInspirations { it.copy(showSelectionQueue = !it.showSelectionQueue) }
+    }
+
+    private fun applySelectionResult(result: SelectionResult, source: InspirationSelectionSource) {
+        updateInspirations { it.copy(selection = result.picks) }
+        val message = when (val outcome = result.outcome) {
+            SelectionOutcome.Changed -> {
+                FirebaseCrashlytics.getInstance().apply {
+                    setCustomKey("deck_inspirations_selection_source", source.name)
+                    log("deck_inspirations_selection_added")
+                }
+                null
+            }
+            SelectionOutcome.Unchanged -> null
+            SelectionOutcome.Illegal -> appContext.getString(R.string.deck_wizard_manual_add_rejected)
+            is SelectionOutcome.CopyCapReached -> appContext.getString(R.string.deck_wizard_seed_copy_cap, outcome.maxCopies)
+            is SelectionOutcome.TotalCapReached -> appContext.getString(R.string.deck_wizard_seed_cap_reached, outcome.cap)
+        }
+        message?.let { _events.trySend(DeckStudioEvent.ShowToast(it)) }
+    }
+
+    /** "Start building the deck": returns the picks as wizard `seedCards` and closes the session without an abandonment log. */
+    fun consumeInspirationSeedCards(): List<Pair<String, Int>> {
+        val selection = _uiState.value.inspirations.selection
+        FirebaseCrashlytics.getInstance().apply {
+            setCustomKey("deck_inspirations_selected_cards", selection.size)
+            setCustomKey("deck_inspirations_selected_copies", InspirationSelection.copies(selection))
+            log("deck_inspirations_start_building")
+        }
+        resetInspirations()
+        return selection.map { it.card.scryfallId to it.quantity }
     }
 
     private fun logFailure(tag: String, t: Throwable) {
@@ -2158,9 +2246,7 @@ class DeckStudioViewModel(
     private companion object {
         const val CREATED_FRESH_DRAFT_KEY = "deckStudioCreatedFreshDraft"
 
-        /** Cap on distinct combo card names resolved to full [Card]s per [loadCombos] call, so a
-         * large combo result can't burst an unbounded number of concurrent Scryfall lookups. */
-        const val MAX_COMBO_CARDS_TO_RESOLVE = 40
+        const val MAX_INSPIRATION_SEARCH_RESULTS = 50
 
         /** Detects a pasted deckstats.net deck URL in the Studio's plain-text import field
          * (Phase 6, D17) — a cheap containment check, not a full URL parse (that happens inside

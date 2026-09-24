@@ -13,9 +13,13 @@ import com.mmg.manahub.core.data.remote.dto.FindMyCombosRequestDto
 import com.mmg.manahub.core.data.remote.dto.FindMyCombosResponseDto
 import com.mmg.manahub.core.data.remote.dto.FindMyCombosResultDto
 import com.mmg.manahub.core.data.remote.dto.VariantDto
+import com.mmg.manahub.core.data.remote.dto.VariantsPageDto
 import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.feature.decks.domain.model.CardComboPage
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -46,13 +50,23 @@ class CommanderSpellbookRepositoryImplTest {
 
     private class FakeApi(
         val result: (() -> FindMyCombosResponseDto)? = null,
+        val variants: (() -> VariantsPageDto)? = null,
     ) : CommanderSpellbookApiContract {
         var callCount = 0
         var lastRequest: FindMyCombosRequestDto? = null
+        var lastCardQuery: String? = null
+        var lastOffset: Int? = null
         override suspend fun findMyCombos(request: FindMyCombosRequestDto): FindMyCombosResponseDto {
             callCount++
             lastRequest = request
             return result?.invoke() ?: throw IllegalStateException("Commander Spellbook down")
+        }
+
+        override suspend fun findVariants(cardQuery: String, limit: Int, offset: Int): VariantsPageDto {
+            callCount++
+            lastCardQuery = cardQuery
+            lastOffset = offset
+            return variants?.invoke() ?: throw IllegalStateException("Commander Spellbook down")
         }
     }
 
@@ -210,5 +224,69 @@ class CommanderSpellbookRepositoryImplTest {
         val success = assertIs<DataResult.Success<com.mmg.manahub.feature.decks.domain.model.ComboResult>>(result)
         assertEquals(1, success.data.complete.size)
         assertEquals(1, api.callCount)
+    }
+
+    // ── findCombosWithCard ─────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `per-card lookup keeps only variants using the card and maps command-zone and legality`() = runTest {
+        val commanderPiece = CardInVariantDto(card = CardRefDto(name = "Kenrith, the Returned King"), mustBeCommander = true)
+        val page = VariantsPageDto(
+            count = 3,
+            next = "https://backend.commanderspellbook.com/variants/?offset=50",
+            results = listOf(
+                variant("v1", listOf("Sol Ring", "Basalt Monolith")).copy(
+                    legalities = buildJsonObject { put("modern", JsonPrimitive(false)); put("legacy", JsonPrimitive(true)); put("oddity", JsonPrimitive("n/a")) },
+                ),
+                variant("v2", listOf("Sol Ring")).copy(uses = variant("v2", listOf("Sol Ring")).uses + commanderPiece),
+                variant("v3", listOf("Soldevi Adnate", "Basalt Monolith")),
+            ),
+        )
+        val api = FakeApi(variants = { page })
+        val cache = FakeCache()
+
+        val result = repository(api, cache).findCombosWithCard("Sol Ring", page = 1)
+
+        val data = assertIs<DataResult.Success<CardComboPage>>(result).data
+        assertEquals(listOf("v1", "v2"), data.combos.map { it.id })
+        assertEquals(mapOf("modern" to false, "legacy" to true), data.combos.first().legalities)
+        assertTrue(data.combos[1].requiresCommandZone)
+        assertTrue(data.hasMore)
+        assertEquals(3, data.totalCount)
+        assertEquals("card=\"Sol Ring\"", api.lastCardQuery)
+        assertEquals(50, api.lastOffset)
+        assertTrue(cache.store.keys.single().startsWith("combo-card:"))
+    }
+
+    @Test
+    fun `a double-faced name is searched by its front face and matched client-side`() = runTest {
+        val api = FakeApi(variants = { VariantsPageDto(results = listOf(variant("v1", listOf("Delver of Secrets", "Brainstorm")))) })
+
+        val result = repository(api).findCombosWithCard("Delver of Secrets // Insectile Aberration", page = 0)
+
+        assertEquals(1, assertIs<DataResult.Success<CardComboPage>>(result).data.combos.size)
+        assertEquals("card:\"Delver of Secrets\"", api.lastCardQuery)
+    }
+
+    @Test
+    fun `a fresh per-card cache entry short-circuits the API`() = runTest {
+        val api = FakeApi(variants = { VariantsPageDto(results = listOf(variant("v1", listOf("Sol Ring", "Basalt Monolith")))) })
+        val cache = FakeCache()
+        val repo = repository(api, cache)
+        repo.findCombosWithCard("Sol Ring", page = 0)
+
+        val second = repo.findCombosWithCard("sol ring", page = 0)
+
+        assertEquals(1, api.callCount)
+        assertEquals(1, assertIs<DataResult.Success<CardComboPage>>(second).data.combos.size)
+    }
+
+    @Test
+    fun `API down with no cache degrades to an empty stale page`() = runTest {
+        val result = repository(FakeApi()).findCombosWithCard("Sol Ring", page = 0)
+
+        val success = assertIs<DataResult.Success<CardComboPage>>(result)
+        assertTrue(success.data.combos.isEmpty())
+        assertTrue(success.isStale)
     }
 }
