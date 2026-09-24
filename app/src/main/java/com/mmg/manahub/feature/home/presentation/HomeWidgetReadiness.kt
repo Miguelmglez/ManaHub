@@ -10,14 +10,12 @@ import com.mmg.manahub.core.model.CommunityDeckSummary
  * @param trendingLoaded true once the trending fetch resolved (its value may be null = hidden).
  * @param communityDecks the COMMUNITY_DECKS list; null while loading.
  * @param dailyPuzzle the DAILY_PUZZLE preview state.
- * @param competitiveEnabled the COMPETITIVE flag; null until the persisted value is read.
  */
 @Immutable
 data class HomeWidgetExtras(
     val trendingLoaded: Boolean = false,
     val communityDecks: List<CommunityDeckSummary>? = null,
     val dailyPuzzle: DailyPuzzleWidgetState = DailyPuzzleWidgetState.Loading,
-    val competitiveEnabled: Boolean? = null,
 )
 
 /**
@@ -58,6 +56,5 @@ fun HomeWidgetType.isReady(state: HomeUiState, extras: HomeWidgetExtras): Boolea
         HomeWidgetType.TRENDING_COMMANDERS -> extras.trendingLoaded
         HomeWidgetType.COMMUNITY_DECKS -> extras.communityDecks != null
         HomeWidgetType.DAILY_PUZZLE -> extras.dailyPuzzle !is DailyPuzzleWidgetState.Loading
-        HomeWidgetType.COMPETITIVE -> extras.competitiveEnabled != null
     }
 }

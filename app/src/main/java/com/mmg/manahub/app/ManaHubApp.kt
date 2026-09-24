@@ -94,7 +94,6 @@ import com.mmg.manahub.core.domain.repository.CardQueueRepository
 import com.mmg.manahub.feature.collection.di.COLLECTION_IMPORT_QUEUE
 import com.mmg.manahub.feature.collection.di.collectionKoinModule
 import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
-import com.mmg.manahub.feature.competitive.di.competitiveKoinModule
 import com.mmg.manahub.feature.decks.di.commanderSpellbookKoinModule
 import com.mmg.manahub.feature.decks.di.communityAggregateKoinModule
 import com.mmg.manahub.feature.decks.di.decksKoinModule
@@ -532,7 +531,6 @@ class ManaHubApp : Application(), KoinComponent {
                 searchWidgetsKoinModule(),
                 gamificationKoinModule(),
                 decksKoinModule(),
-                competitiveKoinModule(),
                 gameKoinModule(
                     observeSession = observeSessionUseCase,
                     updateLife = updateLifeUseCase,

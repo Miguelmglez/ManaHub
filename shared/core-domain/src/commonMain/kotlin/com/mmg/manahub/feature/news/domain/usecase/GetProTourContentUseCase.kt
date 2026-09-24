@@ -6,21 +6,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
- * Filters the already-cached News feed down to Pro Tour / high-level competitive event coverage
- * (Competitive feature, Phase 5). A PURE in-memory keyword predicate over
- * [NewsRepository.observeNews] — zero new Room table, network call, or Worker: the News feature
- * already fetches/caches articles + videos from its RSS/YouTube sources, so this use case simply
- * re-slices that existing stream. Any UI wired to [GetNewsFeedUseCase]/[NewsRepository.observeNews]
- * (e.g. `NewsViewModel`, Home's `MTG_NEWS` widget) keeps working unchanged — this is purely an
- * additive read, never a mutation of the underlying news cache.
- *
- * Matches (case-insensitive) against [NewsItem.title] + [NewsItem.description] against:
- * `"Pro Tour"`, `"PT <SET>"` (a 3-letter set-code abbreviation, e.g. "PT DFT"),
- * `"Regional Championship"`, `"World Championship"`, `"Arena Championship"`, `"Qualifier"`.
- *
- * The bare `"Metagame"` keyword was DROPPED (Competitive redesign, 2026-08): it matched almost any
- * generic deck-tech/metagame-report article, not just actual Pro Tour coverage, making this filter
- * feel broken to users who expected only Pro-Tour-related results.
+ * Pro Tour / high-level competitive coverage for MTG Today › Events: a pure in-memory keyword filter
+ * over the cached news ([NewsRepository.observeNews]); no request, table or Worker of its own.
+ * Matches (case-insensitive) title + description against "Pro Tour", "PT <SET>", "Regional
+ * Championship", "World Championship", "Arena Championship" and "Qualifier". A bare "Metagame"
+ * branch was dropped because it matched generic deck-tech articles.
  */
 class GetProTourContentUseCase(
     private val repository: NewsRepository,
@@ -32,12 +22,7 @@ class GetProTourContentUseCase(
         PRO_TOUR_KEYWORD_REGEX.containsMatchIn("$title $description")
 
     private companion object {
-        /**
-         * The whole alternation is case-insensitive per the Competitive feature spec — including
-         * the `PT [A-Z]{3}` branch, so "pt dft" also matches even though a real set-code
-         * abbreviation is conventionally uppercase. No bare `"Metagame"` branch — see the class
-         * KDoc for why it was dropped.
-         */
+        // Case-insensitive on purpose, including the `PT [A-Z]{3}` branch ("pt dft" matches too).
         val PRO_TOUR_KEYWORD_REGEX = Regex(
             "Pro Tour|PT [A-Z]{3}|Regional Championship|World Championship|Arena Championship|Qualifier",
             RegexOption.IGNORE_CASE,

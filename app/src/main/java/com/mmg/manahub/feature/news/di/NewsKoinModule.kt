@@ -6,6 +6,7 @@ import com.mmg.manahub.feature.news.data.NewsRepositoryImpl
 import com.mmg.manahub.feature.news.data.parser.RssFeedParser
 import com.mmg.manahub.feature.news.data.parser.YouTubeRssFeedParser
 import com.mmg.manahub.feature.news.data.remote.NewsFeedService
+import com.mmg.manahub.feature.today.presentation.events.EventsViewModel
 import com.mmg.manahub.feature.today.presentation.feed.FeedViewModel
 import com.mmg.manahub.feature.today.presentation.saved.SavedViewModel
 import com.mmg.manahub.feature.today.presentation.sources.AddSourceViewModel
@@ -63,4 +64,14 @@ fun newsKoinModule(
     }
     viewModel { SourcesViewModel(manageSources = get(), crashReporter = get()) }
     viewModel { AddSourceViewModel(resolveSource = get(), followSource = get(), crashReporter = get()) }
+    viewModel {
+        EventsViewModel(
+            getUpcomingReleases = get(),
+            getProTourContent = get(),
+            manageSources = get(),
+            userPrefsDataStore = get(),
+            crashReporter = get(),
+            savedStateHandle = get(),
+        )
+    }
 }

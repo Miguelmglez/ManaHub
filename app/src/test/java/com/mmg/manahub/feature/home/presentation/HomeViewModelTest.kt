@@ -292,7 +292,6 @@ class HomeViewModelTest {
             }
         }
         every { userPrefsDataStore.homeCommunityDecksFormatFlow } returns flowOf(null)
-        every { userPrefsDataStore.competitiveEnabledFlow } returns flowOf(false)
     }
 
     /** Persists [types] as the saved board so a test controls which widgets are placed. */
@@ -1147,6 +1146,19 @@ class HomeViewModelTest {
 
         val ids = vm.state.value.layout.map { it.type }
         assertEquals(listOf(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.GAME_STATS_HUB), ids)
+    }
+
+    @Test
+    fun `retired competitive widget token is dropped on decode`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        savedLayoutTokens.value = "context_hero:MEDIUM,competitive:MEDIUM,mtg_news:MEDIUM"
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertTrue(HomeWidgetType.entries.none { it.persistedId == "competitive" })
+        assertEquals(listOf(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.MTG_NEWS), vm.state.value.layout.map { it.type })
     }
 
     @Test

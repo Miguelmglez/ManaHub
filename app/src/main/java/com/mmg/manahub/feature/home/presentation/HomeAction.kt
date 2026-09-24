@@ -117,9 +117,6 @@ sealed interface HomeAction {
     /** Opens the Profile screen on the Quests tab (gamification Phase 2). */
     object OpenProfileQuests : HomeAction
 
-    /** Opens the Competitive screen (gamification Phase 2). */
-    object OpenCompetitive : HomeAction
-
     /** Opens the Daily Puzzle screen (ADR-006), from either the widget's title/CTA. */
     object OpenDailyPuzzle : HomeAction
 

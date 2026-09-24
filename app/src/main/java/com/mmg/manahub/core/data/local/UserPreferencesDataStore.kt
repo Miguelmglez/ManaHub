@@ -123,15 +123,6 @@ private val KEY_PUSH_NOTIFICATIONS_ENABLED = booleanPreferencesKey("push_notific
 private val KEY_COMMUNITY_ENGINE_ENABLED = booleanPreferencesKey("community_engine_enabled")
 /** User opt-out for gamification (absent = opted in); the release gate lives in `FeatureFlags`. */
 private val KEY_GAMIFICATION_ENABLED = booleanPreferencesKey("gamification_enabled")
-/**
- * Master switch for the Competitive feature (Phase 4: MTG metagame rankings / 17lands ratings
- * screen). Backed by the `manahub-competitive` Cloudflare Worker, which refreshes its data
- * entirely server-side via its own cron — the app only does on-demand, cache-first reads when
- * this flag is on; there is no app-side scheduling to gate (unlike gamification's
- * `QuestRotationWorker`). Default: false (new, still-partially-inactive feature), same posture
- * as gamification's default-OFF and `PuzzleFeatureFlags.PUZZLE_ENABLED`.
- */
-private val KEY_COMPETITIVE_ENABLED = booleanPreferencesKey("competitive_enabled")
 /** Last postal code typed into MTG Today › Events' event locator; the key keeps its original name so users keep it. */
 private val KEY_EVENTS_POSTAL_CODE = stringPreferencesKey("competitive_postal_code")
 /** Retired one-shot backfill guard; still removed on wipe so old installs do not keep it around. */
@@ -583,24 +574,6 @@ class UserPreferencesDataStore @Inject constructor(
     /** Persists the master gamification switch. */
     suspend fun setGamificationEnabled(enabled: Boolean) {
         context.userPrefsDataStore.edit { it[KEY_GAMIFICATION_ENABLED] = enabled }
-    }
-
-    /**
-     * Master switch for the Competitive feature (metagame rankings / 17lands ratings). Default:
-     * false (OFF) — the feature is still being built out. Unlike gamification, there is no
-     * app-side engine to gate here: the `manahub-competitive` Cloudflare Worker refreshes its
-     * data entirely via its own server-side cron, so this flag only controls whether the UI is
-     * shown and whether the (not-yet-created) repository performs on-demand cache-first reads.
-     * A future `CompetitiveRepositoryImpl` will short-circuit every method to an error/empty
-     * result while this is off, same pattern as `CommunityAggregateRepositoryImpl`. To enable,
-     * flip the default to true / emit(true).
-     */
-    val competitiveEnabledFlow: Flow<Boolean> = safeData
-        .map { prefs -> prefs[KEY_COMPETITIVE_ENABLED] ?: false }
-
-    /** Persists the master Competitive feature switch. */
-    suspend fun setCompetitiveEnabled(enabled: Boolean) {
-        context.userPrefsDataStore.edit { it[KEY_COMPETITIVE_ENABLED] = enabled }
     }
 
     /** Last postal code typed into the Events tab's event locator. Empty until set. */

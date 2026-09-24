@@ -837,25 +837,13 @@ class HomeViewModel(
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), DailyPuzzleWidgetState.Loading)
         }
 
-    private val competitiveEnabledState: StateFlow<Boolean?> =
-        userPrefsDataStore.competitiveEnabledFlow
-            .catch { emit(false) }
-            .stateInLoading()
-
-    /** Whether the [HomeWidgetType.COMPETITIVE] tile is visible (runtime DataStore flag). */
-    val competitiveEnabledFlow: StateFlow<Boolean> =
-        competitiveEnabledState
-            .map { it ?: false }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
-
     /** The out-of-[HomeUiState] inputs of [HomeWidgetType.isReady]. */
     val widgetExtrasFlow: StateFlow<HomeWidgetExtras> =
-        combine(trendingLoadedFlow, communityDecksFlow, dailyPuzzleFlow, competitiveEnabledState) { trendingLoaded, decks, puzzle, competitive ->
+        combine(trendingLoadedFlow, communityDecksFlow, dailyPuzzleFlow) { trendingLoaded, decks, puzzle ->
             HomeWidgetExtras(
                 trendingLoaded = trendingLoaded,
                 communityDecks = decks,
                 dailyPuzzle = puzzle,
-                competitiveEnabled = competitive,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), HomeWidgetExtras())
 
@@ -1898,7 +1886,7 @@ class HomeViewModel(
         /**
          * Default widget layouts, applied ONLY when nothing has been persisted yet. Signed-out leads with
          * what works without an account; signed-in with the user's own data. Gallery-only widgets
-         * (wishlist, gamification, trending, puzzle, competitive...) keep the board short.
+         * (wishlist, gamification, trending, puzzle...) keep the board short.
          */
         private val DEFAULT_LAYOUT_SIGNED_OUT = listOf(
             WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),

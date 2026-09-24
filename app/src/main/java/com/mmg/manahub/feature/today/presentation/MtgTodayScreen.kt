@@ -45,6 +45,7 @@ import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.today.presentation.events.EventsTab
 import com.mmg.manahub.feature.today.presentation.feed.FeedTab
 import com.mmg.manahub.feature.today.presentation.feed.FeedViewModel
 import com.mmg.manahub.feature.today.presentation.saved.SavedTab
@@ -54,7 +55,7 @@ import org.koin.androidx.compose.koinViewModel
 import java.util.Locale
 
 /**
- * MTG Today: Feed · Saved · Sources. Cross-tab moves (a followed source → the Feed filtered by it,
+ * MTG Today: Feed · Events · Saved · Sources. Cross-tab moves (a followed source → the Feed filtered by it,
  * "Discover sources" → Sources) and the Add Source sheet are hoisted here.
  */
 @Composable
@@ -100,6 +101,7 @@ fun MtgTodayScreen(
                     onAddSource = { showAddSource = true },
                     onDiscoverSources = { selectedTab = TodayTab.SOURCES },
                 )
+                TodayTab.EVENTS -> EventsTab(toastState = toastState)
                 TodayTab.SAVED -> SavedTab(toastState = toastState, onVideoClick = onVideoClick)
                 TodayTab.SOURCES -> SourcesTab(
                     toastState = toastState,

@@ -612,7 +612,6 @@ fun HomeWidgetHost(
                 HomeWidgetType.TRADES_HUB -> TradesHubWidget(uiState, metrics.tradesSlideHeight, onAction)
                 HomeWidgetType.TRENDING_COMMANDERS -> TrendingCommandersWidget(trending, onAction)
                 HomeWidgetType.DAILY_PUZZLE -> DailyPuzzleWidget(dailyPuzzle, onAction)
-                HomeWidgetType.COMPETITIVE -> CompetitiveWidget(onAction)
             }
         }
     }
@@ -644,7 +643,6 @@ private fun widgetHeaderTitleClickAction(type: HomeWidgetType): HomeAction? = wh
     HomeWidgetType.CARD_OF_THE_DAY,
     HomeWidgetType.RULES_TIP,
     HomeWidgetType.CONTEXT_HERO,
-    HomeWidgetType.COMPETITIVE,
     -> null
 }
 
@@ -750,47 +748,6 @@ private fun DailyPuzzleWidget(
                     )
                 }
             }
-        }
-    }
-}
-
-/**
- * Static launcher tile into the Competitive screen (metagame rankings, 17lands Limited ratings,
- * event locator, Pro Tour news filter) — Competitive feature, Phase 5. Carries no widget-level
- * data of its own (unlike [DailyPuzzleWidget]/[TrendingCommandersWidget]): the actual sections
- * live on [com.mmg.manahub.feature.competitive.presentation.CompetitiveScreen] itself, so this
- * tile is a single CTA card, mirroring [QuickActionsWidget]'s "whole body is one big tap target"
- * shape.
- */
-@Composable
-private fun CompetitiveWidget(onAction: (HomeAction) -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    WidgetShell(
-        onClick = { onAction(HomeAction.OpenCompetitive) },
-        onClickLabel = stringResourceSafe(R.string.widget_title_competitive),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = stringResourceSafe(R.string.home_widget_desc_competitive),
-                style = ty.bodyMedium,
-                color = mc.textPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(end = spacing.sm),
-            )
-            MagicCtaButton(
-                onClick = { onAction(HomeAction.OpenCompetitive) },
-                text = stringResourceSafe(R.string.widget_title_competitive),
-                style = MagicCtaStyle.Outlined,
-                color = MagicCtaColor.Gold,
-            )
         }
     }
 }

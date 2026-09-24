@@ -106,7 +106,6 @@ fun WidgetGallerySheet(
     currentLayout: List<WidgetInstance>,
     isAuthenticated: Boolean,
     gamificationEnabled: Boolean,
-    competitiveEnabled: Boolean,
     onAddWidget: (HomeWidgetType) -> Unit,
     onRemoveWidget: (HomeWidgetType) -> Unit,
     onUpdateLayout: (List<WidgetInstance>) -> Unit,
@@ -122,7 +121,7 @@ fun WidgetGallerySheet(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val editor = remember { GalleryEditor(currentLayout, listState, scope) }
-    editor.isVisible = { type -> isGalleryVisible(type, gamificationEnabled, competitiveEnabled) }
+    editor.isVisible = { type -> isGalleryVisible(type, gamificationEnabled) }
     editor.onAddWidget = onAddWidget
     editor.onRemoveWidget = onRemoveWidget
     editor.onUpdateLayout = onUpdateLayout
@@ -301,10 +300,9 @@ private fun galleryRowKey(type: HomeWidgetType): String = GALLERY_ROW_KEY_PREFIX
 private fun galleryHeaderKey(category: WidgetCategory): String = GALLERY_HEADER_KEY_PREFIX + category.name
 
 /** Whether [type] is offered in the gallery at all under the current feature flags. */
-private fun isGalleryVisible(type: HomeWidgetType, gamificationEnabled: Boolean, competitiveEnabled: Boolean): Boolean =
+private fun isGalleryVisible(type: HomeWidgetType, gamificationEnabled: Boolean): Boolean =
     (gamificationEnabled || !type.isGamification) &&
-        (FeatureFlags.Puzzle.PUZZLE_ENABLED || type != HomeWidgetType.DAILY_PUZZLE) &&
-        (competitiveEnabled || type != HomeWidgetType.COMPETITIVE)
+        (FeatureFlags.Puzzle.PUZZLE_ENABLED || type != HomeWidgetType.DAILY_PUZZLE)
 
 /**
  * Holds the sheet's optimistic layout, the gallery category order and the drag state. Every
@@ -790,5 +788,4 @@ private val HomeWidgetType.description: String
         HomeWidgetType.TRENDING_COMMANDERS -> stringResource(R.string.home_widget_desc_trending_commanders)
         HomeWidgetType.COMMUNITY_DECKS -> stringResource(R.string.home_widget_desc_community_decks)
         HomeWidgetType.DAILY_PUZZLE -> stringResource(R.string.home_widget_desc_daily_puzzle)
-        HomeWidgetType.COMPETITIVE -> stringResource(R.string.home_widget_desc_competitive)
     }

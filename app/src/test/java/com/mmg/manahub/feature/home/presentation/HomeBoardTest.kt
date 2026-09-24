@@ -75,23 +75,15 @@ class HomeBoardTest {
         val state = HomeUiState(
             layout = layoutOf(
                 HomeWidgetType.DAILY_PUZZLE,
-                HomeWidgetType.COMPETITIVE,
                 HomeWidgetType.PROGRESSION_HUB,
                 HomeWidgetType.MTG_NEWS,
             ),
             gamificationEnabled = false,
         )
 
-        val rendered = render(state, HomeWidgetExtras(competitiveEnabled = false), puzzleEnabled = false)
+        val rendered = render(state, HomeWidgetExtras(), puzzleEnabled = false)
 
         assertEquals(listOf(HomeWidgetType.MTG_NEWS), rendered)
-    }
-
-    @Test
-    fun `competitive keeps its slot until its flag is known`() {
-        val state = HomeUiState(layout = layoutOf(HomeWidgetType.COMPETITIVE))
-
-        assertEquals(listOf(HomeWidgetType.COMPETITIVE), render(state, HomeWidgetExtras(competitiveEnabled = null)))
     }
 
     @Test

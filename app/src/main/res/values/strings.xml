@@ -2636,6 +2636,52 @@
     <string name="today_add_error_youtube">This YouTube channel couldn\'t be found. Paste the channel link (youtube.com/@name).</string>
     <string name="today_add_error_empty">This feed has no posts yet.</string>
     <string name="today_add_error_already">You already follow this source.</string>
+    <string name="today_tab_events">Events</string>
+    <string name="today_opens_in_browser_a11y">%1$s. Opens in browser.</string>
+    <string name="today_events_releases_title">Upcoming releases</string>
+    <string name="today_events_releases_error">Couldn\'t load release dates.</string>
+    <string name="today_events_releases_empty">No upcoming releases announced yet</string>
+    <string name="today_release_today">Today</string>
+    <string name="today_release_tomorrow">Tomorrow</string>
+    <string name="today_release_out_now">Out now</string>
+    <plurals name="today_release_in_days">
+        <item quantity="one">In %1$d day</item>
+        <item quantity="other">In %1$d days</item>
+    </plurals>
+    <string name="today_release_a11y">%1$s, %2$s, %3$s. Opens in browser.</string>
+    <string name="today_events_locator_title">Find events near you</string>
+    <string name="today_events_postal_code">Postal code</string>
+    <string name="today_events_find">Find events</string>
+    <string name="today_events_twitch_title">Watch live on Twitch</string>
+    <string name="today_events_twitch_desc">Official and community Magic tournament coverage.</string>
+    <string name="today_events_pro_tour_title">Pro Tour &amp; competitive coverage</string>
+    <string name="today_events_pro_tour_empty">No Pro Tour coverage from the sources you follow yet</string>
+    <string name="today_events_more_magicgg">More on magic.gg</string>
+    <string name="today_events_metagame_title">Metagame &amp; decklists</string>
+    <string name="today_format_standard">Standard</string>
+    <string name="today_format_pioneer">Pioneer</string>
+    <string name="today_format_modern">Modern</string>
+    <string name="today_format_legacy">Legacy</string>
+    <string name="today_format_vintage">Vintage</string>
+    <string name="today_format_pauper">Pauper</string>
+    <string name="today_link_mtgo_title">MTGO Decklists</string>
+    <string name="today_link_mtgo_desc">Official Magic Online league and tournament decklists.</string>
+    <string name="today_link_magicgg_decklists_title">Pro Tour Decklists</string>
+    <string name="today_link_magicgg_decklists_desc">Decklists from the Pro Tour and top-level Wizards events.</string>
+    <string name="today_link_magicgg_standings_title">Pro Tour Standings</string>
+    <string name="today_link_magicgg_standings_desc">Live and historical standings for top-level events.</string>
+    <string name="today_link_mtgtop8_title">MTGTop8</string>
+    <string name="today_link_mtgtop8_desc">Top %1$s decklists and metagame share.</string>
+    <string name="today_link_goldfish_meta_title">MTGGoldfish Metagame</string>
+    <string name="today_link_goldfish_meta_desc">%1$s metagame breakdown and top decks.</string>
+    <string name="today_link_mtgdecks_title">MTGDecks.net</string>
+    <string name="today_link_mtgdecks_desc">Community-aggregated %1$s top decks.</string>
+    <string name="today_link_goldfish_movers_title">MTGGoldfish Price Movers</string>
+    <string name="today_link_goldfish_movers_desc">Trending cards and price movers, updated daily.</string>
+    <string name="today_events_limited_title">Limited</string>
+    <string name="today_events_17lands_title">17lands Card Ratings</string>
+    <string name="today_events_17lands_desc">Win-rate-backed Draft ratings for %1$s.</string>
+    <string name="today_events_attribution">Release dates come from Scryfall. Every other link opens the source\'s own site in your browser; ManaHub does not host or re-serve third-party competitive data.</string>
 
     <!-- ══════════════════════════════════════════
          USER PREFERENCES
@@ -3681,7 +3727,6 @@
     <string name="home_widget_desc_friends">Your friends and pending requests</string>
     <string name="home_widget_desc_community_decks">Browse popular community decks</string>
     <string name="home_widget_desc_daily_puzzle">Guess today\'s card from clues</string>
-    <string name="home_widget_desc_competitive">Metagame rankings, Limited ratings, and events</string>
     <string name="home_widget_desc_multiple_add">Add multiple cards easily!</string>
 
     <!-- Home feature overhaul — Quick Start labels (widget tiles) -->
@@ -3771,8 +3816,6 @@
     <string name="widget_title_community_decks">Community Decks</string>
     <!-- Daily Puzzle (ADR-006), Batch B2 — Home widget, gallery-only/opt-in. -->
     <string name="widget_title_daily_puzzle">Daily Puzzle</string>
-    <!-- Competitive feature, Phase 5 — Home widget, gallery-only/opt-in, flag-gated. -->
-    <string name="widget_title_competitive">Competitive</string>
     <string name="home_edit_widgets">Edit Widgets</string>
     <string name="widget_title_wishlist">Wishlist</string>
     <string name="widget_title_discover">Discover cards</string>

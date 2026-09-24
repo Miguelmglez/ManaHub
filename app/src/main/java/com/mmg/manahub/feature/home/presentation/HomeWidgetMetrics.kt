@@ -179,7 +179,6 @@ fun computeHomeWidgetMetrics(lh: HomeLineHeights, sp: Spacing): HomeWidgetMetric
         HomeWidgetType.COMMUNITY_DECKS to shell + deckTileWithOwner,
         HomeWidgetType.TRENDING_COMMANDERS to shell + deckTile,
         HomeWidgetType.DAILY_PUZZLE to shell + singleCta + SlotSlack,
-        HomeWidgetType.COMPETITIVE to shell + singleCta + SlotSlack,
     )
 
     return HomeWidgetMetrics(

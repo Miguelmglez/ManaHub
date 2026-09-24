@@ -40,6 +40,8 @@ import com.mmg.manahub.feature.decks.domain.usecase.AddScannedCardsToDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.CalculateDeckValueSummaryUseCase
 import com.mmg.manahub.feature.news.domain.usecase.FollowSourceUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
+import com.mmg.manahub.feature.news.domain.usecase.GetProTourContentUseCase
+import com.mmg.manahub.feature.news.domain.usecase.GetUpcomingReleasesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ObserveSavedItemsUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
@@ -185,6 +187,8 @@ fun sharedDomainKoinModule(
     single { ToggleSavedItemUseCase(repository = get()) }
     single { ResolveSourceUseCase(repository = get()) }
     single { FollowSourceUseCase(repository = get()) }
+    single { GetProTourContentUseCase(repository = get()) }
+    single { GetUpcomingReleasesUseCase(cardRepository = get()) }
 
     // ── Collection / survey use cases. ──
     single { CompleteSurveyUseCase(progressionEventBus = get()) }

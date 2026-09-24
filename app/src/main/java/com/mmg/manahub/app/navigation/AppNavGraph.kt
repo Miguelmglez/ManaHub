@@ -73,7 +73,6 @@ import com.mmg.manahub.feature.carddetail.presentation.CardDetailScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionScreen
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckDetailScreen
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksScreen
-import com.mmg.manahub.feature.competitive.presentation.CompetitiveScreen
 import com.mmg.manahub.feature.decks.presentation.DECK_STUDIO_SELECT_BUILD_TAB_KEY
 import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
 import com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardScreen
@@ -491,9 +490,6 @@ fun AppNavGraph(
                                             setReleasedAt = action.set.releasedAt,
                                         )
                                     )
-                                    is HomeAction.OpenCompetitive->{
-                                        navController.navigate(Screen.Competitive.route)
-                                    }
                                     is HomeAction.OpenMultiAdd -> navController.navigate(Screen.CollectionAddCard.createRoute(multi = true))
                                     // ── Widget board: handled in HomeScreen/VM ───────────
                                     HomeAction.OpenWidgetGallery,
@@ -1752,15 +1748,6 @@ fun AppNavGraph(
                             }
                         }
                     },
-                )
-            }
-            composable(
-                route = Screen.Competitive.route,
-            ){
-                CompetitiveScreen(
-                    onBack = {
-                        navController.popBackStack()
-                    }
                 )
             }
         }
