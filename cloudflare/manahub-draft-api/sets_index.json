@@ -1,5 +1,5 @@
 {
-  "index_version": "18",
+  "index_version": "19",
   "last_updated": "2026-09-24",
   "sets": [
     {
@@ -111,8 +111,10 @@
       "icon_svg_uri": "https://svgs.scryfall.io/sets/fin.svg?1778472000",
       "released_at": "2025-06-13",
       "content_versions": {
-        "guide": "2026-05-16",
-        "tier_list": "2026-05-16"
+        "guide": "2026-09-24",
+        "tier_list": "2026-09-24",
+        "booster": "2026-09-24",
+        "engine": "2026-09-24"
       }
     },
     {

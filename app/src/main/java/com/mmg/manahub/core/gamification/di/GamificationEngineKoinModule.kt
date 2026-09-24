@@ -1,5 +1,21 @@
 package com.mmg.manahub.core.gamification.di
 
+import androidx.work.WorkManager
+import com.mmg.manahub.app.lifecycle.AppForegroundTracker
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.gamification.data.local.GamificationLocalStore
+import com.mmg.manahub.core.gamification.data.sync.GamificationAccountScopeImpl
+import com.mmg.manahub.core.gamification.data.sync.WorkManagerGamificationWorkScheduler
+import com.mmg.manahub.core.gamification.domain.DefaultGamificationAvailability
+import com.mmg.manahub.core.gamification.domain.GamificationAccountScope
+import com.mmg.manahub.core.gamification.domain.GamificationAvailability
+import com.mmg.manahub.core.gamification.domain.GamificationBackendGate
+import com.mmg.manahub.core.gamification.domain.GamificationCatchUp
+import com.mmg.manahub.core.gamification.domain.GamificationWorkScheduler
+import com.mmg.manahub.core.gamification.engine.DefaultGamificationCatchUp
+import kotlinx.coroutines.flow.map
 import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
@@ -89,19 +105,21 @@ import org.koin.dsl.module
  *
  * @param gamificationDao the Hilt/Room-owned [GamificationDao] singleton.
  * @param gamificationStatsDao the Hilt/Room-owned [GamificationStatsDao] singleton.
+ * @param workManager the Hilt-owned [WorkManager] used by the backend gate's scheduler.
  * @return a Koin [Module] providing the entire native gamification engine graph.
  */
 fun gamificationEngineKoinModule(
     gamificationDao: GamificationDao,
     gamificationStatsDao: GamificationStatsDao,
+    workManager: WorkManager,
 ): Module = module {
     // ── Room DAOs (Hilt/DatabaseModule-owned, Room stays androidMain) — forward-bridged. ──
     single { gamificationDao }
     single { gamificationStatsDao }
 
-    // ── System clock/timezone — trivial, constructed directly (previously Hilt @Provides). ──
+    // ── System clock; the zone is read per call so a device time-zone change applies without a restart. ──
     single<Clock> { Clock.System }
-    single { TimeZone.currentSystemDefault() }
+    val timeZoneProvider: () -> TimeZone = { TimeZone.currentSystemDefault() }
 
     // ── Sync infra: SyncPreferencesStore is stateless, constructed natively (see KDoc above). ──
     single { SyncPreferencesStore(androidContext()) }
@@ -117,17 +135,19 @@ fun gamificationEngineKoinModule(
         GamificationRepositoryImpl(
             dao = get(),
             clock = get(),
-            timeZone = get(),
+            timeZoneProvider = timeZoneProvider,
             userPreferencesDataStore = get(),
         )
     }
 
     // ── Engine collaborators. ──
     // crashReporter comes from coreBridgeKoinModule (single<CrashReporter>) — NOT re-declared here.
-    single { XpGranter(dao = get(), clock = get(), timeZone = get(), userPreferencesDataStore = get()) }
+    single {
+        XpGranter(dao = get(), clock = get(), timeZoneProvider = timeZoneProvider, userPreferencesDataStore = get())
+    }
     single { AchievementEvaluator(dao = get(), statsDao = get(), clock = get(), crashReporter = get()) }
-    single { QuestEvaluator(dao = get(), clock = get(), timeZone = get()) }
-    single { StreakTracker(dao = get(), clock = get(), timeZone = get()) }
+    single { QuestEvaluator(dao = get(), clock = get(), timeZoneProvider = timeZoneProvider) }
+    single { StreakTracker(dao = get(), clock = get(), timeZoneProvider = timeZoneProvider) }
     single { EntitlementGranter(dao = get(), clock = get()) }
     single { QuestStableIdProvider(authRepository = get(), dataStore = get()) }
 
@@ -161,7 +181,7 @@ fun gamificationEngineKoinModule(
             stableIdProvider = get(),
             claimQuestRewardUseCase = get(),
             clock = get(),
-            timeZone = get(),
+            timeZoneProvider = timeZoneProvider,
         )
     }
     single {
@@ -174,11 +194,45 @@ fun gamificationEngineKoinModule(
         )
     }
 
-    // ── KMP migration — Hilt→Koin cutover batch 6: WorkManager subsystem. ──
-    // Both workers gained a `userPreferencesDataStore` param (WS1+WS3 Part A item 3, backend-
-    // performance-optimization-plan.md §1) — defense-in-depth so an already-enqueued periodic run
-    // no-ops when the gamification master flag is off. `UserPreferencesDataStore` is bridged in
-    // `coreBridgeKoinModule` — resolved via `get()`, not re-registered here.
+    // ── Gate + lifecycle (D1/D2/D3). Every gamification gate consumes GamificationAvailability. ──
+    single<GamificationAvailability> {
+        DefaultGamificationAvailability(
+            remoteConfigRepository = get(),
+            userOptInFlow = get<UserPreferencesDataStore>().gamificationEnabledFlow,
+        )
+    }
+    single { GamificationLocalStore(dao = get(), userPreferencesDataStore = get()) }
+    single<GamificationAccountScope> {
+        GamificationAccountScopeImpl(userPreferencesDataStore = get(), localStore = get(), syncManager = get())
+    }
+    single<GamificationCatchUp> {
+        DefaultGamificationCatchUp(
+            achievementBackfill = get(),
+            entitlementGranter = get(),
+            questReconciler = get(),
+            crashReporter = get(),
+        )
+    }
+    single<GamificationWorkScheduler> { WorkManagerGamificationWorkScheduler(workManager = workManager) }
+    single { AppForegroundTracker() }
+    single {
+        GamificationBackendGate(
+            availability = get(),
+            engine = get(),
+            bus = get(),
+            workScheduler = get(),
+            catchUp = get(),
+            accountScope = get(),
+            signedInUserId = get<AuthRepository>().sessionState
+                .map { state -> (state as? SessionState.Authenticated)?.user?.id },
+            appForegroundEvents = get<AppForegroundTracker>().foregroundEvents,
+            clock = get(),
+            timeZoneProvider = timeZoneProvider,
+            crashReporter = get(),
+        )
+    }
+
+    // Workers re-check availability as defense in depth; the sync worker also checks the store owner.
     worker {
         GamificationSyncWorker(
             appContext = androidContext(),
@@ -186,6 +240,7 @@ fun gamificationEngineKoinModule(
             gamificationSyncManager = get(),
             authRepository = get(),
             userPreferencesDataStore = get(),
+            gamificationAvailability = get(),
         )
     }
     worker {
@@ -193,7 +248,7 @@ fun gamificationEngineKoinModule(
             appContext = androidContext(),
             workerParams = it.get(),
             questReconciler = get(),
-            userPreferencesDataStore = get(),
+            gamificationAvailability = get(),
         )
     }
 }

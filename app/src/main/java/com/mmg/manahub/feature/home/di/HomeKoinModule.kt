@@ -117,6 +117,7 @@ fun homeKoinModule(): Module = module {
             wishlistRepository = get(),
             getAccountNudgeUseCase = get(),
             gamificationRepository = get(),
+            gamificationAvailability = get(),
             userCardRepository = get(),
             tradesRepository = get(),
             openForTradeRepository = get(),

@@ -39,7 +39,7 @@ class StreakTrackerTest {
         tracker = StreakTracker(
             mockk<GamificationDao>(relaxed = true),
             FixedClock(Instant.parse("2026-06-12T10:00:00Z")),
-            TimeZone.UTC,
+            { TimeZone.UTC },
         )
     }
 
@@ -228,7 +228,7 @@ class StreakTrackerTest {
     /** A [GamificationDao] mock + tracker wired to the fixed clock, for [process] IO-shell tests. */
     private fun processHarness(): Pair<GamificationDao, StreakTracker> {
         val dao = mockk<GamificationDao>(relaxed = true)
-        val processTracker = StreakTracker(dao, FixedClock(Instant.parse("2026-06-12T10:00:00Z")), TimeZone.UTC)
+        val processTracker = StreakTracker(dao, FixedClock(Instant.parse("2026-06-12T10:00:00Z")), { TimeZone.UTC })
         return dao to processTracker
     }
 

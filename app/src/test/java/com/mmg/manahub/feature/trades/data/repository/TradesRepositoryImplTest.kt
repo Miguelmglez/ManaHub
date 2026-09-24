@@ -5,6 +5,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.data.remote.trades.TradesRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.TradeItemDto
 import com.mmg.manahub.core.data.remote.dto.TradeProposalDto
@@ -629,5 +630,81 @@ class TradesRepositoryImplTest {
             assertEquals(listOf("a-1"), awaitItem().map { it.id })
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 7 — TradeCompleted emission (restore plan D7)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given a successful accept when acceptProposal then no TradeCompleted is emitted`() = runTest {
+        coEvery { remote.acceptProposal("p-001") } returns Result.success(Unit)
+
+        repository.acceptProposal("p-001")
+
+        coVerify(exactly = 0) { progressionEventBus.emit(any()) }
+    }
+
+    @Test
+    fun `given a completed countered trade observed twice when refreshing then TradeCompleted is emitted once keyed by the root`() = runTest {
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(
+            listOf(
+                buildProposalDto(id = "root-1", rootProposalId = "root-1", status = "COUNTERED"),
+                buildProposalDto(id = "counter-2", rootProposalId = "root-1", parentProposalId = "root-1", status = "COMPLETED"),
+            ),
+        )
+
+        repository.refreshProposals(USER_ID)
+        repository.refreshProposalThread("root-1", USER_ID)
+
+        coVerify(exactly = 1) {
+            progressionEventBus.emit(match { it is ProgressionEvent.TradeCompleted && it.tradeId == "root-1" })
+        }
+    }
+
+    @Test
+    fun `given both parties observe the same completed trade then each emits the same global key`() = runTest {
+        val completed = buildProposalDto(id = "t-1", rootProposalId = "t-1", status = "COMPLETED")
+        coEvery { remote.fetchProposals(any(), any()) } returns Result.success(listOf(completed))
+        val receiverBus = mockk<ProgressionEventBus>(relaxed = true)
+        val receiverRepository = TradesRepositoryImpl(remote, cardDao, cardRepository, receiverBus)
+
+        repository.refreshProposals(USER_ID)
+        receiverRepository.refreshProposals("receiver-uuid-002")
+
+        val proposerEvents = mutableListOf<ProgressionEvent>()
+        val receiverEvents = mutableListOf<ProgressionEvent>()
+        coVerify(exactly = 1) { progressionEventBus.emit(capture(proposerEvents)) }
+        coVerify(exactly = 1) { receiverBus.emit(capture(receiverEvents)) }
+        assertEquals("trade:t-1", proposerEvents.single().idempotencyKey)
+        assertEquals(proposerEvents.single().idempotencyKey, receiverEvents.single().idempotencyKey)
+        assertEquals(false, proposerEvents.single().isDeviceScoped)
+    }
+
+    @Test
+    fun `given accepted then revoked trades when refreshing then no TradeCompleted is emitted`() = runTest {
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(
+            listOf(
+                buildProposalDto(id = "a-1", rootProposalId = "a-1", status = "ACCEPTED"),
+                buildProposalDto(id = "r-1", rootProposalId = "r-1", status = "REVOKED"),
+            ),
+        )
+
+        repository.refreshProposals(USER_ID)
+
+        coVerify(exactly = 0) { progressionEventBus.emit(any()) }
+    }
+
+    @Test
+    fun `given the cache is cleared when the completed trade is observed again then it is re-emitted for the ledger to dedupe`() = runTest {
+        coEvery { remote.fetchProposals(USER_ID, any()) } returns Result.success(
+            listOf(buildProposalDto(id = "t-1", rootProposalId = "t-1", status = "COMPLETED")),
+        )
+
+        repository.refreshProposals(USER_ID)
+        repository.clearCache()
+        repository.refreshProposals(USER_ID)
+
+        coVerify(exactly = 2) { progressionEventBus.emit(match { it is ProgressionEvent.TradeCompleted }) }
     }
 }

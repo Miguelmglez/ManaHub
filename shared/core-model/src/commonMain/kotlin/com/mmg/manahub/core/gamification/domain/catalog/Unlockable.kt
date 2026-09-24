@@ -159,6 +159,7 @@ data class RenderSpec(
  * @param renderSpec procedural render description for Chunk B.
  * @param unlockRule the condition that grants this item.
  * @param sortOrder display order within its [kind] (ascending); ties broken by id.
+ * @param availability whether the item can currently be earned; unavailable items are hidden and never granted.
  */
 data class Unlockable(
     val id: UnlockableId,
@@ -167,4 +168,8 @@ data class Unlockable(
     val renderSpec: RenderSpec,
     val unlockRule: UnlockRule,
     val sortOrder: Int = 0,
-)
+    val availability: CatalogAvailability = CatalogAvailability.ALWAYS,
+) {
+    /** True when this item may be shown and granted. */
+    val isAvailable: Boolean get() = availability.isAvailable
+}

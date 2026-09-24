@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.settings.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.gamification.domain.GamificationAvailability
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.dto.UserProfileDto
 import com.mmg.manahub.core.domain.auth.AuthRepository
@@ -59,6 +60,7 @@ class SettingsViewModel(
     private val pushTokenRepository: PushTokenRepository,
     private val notificationPrefsRepository: NotificationPrefsRepository,
     private val voiceModelRepository: VoiceModelRepository,
+    private val gamificationAvailability: GamificationAvailability,
 //    private val langPref:              LanguagePreference
 ) : ViewModel() {
 
@@ -103,13 +105,22 @@ class SettingsViewModel(
                 initialValue = false,
             )
 
-    /** Master gamification switch backed by the local DataStore. Default: enabled. */
+    /** The user's gamification opt-out switch (the stored pref defaults to opted in). */
     val gamificationEnabled: StateFlow<Boolean> =
         userPrefsDataStore.gamificationEnabledFlow
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = true,
+            )
+
+    /** Whether the gamification section is shown: release flag on and not remotely killed. */
+    val gamificationSettingsVisible: StateFlow<Boolean> =
+        gamificationAvailability.settingsVisibleFlow
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = false,
             )
 
     /** Per-language voice-model state, mirrored from the repository. */
@@ -285,9 +296,9 @@ class SettingsViewModel(
     }
 
     /**
-     * Toggles the master gamification preference in the local DataStore.
+     * Persists the user's gamification opt-out; availability also needs the release flag and kill switch.
      *
-     * @param enabled `true` to show all gamification UI, `false` to hide it.
+     * @param enabled `false` opts out of all gamification UI and backend work.
      */
     fun setGamificationEnabled(enabled: Boolean) {
         launchSafely { userPrefsDataStore.setGamificationEnabled(enabled) }

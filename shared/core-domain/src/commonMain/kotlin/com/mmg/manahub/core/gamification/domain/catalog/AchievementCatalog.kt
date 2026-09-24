@@ -22,8 +22,12 @@ import kotlin.reflect.KClass
  * ### Families
  * - DERIVED (Family A) defs declare an [AchievementResolver]; their progress is re-queried from Room
  *   and supports retroactive unlocks + the one-shot backfill.
- * - COUNTER (Family B) defs (win streaks, daily streak, and the remote-backed social/tournament
+ * - COUNTER (Family B) defs (win streaks, daily streak, and the remote-backed trade/tournament
  *   lines that have no clean local aggregate) advance only by event increments going forward.
+ *
+ * ### Copy
+ * Every description states the thresholds it tiers on (single-tier defs their own one), pinned by
+ * `AchievementCatalogTest`. Lowering a threshold is safe: `tier_reached` is never lowered.
  */
 object AchievementCatalog {
 
@@ -38,9 +42,10 @@ object AchievementCatalog {
     private val FRIEND = ProgressionEvent.FriendAdded::class
     private val APP_OPEN = ProgressionEvent.AppOpenedToday::class
     private val PUZZLE_SOLVED = ProgressionEvent.PuzzleSolved::class
+    private val COLLECTION_CHANGED = ProgressionEvent.CollectionChanged::class
 
-    /** Any collection-touching event re-evaluates collection achievements. */
-    private val COLLECTION_EVENTS: Set<KClass<out ProgressionEvent>> = setOf(CARDS, SCAN)
+    /** Any collection-touching event (incl. the zero-XP bulk change) re-evaluates collection achievements. */
+    private val COLLECTION_EVENTS: Set<KClass<out ProgressionEvent>> = setOf(CARDS, SCAN, COLLECTION_CHANGED)
 
     /**
      * The full catalog. Order here is irrelevant (the UI sorts by [AchievementCategory.order] and
@@ -68,7 +73,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "COLLECTOR_50", category = AchievementCategory.COLLECTION,
-                title = "Collector I", description = "Add 50 cards to your collection",
+                title = "Collector I", description = "Own 50 unique cards",
                 emoji = "📚", // 📚
                 tiers = listOf(AchievementTier(50, XpConfig.achievementTier1)),
                 reactsTo = COLLECTION_EVENTS, family = Family.DERIVED,
@@ -78,7 +83,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "COLLECTOR_500", category = AchievementCategory.COLLECTION,
-                title = "Collector III", description = "Add 500 cards to your collection",
+                title = "Collector III", description = "Own 500 unique cards",
                 emoji = "📖", // 📖
                 tiers = listOf(AchievementTier(500, XpConfig.achievementTier2)),
                 reactsTo = COLLECTION_EVENTS, family = Family.DERIVED,
@@ -88,7 +93,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "UNIQUE_CARDS_2000", category = AchievementCategory.COLLECTION,
-                title = "Completionist", description = "Own 50 / 500 / 2,000 unique cards",
+                title = "Completionist", description = "Own 2,000 unique cards",
                 emoji = "🏛", // 🏛
                 tiers = listOf(AchievementTier(2_000, XpConfig.achievementTier3)),
                 reactsTo = COLLECTION_EVENTS, family = Family.DERIVED,
@@ -111,17 +116,17 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "RAINBOW_COLLECTOR", category = AchievementCategory.COLLECTION,
-                title = "Five Colors", description = "Have cards of all 5 colors",
+                title = "Five Colors", description = "Own at least one card of each of the 5 colors",
                 emoji = "🌈", // 🌈
                 tiers = listOf(AchievementTier(5, XpConfig.achievementOneShot)),
                 reactsTo = COLLECTION_EVENTS, family = Family.DERIVED,
-                resolver = AchievementResolver.COLORS_WITH_20_PLUS,
+                resolver = AchievementResolver.COLORS_WITH_ANY,
             )
         )
         add(
             AchievementDef(
                 id = "MYTHIC_OWNER", category = AchievementCategory.COLLECTION,
-                title = "Mythic Hunter", description = "Own a mythic rare card",
+                title = "Mythic Hunter", description = "Own 1 / 10 mythic rare cards",
                 emoji = "🌟", // 🌟
                 tiers = listOf(
                     AchievementTier(1, XpConfig.achievementTier1),
@@ -134,7 +139,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "HIGH_VALUE_COLLECTION", category = AchievementCategory.COLLECTION,
-                title = "High Roller", description = "Own a card worth more than %s",
+                title = "High Roller", description = "Own a card worth $60 or more",
                 emoji = "💎", // 💎
                 // Threshold in whole USD (resolver floors the max card price to an Int).
                 tiers = listOf(AchievementTier(60, XpConfig.achievementOneShot)),
@@ -189,7 +194,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "WIN_STREAK_5", category = AchievementCategory.GAMES,
-                title = "On Fire", description = "Win 3 games in a row",
+                title = "On Fire", description = "Win 5 games in a row",
                 emoji = "🔥", // 🔥
                 tiers = listOf(AchievementTier(5, XpConfig.achievementTier2)),
                 reactsTo = setOf(GAME), family = Family.COUNTER,
@@ -198,7 +203,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "WIN_STREAK_10", category = AchievementCategory.GAMES,
-                title = "On Fire", description = "Win 3 games in a row",
+                title = "On Fire", description = "Win 10 games in a row",
                 emoji = "🔥", // 🔥
                 tiers = listOf(AchievementTier(10, XpConfig.achievementTier3)),
                 reactsTo = setOf(GAME), family = Family.COUNTER,
@@ -227,7 +232,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "COMMANDER_KILLER", category = AchievementCategory.GAMES,
-                title = "Commander's Wrath", description = "Eliminate a player with commander damage",
+                title = "Commander's Wrath", description = "Win 10 Commander games",
                 emoji = "👑", // 👑
                 tiers = listOf(AchievementTier(10, XpConfig.achievementTier2)),
                 reactsTo = setOf(GAME), family = Family.DERIVED,
@@ -270,7 +275,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "DECKS_TIERED", category = AchievementCategory.DECKS,
-                title = "Master Builder", description = "Build 1 / 5 / 20 decks",
+                title = "Master Builder", description = "Build 5 / 20 decks",
                 emoji = "🔧", // 🔧
                 tiers = listOf(
                     AchievementTier(5, XpConfig.achievementTier2),
@@ -328,10 +333,7 @@ object AchievementCatalog {
                 reactsTo = setOf(TOURNEY), family = Family.COUNTER,
             )
         )
-        // NOTE: TournamentCompleted.isLocalWinner is currently HARD-CODED false (ADR-002 §"Phase 0
-        // implementation outcomes" / memory project_gamification_phase0): tournaments have no local-seat
-        // concept yet. This def is harmless but will NOT unlock until a tournament local-seat flag is
-        // added. The evaluator only increments TOURNAMENT_WIN when event.isLocalWinner is true.
+        // Unavailable until tournaments get a local seat: isLocalWinner is always false today (D4).
         add(
             AchievementDef(
                 id = "TOURNAMENT_WIN", category = AchievementCategory.TOURNAMENTS,
@@ -339,17 +341,20 @@ object AchievementCatalog {
                 emoji = "👑", // 👑
                 tiers = listOf(AchievementTier(1, XpConfig.achievementTier3)),
                 reactsTo = setOf(TOURNEY), family = Family.COUNTER,
+                availability = CatalogAvailability.TOURNAMENT_LOCAL_SEAT,
             )
         )
 
-        // ── SOCIAL (account-gated, remote-backed → Family B) ──────────────────────
+        // ── SOCIAL (account-gated) ────────────────────────────────────────────────
+        // Friends are DERIVED from the friends cache so remove + re-add cannot farm them; trades stay counters.
         add(
             AchievementDef(
                 id = "FIRST_FRIEND", category = AchievementCategory.SOCIAL,
                 title = "Companion", description = "Add your first friend",
                 emoji = "🤝", // 🤝
                 tiers = listOf(AchievementTier(1, XpConfig.achievementTier1)),
-                reactsTo = setOf(FRIEND), family = Family.COUNTER,
+                reactsTo = setOf(FRIEND), family = Family.DERIVED,
+                resolver = AchievementResolver.FRIENDS_COUNT,
             )
         )
         add(
@@ -358,7 +363,8 @@ object AchievementCatalog {
                 title = "Social Butterfly", description = "Add 5 friends",
                 emoji = "🦋", // 🦋
                 tiers = listOf(AchievementTier(5, XpConfig.achievementTier2)),
-                reactsTo = setOf(FRIEND), family = Family.COUNTER,
+                reactsTo = setOf(FRIEND), family = Family.DERIVED,
+                resolver = AchievementResolver.FRIENDS_COUNT,
             )
         )
         add(
@@ -381,14 +387,12 @@ object AchievementCatalog {
         )
 
         // ── DEDICATION (daily streak) ─────────────────────────────────────────────
-        // Family B counters that read the StreakTracker. StreakTracker is a Phase-2 STUB; these
-        // defs are defined now but their counter stays 0 until Phase 2 wires the daily streak — so
-        // they will NOT advance in Phase 1. (Defined here so the catalog is complete + Chunk B can
-        // render the section.) They react to APP_OPEN so they re-evaluate once Phase 2 ships.
+        // COUNTER defs fed by the daily-activity streak: the engine runs StreakTracker before this
+        // stage, so AppOpenedToday sees today's streak; the stored value never decreases.
         add(
             AchievementDef(
                 id = "STREAK_3", category = AchievementCategory.DEDICATION,
-                title = "Dedicated", description = "Open the app 3 / 7 / 30 days in a row",
+                title = "Dedicated", description = "Open the app 3 days in a row",
                 emoji = "📅", // 📅
                 tiers = listOf(AchievementTier(3, XpConfig.achievementTier1)),
                 reactsTo = setOf(APP_OPEN), family = Family.COUNTER,
@@ -397,7 +401,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "STREAK_7", category = AchievementCategory.DEDICATION,
-                title = "Dedicated", description = "Open the app 3 / 7 / 30 days in a row",
+                title = "Dedicated", description = "Open the app 7 days in a row",
                 emoji = "📅", // 📅
                 tiers = listOf(AchievementTier(7, XpConfig.achievementTier2)),
                 reactsTo = setOf(APP_OPEN), family = Family.COUNTER,
@@ -406,7 +410,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "STREAK_30", category = AchievementCategory.DEDICATION,
-                title = "Dedicated", description = "Open the app 3 / 7 / 30 days in a row",
+                title = "Dedicated", description = "Open the app 30 days in a row",
                 emoji = "📅", // 📅
                 tiers = listOf(AchievementTier(30, XpConfig.achievementTier3)),
                 reactsTo = setOf(APP_OPEN), family = Family.COUNTER,
@@ -414,11 +418,8 @@ object AchievementCatalog {
         )
 
         // ── DAILY PUZZLE ─────────────────────────────────────────────────────────
-        // ADR-006 Decision 5: only `puzzle_solver` ships this pass — `puzzle_streak` and the
-        // pre-existing STREAK_ counter-resolution stub (counterNextValue() always returns 0 for
-        // STREAK_-prefixed ids) are deferred together as separate follow-up work. DERIVED (not
-        // COUNTER) because `puzzle_results` durably stores every solve, so this gets free
-        // retroactive backfill with zero double-count risk — unlike the STREAK_ line above.
+        // DERIVED from the durable puzzle_results table; follows the Daily Puzzle flag (D5). A
+        // puzzle-streak achievement is deferred (ADR-006 D5, restore plan D14).
         add(
             AchievementDef(
                 id = "PUZZLE_SOLVER", category = AchievementCategory.DEDICATION,
@@ -431,6 +432,7 @@ object AchievementCatalog {
                 ),
                 reactsTo = setOf(PUZZLE_SOLVED), family = Family.DERIVED,
                 resolver = AchievementResolver.PUZZLES_SOLVED,
+                availability = CatalogAvailability.DAILY_PUZZLE,
             )
         )
 
@@ -446,12 +448,12 @@ object AchievementCatalog {
                 isSecret = true,
             )
         )
-        // Second secret: derivable from the same COLORS_WITH_20_PLUS aggregate at the full rainbow (5).
+        // The public RAINBOW_COLLECTOR needs one card per color; this secret needs 20+ per color.
         add(
             AchievementDef(
                 id = "SECRET_PERFECT_RAINBOW", category = AchievementCategory.COLLECTION,
                 title = "Prismatic Devotion",
-                description = "Own 20+ cards in every one of the five colors",
+                description = "Own 20+ cards in each of the 5 colors",
                 emoji = "🔮", // 🔮
                 tiers = listOf(AchievementTier(5, XpConfig.achievementSecret)),
                 reactsTo = COLLECTION_EVENTS, family = Family.DERIVED,
@@ -482,7 +484,7 @@ object AchievementCatalog {
     /** Shared builder for the (non-tiered, single-threshold) games-played stable entries. */
     private fun gamesPlayed(id: String, threshold: Int, xp: Int): AchievementDef = AchievementDef(
         id = id, category = AchievementCategory.GAMES,
-        title = "Seasoned Player", description = "Play 10 / 50 / 100 / 500 games",
+        title = "Seasoned Player", description = "Play $threshold games",
         emoji = "🎮", // 🎮
         tiers = listOf(AchievementTier(threshold, xp)),
         reactsTo = setOf(GAME), family = Family.DERIVED,

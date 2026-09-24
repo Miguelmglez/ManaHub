@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.data.queue
 
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardAddOrigin
 import com.mmg.manahub.core.model.QueuedCard
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -83,6 +84,22 @@ class CardQueueJsonCodecTest {
         assertEquals(3, first.quantity)
         assertEquals("legacy-2", restored[1].id)
         assertEquals(2, restored.map { it.id }.distinct().size)
+        // No origin key in legacy payloads: they restore as manual adds.
+        assertEquals(listOf(CardAddOrigin.MANUAL, CardAddOrigin.MANUAL), restored.map { it.origin })
+    }
+
+    @Test
+    fun origin_roundTrips() {
+        val payload = CardQueueJsonCodec.encode(
+            listOf(
+                entry("a", "s1", 1.0).copy(origin = CardAddOrigin.SCANNED),
+                entry("b", "s2", 1.0).copy(origin = CardAddOrigin.MANUAL),
+            )
+        )
+
+        val restored = CardQueueJsonCodec.decode(payload).entries
+
+        assertEquals(listOf(CardAddOrigin.SCANNED, CardAddOrigin.MANUAL), restored.map { it.origin })
     }
 
     @Test

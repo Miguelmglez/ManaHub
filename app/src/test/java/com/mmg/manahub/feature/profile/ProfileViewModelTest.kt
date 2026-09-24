@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.profile
 
+import com.mmg.manahub.util.testGamificationAvailability
 import app.cash.turbine.test
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
@@ -182,7 +183,6 @@ class ProfileViewModelTest {
         every { userPreferencesDataStore.playerNameFlow }  returns playerNameFlow
         every { userPreferencesDataStore.avatarUrlFlow }   returns avatarUrlFlow
         every { userPreferencesDataStore.preferencesFlow } returns preferencesFlow
-        every { userPreferencesDataStore.gamificationEnabledFlow } returns gamificationEnabledFlow
         every { authRepository.sessionState }              returns sessionStateFlow
         every { gamificationRepository.observeProgression() } returns progressionFlow
         every { gamificationRepository.observeAchievements() } returns achievementsFlow
@@ -227,6 +227,7 @@ class ProfileViewModelTest {
         claimQuestRewardUseCase  = claimQuestRewardUseCase,
         shareInviteUseCase       = shareInviteUseCase,
         appUpdateStatusProvider  = appUpdateStatusProvider,
+        gamificationAvailability = testGamificationAvailability(gamificationEnabledFlow),
     )
 
     // ── Setup / Teardown ─────────────────────────────────────────────────────
@@ -662,7 +663,7 @@ class ProfileViewModelTest {
     }
 
     @Test
-    fun `given gamification disabled in DataStore when ViewModel initializes then gamificationEnabled is false`() = runTest {
+    fun `given user opted out when ViewModel initializes then gamificationEnabled is false`() = runTest {
         // Arrange
         wireDefaultMocks()
         gamificationEnabledFlow.value = false
@@ -674,14 +675,18 @@ class ProfileViewModelTest {
     }
 
     @Test
-    fun `given default mocks when ViewModel initializes then gamificationEnabled defaults to true`() = runTest {
+    fun `given gamification available when ViewModel initializes then gamificationEnabled is true`() = runTest {
         // Arrange
         wireDefaultMocks()
         viewModel = buildViewModel()
         advanceUntilIdle()
 
-        // Assert: master toggle is ON by default (ADR-002 opt-out-first-class)
         assertEquals(true, viewModel.uiState.value.gamificationEnabled)
+    }
+
+    @Test
+    fun `given availability not yet known then gamification stays hidden`() {
+        assertEquals(false, ProfileViewModel.UiState().gamificationEnabled)
     }
 
     // ══════════════════════════════════════════════════════════════════════════

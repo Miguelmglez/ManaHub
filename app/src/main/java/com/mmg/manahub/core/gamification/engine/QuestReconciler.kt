@@ -33,13 +33,13 @@ class QuestReconciler(
     private val stableIdProvider: QuestStableIdProvider,
     private val claimQuestRewardUseCase: ClaimQuestRewardUseCase,
     private val clock: Clock,
-    private val timeZone: TimeZone,
+    private val timeZoneProvider: () -> TimeZone,
 ) {
 
     /** Settles stale quests, then ensures the current daily + weekly periods are generated. */
     suspend fun reconcile() {
         val now = clock.now().toEpochMilliseconds()
-        val today = clock.now().toLocalDateTime(timeZone).date
+        val today = clock.now().toLocalDateTime(timeZoneProvider()).date
 
         settleStale(now)
         ensurePeriodGenerated(QuestPeriod.DAILY, today)
@@ -95,8 +95,8 @@ class QuestReconciler(
     }
 
     private fun expiresAt(period: QuestPeriod, today: LocalDate): Long = when (period) {
-        QuestPeriod.DAILY -> QuestPeriodKeys.dailyExpiresAt(today, timeZone)
-        QuestPeriod.WEEKLY -> QuestPeriodKeys.weeklyExpiresAt(today, timeZone)
+        QuestPeriod.DAILY -> QuestPeriodKeys.dailyExpiresAt(today, timeZoneProvider())
+        QuestPeriod.WEEKLY -> QuestPeriodKeys.weeklyExpiresAt(today, timeZoneProvider())
     }
 
     private companion object {

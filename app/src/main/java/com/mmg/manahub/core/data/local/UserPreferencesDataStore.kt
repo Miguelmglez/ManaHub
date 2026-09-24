@@ -133,12 +133,7 @@ private val KEY_PUSH_NOTIFICATIONS_ENABLED = booleanPreferencesKey("push_notific
  * [com.mmg.manahub.core.model.DataResult.Error] only while this is explicitly turned off.
  */
 private val KEY_COMMUNITY_ENGINE_ENABLED = booleanPreferencesKey("community_engine_enabled")
-/**
- * Master gamification switch (XP, levels, achievements, quests). Default: DISABLED — the
- * gamification UI is hidden for this release (see docs/gamification-hidden-for-release.md).
- * The engine keeps recording progress silently while this is off, so re-enabling restores
- * the user's true state.
- */
+/** User opt-out for gamification (absent = opted in); the release gate lives in `FeatureFlags`. */
 private val KEY_GAMIFICATION_ENABLED = booleanPreferencesKey("gamification_enabled")
 /**
  * Master switch for the Competitive feature (Phase 4: MTG metagame rankings / 17lands ratings
@@ -153,8 +148,12 @@ private val KEY_COMPETITIVE_ENABLED = booleanPreferencesKey("competitive_enabled
  * competitive-specific persistence infra — a single plain string field, so it reuses this
  * general-purpose store rather than a dedicated abstraction. */
 private val KEY_COMPETITIVE_POSTAL_CODE = stringPreferencesKey("competitive_postal_code")
-/** One-shot flag: true once the Family-A achievement backfill has run (ADR-002 §4). Default: false. */
+/** Retired one-shot backfill guard; still removed on wipe so old installs do not keep it around. */
 private val KEY_GAMIFICATION_BACKFILL_DONE = booleanPreferencesKey("gamification_backfill_done")
+/** Account owning the local gamification store; absent = guest-owned (D3). */
+private val KEY_GAMIFICATION_OWNER_USER_ID = stringPreferencesKey("gamification_owner_user_id")
+/** Prefixes of the per-user gamification sync watermarks written by `SyncPreferencesStore`. */
+private val GAMIFICATION_WATERMARK_PREFIXES = listOf("gam_sync_ms_", "gam_pushed_ledger_id_", "gam_cursor_")
 /** Per-install random id seeding deterministic quest generation for guests (ADR-002 §9). Not ANDROID_ID. */
 private val KEY_GAMIFICATION_DEVICE_ID = stringPreferencesKey("gamification_device_id")
 
@@ -175,6 +174,31 @@ private val KEY_EQUIPPED_RING_STYLE = stringPreferencesKey("gamification_equippe
 private val KEY_LAST_CELEBRATED_LEVEL = intPreferencesKey("gamification_last_celebrated_level")
 /** Sentinel meaning the level-up celebration baseline was never set (seed-without-celebrating). */
 private const val LAST_CELEBRATED_LEVEL_UNINITIALIZED = -1
+
+/**
+ * Removes every account-scoped gamification key from the shared `user_prefs` file. Also called
+ * by the Room destructive-migration callback, where no [UserPreferencesDataStore] exists yet.
+ */
+internal suspend fun clearGamificationPreferences(context: Context) {
+    context.userPrefsDataStore.edit { prefs ->
+        listOf(
+            KEY_EQUIPPED_TITLE,
+            KEY_EQUIPPED_BADGES,
+            KEY_EQUIPPED_AVATAR_FRAME,
+            KEY_EQUIPPED_RING_STYLE,
+            KEY_GAMIFICATION_OWNER_USER_ID,
+        ).forEach { prefs.remove(it) }
+        // Absent reads as the -1 sentinel, so the next observer seeds the baseline without a burst.
+        prefs.remove(KEY_LAST_CELEBRATED_LEVEL)
+        prefs.remove(KEY_GAMIFICATION_BACKFILL_DONE)
+        prefs.asMap().keys
+            .filter { key -> GAMIFICATION_WATERMARK_PREFIXES.any { key.name.startsWith(it) } }
+            .forEach { key ->
+                @Suppress("UNCHECKED_CAST")
+                prefs.remove(key as Preferences.Key<Any>)
+            }
+    }
+}
 
 // ── Deck Doctor: scoring-weight overrides (debug-only tuning) ─────────────────
 // Seven independent nullable Float overrides for the engine ScoreWeights. Absent key = use the
@@ -654,14 +678,18 @@ class UserPreferencesDataStore @Inject constructor(
     }
 
     /**
-     * Master gamification switch. Default: false (OFF) because the gamification UI is hidden
-     * for this release (see docs/gamification-hidden-for-release.md). When false, all
-     * gamification UI (XP, levels, achievements, quests) is hidden — the engine keeps recording
-     * progress silently so re-enabling restores the user's true state (ADR-002 §"opt-out
-     * first-class"). To restore the feature, flip the default back to true / emit(true).
+     * The user's gamification opt-out. Default `true`: the release gate is
+     * `FeatureFlags.Gamification.ENABLED` + the remote kill switch, combined with this in
+     * `GamificationAvailability`, which every gate must consume instead of this raw pref.
      */
-    val gamificationEnabledFlow: Flow<Boolean> = safeData
-        .map { prefs -> prefs[KEY_GAMIFICATION_ENABLED] ?: false }
+    val gamificationEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
+        .map { prefs -> prefs[KEY_GAMIFICATION_ENABLED] ?: true }
+        // Fail closed: an unreadable store must never switch the backend on.
+        .catch { e ->
+            if (e is CancellationException) throw e
+            recordNonFatal("gamification_pref_read_failed", e)
+            emit(false)
+        }
 
     /** Persists the master gamification switch. */
     suspend fun setGamificationEnabled(enabled: Boolean) {
@@ -696,22 +724,23 @@ class UserPreferencesDataStore @Inject constructor(
         context.userPrefsDataStore.edit { it[KEY_COMPETITIVE_POSTAL_CODE] = postalCode }
     }
 
-    /**
-     * One-shot guard for the Family-A achievement backfill (ADR-002 §4). Emits false until the
-     * backfill has run, then true forever — so retroactive unlocks are computed exactly once.
-     */
-    val gamificationBackfillDoneFlow: Flow<Boolean> = context.userPrefsDataStore.data
-        .map { prefs -> prefs[KEY_GAMIFICATION_BACKFILL_DONE] ?: false }
-        .catch { emit(false) }
+    /** Account that owns the local gamification store, or null for a guest-owned store (D3). */
+    suspend fun getGamificationOwnerUserId(): String? =
+        context.userPrefsDataStore.data.map { it[KEY_GAMIFICATION_OWNER_USER_ID] }.first()
 
-    /** Reads the backfill-done flag once (snapshot), for the app-start orchestrator. */
-    suspend fun isGamificationBackfillDone(): Boolean =
-        context.userPrefsDataStore.data.map { it[KEY_GAMIFICATION_BACKFILL_DONE] ?: false }.first()
-
-    /** Marks the Family-A achievement backfill as complete (never re-runs after this). */
-    suspend fun setGamificationBackfillDone() {
-        context.userPrefsDataStore.edit { it[KEY_GAMIFICATION_BACKFILL_DONE] = true }
+    /** Persists [userId] as the owner of the local gamification store; null marks it guest-owned. */
+    suspend fun setGamificationOwnerUserId(userId: String?) {
+        context.userPrefsDataStore.edit { prefs ->
+            if (userId == null) prefs.remove(KEY_GAMIFICATION_OWNER_USER_ID)
+            else prefs[KEY_GAMIFICATION_OWNER_USER_ID] = userId
+        }
     }
+
+    /**
+     * Drops every account-scoped gamification preference (equipped cosmetics, celebration baseline,
+     * owner, sync watermarks). Keeps the user opt-out and the per-install device id.
+     */
+    suspend fun clearGamificationLocalState() = clearGamificationPreferences(context)
 
     /**
      * Returns a stable, per-install device id used to seed deterministic quest generation for guests

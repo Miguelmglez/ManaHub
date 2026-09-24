@@ -20,6 +20,7 @@ import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.DeckCreationSource
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckFormat
@@ -1992,7 +1993,12 @@ class DeckWizardViewModel(
         val writeOutcome = runCatching {
             val deckId = if (format.isCommanderFormat) {
                 launchedFromDeckId ?: run {
-                    val newId = deckRepository.createDeck(name = commander?.name ?: format.displayName, description = "Draft", format = format.name)
+                    val newId = deckRepository.createDeck(
+                        name = commander?.name ?: format.displayName,
+                        description = "Draft",
+                        format = format.name,
+                        source = DeckCreationSource.WIZARD,
+                    )
                     pendingDeckId = newId
                     newId
                 }
@@ -2001,6 +2007,8 @@ class DeckWizardViewModel(
                 // creates one of its own.
                 checkNotNull(launchedFromDeckId) { "[DeckWizardViewModel] 60-card generation reached finalize with no launchedFromDeckId" }
             }
+            // A still-empty Studio draft the wizard fills is a wizard deck for progression.
+            deckRepository.tagDeckCreationSource(deckId, DeckCreationSource.WIZARD)
             // commanderCardId/coverCardId travel inside persist's single transaction, never a prior updateDeck.
             val anchor: BuildAnchor = if (commander != null) BuildAnchor.Commander(commander) else BuildAnchor.Sixty(state.engineIdentity, state.seeds.map { it.card })
             buildWizardDeckUseCase.persist(deckRepository, deckId, anchor, manualIds, outcome)

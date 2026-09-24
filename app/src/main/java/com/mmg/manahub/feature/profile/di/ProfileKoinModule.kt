@@ -83,6 +83,7 @@ fun profileKoinModule(
             // modules load together in ManaHubApp's single modules(...) call.
             shareInviteUseCase = get(),
             appUpdateStatusProvider = get(),
+            gamificationAvailability = get(),
         )
     }
 

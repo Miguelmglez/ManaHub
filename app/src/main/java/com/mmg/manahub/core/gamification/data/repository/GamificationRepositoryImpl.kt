@@ -51,7 +51,7 @@ import kotlinx.datetime.toLocalDateTime
 class GamificationRepositoryImpl(
     private val dao: GamificationDao,
     private val clock: Clock,
-    private val timeZone: TimeZone,
+    private val timeZoneProvider: () -> TimeZone,
     private val userPreferencesDataStore: UserPreferencesDataStore,
 ) : GamificationRepository {
 
@@ -61,8 +61,9 @@ class GamificationRepositoryImpl(
     override fun observeAchievements(): Flow<List<AchievementUiModel>> =
         dao.observeAchievements().map { rows ->
             val byId = rows.associateBy { it.achievementId }
-            // Drive off the catalog (the source of truth) so locked/untracked achievements still show.
-            AchievementCatalog.all.map { def -> def.toUiModel(byId[def.id]) }
+            // Drive off the catalog (the source of truth) so locked/untracked achievements still show;
+            // unavailable defs (hidden features, D4/D5) are not advertised.
+            AchievementCatalog.all.filter { it.isAvailable }.map { def -> def.toUiModel(byId[def.id]) }
         }
 
     override fun observePendingCelebrations(): Flow<List<AchievementUiModel>> =
@@ -70,7 +71,7 @@ class GamificationRepositoryImpl(
             // Map each pending row to its catalog def (oldest first, preserved by the DAO ORDER BY).
             // Defensive: a row whose def was removed from the catalog is skipped rather than crashing.
             rows.mapNotNull { row ->
-                AchievementCatalog.byId(row.achievementId)?.toUiModel(row)
+                AchievementCatalog.byId(row.achievementId)?.takeIf { it.isAvailable }?.toUiModel(row)
             }
         }
 
@@ -82,7 +83,7 @@ class GamificationRepositoryImpl(
         // Recompute the current period keys at collection time (cold `flow`), then observe the daily +
         // weekly instance flows for those keys and join them with the catalog into a [QuestBoard].
         flow {
-            val today = clock.now().toLocalDateTime(timeZone).date
+            val today = clock.now().toLocalDateTime(timeZoneProvider()).date
             val dailyKey = QuestPeriodKeys.dailyKey(today)
             val weeklyKey = QuestPeriodKeys.weeklyKey(today)
             emitAll(
@@ -146,7 +147,8 @@ class GamificationRepositoryImpl(
         ) { entitlements, equipped ->
             val ownedIds = entitlements.mapTo(HashSet()) { it.unlockableId }
             val byKind = UnlockableCatalog.byKind.mapValues { (_, items) ->
-                items.map { it.toRewardUiModel(owned = it.id.value in ownedIds, equipped = equipped) }
+                items.filter { it.isAvailable }
+                    .map { it.toRewardUiModel(owned = it.id.value in ownedIds, equipped = equipped) }
             }
             RewardsBoard(byKind = byKind)
         }
@@ -214,6 +216,7 @@ class GamificationRepositoryImpl(
     private fun List<QuestInstanceEntity>.toUiModels(period: QuestPeriod): List<QuestUiModel> {
         val byTemplateId = associateBy { it.templateId }
         return QuestCatalog.forPeriod(period).mapNotNull { template ->
+            if (!template.isAvailable) return@mapNotNull null
             val row = byTemplateId[template.id] ?: return@mapNotNull null
             if (row.status == STATUS_EXPIRED) return@mapNotNull null
             row.toUiModel(template)

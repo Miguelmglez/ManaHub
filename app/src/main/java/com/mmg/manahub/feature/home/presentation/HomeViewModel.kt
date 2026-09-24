@@ -26,6 +26,7 @@ import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
 import com.mmg.manahub.core.gamification.domain.model.QuestBoard
 import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
+import com.mmg.manahub.core.gamification.domain.GamificationAvailability
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.model.CollectionSummary
 import com.mmg.manahub.core.model.CommunityDeckSearchFilters
@@ -138,6 +139,7 @@ class HomeViewModel(
     private val wishlistRepository: WishlistRepository,
     private val getAccountNudgeUseCase: GetAccountNudgeUseCase,
     private val gamificationRepository: GamificationRepository,
+    private val gamificationAvailability: GamificationAvailability,
     private val userCardRepository: UserCardRepository,
     private val tradesRepository: TradesRepository,
     private val openForTradeRepository: OpenForTradeRepository,
@@ -648,11 +650,11 @@ class HomeViewModel(
     // ── Gamification / recently added ───────────────────────────────────────────
 
     /**
-     * Gamification slice (level/XP, streak, quests), gated by the master toggle — disabled means a
-     * null snapshot so every gamification surface disappears.
+     * Gamification slice (level/XP, streak, quests), gated by [GamificationAvailability] — unavailable
+     * means a null snapshot so every gamification surface disappears.
      */
     private val gamificationState: StateFlow<GamificationSnapshot?> =
-        userPrefsDataStore.gamificationEnabledFlow
+        gamificationAvailability.availableFlow
             .catch { emit(false) }
             .distinctUntilChanged()
             .flatMapLatest { enabled ->
@@ -1575,7 +1577,7 @@ class HomeViewModel(
             latestFriendRequestName = friendActivity?.latestFriendRequestName,
             friends = social.friends,
             recentTrades = proposals?.recent,
-            gamificationEnabled = gamification?.enabled ?: true,
+            gamificationEnabled = gamification?.enabled ?: false,
             gamification = gamification?.data,
             gamificationLoaded = gamification != null,
         )

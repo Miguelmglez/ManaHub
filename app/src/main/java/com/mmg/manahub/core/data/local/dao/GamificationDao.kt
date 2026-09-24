@@ -97,9 +97,13 @@ abstract class GamificationDao {
     @Query("SELECT * FROM xp_transactions WHERE id > :id ORDER BY id ASC")
     abstract suspend fun getLedgerAbove(id: Long): List<XpTransactionEntity>
 
-    /** Highest local ledger [id], or 0 when the ledger is empty. The post-cycle PUSH watermark. */
+    /** Highest local ledger [id], or 0 when the ledger is empty. */
     @Query("SELECT COALESCE(MAX(id), 0) FROM xp_transactions")
     abstract suspend fun getMaxLedgerId(): Long
+
+    /** Local ledger ids above [id], ascending; lets sync skip re-pushing rows it just pulled. */
+    @Query("SELECT id FROM xp_transactions WHERE id > :id ORDER BY id ASC")
+    abstract suspend fun getLedgerIdsAbove(id: Long): List<Long>
 
     /** Total of all granted XP across the whole ledger. Source of truth for recomputed progression. */
     @Query("SELECT COALESCE(SUM(amount), 0) FROM xp_transactions")
@@ -114,6 +118,13 @@ abstract class GamificationDao {
      */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     abstract suspend fun insertLedgerRowIfAbsent(row: XpTransactionEntity): Long
+
+    /**
+     * Inserts one pulled page in a single transaction; each element is the new local id, or -1 when
+     * that `idempotency_key` was already present.
+     */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    abstract suspend fun insertLedgerRowsIfAbsent(rows: List<XpTransactionEntity>): List<Long>
 
     /**
      * Recomputes the singleton progression as a DIRECT SET (NOT a ledger grant): after pulling new
@@ -358,4 +369,35 @@ abstract class GamificationDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM entitlements WHERE unlockable_id = :id)")
     abstract suspend fun hasEntitlement(id: String): Boolean
+
+    // ── Account scoping wipe ────────────────────────────────────────────────────
+
+    @Query("DELETE FROM xp_transactions")
+    protected abstract suspend fun deleteAllLedgerRows()
+
+    @Query("DELETE FROM player_progression")
+    protected abstract suspend fun deleteAllProgression()
+
+    @Query("DELETE FROM achievement_progress")
+    protected abstract suspend fun deleteAllAchievements()
+
+    @Query("DELETE FROM entitlements")
+    protected abstract suspend fun deleteAllEntitlements()
+
+    @Query("DELETE FROM streaks")
+    protected abstract suspend fun deleteAllStreaks()
+
+    @Query("DELETE FROM quest_instances")
+    protected abstract suspend fun deleteAllQuests()
+
+    /** Deletes every row of the six gamification tables in one transaction (account switch / deletion). */
+    @Transaction
+    open suspend fun wipeAll() {
+        deleteAllLedgerRows()
+        deleteAllProgression()
+        deleteAllAchievements()
+        deleteAllEntitlements()
+        deleteAllStreaks()
+        deleteAllQuests()
+    }
 }

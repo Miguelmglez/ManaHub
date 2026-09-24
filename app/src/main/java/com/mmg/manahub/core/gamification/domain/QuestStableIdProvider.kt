@@ -8,10 +8,7 @@ import com.mmg.manahub.core.domain.auth.AuthRepository
  *
  * - Signed-in: the authenticated user id, so the SAME quests are generated on every device the user
  *   owns for a given period — with zero sync coordination.
- * - Guest: a random per-install device id persisted once in DataStore (NOT `ANDROID_ID`).
- *
- * Anonymous Supabase users have a non-null id; treating them as "signed in" is fine — their quests are
- * still purely local (quests are never synced).
+ * - Guest (no account): a random per-install device id persisted once in DataStore (NOT `ANDROID_ID`).
  */
 class QuestStableIdProvider(
     private val authRepository: AuthRepository,

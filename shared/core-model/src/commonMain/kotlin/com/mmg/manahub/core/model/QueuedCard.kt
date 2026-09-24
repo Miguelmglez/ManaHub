@@ -9,6 +9,7 @@ import kotlin.uuid.Uuid
  *
  * @property id Stable identity for edit/remove/duplicate/partial-retry; [timestamp] alone collides
  *   when two entries share a millisecond.
+ * @property origin Whether the entry was scanned or picked by hand; decides the commit's XP event.
  */
 data class QueuedCard(
     val card: Card,
@@ -19,6 +20,7 @@ data class QueuedCard(
     val setCode: String,
     val timestamp: Long,
     val id: String = newQueuedCardId(),
+    val origin: CardAddOrigin = CardAddOrigin.MANUAL,
 )
 
 /** Generates a fresh random [QueuedCard.id]. */

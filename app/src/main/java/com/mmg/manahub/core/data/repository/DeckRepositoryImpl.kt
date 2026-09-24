@@ -11,6 +11,7 @@ import com.mmg.manahub.core.data.local.entity.DeckEntity
 import com.mmg.manahub.core.data.local.mapper.toDomainDeck
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckCardSource
+import com.mmg.manahub.core.model.DeckCreationSource
 import com.mmg.manahub.core.model.DeckSlot
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DeckWithCards
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Local-first implementation of [DeckRepository].
@@ -50,6 +52,9 @@ class DeckRepositoryImpl(
 
     private val gson = Gson()
     private val listType = object : TypeToken<List<String>>() {}.type
+
+    // Decks created this process whose DeckCreated waits for the first mainboard card; lost on process death by design.
+    private val pendingCreations = ConcurrentHashMap<String, DeckCreationSource>()
 
     // ── Observables ───────────────────────────────────────────────────────────
 
@@ -90,6 +95,13 @@ class DeckRepositoryImpl(
         name: String,
         description: String,
         format: String,
+    ): String = createDeck(name, description, format, DeckCreationSource.BUILT)
+
+    override suspend fun createDeck(
+        name: String,
+        description: String,
+        format: String,
+        source: DeckCreationSource,
     ): String = withContext(ioDispatcher) {
         val now = System.currentTimeMillis()
         val id = UUID.randomUUID().toString()
@@ -107,16 +119,33 @@ class DeckRepositoryImpl(
                 createdAt = now,
             )
         )
-        // Emit after the create commit (ADR-002 §1). Idempotency key deck_created:{id}
-        // makes the one-time create grant safe under retries.
+        pendingCreations[id] = source
+        id
+    }
+
+    override suspend fun tagDeckCreationSource(deckId: String, source: DeckCreationSource) {
+        pendingCreations.computeIfPresent(deckId) { _, _ -> source }
+    }
+
+    /**
+     * Emits the one-time [ProgressionEvent.DeckCreated] once a deck created this process holds a
+     * mainboard card (restore plan D8): an empty draft never earns anything, and the ledger key
+     * `deck_created:{id}` dedupes any replay. Call after the card write committed.
+     */
+    private suspend fun emitDeckCreatedOnFirstMainboardCard(deckId: String) {
+        if (!pendingCreations.containsKey(deckId)) return
+        if (deckDao.getDeckCards(deckId).none { !it.isSideboard && it.quantity > 0 }) return
+        val deck = deckDao.getDeckById(deckId) ?: return
+        // remove() is the claim: concurrent writers race here and exactly one emits.
+        val source = pendingCreations.remove(deckId) ?: return
         progressionEventBus.emit(
             ProgressionEvent.DeckCreated(
-                deckId = id,
-                format = format,
+                deckId = deckId,
+                format = deck.format,
+                source = source,
                 occurredAt = Clock.System.now(),
             )
         )
-        id
     }
 
     override suspend fun updateDeck(deck: Deck) = withContext(ioDispatcher) {
@@ -143,6 +172,7 @@ class DeckRepositoryImpl(
     }
 
     override suspend fun deleteDeck(deckId: String) = withContext(ioDispatcher) {
+        pendingCreations.remove(deckId)
         // Soft delete — the row stays so SyncManager can push the deletion to Supabase.
         deckDao.softDeleteDeck(deckId, System.currentTimeMillis())
     }
@@ -167,6 +197,7 @@ class DeckRepositoryImpl(
             deckDao.getDeckById(deckId)?.let { deck ->
                 deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
             }
+            if (!isSideboard) emitDeckCreatedOnFirstMainboardCard(deckId)
         }
     }
 
@@ -186,6 +217,7 @@ class DeckRepositoryImpl(
                 )
             },
         )
+        if (result.committedCopies > 0) emitDeckCreatedOnFirstMainboardCard(deckId)
         DeckCardAdditionResult(
             committedEntryIds = result.committedEntryIds,
             blockedCommanderEntryIds = result.blockedCommanderEntryIds,
@@ -246,6 +278,7 @@ class DeckRepositoryImpl(
             deckDao.getDeckById(deckId)?.let { deck ->
                 deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
             }
+            if (fromSideboard) emitDeckCreatedOnFirstMainboardCard(deckId)
         }
     }
 
@@ -351,6 +384,7 @@ class DeckRepositoryImpl(
                 )
             }
             deckDao.replaceAllCardsWithSource(deckId, entities)
+            emitDeckCreatedOnFirstMainboardCard(deckId)
         }
     }
 
@@ -391,6 +425,7 @@ class DeckRepositoryImpl(
                 commanderCardId = commanderCardId,
                 updatedAt = System.currentTimeMillis(),
             )
+            emitDeckCreatedOnFirstMainboardCard(deckId)
         }
     }
 
@@ -403,6 +438,7 @@ class DeckRepositoryImpl(
             deckDao.getDeckById(deckId)?.let { deck ->
                 deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
             }
+            emitDeckCreatedOnFirstMainboardCard(deckId)
         }
     }
 

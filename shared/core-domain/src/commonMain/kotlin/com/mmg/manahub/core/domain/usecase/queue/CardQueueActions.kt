@@ -64,7 +64,8 @@ class CardQueueActions(
 
     /**
      * Commits the current queue snapshot to the collection in ONE [CardBatchCommitter] batch (the
-     * scan committer rewards it as one CardScanned event; the import committer grants no XP).
+     * queue committer rewards its scanned entries as one CardScanned and its manual entries as one
+     * CardsAdded; the import committer grants no XP).
      *
      * Entries already in flight (a per-entry add) are left out of the snapshot. Committed entries
      * are removed through [CardQueueRepository.removeCommitted], so copies added or edits made while
@@ -217,6 +218,7 @@ class CardQueueActions(
         condition = condition,
         language = language,
         quantity = quantity,
+        origin = origin,
     )
 
     private fun QueuedCard.toWishlistEntry(): WishlistEntry = WishlistEntry(
@@ -234,7 +236,8 @@ class CardQueueActions(
 
     companion object {
         /**
-         * The Scanner / AddCard queue: commits count as scans (batched CardScanned XP).
+         * The Scanner / AddCard queue: each entry is rewarded by its [QueuedCard.origin] (scanned
+         * copies as one batched CardScanned, manual picks as one CardsAdded).
          *
          * A named factory rather than a second constructor: the two differ only by the type of
          * their second argument, so a positional call would pick a committer — and therefore an XP

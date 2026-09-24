@@ -24,7 +24,7 @@ import kotlinx.datetime.toLocalDateTime
  *
  * Cap enforcement queries the ledger sums for the current local window BEFORE granting, so caps
  * survive process death and are correct regardless of event ordering. A duplicate idempotency key
- * is a no-op ([ProgressionOutcome.none]).
+ * is a no-op reported as [XpGrantResult.Duplicate], which the engine uses to skip counters (D10).
  *
  * [clock] (and [zoneId]) are injected so tests can pin "today"/"this week".
  *
@@ -37,24 +37,25 @@ import kotlinx.datetime.toLocalDateTime
 class XpGranter(
     private val dao: GamificationDao,
     private val clock: Clock,
-    private val timeZone: TimeZone,
+    private val timeZoneProvider: () -> TimeZone,
     private val userPreferencesDataStore: UserPreferencesDataStore,
 ) {
 
     /**
-     * Computes and persists the XP grant for [event]. Returns the outcome (xpGranted = 0 on a
-     * duplicate or an event that maps to no XP).
+     * Computes and persists the XP grant for [event]: [XpGrantResult.Applied] when a ledger row was
+     * written, [XpGrantResult.Duplicate] when the ledger key already existed, [XpGrantResult.NoXp] when
+     * the event maps to no XP (unledgered, or clamped to 0 by a cap).
      */
-    suspend fun grant(event: ProgressionEvent): ProgressionOutcome {
+    suspend fun grant(event: ProgressionEvent): XpGrantResult {
         // Resolve the device-scoped ledger key ONCE up front and use it everywhere below — the
         // pre-check, the row insert, and the dedup gate must all see the same (possibly prefixed) key.
         val ledgerKey = resolveLedgerKey(event)
 
         // Cheap pre-check: skip all work if this event was already granted.
-        if (dao.hasTransaction(ledgerKey)) return ProgressionOutcome.none
+        if (dao.hasTransaction(ledgerKey)) return XpGrantResult.Duplicate
 
-        val plan = planGrant(event) ?: return ProgressionOutcome.none
-        if (plan.amount <= 0) return ProgressionOutcome.none
+        val plan = planGrant(event) ?: return XpGrantResult.NoXp
+        if (plan.amount <= 0) return XpGrantResult.NoXp
 
         val nowMillis = clock.now().toEpochMilliseconds()
 
@@ -72,13 +73,16 @@ class XpGranter(
             updatedAt = nowMillis,
             levelForTotalXp = LevelCurve::levelForTotalXp,
         )
-        if (!result.applied) return ProgressionOutcome.none
+        // Lost the insert race to a concurrent grant of the same key.
+        if (!result.applied) return XpGrantResult.Duplicate
 
-        return ProgressionOutcome(
-            xpGranted = plan.amount,
-            breakdown = plan.breakdown,
-            newLevel = result.newLevel,
-            leveledUp = result.newLevel > result.previousLevel,
+        return XpGrantResult.Applied(
+            ProgressionOutcome(
+                xpGranted = plan.amount,
+                breakdown = plan.breakdown,
+                newLevel = result.newLevel,
+                leveledUp = result.newLevel > result.previousLevel,
+            )
         )
     }
 
@@ -135,7 +139,8 @@ class XpGranter(
         }
 
         is ProgressionEvent.DeckCreated -> {
-            if (rewardedDecksToday() >= XpConfig.maxRewardedDecksPerDay) null
+            if (!event.source.isUserAuthored) null
+            else if (rewardedDecksToday() >= XpConfig.maxRewardedDecksPerDay) null
             else singleLine(XpSourceCategory.DECK, XpConfig.deckCreated, "Deck created", event.deckId)
         }
 
@@ -173,6 +178,9 @@ class XpGranter(
         // FeatureExplored grants no XP — it only advances exploration quests (no ledger row). Mapping
         // to null keeps the ledger clean and the `when` exhaustive (mirrors DeckSaved).
         is ProgressionEvent.FeatureExplored -> null
+
+        // Zero-XP re-evaluation trigger for DERIVED collection achievements (no ledger row).
+        is ProgressionEvent.CollectionChanged -> null
 
         // Daily Puzzle feature (Batch B3 gamification hookup). The perfect-solve bonus is
         // DELIBERATELY EXCLUDED for GUESS_CARD (see XpConfig.puzzlePerfectBonus KDoc): a lucky or
@@ -230,8 +238,8 @@ class XpGranter(
 
     /** Epoch-millis at local midnight today. */
     private fun startOfTodayMillis(): Long {
-        val today = clock.now().toLocalDateTime(timeZone).date
-        return today.atStartOfDayIn(timeZone).toEpochMilliseconds()
+        val today = clock.now().toLocalDateTime(timeZoneProvider()).date
+        return today.atStartOfDayIn(timeZoneProvider()).toEpochMilliseconds()
     }
 
     /**
@@ -243,9 +251,29 @@ class XpGranter(
      * `Locale.getDefault()` and therefore unit-testable.
      */
     private fun startOfThisWeekMillis(): Long {
-        val today = clock.now().toLocalDateTime(timeZone).date
+        val today = clock.now().toLocalDateTime(timeZoneProvider()).date
         // ISO day-of-week: Monday = 1 .. Sunday = 7
         val weekStart = today.minus(today.dayOfWeek.isoDayNumber - 1, DateTimeUnit.DAY)
-        return weekStart.atStartOfDayIn(timeZone).toEpochMilliseconds()
+        return weekStart.atStartOfDayIn(timeZoneProvider()).toEpochMilliseconds()
+    }
+}
+
+/** Tri-state result of [XpGranter.grant] (restore plan D10). */
+sealed interface XpGrantResult {
+
+    /** The outcome to fold into the engine's result; [ProgressionOutcome.none] unless [Applied]. */
+    val outcome: ProgressionOutcome
+
+    /** A new ledger row was written. */
+    data class Applied(override val outcome: ProgressionOutcome) : XpGrantResult
+
+    /** The event's ledger key already existed: a replay, so counters and quests must not advance. */
+    data object Duplicate : XpGrantResult {
+        override val outcome: ProgressionOutcome get() = ProgressionOutcome.none
+    }
+
+    /** The event maps to no XP (unledgered event or a cap clamped it to 0); counters still advance. */
+    data object NoXp : XpGrantResult {
+        override val outcome: ProgressionOutcome get() = ProgressionOutcome.none
     }
 }

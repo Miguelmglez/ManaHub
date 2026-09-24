@@ -28,6 +28,8 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
+private const val FRIENDSHIP_COLUMNS = "id,user_id_1,user_id_2,status,created_at"
+
 class FriendshipClient(
     private val httpClient: HttpClient,
     private val baseUrl: String,
@@ -85,24 +87,30 @@ class FriendshipClient(
         }
     }
 
+    /** PATCHes the matching rows and returns them; an empty list means no row was changed. */
     suspend fun updateFriendshipStatus(
         idFilter: String,
-        prefer: String = "return=minimal",
         body: UpdateFriendshipStatusDto,
-    ) {
+        select: String = FRIENDSHIP_COLUMNS,
+    ): List<FriendshipDto> =
         httpClient.patch("${baseUrl}friendships") {
             parameter("id", idFilter)
-            header("Prefer", prefer)
+            parameter("select", select)
+            header("Prefer", "return=representation")
             contentType(ContentType.Application.Json)
             setBody(body)
-        }
-    }
+        }.body()
 
-    suspend fun deleteFriendship(idFilter: String) {
+    /** DELETEs the matching rows and returns them; an empty list means nothing was deleted. */
+    suspend fun deleteFriendship(
+        idFilter: String,
+        select: String = FRIENDSHIP_COLUMNS,
+    ): List<FriendshipDto> =
         httpClient.delete("${baseUrl}friendships") {
             parameter("id", idFilter)
-        }
-    }
+            parameter("select", select)
+            header("Prefer", "return=representation")
+        }.body()
 
     suspend fun getProfilesByIds(
         idFilter: String,

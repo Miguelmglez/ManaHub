@@ -119,6 +119,7 @@ fun SettingsScreen(
     val prefsState by viewModel.prefsState.collectAsStateWithLifecycle()
     val pushEnabled by viewModel.pushNotificationsEnabled.collectAsStateWithLifecycle()
     val gamificationEnabled by viewModel.gamificationEnabled.collectAsStateWithLifecycle()
+    val gamificationSettingsVisible by viewModel.gamificationSettingsVisible.collectAsStateWithLifecycle()
     val notificationPrefs by viewModel.notificationPrefs.collectAsStateWithLifecycle()
     val voiceModelStates by viewModel.voiceModelStates.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
@@ -405,15 +406,14 @@ fun SettingsScreen(
                 },
             )
 
-            // Hidden for release — see docs/gamification-hidden-for-release.md
-            // The gamification UI is hidden for this release, so the master toggle is removed
-            // to prevent users from re-enabling it. The engine keeps recording progress silently.
-            // To restore: un-comment the divider + GamificationSection below.
-            // HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
-            // GamificationSection(
-            //     enabled = gamificationEnabled,
-            //     onEnabledChange = viewModel::setGamificationEnabled,
-            // )
+            // Shown only while FeatureFlags.Gamification.ENABLED and not killed; see docs/hidden-features/.
+            if (gamificationSettingsVisible) {
+                HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+                GamificationSection(
+                    enabled = gamificationEnabled,
+                    onEnabledChange = viewModel::setGamificationEnabled,
+                )
+            }
 
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
             VoiceRecognitionSection(

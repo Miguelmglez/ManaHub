@@ -4,7 +4,9 @@ import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
 import com.mmg.manahub.core.data.local.entity.AchievementProgressEntity
+import com.mmg.manahub.core.data.local.entity.StreakEntity
 import com.mmg.manahub.core.data.local.entity.XpTransactionEntity
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.core.gamification.domain.LevelCurve
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import io.mockk.Runs
@@ -247,67 +249,89 @@ class AchievementEvaluatorTest {
         assertEquals(0, streak.tierReached)
     }
 
-    // ── Daily Puzzle: PUZZLE_SOLVER (Batch B3, ADR-006 Decision 5) ─────────────────
-
     @Test
-    fun `crossing the puzzles-solved tier-1 threshold unlocks and stamps unlocked_at`() = runTest {
-        coEvery { statsDao.puzzlesSolved() } returns 1
-
+    fun `a replayed event skips COUNTER defs but still re-derives DERIVED defs`() = runTest {
+        coEvery { statsDao.totalGames() } returns 10
         val rows = mutableListOf<AchievementProgressEntity>()
         coEvery { dao.upsertAchievement(capture(rows)) } just Runs
 
-        val unlocks = evaluator.process(puzzleEvent())
+        evaluator.process(gameEvent(isLocalWin = true), includeCounters = false)
 
-        val solver = rows.first { it.achievementId == "PUZZLE_SOLVER" }
-        assertEquals(1, solver.currentValue)
-        assertEquals(1, solver.tierReached)
-        assertEquals(now, solver.unlockedAt)
-        assertTrue(unlocks.any { it.id == "PUZZLE_SOLVER" && it.tier == 1 })
+        assertTrue(rows.none { it.achievementId.startsWith("WIN_STREAK_") })
+        assertTrue(rows.any { it.achievementId == "GAMES_PLAYED_10" })
+    }
+
+    // ── DEDICATION: STREAK_* from the real daily-activity streak (G-12) ─────────────
+
+    @Test
+    fun `STREAK_3 unlocks from the current daily-activity streak`() = runTest {
+        coEvery { dao.getStreak(StreakTracker.TYPE_DAILY_ACTIVITY) } returns streak(current = 3)
+        val rows = mutableListOf<AchievementProgressEntity>()
+        coEvery { dao.upsertAchievement(capture(rows)) } just Runs
+
+        val unlocks = evaluator.process(appOpenEvent())
+
+        assertEquals(3, rows.first { it.achievementId == "STREAK_3" }.currentValue)
+        assertTrue(unlocks.any { it.id == "STREAK_3" && it.tier == 1 })
+        assertTrue(unlocks.none { it.id == "STREAK_7" })
     }
 
     @Test
-    fun `puzzles-solved DERIVED resolver retroactively crosses multiple tiers at once`() = runTest {
-        // No prior progress, but 7 puzzles already solved (e.g. a backfill) → tiers 1 AND 7 unlock
-        // in the same evaluation, mirroring the GAMES_PLAYED retroactive-unlock test above.
+    fun `a broken streak never lowers the stored STREAK counter`() = runTest {
+        coEvery { dao.getStreak(StreakTracker.TYPE_DAILY_ACTIVITY) } returns streak(current = 1)
+        coEvery { dao.getAchievement("STREAK_7") } returns AchievementProgressEntity(
+            achievementId = "STREAK_7", currentValue = 7, tierReached = 1,
+            unlockedAt = 5L, celebratedAt = 5L,
+        )
+        val rows = mutableListOf<AchievementProgressEntity>()
+        coEvery { dao.upsertAchievement(capture(rows)) } just Runs
+
+        evaluator.process(appOpenEvent())
+
+        val streak7 = rows.first { it.achievementId == "STREAK_7" }
+        assertEquals(7, streak7.currentValue)
+        assertEquals(1, streak7.tierReached)
+        assertEquals(5L, streak7.unlockedAt)
+    }
+
+    // ── Availability gates (D4/D5) ─────────────────────────────────────────────────
+
+    @Test
+    fun `TOURNAMENT_WIN is never evaluated while unavailable`() = runTest {
+        val rows = mutableListOf<AchievementProgressEntity>()
+        coEvery { dao.upsertAchievement(capture(rows)) } just Runs
+
+        evaluator.process(
+            ProgressionEvent.TournamentCompleted(
+                tournamentId = 1L, type = "swiss", isLocalWinner = true, occurredAt = fixedInstant,
+            )
+        )
+
+        assertTrue(rows.none { it.achievementId == "TOURNAMENT_WIN" })
+        assertTrue(rows.any { it.achievementId == "TOURNAMENT_FIRST" })
+    }
+
+    @Test
+    fun `PUZZLE_SOLVER follows the Daily Puzzle flag`() = runTest {
         coEvery { statsDao.puzzlesSolved() } returns 7
-
-        val unlocks = evaluator.process(puzzleEvent())
-
-        assertTrue(unlocks.any { it.id == "PUZZLE_SOLVER" && it.tier == 1 })
-        assertTrue(unlocks.any { it.id == "PUZZLE_SOLVER" && it.tier == 2 })
-    }
-
-    @Test
-    fun `puzzles-solved below the first threshold does not unlock`() = runTest {
-        coEvery { statsDao.puzzlesSolved() } returns 0
-
         val rows = mutableListOf<AchievementProgressEntity>()
         coEvery { dao.upsertAchievement(capture(rows)) } just Runs
 
         val unlocks = evaluator.process(puzzleEvent())
 
-        val solver = rows.first { it.achievementId == "PUZZLE_SOLVER" }
-        assertEquals(0, solver.tierReached)
-        assertTrue(unlocks.none { it.id == "PUZZLE_SOLVER" })
-    }
-
-    @Test
-    fun `puzzle tier XP is granted through the ledger key and is not re-granted`() = runTest {
-        coEvery { statsDao.puzzlesSolved() } returns 1
-        val txn = slot<XpTransactionEntity>()
-        coEvery {
-            dao.grantXpAtomically(capture(txn), any(), any(), any())
-        } answers { appliedResult(secondArg<Int>()) }
-
-        evaluator.process(puzzleEvent())
-
-        assertEquals("achievement:PUZZLE_SOLVER:tier:1", txn.captured.idempotencyKey)
-
-        // A repeat evaluation with the same ledger key already present must not re-grant.
-        coEvery { dao.hasTransaction("achievement:PUZZLE_SOLVER:tier:1") } returns true
-        evaluator.process(puzzleEvent())
-        coVerify(exactly = 1) {
-            dao.grantXpAtomically(match { it.idempotencyKey == "achievement:PUZZLE_SOLVER:tier:1" }, any(), any(), any())
+        if (FeatureFlags.Puzzle.PUZZLE_ENABLED) {
+            assertTrue(unlocks.any { it.id == "PUZZLE_SOLVER" && it.tier == 2 })
+        } else {
+            assertTrue(unlocks.isEmpty())
+            assertTrue(rows.none { it.achievementId == "PUZZLE_SOLVER" })
         }
     }
+
+    private fun appOpenEvent() =
+        ProgressionEvent.AppOpenedToday(localDate = "2026-06-12", occurredAt = fixedInstant)
+
+    private fun streak(current: Int) = StreakEntity(
+        type = StreakTracker.TYPE_DAILY_ACTIVITY, current = current, longest = current,
+        lastActiveDate = "2026-06-12", freezeTokens = 0,
+    )
 }

@@ -2,14 +2,13 @@ package com.mmg.manahub.feature.game.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.gamification.domain.GamificationAvailability
 import com.mmg.manahub.core.gamification.domain.GamificationEngine
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.domain.model.ProgressionOutcome
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.update
@@ -26,14 +25,14 @@ import kotlinx.coroutines.launch
  * recent outcome" (multiple games could be in flight). The strip renders nothing until [outcome]
  * becomes non-null, so the result screen is never blocked.
  *
- * Suppressed by the master toggle: if gamification is disabled, [outcome] stays null and the strip
- * never appears.
+ * Suppressed by [GamificationAvailability]: when gamification is unavailable, [outcome] stays null
+ * and the strip never appears.
  *
  * Usage: call [observe] once (e.g. from a `LaunchedEffect(sessionId)`); read [outcome].
  */
 class GameResultStripViewModel(
     private val engine: GamificationEngine,
-    private val userPreferencesDataStore: UserPreferencesDataStore,
+    private val gamificationAvailability: GamificationAvailability,
 ) : ViewModel() {
 
     private val _outcome = MutableStateFlow<ProgressionOutcome?>(null)
@@ -58,9 +57,7 @@ class GameResultStripViewModel(
         _outcome.value = null
         observeJob = viewModelScope.launch {
             // Master toggle: when disabled, never surface a strip.
-            val enabled = runCatching {
-                userPreferencesDataStore.gamificationEnabledFlow.catch { emit(false) }.first()
-            }.getOrDefault(false)
+            val enabled = runCatching { gamificationAvailability.availableFlow.first() }.getOrDefault(false)
             if (!enabled) return@launch
 
             // Suspend until the first outcome for this session arrives (replay buffer means an

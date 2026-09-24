@@ -27,8 +27,8 @@ import com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog.all
 object UnlockableCatalog {
 
     /**
-     * The full catalog (~20 items). Order here is irrelevant; the UI groups by [Unlockable.kind] and
-     * sorts by [Unlockable.sortOrder].
+     * The full catalog (size pinned by `UnlockableCatalogTest`). Order here is irrelevant; the UI
+     * groups by [Unlockable.kind] and sorts by [Unlockable.sortOrder].
      */
     val all: List<Unlockable> = buildList {
 
@@ -84,7 +84,7 @@ object UnlockableCatalog {
                 id = "title_tournament_champion", displayName = "Tournament Champion",
                 primary = CosmeticColorToken.GOLD, secondary = CosmeticColorToken.LIFE_NEGATIVE,
                 rule = UnlockRule.AchievementUnlocked("TOURNAMENT_WIN"), sortOrder = 12,
-            )
+            ).copy(availability = CatalogAvailability.TOURNAMENT_LOCAL_SEAT)
         )
         add(
             title(

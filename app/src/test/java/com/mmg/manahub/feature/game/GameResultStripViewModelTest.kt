@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.game
 
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.util.testGamificationAvailability
 import com.mmg.manahub.core.gamification.domain.GamificationEngine
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.domain.model.ProcessedOutcome
@@ -40,7 +40,6 @@ class GameResultStripViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
 
     private val engine = mockk<GamificationEngine>()
-    private val dataStore = mockk<UserPreferencesDataStore>(relaxed = true)
 
     private val outcomes = MutableSharedFlow<ProcessedOutcome>(
         replay = 8,
@@ -53,7 +52,6 @@ class GameResultStripViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         every { engine.outcomes } returns outcomes
-        every { dataStore.gamificationEnabledFlow } returns enabledFlow
     }
 
     @After
@@ -79,7 +77,7 @@ class GameResultStripViewModelTest {
         leveledUp = true,
     )
 
-    private fun buildViewModel() = GameResultStripViewModel(engine, dataStore)
+    private fun buildViewModel() = GameResultStripViewModel(engine, testGamificationAvailability(enabledFlow))
 
     @Test
     fun `given matching session outcome when observed then exposes that outcome`() = runTest {

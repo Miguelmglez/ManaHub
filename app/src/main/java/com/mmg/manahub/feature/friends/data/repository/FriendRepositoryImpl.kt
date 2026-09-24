@@ -26,6 +26,7 @@ import com.mmg.manahub.core.model.withMetadata
 import com.mmg.manahub.core.model.FriendMatchHistory
 import com.mmg.manahub.core.model.FriendRequest
 import com.mmg.manahub.core.model.FriendStats
+import com.mmg.manahub.core.model.FriendshipGoneException
 import com.mmg.manahub.core.model.OutgoingFriendRequest
 import com.mmg.manahub.core.domain.repository.FriendRepository
 import kotlinx.coroutines.CancellationException
@@ -33,6 +34,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock
+import java.util.concurrent.ConcurrentHashMap
 
 class FriendRepositoryImpl(
     private val dao: FriendDao,
@@ -41,6 +43,9 @@ class FriendRepositoryImpl(
     private val progressionEventBus: ProgressionEventBus,
     private val crashReporter: CrashReporter,
 ) : FriendRepository {
+
+    // Friend user ids rewarded this process (accept / invite), replayed by the next cache fill.
+    private val emittedFriendIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     override fun observeFriends(): Flow<List<Friend>> =
         dao.observeFriends().map { list -> list.map { it.toDomain() } }
@@ -56,10 +61,32 @@ class FriendRepositoryImpl(
     override fun observeFriendCount(): Flow<Int> = dao.observeFriendCount()
 
     override suspend fun refreshFriends(currentUserId: String): Result<Unit> =
+        refreshFriends(currentUserId, alreadyEmitted = emptySet())
+
+    /**
+     * Replaces the friends cache and emits [ProgressionEvent.FriendAdded] for each friend that was not
+     * cached before (restore plan D6: the requester learns of an acceptance here). [alreadyEmitted]
+     * user ids were just rewarded by the caller.
+     */
+    private suspend fun refreshFriends(currentUserId: String, alreadyEmitted: Set<String>): Result<Unit> =
         remote.getFriends(currentUserId).map { friends ->
+            val previous = dao.getFriendUserIds().toSet()
             dao.clearFriends()
             dao.upsertFriends(friends.map { it.toEntity() })
+            val newFriendIds = friends.map { it.friendUserId }
+                .filter { it !in previous && it !in alreadyEmitted }
+                .distinct()
+            // An empty prior cache (fresh install, wipe, first load) is history, not new friendships:
+            // only friends rewarded this session replay, so FIRST_FRIEND re-derives from the filled cache.
+            newFriendIds
+                .filter { previous.isNotEmpty() || it in emittedFriendIds }
+                .forEach { emitFriendAdded(it) }
         }
+
+    private suspend fun emitFriendAdded(otherUserId: String) {
+        emittedFriendIds += otherUserId
+        progressionEventBus.emit(ProgressionEvent.FriendAdded(friendId = otherUserId, occurredAt = Clock.System.now()))
+    }
 
     override suspend fun refreshRequests(currentUserId: String): Result<Unit> =
         remote.getPendingRequests(currentUserId).map { requests ->
@@ -76,37 +103,34 @@ class FriendRepositoryImpl(
     override suspend fun sendFriendRequest(fromUserId: String, toUserId: String): Result<Unit> =
         remote.sendFriendRequest(fromUserId, toUserId)
 
-    override suspend fun acceptRequest(friendshipId: String, currentUserId: String): Result<Unit> =
-        remote.acceptRequest(friendshipId).also { result ->
-            if (result.isSuccess) {
-                dao.deleteRequest(friendshipId)
-                // refreshFriends repopulates the local cache from the server. A silent
-                // failure here leaves the just-accepted friend missing from the list until
-                // the next manual refresh, so make it observable (and retry once) instead of
-                // discarding the Result fire-and-forget.
-                refreshFriends(currentUserId).onFailure { firstError ->
-                    crashReporter.apply {
-                        log("acceptRequest: refreshFriends failed after ACCEPT (friendshipId=$friendshipId), retrying once")
-                        recordException(firstError)
-                    }
-                    refreshFriends(currentUserId).onFailure { retryError ->
-                        crashReporter.apply {
-                            log("acceptRequest: refreshFriends retry also failed (friendshipId=$friendshipId); local friends cache may be stale")
-                            recordException(retryError)
-                        }
-                    }
+    override suspend fun acceptRequest(friendshipId: String, currentUserId: String): Result<Unit> {
+        val accepted = remote.acceptRequestReturning(friendshipId).getOrElse { error ->
+            // The request is gone server-side: reconcile the list instead of deleting or rewarding locally.
+            if (error is FriendshipGoneException) refreshRequests(currentUserId)
+            return Result.failure(error)
+        }
+        val otherUserId = if (accepted.userId1 == currentUserId) accepted.userId2 else accepted.userId1
+        dao.deleteRequest(friendshipId)
+        // refreshFriends repopulates the local cache from the server. A silent
+        // failure here leaves the just-accepted friend missing from the list until
+        // the next manual refresh, so make it observable (and retry once) instead of
+        // discarding the Result fire-and-forget.
+        refreshFriends(currentUserId, setOf(otherUserId)).onFailure { firstError ->
+            crashReporter.apply {
+                log("acceptRequest: refreshFriends failed after ACCEPT (friendshipId=$friendshipId), retrying once")
+                recordException(firstError)
+            }
+            refreshFriends(currentUserId, setOf(otherUserId)).onFailure { retryError ->
+                crashReporter.apply {
+                    log("acceptRequest: refreshFriends retry also failed (friendshipId=$friendshipId); local friends cache may be stale")
+                    recordException(retryError)
                 }
-                // Emit after the friendship is confirmed ACCEPTED (ADR-002 §1). The
-                // friendshipId is a stable per-friendship id, so the idempotency key
-                // friend:{friendshipId} dedupes retries; the weekly cap limits farming.
-                progressionEventBus.emit(
-                    ProgressionEvent.FriendAdded(
-                        friendId = friendshipId,
-                        occurredAt = Clock.System.now(),
-                    )
-                )
             }
         }
+        // After the refresh so the DERIVED friend count sees the new row; the per-user key dedupes re-adds.
+        emitFriendAdded(otherUserId)
+        return Result.success(Unit)
+    }
 
     override suspend fun rejectRequest(friendshipId: String): Result<Unit> =
         remote.rejectRequest(friendshipId).also { result ->
@@ -148,6 +172,9 @@ class FriendRepositoryImpl(
                 inviterId = dto.inviterId,
                 inviterNickname = dto.inviterNickname,
             )
+        }.onSuccess { result ->
+            // accept_invite leaves an ACCEPTED friendship with the inviter.
+            emitFriendAdded(result.inviterId)
         }.recoverCatching { throwable ->
             // Extract only the known semantic token from the Supabase error body, never the
             // raw PostgreSQL message, to avoid leaking internal schema details.

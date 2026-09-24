@@ -6,7 +6,8 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.domain.config.DefaultsOnlyRemoteConfigRepository
+import com.mmg.manahub.core.gamification.domain.DefaultGamificationAvailability
 import com.mmg.manahub.core.gamification.engine.QuestReconciler
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -14,7 +15,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -35,7 +36,12 @@ import org.junit.Test
 class QuestRotationWorkerTest {
 
     private val questReconciler: QuestReconciler = mockk(relaxed = true)
-    private val userPreferencesDataStore: UserPreferencesDataStore = mockk()
+    private val optIn = MutableStateFlow(true)
+    private val availability = DefaultGamificationAvailability(
+        remoteConfigRepository = DefaultsOnlyRemoteConfigRepository(),
+        userOptInFlow = optIn,
+        compileEnabled = true,
+    )
 
     @Before
     fun setUp() {
@@ -62,14 +68,14 @@ class QuestRotationWorkerTest {
                     appContext,
                     workerParameters,
                     questReconciler,
-                    userPreferencesDataStore,
+                    availability,
                 )
             })
             .build()
 
     @Test
     fun `doWork returns success and never reconciles when gamification flag is off`() = runBlocking {
-        every { userPreferencesDataStore.gamificationEnabledFlow } returns flowOf(false)
+        optIn.value = false
 
         val result = buildWorker().doWork()
 
@@ -79,7 +85,7 @@ class QuestRotationWorkerTest {
 
     @Test
     fun `doWork reconciles when gamification flag is on`() = runBlocking {
-        every { userPreferencesDataStore.gamificationEnabledFlow } returns flowOf(true)
+        optIn.value = true
         coEvery { questReconciler.reconcile() } returns Unit
 
         val result = buildWorker().doWork()

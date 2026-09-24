@@ -1,9 +1,12 @@
 package com.mmg.manahub.core.data.local
 
 import android.content.Context
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.mmg.manahub.core.data.sync.SyncCursor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -69,7 +72,7 @@ class SyncPreferencesStore @Inject constructor(
             // wiped the local ledger is gone, so a stale "already pushed up to id N" or "synced up to T"
             // watermark must NOT survive — otherwise the next sync would skip re-pulling the account's
             // history and never re-push the (now re-created) local rows.
-            val prefixes = listOf("sync_millis_", "gam_sync_ms_", "gam_pushed_ledger_id_")
+            val prefixes = listOf("sync_millis_", "gam_sync_ms_", "gam_pushed_ledger_id_", GAM_CURSOR_PREFIX)
             val keysToRemove = prefs.asMap().keys
                 .filter { key -> prefixes.any { key.name.startsWith(it) } }
             @Suppress("UNCHECKED_CAST")
@@ -139,24 +142,61 @@ class SyncPreferencesStore @Inject constructor(
 
     private fun statsMilliKey(userId: String) = longPreferencesKey("stats_sync_ms_$userId")
 
-    // ── Gamification sync (Phase 4) ──────────────────────────────────────────
+    // ── Gamification sync (Phase 4, keyset cursors since G-01) ─────────────────
 
     /**
-     * Returns the gamification PULL watermark for [userId] as epoch millis. Returns 0L if
-     * gamification has never synced, forcing a full pull (and the `id`-based push covers all local
-     * ledger rows). Used by
-     * [com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager].
+     * Returns the `server_seq` of the last pulled-and-applied XP ledger row for [userId], or 0L for a
+     * full pull. Used by [com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager].
      */
-    suspend fun getGamificationSyncMillis(userId: String): Long =
+    suspend fun getGamificationLedgerCursor(userId: String): Long =
         context.userPrefsDataStore.data
-            .map { prefs -> prefs[gamSyncMilliKey(userId)] ?: 0L }
+            .map { prefs -> prefs[gamLedgerCursorKey(userId)] ?: 0L }
             .first()
 
-    /** Records [millis] as the gamification PULL watermark for [userId]. */
-    suspend fun saveGamificationSyncMillis(userId: String, millis: Long) {
+    /** Records [serverSeq] as the last applied XP ledger row for [userId]. */
+    suspend fun saveGamificationLedgerCursor(userId: String, serverSeq: Long) {
         context.userPrefsDataStore.edit { prefs ->
-            prefs[gamSyncMilliKey(userId)] = millis
+            prefs[gamLedgerCursorKey(userId)] = serverSeq
         }
+    }
+
+    /**
+     * Returns the `(changed_at, pk)` cursor of the last applied row of the keyset-paged [table] for
+     * [userId], or null for a full pull. [table] is a short stable tag (e.g. `ach`, `ent`, `streak`).
+     */
+    suspend fun getGamificationKeysetCursor(userId: String, table: String): SyncCursor? =
+        context.userPrefsDataStore.data
+            .map { prefs ->
+                val position = prefs[gamKeysetPositionKey(table, userId)]
+                val key = prefs[gamKeysetIdKey(table, userId)]
+                if (position != null && key != null) SyncCursor(position, key) else null
+            }
+            .first()
+
+    /** Records [cursor] for [table] of [userId]; both fields are written in one edit. */
+    suspend fun saveGamificationKeysetCursor(userId: String, table: String, cursor: SyncCursor) {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[gamKeysetPositionKey(table, userId)] = cursor.position
+            prefs[gamKeysetIdKey(table, userId)] = cursor.key
+        }
+    }
+
+    /**
+     * One-time migration off the legacy client-clock pull watermark (`gam_sync_ms_*`): when it is still
+     * present, removes it and every keyset cursor of [userId] in one edit so the next pull is a full
+     * paged pull. Returns true when a reset happened.
+     */
+    suspend fun resetLegacyGamificationPullWatermark(userId: String): Boolean {
+        var reset = false
+        context.userPrefsDataStore.edit { prefs ->
+            val legacyKey = gamLegacySyncMilliKey(userId)
+            if (prefs.contains(legacyKey)) {
+                prefs.remove(legacyKey)
+                removeGamificationCursors(prefs, userId)
+                reset = true
+            }
+        }
+        return reset
     }
 
     /**
@@ -177,24 +217,48 @@ class SyncPreferencesStore @Inject constructor(
     }
 
     /**
-     * Clears BOTH gamification watermarks for [userId], forcing a full push + pull on the next sync.
+     * Clears every gamification watermark and cursor for [userId], forcing a full push + pull on the
+     * next sync.
      *
      * Called by
-     * [com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager.reconcileOnSignIn] so an
-     * anonymous/guest's local progress merges INTO the account: the push re-sends every local ledger
+     * [com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager.reconcileOnSignIn] so a
+     * guest's local progress merges INTO the account that claims the store: the push re-sends every local ledger
      * row and the pull re-fetches the account's full history. Monotonic server-side merges
      * (GREATEST/earliest/union) make this idempotent — no XP is double-counted (ledger UNIQUE key) and
      * no state is lost.
      */
     suspend fun clearGamificationWatermarks(userId: String) {
         context.userPrefsDataStore.edit { prefs ->
-            prefs.remove(gamSyncMilliKey(userId))
+            prefs.remove(gamLegacySyncMilliKey(userId))
             prefs.remove(gamPushedLedgerIdKey(userId))
+            removeGamificationCursors(prefs, userId)
         }
     }
 
-    private fun gamSyncMilliKey(userId: String) = longPreferencesKey("gam_sync_ms_$userId")
+    private fun removeGamificationCursors(prefs: MutablePreferences, userId: String) {
+        prefs.asMap().keys
+            .filter { key -> key.name.startsWith(GAM_CURSOR_PREFIX) && key.name.endsWith("_$userId") }
+            .forEach { key ->
+                @Suppress("UNCHECKED_CAST")
+                prefs.remove(key as Preferences.Key<Any>)
+            }
+    }
+
+    private fun gamLegacySyncMilliKey(userId: String) = longPreferencesKey("gam_sync_ms_$userId")
+
+    private fun gamLedgerCursorKey(userId: String) =
+        longPreferencesKey("${GAM_CURSOR_PREFIX}xp_seq_$userId")
+
+    private fun gamKeysetPositionKey(table: String, userId: String) =
+        longPreferencesKey("${GAM_CURSOR_PREFIX}${table}_at_$userId")
+
+    private fun gamKeysetIdKey(table: String, userId: String) =
+        stringPreferencesKey("${GAM_CURSOR_PREFIX}${table}_key_$userId")
 
     private fun gamPushedLedgerIdKey(userId: String) =
         longPreferencesKey("gam_pushed_ledger_id_$userId")
+
+    private companion object {
+        const val GAM_CURSOR_PREFIX = "gam_cursor_"
+    }
 }

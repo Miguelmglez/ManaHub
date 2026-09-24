@@ -170,4 +170,10 @@ interface GamificationStatsDao {
     /** Total solved daily puzzles (ADR-006 Decision 5 — DERIVED, free retroactive backfill). */
     @Query("SELECT COUNT(*) FROM puzzle_results WHERE solved = 1")
     suspend fun puzzlesSolved(): Int
+
+    // ── Social ───────────────────────────────────────────────────────────────────
+
+    /** Accepted friends in the local friends cache (one row per friendship). */
+    @Query("SELECT COUNT(DISTINCT friend_user_id) FROM friends")
+    suspend fun friendsCount(): Int
 }

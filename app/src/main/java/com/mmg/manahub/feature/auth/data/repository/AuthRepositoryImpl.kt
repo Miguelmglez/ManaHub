@@ -85,6 +85,8 @@ class AuthRepositoryImpl(
     private val supabaseOkHttpClient: OkHttpClient,
     private val applicationScope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher,
+    // Drops account-scoped local stores (gamification) after a confirmed server-side deletion.
+    private val onAccountDeleted: suspend () -> Unit = {},
 ) : AuthRepository {
 
     private val profileRefreshSignal = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -789,6 +791,14 @@ class AuthRepositoryImpl(
             // alive — causing the background sync worker to keep hitting Supabase
             // with an invalid token until the JWT TTL expires.
             signOutLocally(SignOutScope.LOCAL)
+            try {
+                onAccountDeleted()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The account is already gone server-side; a local cleanup failure must not report failure.
+                recordNonFatal("auth_delete_account_local_cleanup_failed", e)
+            }
             AuthResult.Success(Unit)
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
     }

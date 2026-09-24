@@ -5,7 +5,12 @@ import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
 import com.mmg.manahub.core.data.local.entity.AchievementProgressEntity
 import com.mmg.manahub.core.gamification.domain.catalog.AchievementCatalog
 import com.mmg.manahub.core.gamification.domain.catalog.Family
+import io.mockk.Runs
+import io.mockk.coEvery
+import io.mockk.just
 import io.mockk.mockk
+import kotlinx.coroutines.test.runTest
+import com.mmg.manahub.core.FeatureFlags
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -109,5 +114,24 @@ class AchievementBackfillTest {
         val resolved = derivedDefs.associate { it.id to 0 }
         val plan = backfill.computeBackfillRows(derivedDefs, resolved, emptyMap(), now)
         assertEquals(derivedDefs.size, plan.rows.size)
+    }
+
+    @Test
+    fun `run skips unavailable defs and resolves the rainbow pair separately`() = runTest {
+        val dao = mockk<GamificationDao>(relaxed = true)
+        val statsDao = mockk<GamificationStatsDao>(relaxed = true)
+        coEvery { dao.getAchievement(any()) } returns null
+        coEvery { dao.hasTransaction(any()) } returns true
+        coEvery { statsDao.puzzlesSolved() } returns 30
+        // One card of every color: the public rainbow unlocks, the 20-per-color secret does not.
+        coEvery { statsDao.ownedCountForColor(any()) } returns 1
+        val rows = mutableListOf<AchievementProgressEntity>()
+        coEvery { dao.upsertAchievement(capture(rows)) } just Runs
+
+        AchievementBackfill(dao, statsDao, FixedClock(Instant.fromEpochMilliseconds(now)), Dispatchers.Unconfined).run()
+
+        assertEquals(!FeatureFlags.Puzzle.PUZZLE_ENABLED, rows.none { it.achievementId == "PUZZLE_SOLVER" })
+        assertEquals(1, rows.first { it.achievementId == "RAINBOW_COLLECTOR" }.tierReached)
+        assertEquals(0, rows.first { it.achievementId == "SECRET_PERFECT_RAINBOW" }.tierReached)
     }
 }

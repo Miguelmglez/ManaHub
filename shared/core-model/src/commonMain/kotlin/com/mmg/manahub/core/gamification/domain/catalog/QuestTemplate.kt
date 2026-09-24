@@ -28,6 +28,7 @@ import kotlin.reflect.KClass
  * @param emoji glyph for the UI.
  * @param reactsTo event classes that can advance this quest.
  * @param advance pure mapping from a matching event to its progress increment (>= 0).
+ * @param availability whether the template may be generated; unavailable templates are never rolled.
  */
 data class QuestTemplate(
     val id: String,
@@ -40,7 +41,11 @@ data class QuestTemplate(
     val emoji: String,
     val reactsTo: Set<KClass<out ProgressionEvent>>,
     val advance: (ProgressionEvent) -> Int,
+    val availability: CatalogAvailability = CatalogAvailability.ALWAYS,
 ) {
+    /** True when this template may be generated and advanced. */
+    val isAvailable: Boolean get() = availability.isAvailable
+
     init {
         require(target > 0) { "Quest '$id' target must be positive" }
         require(reactsTo.isNotEmpty()) { "Quest '$id' must react to at least one event" }

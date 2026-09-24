@@ -24,6 +24,10 @@ interface FriendDao {
     @Query("SELECT COUNT(*) FROM friends")
     fun observeFriendCount(): Flow<Int>
 
+    /** User ids of the cached friends (snapshot read, used to detect newly accepted friendships). */
+    @Query("SELECT friend_user_id FROM friends")
+    suspend fun getFriendUserIds(): List<String>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertFriends(friends: List<FriendEntity>)
 

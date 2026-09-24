@@ -23,6 +23,7 @@ import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.core.gamification.data.local.GamificationLocalStore
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.sync.CollectionMergeConflictResolver
 import com.mmg.manahub.core.sync.SyncManager
@@ -90,6 +91,8 @@ fun coreBridgeKoinModule(
             supabaseOkHttpClient = get(named("supabase")),
             applicationScope = get(),
             ioDispatcher = Dispatchers.IO,
+            // Resolved lazily: GamificationLocalStore lives in gamificationEngineKoinModule.
+            onAccountDeleted = { get<GamificationLocalStore>().wipe() },
         )
     }
 

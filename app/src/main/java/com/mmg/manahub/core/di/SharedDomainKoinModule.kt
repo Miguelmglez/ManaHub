@@ -211,7 +211,9 @@ fun sharedDomainKoinModule(
 
     // Collection import: batched resolution, no-XP commits and batched wishlist writes.
     single { ResolveCollectionImportUseCase(cardRepository = get(), crashReporter = get()) }
-    single { CommitImportedCardsUseCase(userCardRepository = get(), crashReporter = get()) }
+    single {
+        CommitImportedCardsUseCase(userCardRepository = get(), crashReporter = get(), progressionEventBus = get())
+    }
     single { AddAllToWishlistUseCase(repo = get(), authRepo = get()) }
 
     // ── Deck use cases. ──

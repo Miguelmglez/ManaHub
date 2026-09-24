@@ -7,25 +7,22 @@ import com.mmg.manahub.core.data.local.entity.XpTransactionEntity
 import com.mmg.manahub.core.gamification.domain.LevelCurve
 import com.mmg.manahub.core.gamification.domain.catalog.AchievementCatalog
 import com.mmg.manahub.core.gamification.domain.catalog.AchievementDef
-import com.mmg.manahub.core.gamification.domain.catalog.AchievementResolver
 import com.mmg.manahub.core.gamification.domain.catalog.Family
 import com.mmg.manahub.core.gamification.domain.model.XpSourceCategory
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
-import kotlin.math.floor
 
 /**
- * One-shot Family-A achievement backfill (ADR-002 §4).
+ * Idempotent Family-A achievement backfill (ADR-002 §4), run by the catch-up on every OFF→ON gate
+ * transition (restore plan D2).
  *
- * On the FIRST launch after the v39 migration it evaluates every Family-A (DERIVED) achievement
- * against the user's current Room data and persists the resulting progress + retroactive unlocks. To
- * avoid spamming the (Chunk B) celebration queue with achievements the user "already had", backfilled
- * unlocks set `celebrated_at = unlocked_at` so the celebration host ignores them.
+ * Evaluates every AVAILABLE Family-A (DERIVED) achievement against the user's current Room data and
+ * persists the resulting progress + retroactive unlocks. To avoid spamming the celebration queue with
+ * achievements the user "already had", backfilled unlocks set `celebrated_at = unlocked_at`.
  *
- * Run-once is guarded by the DataStore flag `gamificationBackfillDone`. The pure computation lives in
- * [computeBackfillRows] (takes resolved values + existing rows, returns the rows to persist) so it is
- * unit-testable without Room; [run] is the IO orchestrator that reads/writes the DAO.
+ * The pure computation lives in [computeBackfillRows] (takes resolved values + existing rows, returns
+ * the rows to persist) so it is unit-testable without Room; [run] is the IO orchestrator.
  *
  * Family-B (COUNTER) achievements are intentionally NOT backfilled — streaks and remote-backed
  * social/tournament counts cannot be reconstructed from local Room data.
@@ -37,14 +34,7 @@ class AchievementBackfill(
     private val defaultDispatcher: CoroutineDispatcher,
 ) {
 
-    private companion object {
-        val WUBRG = listOf("W", "U", "B", "R", "G")
-        const val QUICK_WIN_MAX_TURNS = 7
-        const val COMEBACK_MAX_LIFE = 5
-        const val MARATHON_MIN_MS = 90L * 60_000L
-        const val MULTIPLAYER_MIN_PLAYERS = 4
-        const val ONE_LIFE = 1
-    }
+    private val derivedResolver = DerivedAchievementResolver(statsDao)
 
     /**
      * Executes the backfill: resolves each Family-A def's value, loads existing progress, computes the
@@ -54,10 +44,10 @@ class AchievementBackfill(
      */
     suspend fun run(): Int = withContext(defaultDispatcher) {
         val now = clock.now().toEpochMilliseconds()
-        val derivedDefs = AchievementCatalog.all.filter { it.family == Family.DERIVED }
+        val derivedDefs = AchievementCatalog.all.filter { it.family == Family.DERIVED && it.isAvailable }
 
         val resolved: Map<String, Int> = derivedDefs.associate { def ->
-            def.id to resolveDerivedValue(def.resolver!!)
+            def.id to derivedResolver.resolve(def.resolver!!)
         }
         val existing: Map<String, AchievementProgressEntity> = derivedDefs
             .mapNotNull { def -> dao.getAchievement(def.id) }
@@ -137,27 +127,6 @@ class AchievementBackfill(
             updatedAt = grant.now,
             levelForTotalXp = LevelCurve::levelForTotalXp,
         )
-    }
-
-    private suspend fun resolveDerivedValue(resolver: AchievementResolver): Int = when (resolver) {
-        AchievementResolver.CARDS_OWNED -> statsDao.totalCardsOwned()
-        AchievementResolver.UNIQUE_CARDS -> statsDao.uniqueCardsOwned()
-        AchievementResolver.FOIL_CARDS -> statsDao.foilCardsOwned()
-        AchievementResolver.COLORS_WITH_20_PLUS -> WUBRG.count { statsDao.ownedCountForColor(it) >= 20 }
-        AchievementResolver.MYTHIC_CARDS -> statsDao.mythicCardsOwned()
-        AchievementResolver.MAX_CARD_VALUE_USD -> floor(statsDao.maxCardValueUsd()).toInt()
-        AchievementResolver.GAMES_PLAYED -> statsDao.totalGames()
-        AchievementResolver.LOCAL_WINS -> statsDao.localWins()
-        AchievementResolver.QUICK_WINS -> statsDao.quickLocalWins(QUICK_WIN_MAX_TURNS)
-        AchievementResolver.COMEBACK_WINS -> statsDao.comebackLocalWins(COMEBACK_MAX_LIFE)
-        AchievementResolver.MARATHON_GAMES -> statsDao.marathonGames(MARATHON_MIN_MS)
-        AchievementResolver.COMMANDER_WINS -> statsDao.commanderLocalWins()
-        AchievementResolver.MULTIPLAYER_GAMES -> statsDao.multiplayerGames(MULTIPLAYER_MIN_PLAYERS)
-        AchievementResolver.DECKS_BUILT -> statsDao.decksBuilt()
-        AchievementResolver.DISTINCT_DECK_FORMATS -> statsDao.distinctDeckFormats()
-        AchievementResolver.SURVEYS_COMPLETED -> statsDao.surveysCompleted()
-        AchievementResolver.GAMES_ENDED_AT_ONE_LIFE -> statsDao.localWinsAtExactLife(ONE_LIFE)
-        AchievementResolver.PUZZLES_SOLVED -> statsDao.puzzlesSolved()
     }
 
     /** The rows to persist + the tier XP to grant, produced by [computeBackfillRows]. */

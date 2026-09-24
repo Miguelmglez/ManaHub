@@ -3,6 +3,7 @@ package com.mmg.manahub.core.domain.repository
 
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckCardSource
+import com.mmg.manahub.core.model.DeckCreationSource
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DeckWithCards
 import kotlinx.coroutines.flow.Flow
@@ -62,6 +63,24 @@ interface DeckRepository {
      * @return The UUID of the newly created deck.
      */
     suspend fun createDeck(name: String, description: String, format: String): String
+
+    /**
+     * Creates a deck like [createDeck] and records [source] for its one-time `DeckCreated` progression
+     * event, which fires when the deck's first mainboard card is persisted (never for an empty draft).
+     * The default ignores [source]: implementations without progression just create the deck.
+     */
+    suspend fun createDeck(
+        name: String,
+        description: String,
+        format: String,
+        source: DeckCreationSource,
+    ): String = createDeck(name, description, format)
+
+    /**
+     * Re-tags a deck created in this session whose `DeckCreated` has not fired yet (it is still empty),
+     * e.g. a Studio draft that is about to be filled by an import or the wizard. No-op otherwise.
+     */
+    suspend fun tagDeckCreationSource(deckId: String, source: DeckCreationSource) {}
 
     /**
      * Updates deck metadata. Bumps [Deck.updatedAt] so the sync engine picks up the change.

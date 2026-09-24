@@ -159,7 +159,7 @@ fun gameKoinModule(
     viewModel {
         GameResultStripViewModel(
             engine = get(),
-            userPreferencesDataStore = get(),        // coreBridge
+            gamificationAvailability = get(),        // gamificationEngineKoinModule
         )
     }
 }

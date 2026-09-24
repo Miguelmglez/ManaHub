@@ -69,7 +69,11 @@ object DatabaseModule {
             // Clearing all watermarks here ensures the next sync performs a full pull.
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
-                    runBlocking { syncPrefs.clearAllWatermarks() }
+                    runBlocking {
+                        syncPrefs.clearAllWatermarks()
+                        // Room's gamification tables are gone; their DataStore half (owner, cosmetics) must follow.
+                        clearGamificationPreferences(context)
+                    }
                 }
             })
             // All migrations from v25 onward are explicit and data-safe.

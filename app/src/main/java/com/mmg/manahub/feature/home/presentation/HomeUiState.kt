@@ -123,8 +123,8 @@ data class HomeUiState(
     val recentTrades: List<TradeProposal>? = null,
 
     // ── Gamification (Phase 2) ──────────────────────────────────────────────────
-    /** Master toggle. When false every gamification surface (widgets + hero suggestion) is hidden. */
-    val gamificationEnabled: Boolean = true,
+    /** Gamification availability; false (the default until known) hides every gamification surface. */
+    val gamificationEnabled: Boolean = false,
     /** Level / XP / streak / quest summary for the Home gamification widgets; null until loaded. */
     val gamification: HomeGamification? = null,
     /** True once the gamification slice (toggle + snapshot) has resolved. */

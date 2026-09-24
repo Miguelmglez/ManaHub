@@ -14,7 +14,10 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import kotlinx.coroutines.CancellationException
+import kotlinx.datetime.Clock
 import java.util.concurrent.TimeUnit
 
 /**
@@ -26,6 +29,7 @@ class CollectionSyncWorker(
     workerParams: WorkerParameters,
     private val syncManager: SyncManager,
     private val authRepository: AuthRepository,
+    private val progressionEventBus: ProgressionEventBus? = null,
 ) : CoroutineWorker(appContext, workerParams) {
 
     companion object {
@@ -133,6 +137,10 @@ class CollectionSyncWorker(
                 // A pull is the only event that introduces cards whose strategy tags this device
                 // has never resolved -- hydrate them in batched passes off the sync's critical path.
                 CardTagHydrationWorker.enqueueImmediate(workManager)
+                // Pulled rows are already committed; re-evaluate DERIVED collection achievements (0 XP).
+                if (result.collectionPulled > 0) {
+                    progressionEventBus?.emit(ProgressionEvent.CollectionChanged(occurredAt = Clock.System.now()))
+                }
                 Result.success()
             }
         } catch (e: CancellationException) {

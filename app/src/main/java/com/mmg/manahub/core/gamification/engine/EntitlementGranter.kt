@@ -84,6 +84,7 @@ class EntitlementGranter(
         val granted = mutableListOf<UnlockableId>()
 
         for (unlockable in UnlockableCatalog.all) {
+            if (!unlockable.isAvailable) continue
             val satisfied = unlockable.unlockRule.isSatisfied(currentLevel, unlockedAchievementIds)
             if (!satisfied) continue
 

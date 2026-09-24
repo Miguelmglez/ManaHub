@@ -72,6 +72,7 @@ fun settingsKoinModule(
             pushTokenRepository = get(),
             notificationPrefsRepository = get(),
             voiceModelRepository = get(),
+            gamificationAvailability = get(),
         )
     }
 }

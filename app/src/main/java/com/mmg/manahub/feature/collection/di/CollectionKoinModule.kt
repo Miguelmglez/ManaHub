@@ -107,6 +107,7 @@ fun collectionKoinModule(
             workerParams = it.get(),
             syncManager = get(),
             authRepository = get(),
+            progressionEventBus = get(),
         )
     }
 

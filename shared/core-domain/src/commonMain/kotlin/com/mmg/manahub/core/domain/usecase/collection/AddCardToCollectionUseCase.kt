@@ -14,9 +14,8 @@ import kotlinx.datetime.Clock
  * resulting XP to the correct source and avoid double-counting.
  *
  * - [MANUAL] adds (search, card detail, manual entry) emit a [ProgressionEvent.CardsAdded].
- * - [SCANNER] adds are aggregated by [CommitScannedCardsUseCase] into a single
- *   [ProgressionEvent.CardScanned]; this use case therefore suppresses its own emission for
- *   scanner adds so the same card is never rewarded twice.
+ * - [SCANNER] adds are not rewarded here: batched queue commits go through
+ *   [CommitScannedCardsUseCase], which emits per entry origin, so the same card is never rewarded twice.
  */
 enum class CollectionAddSource {
     MANUAL,
@@ -63,10 +62,12 @@ class AddCardToCollectionUseCase(
 
         // Emit only for manual adds; scanner adds are batched by CommitScannedCardsUseCase.
         if (source == CollectionAddSource.MANUAL) {
+            // The first copy of a new row is the unique card, not also an extra copy (G-10).
+            val addedUnique = if (outcome == AddOutcome.CREATED_NEW) 1 else 0
             progressionEventBus.emit(
                 ProgressionEvent.CardsAdded(
-                    addedCopies = quantity,
-                    addedUnique = if (outcome == AddOutcome.CREATED_NEW) 1 else 0,
+                    addedCopies = quantity - addedUnique,
+                    addedUnique = addedUnique,
                     occurredAt = Clock.System.now(),
                 )
             )

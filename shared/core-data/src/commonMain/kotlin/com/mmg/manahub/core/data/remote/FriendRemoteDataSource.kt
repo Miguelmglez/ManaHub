@@ -14,6 +14,8 @@ import com.mmg.manahub.core.data.remote.dto.SearchFriendCardsRequestDto
 import com.mmg.manahub.core.model.FriendCardCursor
 import com.mmg.manahub.core.model.FriendCardSearchException
 import com.mmg.manahub.core.model.FriendCardSearchParams
+import com.mmg.manahub.core.model.FriendshipGoneException
+import com.mmg.manahub.core.data.remote.dto.FriendshipDto
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.statement.bodyAsText
 import io.ktor.serialization.ContentConvertException
@@ -113,29 +115,34 @@ class FriendRemoteDataSource(
         }
 
     /**
-     * Accepts a pending friend request by updating its status to ACCEPTED.
+     * Accepts a pending friend request by updating its status to ACCEPTED and returns the updated
+     * row. Fails with [FriendshipGoneException] when the server changed no row (the request was
+     * cancelled meanwhile, or row-level security hides it).
      */
-    suspend fun acceptRequest(friendshipId: String): Result<Unit> =
+    suspend fun acceptRequestReturning(friendshipId: String): Result<FriendshipDto> =
         withContext(dispatcherProvider.io) {
             runCatching {
                 client.updateFriendshipStatus(
                     idFilter = "eq.$friendshipId",
                     body = UpdateFriendshipStatusDto("ACCEPTED"),
-                )
+                ).firstOrNull() ?: throw FriendshipGoneException()
             }
         }
 
-    suspend fun rejectRequest(friendshipId: String): Result<Unit> =
-        withContext(dispatcherProvider.io) {
-            runCatching {
-                client.deleteFriendship(idFilter = "eq.$friendshipId")
-            }
-        }
+    /** [acceptRequestReturning] without the row, for callers that only need success. */
+    suspend fun acceptRequest(friendshipId: String): Result<Unit> =
+        acceptRequestReturning(friendshipId).map { }
 
-    suspend fun removeFriend(friendshipId: String): Result<Unit> =
+    /** Deletes a pending request; fails with [FriendshipGoneException] when no row was deleted. */
+    suspend fun rejectRequest(friendshipId: String): Result<Unit> = deleteExisting(friendshipId)
+
+    /** Deletes an accepted friendship; fails with [FriendshipGoneException] when no row was deleted. */
+    suspend fun removeFriend(friendshipId: String): Result<Unit> = deleteExisting(friendshipId)
+
+    private suspend fun deleteExisting(friendshipId: String): Result<Unit> =
         withContext(dispatcherProvider.io) {
             runCatching {
-                client.deleteFriendship(idFilter = "eq.$friendshipId")
+                if (client.deleteFriendship(idFilter = "eq.$friendshipId").isEmpty()) throw FriendshipGoneException()
             }
         }
 

@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.data.queue
 
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardAddOrigin
 import com.mmg.manahub.core.model.QueuedCard
 import com.mmg.manahub.core.model.newQueuedCardId
 import kotlinx.serialization.json.Json
@@ -79,6 +80,7 @@ object CardQueueJsonCodec {
         put("condition", condition)
         put("timestamp", timestamp)
         put("id", id)
+        put("origin", origin.name)
     }
 
     private fun JsonObject.toQueuedCard(): QueuedCard {
@@ -132,6 +134,10 @@ object CardQueueJsonCodec {
             timestamp = requirePrimitive("timestamp").longOrNull ?: error("timestamp"),
             // Entries persisted before the id field existed get a fresh one.
             id = optionalString("id") ?: newQueuedCardId(),
+            // Entries persisted before the origin field existed are treated as manual adds.
+            origin = optionalString("origin")
+                ?.let { raw -> CardAddOrigin.entries.firstOrNull { it.name == raw } }
+                ?: CardAddOrigin.MANUAL,
         )
     }
 

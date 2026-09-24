@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.datetime.Clock
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
@@ -42,6 +43,9 @@ class TradesRepositoryImpl(
 
     private val cache = MutableStateFlow<List<TradeProposal>>(emptyList())
 
+    // Trade keys already put on the bus this process, so every refresh does not re-emit the history.
+    private val emittedTradeKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
     override fun observeActiveProposals(): Flow<List<TradeProposal>> =
         cache.map { list -> list.filter { it.status.isActive } }
 
@@ -58,6 +62,7 @@ class TradesRepositoryImpl(
         if (proposalsResult.isFailure) return Result.failure(proposalsResult.exceptionOrNull()!!)
 
         val dtos = proposalsResult.getOrThrow().distinctBy { it.id }
+        emitNewlyCompletedTrades(dtos)
         // The existing-items merge is computed INSIDE the update lambda so a concurrent
         // refreshProposalThread() call can't interleave a read-then-write and silently drop
         // the other call's freshly-fetched items (trades audit §2.8, 2026-07-10).
@@ -75,6 +80,7 @@ class TradesRepositoryImpl(
             .getOrElse { return Result.failure(it) }
             .filter { it.rootProposalId == rootProposalId }
             .distinctBy { it.id }
+        emitNewlyCompletedTrades(dtos)
 
         val threadItems = fetchItemsForProposals(dtos.map { it.id })
 
@@ -179,29 +185,40 @@ class TradesRepositoryImpl(
         reviewFlags: ReviewFlags,
     ): Result<String> = remote.counterProposal(parentProposalId, items, reviewFlags)
 
+    // Accepting does not complete a trade (it can still be revoked): no progression here (D7).
     override suspend fun acceptProposal(proposalId: String): Result<Unit> =
-        remote.acceptProposal(proposalId).also { result ->
-            // Emit only after a successful accept (ADR-002 §1). Idempotency key
-            // trade:{proposalId} means a second accept (e.g. the counterparty's device,
-            // or a retry) grants XP at most once per proposal.
-            if (result.isSuccess) {
-                progressionEventBus.emit(
-                    ProgressionEvent.TradeCompleted(
-                        tradeId = proposalId,
-                        occurredAt = Clock.System.now(),
-                    )
-                )
-            }
-        }
+        remote.acceptProposal(proposalId)
 
     override suspend fun revokeAcceptance(proposalId: String): Result<Unit> =
         remote.revokeAcceptance(proposalId)
 
+    // COMPLETED needs both parties; the caller's post-success thread refresh observes it and emits.
     override suspend fun markCompleted(proposalId: String): Result<Unit> =
         remote.markCompleted(proposalId)
 
     override fun clearCache() {
         cache.value = emptyList()
+        emittedTradeKeys.clear()
+    }
+
+    /**
+     * Emits [ProgressionEvent.TradeCompleted] for every COMPLETED proposal in [dtos] not yet emitted
+     * this process (restore plan D7). Runs on every server-status observation, so BOTH parties earn it;
+     * the key `trade:{rootProposalId}` is global per user, so the ledger dedupes repeats across
+     * processes and devices and a replay never advances the trade counters (D10).
+     */
+    private suspend fun emitNewlyCompletedTrades(dtos: List<TradeProposalDto>) {
+        dtos.asSequence()
+            .filter { it.status == TradeStatus.COMPLETED.name }
+            .map { it.rootProposalId.ifBlank { it.id } }
+            .distinct()
+            .filter { emittedTradeKeys.add(it) }
+            .toList()
+            .forEach { tradeId ->
+                progressionEventBus.emit(
+                    ProgressionEvent.TradeCompleted(tradeId = tradeId, occurredAt = Clock.System.now())
+                )
+            }
     }
 
     /** Metadata-only mapping that keeps [existing]'s items and their loaded state. */

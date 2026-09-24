@@ -1,17 +1,20 @@
 package com.mmg.manahub.core.domain.usecase.collection
 
+import com.mmg.manahub.core.domain.repository.AddOutcome
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.core.model.CardAddOrigin
 import com.mmg.manahub.core.model.DataResult
 import kotlinx.datetime.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * A single card entry queued by the scanner, ready to be committed to the collection.
+ * A single queued card entry (Scanner or AddCard "Select multiple"), ready to be committed to the
+ * collection. Presentation-agnostic so the domain layer does not depend on either screen's model.
  *
- * Kept presentation-agnostic so the domain layer does not depend on the scanner UI's
- * `ScannedCard` model. The scanner ViewModel maps its session entries into this shape.
+ * @property origin decides the XP event: [CardAddOrigin.SCANNED] entries count as scans,
+ *   [CardAddOrigin.MANUAL] entries as manual adds. Committers that grant no XP ignore it.
  */
 data class CardCommit(
     val scryfallId: String,
@@ -19,6 +22,7 @@ data class CardCommit(
     val condition:  String,
     val language:   String,
     val quantity:   Int,
+    val origin:     CardAddOrigin = CardAddOrigin.MANUAL,
 )
 
 /**
@@ -44,16 +48,15 @@ data class CommitScanResult(
 )
 
 /**
- * Commits a batch of scanner-recognised cards to the collection and emits a SINGLE
- * [ProgressionEvent.CardScanned] for the whole batch after the writes succeed (ADR-002 §1).
+ * Commits a batch of queued cards to the collection (the shared Scanner / AddCard queue's canonical
+ * write path) and, after the writes, emits at most one event per origin for the whole batch
+ * (restore plan D9): one [ProgressionEvent.CardScanned] for the copies of [CardAddOrigin.SCANNED]
+ * entries and one [ProgressionEvent.CardsAdded] for the [CardAddOrigin.MANUAL] entries, where only the
+ * FIRST copy of a newly created row counts as unique and every other copy as an extra copy.
  *
- * This is the scanner's canonical write path. It deliberately funnels every add through
- * [AddCardToCollectionUseCase] with [CollectionAddSource.SCANNER], which suppresses the
- * per-card [ProgressionEvent.CardsAdded] emission — so scanned cards are rewarded exactly once,
- * via the batched scan event (3 XP/card, capped), never double-counted as manual adds.
- *
- * Emission lives here (a use case), not in the ViewModel, and uses a freshly generated
- * `scanBatchId` per commit so the ledger dedupes accidental re-commits of the same batch.
+ * Every add goes through [AddCardToCollectionUseCase.addReturningOutcome], which never emits, so no
+ * card is rewarded twice. The scan event's fresh `scanBatchId` lets the ledger dedupe an accidental
+ * re-emission of the same batch.
  */
 @OptIn(ExperimentalUuidApi::class)
 class CommitScannedCardsUseCase(
@@ -80,6 +83,9 @@ class CommitScannedCardsUseCase(
 
         var committedCopies = 0
         var failedEntries = 0
+        var scannedCopies = 0
+        var manualUnique = 0
+        var manualCopies = 0
         val entrySucceeded = ArrayList<Boolean>(entries.size)
         entries.forEach { entry ->
             try {
@@ -93,6 +99,14 @@ class CommitScannedCardsUseCase(
                 )
                 if (result is DataResult.Success) {
                     committedCopies += entry.quantity
+                    when (entry.origin) {
+                        CardAddOrigin.SCANNED -> scannedCopies += entry.quantity
+                        CardAddOrigin.MANUAL -> {
+                            val createdRow = if (result.data == AddOutcome.CREATED_NEW) 1 else 0
+                            manualUnique += createdRow
+                            manualCopies += entry.quantity - createdRow
+                        }
+                    }
                     entrySucceeded.add(true)
                 } else {
                     failedEntries++
@@ -106,13 +120,22 @@ class CommitScannedCardsUseCase(
             }
         }
 
-        // Emit one scan event for the whole batch, only if at least one copy landed.
-        if (committedCopies > 0) {
+        val now = Clock.System.now()
+        if (scannedCopies > 0) {
             progressionEventBus.emit(
                 ProgressionEvent.CardScanned(
                     scanBatchId = Uuid.random().toString(),
-                    count = committedCopies,
-                    occurredAt = Clock.System.now(),
+                    count = scannedCopies,
+                    occurredAt = now,
+                )
+            )
+        }
+        if (manualUnique + manualCopies > 0) {
+            progressionEventBus.emit(
+                ProgressionEvent.CardsAdded(
+                    addedCopies = manualCopies,
+                    addedUnique = manualUnique,
+                    occurredAt = now,
                 )
             )
         }

@@ -102,3 +102,9 @@ sealed class FriendCardSearchException(message: String, cause: Throwable? = null
     /** The request never produced an HTTP response (offline, timeout, DNS). */
     class Network(cause: Throwable) : FriendCardSearchException("NETWORK", cause)
 }
+
+/**
+ * A friendship mutation matched no row: the request or friendship no longer exists, or row-level
+ * security hides it from the caller. The server changed nothing, so the local cache must not either.
+ */
+class FriendshipGoneException : Exception("The friend request or friendship no longer exists")

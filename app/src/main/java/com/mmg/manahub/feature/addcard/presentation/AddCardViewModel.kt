@@ -13,6 +13,7 @@ import com.mmg.manahub.core.domain.usecase.queue.AddAllToCollectionResult
 import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.QueuedCard
+import com.mmg.manahub.core.model.CardAddOrigin
 import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.DataResult
@@ -434,6 +435,7 @@ class AddCardViewModel(
         condition = DEFAULT_CONDITION,
         setCode = card.setCode,
         timestamp = nowMillis(),
+        origin = CardAddOrigin.MANUAL,
     )
 
     /** Opens the queue sheet; no-op when the queue is empty. */

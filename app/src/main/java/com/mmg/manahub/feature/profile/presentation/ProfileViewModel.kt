@@ -18,6 +18,7 @@ import com.mmg.manahub.core.gamification.domain.model.QuestBoard
 import com.mmg.manahub.core.gamification.domain.model.RewardUiModel
 import com.mmg.manahub.core.gamification.domain.model.RewardsBoard
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
+import com.mmg.manahub.core.gamification.domain.GamificationAvailability
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.gamification.domain.model.ClaimResult
 import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
@@ -67,6 +68,7 @@ class ProfileViewModel(
     private val claimQuestRewardUseCase: ClaimQuestRewardUseCase,
     private val shareInviteUseCase: ShareInviteUseCase,
     private val appUpdateStatusProvider: AppUpdateStatusProvider,
+    private val gamificationAvailability: GamificationAvailability,
 ) : ViewModel() {
 
     data class UiState(
@@ -106,7 +108,7 @@ class ProfileViewModel(
         /** Null until the progression flow first emits; the migration seeds a level-1 row. */
         val progression: PlayerProgression? = null,
         /** Master gamification switch; when false the hero ring + level chip are hidden. */
-        val gamificationEnabled: Boolean = true,
+        val gamificationEnabled: Boolean = false,
         // Quests (gamification Phase 2) — drive the Quests tab.
         /** Active daily + weekly quest board. Empty until the first emission. */
         val questBoard: QuestBoard = QuestBoard.empty,
@@ -180,9 +182,9 @@ class ProfileViewModel(
             .catch { /* ignore — achievements section stays empty */ }
             .launchIn(viewModelScope)
 
-        userPreferencesDataStore.gamificationEnabledFlow
+        gamificationAvailability.availableFlow
             .onEach { enabled -> _uiState.update { it.copy(gamificationEnabled = enabled) } }
-            .catch { /* ignore — default keeps gamification visible */ }
+            .catch { /* ignore — the hidden default stays */ }
             .launchIn(viewModelScope)
 
         // ── Quests (ADR-002, Phase 2) ───────────────────────────────────────────

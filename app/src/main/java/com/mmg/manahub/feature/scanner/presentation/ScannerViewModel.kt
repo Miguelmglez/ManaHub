@@ -17,6 +17,7 @@ import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.QueuedCard
+import com.mmg.manahub.core.model.CardAddOrigin
 import com.mmg.manahub.core.di.ApplicationScope
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.util.AnalyticsHelper
@@ -444,6 +445,7 @@ class ScannerViewModel @Inject constructor(
                 condition = state.selectedCondition,
                 setCode = card.setCode,
                 timestamp = System.currentTimeMillis(),
+                origin = CardAddOrigin.SCANNED,
             )
         )
         syncQueueSnapshot()

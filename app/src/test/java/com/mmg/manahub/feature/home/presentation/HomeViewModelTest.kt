@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.home.presentation
 
 // COMMENTS_REVIEWED: 2026-09-16
 
+import com.mmg.manahub.util.testGamificationAvailability
 import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
@@ -266,7 +267,6 @@ class HomeViewModelTest {
         every { userPrefsDataStore.homeCommunityDecksCategoryFlow } returns flowOf(null)
 
         // Gamification (Phase 2): enabled with empty board / zeroed streak / level 1.
-        every { userPrefsDataStore.gamificationEnabledFlow } returns gamificationEnabledFlow
         every { gamificationRepository.observeProgression() } returns progressionFlow
         every { gamificationRepository.observeActiveQuests() } returns questBoardFlow
         every { gamificationRepository.observeDailyActivityStreak() } returns streakFlow
@@ -339,6 +339,7 @@ class HomeViewModelTest {
         wishlistRepository = wishlistRepository,
         getAccountNudgeUseCase = GetAccountNudgeUseCase(),
         gamificationRepository = gamificationRepository,
+        gamificationAvailability = testGamificationAvailability(gamificationEnabledFlow),
         userCardRepository = userCardRepository,
         tradesRepository = tradesRepository,
         openForTradeRepository = openForTradeRepository,
