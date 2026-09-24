@@ -208,6 +208,7 @@
 
     <!-- Card Detail — External Links section -->
     <string name="carddetail_links_title">External Links</string>
+    <string name="carddetail_links_open_failed">Couldn\'t open this link</string>
     <string name="carddetail_links_references">References</string>
     <string name="carddetail_links_community">Community</string>
     <string name="carddetail_links_purchase">Where to Buy</string>
