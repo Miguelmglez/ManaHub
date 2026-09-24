@@ -5,7 +5,6 @@ import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.model.news.RefreshResult
 import com.mmg.manahub.core.model.news.ResolvedSource
 import com.mmg.manahub.core.model.news.SavedNewsItem
-import com.mmg.manahub.core.model.news.SourceType
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -31,22 +30,11 @@ interface NewsRepository {
     /** Refreshes a single source immediately, bypassing the staleness check (F9 — new source). */
     suspend fun refreshSource(sourceId: String): Result<Unit>
 
-    suspend fun toggleSource(sourceId: String, enabled: Boolean)
-    suspend fun addCustomSource(
-        name: String,
-        feedUrl: String,
-        type: SourceType,
-        language: String = "en",
-    ): Result<ContentSource>
-    suspend fun deleteSource(sourceId: String)
-    suspend fun validateFeed(feedUrl: String, type: SourceType): Result<Int>
+    /** Follows or unfollows a source (the `is_enabled` flag); only followed sources feed the Feed. */
+    suspend fun setSourceFollowed(sourceId: String, followed: Boolean)
 
-    /**
-     * Best-effort detection of the feed's channel-level language (RSS 2.0 `<channel><language>`),
-     * used to pre-select the add-source form's language chip. Returns null on failure, a feed
-     * format with no such element, or an unmapped language code — never throws.
-     */
-    suspend fun detectFeedLanguage(feedUrl: String): String?
+    /** Deletes a custom source; default sources can only be unfollowed. */
+    suspend fun deleteSource(sourceId: String)
 
     suspend fun save(item: NewsItem)
     suspend fun unsave(itemId: String)

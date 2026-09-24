@@ -318,68 +318,13 @@ class NewsRepositoryImpl(
         }
     }
 
-    override suspend fun toggleSource(sourceId: String, enabled: Boolean) {
-        newsDao.setSourceEnabled(sourceId, enabled)
+    override suspend fun setSourceFollowed(sourceId: String, followed: Boolean) {
+        newsDao.setSourceEnabled(sourceId, followed)
     }
 
-    override suspend fun addCustomSource(
-        name: String,
-        feedUrl: String,
-        type: SourceType,
-        language: String,
-    ): Result<ContentSource> = try {
-        require(feedUrl.startsWith("https://")) { "Feed URL must use HTTPS" }
-        val entity = ContentSourceEntity(
-            id = "custom_${UUID.randomUUID()}",
-            name = name.trim().take(100),
-            feedUrl = feedUrl,
-            type = type.name,
-            isEnabled = true,
-            isDefault = false,
-            language = language,
-        )
-        newsDao.insertSourcesIfAbsent(listOf(entity))
-        Result.success(entity.toDomain())
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
-
-    /** Custom sources only; a default source can be unfollowed but never deleted. */
     override suspend fun deleteSource(sourceId: String) {
         val source = newsDao.getSourceById(sourceId) ?: return
         if (!source.isDefault) newsDao.deleteSource(source)
-    }
-
-    override suspend fun validateFeed(feedUrl: String, type: SourceType): Result<Int> = try {
-        val fetchResult = feedService.fetchFeed(feedUrl).getOrThrow()
-        val xml = when (fetchResult) {
-            is FeedFetchResult.Fetched -> fetchResult.body
-            // No etag/lastModified were sent, so a fresh validation fetch should never 304 —
-            // but stay defensive rather than assuming the server always honours that.
-            FeedFetchResult.NotModified -> return Result.failure(Exception("No items found in feed"))
-        }
-        val count = when (type) {
-            SourceType.ARTICLE -> rssParser.parse(xml, "validate", "Validate").size
-            SourceType.VIDEO -> ytParser.parse(xml, "validate", "Validate").size
-        }
-        if (count > 0) Result.success(count)
-        else Result.failure(Exception("No items found in feed"))
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
-
-    /**
-     * Best-effort detection of an RSS 2.0 `<channel><language>` element, used to pre-select the
-     * language chip in the add-source form (nice-to-have, never blocks the add flow). Returns
-     * null on any failure, a non-RSS feed (YouTube Atom has no such element), or an unmapped
-     * language code.
-     */
-    override suspend fun detectFeedLanguage(feedUrl: String): String? = try {
-        val fetchResult = feedService.fetchFeed(feedUrl).getOrNull()
-        val xml = (fetchResult as? FeedFetchResult.Fetched)?.body
-        xml?.let { rssParser.detectChannelLanguage(it) }
-    } catch (_: Exception) {
-        null
     }
 
     // ── Source resolution ("paste any URL") ──────────────────────────────────

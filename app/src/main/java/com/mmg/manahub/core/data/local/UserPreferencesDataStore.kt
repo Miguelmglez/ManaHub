@@ -17,15 +17,12 @@ import com.mmg.manahub.core.model.AppLanguage
 import com.mmg.manahub.core.model.CardLanguage
 import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.ScoreWeightOverrides
 import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.model.UserPreferences
 import com.mmg.manahub.core.util.recordNonFatal
 import kotlinx.coroutines.CancellationException
-import com.mmg.manahub.core.model.news.NewsFilterPrefs
-import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics
 import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.Companion.MAX_EQUIPPED_BADGES
@@ -41,7 +38,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
-import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -49,20 +45,10 @@ internal val Context.userPrefsDataStore by preferencesDataStore(name = "user_pre
 
 private val KEY_APP_LANGUAGE      = stringPreferencesKey("app_language")
 private val KEY_CARD_LANGUAGE     = stringPreferencesKey("card_language")
+// Retired News filter keys: read once by the follow migration, then removed.
 private val KEY_NEWS_LANGUAGES    = stringSetPreferencesKey("news_languages")
-/** News filter: included [SourceType] names. Absent → both ARTICLE + VIDEO. */
 private val KEY_NEWS_FILTER_TYPES      = stringSetPreferencesKey("news_filter_types")
-/**
- * News filter: explicit source-id allowlist. Tri-state, split across two keys since a
- * `stringSetPreferencesKey` cannot itself distinguish "unset" from "explicitly empty":
- *  - key absent, [KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY] absent/false → `null` (all
- *    enabled sources — the default).
- *  - key absent, [KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY] true → `emptySet()` (the user
- *    explicitly deselected every source via "Deselect All" — must NOT read back as "all").
- *  - key present (always non-empty by construction) → that explicit allowlist.
- */
 private val KEY_NEWS_FILTER_SOURCE_IDS = stringSetPreferencesKey("news_filter_source_ids")
-/** See [KEY_NEWS_FILTER_SOURCE_IDS]. Cleared whenever the allowlist is null or non-empty. */
 private val KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY = booleanPreferencesKey("news_filter_source_ids_explicit_empty")
 /** Set once the retired news filters were translated into followed sources (MTG Today). */
 private val KEY_NEWS_FOLLOW_MIGRATION_DONE = booleanPreferencesKey("news_follow_migration_done")
@@ -244,11 +230,6 @@ class UserPreferencesDataStore @Inject constructor(
 
     override val preferencesFlow: Flow<UserPreferences> = context.userPrefsDataStore.data
         .map { prefs ->
-            val deviceLang = Locale.getDefault().language
-            val defaultNewsLangs = buildSet {
-                add("en")
-                if (deviceLang == "es" || deviceLang == "de") add(deviceLang)
-            }
             val defaultCurrency = "EUR"
 
             UserPreferences(
@@ -258,10 +239,6 @@ class UserPreferencesDataStore @Inject constructor(
                 cardLanguage = CardLanguage.fromCode(
                     prefs[KEY_CARD_LANGUAGE] ?: "en"
                 ),
-                newsLanguages = (prefs[KEY_NEWS_LANGUAGES] ?: defaultNewsLangs)
-                    .mapNotNull { NewsLanguage.entries.find { l -> l.code == it } }
-                    .toSet()
-                    .ifEmpty { setOf(NewsLanguage.ENGLISH) },
                 preferredCurrency = PreferredCurrency.fromCode(
                     prefs[KEY_PREFERRED_CURRENCY] ?: defaultCurrency
                 ),
@@ -284,116 +261,6 @@ class UserPreferencesDataStore @Inject constructor(
 
     override suspend fun setCardLanguage(language: CardLanguage) {
         context.userPrefsDataStore.edit { it[KEY_CARD_LANGUAGE] = language.code }
-    }
-
-    override suspend fun setNewsLanguages(languages: Set<NewsLanguage>) {
-        context.userPrefsDataStore.edit { it[KEY_NEWS_LANGUAGES] = languages.map { l -> l.code }.toSet() }
-    }
-
-    // ── News feed filters (shared by NewsScreen + Home news widget) ───────────────
-    //
-    // The single persisted source of truth for the news filter selection. Languages
-    // reuse the existing KEY_NEWS_LANGUAGES key (which stores long NewsLanguage codes
-    // such as "en-GB"); the filter layer works in SHORT codes ("en"/"es"/"de") that
-    // match ContentSource.language, so we project to the first two chars on read and
-    // map short → NewsLanguage on write. Default is English-only.
-
-    /**
-     * Emits the persisted [NewsFilterPrefs]. Absent values fall back to
-     * [NewsFilterPrefs.DEFAULT] (English-only, both content types, all enabled sources).
-     */
-    fun observeNewsFilters(): Flow<NewsFilterPrefs> =
-        context.userPrefsDataStore.data
-            .map { prefs ->
-                val languages = prefs[KEY_NEWS_LANGUAGES]
-                    ?.map { it.take(2) }
-                    ?.toSet()
-                    ?.ifEmpty { null }
-                    ?: NewsFilterPrefs.DEFAULT.languages
-
-                val types = prefs[KEY_NEWS_FILTER_TYPES]
-                    ?.mapNotNull { name -> SourceType.entries.firstOrNull { it.name == name } }
-                    ?.toSet()
-                    ?.ifEmpty { null }
-                    ?: NewsFilterPrefs.DEFAULT.types
-
-                // Tri-state read: an explicit-empty flag wins over the (necessarily absent)
-                // allowlist key so "Deselect All" survives a restart instead of reverting to
-                // "all enabled sources". See KEY_NEWS_FILTER_SOURCE_IDS's KDoc for the scheme.
-                val sourceIds = if (prefs[KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY] == true) {
-                    emptySet()
-                } else {
-                    prefs[KEY_NEWS_FILTER_SOURCE_IDS]?.takeIf { it.isNotEmpty() }
-                }
-
-                NewsFilterPrefs(languages = languages, types = types, sourceIds = sourceIds)
-            }
-            .catch { emit(NewsFilterPrefs.DEFAULT) }
-
-    /**
-     * Persists the full news filter selection. Languages are stored as long
-     * [NewsLanguage] codes (resolved from the short codes), so [preferencesFlow]'s
-     * `newsLanguages` and [setNewsLanguages] keep working unchanged.
-     */
-    suspend fun setNewsFilters(
-        languages: Set<String>,
-        types: Set<SourceType>,
-        sourceIds: Set<String>?,
-    ) {
-        context.userPrefsDataStore.edit { prefs ->
-            val longLangCodes = languages
-                .mapNotNull { short -> NewsLanguage.entries.firstOrNull { it.code.take(2) == short }?.code }
-                .toSet()
-                .ifEmpty { setOf(NewsLanguage.ENGLISH.code) }
-            prefs[KEY_NEWS_LANGUAGES] = longLangCodes
-            prefs[KEY_NEWS_FILTER_TYPES] = types
-                .ifEmpty { NewsFilterPrefs.DEFAULT.types }
-                .map { it.name }
-                .toSet()
-            // Tri-state write — see KEY_NEWS_FILTER_SOURCE_IDS's KDoc. `null` clears both keys
-            // (all enabled sources); an explicit empty set is preserved via the companion flag
-            // instead of collapsing to the same on-disk state as `null`.
-            when {
-                sourceIds == null -> {
-                    prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS)
-                    prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY)
-                }
-                sourceIds.isEmpty() -> {
-                    prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS)
-                    prefs[KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY] = true
-                }
-                else -> {
-                    prefs[KEY_NEWS_FILTER_SOURCE_IDS] = sourceIds
-                    prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY)
-                }
-            }
-        }
-    }
-
-    /**
-     * F6: atomically removes [sourceId] from the persisted news filter source-id allowlist in a
-     * SINGLE `edit{}` transaction against the live DataStore state. Unlike a read-then-write via
-     * [observeNewsFilters] + [setNewsFilters] (the previous implementation), this can never race
-     * with a concurrent filter-apply and clobber an unrelated language/type change that committed
-     * in between the read and the write — it only ever touches
-     * [KEY_NEWS_FILTER_SOURCE_IDS]/[KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY], never
-     * [KEY_NEWS_LANGUAGES]/[KEY_NEWS_FILTER_TYPES]. No-op when the allowlist is unset or doesn't
-     * reference [sourceId]. Dropping the allowlist to empty preserves the tri-state "explicit
-     * empty" contract (see [KEY_NEWS_FILTER_SOURCE_IDS]) rather than silently reverting to "all
-     * enabled sources".
-     */
-    suspend fun pruneNewsFilterSourceId(sourceId: String) {
-        context.userPrefsDataStore.edit { prefs ->
-            val current = prefs[KEY_NEWS_FILTER_SOURCE_IDS] ?: return@edit
-            if (sourceId !in current) return@edit
-            val updated = current - sourceId
-            if (updated.isEmpty()) {
-                prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS)
-                prefs[KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY] = true
-            } else {
-                prefs[KEY_NEWS_FILTER_SOURCE_IDS] = updated
-            }
-        }
     }
 
     // ── News follow migration (MTG Today) ────────────────────────────────────────
@@ -422,16 +289,6 @@ class UserPreferencesDataStore @Inject constructor(
         }
     }
 
-    /** Clears all persisted news filters back to [NewsFilterPrefs.DEFAULT] (English-only). */
-    suspend fun resetNewsFilters() {
-        context.userPrefsDataStore.edit { prefs ->
-            prefs[KEY_NEWS_LANGUAGES] = setOf(NewsLanguage.ENGLISH.code)
-            prefs.remove(KEY_NEWS_FILTER_TYPES)
-            prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS)
-            prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY)
-        }
-    }
-
     override suspend fun setPreferredCurrency(currency: PreferredCurrency) {
         context.userPrefsDataStore.edit { it[KEY_PREFERRED_CURRENCY] = currency.code }
     }
@@ -442,7 +299,6 @@ class UserPreferencesDataStore @Inject constructor(
     private fun defaultPreferences() = UserPreferences(
         appLanguage = AppLanguage.ENGLISH,
         cardLanguage = CardLanguage.ENGLISH,
-        newsLanguages = setOf(NewsLanguage.ENGLISH),
         preferredCurrency = PreferredCurrency.EUR,
         collectionViewMode = CollectionViewMode.GRID,
     )

@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -19,13 +20,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +47,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.core.model.news.NewsItem
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.news_item_more_a11y
+import com.mmg.manahub.core.ui.news_item_save_a11y
+import com.mmg.manahub.core.ui.news_item_unsave_a11y
 import com.mmg.manahub.core.ui.theme.CardCornerRadius
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
@@ -46,6 +59,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.TimeAgoFormatter
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Unified component for News items (Articles and Videos).
@@ -56,6 +70,8 @@ import com.mmg.manahub.core.util.TimeAgoFormatter
  *   on web (or when `null`) the image simply shows nothing while loading.
  * @param titleMinLines minimum title lines; a row of equal-height cards passes the title's
  *   `maxLines` (2) so short titles reserve the same space as long ones.
+ * @param isSaved bookmark state; the bookmark button shows only when [onToggleSave] is set (horizontal layout).
+ * @param overflowMenu items of the "more" menu anchored to the card; the button shows only when set.
  */
 @Composable
 fun NewsItemCard(
@@ -67,6 +83,9 @@ fun NewsItemCard(
     languageBadge: String? = null,
     showDescription: Boolean = true,
     titleMinLines: Int = 1,
+    isSaved: Boolean = false,
+    onToggleSave: (() -> Unit)? = null,
+    overflowMenu: (@Composable ColumnScope.(dismiss: () -> Unit) -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val interactionSource = remember { MutableInteractionSource() }
@@ -94,6 +113,9 @@ fun NewsItemCard(
             languageBadge = languageBadge,
             showDescription = showDescription,
             titleMinLines = titleMinLines,
+            isSaved = isSaved,
+            onToggleSave = onToggleSave,
+            overflowMenu = overflowMenu,
             modifier = containerModifier.padding(MaterialTheme.spacing.md)
         )
     } else {
@@ -114,6 +136,9 @@ private fun HorizontalNewsLayout(
     languageBadge: String?,
     showDescription: Boolean,
     titleMinLines: Int,
+    isSaved: Boolean,
+    onToggleSave: (() -> Unit)?,
+    overflowMenu: (@Composable ColumnScope.(dismiss: () -> Unit) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -168,6 +193,48 @@ private fun HorizontalNewsLayout(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+            if (onToggleSave != null || overflowMenu != null) {
+                NewsItemActions(isSaved = isSaved, onToggleSave = onToggleSave, overflowMenu = overflowMenu)
+            }
+        }
+    }
+}
+
+@Composable
+private fun NewsItemActions(
+    isSaved: Boolean,
+    onToggleSave: (() -> Unit)?,
+    overflowMenu: (@Composable ColumnScope.(dismiss: () -> Unit) -> Unit)?,
+) {
+    val mc = MaterialTheme.magicColors
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        if (onToggleSave != null) {
+            IconButton(onClick = onToggleSave) {
+                Icon(
+                    imageVector = if (isSaved) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                    contentDescription = stringResource(if (isSaved) Res.string.news_item_unsave_a11y else Res.string.news_item_save_a11y),
+                    tint = if (isSaved) mc.primaryAccent else mc.textSecondary,
+                )
+            }
+        }
+        if (overflowMenu != null) {
+            var expanded by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { expanded = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = stringResource(Res.string.news_item_more_a11y),
+                        tint = mc.textSecondary,
+                    )
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    containerColor = mc.surface,
+                ) {
+                    overflowMenu { expanded = false }
+                }
             }
         }
     }

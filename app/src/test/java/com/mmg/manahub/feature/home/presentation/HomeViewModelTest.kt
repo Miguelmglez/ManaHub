@@ -13,7 +13,6 @@ import com.mmg.manahub.core.model.PersistedWidget
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.QuickStartAction
 import com.mmg.manahub.core.model.WidgetSize
-import com.mmg.manahub.core.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.model.news.RefreshResult
 import com.mmg.manahub.core.domain.repository.DeckRepository
@@ -198,8 +197,6 @@ class HomeViewModelTest {
         every { getNewsFeedUseCase() } returns flowOf(emptyList())
         coEvery { refreshNewsFeedUseCase() } returns
             Result.success(RefreshResult(fetched = 0, failed = 0, notModified = 0))
-        // News filter source of truth: default (English-only, all enabled sources).
-        every { userPrefsDataStore.observeNewsFilters() } returns flowOf(NewsFilterPrefs.DEFAULT)
         // Default to no sources; news tests override this with sources that enable their feed.
         every { manageSourcesUseCase.observeSources() } returns flowOf(emptyList())
 
@@ -429,11 +426,7 @@ class HomeViewModelTest {
         author = null,
     )
 
-    /**
-     * Stubs [manageSourcesUseCase] so every source id present in [feed] resolves to an
-     * enabled English source — the Home news widget now filters by enabled-source ∩
-     * language ∩ type, so without matching sources the feed would be filtered out.
-     */
+    /** Stubs [manageSourcesUseCase] so every source id in [feed] is followed; the widget only shows followed sources. */
     private fun stubEnabledEnglishSourcesFor(feed: List<NewsItem>) {
         val sources = feed.map { it.sourceId }.distinct().map { sid ->
             com.mmg.manahub.core.model.news.ContentSource(
@@ -1539,63 +1532,41 @@ class HomeViewModelTest {
         coVerify(atLeast = 2) { cardRepository.getRandomCard("lang:en") }
     }
 
-    // ── News filters (persisted, shared with NewsScreen) ──────────────────────
+    // ── News widget: followed sources only ─────────────────────────────────────
 
     @Test
-    fun `newsFiltersActive is false when filters match the English-only default`() = runTest(testDispatcher) {
-        every { userPrefsDataStore.observeNewsFilters() } returns flowOf(NewsFilterPrefs.DEFAULT)
-
-        val vm = buildViewModel()
-        backgroundScope.launch { vm.state.collect {} }
-        advanceUntilIdle()
-
-        assertFalse(vm.state.value.newsFiltersActive)
-    }
-
-    @Test
-    fun `newsFiltersActive is true when persisted filters differ from default`() = runTest(testDispatcher) {
-        every { userPrefsDataStore.observeNewsFilters() } returns
-            flowOf(NewsFilterPrefs.DEFAULT.copy(languages = setOf("en", "es")))
-
-        val vm = buildViewModel()
-        backgroundScope.launch { vm.state.collect {} }
-        advanceUntilIdle()
-
-        assertTrue(vm.state.value.newsFiltersActive)
-    }
-
-    @Test
-    fun `recentNews filters out items whose source language is not selected`() = runTest(testDispatcher) {
+    fun `recentNews shows items from followed sources in every language`() = runTest(testDispatcher) {
         val enArticle = newsArticle("en-1").copy(sourceId = "en-src")
         val esArticle = newsArticle("es-1").copy(sourceId = "es-src")
         every { getNewsFeedUseCase() } returns flowOf(listOf(enArticle, esArticle))
         every { manageSourcesUseCase.observeSources() } returns flowOf(
-            listOf(
-                contentSource("en-src", "en"),
-                contentSource("es-src", "es"),
-            ),
+            listOf(contentSource("en-src", "en"), contentSource("es-src", "es")),
         )
-        // Default filters are English-only.
-        every { userPrefsDataStore.observeNewsFilters() } returns flowOf(NewsFilterPrefs.DEFAULT)
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
 
-        val ids = vm.state.value.recentNews!!.map { it.id }
-        assertEquals(listOf("en-1"), ids)
+        assertEquals(listOf("en-1", "es-1"), vm.state.value.recentNews!!.map { it.id })
     }
 
     @Test
-    fun `ResetNewsFilters delegates to userPrefsDataStore`() = runTest(testDispatcher) {
+    fun `recentNews hides items from unfollowed sources`() = runTest(testDispatcher) {
+        val followed = newsArticle("f-1").copy(sourceId = "followed-src")
+        val unfollowed = newsArticle("u-1").copy(sourceId = "unfollowed-src")
+        every { getNewsFeedUseCase() } returns flowOf(listOf(followed, unfollowed))
+        every { manageSourcesUseCase.observeSources() } returns flowOf(
+            listOf(
+                contentSource("followed-src", "en"),
+                contentSource("unfollowed-src", "en").copy(isEnabled = false),
+            ),
+        )
+
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
 
-        vm.onAction(HomeAction.ResetNewsFilters)
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) { userPrefsDataStore.resetNewsFilters() }
+        assertEquals(listOf("f-1"), vm.state.value.recentNews!!.map { it.id })
     }
 
     private fun discoverCard(id: String) = com.mmg.manahub.core.model.Card(

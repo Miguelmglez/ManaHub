@@ -74,7 +74,6 @@ import com.google.accompanist.permissions.shouldShowRationale
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.AppLanguage
 import com.mmg.manahub.core.model.CardLanguage
-import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.UserPreferences
 import androidx.core.content.ContextCompat
@@ -106,7 +105,6 @@ import com.mmg.manahub.core.voice.domain.VoiceModelState
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onManageNewsSources: () -> Unit = {},
     onManageTagDictionary: () -> Unit = {},
     onManageAccount: () -> Unit = {},
     // KMP migration — Phase 0 Spike D: Settings is the first "Koin island". This ViewModel is
@@ -207,44 +205,9 @@ fun SettingsScreen(
                 prefs = prefsState.userPreferences,
                 onAppLanguage = viewModel::setAppLanguage,
                 onCardLanguage = viewModel::setCardLanguage,
-                onNewsLanguages = viewModel::setNewsLanguages,
                 onCurrency = viewModel::setPreferredCurrency,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
-            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
-            Text(
-                stringResource(R.string.settings_section_news),
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = mc.textPrimary,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onManageNewsSources)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.settings_manage_news_sources),
-                        style = MaterialTheme.magicTypography.bodyMedium,
-                        color = mc.textPrimary,
-                    )
-                    Text(
-                        stringResource(R.string.settings_manage_news_sources_subtitle),
-                        style = MaterialTheme.magicTypography.bodySmall,
-                        color = mc.textSecondary,
-                    )
-                }
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = mc.textSecondary,
-                )
-            }
-
             /* HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
              Text(
                  stringResource(R.string.settings_section_prices),
@@ -260,41 +223,7 @@ fun SettingsScreen(
                  onCheckedChange = viewModel::onAutoRefreshChanged,
              )
 
-             Spacer(Modifier.height(16.dp))
-             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
-             Text(
-                 stringResource(R.string.settings_section_news),
-                 style = MaterialTheme.magicTypography.titleMedium,
-                 color = mc.textPrimary,
-                 modifier = Modifier.padding(horizontal = 16.dp),
-             )
-
-             Row(
-                 modifier = Modifier
-                     .fillMaxWidth()
-                     .clickable(onClick = onManageNewsSources)
-                     .padding(horizontal = 16.dp, vertical = 12.dp),
-                 verticalAlignment = Alignment.CenterVertically,
-                 horizontalArrangement = Arrangement.SpaceBetween,
-             ) {
-                 Column(modifier = Modifier.weight(1f)) {
-                     Text(
-                         stringResource(R.string.settings_manage_news_sources),
-                         style = MaterialTheme.magicTypography.bodyMedium,
-                         color = mc.textPrimary,
-                     )
-                     Text(
-                         stringResource(R.string.settings_manage_news_sources_subtitle),
-                         style = MaterialTheme.magicTypography.bodySmall,
-                         color = mc.textSecondary,
-                     )
-                 }
-                 Icon(
-                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                     contentDescription = null,
-                     tint = mc.textSecondary,
-                 )
-             }*/
+*/
 
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
             Row(
@@ -918,7 +847,6 @@ private fun PreferencesSection(
     prefs: UserPreferences,
     onAppLanguage: (AppLanguage) -> Unit,
     onCardLanguage: (CardLanguage) -> Unit,
-    onNewsLanguages: (Set<NewsLanguage>) -> Unit,
     onCurrency: (PreferredCurrency) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1003,45 +931,7 @@ private fun PreferencesSection(
                     }
                 }
             }*/
-/*
-            // News Language — multi-select checkboxes
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    stringResource(R.string.pref_news_language),
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    color = mc.textPrimary,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    NewsLanguage.entries.filter { it != NewsLanguage.GERMAN }.forEach { lang ->
-                        val checked = lang in prefs.newsLanguages
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable {
-                                val updated = if (checked) {
-                                    prefs.newsLanguages - lang
-                                } else {
-                                    prefs.newsLanguages + lang
-                                }
-                                if (updated.isNotEmpty()) onNewsLanguages(updated)
-                            },
-                        ) {
-                            Checkbox(
-                                checked = checked,
-                                onCheckedChange = null,
-                                colors = CheckboxDefaults.colors(
-                                    checkedColor = mc.primaryAccent,
-                                    uncheckedColor = mc.textDisabled,
-                                ),
-                            )
-                            Text(
-                                text = lang.displayName,
-                                style = MaterialTheme.magicTypography.bodySmall,
-                                color = if (checked) mc.textPrimary else mc.textSecondary,
-                            )
-                        }
-                    }
-                }
-            }*/
+
 
             // Currency — radio buttons
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

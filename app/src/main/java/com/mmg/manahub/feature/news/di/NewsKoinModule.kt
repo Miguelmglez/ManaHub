@@ -6,43 +6,28 @@ import com.mmg.manahub.feature.news.data.NewsRepositoryImpl
 import com.mmg.manahub.feature.news.data.parser.RssFeedParser
 import com.mmg.manahub.feature.news.data.parser.YouTubeRssFeedParser
 import com.mmg.manahub.feature.news.data.remote.NewsFeedService
-import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsViewModel
-import com.mmg.manahub.feature.news.presentation.NewsViewModel
-import org.koin.android.ext.koin.androidContext
+import com.mmg.manahub.feature.today.presentation.feed.FeedViewModel
+import com.mmg.manahub.feature.today.presentation.saved.SavedViewModel
+import com.mmg.manahub.feature.today.presentation.sources.AddSourceViewModel
+import com.mmg.manahub.feature.today.presentation.sources.SourcesViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
 /**
- * KMP migration — Hilt→Koin cutover batch 3. The News feature is a multi-ViewModel "Koin island":
- * BOTH [NewsViewModel] (feed + filters) and [NewsSourcesSettingsViewModel] (source management) are
- * resolved by Koin (`koinViewModel()`) while every other un-migrated feature stays on Hilt.
+ * Koin module for the News data layer and the MTG Today ViewModels.
  *
- * ## `NewsRepository` is now natively Koin-built (the feature-private Hilt `NewsModule` was DELETED)
- * `NewsRepositoryImpl` and its three collaborators ([NewsFeedService], [RssFeedParser],
- * [YouTubeRssFeedParser]) had their `@Inject`/`@Singleton` annotations stripped — this batch confirmed
- * `NewsRepository` had NO other Hilt-only consumer (only `SharedDomainKoinModule`'s three News use
- * cases, which already resolved it via `get()`, never the forward-bridged instance directly).
- *
- * ## Bridge / shared singletons (all resolved via `get()`)
- * - `GetNewsFeedUseCase`, `RefreshNewsFeedUseCase`, `ManageSourcesUseCase` — natively Koin-built in
- *   `SharedDomainKoinModule` (batch 2).
- * - `UserPreferencesDataStore` — already in `coreBridgeKoinModule`; also consumed by
- *   [NewsRepositoryImpl] for the one-time legacy-filter → follow migration.
- * - `OkHttpClient` — the app-wide client, promoted into `coreBridgeKoinModule` this batch (was only a
- *   Hilt `ManaHubApp` field used for the Coil image loader; now also feeds [NewsFeedService]).
- *
- * ## Bridged singleton (Room DAO stays Hilt/`DatabaseModule`-owned)
- * @param newsDao the Hilt/Room-owned [NewsDao] singleton (this island only).
- * @return a Koin [Module] providing the News data layer + both News ViewModel factories.
+ * - The Room-owned [NewsDao] is bridged in from Hilt (`DatabaseModule`); Room stays androidMain.
+ * - News/MTG Today use cases come from `SharedDomainKoinModule`; `UserPreferencesDataStore`,
+ *   `OkHttpClient` and `CrashReporter` from `coreBridgeKoinModule`.
+ * - `UserPreferencesDataStore` is consumed by [NewsRepositoryImpl] for the one-time legacy-filter
+ *   → follow migration.
  */
 fun newsKoinModule(
     newsDao: NewsDao,
 ): Module = module {
-    // ── Hilt → Koin bridge: the Room-owned DAO (Room stays androidMain / Hilt/DatabaseModule). ──
     single { newsDao }
 
-    // ── News data layer (natively Koin-built; the feature-private Hilt NewsModule was DELETED). ──
     single { NewsFeedService(client = get()) }
     single { RssFeedParser() }
     single { YouTubeRssFeedParser() }
@@ -57,17 +42,25 @@ fun newsKoinModule(
     }
 
     viewModel {
-        NewsViewModel(
+        FeedViewModel(
             getNewsFeed = get(),
             refreshNewsFeed = get(),
             manageSources = get(),
-            userPrefsDataStore = get(),
+            observeSavedItems = get(),
+            toggleSavedItem = get(),
+            crashReporter = get(),
+            savedStateHandle = get(),
         )
     }
     viewModel {
-        NewsSourcesSettingsViewModel(
+        SavedViewModel(
+            observeSavedItems = get(),
             manageSources = get(),
-            context = androidContext(),
+            toggleSavedItem = get(),
+            crashReporter = get(),
+            savedStateHandle = get(),
         )
     }
+    viewModel { SourcesViewModel(manageSources = get(), crashReporter = get()) }
+    viewModel { AddSourceViewModel(resolveSource = get(), followSource = get(), crashReporter = get()) }
 }

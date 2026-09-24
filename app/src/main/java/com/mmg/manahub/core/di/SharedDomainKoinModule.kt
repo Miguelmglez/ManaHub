@@ -38,9 +38,13 @@ import com.mmg.manahub.feature.draft.domain.usecase.ObserveDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.StartDraftUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.AddScannedCardsToDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.CalculateDeckValueSummaryUseCase
+import com.mmg.manahub.feature.news.domain.usecase.FollowSourceUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
+import com.mmg.manahub.feature.news.domain.usecase.ObserveSavedItemsUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
+import com.mmg.manahub.feature.news.domain.usecase.ResolveSourceUseCase
+import com.mmg.manahub.feature.news.domain.usecase.ToggleSavedItemUseCase
 import com.mmg.manahub.feature.survey.domain.usecase.CompleteSurveyUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
@@ -177,6 +181,10 @@ fun sharedDomainKoinModule(
     single { GetNewsFeedUseCase(repository = get()) }
     single { ManageSourcesUseCase(repository = get()) }
     single { RefreshNewsFeedUseCase(repository = get()) }
+    single { ObserveSavedItemsUseCase(repository = get()) }
+    single { ToggleSavedItemUseCase(repository = get()) }
+    single { ResolveSourceUseCase(repository = get()) }
+    single { FollowSourceUseCase(repository = get()) }
 
     // ── Collection / survey use cases. ──
     single { CompleteSurveyUseCase(progressionEventBus = get()) }

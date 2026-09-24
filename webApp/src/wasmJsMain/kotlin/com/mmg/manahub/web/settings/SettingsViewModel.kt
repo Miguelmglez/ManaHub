@@ -7,7 +7,6 @@ import com.mmg.manahub.core.model.AppLanguage
 import com.mmg.manahub.core.model.CardLanguage
 import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.UserPreferences
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,7 +22,7 @@ import kotlinx.coroutines.launch
  * implements every flow/setter this screen needs against real `window.localStorage`, so this slice
  * needed zero new repository work.
  *
- * Deliberately exposes only 4 of the interface's 9 setters as real controls:
+ * Deliberately exposes only 4 of the interface's 8 setters as real controls:
  *  - [setCardLanguage] / [setPreferredCurrency] / [setCollectionViewMode] / [setCollectionGroupingMode]
  *    ARE exposed.
  *  - `setAppLanguage` is NOT exposed. [AppLanguage] has exactly ONE entry ([AppLanguage.ENGLISH])
@@ -33,9 +32,6 @@ import kotlinx.coroutines.launch
  *    equivalent row (`feature/settings/presentation/SettingsScreen.kt`'s `PreferencesSection`) is
  *    commented out for the identical reason -- this is not a web-only scope cut, it mirrors a
  *    decision Android already made.
- *  - `setNewsLanguages` is NOT exposed -- News is not built on web yet (CORS blocker, see
- *    `project_kmp_spike_findings` memory), so a language picker for a feature that doesn't exist
- *    would be dead UI too. Same reasoning Android's own commented-out News-language row reflects.
  *  - `saveLastPriceRefresh` / `saveUserDefinedTag` / `deleteUserDefinedTag` are NOT exposed here --
  *    not simple settings-screen toggles (price refresh is CLAUDE.md's "Backend call budget"
  *    automatic-only background path, no manual trigger on ANY platform; user-defined tags are a
@@ -86,7 +82,6 @@ class SettingsViewModel(
         val DEFAULT_PREFERENCES = UserPreferences(
             appLanguage = AppLanguage.ENGLISH,
             cardLanguage = CardLanguage.ENGLISH,
-            newsLanguages = setOf(NewsLanguage.ENGLISH),
             preferredCurrency = PreferredCurrency.EUR,
             collectionViewMode = CollectionViewMode.GRID,
         )

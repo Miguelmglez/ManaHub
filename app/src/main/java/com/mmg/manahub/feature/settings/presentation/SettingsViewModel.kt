@@ -13,7 +13,6 @@ import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.model.AppLanguage
 import com.mmg.manahub.core.model.CardLanguage
-import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.util.AnalyticsHelper
@@ -196,11 +195,6 @@ class SettingsViewModel(
 
     fun setCardLanguage(language: CardLanguage) {
         launchSafely { userPreferencesRepo.setCardLanguage(language) }
-    }
-
-    fun setNewsLanguages(languages: Set<NewsLanguage>) {
-        if (languages.isEmpty()) return
-        launchSafely { userPreferencesRepo.setNewsLanguages(languages) }
     }
 
     fun setPreferredCurrency(currency: PreferredCurrency) {

@@ -57,11 +57,8 @@ import org.junit.Test
  * GROUP 7 — refreshAll: RefreshResult never lies about success (all-fail / partial-fail / isolation)
  * GROUP 8 — refreshAll: Crashlytics non-fatal is keyed by source id, never the feed URL
  * GROUP 9 — refreshSource (F9)
- * GROUP 10 — addCustomSource: language persistence + HTTPS validation
  * GROUP 11 — deleteSource: custom sources only
- * GROUP 12 — detectFeedLanguage
- * GROUP 13 — validateFeed
- * GROUP 14 — observeNews / observeSources / toggleSource
+ * GROUP 14 — observeNews / observeSources / setSourceFollowed
  * GROUP 15 — reconcileDefaultSources (dead-source cleanup fix, 2026-07-16): feedUrl drift
  *            rewrite + watermark reset, retired-id cleanup, idempotency, custom sources untouched
  * GROUP 16 — saved items (snapshot mapping, save/unsave, id set)
@@ -503,52 +500,6 @@ class NewsRepositoryImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 10 — addCustomSource: language persistence + HTTPS validation
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given a custom source added with language es then the persisted entity has language es`() = runTest {
-        val slot = slot<List<ContentSourceEntity>>()
-        coEvery { newsDao.insertSourcesIfAbsent(capture(slot)) } returns Unit
-
-        val result = repository.addCustomSource(
-            name = "Spanish Blog",
-            feedUrl = "https://example.com/es/feed",
-            type = SourceType.ARTICLE,
-            language = "es",
-        )
-
-        assertTrue(result.isSuccess)
-        assertEquals("es", result.getOrThrow().language)
-        assertEquals("es", slot.captured.single().language)
-    }
-
-    @Test
-    fun `given a custom source added with language de then the persisted entity has language de, not a hardcoded en`() = runTest {
-        val result = repository.addCustomSource(
-            name = "German Blog",
-            feedUrl = "https://example.com/de/feed",
-            type = SourceType.ARTICLE,
-            language = "de",
-        )
-
-        assertEquals("de", result.getOrThrow().language)
-    }
-
-    @Test
-    fun `given a feed URL that is not HTTPS when addCustomSource then it fails and nothing is persisted`() = runTest {
-        val result = repository.addCustomSource(
-            name = "Insecure",
-            feedUrl = "http://example.com/feed",
-            type = SourceType.ARTICLE,
-            language = "en",
-        )
-
-        assertTrue(result.isFailure)
-        coVerify(exactly = 0) { newsDao.insertSourcesIfAbsent(any()) }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
     //  GROUP 11 — deleteSource: custom only, no filter bookkeeping any more
     // ══════════════════════════════════════════════════════════════════════════
 
@@ -582,77 +533,7 @@ class NewsRepositoryImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 12 — detectFeedLanguage
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given a successful fetch with a detectable channel language then detectFeedLanguage returns it`() = runTest {
-        coEvery { feedService.fetchFeed("https://example.com/feed") } returns fetched(body = "<rss/>")
-        every { rssParser.detectChannelLanguage("<rss/>") } returns "es"
-
-        val language = repository.detectFeedLanguage("https://example.com/feed")
-
-        assertEquals("es", language)
-    }
-
-    @Test
-    fun `given fetchFeed returns NotModified when detectFeedLanguage then it returns null`() = runTest {
-        coEvery { feedService.fetchFeed("https://example.com/feed") } returns Result.success(FeedFetchResult.NotModified)
-
-        val language = repository.detectFeedLanguage("https://example.com/feed")
-
-        assertNull(language)
-    }
-
-    @Test
-    fun `given fetchFeed fails when detectFeedLanguage then it returns null instead of throwing`() = runTest {
-        coEvery { feedService.fetchFeed("https://example.com/feed") } returns Result.failure(RuntimeException("down"))
-
-        val language = repository.detectFeedLanguage("https://example.com/feed")
-
-        assertNull(language)
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 13 — validateFeed
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given a feed that parses to N items when validateFeed then it succeeds with that count`() = runTest {
-        coEvery { feedService.fetchFeed("https://example.com/feed") } returns fetched(body = "<rss/>")
-        val items = listOf(
-            NewsArticleEntity("1", "T1", "D", null, 0L, "S", "validate", "u1", null),
-            NewsArticleEntity("2", "T2", "D", null, 0L, "S", "validate", "u2", null),
-        )
-        every { rssParser.parse("<rss/>", "validate", "Validate") } returns items
-
-        val result = repository.validateFeed("https://example.com/feed", SourceType.ARTICLE)
-
-        assertEquals(2, result.getOrThrow())
-    }
-
-    @Test
-    fun `given a feed that parses to zero items when validateFeed then it fails with a descriptive message`() = runTest {
-        coEvery { feedService.fetchFeed("https://example.com/feed") } returns fetched(body = "<rss/>")
-        every { rssParser.parse("<rss/>", "validate", "Validate") } returns emptyList()
-
-        val result = repository.validateFeed("https://example.com/feed", SourceType.ARTICLE)
-
-        assertTrue(result.isFailure)
-        assertEquals("No items found in feed", result.exceptionOrNull()?.message)
-    }
-
-    @Test
-    fun `given fetchFeed unexpectedly returns NotModified when validateFeed then it fails defensively`() = runTest {
-        coEvery { feedService.fetchFeed("https://example.com/feed") } returns Result.success(FeedFetchResult.NotModified)
-
-        val result = repository.validateFeed("https://example.com/feed", SourceType.ARTICLE)
-
-        assertTrue(result.isFailure)
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 14 — observeNews / observeSources / toggleSource
+    //  GROUP 14 — observeNews / observeSources / setSourceFollowed
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
@@ -686,10 +567,10 @@ class NewsRepositoryImplTest {
     }
 
     @Test
-    fun `given toggleSource is called then it delegates to the DAO with the same id and enabled flag`() = runTest {
+    fun `given setSourceFollowed is called then it delegates to the DAO with the same id and flag`() = runTest {
         coEvery { newsDao.setSourceEnabled("s1", false) } returns Unit
 
-        repository.toggleSource("s1", false)
+        repository.setSourceFollowed("s1", false)
 
         coVerify(exactly = 1) { newsDao.setSourceEnabled("s1", false) }
     }

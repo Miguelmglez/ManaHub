@@ -33,7 +33,6 @@ import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.MagicSet
-import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.QueuedCard
 import com.mmg.manahub.core.model.SetType
@@ -99,7 +98,6 @@ class AddCardViewModelTest {
     private val testPreferences = UserPreferences(
         appLanguage = AppLanguage.ENGLISH,
         cardLanguage = CardLanguage.ENGLISH,
-        newsLanguages = setOf(NewsLanguage.ENGLISH),
         preferredCurrency = PreferredCurrency.EUR,
         collectionViewMode = CollectionViewMode.GRID,
     )

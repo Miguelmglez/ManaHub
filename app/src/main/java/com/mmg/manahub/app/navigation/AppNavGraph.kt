@@ -95,9 +95,9 @@ import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import com.mmg.manahub.feature.home.presentation.HomeAction
 import com.mmg.manahub.feature.home.presentation.HomeHeroState
 import com.mmg.manahub.feature.home.presentation.HomeScreen
-import com.mmg.manahub.feature.news.presentation.NewsScreen
-import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.manahub.feature.news.presentation.VideoPlayerScreen
+import com.mmg.manahub.feature.today.presentation.MtgTodayScreen
+import com.mmg.manahub.feature.today.presentation.TodayTab
 import com.mmg.manahub.feature.playtest.presentation.hand.PlaytestHandScreen
 import com.mmg.manahub.feature.playtest.presentation.setup.PlaytestSetupScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileScreen
@@ -409,7 +409,7 @@ fun AppNavGraph(
                                     HomeAction.DraftSimulator -> navController.navigate(Screen.Draft.route)
                                     HomeAction.OpenLibrary -> navController.navigateTab(Screen.Collection.baseRoute)
                                     HomeAction.OpenDecks -> navController.navigate(Screen.Collection.routeWithTab("decks"))
-                                    HomeAction.OpenNews -> navController.navigate(Screen.News.route)
+                                    HomeAction.OpenNews -> navController.navigate(Screen.MtgToday.baseRoute)
                                     HomeAction.OpenStats -> navController.navigate(Screen.Stats.route)
                                     HomeAction.OpenFriends -> navController.navigate(Screen.FriendsList.route)
                                     HomeAction.OpenTrades -> navController.navigate(Screen.Collection.routeWithTab("trades"))
@@ -502,7 +502,6 @@ fun AppNavGraph(
                                     HomeAction.RefreshDiscover,
                                     HomeAction.RefreshRandomCard,
                                     is HomeAction.SelectDiscoverSet,
-                                    HomeAction.ResetNewsFilters,
                                     is HomeAction.MoveWidget,
                                     is HomeAction.AddWidget,
                                     is HomeAction.RemoveWidget,
@@ -913,7 +912,6 @@ fun AppNavGraph(
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
-                    onManageNewsSources = { navController.navigate(Screen.NewsSourcesSettings.route) },
                     onManageTagDictionary = { navController.navigate(Screen.TagDictionary.route) },
                     onManageAccount = { navController.navigate(Screen.AccountManagement.route) },
                 )
@@ -923,20 +921,23 @@ fun AppNavGraph(
                 TagDictionaryScreen(onBack = { navController.popBackStack() })
             }
 
-            // ── News ──────────────────────────────────────────────────────────
-            composable(Screen.News.route) {
-                NewsScreen(
+            // ── MTG Today ─────────────────────────────────────────────────────
+            composable(
+                route = Screen.MtgToday.route,
+                arguments = listOf(
+                    navArgument("tab") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { backStackEntry ->
+                MtgTodayScreen(
+                    initialTab = TodayTab.fromRouteId(backStackEntry.arguments?.getString("tab")),
                     onBack = { navController.popBackStack() },
-
                     onVideoClick = { videoId, title ->
                         navController.navigate(Screen.NewsVideoPlayer.createRoute(videoId, title))
                     },
-                )
-            }
-
-            composable(Screen.NewsSourcesSettings.route) {
-                NewsSourcesSettingsScreen(
-                    onBack = { navController.popBackStack() },
                 )
             }
 

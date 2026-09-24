@@ -595,7 +595,7 @@ fun HomeWidgetHost(
                 )
                 HomeWidgetType.LATEST_SETS -> LatestSetsWidget(uiState.latestSets, metrics.draftSetTileHeight, onAction)
                 HomeWidgetType.MTG_NEWS ->
-                    NewsWidget(uiState.recentNews, uiState.newsFiltersActive, metrics.newsCardHeight, onAction)
+                    NewsWidget(uiState.recentNews, metrics.newsCardHeight, onAction)
                 HomeWidgetType.RULES_TIP -> RulesTipWidget(rulesTipIndex)
                 HomeWidgetType.FRIENDS -> FriendsWidget(
                     friends = uiState.friends,
@@ -2928,7 +2928,6 @@ private fun LatestSetsWidget(sets: List<DraftSet>?, tileHeight: Dp, onAction: (H
 @Composable
 private fun NewsWidget(
     news: List<NewsItem>?,
-    filtersActive: Boolean,
     cardHeight: Dp,
     onAction: (HomeAction) -> Unit,
 ) {
@@ -2936,8 +2935,7 @@ private fun NewsWidget(
     if (news == null) return
     WidgetShell {
         if (news.isEmpty()) {
-            // Empty list: offer to reset the (possibly over-restrictive) persisted filters.
-            NewsEmptyWithReset(filtersActive = filtersActive, onAction = onAction)
+            NewsEmptyBody(onAction = onAction)
             return@WidgetShell
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
@@ -2961,28 +2959,17 @@ private fun NewsWidget(
 /** News titles always reserve two lines so every card in the row has the same height. */
 private const val NEWS_TITLE_LINES = 2
 
-/**
- * Empty-state body for the News widget. Always offers a "Reset filters" button (per spec)
- * so the user can recover when the persisted filters hide everything; the message hints at
- * filtering when [filtersActive].
- */
+/** Empty body of the News widget: nothing from followed sources yet, so point at MTG Today to follow some. */
 @Composable
-private fun NewsEmptyWithReset(filtersActive: Boolean, onAction: (HomeAction) -> Unit) {
+private fun NewsEmptyBody(onAction: (HomeAction) -> Unit) {
     val spacing = MaterialTheme.spacing
     Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
         WidgetEmptyBody(stringResourceSafe(R.string.home_news_empty))
         MagicCtaButton(
-            onClick = { onAction(HomeAction.ResetNewsFilters) },
-            text = stringResourceSafe(R.string.home_news_reset_filters),
+            onClick = { onAction(HomeAction.OpenNews) },
+            text = stringResourceSafe(R.string.home_news_open_today),
             style = MagicCtaStyle.Outlined,
             color = MagicCtaColor.Primary,
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-            },
         )
     }
 }

@@ -291,9 +291,14 @@ sealed class Screen(val route: String) {
         fun route(id: Long) = "tournament/$id"
     }
 
-    // ── News ──────────────────────────────────────────────────────────────────
-    object News : Screen("news")
-    object NewsSourcesSettings : Screen("news_sources_settings")
+    // ── MTG Today (news feed, saved items, sources) ──────────────────────────
+    object MtgToday : Screen("today?tab={tab}") {
+        /** Opens the Feed tab. */
+        const val baseRoute = "today"
+
+        /** Builds a route that opens [tab] (a `TodayTab.routeId`, e.g. "sources"). */
+        fun routeWithTab(tab: String) = "today?tab=$tab"
+    }
     object NewsVideoPlayer : Screen("news/video/{videoId}?title={title}") {
         fun createRoute(videoId: String, title: String) =
             "news/video/${Uri.encode(videoId)}?title=${Uri.encode(title)}"

@@ -108,12 +108,6 @@ sealed interface HomeAction {
      */
     data class SelectDiscoverSet(val set: com.mmg.manahub.core.model.MagicSet?) : HomeAction
 
-    /**
-     * Resets the persisted News filters (languages/types/sources) back to their defaults
-     * (English-only). Handled in [HomeViewModel] via DataStore.
-     */
-    object ResetNewsFilters : HomeAction
-
     // ── Per-widget navigation intents (resolved by AppNavGraph) ─────────────────
     object OpenDraftSimulator : HomeAction
     object OpenDraftGuide : HomeAction

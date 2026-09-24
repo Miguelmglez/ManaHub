@@ -6,7 +6,6 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardLanguage
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.model.UserCard
@@ -147,7 +146,6 @@ object TestFixtures {
     ) = UserPreferences(
         appLanguage        = AppLanguage.ENGLISH,
         cardLanguage       = cardLanguage,
-        newsLanguages      = setOf(NewsLanguage.ENGLISH),
         preferredCurrency  = preferredCurrency,
         collectionViewMode = CollectionViewMode.GRID,
     )

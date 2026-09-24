@@ -197,7 +197,6 @@ fun HomeScreen(
                 is HomeAction.SelectCommunityDecksCategory,
                 is HomeAction.SelectCommunityDecksFormat,
                 HomeAction.RollRulesTip,
-                HomeAction.ResetNewsFilters,
                 -> viewModel.onAction(action)
                 // RateApp needs an Activity context to launch the store; resolve it upstream.
                 HomeAction.RateApp -> onAction(action)
