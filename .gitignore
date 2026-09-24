@@ -406,6 +406,8 @@ graphify-out/
 !/docs/plans/kmp-library-and-filesystem-map.md
 !/docs/plans/kmp-migration-progress.md
 !/docs/plans/kmp-next-session-prompt.md
+# Browse Inspirations rework plan: committed at the owner's explicit request (secret-free).
+!/docs/plans/browse-inspirations-rework-plan.md
 /.claude/skills/compose-ui/SKILL.md
 /.claude/skills/compose-ui/references/visual-loop-setup.md
 /.claude/skills/compose-ui/references/components.md
