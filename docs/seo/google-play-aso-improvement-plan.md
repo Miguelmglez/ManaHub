@@ -192,9 +192,10 @@ are live in the production build.** Promising a hidden feature is a metadata-pol
 **Hidden or not ready: do NOT mention in the listing yet** (these become "What's new" and LiveOps
 moments when they ship): online multiplayer (`ONLINE_SESSIONS_ENABLED = false`), gamification
 (`Gamification.ENABLED = false`), Daily Puzzle (`PUZZLE_ENABLED = false`), draft simulator
-(`SIMULATOR_ENABLED = false`; the draft area is flagged "not live, rebuild in progress"), Discoveries v2
-and its "Build this" hand-off (`DISCOVERIES_V2_ENABLED`, `DISCOVERY_BUILD_HANDOFF_ENABLED = false`),
-tablet/foldable layouts (planned).
+(`SIMULATOR_ENABLED = false`; the draft area is flagged "not live, rebuild in progress"), tablet/foldable
+layouts (planned). (Update: Deck Studio's **Browse inspirations**, `DISCOVERIES_V2_ENABLED` +
+`DISCOVERY_BUILD_HANDOFF_ENABLED`, went live on 2026-09-24. It can be mentioned as "find deck ideas
+in your own collection" once it is in a production release.)
 
 **Claims to word carefully**
 
