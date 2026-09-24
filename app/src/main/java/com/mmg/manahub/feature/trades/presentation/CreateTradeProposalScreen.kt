@@ -23,26 +23,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LibraryBooks
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -55,38 +52,47 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.AddCardRow
 import com.mmg.manahub.core.ui.components.AddCardSheet
+import com.mmg.manahub.core.ui.components.AvatarImage
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.CardSearchSheet
+import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
+import com.mmg.manahub.core.ui.components.MagicLoadingFooter
+import com.mmg.manahub.core.ui.components.InlineErrorState
+import com.mmg.manahub.core.data.network.RateLimitExhaustedException
+import androidx.compose.foundation.lazy.LazyListScope
 import com.mmg.manahub.core.ui.components.EmptyState
-import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.HexGridBackground
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicSelectionItem
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
-import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
-import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -139,6 +145,14 @@ fun CreateTradeProposalScreen(
     var showEditSheet by remember { mutableStateOf(false) }
     var showLoginSheet by remember { mutableStateOf(false) }
     val noFriendMsg = stringResource(R.string.trades_friend_required)
+    val openSearch: (TradeSide) -> Unit = { side ->
+        if (uiState.selectedFriend == null) {
+            toastState.show(noFriendMsg, MagicToastType.ERROR)
+        } else {
+            viewModel.onOpenSearch(side)
+            showAddItemSheet = side
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(mc.background)) {
         HexGridBackground(modifier = Modifier.fillMaxSize(), color = mc.primaryAccent.copy(alpha = 0.05f))
@@ -193,41 +207,16 @@ fun CreateTradeProposalScreen(
                         .padding(horizontal = MaterialTheme.spacing.lg, vertical = MaterialTheme.spacing.sm),
                     verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
                 ) {
-                    Button(
-                        onClick  = viewModel::onSendProposal,
-                        enabled  = !uiState.isSaving,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                        shape    = ButtonShape
-                    ) {
-                        if (uiState.isSaving) {
-                            MagicLoadingSpinner(size = MagicLoadingSize.XSmall)
-                        } else {
-                            Text(
-                                stringResource(
-                                    if (uiState.editingProposalId != null) R.string.trades_update_proposal
-                                    else R.string.trades_send_proposal
-                                ),
-                                color = mc.background,
-                                style = MaterialTheme.magicTypography.titleMedium,
-                            )
-                        }
-                    }
-                    if (!uiState.isCounterMode && uiState.editingProposalId == null) {
-                        OutlinedButton(
-                            onClick  = viewModel::onSaveDraft,
-                            enabled  = !uiState.isSaving,
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
-                            shape    = ButtonShape,
-                            border   = BorderStroke(1.dp, mc.textDisabled.copy(alpha = 0.2f)),
-                            colors   = ButtonDefaults.outlinedButtonColors(contentColor = mc.textSecondary)
-                        ) {
-                            Text(
-                                stringResource(R.string.trades_save_draft),
-                                style = MaterialTheme.magicTypography.bodyLarge,
-                            )
-                        }
-                    }
+                    MagicCtaButton(
+                        onClick   = viewModel::onSendProposal,
+                        text      = stringResource(
+                            if (uiState.editingProposalId != null) R.string.trades_update_proposal
+                            else R.string.trades_send_proposal
+                        ),
+                        isLoading = uiState.isSaving,
+                        color     = MagicCtaColor.Primary,
+                        modifier  = Modifier.fillMaxWidth(),
+                    )
                 }
             },
         ) { innerPadding ->
@@ -290,27 +279,8 @@ fun CreateTradeProposalScreen(
                             matches = uiState.proposerMatches,
                             onCardClick = onNavigateToCardDetail,
                             onAdd   = { row ->
-                                val card = row.card
                                 viewModel.addSuggestionToProposer(
-                                    TradeItemDraft(
-                                        cardId       = card.scryfallId,
-                                        cardName     = card.name,
-                                        imageUrl     = card.imageArtCrop ?: card.imageNormal,
-                                        typeLine     = card.typeLine,
-                                        setCode      = card.setCode,
-                                        setName      = card.setName,
-                                        rarity       = card.rarity,
-                                        priceUsd     = card.priceUsd,
-                                        priceUsdFoil = card.priceUsdFoil,
-                                        priceEur     = card.priceEur,
-                                        priceEurFoil = card.priceEurFoil,
-                                        quantity     = 1,
-                                        isFoil       = row.wishlistEntry?.isFoil ?: row.offerEntry?.isFoil ?: false,
-                                        condition    = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM",
-                                        language     = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en",
-                                        userCardIdRef = row.offerEntry?.userCardId,
-                                        isInCollection = row.isOwned || row.offerEntry != null,
-                                    )
+                                    row.toTradeItemDraft(isInCollection = row.isOwned || row.offerEntry != null)
                                 )
                             },
                         )
@@ -328,17 +298,9 @@ fun CreateTradeProposalScreen(
 
                 if (uiState.proposerItems.isEmpty() && !uiState.includesReviewFromProposer) {
                     item(key = "proposer_empty") {
-                        EmptySidePlaceholder(
-                            text = stringResource(R.string.trades_proposer_empty_cta),
-                            enabled = uiState.selectedFriend != null,
-                            onClick = {
-                                if (uiState.selectedFriend == null) {
-                                    toastState.show(noFriendMsg, MagicToastType.ERROR)
-                                } else {
-                                    viewModel.onOpenSearch(TradeSide.PROPOSER)
-                                    showAddItemSheet = TradeSide.PROPOSER
-                                }
-                            }
+                        SideEmptyState(
+                            title = stringResource(R.string.trades_proposer_empty_cta),
+                            onAdd = { openSearch(TradeSide.PROPOSER) },
                         )
                     }
                 } else {
@@ -356,14 +318,7 @@ fun CreateTradeProposalScreen(
                     item(key = "they_get_add") {
                         AddItemButton(
                             enabled = uiState.selectedFriend != null,
-                            onClick = {
-                                if (uiState.selectedFriend == null) {
-                                    toastState.show(noFriendMsg, MagicToastType.ERROR)
-                                } else {
-                                    viewModel.onOpenSearch(TradeSide.PROPOSER)
-                                    showAddItemSheet = TradeSide.PROPOSER
-                                }
-                            }
+                            onClick = { openSearch(TradeSide.PROPOSER) },
                         )
                     }
                 }
@@ -410,27 +365,8 @@ fun CreateTradeProposalScreen(
                             matches = uiState.receiverMatches,
                             onCardClick = onNavigateToCardDetail,
                             onAdd   = { row ->
-                                val card = row.card
                                 viewModel.addSuggestionToReceiver(
-                                    TradeItemDraft(
-                                        cardId       = card.scryfallId,
-                                        cardName     = card.name,
-                                        imageUrl     = card.imageArtCrop ?: card.imageNormal,
-                                        typeLine     = card.typeLine,
-                                        setCode      = card.setCode,
-                                        setName      = card.setName,
-                                        rarity       = card.rarity,
-                                        priceUsd     = card.priceUsd,
-                                        priceUsdFoil = card.priceUsdFoil,
-                                        priceEur     = card.priceEur,
-                                        priceEurFoil = card.priceEurFoil,
-                                        quantity     = 1,
-                                        isFoil       = row.offerEntry?.isFoil ?: false,
-                                        condition    = row.offerEntry?.condition ?: "NM",
-                                        language     = row.offerEntry?.language ?: "en",
-                                        userCardIdRef = row.offerEntry?.userCardId,
-                                        isInCollection = row.offerEntry != null,
-                                    )
+                                    row.toTradeItemDraft(isInCollection = row.offerEntry != null)
                                 )
                             },
                         )
@@ -439,17 +375,9 @@ fun CreateTradeProposalScreen(
 
                 if (uiState.receiverItems.isEmpty()) {
                     item(key = "receiver_empty") {
-                        EmptySidePlaceholder(
-                            text = stringResource(R.string.trades_receiver_empty_cta),
-                            enabled = uiState.selectedFriend != null,
-                            onClick = {
-                                if (uiState.selectedFriend == null) {
-                                    toastState.show(noFriendMsg, MagicToastType.ERROR)
-                                } else {
-                                    viewModel.onOpenSearch(TradeSide.RECEIVER)
-                                    showAddItemSheet = TradeSide.RECEIVER
-                                }
-                            }
+                        SideEmptyState(
+                            title = stringResource(R.string.trades_receiver_empty_cta),
+                            onAdd = { openSearch(TradeSide.RECEIVER) },
                         )
                     }
                 } else {
@@ -467,14 +395,7 @@ fun CreateTradeProposalScreen(
                     item(key = "you_get_add") {
                         AddItemButton(
                             enabled = uiState.selectedFriend != null,
-                            onClick = {
-                                if (uiState.selectedFriend == null) {
-                                    toastState.show(noFriendMsg, MagicToastType.ERROR)
-                                } else {
-                                    viewModel.onOpenSearch(TradeSide.RECEIVER)
-                                    showAddItemSheet = TradeSide.RECEIVER
-                                }
-                            }
+                            onClick = { openSearch(TradeSide.RECEIVER) },
                         )
                     }
                 }
@@ -531,25 +452,9 @@ fun CreateTradeProposalScreen(
             ),
             onAdd = { row ->
                 focusManager.clearFocus()
-                val card = row.card
-                val draft = TradeItemDraft(
-                    cardId = card.scryfallId,
-                    cardName = card.name,
-                    imageUrl = card.imageArtCrop ?: card.imageNormal,
-                    typeLine = card.typeLine,
-                    setCode = card.setCode,
-                    setName = card.setName,
-                    rarity = card.rarity,
-                    priceUsd = card.priceUsd,
-                    priceUsdFoil = card.priceUsdFoil,
-                    priceEur = card.priceEur,
-                    priceEurFoil = card.priceEurFoil,
-                    quantity = 1,
-                    isFoil = row.wishlistEntry?.isFoil ?: row.offerEntry?.isFoil ?: false,
-                    condition = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM",
-                    language = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en",
-                    userCardIdRef = row.offerEntry?.userCardId,
+                val draft = row.toTradeItemDraft(
                     isInCollection = row.isOwned || row.offerEntry != null || row.wishlistEntry != null,
+                    fromFriendList = side == TradeSide.PROPOSER && row.offerEntry == null && row.wishlistEntry != null,
                 )
                 when (side) {
                     TradeSide.PROPOSER -> viewModel.addProposerItem(draft)
@@ -558,22 +463,8 @@ fun CreateTradeProposalScreen(
             },
             onRemove = { row ->
                 focusManager.clearFocus()
-                // Derive the same normalized variant fields that onAdd uses when building the
-                // TradeItemDraft, so the findLast predicate matches the stored item exactly.
-                // WishlistEntry.condition / .language are nullable; if null, onAdd falls back to
-                // "NM" / "en" — we must apply the same fallback here or the comparison fails.
-                val resolvedIsFoil = row.wishlistEntry?.isFoil ?: row.offerEntry?.isFoil ?: false
-                val resolvedCondition = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM"
-                val resolvedLanguage = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en"
-                val resolvedUserCardIdRef = row.offerEntry?.userCardId
-
-                val predicate: (TradeItemDraft) -> Boolean = { item ->
-                    item.cardId == row.card.scryfallId &&
-                        item.isFoil == resolvedIsFoil &&
-                        item.condition == resolvedCondition &&
-                        item.language == resolvedLanguage &&
-                            item.userCardIdRef == resolvedUserCardIdRef
-                }
+                // Same variant resolution as onAdd, so the removed item is the one that was added.
+                val predicate: (TradeItemDraft) -> Boolean = { item -> row.matchesDraft(item) }
 
                 when (side) {
                     TradeSide.PROPOSER ->
@@ -591,6 +482,14 @@ fun CreateTradeProposalScreen(
                 viewModel.setNavigatingToDetail(true)
                 onNavigateToCardDetail(scryfallId)
             },
+            offerResultsFooter = if (side == TradeSide.RECEIVER) {
+                { friendCollectionFooter(uiState, viewModel::onLoadMoreFriendCollection, viewModel::onRetryFriendCollection) }
+            } else {
+                null
+            },
+            scryfallErrorContent = uiState.scryfallError?.let { error ->
+                @Composable { ScryfallSearchError(error = error, onRetry = viewModel::retryScryfallSearch) }
+            },
             onDismiss = {
                 focusManager.clearFocus()
                 if (!uiState.isNavigatingToDetail) {
@@ -607,6 +506,12 @@ fun CreateTradeProposalScreen(
         editingItem?.let { item ->
             AddCardSheet(
                 cardName = item.cardName,
+                initialFoil = item.isFoil,
+                initialCondition = item.condition,
+                initialLanguage = item.language,
+                initialQty = item.quantity,
+                maxQty = item.maxQuantity ?: 99,
+                variantLocked = item.isVariantLocked,
                 onConfirm = { isFoil, condition, language, qty ->
                     val updated = item.copy(
                         quantity = qty,
@@ -630,6 +535,22 @@ fun CreateTradeProposalScreen(
                 confirmButtonText = stringResource(R.string.scanner_edit_save)
             )
         }
+    }
+
+    uiState.pendingFriendSwitch?.let { pending ->
+        MagicAlertDialog(
+            onDismissRequest = viewModel::onDismissFriendSwitch,
+            title = stringResource(R.string.trades_friend_switch_title),
+            text = stringResource(R.string.trades_friend_switch_body),
+            confirmLabel = stringResource(
+                if (pending.friend == null) R.string.trades_friend_switch_confirm_none
+                else R.string.trades_friend_switch_confirm
+            ),
+            onConfirm = viewModel::onConfirmFriendSwitch,
+            dismissLabel = stringResource(R.string.action_cancel),
+            onDismiss = viewModel::onDismissFriendSwitch,
+            confirmColor = MagicCtaColor.Error,
+        )
     }
 
     if (showLoginSheet) {
@@ -667,26 +588,15 @@ private fun FriendSelector(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(mc.backgroundSecondary),
-                contentAlignment = Alignment.Center
-            ) {
-                if (selectedFriend?.avatarUrl != null) {
-                    AsyncImage(
-                        model = selectedFriend.avatarUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
+            if (selectedFriend != null) {
+                FriendAvatar(selectedFriend)
+            } else {
+                Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = null,
-                        tint = mc.textDisabled,
-                        modifier = Modifier.size(18.dp)
+                        tint = mc.textSecondary,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -707,7 +617,7 @@ private fun FriendSelector(
                     Text(
                         text = stringResource(R.string.trades_friend_selector_hint),
                         style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.textDisabled
+                        color = mc.textSecondary
                     )
                 }
             }
@@ -747,7 +657,7 @@ private fun FriendSelector(
                 ) {
                     IconButton(
                         onClick = { showSheet = false },
-                        modifier = Modifier.offset(x = (-12).dp)
+                        modifier = Modifier.offset(x = -MaterialTheme.spacing.md)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
@@ -762,7 +672,7 @@ private fun FriendSelector(
                 // (never by index — the CLAUDE.md rule against a key value that can repeat).
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
                 ) {
                     item(key = "friend_selector_title") {
                         Text(
@@ -802,59 +712,37 @@ private fun FriendSelector(
                         else -> {
                             // "None" option
                             item(key = "friend_selector_none_option") {
-                                Surface(
+                                val isSelected = selectedFriend == null
+                                MagicSelectionItem(
+                                    title = stringResource(R.string.trades_friend_none_option),
+                                    isSelected = isSelected,
                                     onClick = {
                                         onFriendSelected(null)
                                         showSheet = false
                                     },
-                                    shape = CardShape,
-                                    color = if (selectedFriend == null) mc.primaryAccent.copy(alpha = 0.1f) else Color.Transparent,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        stringResource(R.string.trades_friend_none_option),
-                                        modifier = Modifier.padding(MaterialTheme.spacing.lg),
-                                        style = MaterialTheme.magicTypography.bodyMedium,
-                                        color = if (selectedFriend == null) mc.primaryAccent else mc.textPrimary
-                                    )
-                                }
+                                    modifier = Modifier.semantics {
+                                        role = Role.RadioButton
+                                        selected = isSelected
+                                    },
+                                )
                             }
 
                             items(friends, key = { it.userId }) { friend ->
-                                Surface(
+                                val isSelected = selectedFriend?.userId == friend.userId
+                                MagicSelectionItem(
+                                    title = friend.nickname,
+                                    description = friend.gameTag,
+                                    isSelected = isSelected,
                                     onClick = {
                                         onFriendSelected(friend)
                                         showSheet = false
                                     },
-                                    shape = CardShape,
-                                    color = if (selectedFriend?.userId == friend.userId) mc.primaryAccent.copy(alpha = 0.1f) else Color.Transparent,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(MaterialTheme.spacing.md),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md)
-                                    ) {
-                                        AsyncImage(
-                                            model = friend.avatarUrl,
-                                            contentDescription = null,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.size(40.dp).clip(CircleShape)
-                                        )
-                                        Column {
-                                            Text(
-                                                friend.nickname,
-                                                style = MaterialTheme.magicTypography.bodyMedium,
-                                                color = if (selectedFriend?.userId == friend.userId) mc.primaryAccent else mc.textPrimary
-                                            )
-                                            Text(
-                                                friend.gameTag,
-                                                style = MaterialTheme.magicTypography.labelSmall,
-                                                color = mc.textSecondary
-                                            )
-                                        }
-                                    }
-                                }
+                                    icon = { FriendAvatar(friend) },
+                                    modifier = Modifier.semantics {
+                                        role = Role.RadioButton
+                                        selected = isSelected
+                                    },
+                                )
                             }
                         }
                     }
@@ -871,35 +759,18 @@ private fun ProposerIdentityCard(nickname: String, avatarUrl: String? = null) {
         shape    = CardShape,
         color    = mc.surface.copy(alpha = 0.3f),
         modifier = Modifier.fillMaxWidth(),
-        border   = androidx.compose.foundation.BorderStroke(1.dp, mc.textDisabled.copy(alpha = 0.06f)),
+        border   = BorderStroke(1.dp, mc.textDisabled.copy(alpha = 0.06f)),
     ) {
         Row(
             modifier              = Modifier.padding(MaterialTheme.spacing.md),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
         ) {
-            Box(
-                modifier         = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(mc.primaryAccent.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (avatarUrl != null) {
-                    AsyncImage(
-                        model = avatarUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Text(
-                        text  = nickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                        style = MaterialTheme.magicTypography.labelLarge,
-                        color = mc.primaryAccent,
-                    )
-                }
-            }
+            AvatarImage(
+                avatarUrl = avatarUrl?.takeIf { it.isNotBlank() },
+                initials  = nickname.initial(),
+                size      = AVATAR_SIZE,
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text  = nickname.ifBlank { stringResource(R.string.trades_you_offer_section) },
@@ -916,6 +787,19 @@ private fun ProposerIdentityCard(nickname: String, avatarUrl: String? = null) {
     }
 }
 
+private const val AVATAR_SIZE = 40
+
+private fun String.initial(): String = firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+
+@Composable
+private fun FriendAvatar(friend: Friend) {
+    AvatarImage(
+        avatarUrl = friend.avatarUrl?.takeIf { it.isNotBlank() },
+        initials  = friend.nickname.initial(),
+        size      = AVATAR_SIZE,
+    )
+}
+
 @Composable
 private fun TradeItemDraftRow(
     item:     TradeItemDraft,
@@ -927,7 +811,7 @@ private fun TradeItemDraftRow(
     Surface(
         shape    = CardShape,
         color    = mc.surface.copy(alpha = 0.7f),
-        border   = androidx.compose.foundation.BorderStroke(1.dp, mc.textDisabled.copy(alpha = 0.1f)),
+        border   = BorderStroke(1.dp, mc.textDisabled.copy(alpha = 0.1f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -936,13 +820,13 @@ private fun TradeItemDraftRow(
                     imageVector = Icons.Default.Warning,
                     contentDescription = null,
                     tint = mc.goldMtg,
-                    modifier = Modifier.size(10.dp)
+                    modifier = Modifier.size(12.dp)
                 )
-                Spacer(Modifier.width(MaterialTheme.spacing.xxs))
+                Spacer(Modifier.width(MaterialTheme.spacing.xs))
                 Text(
                     text = stringResource(R.string.trades_warning_not_in_collection),
                     style = MaterialTheme.magicTypography.labelSmall,
-                    color = mc.goldMtg,
+                    color = mc.textSecondary,
                 )
             }
 
@@ -953,7 +837,7 @@ private fun TradeItemDraftRow(
                 priceEur      = null,
                 onClick       = onClick,
                 modifier      = Modifier.weight(1f),
-                quantityText  = "×${item.quantity}",
+                quantityText  = stringResource(R.string.trades_quantity_multiplier, item.quantity),
                 hasFoil       = item.isFoil,
                 condition     = item.condition.takeIf { it.isNotBlank() },
                 language      = item.language.takeIf { it.isNotBlank() },
@@ -961,14 +845,14 @@ private fun TradeItemDraftRow(
                 setCode       = item.setCode,
                 setName       = item.setName,
                 rarity        = item.rarity,
-                containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                containerColor = Color.Transparent,
                 extraSupportingContent = if (!item.isInCollection) extraContent else null,
             )
             IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
                 Icon(
                     imageVector        = Icons.Default.Close,
                     contentDescription = stringResource(R.string.action_remove),
-                    tint               = mc.textDisabled,
+                    tint               = mc.textSecondary,
                     modifier           = Modifier.size(16.dp),
                 )
             }
@@ -976,40 +860,19 @@ private fun TradeItemDraftRow(
     }
 }
 
+/** Empty trade side; the CTA stays tappable without a partner so the tap can explain why search is blocked. */
 @Composable
-private fun EmptySidePlaceholder(
-    text: String,
-    onClick: () -> Unit,
-    enabled: Boolean = true,
+private fun SideEmptyState(
+    title: String,
+    onAdd: () -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
-    val contentAlpha = if (enabled) 1f else 0.5f
-    Surface(
-        onClick = onClick,
-        shape = CardShape,
-        color = mc.surface.copy(alpha = if (enabled) 0.3f else 0.15f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, mc.textDisabled.copy(alpha = 0.1f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(MaterialTheme.spacing.xl),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null,
-                tint = mc.primaryAccent.copy(alpha = 0.5f * contentAlpha),
-                modifier = Modifier.size(32.dp)
-            )
-            Text(
-                text = text,
-                style = MaterialTheme.magicTypography.bodySmall,
-                color = mc.textSecondary.copy(alpha = contentAlpha),
-                textAlign = TextAlign.Center
-            )
-        }
-    }
+    EmptyState(
+        title       = title,
+        icon        = Icons.Default.Add,
+        actionLabel = stringResource(R.string.trades_add_item),
+        onAction    = onAdd,
+        modifier    = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
@@ -1019,75 +882,33 @@ private fun ReviewCollectionToggle(
     onToggle: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-
-    val accentColor = mc.primaryAccent
-    val borderColor = if (checked) accentColor else mc.textDisabled.copy(alpha = 0.25f)
-    val surfaceColor = if (checked) accentColor.copy(alpha = 0.12f) else mc.surface.copy(alpha = 0.2f)
-    val shadowElevation = if (checked) 4.dp else 0.dp
-
-    Surface(
-        onClick = onToggle,
-        shape = CardShape,
-        color = surfaceColor,
-        border = BorderStroke(width = if (checked) 1.5.dp else 1.dp, color = borderColor),
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = shadowElevation,
-                shape = CardShape,
-                ambientColor = accentColor.copy(alpha = 0.2f),
-                spotColor = accentColor.copy(alpha = 0.3f),
-            ),
-        shadowElevation = 0.dp, // handled manually via Modifier.shadow above
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
-        ) {
-            // ── Collection icon badge ──────────────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(ChipShape)
-                    .background(
-                        if (checked) accentColor.copy(alpha = 0.22f)
-                        else mc.backgroundSecondary.copy(alpha = 0.5f)
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.LibraryBooks,
-                    contentDescription = null,
-                    tint = if (checked) accentColor else mc.textDisabled,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-
-            // ── Label + subtitle ───────────────────────────────────────────────────
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs)) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (checked) accentColor else mc.textPrimary,
-                )
-                Text(
-                    text = stringResource(R.string.trades_review_collection_subtitle),
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = if (checked) accentColor.copy(alpha = 0.75f) else mc.textSecondary,
-                )
-            }
-
-            // ── Toggle indicator ───────────────────────────────────────────────────
+    val tint = if (checked) mc.primaryAccent else mc.textSecondary
+    MagicSelectionItem(
+        title       = label,
+        description = stringResource(R.string.trades_review_collection_subtitle),
+        isSelected  = checked,
+        onClick     = onToggle,
+        icon        = {
             Icon(
-                imageVector = if (checked) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                imageVector = Icons.Default.LibraryBooks,
                 contentDescription = null,
-                tint = if (checked) accentColor else mc.textDisabled.copy(alpha = 0.5f),
-                modifier = Modifier.size(22.dp),
+                tint = tint,
+                modifier = Modifier.size(24.dp),
             )
-        }
-    }
+        },
+        trailing    = {
+            Icon(
+                imageVector = if (checked) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(24.dp),
+            )
+        },
+        modifier    = Modifier.semantics {
+            role = Role.Checkbox
+            toggleableState = ToggleableState(checked)
+        },
+    )
 }
 
 /**
@@ -1103,12 +924,23 @@ private fun InlineSuggestionsRow(
 ) {
     val mc = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
-        Text(
-            text = label,
-            style = MaterialTheme.magicTypography.labelSmall,
-            color = mc.goldMtg,
-            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.xs)
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs),
+        ) {
+            Icon(
+                imageVector = Icons.Default.AutoAwesome,
+                contentDescription = null,
+                tint = mc.goldMtg,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.magicTypography.labelSmall,
+                color = mc.textSecondary,
+            )
+        }
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
@@ -1125,6 +957,9 @@ private fun InlineSuggestionsRow(
         }
     }
 }
+
+// Fraction of the card's longer side the corner glow spreads over, so it scales with the card.
+private const val SUGGESTION_GLOW_RADIUS_FRACTION = 0.4f
 
 @Composable
 private fun SuggestionCardItem(
@@ -1164,13 +999,18 @@ private fun SuggestionCardItem(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(glowColor, Color.Transparent),
-                        center = Offset.Zero,
-                        radius = 400f
-                    )
-                )
+                .drawBehind {
+                    val radius = size.maxDimension * SUGGESTION_GLOW_RADIUS_FRACTION
+                    if (glowColor.alpha > 0f && radius > 0f) {
+                        drawRect(
+                            Brush.radialGradient(
+                                colors = listOf(glowColor, Color.Transparent),
+                                center = Offset.Zero,
+                                radius = radius,
+                            )
+                        )
+                    }
+                }
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1208,25 +1048,57 @@ private fun SuggestionCardItem(
     }
 }
 
+/** Adds a card to a trade side; without a partner it renders neutral but still reports why on tap. */
 @Composable
 private fun AddItemButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
 ) {
-    val mc = MaterialTheme.magicColors
-    val contentAlpha = if (enabled) 1f else 0.5f
-    OutlinedButton(
-        onClick = onClick,
+    MagicCtaButton(
+        onClick  = onClick,
+        text     = stringResource(R.string.trades_add_item),
+        style    = MagicCtaStyle.Outlined,
+        color    = if (enabled) MagicCtaColor.Primary else MagicCtaColor.Neutral,
+        icon     = { Icon(Icons.Default.Add, contentDescription = null) },
         modifier = Modifier.fillMaxWidth(),
-        shape = ButtonShape,
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent.copy(alpha = contentAlpha)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.3f * contentAlpha))
-    ) {
-        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(MaterialTheme.spacing.sm))
-        Text(
-            stringResource(R.string.trades_add_item),
-            style = MaterialTheme.magicTypography.labelLarge,
-        )
+    )
+}
+
+/** Paging footer of the friend's collection in the "You get" sheet: loads the next page when it scrolls into view. */
+private fun LazyListScope.friendCollectionFooter(
+    uiState: ProposalEditorUiState,
+    onLoadMore: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    when {
+        uiState.friendCollectionLoadFailed -> item(key = "friend_collection_error") {
+            InlineErrorState(
+                message = stringResource(R.string.trades_friend_collection_load_error),
+                retryLabel = stringResource(R.string.action_retry),
+                onRetry = onRetry,
+            )
+        }
+        uiState.friendCollectionHasMore -> item(key = "friend_collection_more") {
+            // Keyed on the row count so a footer still on screen after a page lands asks for the next one.
+            LaunchedEffect(uiState.offerResults.size) { onLoadMore() }
+            MagicLoadingFooter(label = null)
+        }
     }
+}
+
+/** Failed Scryfall search in the "All cards" tab; a rate-limited failure disables retry until the cooldown ends. */
+@Composable
+private fun ScryfallSearchError(error: String, onRetry: () -> Unit) {
+    val retryAfterMs = RateLimitExhaustedException.retryAfterMsOrNull(error)
+    val remainingSeconds = rememberRateLimitCountdownSeconds(retryAfterMs)
+    InlineErrorState(
+        message = when {
+            retryAfterMs == null -> stringResource(R.string.trades_scryfall_search_error)
+            remainingSeconds > 0 -> stringResource(R.string.error_rate_limited_retry_countdown, remainingSeconds)
+            else -> stringResource(R.string.error_rate_limited_message)
+        },
+        retryLabel = stringResource(R.string.action_retry),
+        onRetry = onRetry,
+        enabled = remainingSeconds <= 0,
+    )
 }

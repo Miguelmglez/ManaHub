@@ -122,6 +122,10 @@ fun AddCardSheet(
      */
     cardImagePlaceholder: Painter? = null,
     extraContent: (@Composable () -> Unit)? = null,
+    /** Upper bound for the quantity stepper (e.g. the copies actually offered). */
+    maxQty: Int = 99,
+    /** When true, foil/condition/language are shown read-only (the card is a concrete copy). */
+    variantLocked: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -130,7 +134,8 @@ fun AddCardSheet(
     var isFoil by remember { mutableStateOf(initialFoil) }
     var condition by remember { mutableStateOf(initialCondition) }
     var language by remember { mutableStateOf(initialLanguage) }
-    var qty by remember { mutableIntStateOf(initialQty) }
+    val qtyCap = maxQty.coerceAtLeast(1)
+    var qty by remember { mutableIntStateOf(initialQty.coerceIn(1, qtyCap)) }
 
     var showConditionSheet by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
@@ -311,6 +316,7 @@ fun AddCardSheet(
                         value = condition,
                         icon = null, // Could add icon here if needed
                         modifier = Modifier.weight(1.2f),
+                        enabled = !variantLocked,
                         onClick = { showConditionSheet = true }
                     )
 
@@ -320,6 +326,7 @@ fun AddCardSheet(
                         value = CardConstants.getFlag(language),
                         icon = null,
                         modifier = Modifier.weight(1f),
+                        enabled = !variantLocked,
                         onClick = { showLanguageSheet = true }
                     )
 
@@ -332,6 +339,7 @@ fun AddCardSheet(
                             1.dp,
                             if (isFoil) mc.primaryAccent.copy(alpha = 0.6f) else mc.surfaceVariant
                         ),
+                        enabled = !variantLocked,
                         onClick = { isFoil = !isFoil }
                     ) {
                         Column(
@@ -347,6 +355,7 @@ fun AddCardSheet(
                             Switch(
                                 checked = isFoil,
                                 onCheckedChange = { isFoil = it },
+                                enabled = !variantLocked,
                                 modifier = Modifier.size(width = 32.dp, height = 24.dp).scale(0.75f),
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = mc.background,
@@ -400,14 +409,15 @@ fun AddCardSheet(
                         )
 
                         IconButton(
-                            onClick = { if (qty < 99) qty++ },
+                            onClick = { if (qty < qtyCap) qty++ },
+                            enabled = qty < qtyCap,
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
                                 Icons.Default.Add,
                                 contentDescription = "Add",
                                 modifier = Modifier.size(20.dp),
-                                tint = if (qty < 99) mc.primaryAccent else mc.textDisabled
+                                tint = if (qty < qtyCap) mc.primaryAccent else mc.textDisabled
                             )
                         }
                     }
@@ -481,6 +491,7 @@ private fun SelectorCard(
     value: String,
     icon: @Composable (() -> Unit)?,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -492,6 +503,7 @@ private fun SelectorCard(
         color = mc.surface,
         shape = CardShape,
         border = BorderStroke(1.dp, mc.surfaceVariant),
+        enabled = enabled,
         onClick = onClick
     ) {
         Column(

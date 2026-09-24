@@ -1,6 +1,17 @@
 package com.mmg.manahub.feature.home.presentation
 
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.max
+import com.mmg.manahub.core.FeatureFlags
+import com.mmg.manahub.core.ui.components.rememberMagicSkeletonPulse
+import com.mmg.manahub.core.ui.isReducedMotionEnabled
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.BorderStroke
@@ -23,15 +34,14 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
@@ -63,32 +73,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.QuickStartAction
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.AvatarImage
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicFilterChip
-import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
-import java.util.Calendar
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Home dashboard — fully customizable widget board.
@@ -116,12 +125,16 @@ fun HomeScreen(
     // HomeViewModel.communityDecksFlow's KDoc.
     val communityDecks by viewModel.communityDecksFlow.collectAsStateWithLifecycle()
     val communityDecksCategory by viewModel.communityDecksCategoryFlow.collectAsStateWithLifecycle()
+    val communityDecksFormat by viewModel.communityDecksFormatFlow.collectAsStateWithLifecycle()
     // Daily Puzzle (ADR-006), Batch B2 — kept OUTSIDE HomeUiState for the same reason, see
     // HomeViewModel.dailyPuzzleFlow's KDoc.
     val dailyPuzzle by viewModel.dailyPuzzleFlow.collectAsStateWithLifecycle()
     // Competitive feature, Phase 5 — kept OUTSIDE HomeUiState for the same reason, see
     // HomeViewModel.competitiveEnabledFlow's KDoc.
     val competitiveEnabled by viewModel.competitiveEnabledFlow.collectAsStateWithLifecycle()
+    val widgetReadiness by viewModel.widgetReadiness.collectAsStateWithLifecycle()
+    val widgetExtras by viewModel.widgetExtrasFlow.collectAsStateWithLifecycle()
+    val rulesTipIndex by viewModel.rulesTipIndexFlow.collectAsStateWithLifecycle()
     var showCustomizeSheet by remember { mutableStateOf(false) }
     var showGallerySheet by remember { mutableStateOf(false) }
 
@@ -141,15 +154,21 @@ fun HomeScreen(
     }
 
     // The active game override is disabled for now (user request: only show Welcome and Loading).
-    val effectiveState = uiState.copy(quickStartActions = effectiveQuickStartActions)
+    val effectiveState = remember(uiState, effectiveQuickStartActions) {
+        uiState.copy(quickStartActions = effectiveQuickStartActions)
+    }
 
     HomeScreen(
         uiState = effectiveState,
         trending = trending,
         communityDecks = communityDecks,
         communityDecksCategory = communityDecksCategory,
+        communityDecksFormat = communityDecksFormat,
         dailyPuzzle = dailyPuzzle,
-        competitiveEnabled = competitiveEnabled,
+        widgetReadiness = widgetReadiness,
+        widgetExtras = widgetExtras,
+        rulesTipIndex = rulesTipIndex,
+        revealTracker = viewModel.revealTracker,
         onAction = { action ->
             when (action) {
                 HomeAction.CustomizeQuickStart -> showCustomizeSheet = true
@@ -176,6 +195,8 @@ fun HomeScreen(
                 HomeAction.RefreshRandomCard,
                 is HomeAction.SelectDiscoverSet,
                 is HomeAction.SelectCommunityDecksCategory,
+                is HomeAction.SelectCommunityDecksFormat,
+                HomeAction.RollRulesTip,
                 HomeAction.ResetNewsFilters,
                 -> viewModel.onAction(action)
                 // RateApp needs an Activity context to launch the store; resolve it upstream.
@@ -213,7 +234,6 @@ fun HomeScreen(
             competitiveEnabled = competitiveEnabled,
             onAddWidget = { type -> viewModel.onAction(HomeAction.AddWidget(type)) },
             onRemoveWidget = { type -> viewModel.onAction(HomeAction.RemoveWidget(type)) },
-            onMoveWidget = { from, to -> viewModel.onAction(HomeAction.MoveWidget(from, to)) },
             onUpdateLayout = { layout -> viewModel.onAction(HomeAction.UpdateLayout(layout)) },
             onCreateAccount = {
                 showGallerySheet = false
@@ -236,43 +256,57 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
-    // Deck Doctor Community/Archetype plan, Phase 5.
     trending: com.mmg.manahub.core.model.TrendingSnapshot? = null,
-    // Home widget board overhaul, TASK 5b.
     communityDecks: List<com.mmg.manahub.core.model.CommunityDeckSummary>? = null,
     communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
-    // Daily Puzzle (ADR-006), Batch B2.
+    communityDecksFormat: com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckFormatFilter? = null,
     dailyPuzzle: DailyPuzzleWidgetState? = null,
-    // Competitive feature, Phase 5.
-    competitiveEnabled: Boolean = false,
+    widgetReadiness: Map<HomeWidgetType, Boolean> = emptyMap(),
+    widgetExtras: HomeWidgetExtras = HomeWidgetExtras(),
+    rulesTipIndex: Int = 0,
+    revealTracker: WidgetRevealTracker = remember { WidgetRevealTracker() },
 ) {
     val spacing = MaterialTheme.spacing
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
+    // Hoisted above every branch so the board keeps its scroll position through loading and the
+    // Card Detail round trip.
+    val gridState = rememberLazyGridState()
+    val reducedMotion = isReducedMotionEnabled()
+    val pulse = rememberMagicSkeletonPulse(reducedMotion)
+    val metrics = rememberHomeWidgetMetrics()
+    val motion = remember(revealTracker, reducedMotion, pulse, gridState) {
+        HomeBoardMotion(revealTracker, reducedMotion, pulse, gridState)
+    }
+    // Keeps the hero slot while a just-emptied welcome plays its completion card, then releases it.
+    val heroHasSteps = (uiState.hero as? HomeHeroState.Welcome)?.steps?.isNotEmpty() == true
+    var holdCompletedHero by remember { mutableStateOf(false) }
+    LaunchedEffect(heroHasSteps) {
+        if (heroHasSteps) {
+            holdCompletedHero = true
+        } else if (holdCompletedHero) {
+            delay(HERO_COMPLETION_HOLD_MS)
+            holdCompletedHero = false
+        }
+    }
+    val widgets = remember(uiState, widgetExtras, trending, holdCompletedHero) {
+        boardWidgetsToRender(
+            state = uiState,
+            extras = widgetExtras,
+            trendingEmpty = trending?.topCommanders.isNullOrEmpty(),
+            puzzleEnabled = FeatureFlags.Puzzle.PUZZLE_ENABLED,
+            holdCompletedHero = holdCompletedHero,
+        )
+    }
+    // The board holds still while a shared-element transition runs, so the source bounds never move.
+    val boardFrozen = sharedTransitionScope?.isTransitionActive == true
+
     Box(modifier = modifier.fillMaxSize()) {
         ThemeBackground(modifier = Modifier.fillMaxSize())
 
-        // TASK 1: while the board's first combine emission is still pending, render a skeleton
-        // instead of an empty/partial grid so the transition to real content is smooth (no giant
-        // pop-in once everything resolves at once). The top bar stays visible throughout.
-        if (uiState.isLoading) {
-            Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-                HomeTopBar(
-                    uiState = uiState,
-                    onAvatarClick = { onAction(HomeAction.OpenProfile) },
-                    modifier = Modifier.padding(horizontal = spacing.lg),
-                )
-                HomeBoardSkeleton(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = spacing.lg),
-                )
-            }
-            return@Box
-        }
-
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
+            state = gridState,
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding(),
@@ -285,64 +319,97 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(spacing.lg),
             horizontalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
+            item(key = HOME_KEY_TOP_BAR, span = { GridItemSpan(maxLineSpan) }) {
                 HomeTopBar(
                     uiState = uiState,
                     onAvatarClick = { onAction(HomeAction.OpenProfile) },
                 )
             }
 
+            if (!uiState.boardReady) {
+                // Same grid, padding and top bar as the real board, so resolving it shifts nothing.
+                items(
+                    count = HOME_BOARD_SKELETON_COUNT,
+                    key = { "$HOME_KEY_SKELETON_PREFIX$it" },
+                    span = { GridItemSpan(maxLineSpan) },
+                ) {
+                    HomeBoardSkeletonItem(
+                        pulse = pulse,
+                        modifier = if (boardFrozen) Modifier else Modifier.animateItem(),
+                    )
+                }
+                return@LazyVerticalGrid
+            }
+
             // Every widget is MEDIUM (full width) after the consolidation.
-            // Defensive distinctBy to prevent fatal key collisions if a race condition
-            // occurs during rapid add/remove/move actions.
             items(
-                items = uiState.layout.distinctBy { it.type.persistedId },
-                key = { "widget_${it.type.persistedId}" },
+                items = widgets,
+                key = { homeWidgetKey(it.type) },
                 span = { GridItemSpan(maxLineSpan) },
             ) { widget ->
-                HomeWidgetContainer(
+                HomeWidgetHost(
                     widget = widget,
                     uiState = uiState,
+                    ready = widgetReadiness[widget.type] == true,
+                    metrics = metrics,
+                    motion = motion,
                     onAction = onAction,
+                    modifier = if (boardFrozen) Modifier else Modifier.animateItem(),
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
-                    modifier = Modifier,
                     trending = trending,
                     communityDecks = communityDecks,
                     communityDecksCategory = communityDecksCategory,
+                    communityDecksFormat = communityDecksFormat,
                     dailyPuzzle = dailyPuzzle,
-                    competitiveEnabled = competitiveEnabled,
+                    rulesTipIndex = rulesTipIndex,
                 )
             }
 
             if (uiState.layout.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
+                item(key = HOME_KEY_EMPTY, span = { GridItemSpan(maxLineSpan) }) {
                     EmptyState(
                         title = stringResource(R.string.home_empty_title),
                         subtitle = stringResource(R.string.home_empty_message),
                         actionLabel = stringResource(R.string.home_add_widgets),
                         onAction = { onAction(HomeAction.OpenWidgetGallery) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(if (boardFrozen) Modifier else Modifier.animateItem()),
                     )
                 }
             }
 
             uiState.accountNudge?.let { nudge ->
-                item(span = { GridItemSpan(maxLineSpan) }) {
+                item(key = HOME_KEY_NUDGE, span = { GridItemSpan(maxLineSpan) }) {
                     AccountNudgeCard(
                         nudge = nudge,
                         onCreateAccount = { onAction(HomeAction.CreateAccount) },
                         onDismiss = { onAction(HomeAction.DismissAccountNudge) },
+                        modifier = if (boardFrozen) Modifier else Modifier.animateItem(),
                     )
                 }
             }
 
             // Entry point to the widget gallery (add / remove / reorder) at the bottom.
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                EditWidgetsButton(onClick = { onAction(HomeAction.OpenWidgetGallery) })
+            item(key = HOME_KEY_EDIT_WIDGETS, span = { GridItemSpan(maxLineSpan) }) {
+                EditWidgetsButton(
+                    onClick = { onAction(HomeAction.OpenWidgetGallery) },
+                    modifier = if (boardFrozen) Modifier else Modifier.animateItem(),
+                )
             }
         }
     }
 }
+
+/** Completion card time (ContextHeroWidget waits 1.5 s, then plays its exit) before the slot goes. */
+private const val HERO_COMPLETION_HOLD_MS = 2_000L
+
+private const val HOME_KEY_TOP_BAR = "home_top_bar"
+private const val HOME_KEY_EMPTY = "home_empty"
+private const val HOME_KEY_NUDGE = "home_nudge"
+private const val HOME_KEY_EDIT_WIDGETS = "home_edit_widgets"
+private const val HOME_KEY_SKELETON_PREFIX = "home_skeleton_"
 
 @Composable
 private fun EditWidgetsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -370,6 +437,10 @@ private fun EditWidgetsButton(onClick: () -> Unit, modifier: Modifier = Modifier
 
 private val HomeTopBarHeight = 56.dp
 
+private val HomeAvatarSize = 56.dp
+
+private const val GREETING_FADE_MS = 220
+
 @Composable
 private fun HomeTopBar(
     uiState: HomeUiState,
@@ -383,62 +454,72 @@ private fun HomeTopBar(
     val playerName = uiState.playerName
     val greeting = greetingText(playerName)
     val openProfileDescription = stringResource(R.string.home_open_profile_a11y)
+    val greetingStyle = ty.displayMedium.copy(fontWeight = FontWeight.Bold)
+    val greetingTwoLines = with(LocalDensity.current) { greetingStyle.lineHeight.toDp() * 2 }
+    // Hidden until auth resolves so a signed-in user never sees the signed-out greeting first.
+    val greetingAlpha by animateFloatAsState(
+        targetValue = if (uiState.authResolved) 1f else 0f,
+        animationSpec = tween(GREETING_FADE_MS),
+        label = "greeting-alpha",
+    )
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(HomeTopBarHeight + 24.dp)
+            .heightIn(min = max(HomeTopBarHeight, greetingTwoLines))
             .padding(horizontal = spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = greeting,
-                style = ty.displayMedium.copy(fontWeight = FontWeight.Bold),
+                style = greetingStyle,
                 color = mc.textPrimary,
+                minLines = 2,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.graphicsLayer { alpha = greetingAlpha },
             )
         }
+        Spacer(Modifier.width(spacing.sm))
         
-        Surface(
+        val avatarUrl = uiState.avatarUrl?.takeIf { it.isNotBlank() }
+        val initials = playerName?.trim()?.firstOrNull()?.uppercase()
+        Box(
             modifier = Modifier
-                .size(56.dp)
+                .size(HomeAvatarSize)
                 .coloredShadow(
                     color = mc.primaryAccent.copy(alpha = 0.25f),
-                    borderRadius = 28.dp,
-                    blurRadius = 16.dp
+                    borderRadius = HomeAvatarSize / 2,
+                    blurRadius = spacing.lg,
                 )
                 .clip(CircleShape)
                 .border(BorderStroke(2.dp, mc.primaryAccent.copy(alpha = 0.5f)), CircleShape)
-                .clickable(onClick = onAvatarClick)
+                .clickable(onClickLabel = openProfileDescription, role = Role.Button, onClick = onAvatarClick)
                 .semantics { contentDescription = openProfileDescription },
-            color = mc.surface,
-            shape = CircleShape,
+            contentAlignment = Alignment.Center,
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                if (!uiState.avatarUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = uiState.avatarUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.AccountCircle,
-                        contentDescription = null,
-                        tint = mc.primaryAccent,
-                        modifier = Modifier.size(32.dp),
-                    )
-                }
+            if (avatarUrl != null || initials != null) {
+                AvatarImage(
+                    avatarUrl = avatarUrl,
+                    initials = initials.orEmpty(),
+                    size = HomeAvatarSize.value.toInt(),
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = null,
+                    tint = mc.primaryAccent,
+                    modifier = Modifier.size(32.dp),
+                )
             }
         }
     }
 }
 
 /** Milliseconds in a day — used to derive the deterministic daily greeting-variant index. */
-private const val GREETING_DAY_MS = 24L * 60L * 60L * 1000L
+private const val GREETING_HOUR_MS = 60L * 60L * 1000L
+private const val GREETING_DAY_MS = 24L * GREETING_HOUR_MS
 
 /** Morning band (05:00–11:59): 4 MTG-flavored variants (Home widget board overhaul, TASK 2). */
 private val MORNING_GREETINGS = intArrayOf(
@@ -484,7 +565,7 @@ private val SIGNED_OUT_GREETINGS = intArrayOf(
  *
  * Pure and non-`@Composable` on purpose (Home widget board overhaul, TASK 2) so it is unit
  * testable without Compose UI test infra — see `HomeScreenGreetingTest`. Selection is
- * DETERMINISTIC — seeded by [epochDay], mirroring [RulesTipWidget]'s `RULES_TIP_SHUFFLE_SEED`
+ * DETERMINISTIC — seeded by [epochDay], mirroring the Rules Tip daily order
  * pattern — so the greeting is stable across recompositions and within the same day, but varies
  * day to day. Never uses an unseeded `Random()` per call.
  */
@@ -506,12 +587,23 @@ internal fun resolveGreetingVariant(hour: Int, epochDay: Long, hasName: Boolean)
 /** Picks a time-of-day-appropriate, MTG-flavored greeting variant (Home widget board overhaul, TASK 2). */
 @Composable
 private fun greetingText(name: String?): String {
-    val epochDay = remember { System.currentTimeMillis() / GREETING_DAY_MS }
+    val (hour, epochDay) = remember {
+        localGreetingClock(System.currentTimeMillis(), java.util.TimeZone.getDefault())
+    }
     if (name.isNullOrBlank()) {
         return stringResource(resolveGreetingVariant(hour = 0, epochDay = epochDay, hasName = false))
     }
-    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
     return stringResource(resolveGreetingVariant(hour = hour, epochDay = epochDay, hasName = true), name)
+}
+
+/**
+ * The local hour (0..23) and local epoch day for [nowMs] in [timeZone], taken from ONE instant so
+ * the greeting's time band and its daily variant always agree on the same local day.
+ */
+internal fun localGreetingClock(nowMs: Long, timeZone: java.util.TimeZone): Pair<Int, Long> {
+    val localMs = nowMs + timeZone.getOffset(nowMs)
+    val hour = Math.floorMod(localMs / GREETING_HOUR_MS, 24L).toInt()
+    return hour to Math.floorDiv(localMs, GREETING_DAY_MS)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -546,33 +638,23 @@ fun AccountNudgeCard(
                 style = ty.bodyMedium,
                 color = mc.textSecondary,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                Surface(
-                    color = mc.primaryAccent,
-                    shape = ButtonShape,
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 48.dp)
-                        .clip(ButtonShape)
-                        .clickable(onClick = onCreateAccount),
-                ) {
-                    Box(modifier = Modifier.padding(vertical = spacing.md), contentAlignment = Alignment.Center) {
-                        Text(stringResource(R.string.home_account_gated_cta), style = ty.labelMedium, color = mc.background, maxLines = 1)
-                    }
-                }
-                Surface(
-                    color = mc.surfaceVariant,
-                    shape = ButtonShape,
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .widthIn(min = 48.dp)
-                        .clip(ButtonShape)
-                        .clickable(onClick = onDismiss),
-                ) {
-                    Box(modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md), contentAlignment = Alignment.Center) {
-                        Text(stringResource(R.string.home_nudge_dismiss), style = ty.labelMedium, color = mc.textSecondary, maxLines = 1)
-                    }
-                }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(spacing.md),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MagicCtaButton(
+                    onClick = onCreateAccount,
+                    text = stringResource(R.string.home_account_gated_cta),
+                    style = MagicCtaStyle.Filled,
+                    color = MagicCtaColor.Primary,
+                    modifier = Modifier.weight(1f),
+                )
+                MagicCtaButton(
+                    onClick = onDismiss,
+                    text = stringResource(R.string.home_nudge_dismiss),
+                    style = MagicCtaStyle.Ghost,
+                    color = MagicCtaColor.Neutral,
+                )
             }
         }
     }
@@ -672,7 +754,7 @@ private val QuickStartAction.label: String
     @ReadOnlyComposable
     get() = when (this) {
         QuickStartAction.SCAN_CARD -> stringResource(R.string.quick_start_sheet_scan_card)
-        QuickStartAction.CREATE_DECK -> stringResource(R.string.quick_start_sheet_decks)
+        QuickStartAction.CREATE_DECK -> stringResource(R.string.quick_start_sheet_new_deck)
         QuickStartAction.DRAFT_GUIDE -> stringResource(R.string.quick_start_sheet_draft_guide)
         QuickStartAction.SEARCH_CARD -> stringResource(R.string.quick_start_sheet_search_card)
         QuickStartAction.DECKS -> stringResource(R.string.quick_start_sheet_decks)
@@ -689,7 +771,7 @@ private val QuickStartAction.label: String
 private val QuickStartAction.icon: androidx.compose.ui.graphics.vector.ImageVector
     get() = when (this) {
         QuickStartAction.SCAN_CARD -> Icons.Default.Camera
-        QuickStartAction.CREATE_DECK -> Icons.Default.Style
+        QuickStartAction.CREATE_DECK -> Icons.Default.AddCircle
         QuickStartAction.DRAFT_GUIDE -> Icons.Default.SportsEsports
         QuickStartAction.SEARCH_CARD -> Icons.Default.Search
         QuickStartAction.DECKS -> Icons.Default.Style

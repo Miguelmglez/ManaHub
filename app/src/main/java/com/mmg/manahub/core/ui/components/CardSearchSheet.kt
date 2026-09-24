@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -172,6 +173,10 @@ fun CardSearchSheet(
      */
     selectedTabIndex: Int? = null,
     onSelectedTabChange: (Int) -> Unit = {},
+    /** Extra lazy items after [offerResults] in the Offer tab, e.g. a paging footer. */
+    offerResultsFooter: (LazyListScope.() -> Unit)? = null,
+    /** Replaces the "no cards" text in the All Cards tab while the last search failed. */
+    scryfallErrorContent: (@Composable () -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -465,6 +470,7 @@ fun CardSearchSheet(
                                 )
                             }
                         }
+                        offerResultsFooter?.invoke(this)
 
                         if (addCardsResults.isNotEmpty()) {
                             if (offerResults.isNotEmpty()) {
@@ -524,6 +530,8 @@ fun CardSearchSheet(
                         ) {
                             if (isSearching) {
                                 MagicLoadingSpinner()
+                            } else if (selectedTab == scryfallTabIndex && scryfallErrorContent != null) {
+                                scryfallErrorContent()
                             } else {
                                 Text(
                                     text = if (selectedTab == scryfallTabIndex && query.isBlank())

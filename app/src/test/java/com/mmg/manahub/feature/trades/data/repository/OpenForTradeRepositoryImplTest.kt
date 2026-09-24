@@ -3,6 +3,8 @@ package com.mmg.manahub.feature.trades.data.repository
 import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.core.data.local.entity.LocalOpenForTradeEntity
 import com.mmg.manahub.core.data.remote.trades.OpenForTradeRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.KeysetDrain
+import com.mmg.manahub.core.data.remote.dto.OpenForTradeEntryDto
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -372,5 +374,48 @@ class OpenForTradeRepositoryImplTest {
 
         assertTrue(result.isFailure)
         coVerify(exactly = 0) { dao.deleteByCollectionId(any()) }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 8 — syncFromRemote: eviction only after a complete keyset drain
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun offerDto(id: String) =
+        OpenForTradeEntryDto(id = id, userId = USER_ID, userCardId = "row-$id", createdAt = "2024-01-01T00:00:00Z")
+
+    @Test
+    fun `given a partial drain when syncFromRemote then fetched rows are kept and nothing is evicted`() = runTest {
+        coEvery { remote.drainOpenForTrade(USER_ID) } returns
+            KeysetDrain(listOf(offerDto("o1")), isComplete = false, failure = RuntimeException("page 2 failed"))
+        coEvery { dao.getSyncedIds() } returns listOf("o1", "o-old")
+
+        val result = repository.syncFromRemote(USER_ID)
+
+        assertTrue(result.isFailure)
+        coVerify { dao.upsertAll(match { rows -> rows.map { it.id } == listOf("o1") }) }
+        coVerify(exactly = 0) { dao.deleteSyncedByIds(any()) }
+        coVerify(exactly = 0) { dao.deleteSyncedNotIn(any()) }
+        coVerify(exactly = 0) { dao.clearSynced() }
+    }
+
+    @Test
+    fun `given a drain stopped at its page cap when syncFromRemote then nothing is evicted`() = runTest {
+        coEvery { remote.drainOpenForTrade(USER_ID) } returns KeysetDrain(listOf(offerDto("o1")), isComplete = false)
+
+        val result = repository.syncFromRemote(USER_ID)
+
+        assertTrue(result.isFailure)
+        coVerify(exactly = 0) { dao.deleteSyncedByIds(any()) }
+    }
+
+    @Test
+    fun `given a complete drain when syncFromRemote then only synced rows the server no longer has are evicted`() = runTest {
+        coEvery { remote.drainOpenForTrade(USER_ID) } returns KeysetDrain.complete(listOf(offerDto("o1")))
+        coEvery { dao.getSyncedIds() } returns listOf("o1", "o-old")
+
+        val result = repository.syncFromRemote(USER_ID)
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 1) { dao.deleteSyncedByIds(listOf("o-old")) }
     }
 }

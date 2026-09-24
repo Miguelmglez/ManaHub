@@ -20,31 +20,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
@@ -56,28 +44,29 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardListItem
+import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.components.FullErrorState
+import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.PullRefreshHeader
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.rememberPullRefreshState
-import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
-import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -99,7 +88,7 @@ fun TradeNegotiationDetailScreen(
     val mc = MaterialTheme.magicColors
     val context = LocalContext.current
 
-    LaunchedEffect(Unit) { viewModel.refresh() }
+    LaunchedEffect(Unit) { viewModel.onScreenEntered() }
 
     // §5.2 fix: one-shot navigation/toast effects are delivered through a buffered
     // Channel (viewModel.events), never a nullable StateFlow field — a StateFlow
@@ -124,6 +113,11 @@ fun TradeNegotiationDetailScreen(
                         )
                     }
                 }
+                NegotiationEvent.CollectionApplyDeferred ->
+                    toastState.show(
+                        context.getString(R.string.trades_collection_apply_deferred),
+                        MagicToastType.INFO,
+                    )
                 is NegotiationEvent.ShowError -> {
                     val msg = event.message ?: context.getString(R.string.trades_error_generic_body)
                     toastState.show(msg, MagicToastType.ERROR)
@@ -159,6 +153,7 @@ fun TradeNegotiationDetailScreen(
     if (uiState.pendingRevokeProposalId != null) {
         RevokeConfirmationDialog(
             hasSynced = uiState.pendingRevokeHasSynced,
+            canReverse = uiState.pendingRevokeCanReverse,
             onRevokeAndReverse = { viewModel.onRevokeConfirmed(reverseCollection = true) },
             onJustRevoke = { viewModel.onRevokeConfirmed(reverseCollection = false) },
             onDismiss = viewModel::onRevokeDismissed,
@@ -204,7 +199,7 @@ fun TradeNegotiationDetailScreen(
             },
         ) { innerPadding ->
             when {
-                uiState.isLoading -> Box(
+                uiState.thread.isEmpty() && uiState.isLoading -> Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
@@ -213,18 +208,21 @@ fun TradeNegotiationDetailScreen(
                     MagicLoadingSpinner()
                 }
 
-                uiState.thread.isEmpty() -> Box(
+                uiState.thread.isEmpty() && uiState.refreshFailed -> FullErrorState(
+                    message = stringResource(R.string.trades_thread_load_error),
+                    retryLabel = stringResource(R.string.action_retry),
+                    onRetry = viewModel::refresh,
+                    enabled = !uiState.isRefreshing,
+                    modifier = Modifier.padding(innerPadding),
+                )
+
+                uiState.thread.isEmpty() -> EmptyState(
+                    title = stringResource(R.string.trades_no_proposals_yet),
+                    icon = Icons.Default.SwapHoriz,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = stringResource(R.string.trades_no_proposals_yet),
-                        style = MaterialTheme.magicTypography.bodyMedium,
-                        color = mc.textSecondary,
-                    )
-                }
+                )
 
                 else -> LazyColumn(
                     modifier = Modifier
@@ -253,6 +251,7 @@ fun TradeNegotiationDetailScreen(
                             participantNames = uiState.participantNames,
                             isProcessing = uiState.isProcessing,
                             syncedCollectionProposalIds = uiState.syncedCollectionProposalIds,
+                            pendingApplyProposalIds = uiState.pendingApplyProposalIds,
                             isSyncingCollection = uiState.isSyncingCollection,
                             onAccept = { viewModel.onAccept(proposal.id) },
                             onDecline = { viewModel.onDecline(proposal.id) },
@@ -262,6 +261,8 @@ fun TradeNegotiationDetailScreen(
                             onCounter = { viewModel.onCounter(proposal.id) },
                             onEdit = { viewModel.onEdit(proposal.id) },
                             onUpdateCollection = { viewModel.onUpdateCollection(proposal.id) },
+                            onUndoCollectionChanges = { viewModel.onUndoCollectionChanges(proposal.id) },
+                            onRetryItems = viewModel::refresh,
                             onCardClick = onNavigateToCardDetail,
                         )
                     }
@@ -293,6 +294,7 @@ private fun ProposalCard(
     participantNames: Map<String, String>,
     isProcessing: Boolean,
     syncedCollectionProposalIds: Set<String>,
+    pendingApplyProposalIds: Set<String>,
     isSyncingCollection: Boolean,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
@@ -302,6 +304,8 @@ private fun ProposalCard(
     onCounter: () -> Unit,
     onEdit: () -> Unit,
     onUpdateCollection: () -> Unit,
+    onUndoCollectionChanges: () -> Unit,
+    onRetryItems: () -> Unit,
     onCardClick: (String) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -312,7 +316,7 @@ private fun ProposalCard(
         stringResource(R.string.trades_you_offer_section)
     } else {
         val name = participantNames[proposal.proposerId]
-        if (name != null) stringResource(R.string.trades_named_sends, name)
+        if (!name.isNullOrBlank()) stringResource(R.string.trades_named_sends, name)
         else stringResource(R.string.trades_they_offer_section)
     }
     // receiverItems = cards FROM the receiver → label shows the receiver as the sender
@@ -320,7 +324,7 @@ private fun ProposalCard(
         stringResource(R.string.trades_you_offer_section)
     } else {
         val name = participantNames[proposal.receiverId]
-        if (name != null) stringResource(R.string.trades_named_sends, name)
+        if (!name.isNullOrBlank()) stringResource(R.string.trades_named_sends, name)
         else stringResource(R.string.trades_they_offer_section)
     }
 
@@ -336,7 +340,7 @@ private fun ProposalCard(
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                ProposalStatusBadge(status = proposal.status, mc = mc)
+                TradeStatusBadge(status = proposal.status)
 
                 val relativeTime = TimeAgoFormatter.format(proposal.updatedAt)
                 if (relativeTime.isNotBlank()) {
@@ -344,20 +348,30 @@ private fun ProposalCard(
                         Icon(
                             imageVector = Icons.Default.History,
                             contentDescription = null,
-                            tint = mc.textDisabled,
+                            tint = mc.textSecondary,
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(Modifier.width(MaterialTheme.spacing.xs))
                         Text(
                             text = relativeTime,
                             style = MaterialTheme.magicTypography.labelSmall,
-                            color = mc.textDisabled,
+                            color = mc.textSecondary,
                         )
                     }
                 }
             }
 
             Spacer(Modifier.height(MaterialTheme.spacing.lg))
+
+            if (!proposal.itemsLoaded) {
+                InlineErrorState(
+                    message = stringResource(R.string.trades_items_load_failed),
+                    retryLabel = stringResource(R.string.action_retry),
+                    onRetry = onRetryItems,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(MaterialTheme.spacing.sm))
+            }
 
             val proposerItems = proposal.items.filter { it.fromUserId == proposal.proposerId }
             val receiverItems = proposal.items.filter { it.fromUserId == proposal.receiverId }
@@ -399,6 +413,28 @@ private fun ProposalCard(
                 )
             }
 
+            if (proposal.status == TradeStatus.ACCEPTED && proposal.id in pendingApplyProposalIds) {
+                Spacer(Modifier.height(MaterialTheme.spacing.md))
+                Text(
+                    text = stringResource(R.string.trades_collection_apply_deferred),
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.textSecondary,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            if (proposal.status == TradeStatus.REVOKED && proposal.id in syncedCollectionProposalIds) {
+                Spacer(Modifier.height(MaterialTheme.spacing.md))
+                MagicCtaButton(
+                    onClick = onUndoCollectionChanges,
+                    text = stringResource(R.string.trades_undo_collection_changes),
+                    enabled = proposal.itemsLoaded,
+                    isLoading = isSyncingCollection,
+                    color = MagicCtaColor.Error,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
             // "Update Collection" section — visible only on completed proposals.
             // Shows a confirmation label once the user has already synced.
             if (proposal.status == TradeStatus.COMPLETED) {
@@ -412,108 +448,16 @@ private fun ProposalCard(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else {
-                    Button(
+                    MagicCtaButton(
                         onClick = onUpdateCollection,
-                        enabled = !isSyncingCollection,
+                        text = stringResource(R.string.trades_update_collection),
+                        enabled = proposal.itemsLoaded,
+                        isLoading = isSyncingCollection,
+                        color = MagicCtaColor.Primary,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                        shape = ButtonShape,
-                    ) {
-                        if (isSyncingCollection) {
-                            MagicLoadingSpinner(
-                                modifier = Modifier.size(18.dp),
-                            )
-                        } else {
-                            Text(
-                                text = stringResource(R.string.trades_update_collection),
-                                color = mc.background,
-                                style = MaterialTheme.magicTypography.labelLarge,
-                            )
-                        }
-                    }
+                    )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun ProposalStatusBadge(status: TradeStatus, mc: MagicColors) {
-    val color: Color
-    val icon: ImageVector
-    val labelRes: Int
-
-    when (status) {
-        TradeStatus.COMPLETED -> {
-            color = mc.lifePositive
-            icon = Icons.Default.CheckCircle
-            labelRes = R.string.trades_status_completed
-        }
-
-        TradeStatus.ACCEPTED -> {
-            color = mc.primaryAccent
-            icon = Icons.Default.Check
-            labelRes = R.string.trades_status_accepted
-        }
-
-        TradeStatus.CANCELLED -> {
-            color = mc.lifeNegative
-            icon = Icons.Default.Cancel
-            labelRes = R.string.trades_status_cancelled
-        }
-
-        TradeStatus.REVOKED -> {
-            color = mc.lifeNegative
-            icon = Icons.AutoMirrored.Filled.Undo
-            labelRes = R.string.trades_status_revoked
-        }
-
-        TradeStatus.DECLINED -> {
-            color = mc.goldMtg
-            icon = Icons.Default.Block
-            labelRes = R.string.trades_status_declined
-        }
-
-        TradeStatus.COUNTERED -> {
-            color = mc.secondaryAccent
-            icon = Icons.Default.SwapHoriz
-            labelRes = R.string.trades_status_countered
-        }
-
-        TradeStatus.PROPOSED -> {
-            color = mc.primaryAccent
-            icon = Icons.AutoMirrored.Filled.Send
-            labelRes = R.string.trades_status_proposed
-        }
-
-        TradeStatus.DRAFT -> {
-            color = mc.textSecondary
-            icon = Icons.Default.Edit
-            labelRes = R.string.trades_status_draft
-        }
-    }
-
-    Surface(
-        shape = ChipShape,
-        color = color.copy(alpha = 0.12f),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.2f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.sm, vertical = MaterialTheme.spacing.xs),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(14.dp)
-            )
-            Text(
-                text = stringResource(labelRes),
-                style = MaterialTheme.magicTypography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = color,
-            )
         }
     }
 }
@@ -565,19 +509,20 @@ private fun ItemsSection(
                 Text(
                     text = stringResource(R.string.trades_review_collection_placeholder),
                     style = MaterialTheme.magicTypography.labelMedium,
-                    color = mc.secondaryAccent,
+                    color = mc.textPrimary,
                 )
             }
         }
     }
+    val unknownCard = stringResource(R.string.trades_unknown_card)
     items.filter { !it.isReviewCollectionPlaceholder }.forEach { item ->
         CardListItem(
-            name = item.cardName.ifBlank { item.cardId },
+            name = item.cardName.ifBlank { unknownCard },
             imageUrl = item.imageUrl,
             priceUsd = null,
             priceEur = null,
             onClick = { onCardClick(item.cardId) },
-            quantityText = item.quantity?.let { "×$it" },
+            quantityText = item.quantity?.let { stringResource(R.string.trades_quantity_multiplier, it) },
             hasFoil = item.isFoil == true,
             condition = item.condition?.takeIf { it.isNotBlank() },
             language = item.language?.takeIf { it.isNotBlank() },
@@ -604,82 +549,55 @@ private fun ProposalActions(
     onCounter: () -> Unit,
     onEdit: () -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
     when (proposal.status) {
-        TradeStatus.DRAFT -> {
-            if (isProposer) {
-                Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
-                    OutlinedButton(
-                        onClick = onEdit,
-                        enabled = !isProcessing,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(stringResource(R.string.trades_action_edit), color = mc.textPrimary)
-                    }
-                    Button(
-                        onClick = onCancel,
-                        enabled = !isProcessing,
-                        colors = ButtonDefaults.buttonColors(containerColor = mc.lifeNegative),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.trades_action_cancel), color = mc.background)
-                    }
-                }
-            }
-        }
+        // Drafts can no longer be created; legacy ones get no actions because the server rejects them.
+        TradeStatus.DRAFT -> Unit
 
         TradeStatus.PROPOSED -> {
             if (isProposer) {
                 Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
-                    OutlinedButton(
+                    MagicCtaButton(
                         onClick = onEdit,
-                        enabled = !isProcessing,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(stringResource(R.string.trades_action_edit), color = mc.textPrimary)
-                    }
-                    Button(
-                        onClick = onCancel,
-                        enabled = !isProcessing,
-                        colors = ButtonDefaults.buttonColors(containerColor = mc.lifeNegative),
+                        text = stringResource(R.string.trades_action_edit),
+                        enabled = !isProcessing && proposal.itemsLoaded,
+                        style = MagicCtaStyle.Outlined,
+                        color = MagicCtaColor.Neutral,
                         modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.trades_action_cancel), color = mc.background)
-                    }
+                    )
+                    MagicCtaButton(
+                        onClick = onCancel,
+                        text = stringResource(R.string.trades_action_cancel),
+                        enabled = !isProcessing,
+                        color = MagicCtaColor.Error,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
-                        Button(
+                        MagicCtaButton(
                             onClick = onAccept,
+                            text = stringResource(R.string.trades_action_accept),
                             enabled = !isProcessing,
-                            colors = ButtonDefaults.buttonColors(containerColor = mc.lifePositive),
+                            color = MagicCtaColor.Success,
                             modifier = Modifier.weight(1f),
-                        ) {
-                            Text(
-                                stringResource(R.string.trades_action_accept),
-                                color = mc.background
-                            )
-                        }
-                        Button(
+                        )
+                        MagicCtaButton(
                             onClick = onDecline,
+                            text = stringResource(R.string.trades_action_decline),
                             enabled = !isProcessing,
-                            colors = ButtonDefaults.buttonColors(containerColor = mc.lifeNegative),
+                            color = MagicCtaColor.Error,
                             modifier = Modifier.weight(1f),
-                        ) {
-                            Text(
-                                stringResource(R.string.trades_action_decline),
-                                color = mc.background
-                            )
-                        }
+                        )
                     }
-                    OutlinedButton(
+                    MagicCtaButton(
                         onClick = onCounter,
-                        enabled = !isProcessing,
+                        text = stringResource(R.string.trades_action_counter),
+                        enabled = !isProcessing && proposal.itemsLoaded,
+                        style = MagicCtaStyle.Outlined,
+                        color = MagicCtaColor.Primary,
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.trades_action_counter), color = mc.textPrimary)
-                    }
+                    )
                 }
             }
         }
@@ -694,25 +612,22 @@ private fun ProposalActions(
             }
             Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
                 if (!alreadyMarked) {
-                    Button(
+                    MagicCtaButton(
                         onClick = onMarkCompleted,
-                        enabled = !isProcessing,
-                        colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+                        text = stringResource(R.string.trades_action_mark_completed),
+                        enabled = !isProcessing && proposal.itemsLoaded,
+                        color = MagicCtaColor.Primary,
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            stringResource(R.string.trades_action_mark_completed),
-                            color = mc.background
-                        )
-                    }
+                    )
                 }
-                TextButton(
+                MagicCtaButton(
                     onClick = onRevoke,
+                    text = stringResource(R.string.trades_action_revoke),
                     enabled = !isProcessing,
+                    style = MagicCtaStyle.Ghost,
+                    color = MagicCtaColor.Error,
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.trades_action_revoke), color = mc.lifeNegative)
-                }
+                )
             }
         }
 
@@ -762,14 +677,6 @@ private fun MarkCompleteDialog(
     val mc = MaterialTheme.magicColors
     val hasItems = sentItems.isNotEmpty() || receivedItems.isNotEmpty()
 
-    /** Formats up to 5 items as bullet points, appending "…and N more" when needed. */
-    fun formatItems(items: List<TradeItem>): String {
-        val shown = items.take(5).joinToString("\n") { item ->
-            "• ${item.cardName.ifBlank { item.cardId }} ×${item.quantity ?: 1}"
-        }
-        return if (items.size > 5) "$shown\n…and ${items.size - 5} more" else shown
-    }
-
     MagicAlertDialog(
         onDismissRequest = onDismiss,
         title = stringResource(R.string.trades_complete_dialog_title),
@@ -788,11 +695,7 @@ private fun MarkCompleteDialog(
                             style = MaterialTheme.magicTypography.labelLarge.copy(fontWeight = FontWeight.Bold),
                             color = mc.textPrimary,
                         )
-                        Text(
-                            formatItems(sentItems),
-                            style = MaterialTheme.magicTypography.bodyMedium,
-                            color = mc.textSecondary,
-                        )
+                        TradeItemSummaryList(sentItems)
                         Text(
                             stringResource(R.string.trades_complete_dialog_send_note),
                             style = MaterialTheme.magicTypography.labelSmall,
@@ -805,11 +708,7 @@ private fun MarkCompleteDialog(
                             style = MaterialTheme.magicTypography.labelLarge.copy(fontWeight = FontWeight.Bold),
                             color = mc.textPrimary,
                         )
-                        Text(
-                            formatItems(receivedItems),
-                            style = MaterialTheme.magicTypography.bodyMedium,
-                            color = mc.textSecondary,
-                        )
+                        TradeItemSummaryList(receivedItems)
                         Text(
                             stringResource(R.string.trades_complete_dialog_receive_note),
                             style = MaterialTheme.magicTypography.labelSmall,
@@ -844,6 +743,45 @@ private fun MarkCompleteDialog(
     )
 }
 
+private const val SUMMARY_VISIBLE_ITEMS = 5
+
+/** Bulleted summary of up to [SUMMARY_VISIBLE_ITEMS] trade items, with an "…and N more" overflow line. */
+@Composable
+private fun TradeItemSummaryList(items: List<TradeItem>) {
+    val mc = MaterialTheme.magicColors
+    val style = MaterialTheme.magicTypography.bodyMedium
+    val unknownCard = stringResource(R.string.trades_unknown_card)
+    val bullet = stringResource(R.string.trades_list_bullet)
+    Column {
+        items.take(SUMMARY_VISIBLE_ITEMS).forEach { item ->
+            Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)) {
+                Text(text = bullet, style = style, color = mc.textSecondary)
+                CardName(
+                    name = item.cardName.ifBlank { unknownCard },
+                    style = style,
+                    color = mc.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Text(
+                    text = stringResource(R.string.trades_quantity_multiplier, item.quantity ?: 1),
+                    style = style,
+                    color = mc.textSecondary,
+                )
+            }
+        }
+        val hidden = items.size - SUMMARY_VISIBLE_ITEMS
+        if (hidden > 0) {
+            Text(
+                text = pluralStringResource(R.plurals.trades_items_more, hidden, hidden),
+                style = style,
+                color = mc.textSecondary,
+            )
+        }
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Revoke confirmation dialog
 // ─────────────────────────────────────────────────────────────────────────────
@@ -857,6 +795,7 @@ private fun MarkCompleteDialog(
 @Composable
 private fun RevokeConfirmationDialog(
     hasSynced: Boolean,
+    canReverse: Boolean,
     onRevokeAndReverse: () -> Unit,
     onJustRevoke: () -> Unit,
     onDismiss: () -> Unit,
@@ -872,6 +811,7 @@ private fun RevokeConfirmationDialog(
         buttons = {
             MagicCtaButton(
                 onClick = if (hasSynced) onRevokeAndReverse else onJustRevoke,
+                enabled = !hasSynced || canReverse,
                 text = stringResource(
                     if (hasSynced) R.string.trades_revoke_and_reverse
                     else R.string.trades_revoke_just_revoke

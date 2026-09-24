@@ -39,7 +39,9 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -226,5 +228,38 @@ class TradeProposalViewModelPrefillTest {
             // is harmless (an empty Room IN-clause), so it is not asserted against here.
             coVerify(exactly = 0) { cardRepository.warmCacheForIds(any()) }
             assertEquals(0, vm.uiState.value.proposerItems.size)
+        }
+
+    @Test
+    fun `given the cached proposal's items never loaded and the refresh cannot load them then the editor stays hidden`() =
+        runTest {
+            val unloaded = proposal(emptyList()).copy(itemsLoaded = false)
+            every { tradesRepository.observeProposalThread(ROOT_ID) } returns flowOf(listOf(unloaded))
+            coEvery { tradesRepository.refreshProposalThread(ROOT_ID, MY_USER_ID) } returns Result.success(Unit)
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { tradesRepository.refreshProposalThread(ROOT_ID, MY_USER_ID) }
+            assertTrue("an unloaded proposal must never open as a blank, savable draft", vm.uiState.value.prefillFailed)
+        }
+
+    @Test
+    fun `given the cached proposal's items never loaded when the refresh loads them then the editor is prefilled`() =
+        runTest {
+            val items = listOf(tradeItem(id = "item-1", cardId = "card-a", fromUserId = MY_USER_ID, toUserId = FRIEND_USER_ID))
+            every { tradesRepository.observeProposalThread(ROOT_ID) } returnsMany listOf(
+                flowOf(listOf(proposal(emptyList()).copy(itemsLoaded = false))),
+                flowOf(listOf(proposal(items))),
+            )
+            coEvery { tradesRepository.refreshProposalThread(ROOT_ID, MY_USER_ID) } returns Result.success(Unit)
+            coEvery { cardRepository.warmCacheForIds(any()) } returns Unit
+            coEvery { cardRepository.getCardsByIds(any()) } returns emptyList()
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.prefillFailed)
+            assertEquals(1, vm.uiState.value.proposerItems.size)
         }
 }

@@ -13,6 +13,9 @@ import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.model.Friend
 import com.mmg.manahub.core.model.FriendCard
+import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.FriendCardCursor
+import com.mmg.manahub.core.model.FriendCardPage
 import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.core.model.OpenForTradeEntry
 import com.mmg.manahub.core.model.TradeSide
@@ -24,6 +27,7 @@ import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CreateTradeProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.EditProposalUseCase
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -38,6 +42,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -264,12 +270,10 @@ class TradeProposalViewModelMatchesTest {
         every { openForTradeRepository.observeLocal() } returns offerFlow
         every { friendRepository.observeFriends() } returns friendsFlow
 
-        // The ViewModel's fetchFriendData calls getFriendCollection with three different list
-        // values: "wishlist", "trade", and "collection". Provide a default stub for "collection"
-        // so tests that only care about wishlist/offer matches don't need to stub it explicitly.
+        // Default: the friend's collection pages are empty unless a test stubs them.
         coEvery {
-            friendRepository.getFriendCollection(any(), eq("collection"), any(), any(), any())
-        } returns Result.success(emptyList())
+            friendRepository.searchFriendCards(any(), eq("collection"), any(), any(), any())
+        } returns friendPage(emptyList())
     }
 
     @After
@@ -310,13 +314,15 @@ class TradeProposalViewModelMatchesTest {
 
     // ── Helper to set up friend data on friendRepository mock ────────────────
 
+    private fun friendPage(cards: List<FriendCard>) = Result.success(FriendCardPage(cards, nextCursor = null, hasMore = false))
+
     private fun stubFriendWishlist(
         friendUserId: String,
         cards: List<FriendCard>,
     ) {
         coEvery {
-            friendRepository.getFriendCollection(friendUserId, "wishlist", "", any(), any())
-        } returns Result.success(cards)
+            friendRepository.searchFriendCards(friendUserId, "wishlist", any(), any(), any())
+        } returns friendPage(cards)
     }
 
     private fun stubFriendOffers(
@@ -324,8 +330,8 @@ class TradeProposalViewModelMatchesTest {
         cards: List<FriendCard>,
     ) {
         coEvery {
-            friendRepository.getFriendCollection(friendUserId, "trade", "", any(), any())
-        } returns Result.success(cards)
+            friendRepository.searchFriendCards(friendUserId, "trade", any(), any(), any())
+        } returns friendPage(cards)
     }
 
     /**
@@ -337,13 +343,13 @@ class TradeProposalViewModelMatchesTest {
         cards: List<FriendCard> = emptyList(),
     ) {
         coEvery {
-            friendRepository.getFriendCollection(friendUserId, "collection", "", any(), any())
-        } returns Result.success(cards)
+            friendRepository.searchFriendCards(friendUserId, "collection", any(), any(), any())
+        } returns friendPage(cards)
     }
 
     private fun stubFriendCollectionFailing(friendUserId: String) {
         coEvery {
-            friendRepository.getFriendCollection(friendUserId, any(), any(), any(), any())
+            friendRepository.searchFriendCards(friendUserId, any(), any(), any(), any())
         } returns Result.failure(RuntimeException("Network error"))
     }
 
@@ -949,14 +955,14 @@ class TradeProposalViewModelMatchesTest {
         )
 
         // Friend 1 wants LIGHTNING_BOLT; Friend 2 wants COUNTERSPELL
-        coEvery { friendRepository.getFriendCollection("friend-001", "wishlist", "", any(), any()) } returns
-            Result.success(listOf(buildFriendCard(CARD_ID_LIGHTNING_BOLT, sourceList = "wishlist")))
-        coEvery { friendRepository.getFriendCollection("friend-001", "trade", "", any(), any()) } returns
-            Result.success(emptyList())
-        coEvery { friendRepository.getFriendCollection("friend-002", "wishlist", "", any(), any()) } returns
-            Result.success(listOf(buildFriendCard(CARD_ID_COUNTERSPELL, sourceList = "wishlist")))
-        coEvery { friendRepository.getFriendCollection("friend-002", "trade", "", any(), any()) } returns
-            Result.success(emptyList())
+        coEvery { friendRepository.searchFriendCards("friend-001", "wishlist", any(), any(), any()) } returns
+            friendPage(listOf(buildFriendCard(CARD_ID_LIGHTNING_BOLT, sourceList = "wishlist")))
+        coEvery { friendRepository.searchFriendCards("friend-001", "trade", any(), any(), any()) } returns
+            friendPage(emptyList())
+        coEvery { friendRepository.searchFriendCards("friend-002", "wishlist", any(), any(), any()) } returns
+            friendPage(listOf(buildFriendCard(CARD_ID_COUNTERSPELL, sourceList = "wishlist")))
+        coEvery { friendRepository.searchFriendCards("friend-002", "trade", any(), any(), any()) } returns
+            friendPage(emptyList())
 
         val vm = createViewModel()
         advanceUntilIdle()
@@ -1069,7 +1075,7 @@ class TradeProposalViewModelMatchesTest {
     // =========================================================================
 
     @Test
-    fun `given getFriendCollection fails then matches remain empty and state does not crash`() = runTest {
+    fun `given the friend list search fails then matches remain empty and state does not crash`() = runTest {
         // Arrange
         offerFlow.value = listOf(buildOfferEntry(CARD_ID_LIGHTNING_BOLT))
         wishlistFlow.value = listOf(buildWishlistEntry(CARD_ID_COUNTERSPELL))
@@ -1268,5 +1274,267 @@ class TradeProposalViewModelMatchesTest {
 
         val row = vm.uiState.value.proposerMatches.first()
         assertTrue("isExactMatch must be false when foil flags differ", !row.isExactMatch)
+    }
+
+    // =========================================================================
+    // GROUP 9: trades audit 2026-09-23 regressions (C2, H9, H10, H11)
+    // =========================================================================
+
+    @Test
+    fun `given friend wishes foil and non-foil of one card then the wishlist rows have distinct keys`() = runTest {
+        val friend = buildFriend()
+        stubFriendWishlist(
+            FRIEND_USER_ID,
+            listOf(
+                buildFriendCard(CARD_ID_LIGHTNING_BOLT, isFoil = false),
+                buildFriendCard(CARD_ID_LIGHTNING_BOLT, isFoil = true),
+            ),
+        )
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(friend)
+        advanceUntilIdle()
+
+        vm.onOpenSearch(TradeSide.PROPOSER)
+        advanceUntilIdle()
+
+        val keys = vm.uiState.value.wishlistResults.map { it.uniqueKey }
+        assertEquals(2, keys.size)
+        assertEquals("LazyColumn keys must never collide", 2, keys.toSet().size)
+    }
+
+    @Test
+    fun `given friend wishes a foil and I offer a non-foil then the suggested item uses my copy`() = runTest {
+        offerFlow.value = listOf(buildOfferEntry(CARD_ID_LIGHTNING_BOLT, isFoil = false, condition = "LP", language = "de", quantity = 3))
+        val friend = buildFriend()
+        stubFriendWishlist(FRIEND_USER_ID, listOf(buildFriendCard(CARD_ID_LIGHTNING_BOLT, isFoil = true, condition = "NM", language = "en")))
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(friend)
+        advanceUntilIdle()
+
+        val draft = vm.uiState.value.proposerMatches.single().toTradeItemDraft(isInCollection = true)
+
+        assertEquals(false, draft.isFoil)
+        assertEquals("LP", draft.condition)
+        assertEquals("de", draft.language)
+        assertEquals("uc-$CARD_ID_LIGHTNING_BOLT", draft.userCardIdRef)
+        assertEquals(3, draft.maxQuantity)
+        assertTrue(vm.uiState.value.proposerMatches.single().matchesDraft(draft))
+    }
+
+    @Test
+    fun `given an offered item at its cap when added again then the quantity never exceeds the offer`() = runTest {
+        offerFlow.value = listOf(buildOfferEntry(CARD_ID_LIGHTNING_BOLT, quantity = 2))
+        val friend = buildFriend()
+        stubFriendWishlist(FRIEND_USER_ID, listOf(buildFriendCard(CARD_ID_LIGHTNING_BOLT)))
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(friend)
+        advanceUntilIdle()
+        val row = vm.uiState.value.proposerMatches.single()
+
+        repeat(3) { vm.addSuggestionToProposer(row.toTradeItemDraft(isInCollection = true)) }
+
+        assertEquals(2, vm.uiState.value.proposerItems.single().quantity)
+    }
+
+    @Test
+    fun `given an item tied to a row when its variant is edited then the ref and cap are dropped and quantity stays valid`() = runTest {
+        val vm = createViewModel()
+        advanceUntilIdle()
+        val item = TradeItemDraft(cardId = CARD_ID_LIGHTNING_BOLT, userCardIdRef = "uc-1", maxQuantity = 2)
+        vm.addSuggestionToProposer(item)
+        val stored = vm.uiState.value.proposerItems.single()
+
+        vm.updateProposerItem(stored.copy(quantity = 5))
+        assertEquals("quantity is clamped while the ref holds", 2, vm.uiState.value.proposerItems.single().quantity)
+
+        vm.updateProposerItem(stored.copy(isFoil = true, quantity = 5))
+        val edited = vm.uiState.value.proposerItems.single()
+        assertEquals(null, edited.userCardIdRef)
+        assertEquals(null, edited.maxQuantity)
+        assertEquals(5, edited.quantity)
+    }
+
+    @Test
+    fun `given the draft holds friend items when switching friend then confirmation is required and items survive until confirmed`() = runTest {
+        val friend = buildFriend()
+        val other = buildFriend(userId = "user-friend-003", nickname = "Other")
+        stubFriendWishlist(FRIEND_USER_ID, emptyList())
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+        stubFriendWishlist("user-friend-003", emptyList())
+        stubFriendOffers("user-friend-003", emptyList())
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(friend)
+        advanceUntilIdle()
+        vm.addSuggestionToReceiver(TradeItemDraft(cardId = CARD_ID_COUNTERSPELL))
+        vm.addSuggestionToProposer(TradeItemDraft(cardId = CARD_ID_DARK_RITUAL, fromFriendList = true))
+        vm.addSuggestionToProposer(TradeItemDraft(cardId = CARD_ID_LIGHTNING_BOLT, userCardIdRef = "uc-mine"))
+
+        vm.onFriendSelected(other)
+        advanceUntilIdle()
+
+        assertEquals(FRIEND_USER_ID, vm.uiState.value.selectedFriend?.userId)
+        assertEquals(other, vm.uiState.value.pendingFriendSwitch?.friend)
+        assertEquals(1, vm.uiState.value.receiverItems.size)
+
+        vm.onConfirmFriendSwitch()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals("user-friend-003", state.selectedFriend?.userId)
+        assertTrue(state.receiverItems.isEmpty())
+        assertEquals(listOf(CARD_ID_LIGHTNING_BOLT), state.proposerItems.map { it.cardId })
+        assertEquals(null, state.pendingFriendSwitch)
+    }
+
+    @Test
+    fun `given a pending friend switch when dismissed then the original friend and items stay`() = runTest {
+        val friend = buildFriend()
+        stubFriendWishlist(FRIEND_USER_ID, emptyList())
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(friend)
+        advanceUntilIdle()
+        vm.addSuggestionToReceiver(TradeItemDraft(cardId = CARD_ID_COUNTERSPELL))
+
+        vm.onFriendSelected(null)
+        vm.onDismissFriendSwitch()
+        advanceUntilIdle()
+
+        assertEquals(FRIEND_USER_ID, vm.uiState.value.selectedFriend?.userId)
+        assertEquals(1, vm.uiState.value.receiverItems.size)
+    }
+
+    // =========================================================================
+    // GROUP 9: paged friend lists, on-demand friend collection, Scryfall search, receiver pick
+    // =========================================================================
+
+    @Test
+    fun `given a friend wishlist spanning two pages then a match from the second page is suggested`() = runTest {
+        offerFlow.value = listOf(buildOfferEntry(CARD_ID_COUNTERSPELL))
+        val cursor = FriendCardCursor(sortKey = "k", rowId = "r")
+        coEvery { friendRepository.searchFriendCards(FRIEND_USER_ID, "wishlist", any(), null, any()) } returns
+            Result.success(FriendCardPage(listOf(buildFriendCard(CARD_ID_LIGHTNING_BOLT)), nextCursor = cursor, hasMore = true))
+        coEvery { friendRepository.searchFriendCards(FRIEND_USER_ID, "wishlist", any(), cursor, any()) } returns
+            friendPage(listOf(buildFriendCard(CARD_ID_COUNTERSPELL)))
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(buildFriend())
+        advanceUntilIdle()
+
+        assertEquals(listOf(CARD_ID_COUNTERSPELL), vm.uiState.value.proposerMatches.map { it.card.scryfallId })
+    }
+
+    @Test
+    fun `given a friend is selected then the friend's collection is only fetched once the You get sheet opens`() = runTest {
+        stubFriendWishlist(FRIEND_USER_ID, emptyList())
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+        coEvery { friendRepository.searchFriendCards(FRIEND_USER_ID, "collection", any(), any(), any()) } returns
+            friendPage(listOf(buildFriendCard(CARD_ID_DARK_RITUAL, sourceList = "collection")))
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(buildFriend())
+        advanceUntilIdle()
+        coVerify(exactly = 0) { friendRepository.searchFriendCards(FRIEND_USER_ID, "collection", any(), any(), any()) }
+
+        vm.onOpenSearch(TradeSide.RECEIVER)
+        advanceUntilIdle()
+        vm.onOpenSearch(TradeSide.RECEIVER)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { friendRepository.searchFriendCards(FRIEND_USER_ID, "collection", any(), null, any()) }
+        assertTrue(vm.uiState.value.offerResults.any { it.card.scryfallId == CARD_ID_DARK_RITUAL })
+    }
+
+    @Test
+    fun `given a friend collection with more pages when load more is requested then the next page is appended`() = runTest {
+        stubFriendWishlist(FRIEND_USER_ID, emptyList())
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+        val cursor = FriendCardCursor(sortKey = "k", rowId = "r")
+        coEvery { friendRepository.searchFriendCards(FRIEND_USER_ID, "collection", any(), null, any()) } returns
+            Result.success(FriendCardPage(listOf(buildFriendCard(CARD_ID_DARK_RITUAL, sourceList = "collection")), cursor, hasMore = true))
+        coEvery { friendRepository.searchFriendCards(FRIEND_USER_ID, "collection", any(), cursor, any()) } returns
+            friendPage(listOf(buildFriendCard(CARD_ID_BIRDS_OF_PARADISE, sourceList = "collection")))
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(buildFriend())
+        vm.onOpenSearch(TradeSide.RECEIVER)
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.friendCollectionHasMore)
+
+        vm.onLoadMoreFriendCollection()
+        vm.onLoadMoreFriendCollection()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { friendRepository.searchFriendCards(FRIEND_USER_ID, "collection", any(), cursor, any()) }
+        assertEquals(
+            setOf(CARD_ID_DARK_RITUAL, CARD_ID_BIRDS_OF_PARADISE),
+            vm.uiState.value.offerResults.map { it.card.scryfallId }.toSet(),
+        )
+        assertFalse(vm.uiState.value.friendCollectionHasMore)
+    }
+
+    @Test
+    fun `given quick successive Scryfall searches then only the last query is sent`() = runTest {
+        coEvery { cardRepository.searchCards(any()) } returns DataResult.Success(listOf(buildCard(CARD_ID_LIGHTNING_BOLT)))
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.searchScryfallDirect("li")
+        vm.searchScryfallDirect("lig")
+        vm.searchScryfallDirect("light")
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { cardRepository.searchCards(any()) }
+        coVerify(exactly = 1) { cardRepository.searchCards("light") }
+        assertEquals(listOf(CARD_ID_LIGHTNING_BOLT), vm.uiState.value.scryfallResults.map { it.card.scryfallId })
+        assertNull(vm.uiState.value.scryfallError)
+    }
+
+    @Test
+    fun `given a Scryfall failure then the error is kept and a no-match 404 is not an error`() = runTest {
+        coEvery { cardRepository.searchCards("boom") } returns DataResult.Error("RATE_LIMIT_EXHAUSTED:5000")
+        coEvery { cardRepository.searchCards("nothing") } returns DataResult.Error("SCRYFALL_404")
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.searchScryfallDirect("boom")
+        advanceUntilIdle()
+        assertEquals("RATE_LIMIT_EXHAUSTED:5000", vm.uiState.value.scryfallError)
+        assertFalse(vm.uiState.value.isSearchingScryfall)
+
+        vm.searchScryfallDirect("nothing")
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.scryfallError)
+        assertTrue(vm.uiState.value.scryfallResults.isEmpty())
+    }
+
+    @Test
+    fun `given the user picked no counterparty then a friends refresh never re-selects the nav receiver`() = runTest {
+        stubFriendWishlist(FRIEND_USER_ID, emptyList())
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+        val friend = buildFriend()
+        friendsFlow.value = listOf(friend)
+
+        val vm = createViewModel(receiverId = FRIEND_USER_ID)
+        advanceUntilIdle()
+        assertEquals(friend, vm.uiState.value.selectedFriend)
+
+        vm.onFriendSelected(null)
+        friendsFlow.value = listOf(friend, buildFriend(userId = "other", nickname = "Other"))
+        advanceUntilIdle()
+
+        assertNull(vm.uiState.value.selectedFriend)
     }
 }

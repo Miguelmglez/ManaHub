@@ -23,6 +23,7 @@ import com.mmg.manahub.core.data.local.entity.projection.VariantCardProjection
 import com.mmg.manahub.core.model.CardType
 import com.mmg.manahub.core.model.CardValue
 import com.mmg.manahub.core.model.CollectionStats
+import com.mmg.manahub.core.model.CollectionSummary
 import com.mmg.manahub.core.model.MtgColor
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.Rarity
@@ -281,6 +282,33 @@ class StatsRepositoryImpl(
             .flowOn(dispatcherProvider.io)
             .distinctUntilChanged()
     }
+
+    /**
+     * Five unfiltered queries instead of [observeCollectionStats]' thirty: the Home board only
+     * needs the headline numbers, and the full pipeline has contributed to a production OOM.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun observeCollectionSummary(): Flow<CollectionSummary> =
+        currentUserIdFlow.flatMapLatest { userId ->
+            combine(
+                statsDao.observeTotals(null, null, userId),
+                statsDao.observeTotalValueUsd(null, null, userId),
+                statsDao.observeTotalValueEur(null, null, userId),
+                statsDao.observeCountByColorIdentity(null, null, userId),
+                statsDao.observeCountByRarity(null, null, userId),
+            ) { totals, valueUsd, valueEur, colors, rarities ->
+                CollectionSummary(
+                    totalCards = totals.totalCards,
+                    uniqueCards = totals.uniqueCards,
+                    totalValueUsd = valueUsd,
+                    totalValueEur = valueEur,
+                    byColor = colors.toColorMap(),
+                    byRarity = rarities.toRarityMap(),
+                )
+            }
+        }
+            .flowOn(dispatcherProvider.io)
+            .distinctUntilChanged()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeCollectionSetCodes(): Flow<List<String>> {

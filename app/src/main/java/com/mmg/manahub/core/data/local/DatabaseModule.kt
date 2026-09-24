@@ -162,6 +162,10 @@ object DatabaseModule {
                 // v54 → v55 lives as a top-level `val` in Migration_54_55.kt.
                 // Additive: draft_sets.setImageUrl column.
                 MIGRATION_54_55,
+                // v55 → v56 lives as a top-level `val` in Migration_55_56.kt (same reason).
+                // Trades audit H4/H8: trade_collection_sync.pending_apply and owner_user_id on
+                // local_wishlists / local_open_for_trade (all additive).
+                MIGRATION_55_56,
             )
             .build()
 

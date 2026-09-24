@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
+import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
@@ -83,6 +84,7 @@ class TradeNegotiationViewModelTest {
     private val sessionFlow = MutableStateFlow<SessionState>(SessionState.Loading)
     private val friendsFlow = MutableStateFlow<List<Friend>>(emptyList())
     private val threadFlow = MutableStateFlow<List<TradeProposal>>(emptyList())
+    private val pendingApplyFlow = MutableStateFlow<List<String>>(emptyList())
 
     private companion object {
         const val ROOT_PROPOSAL_ID = "root-proposal-001"
@@ -156,12 +158,27 @@ class TradeNegotiationViewModelTest {
         every { getThread(any()) } returns threadFlow
         coEvery { refreshTradeThread(any(), any()) } returns Result.success(Unit)
         every { tradeCollectionSyncDao.observeSyncedProposalIds(any()) } returns MutableStateFlow(emptyList())
+        every { tradeCollectionSyncDao.observePendingApplyProposalIds(any()) } returns pendingApplyFlow
+        coEvery { tradeCollectionSyncDao.markPendingApply(any()) } answers {
+            pendingApplyFlow.value = pendingApplyFlow.value + firstArg<TradeCollectionSyncEntity>().proposalId
+        }
+        coEvery { tradeCollectionSyncDao.clearPendingApply(any(), any()) } answers {
+            pendingApplyFlow.value = pendingApplyFlow.value - firstArg<String>()
+        }
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
         unmockkStatic(FirebaseCrashlytics::class)
+    }
+
+    /** Makes the next thread refresh report every proposal as COMPLETED (both parties marked). */
+    private fun completeOnRefresh() {
+        coEvery { refreshTradeThread(any(), any()) } coAnswers {
+            threadFlow.value = threadFlow.value.map { it.copy(status = TradeStatus.COMPLETED) }
+            Result.success(Unit)
+        }
     }
 
     private fun createViewModel() = TradeNegotiationViewModel(
@@ -268,7 +285,7 @@ class TradeNegotiationViewModelTest {
         advanceUntilIdle()
 
         coVerify(exactly = 1) { acceptProposal("p1") }
-        verify { analyticsHelper.logEvent("trade_accepted", mapOf("root_proposal_id" to ROOT_PROPOSAL_ID)) }
+        verify { analyticsHelper.logEvent("trade_accepted", emptyMap()) }
         assertFalse(vm.uiState.value.isProcessing)
     }
 
@@ -616,6 +633,7 @@ class TradeNegotiationViewModelTest {
 
         val vm = createViewModel()
         advanceUntilIdle()
+        completeOnRefresh()
         vm.onMarkCompleted("p1")
 
         vm.events.test {
@@ -627,7 +645,7 @@ class TradeNegotiationViewModelTest {
         verify {
             analyticsHelper.logEvent(
                 "trade_completed",
-                mapOf("root_proposal_id" to ROOT_PROPOSAL_ID, "added_to_collection" to true),
+                mapOf("added_to_collection" to true),
             )
         }
     }
@@ -671,6 +689,7 @@ class TradeNegotiationViewModelTest {
 
         val vm = createViewModel()
         advanceUntilIdle()
+        completeOnRefresh()
         vm.onMarkCompleted("p1")
 
         vm.events.test {
@@ -820,5 +839,248 @@ class TradeNegotiationViewModelTest {
             assertFalse(event.args.isCounter)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // =========================================================================
+    // GROUP 8: unloaded items never drive collection changes (trades audit H3)
+    // =========================================================================
+
+    @Test
+    fun `given the proposal's items are not loaded when onUpdateCollection then nothing is applied`() = runTest {
+        threadFlow.value = listOf(buildProposal(id = "p1", status = TradeStatus.COMPLETED).copy(itemsLoaded = false))
+        sessionFlow.value = authenticated(USER_A)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onUpdateCollection("p1")
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { updateTradeCollection(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `given the proposal's items are not loaded when onMarkCompleted then no confirmation opens`() = runTest {
+        threadFlow.value = listOf(buildProposal(id = "p1", status = TradeStatus.ACCEPTED).copy(itemsLoaded = false))
+        sessionFlow.value = authenticated(USER_A)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onMarkCompleted("p1")
+
+        assertNull(vm.uiState.value.pendingMarkCompletedProposalId)
+    }
+
+    @Test
+    fun `given the proposal's items are not loaded when a revoke with reversal is confirmed then nothing runs`() = runTest {
+        threadFlow.value = listOf(buildProposal(id = "p1", status = TradeStatus.ACCEPTED).copy(itemsLoaded = false))
+        sessionFlow.value = authenticated(USER_A)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onRevoke("p1")
+        assertFalse(vm.uiState.value.pendingRevokeCanReverse)
+        vm.onRevokeConfirmed(reverseCollection = true)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { revokeAcceptance(any()) }
+        coVerify(exactly = 0) { updateTradeCollection(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `given the proposal's items are not loaded when onCounter then no editor navigation happens`() = runTest {
+        threadFlow.value = listOf(buildProposal(id = "p1").copy(itemsLoaded = false))
+        sessionFlow.value = authenticated(USER_B)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.events.test {
+            vm.onCounter("p1")
+            vm.onEdit("p1")
+            advanceUntilIdle()
+            expectNoEvents()
+        }
+    }
+
+    // =========================================================================
+    // GROUP 9: collection changes only once COMPLETED (trades audit H4)
+    // =========================================================================
+
+    @Test
+    fun `given the trade stays ACCEPTED after marking completed then nothing is applied and the choice is persisted`() = runTest {
+        val sentItem = buildItem(id = "i1", fromUserId = USER_A, toUserId = USER_B)
+        threadFlow.value = listOf(buildProposal(id = "p1", status = TradeStatus.ACCEPTED, items = listOf(sentItem)))
+        sessionFlow.value = authenticated(USER_A)
+        coEvery { markCompleted("p1") } returns Result.success(Unit)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onMarkCompleted("p1")
+
+        vm.events.test {
+            vm.onConfirmMarkCompleted(addToCollection = true)
+            advanceUntilIdle()
+            assertEquals(NegotiationEvent.CollectionApplyDeferred, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { updateTradeCollection(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 1) { tradeCollectionSyncDao.markPendingApply(match { it.proposalId == "p1" && it.pendingApply }) }
+        assertTrue("p1" in vm.uiState.value.pendingApplyProposalIds)
+    }
+
+    @Test
+    fun `given a pending apply when the trade is later seen COMPLETED then the collection is applied once`() = runTest {
+        val sentItem = buildItem(id = "i1", fromUserId = USER_A, toUserId = USER_B)
+        val accepted = buildProposal(id = "p1", status = TradeStatus.ACCEPTED, items = listOf(sentItem))
+        threadFlow.value = listOf(accepted)
+        pendingApplyFlow.value = listOf("p1")
+        sessionFlow.value = authenticated(USER_A)
+        coEvery { updateTradeCollection(any(), any(), any(), any(), any()) } returns Result.success(Unit)
+
+        createViewModel()
+        advanceUntilIdle()
+        coVerify(exactly = 0) { updateTradeCollection(any(), any(), any(), any(), any()) }
+
+        threadFlow.value = listOf(accepted.copy(status = TradeStatus.COMPLETED))
+        advanceUntilIdle()
+        threadFlow.value = listOf(accepted.copy(status = TradeStatus.COMPLETED, updatedAt = 2_000L))
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { updateTradeCollection("p1", USER_A, listOf(sentItem), emptyList(), false) }
+    }
+
+    @Test
+    fun `given a pending apply when the trade is revoked then the pending choice is dropped without touching the collection`() = runTest {
+        threadFlow.value = listOf(buildProposal(id = "p1", status = TradeStatus.REVOKED))
+        pendingApplyFlow.value = listOf("p1")
+        sessionFlow.value = authenticated(USER_A)
+
+        createViewModel()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { tradeCollectionSyncDao.clearPendingApply("p1", USER_A) }
+        coVerify(exactly = 0) { updateTradeCollection(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `given a revoked trade whose changes were applied when undo is requested then the reversal runs`() = runTest {
+        val sentItem = buildItem(id = "i1", fromUserId = USER_A, toUserId = USER_B)
+        threadFlow.value = listOf(buildProposal(id = "p1", status = TradeStatus.REVOKED, items = listOf(sentItem)))
+        every { tradeCollectionSyncDao.observeSyncedProposalIds(USER_A) } returns MutableStateFlow(listOf("p1"))
+        sessionFlow.value = authenticated(USER_A)
+        coEvery { updateTradeCollection(any(), any(), any(), any(), any()) } returns Result.success(Unit)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onUndoCollectionChanges("p1")
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { updateTradeCollection("p1", USER_A, listOf(sentItem), emptyList(), true) }
+    }
+
+    @Test
+    fun `given a revoked trade with no applied changes when undo is requested then nothing runs`() = runTest {
+        threadFlow.value = listOf(buildProposal(id = "p1", status = TradeStatus.REVOKED))
+        sessionFlow.value = authenticated(USER_A)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onUndoCollectionChanges("p1")
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { updateTradeCollection(any(), any(), any(), any(), any()) }
+    }
+
+    // =========================================================================
+    // Refresh: single flight, first-load state, account switch
+    // =========================================================================
+
+    @Test
+    fun `given the session trigger and the screen entry fire together then the thread is refreshed once`() = runTest {
+        sessionFlow.value = authenticated(USER_A)
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        coEvery { refreshTradeThread(any(), any()) } coAnswers { gate.await(); Result.success(Unit) }
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onScreenEntered()
+        vm.refresh()
+        advanceUntilIdle()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { refreshTradeThread(ROOT_PROPOSAL_ID, USER_A) }
+        assertFalse(vm.uiState.value.isRefreshing)
+    }
+
+    @Test
+    fun `given a return to the screen then the thread is refreshed again`() = runTest {
+        sessionFlow.value = authenticated(USER_A)
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.onScreenEntered()
+        advanceUntilIdle()
+        vm.onScreenEntered()
+        advanceUntilIdle()
+
+        coVerify(exactly = 2) { refreshTradeThread(ROOT_PROPOSAL_ID, USER_A) }
+    }
+
+    @Test
+    fun `given an empty cache then the thread stays loading until the first refresh finishes`() = runTest {
+        sessionFlow.value = authenticated(USER_A)
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        coEvery { refreshTradeThread(any(), any()) } coAnswers { gate.await(); Result.success(Unit) }
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.isLoading)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isLoading)
+        assertFalse(vm.uiState.value.refreshFailed)
+    }
+
+    @Test
+    fun `given the first refresh fails with nothing cached then refreshFailed is set`() = runTest {
+        sessionFlow.value = authenticated(USER_A)
+        coEvery { refreshTradeThread(any(), any()) } returns Result.failure(RuntimeException("offline"))
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.isLoading)
+        assertTrue(vm.uiState.value.refreshFailed)
+        assertTrue(vm.uiState.value.thread.isEmpty())
+    }
+
+    @Test
+    fun `given the account switches then the new account's thread is refreshed and old dialogs are dropped`() = runTest {
+        threadFlow.value = listOf(buildProposal(id = "p1", status = TradeStatus.PROPOSED))
+        sessionFlow.value = authenticated(USER_A)
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onCancelRequested("p1")
+
+        sessionFlow.value = authenticated(USER_B)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { refreshTradeThread(ROOT_PROPOSAL_ID, USER_B) }
+        assertEquals(USER_B, vm.uiState.value.currentUserId)
+        assertNull(vm.uiState.value.pendingCancelProposalId)
+    }
+
+    @Test
+    fun `given a user without a nickname then no blank participant name is stored`() = runTest {
+        sessionFlow.value = SessionState.Authenticated(
+            AuthUser(id = USER_A, email = "a@test.com", nickname = null, gameTag = "#TAG", avatarUrl = null, provider = "email"),
+        )
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        assertFalse(USER_A in vm.uiState.value.participantNames)
     }
 }

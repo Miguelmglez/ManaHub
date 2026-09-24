@@ -35,6 +35,17 @@ sealed interface HomeAction {
      * board overhaul, TASK 5b). Handled in [HomeViewModel].
      */
     data class SelectCommunityDecksCategory(val category: HomeCommunityDeckCategory) : HomeAction
+
+    /**
+     * Switches the Home COMMUNITY_DECKS widget's format filter and persists the choice; null means
+     * every format. Handled in [HomeViewModel].
+     */
+    data class SelectCommunityDecksFormat(
+        val format: com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckFormatFilter?,
+    ) : HomeAction
+
+    /** Shows a different, randomly chosen Rules Tip (in-memory only). Handled in [HomeViewModel]. */
+    object RollRulesTip : HomeAction
     object OpenTournaments : HomeAction
     object OpenSettings : HomeAction
     object OpenProfile : HomeAction

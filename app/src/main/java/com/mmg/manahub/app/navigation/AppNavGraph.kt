@@ -259,7 +259,7 @@ fun AppNavGraph(
         }
     }
 
-    // Toast for invite results — shown at the global level so it is visible regardless of
+    // Global toast (invite results, exit prompt) — shown at the global level so it is visible regardless of
     // which screen the user ends up on after the InviteDispatcherScreen navigates away.
     val inviteToastState = rememberMagicToastState()
 
@@ -293,6 +293,21 @@ fun AppNavGraph(
     }
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
+
+    // Composed before the NavHost so screen/sheet/overlay back handlers registered later win.
+    val exitGuard = remember { AppExitBackGuard(clock = android.os.SystemClock::elapsedRealtime) }
+    AppExitBackHandler(
+        atRoot = backStack != null && navController.previousBackStackEntry == null,
+        guard = exitGuard,
+        onShowPrompt = {
+            FirebaseCrashlytics.getInstance().log("app_exit_back_prompt_shown")
+            inviteToastState.show(
+                message = context.getString(R.string.app_exit_back_prompt),
+                type = MagicToastType.INFO,
+                durationMs = AppExitBackGuard.DEFAULT_WINDOW_MS,
+            )
+        },
+    )
 
     var pendingPlaytestSetup by remember { mutableStateOf<PlaytestSetup?>(null) }
     var pendingPlayerConfigs by remember { mutableStateOf<List<PlayerConfig>?>(null) }
@@ -494,6 +509,8 @@ fun AppNavGraph(
                                     is HomeAction.UpdateLayout,
                                     is HomeAction.SkipFirstStep,
                                     is HomeAction.SelectCommunityDecksCategory,
+                                    is HomeAction.SelectCommunityDecksFormat,
+                                    HomeAction.RollRulesTip,
                                     -> Unit
                                 }
                             },
@@ -538,6 +555,9 @@ fun AppNavGraph(
                                 navController.navigate(
                                     Screen.TradeNegotiationDetail.createRoute(proposalId, rootProposalId)
                                 )
+                            },
+                            onNavigateToAddFriends = {
+                                navController.navigate(Screen.FriendsList.route)
                             },
                             onBrowseCommunityDecks = {
                                 navController.navigate(Screen.CommunityDecks.route)
@@ -623,10 +643,13 @@ fun AppNavGraph(
                                 defaultValue = null
                             }
                         ),
-                        enterTransition = { 
+                        enterTransition = {
                             fadeIn(tween(500))
                         },
-                        exitTransition = { fadeOut(tween(500)) }
+                        exitTransition = { fadeOut(tween(500)) },
+                        // The default pop exit slides the screen, which drags the shared card
+                        // image's source bounds sideways on the way back.
+                        popExitTransition = { fadeOut(tween(500)) },
                     ) { backStackEntry ->
                         val sharedTransitionKey = backStackEntry.arguments?.getString("sharedTransitionKey")
                         CardDetailScreen(
@@ -1279,14 +1302,19 @@ fun AppNavGraph(
                     },
                 ),
             ) {
-                TradesSharedListScreen(onBack = { navController.popBackStack() })
+                TradesSharedListScreen(
+                    onBack = { navController.popBackStack() },
+                    onCardClick = { scryfallId -> navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId)) },
+                )
             }
 
             // ── Trade proposal editor ─────────────────────────────────────────
             composable(
                 route     = Screen.CreateTradeProposal.route,
                 arguments = listOf(
-                    navArgument("receiverId") { type = NavType.StringType },
+                    navArgument("receiverId") {
+                        type = NavType.StringType; nullable = true; defaultValue = null
+                    },
                     navArgument("parentProposalId") {
                         type = NavType.StringType; nullable = true; defaultValue = null
                     },

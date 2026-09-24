@@ -132,7 +132,7 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
 - → memory: `feedback_sync_watermark_never_past_unapplied`, `feedback_setof_rpc_must_be_paginated`,
   `feedback_idempotency_gate_tests_own_completion`, `project_collection_sync_data_loss_2026-09`
 
-### Database (Room v53)
+### Database (Room v56)
 - DB file `mtg_collection.db`. The `UserCardEntity` → `CardEntity` FK was **removed in v53** (ADR-008);
   do not reintroduce it. It was `ON DELETE RESTRICT` from v38 to v52.
 - Migration chain 1→53, gaps at 7–10 and 15–17 covered by `fallbackToDestructiveMigration()` (dev-only;
@@ -150,6 +150,9 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
   indices; those index names must match Room's generated names byte for byte or
   `runMigrationsAndValidate` crash-loops every user at launch (destructive fallback covers only
   v1–24). Guarded by `Migration52To53Test`.
+  v54 = additive `decks.posture_override`; v55 = additive `draft_sets.setImageUrl` (Draft);
+  v56 = additive `trade_collection_sync.pending_apply` + nullable `owner_user_id` on
+  `local_wishlists`/`local_open_for_trade` (Trades audit H4/H8).
   Every migration since v39 follows the same pattern: a top-level `val MIGRATION_x_y` in its own file,
   `CREATE TABLE IF NOT EXISTS …` / `ADD COLUMN … TEXT NOT NULL DEFAULT '…'` guarded by a
   `columnExists` check where applicable, CardDao upsert untouched → no CASCADE risk.
@@ -208,8 +211,34 @@ Box { Scaffold { ... }; MagicToastHost(toastState) }
 ```
 
 ### Shared UI components (`core/ui/components/`)
-Reuse before writing inline: `EmptyState`, `InlineErrorState`, `FullErrorState`, `MagicToast(Host/State)`,
-`CardGridItem`, `CardListItem`, `AddToCollectionSheet`, `CardSearchSheet`, `TradeSelectionSheet`.
+Two locations: `shared/core-ui/src/commonMain/.../core/ui/components/` (KMP, default home for new ones) and
+`app/src/main/java/com/mmg/manahub/core/ui/components/` (Android-only). **Reuse before writing inline** —
+a hand-rolled equivalent of anything below is a review finding. Inventory (what it replaces in brackets):
+- **Actions & selection:** `MagicCtaButton` [Button/OutlinedButton/TextButton/Surface+clickable] ·
+  `MagicFilterChip` [FilterChip/InputChip/custom pills] · `ManaTabRow` [TabRow/Tab, top-level sub-tabs] ·
+  `MagicSegmentedControl` [chip rows used as tabs; 2–4 views, also nested under a `ManaTabRow`] ·
+  `MagicSelectionItem` [custom selectable rows in pick-one lists/sheets] · `ManaHubSelector` /
+  `ManaHubBottomSheetSelector<T>` [dropdowns / hand-rolled single-select sheets, text-only items] ·
+  `SectionHeader` [custom collapsible header rows] · `ManaColorPicker` [WUBRG chips].
+- **Feedback & states:** `EmptyState` (optional CTA; `fillMaxWidth()` inside lists) · `InlineErrorState` /
+  `FullErrorState` (+ `rememberRateLimitCountdownSeconds` to gate retry) · `MagicToastHost`/
+  `rememberMagicToastState` (always pass `MagicToastType.ERROR` for errors; default is SUCCESS) ·
+  `MagicAlertDialog` · `MagicLoadingSpinner(size = MagicLoadingSize.*)` [CircularProgressIndicator; Android]
+  · `MagicProgressBar` / `MagicLoadingFooter` [LinearProgressIndicator, pagination footer] ·
+  `PullRefreshHeader` + `rememberPullRefreshState` [PullToRefreshBox/SwipeRefresh].
+- **Cards:** `CardName` · `CardListItem` / `CardGridItem` / `CardRow` [hand-built card rows/tiles] ·
+  `MagicCard` [raw card-art `AsyncImage`] · `MagicCardInspectionOverlay` · `CardFullScreenDialog` /
+  `FullScreenImageViewer` · `CardTagChip` / `CardTagGroup` · `SetSymbol` · `ManaCostImages` / `OracleText`
+  [text-rendered costs/rules] · `ManaCurveChart` / `CircularDistribution` / `MiniProgressRing`.
+- **Badges & people:** `CopyBadge` [tiny count/label pills] · `FoilBadge` · `RarityDot` · `LanguageBadge` ·
+  `StaleBadge`/`StaleWarningBanner` · `AvatarImage(avatarUrl, initials, size)` [Box+CircleShape+AsyncImage].
+- **Sheets & pickers:** `AddCardSheet` (foil/condition/language/qty) · `ConditionSelectorSheet` ·
+  `LanguageSelectorSheet` · `VariantSelectorSheet` · `TradeSelectionSheet` · `CardPickerField` /
+  `CardSearchField` · Android-only: `CardSearchSheet`, `CardQueueSheet`, `DeckCardQueueSheet`,
+  `ShareProfileSheet`, `search/AdvancedSearchSheet` + its pickers (`SetPickerSheet`, `TagPickerSheet`, …).
+- **Content tiles:** `DeckItem` · `DraftSetCard` · `NewsItemCard` · game setup (`GameModeSelector`,
+  `LayoutTemplateSelector`, `PlayerCountStepper`, `PlayerEditSheet`, `FloatingDelta`) · `MagicBottomBar` ·
+  themed backgrounds (`HexGridBackground` + 5 palette backgrounds) · `InlineIcons` / `manaColorFor`.
 
 **Mandatory component usage:**
 - **Card names:** always use `CardName` (substitutes "A-" prefix + post-"//" with Alchemy icon, supports `showFrontOnly`/`fontWeight`)

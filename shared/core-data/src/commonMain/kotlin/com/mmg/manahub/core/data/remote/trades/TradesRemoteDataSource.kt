@@ -9,7 +9,6 @@ import com.mmg.manahub.core.model.ReviewFlags
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -31,19 +30,41 @@ class TradesRemoteDataSource(
 ) {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
-    suspend fun fetchProposals(userId: String): Result<List<TradeProposalDto>> =
-        safeCall {
-            supabaseClient.postgrest["trade_proposals"]
-                .select {
-                    filter {
+    /**
+     * Every proposal where [userId] is a participant, optionally only the thread rooted at
+     * [rootProposalId], drained page by page in `(created_at, id)` order. Fails unless every page
+     * was fetched, so a truncated list can never replace the cached one.
+     */
+    suspend fun fetchProposals(userId: String, rootProposalId: String? = null): Result<List<TradeProposalDto>> =
+        drainByCreatedAt(
+            id = { it.id },
+            createdAt = { it.createdAt },
+        ) { after, limit -> fetchProposalsPage(userId, rootProposalId, after, limit) }.toResult()
+
+    /** One `(created_at, id)` keyset page of [fetchProposals]. */
+    suspend fun fetchProposalsPage(
+        userId: String,
+        rootProposalId: String?,
+        after: CreatedAtCursor?,
+        limit: Int,
+    ): Result<List<TradeProposalDto>> = safeCall {
+        supabaseClient.postgrest["trade_proposals"]
+            .select {
+                filter {
+                    if (rootProposalId != null) eq("root_proposal_id", rootProposalId)
+                    // Two top-level `or` groups would overwrite each other, so they are nested under one `and`.
+                    and {
                         or {
                             eq("proposer_id", userId)
                             eq("receiver_id", userId)
                         }
+                        if (after != null) afterCreatedAt(after)
                     }
                 }
-                .decodeList<TradeProposalDto>()
-        }
+                createdAtPage(limit)
+            }
+            .decodeList<TradeProposalDto>()
+    }
 
     suspend fun fetchProposalItems(proposalId: String): Result<List<TradeItemDto>> =
         safeCall {
@@ -153,13 +174,8 @@ class TradesRemoteDataSource(
     }
 
     private suspend fun <T> safeCall(block: suspend () -> T): Result<T> =
-        withContext(dispatcherProvider.io) {
-            try {
-                Result.success(block())
-            } catch (e: RestException) {
-                Result.failure(parseTradeError(e.message))
-            } catch (e: Exception) {
-                Result.failure(e)
-            }
+        dispatcherProvider.remoteResult(block).recoverCatching { e ->
+            // Trade RPC errors carry a typed token in the message; everything else passes through.
+            throw if (e is RestException) parseTradeError(e.message) else e
         }
 }

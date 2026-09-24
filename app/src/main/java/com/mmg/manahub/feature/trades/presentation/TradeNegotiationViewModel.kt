@@ -10,6 +10,8 @@ import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
+import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
+import com.mmg.manahub.core.model.TradeStatus
 import com.mmg.manahub.core.model.TradeError
 import com.mmg.manahub.core.model.TradeItem
 import com.mmg.manahub.core.model.TradeProposal
@@ -24,12 +26,17 @@ import com.mmg.manahub.feature.trades.domain.usecase.RevokeAcceptanceUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.UpdateTradeCollectionUseCase
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.flatMapLatest
@@ -76,6 +83,9 @@ sealed class NegotiationEvent {
      */
     data class CollectionSyncResult(val success: Boolean) : NegotiationEvent()
 
+    /** The trade is not COMPLETED yet: the collection will update once the other party completes it. */
+    object CollectionApplyDeferred : NegotiationEvent()
+
     /**
      * A failure message already resolved to user-facing text via [toUserFacingMessage].
      * Null falls back to a generic error string resolved by the screen.
@@ -88,8 +98,11 @@ data class NegotiationUiState(
     val currentUserId: String = "",
     /** userId → display name; populated from auth session (current user) and friends list. */
     val participantNames: Map<String, String> = emptyMap(),
+    /** True until the first thread refresh finishes, so an empty cache never reads as "no proposals". */
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
+    /** True when the last refresh failed; with an empty [thread] the screen shows a retryable error. */
+    val refreshFailed: Boolean = false,
     val isProcessing: Boolean = false,
     val errorDialog: NegotiationError? = null,
     val pendingMarkCompletedProposalId: String? = null,
@@ -99,6 +112,8 @@ data class NegotiationUiState(
     val pendingRevokeProposalId: String? = null,
     /** True if the user already synced the collection for the pending-revoke proposal. */
     val pendingRevokeHasSynced: Boolean = false,
+    /** False when the pending-revoke proposal's items are not loaded, so nothing can be reversed. */
+    val pendingRevokeCanReverse: Boolean = true,
     val pendingCancelProposalId: String? = null,
     /**
      * Set when the user taps Accept on a proposal where the other party has only included
@@ -112,6 +127,8 @@ data class NegotiationUiState(
      * [TradeCollectionSyncDao.observeSyncedProposalIds].
      */
     val syncedCollectionProposalIds: Set<String> = emptySet(),
+    /** Proposal IDs whose collection update was requested but waits for the trade to be COMPLETED. */
+    val pendingApplyProposalIds: Set<String> = emptySet(),
     /** True while [UpdateTradeCollectionUseCase] is executing, to disable the button. */
     val isSyncingCollection: Boolean = false,
 )
@@ -142,6 +159,13 @@ class TradeNegotiationViewModel(
     private val _events = Channel<NegotiationEvent>(Channel.BUFFERED)
     val events: Flow<NegotiationEvent> = _events.receiveAsFlow()
 
+    // Declared before init: the Main.immediate collectors launched there can run synchronously.
+    // Guards against re-running a failed auto-apply on every emission of the same state.
+    private val autoApplyAttempted = mutableSetOf<String>()
+    // The first entry is covered by the session collector; later entries (back from the editor) refresh.
+    private var hasEnteredScreen = false
+    private var refreshJob: Job? = null
+
     init {
         viewModelScope.launch {
             // Note (§6.4): no `.catch` here — `sessionState` is a `StateFlow`, which by
@@ -153,15 +177,19 @@ class TradeNegotiationViewModel(
                 .collect { state ->
                     if (state is SessionState.Authenticated) {
                         val userId = state.user.id
-                        val firstAuth = _uiState.value.currentUserId.isBlank()
-                        val nickname = state.user.nickname ?: ""
+                        val previousUserId = _uiState.value.currentUserId
+                        val isAccountSwitch = previousUserId.isNotBlank() && previousUserId != userId
+                        val nickname = state.user.nickname?.takeIf { it.isNotBlank() }
                         _uiState.update { s ->
-                            s.copy(
+                            // Another account's dialogs and names must not survive a switch; the refresh re-scopes the thread.
+                            val base = if (isAccountSwitch) NegotiationUiState(thread = s.thread, isLoading = true) else s
+                            base.copy(
                                 currentUserId = userId,
-                                participantNames = s.participantNames + (userId to nickname),
+                                participantNames = if (nickname != null) base.participantNames + (userId to nickname) else base.participantNames,
                             )
                         }
-                        if (firstAuth) refresh()
+                        if (isAccountSwitch) autoApplyAttempted.clear()
+                        if (previousUserId.isBlank() || isAccountSwitch) startRefresh(userId, force = isAccountSwitch)
                     }
                 }
         }
@@ -170,16 +198,20 @@ class TradeNegotiationViewModel(
                 .distinctUntilChanged()
                 .catch { /* friends are supplementary for display only */ }
                 .collect { friends ->
-                    val names = friends.associate { it.userId to it.nickname }
+                    val names = friends.filter { it.nickname.isNotBlank() }.associate { it.userId to it.nickname }
                     _uiState.update { s -> s.copy(participantNames = s.participantNames + names) }
                 }
         }
         viewModelScope.launch {
             getThread(rootProposalId)
                 .distinctUntilChanged()
-                .catch { _uiState.update { s -> s.copy(isLoading = false) } }
+                .catch { e ->
+                    recordNonFatal("trade_thread_observe_failed", e)
+                    _uiState.update { s -> s.copy(isLoading = false, refreshFailed = true) }
+                }
                 .collect { thread ->
-                    _uiState.update { s -> s.copy(thread = thread, isLoading = false) }
+                    // A cached thread renders at once; an empty one keeps loading until the refresh ends.
+                    _uiState.update { s -> s.copy(thread = thread, isLoading = s.isLoading && thread.isEmpty()) }
                 }
         }
         // Observe which proposals have already been collection-synced by this user.
@@ -200,7 +232,54 @@ class TradeNegotiationViewModel(
                     _uiState.update { s -> s.copy(syncedCollectionProposalIds = ids.toSet()) }
                 }
         }
+        // Applies a deferred collection update once the trade is seen COMPLETED; drops it when the
+        // trade ended any other way.
+        viewModelScope.launch {
+            authRepository.sessionState
+                .filterIsInstance<SessionState.Authenticated>()
+                .map { it.user.id }
+                .distinctUntilChanged()
+                .flatMapLatest { userId ->
+                    combine(getThread(rootProposalId), tradeCollectionSyncDao.observePendingApplyProposalIds(userId)) { thread, pending ->
+                        Triple(userId, thread, pending.toSet())
+                    }
+                }
+                .catch { e -> recordNonFatal("trade_pending_apply_observe_failed", e) }
+                .collect { (userId, thread, pending) ->
+                    _uiState.update { s -> s.copy(pendingApplyProposalIds = pending) }
+                    resolvePendingApplies(userId, thread, pending)
+                }
+        }
     }
+
+    private fun resolvePendingApplies(userId: String, thread: List<TradeProposal>, pending: Set<String>) {
+        thread.filter { it.id in pending }.forEach { proposal ->
+            when {
+                proposal.status == TradeStatus.COMPLETED && proposal.itemsLoaded -> {
+                    if (!autoApplyAttempted.add(proposal.id)) return@forEach
+                    viewModelScope.launch(ioDispatcher) {
+                        updateTradeCollection(proposal.id, userId, sentItemsOf(proposal, userId), receivedItemsOf(proposal, userId))
+                            .onSuccess { _events.trySend(NegotiationEvent.CollectionSyncResult(success = true)) }
+                            .onFailure { e ->
+                                recordNonFatal("trade_pending_apply_failed", e)
+                                _events.trySend(NegotiationEvent.CollectionSyncResult(success = false))
+                            }
+                    }
+                }
+                proposal.status.isTerminal && proposal.status != TradeStatus.COMPLETED ->
+                    viewModelScope.launch(ioDispatcher) {
+                        runCatching { tradeCollectionSyncDao.clearPendingApply(proposal.id, userId) }
+                            .onFailure { e -> if (e is kotlinx.coroutines.CancellationException) throw e }
+                    }
+            }
+        }
+    }
+
+    private fun sentItemsOf(proposal: TradeProposal, userId: String) =
+        proposal.items.filter { it.fromUserId == userId && !it.isReviewCollectionPlaceholder }
+
+    private fun receivedItemsOf(proposal: TradeProposal, userId: String) =
+        proposal.items.filter { it.toUserId == userId && !it.isReviewCollectionPlaceholder }
 
     fun onAccept(proposalId: String) {
         if (_uiState.value.isProcessing) return
@@ -253,11 +332,11 @@ class TradeNegotiationViewModel(
         }
         if (!acquired) return
         viewModelScope.launch(ioDispatcher) {
-            FirebaseCrashlytics.getInstance().log("trade_accept_started: proposal=$proposalId")
+            FirebaseCrashlytics.getInstance().log("trade_accept_started")
             acceptProposal(proposalId)
                 .onSuccess {
-                    analyticsHelper.logEvent("trade_accepted", mapOf("root_proposal_id" to rootProposalId))
-                    refresh()
+                    analyticsHelper.logEvent("trade_accepted", emptyMap())
+                    startRefresh(force = true)
                 }
                 .onFailure { e ->
                     val error = when (e) {
@@ -265,8 +344,7 @@ class TradeNegotiationViewModel(
                         is TradeError.CannotAcceptReviewCollection -> NegotiationError.Generic(e.toUserFacingMessage())
                         else -> {
                             FirebaseCrashlytics.getInstance().apply {
-                                log("trade_accept_failed: proposal=$proposalId")
-                                setCustomKey("trade_root_proposal_id", rootProposalId)
+                                log("trade_accept_failed")
                                 recordException(e)
                             }
                             NegotiationError.Generic(e.toUserFacingMessage())
@@ -286,11 +364,10 @@ class TradeNegotiationViewModel(
         if (!acquired) return
         viewModelScope.launch(ioDispatcher) {
             declineProposal(proposalId)
-                .onSuccess { refresh() }
+                .onSuccess { startRefresh(force = true) }
                 .onFailure { e ->
                     FirebaseCrashlytics.getInstance().apply {
-                        log("trade_decline_failed: proposal=$proposalId")
-                        setCustomKey("trade_root_proposal_id", rootProposalId)
+                        log("trade_decline_failed")
                         recordException(e)
                     }
                     _events.trySend(NegotiationEvent.ShowError(e.toUserFacingMessage()))
@@ -321,11 +398,10 @@ class TradeNegotiationViewModel(
         if (!acquired) return
         viewModelScope.launch(ioDispatcher) {
             cancelProposal(proposalId)
-                .onSuccess { refresh() }
+                .onSuccess { startRefresh(force = true) }
                 .onFailure { e ->
                     FirebaseCrashlytics.getInstance().apply {
-                        log("trade_cancel_failed: proposal=$proposalId")
-                        setCustomKey("trade_root_proposal_id", rootProposalId)
+                        log("trade_cancel_failed")
                         recordException(e)
                     }
                     _events.trySend(NegotiationEvent.ShowError(e.toUserFacingMessage()))
@@ -336,26 +412,30 @@ class TradeNegotiationViewModel(
 
     fun onRevoke(proposalId: String) {
         if (_uiState.value.isProcessing) return
+        val proposal = _uiState.value.thread.find { it.id == proposalId }
         val hasSynced = proposalId in _uiState.value.syncedCollectionProposalIds
         _uiState.update { it.copy(
             pendingRevokeProposalId = proposalId,
             pendingRevokeHasSynced = hasSynced,
+            pendingRevokeCanReverse = proposal?.itemsLoaded == true,
         )}
     }
 
     fun onRevokeDismissed() {
-        _uiState.update { it.copy(pendingRevokeProposalId = null, pendingRevokeHasSynced = false) }
+        _uiState.update { it.copy(pendingRevokeProposalId = null, pendingRevokeHasSynced = false, pendingRevokeCanReverse = true) }
     }
 
     fun onRevokeConfirmed(reverseCollection: Boolean) {
         val proposalId = _uiState.value.pendingRevokeProposalId ?: return
-        _uiState.update { it.copy(pendingRevokeProposalId = null, pendingRevokeHasSynced = false) }
+        _uiState.update { it.copy(pendingRevokeProposalId = null, pendingRevokeHasSynced = false, pendingRevokeCanReverse = true) }
         doRevoke(proposalId, reverseCollection)
     }
 
     private fun doRevoke(proposalId: String, reverseCollection: Boolean) {
         val userId = _uiState.value.currentUserId
         val proposal = _uiState.value.thread.find { it.id == proposalId } ?: return
+        // Reversing from an unloaded item list would reverse nothing yet still drop the sync record.
+        if (reverseCollection && !proposal.itemsLoaded) return
         var acquired = false
         _uiState.update { state ->
             if (state.isProcessing) state else { acquired = true; state.copy(isProcessing = true) }
@@ -377,17 +457,18 @@ class TradeNegotiationViewModel(
                         updateTradeCollection(proposalId, userId, sentItems, receivedItems, reverse = true)
                             .onSuccess { _events.trySend(NegotiationEvent.CollectionSyncResult(success = true)) }
                             .onFailure { e ->
-                                recordNonFatal("trade_revoke_collection_reverse_failed: proposal=$proposalId", e)
+                                recordNonFatal("trade_revoke_collection_reverse_failed", e)
                                 _events.trySend(NegotiationEvent.CollectionSyncResult(success = false))
                             }
                     }
-                    FirebaseCrashlytics.getInstance().log("trade_revoked: proposal=$proposalId")
-                    refresh()
+                    runCatching { tradeCollectionSyncDao.clearPendingApply(proposalId, userId) }
+                        .onFailure { e -> if (e is kotlinx.coroutines.CancellationException) throw e }
+                    FirebaseCrashlytics.getInstance().log("trade_revoked")
+                    startRefresh(force = true)
                 }
                 .onFailure { e ->
                     FirebaseCrashlytics.getInstance().apply {
-                        log("trade_revoke_failed: proposal=$proposalId")
-                        setCustomKey("trade_root_proposal_id", rootProposalId)
+                        log("trade_revoke_failed")
                         recordException(e)
                     }
                     _events.trySend(NegotiationEvent.ShowError(e.toUserFacingMessage()))
@@ -399,6 +480,7 @@ class TradeNegotiationViewModel(
     fun onMarkCompleted(proposalId: String) {
         if (_uiState.value.isProcessing) return
         val proposal = _uiState.value.thread.find { it.id == proposalId } ?: return
+        if (!proposal.itemsLoaded) return
         val currentUserId = _uiState.value.currentUserId
         val sentItems = proposal.items.filter { it.fromUserId == currentUserId && !it.isReviewCollectionPlaceholder }
         val receivedItems = proposal.items.filter { it.toUserId == currentUserId && !it.isReviewCollectionPlaceholder }
@@ -442,34 +524,23 @@ class TradeNegotiationViewModel(
         }
         if (!acquired) return
         viewModelScope.launch(ioDispatcher) {
-            FirebaseCrashlytics.getInstance().log("trade_mark_completed_started: proposal=$proposalId")
+            FirebaseCrashlytics.getInstance().log("trade_mark_completed_started")
             markCompleted(proposalId)
                 .onSuccess {
                     if (addToCollection) {
-                        // §2.5 fix: fold the Result instead of discarding it — a failed
-                        // collection update after a successful "mark completed" used to
-                        // leave the user's collection stale with zero feedback or signal.
-                        updateTradeCollection(proposalId, userId, sentItems, receivedItems)
-                            .onSuccess { _events.trySend(NegotiationEvent.CollectionSyncResult(success = true)) }
-                            .onFailure { e ->
-                                recordNonFatal("trade_mark_completed_collection_update_failed: proposal=$proposalId", e)
-                                _events.trySend(NegotiationEvent.CollectionSyncResult(success = false))
-                            }
+                        applyWhenCompleted(proposalId, userId, sentItems, receivedItems)
+                    } else {
+                        startRefresh(force = true)
                     }
-                    analyticsHelper.logEvent("trade_completed", mapOf(
-                        "root_proposal_id" to rootProposalId,
-                        "added_to_collection" to addToCollection,
-                    ))
-                    FirebaseCrashlytics.getInstance().log("trade_mark_completed_success: proposal=$proposalId")
-                    refresh()
+                    analyticsHelper.logEvent("trade_completed", mapOf("added_to_collection" to addToCollection))
+                    FirebaseCrashlytics.getInstance().log("trade_mark_completed_success")
                 }
                 .onFailure { e ->
                     val error = when (e) {
                         is TradeError.InventoryGone -> NegotiationError.InventoryGone
                         else -> {
                             FirebaseCrashlytics.getInstance().apply {
-                                log("trade_mark_completed_failed: proposal=$proposalId")
-                                setCustomKey("trade_root_proposal_id", rootProposalId)
+                                log("trade_mark_completed_failed")
                                 recordException(e)
                             }
                             NegotiationError.Generic(e.toUserFacingMessage())
@@ -481,8 +552,79 @@ class TradeNegotiationViewModel(
         }
     }
 
+    /**
+     * Marking completed keeps the trade ACCEPTED until BOTH parties mark it, and it can still be
+     * revoked meanwhile, so the collection changes only when the refreshed status is COMPLETED.
+     * Otherwise the choice is persisted and applied when COMPLETED is observed.
+     */
+    private suspend fun applyWhenCompleted(
+        proposalId: String,
+        userId: String,
+        sentItems: List<TradeItem>,
+        receivedItems: List<TradeItem>,
+    ) {
+        refreshTradeThread(rootProposalId, userId)
+            .onFailure { e -> recordNonFatal("trade_mark_completed_refresh_failed", e) }
+        val refreshed = getThread(rootProposalId).first().find { it.id == proposalId }
+        if (refreshed?.status == TradeStatus.COMPLETED) {
+            val loaded = refreshed.takeIf { it.itemsLoaded }
+            // §2.5 fix: fold the Result — a failed update must never leave the collection stale silently.
+            updateTradeCollection(
+                proposalId,
+                userId,
+                loaded?.let { sentItemsOf(it, userId) } ?: sentItems,
+                loaded?.let { receivedItemsOf(it, userId) } ?: receivedItems,
+            )
+                .onSuccess { _events.trySend(NegotiationEvent.CollectionSyncResult(success = true)) }
+                .onFailure { e ->
+                    recordNonFatal("trade_mark_completed_collection_update_failed", e)
+                    _events.trySend(NegotiationEvent.CollectionSyncResult(success = false))
+                }
+        } else {
+            runCatching {
+                tradeCollectionSyncDao.markPendingApply(
+                    TradeCollectionSyncEntity(proposalId = proposalId, userId = userId, pendingApply = true)
+                )
+            }.onSuccess {
+                _events.trySend(NegotiationEvent.CollectionApplyDeferred)
+            }.onFailure { e ->
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                recordNonFatal("trade_mark_completed_pending_apply_failed", e)
+                _events.trySend(NegotiationEvent.CollectionSyncResult(success = false))
+            }
+        }
+    }
+
+    /**
+     * Reverses the collection changes of a trade that was revoked after they were applied (the
+     * other party revoked, or the changes predate the COMPLETED-only rule).
+     */
+    fun onUndoCollectionChanges(proposalId: String) {
+        val proposal = _uiState.value.thread.find { it.id == proposalId }
+            ?.takeIf { it.status == TradeStatus.REVOKED && it.itemsLoaded } ?: return
+        val userId = _uiState.value.currentUserId
+        if (userId.isBlank() || proposalId !in _uiState.value.syncedCollectionProposalIds) return
+        var acquired = false
+        _uiState.update { state ->
+            if (state.isSyncingCollection) state else { acquired = true; state.copy(isSyncingCollection = true) }
+        }
+        if (!acquired) return
+        viewModelScope.launch(ioDispatcher) {
+            updateTradeCollection(proposalId, userId, sentItemsOf(proposal, userId), receivedItemsOf(proposal, userId), reverse = true)
+                .onSuccess {
+                    _uiState.update { s -> s.copy(syncedCollectionProposalIds = s.syncedCollectionProposalIds - proposalId) }
+                    _events.trySend(NegotiationEvent.CollectionSyncResult(success = true))
+                }
+                .onFailure { e ->
+                    recordNonFatal("trade_undo_collection_changes_failed", e)
+                    _events.trySend(NegotiationEvent.CollectionSyncResult(success = false))
+                }
+            _uiState.update { it.copy(isSyncingCollection = false) }
+        }
+    }
+
     fun onCounter(proposalId: String) {
-        val proposal = _uiState.value.thread.find { it.id == proposalId } ?: return
+        val proposal = _uiState.value.thread.find { it.id == proposalId }?.takeIf { it.itemsLoaded } ?: return
         val currentUserId = _uiState.value.currentUserId
         val otherUserId = if (proposal.proposerId == currentUserId) proposal.receiverId else proposal.proposerId
         _events.trySend(NegotiationEvent.NavigateToEditor(EditorNavArgs(
@@ -494,7 +636,7 @@ class TradeNegotiationViewModel(
     }
 
     fun onEdit(proposalId: String) {
-        val proposal = _uiState.value.thread.find { it.id == proposalId } ?: return
+        val proposal = _uiState.value.thread.find { it.id == proposalId }?.takeIf { it.itemsLoaded } ?: return
         val currentUserId = _uiState.value.currentUserId
         val otherUserId = if (proposal.proposerId == currentUserId) proposal.receiverId else proposal.proposerId
         _events.trySend(NegotiationEvent.NavigateToEditor(EditorNavArgs(
@@ -513,7 +655,7 @@ class TradeNegotiationViewModel(
      * static "Collection updated" label on subsequent renders.
      */
     fun onUpdateCollection(proposalId: String) {
-        val proposal = _uiState.value.thread.find { it.id == proposalId } ?: return
+        val proposal = _uiState.value.thread.find { it.id == proposalId }?.takeIf { it.itemsLoaded } ?: return
         val userId = _uiState.value.currentUserId
         if (userId.isBlank()) return
         var acquired = false
@@ -530,10 +672,7 @@ class TradeNegotiationViewModel(
             }
             updateTradeCollection(proposalId, userId, sentItems, receivedItems)
                 .onSuccess {
-                    analyticsHelper.logEvent(
-                        "trade_collection_updated",
-                        mapOf("proposal_id" to proposalId),
-                    )
+                    analyticsHelper.logEvent("trade_collection_updated", emptyMap())
                     _uiState.update { s ->
                         s.copy(syncedCollectionProposalIds = s.syncedCollectionProposalIds + proposalId)
                     }
@@ -543,7 +682,7 @@ class TradeNegotiationViewModel(
                     // §5.1 fix: previously showed `e.message` verbatim (raw server text /
                     // sentinel key leaking to the UI). Now recorded for diagnosis and
                     // surfaced as a semantic event the screen resolves to a fixed string.
-                    recordNonFatal("trade_collection_update_failed: proposal=$proposalId", e)
+                    recordNonFatal("trade_collection_update_failed", e)
                     _events.trySend(NegotiationEvent.CollectionSyncResult(success = false))
                 }
             _uiState.update { it.copy(isSyncingCollection = false) }
@@ -552,14 +691,33 @@ class TradeNegotiationViewModel(
 
     fun onErrorDismissed() = _uiState.update { it.copy(errorDialog = null) }
 
-    fun refresh() {
-        val userId = _uiState.value.currentUserId
+    /** Called each time the screen enters composition; refreshes only on a return to it. */
+    fun onScreenEntered() {
+        if (hasEnteredScreen) refresh() else hasEnteredScreen = true
+    }
+
+    /** User-initiated refresh; a no-op while another refresh is in flight. */
+    fun refresh() = startRefresh(force = false)
+
+    /**
+     * Single-flight thread refresh. `isRefreshing` is claimed atomically before launching, so two
+     * triggers never start two network refreshes. [force] (after a mutation) supersedes an
+     * in-flight refresh instead, since that one may have read the pre-mutation state.
+     */
+    private fun startRefresh(userId: String = _uiState.value.currentUserId, force: Boolean) {
         if (userId.isBlank()) return
-        viewModelScope.launch(ioDispatcher) {
-            _uiState.update { it.copy(isRefreshing = true) }
-            refreshTradeThread(rootProposalId, userId)
-                .onFailure { e -> _events.trySend(NegotiationEvent.ShowError(e.toUserFacingMessage())) }
-            _uiState.update { it.copy(isRefreshing = false) }
+        var acquired = false
+        _uiState.update { s ->
+            if (s.isRefreshing && !force) s else { acquired = true; s.copy(isRefreshing = true) }
+        }
+        if (!acquired) return
+        val previous = refreshJob
+        refreshJob = viewModelScope.launch(ioDispatcher) {
+            previous?.cancelAndJoin()
+            val result = refreshTradeThread(rootProposalId, userId)
+            ensureActive()
+            result.onFailure { e -> _events.trySend(NegotiationEvent.ShowError(e.toUserFacingMessage())) }
+            _uiState.update { it.copy(isRefreshing = false, isLoading = false, refreshFailed = result.isFailure) }
         }
     }
 }

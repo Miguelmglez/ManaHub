@@ -5,6 +5,7 @@
     ═══════════════════════════════════════════ -->
     <string name="app_name">ManaHub</string>
     <string name="app_tagline">Your Magic companion</string>
+    <string name="app_exit_back_prompt">Press back again to close the app</string>
     <string name="splash_tagline">Your Magic Companion</string>
 
     <!-- Acciones comunes -->
@@ -3092,6 +3093,14 @@
     <string name="trades_shared_list_not_found">Link not found</string>
     <string name="trades_shared_list_title">Shared list</string>
     <string name="trades_shared_list_by">Shared list from @%s</string>
+    <string name="trades_shared_list_type_wishlist">Wishlist</string>
+    <string name="trades_shared_list_type_open_for_trade">Open for trade</string>
+    <string name="trades_shared_list_empty">This list is empty</string>
+    <string name="trades_shared_list_error">Couldn\'t load this list</string>
+    <string name="trades_shared_list_any_variant">Any version</string>
+    <string name="trades_unknown_card">Unknown card</string>
+    <string name="trades_friend_collection_load_error">Couldn\'t load more of their collection</string>
+    <string name="trades_scryfall_search_error">Search failed. Check your connection and try again.</string>
     <string name="trades_migration_synced_n_cards">Synced %d cards from this device to your account.</string>
     <string name="trades_select_card_id_hint">Enter card Scryfall ID</string>
     <string name="trades_foil">Foil</string>
@@ -3104,7 +3113,13 @@
     <string name="trades_add_card">Add card</string>
     <string name="trades_review_collection_chip">Review my collection</string>
     <string name="trades_review_collection_warning">Proposals with \'Review my collection\' cannot be accepted directly — only declined or countered.</string>
-    <string name="trades_save_draft">Save draft</string>
+    <string name="trades_collection_apply_deferred">Your collection will update when the trade is completed.</string>
+    <string name="trades_undo_collection_changes">Undo collection changes</string>
+    <string name="trades_items_load_failed">The cards in this proposal could not be loaded.</string>
+    <string name="trades_friend_switch_title">Change trade partner?</string>
+    <string name="trades_friend_switch_body">Cards from the current friend\'s lists will be removed from this proposal.</string>
+    <string name="trades_friend_switch_confirm">Change friend</string>
+    <string name="trades_friend_switch_confirm_none">Remove friend</string>
     <string name="trades_send_proposal">Send proposal</string>
     <string name="trades_discard">Discard</string>
     <string name="trades_quantity">Qty</string>
@@ -3231,6 +3246,8 @@
     <string name="trades_proposal_version">Proposal v%d</string>
     <string name="trades_review_collection_placeholder">Review my collection</string>
     <string name="trades_no_proposals_yet">No proposals in this thread yet.</string>
+    <string name="trades_thread_load_error">Couldn\'t load this trade</string>
+    <string name="trades_history_load_error">Couldn\'t load your trades</string>
     <string name="trades_action_accept">Accept</string>
     <string name="trades_action_decline">Decline</string>
     <string name="trades_action_cancel">Cancel</string>
@@ -3284,6 +3301,14 @@
     <string name="trades_history_your_turn">Your turn</string>
     <string name="trades_history_refreshing">Updating…</string>
     <string name="trades_history_pull_to_refresh">Pull to refresh</string>
+    <string name="trades_quantity_multiplier">×%1$d</string>
+    <string name="trades_list_bullet">•</string>
+    <plurals name="trades_items_more">
+        <item quantity="one">…and %1$d more</item>
+        <item quantity="other">…and %1$d more</item>
+    </plurals>
+    <string name="trades_section_state_expanded">Expanded</string>
+    <string name="trades_section_state_collapsed">Collapsed</string>
 
     <!-- ══════════════════════════════════════════
          SCANNER — language names + wishlist button
@@ -3511,7 +3536,10 @@
 
     <!-- Home widget board overhaul, TASK 5b — Community Decks widget -->
     <string name="home_community_decks_empty">No community decks available right now.</string>
-    <string name="home_community_decks_category_a11y">Choose category</string>
+    <string name="home_community_decks_category_a11y">Choose format and category</string>
+    <string name="home_community_decks_selection">%1$s · %2$s</string>
+    <string name="home_community_decks_format_section">Format</string>
+    <string name="home_community_decks_category_section">Category</string>
     <string name="home_community_decks_category_sheet_title">Browse by</string>
     <string name="home_community_decks_category_popular">Popular</string>
     <string name="home_community_decks_category_popular_desc">Trending decks the community is brewing.</string>
@@ -3595,6 +3623,7 @@
     <string name="quick_start_draft_guides">Draft Guides</string>
     <string name="quick_start_search_card">Search Card</string>
     <string name="quick_start_my_decks">My Decks</string>
+    <string name="quick_start_new_deck">New Deck</string>
     <string name="quick_start_news">News</string>
     <string name="quick_start_my_stats">My Stats</string>
     <string name="quick_start_friends">Friends</string>
@@ -3612,6 +3641,7 @@
     <string name="quick_start_sheet_draft_guide">Draft guide</string>
     <string name="quick_start_sheet_search_card">Search card</string>
     <string name="quick_start_sheet_decks">My decks</string>
+    <string name="quick_start_sheet_new_deck">New deck</string>
     <string name="quick_start_sheet_news">News</string>
     <string name="quick_start_sheet_stats">Stats</string>
     <string name="quick_start_sheet_friends">Friends</string>
@@ -3632,6 +3662,7 @@
 
     <!-- Rules tips (rotated by day) -->
     <string name="home_rules_tip_label">Did you know?</string>
+    <string name="home_rules_tip_roll_a11y">Roll another tip</string>
 
     <!-- Rules tip categories (Home feature overhaul Phase 2.4) -->
     <string name="tip_category_fundamentals">Fundamentals</string>

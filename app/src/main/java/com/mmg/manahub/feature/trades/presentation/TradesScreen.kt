@@ -1,6 +1,5 @@
 package com.mmg.manahub.feature.trades.presentation
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,8 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -37,7 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,8 +44,10 @@ import com.mmg.manahub.core.ui.components.AvatarImage
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.core.ui.components.EmptyState
-import com.mmg.manahub.core.ui.components.MagicFilterChip
+import com.mmg.manahub.core.ui.components.MagicSegmentedControl
 import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.SectionHeader
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -68,8 +68,9 @@ private val FabClearance = 88.dp
 @Composable
 fun TradesScreen(
     onCardClick: (scryfallId: String) -> Unit,
-    onNavigateToProposal: (receiverId: String) -> Unit = {},
+    onNavigateToProposal: (receiverId: String?) -> Unit = {},
     onNavigateToThread: (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
+    onNavigateToAddFriends: () -> Unit = {},
     viewModel: TradesViewModel = koinViewModel(),
     authViewModel: AuthViewModel = koinViewModel(),
 ) {
@@ -81,8 +82,8 @@ fun TradesScreen(
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                is TradesEvent.ShowMessage -> event.message?.let { toastState.show(it) }
-                TradesEvent.SyncFailed -> toastState.show(syncFailedMessage)
+                is TradesEvent.ShowMessage -> event.message?.let { toastState.show(it, MagicToastType.ERROR) }
+                TradesEvent.SyncFailed -> toastState.show(syncFailedMessage, MagicToastType.ERROR)
             }
         }
     }
@@ -118,7 +119,8 @@ fun TradesScreen(
                             friends = uiState.friends,
                             onFriendClick = { friend ->
                                 onNavigateToProposal(friend.userId)
-                            }
+                            },
+                            onAddFriends = onNavigateToAddFriends,
                         )
 
                         TradesMainTab.HISTORY -> TradesHistoryScreen(
@@ -134,7 +136,7 @@ fun TradesScreen(
         if (uiState.isLoggedIn) {
             val mc = MaterialTheme.magicColors
             FloatingActionButton(
-                onClick = { onNavigateToProposal("") },
+                onClick = { onNavigateToProposal(null) },
                 containerColor = mc.primaryAccent,
                 contentColor = mc.background,
                 modifier = Modifier
@@ -166,33 +168,26 @@ fun TradesScreen(
 //  Sub-Navigation Chips
 // ─────────────────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TradesSubNavigation(
     selectedTab: TradesMainTab,
     onTabSelected: (TradesMainTab) -> Unit,
 ) {
     val spacing = MaterialTheme.spacing
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = spacing.lg, vertical = spacing.xs),
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm)
-    ) {
-        TradesMainTab.entries.forEach { tab ->
-            val label = when (tab) {
-                TradesMainTab.MY_LIST -> stringResource(R.string.trades_toggle_my_lists)
-                TradesMainTab.FRIENDS -> stringResource(R.string.trades_toggle_friends)
-                TradesMainTab.HISTORY -> stringResource(R.string.trades_tab_history)
-            }
-            MagicFilterChip(
-                modifier = Modifier.weight(1f),
-                selected = selectedTab == tab,
-                onClick = { onTabSelected(tab) },
-                label = label,
-            )
+    val tabs = TradesMainTab.entries
+    val labels = tabs.map { tab ->
+        when (tab) {
+            TradesMainTab.MY_LIST -> stringResource(R.string.trades_toggle_my_lists)
+            TradesMainTab.FRIENDS -> stringResource(R.string.trades_toggle_friends)
+            TradesMainTab.HISTORY -> stringResource(R.string.trades_tab_history)
         }
     }
+    MagicSegmentedControl(
+        options = labels,
+        selectedIndex = tabs.indexOf(selectedTab),
+        onOptionSelected = { index -> onTabSelected(tabs[index]) },
+        modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.xs),
+    )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -215,22 +210,20 @@ private fun MyListContent(
     ) {
         // ── My Wishlist section ───────────────────────────────────────────────
         item(key = "wishlist_header") {
-            CollapsibleSectionHeader(
+            TradeListSectionHeader(
                 title = stringResource(R.string.trades_wishlist_section),
                 count = uiState.wishlist.size,
                 expanded = wishlistExpanded,
                 onToggle = { wishlistExpanded = !wishlistExpanded },
-                modifier = Modifier.padding(horizontal = spacing.lg)
+                modifier = Modifier.padding(horizontal = spacing.lg),
             )
         }
         if (wishlistExpanded) {
             if (uiState.wishlist.isEmpty()) {
                 item(key = "wishlist_empty") {
-                    Text(
-                        text = stringResource(R.string.state_empty),
-                        style = MaterialTheme.magicTypography.bodySmall,
-                        color = MaterialTheme.magicColors.textDisabled,
-                        modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.sm),
+                    EmptyState(
+                        title = stringResource(R.string.state_empty),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             } else {
@@ -248,22 +241,20 @@ private fun MyListContent(
 
         // ── My Offers section ─────────────────────────────────────────────────
         item(key = "offers_header") {
-            CollapsibleSectionHeader(
+            TradeListSectionHeader(
                 title = stringResource(R.string.trades_offers_section),
                 count = uiState.openForTrade.size,
                 expanded = offersExpanded,
                 onToggle = { offersExpanded = !offersExpanded },
-                modifier = Modifier.padding(horizontal = spacing.lg)
+                modifier = Modifier.padding(horizontal = spacing.lg),
             )
         }
         if (offersExpanded) {
             if (uiState.openForTrade.isEmpty()) {
                 item(key = "offers_empty") {
-                    Text(
-                        text = stringResource(R.string.state_empty),
-                        style = MaterialTheme.magicTypography.bodySmall,
-                        color = MaterialTheme.magicColors.textDisabled,
-                        modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.sm),
+                    EmptyState(
+                        title = stringResource(R.string.state_empty),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             } else {
@@ -287,34 +278,16 @@ private fun MyListContent(
 private fun FriendsContent(
     friends: List<Friend>,
     onFriendClick: (Friend) -> Unit,
+    onAddFriends: () -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
     if (friends.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(spacing.xxl),
-            contentAlignment = Alignment.Center,
-        ) {
-            Surface(
-                shape = CardShape,
-                color = mc.surface,
-            ) {
-                Column(
-                    modifier = Modifier.padding(spacing.xl),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(spacing.sm),
-                ) {
-                    Text(
-                        text = stringResource(R.string.trades_no_friends_cta),
-                        style = MaterialTheme.magicTypography.bodyMedium,
-                        color = mc.textSecondary,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-        }
+        EmptyState(
+            icon = Icons.Default.People,
+            title = stringResource(R.string.trades_no_friends_cta),
+            actionLabel = stringResource(R.string.trades_friend_sheet_no_friends_action),
+            onAction = onAddFriends,
+        )
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -339,18 +312,17 @@ private fun FriendDashboardRow(
     val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
     Surface(
+        onClick = onClick,
         shape = CardShape,
         color = mc.surface,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AvatarImage(
-                avatarUrl = friend.avatarUrl,
+                avatarUrl = friend.avatarUrl?.takeIf { it.isNotBlank() },
                 initials = friend.nickname.take(1).uppercase(Locale.getDefault()),
                 size = 40,
             )
@@ -377,39 +349,25 @@ private fun FriendDashboardRow(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Collapsible section header
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
-private fun CollapsibleSectionHeader(
+private fun TradeListSectionHeader(
     title: String,
     count: Int,
     expanded: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val mc = MaterialTheme.magicColors
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp) // project rule: every interactive element >= 48dp touch target
-            .clickable(onClick = onToggle),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(
-            text = "$title ($count)",
-            style = MaterialTheme.magicTypography.labelLarge,
-            color = mc.textSecondary,
-        )
-        Icon(
-            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-            contentDescription = null,
-            tint = mc.textSecondary,
-            modifier = Modifier.size(20.dp),
-        )
-    }
+    val stateLabel = stringResource(
+        if (expanded) R.string.trades_section_state_expanded else R.string.trades_section_state_collapsed
+    )
+    SectionHeader(
+        title = title,
+        expanded = expanded,
+        onToggle = onToggle,
+        titleColor = MaterialTheme.magicColors.textSecondary,
+        trailing = { CopyBadge(label = count.toString()) },
+        modifier = modifier.semantics { stateDescription = stateLabel },
+    )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -424,11 +382,11 @@ private fun WishlistEntryRow(
     val card = entry.card
 
     CardListItem(
-        name = card?.name ?: entry.cardId,
+        name = card?.name ?: stringResource(R.string.trades_unknown_card),
         imageUrl =  card?.imageNormal,
         priceUsd = if (entry.isFoil == true) card?.priceUsdFoil else card?.priceUsd,
         priceEur = if (entry.isFoil == true) card?.priceEurFoil else card?.priceEur,
-        quantityText = if (entry.quantity > 1) "×${entry.quantity}" else null,
+        quantityText = if (entry.quantity > 1) stringResource(R.string.trades_quantity_multiplier, entry.quantity) else null,
         onClick = { onCardClick(entry.cardId) },
         hasFoil = entry.isFoil == true,
         isStale = card?.isStale ?: false,
@@ -458,11 +416,11 @@ private fun OfferEntryRow(
     val card = entry.card
 
     CardListItem(
-        name = card?.name ?: entry.scryfallId,
+        name = card?.name ?: stringResource(R.string.trades_unknown_card),
         imageUrl = card?.imageNormal,
         priceUsd = if (entry.isFoil) card?.priceUsdFoil else card?.priceUsd,
         priceEur = if (entry.isFoil) card?.priceEurFoil else card?.priceEur,
-        quantityText = if (entry.quantity > 1) "×${entry.quantity}" else null,
+        quantityText = if (entry.quantity > 1) stringResource(R.string.trades_quantity_multiplier, entry.quantity) else null,
         onClick = { onCardClick(entry.scryfallId) },
         hasFoil = entry.isFoil,
         isStale = card?.isStale ?: false,

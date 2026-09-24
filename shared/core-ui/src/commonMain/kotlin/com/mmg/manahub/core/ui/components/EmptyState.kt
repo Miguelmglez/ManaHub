@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 
 /**
  * Generic empty-state composable used across screens.
@@ -32,6 +33,8 @@ import com.mmg.manahub.core.ui.theme.magicTypography
  * @param actionLabel Label for the optional action button.
  * @param onAction Click callback for the action button. Button is only shown when non-null.
  * @param modifier Modifier applied to the root [Column]. Defaults to [Modifier.fillMaxSize].
+ * @param compact Tight spacing-token padding and a small icon, for fixed-height slots such as a
+ *   dashboard widget body. Defaults to `false` (the full-screen layout).
  */
 @Composable
 fun EmptyState(
@@ -42,12 +45,14 @@ fun EmptyState(
     enabled: Boolean = true,
     onAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier.fillMaxSize(),
+    compact: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
 
     Column(
-        modifier = modifier.padding(32.dp),
+        modifier = modifier.padding(if (compact) spacing.sm else 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -56,9 +61,9 @@ fun EmptyState(
                 imageVector = icon,
                 contentDescription = null,
                 tint = mc.textDisabled,
-                modifier = Modifier.size(64.dp),
+                modifier = Modifier.size(if (compact) 24.dp else 64.dp),
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(if (compact) spacing.xs else 16.dp))
         }
 
         Text(
@@ -69,7 +74,7 @@ fun EmptyState(
         )
 
         if (subtitle != null) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(if (compact) spacing.xxs else 8.dp))
             Text(
                 text = subtitle,
                 style = ty.bodySmall,
@@ -79,7 +84,7 @@ fun EmptyState(
         }
 
         if (actionLabel != null && onAction != null && enabled) {
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(if (compact) spacing.sm else 20.dp))
             MagicCtaButton(
                 onClick = onAction,
                 text = actionLabel,

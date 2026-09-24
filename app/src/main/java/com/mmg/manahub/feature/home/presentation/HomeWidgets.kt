@@ -1,6 +1,27 @@
 package com.mmg.manahub.feature.home.presentation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.EaseOutCubic
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.material.icons.filled.Casino
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.max
+import com.mmg.manahub.core.ui.CardSharedBoundsTransform
+import com.mmg.manahub.core.ui.components.MagicSkeletonBlock
+import com.mmg.manahub.core.ui.components.MagicSkeletonPulse
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
@@ -82,7 +103,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
@@ -104,7 +124,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -147,43 +166,31 @@ import com.mmg.manahub.core.util.TimeAgoFormatter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
-import kotlin.random.Random
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Lock
+import com.mmg.manahub.core.ui.components.CopyBadge
+import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.InlineErrorState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import com.mmg.manahub.core.ui.components.MagicFilterChip
+import com.mmg.manahub.core.ui.components.MagicSelectionItem
+import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckFormatFilter
+import com.mmg.manahub.feature.communitydecks.presentation.displayResId
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  Home widget host + container + shared chrome
+//  Home widget host + body slot + shared chrome
 //
-//  Every widget renders inside a uniform, flat [WidgetShell] (Surface + CardShape +
-//  2dp elevation). [HomeWidgetHost] maps a placed [WidgetInstance] to its concrete
-//  composable. [HomeWidgetContainer] registers its root bounds for drag hit-testing
-//  in the gallery. All composables here are stateless; state lives in HomeScreen /
-//  HomeViewModel. Every widget renders at a single MEDIUM size.
+//  [HomeWidgetHost] renders a placed widget: its header right away and its body inside a
+//  fixed-height [WidgetBodySlot] that crossfades from the widget's own skeleton to its content.
+//  Every size comes from [HomeWidgetMetrics]. All composables here are stateless; state lives in
+//  HomeScreen / HomeViewModel.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Minimum height for a MEDIUM widget — the only supported size after consolidation. */
-private val MediumMinHeight: Dp = 200.dp
-
-// ── F-12 (Home feature overhaul Phase 3 hygiene): named, documented font-size constants for the
-// few spots that don't fit an existing magicTypography token exactly. Hoisted here rather than
-// left as inline `9.sp`/`32.sp`/`17.sp` literals scattered through the file. ──
-
-/** Compact caption size for [StatBox]/[AnimatedStatKPI] labels — smaller than `labelSmall`'s
- * default, needed so a 2x2 stat grid's uppercase captions don't wrap on narrow devices. */
-private val CompactCaptionSize = 9.sp
-
-/** Large numeral size for [StatKPI]'s hero value — bigger than `displayMedium`'s default so a
- * single KPI number reads as the focal point of its row. */
-private val StatKpiValueSize = 32.sp
-
-/** Slightly taller line height for the Rules Tip body text (readability for multi-line tips
- * rendered through [OracleText], which can include inline mana-symbol icons). */
-private val RulesTipBodyLineHeight = 17.sp
-
-/**
- * Fixed seed for the Rules Tip catalog's daily-order shuffle (Home feature overhaul Phase 2.4).
- * A hardcoded, constant seed keeps the permutation stable across app restarts/recompositions and
- * identical for every user — only the epoch-day index into it changes.
- */
-private const val RULES_TIP_SHUFFLE_SEED = 20260713L
+// surfaceVariant is ~1.1:1 on HallowedPrint; a low-alpha textDisabled fill stays visible on every palette.
+private const val SUBTLE_FILL_ALPHA = 0.10f
 
 /**
  * Minimal container for widgets. Removes the solid background box to let the
@@ -282,23 +289,11 @@ private fun WidgetSectionHeader(
                 text = title.uppercase(),
                 style = ty.labelLarge,
                 color = mc.textPrimary,
-                letterSpacing = 2.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         trailingContent?.invoke()
-    }
-}
-
-/** Centered loading spinner used while a data slice is null (not yet loaded). */
-@Composable
-private fun WidgetLoading(modifier: Modifier = Modifier.fillMaxWidth()) {
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.Center,
-    ) {
-        MagicLoadingSpinner(size = MagicLoadingSize.Small)
     }
 }
 
@@ -310,177 +305,257 @@ private fun WidgetEmptyBody(message: String) {
     Text(text = message, style = ty.bodySmall, color = mc.textSecondary)
 }
 
-/**
- * Empty body with a tap-to-retry affordance, used when a widget's data failed to load
- * (e.g. the Discover/Card-of-the-day fetch) so the user can re-trigger it instead of
- * staring at an endless spinner. The whole row is a ≥48dp tap target.
- */
+/** Retry body for a widget whose fetch failed, so the user can re-trigger it. */
 @Composable
 private fun WidgetRetryBody(message: String, onRetry: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clip(ChipShape)
-            .clickable(onClickLabel = stringResourceSafe(R.string.home_retry), role = Role.Button, onClick = onRetry)
-            .padding(vertical = spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-    ) {
-        Icon(
-            imageVector = Icons.Default.Refresh,
-            contentDescription = null,
-            tint = mc.primaryAccent,
-            modifier = Modifier.size(18.dp),
-        )
-        Text(
-            text = message,
-            style = ty.bodySmall,
-            color = mc.textSecondary,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-/** Sign-in prompt used by account-gated widgets when the user is unauthenticated. */
-@Composable
-fun AccountGatedPlaceholder(
-    widgetTitle: String,
-    onSignIn: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    WidgetShell(onClick = onSignIn) {
-        Text(
-            text = widgetTitle,
-            style = ty.titleMedium,
-            color = mc.textPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        WidgetEmptyBody(message = stringResourceSafe(R.string.home_account_gated_lock))
-        Spacer(Modifier.height(spacing.xs))
-        Text(
-            text = stringResourceSafe(R.string.home_account_gated_cta),
-            style = ty.labelMedium,
-            color = mc.primaryAccent,
-        )
-    }
+    InlineErrorState(
+        message = message,
+        retryLabel = stringResourceSafe(R.string.home_retry),
+        onRetry = onRetry,
+    )
 }
 
 /**
- * Board-level loading skeleton (Home widget board overhaul, TASK 1), shown by [HomeScreen] while
- * the FIRST combine emission of [HomeUiState] is still pending — replaces an empty/partial grid
- * with a few placeholder blocks so real widgets don't all pop in at once once the board resolves.
+ * Sign-in prompt used by account-gated widgets when the user is signed out. It fills the widget's
+ * fixed body slot; the widget title is already in the section header.
  */
 @Composable
-fun HomeBoardSkeleton(modifier: Modifier = Modifier) {
-    val spacing = MaterialTheme.spacing
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(spacing.lg), // Match grid spacing
-    ) {
-        repeat(HOME_BOARD_SKELETON_BLOCK_COUNT) {
-            HomeBoardSkeletonBlock()
+fun AccountGatedPlaceholder(onSignIn: () -> Unit, modifier: Modifier = Modifier) {
+    EmptyState(
+        title = stringResourceSafe(R.string.home_account_gated_lock),
+        icon = Icons.Default.Lock,
+        actionLabel = stringResourceSafe(R.string.home_account_gated_cta),
+        onAction = onSignIn,
+        compact = true,
+        modifier = modifier.fillMaxSize(),
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Body slot — one fixed height for skeleton, placeholder, empty, error and content
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Tiles drawn by a row skeleton; enough to overflow any phone width. */
+private const val SKELETON_ROW_TILES = 4
+
+/** Placeholder quest rows drawn by the QUESTS_HUB skeleton. */
+private const val SKELETON_QUEST_ROWS = 3
+
+/** Body height of a board-level placeholder item while the board itself is not ready. */
+private val BoardSkeletonBodyHeight = 160.dp
+
+private val BoardSkeletonTitleWidth = 120.dp
+
+/**
+ * Hosts a widget body. The skeleton and the content occupy the same box ([height], or the frame
+ * both draw when null), and swap by alpha only, so a readiness change never resizes the grid item.
+ *
+ * The first reveal of a widget in this process lifts the content into place, staggered by its
+ * on-screen position; later readiness flips crossfade, and a widget that is already revealed and
+ * ready renders its content immediately (no replay when returning to Home).
+ */
+@Composable
+private fun WidgetBodySlot(
+    type: HomeWidgetType,
+    ready: Boolean,
+    height: Dp?,
+    motion: HomeBoardMotion,
+    skeleton: @Composable () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val contentAlpha = remember(type) {
+        Animatable(if (ready && motion.tracker.isRevealed(type)) 1f else 0f)
+    }
+    val lift = remember(type) { Animatable(0f) }
+    LaunchedEffect(type, ready) {
+        if (!ready) {
+            contentAlpha.snapTo(0f)
+            lift.snapTo(0f)
+            return@LaunchedEffect
+        }
+        val firstReveal = motion.tracker.markRevealed(type)
+        if (contentAlpha.value >= 1f) return@LaunchedEffect
+        if (motion.reducedMotion) {
+            contentAlpha.animateTo(1f, tween(REDUCED_MOTION_FADE_MS))
+            return@LaunchedEffect
+        }
+        if (firstReveal) {
+            // One frame so the grid's layout info includes this item before reading its position.
+            withFrameNanos { }
+            val visibleIndex = motion.visibleIndexOf(homeWidgetKey(type))
+            if (visibleIndex != null) {
+                lift.snapTo(1f)
+                delay(revealStaggerDelayMs(visibleIndex))
+                launch { lift.animateTo(0f, tween(REVEAL_LIFT_MS, easing = EaseOutCubic)) }
+            }
+        }
+        contentAlpha.animateTo(1f, tween(REVEAL_CROSSFADE_MS))
+    }
+    val skeletonVisible by remember(type) { derivedStateOf { contentAlpha.value < 1f } }
+    val liftPx = with(LocalDensity.current) { REVEAL_LIFT_DP.dp.toPx() }
+    val layerSize = if (height != null) Modifier.fillMaxSize() else Modifier
+
+    Box(modifier = if (height != null) Modifier.fillMaxWidth().height(height) else Modifier.fillMaxWidth()) {
+        if (!ready || skeletonVisible) {
+            Box(layerSize.graphicsLayer { alpha = if (ready) 1f - contentAlpha.value else 1f }) { skeleton() }
+        }
+        if (ready) {
+            Box(
+                layerSize.graphicsLayer {
+                    alpha = contentAlpha.value
+                    translationY = lift.value * liftPx
+                },
+            ) { content() }
         }
     }
 }
 
-/** Number of placeholder blocks shown by [HomeBoardSkeleton] — matches a typical first screenful. */
-private const val HOME_BOARD_SKELETON_BLOCK_COUNT = 4
-
-/** A single pulsing placeholder block, sized like a typical MEDIUM widget. */
+/** The widget's own skeleton, drawn at exactly its body size. */
 @Composable
-private fun HomeBoardSkeletonBlock() {
-    val mc = MaterialTheme.magicColors
-    val infiniteTransition = rememberInfiniteTransition(label = "home-board-skeleton")
-    val animatedAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
-        label = "skeleton-pulse",
-    )
-    // Reduced-motion users see a static mid-tone block, not a pulsing one (mirrors the hero pulse
-    // at ContextHeroWidget's isReducedMotionEnabled() guard).
-    val alpha = if (isReducedMotionEnabled()) 0.5f else animatedAlpha
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(MediumMinHeight) // Use fixed height to prevent shifts
-            .clip(CardShape)
-            .background(mc.surfaceVariant.copy(alpha = alpha)),
-    )
+private fun WidgetSkeleton(
+    type: HomeWidgetType,
+    metrics: HomeWidgetMetrics,
+    pulse: MagicSkeletonPulse,
+) {
+    val spacing = MaterialTheme.spacing
+    val tileSize: Pair<Dp, Dp>? = when (type) {
+        HomeWidgetType.DISCOVER_CARDS,
+        HomeWidgetType.RECENTLY_ADDED,
+        HomeWidgetType.WISHLIST_PROGRESS -> HomeCardThumbWidth to metrics.cardThumbHeight
+        HomeWidgetType.YOUR_DECKS_SHELF,
+        HomeWidgetType.TRENDING_COMMANDERS -> HomeDeckTileWidth to metrics.deckTileHeight
+        HomeWidgetType.COMMUNITY_DECKS -> HomeDeckTileWidth to metrics.deckTileWithOwnerHeight
+        HomeWidgetType.LATEST_SETS -> HomeDraftSetTileWidth to metrics.draftSetTileHeight
+        HomeWidgetType.MTG_NEWS -> HomeNewsCardWidth to metrics.newsCardHeight
+        else -> null
+    }
+    val shellArea = Modifier.fillMaxSize().padding(vertical = spacing.xxs)
+    when {
+        type == HomeWidgetType.CARD_OF_THE_DAY -> RandomCardFrame {
+            MagicSkeletonBlock(pulse = pulse, modifier = Modifier.fillMaxSize(), shape = CardShape)
+        }
+        type == HomeWidgetType.RULES_TIP -> BoxWithConstraints(
+            Modifier.fillMaxWidth().padding(vertical = spacing.xxs),
+        ) {
+            MagicSkeletonBlock(
+                pulse = pulse,
+                modifier = Modifier.fillMaxWidth().height(rememberRulesTipCardHeight(maxWidth)),
+            )
+        }
+        tileSize != null -> Box(shellArea.clipToBounds()) {
+            Row(
+                modifier = Modifier.wrapContentWidth(Alignment.Start, unbounded = true),
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                repeat(SKELETON_ROW_TILES) {
+                    MagicSkeletonBlock(pulse = pulse, modifier = Modifier.size(tileSize.first, tileSize.second))
+                }
+            }
+        }
+        type == HomeWidgetType.QUESTS_HUB -> Column(
+            modifier = shellArea,
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
+        ) {
+            repeat(SKELETON_QUEST_ROWS) {
+                MagicSkeletonBlock(pulse = pulse, modifier = Modifier.fillMaxWidth().weight(1f), shape = ChipShape)
+            }
+        }
+        else -> MagicSkeletonBlock(pulse = pulse, modifier = shellArea, shape = CardShape)
+    }
+}
+
+/**
+ * Board-level placeholder item, rendered by [HomeScreen] inside the same grid (same padding, same
+ * top bar) while the board itself is not ready: a header-shaped row plus a body block.
+ */
+@Composable
+fun HomeBoardSkeletonItem(pulse: MagicSkeletonPulse, modifier: Modifier = Modifier) {
+    val spacing = MaterialTheme.spacing
+    val titleHeight = with(LocalDensity.current) { MaterialTheme.magicTypography.labelLarge.lineHeight.toDp() }
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(spacing.xs),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+        ) {
+            MagicSkeletonBlock(pulse = pulse, modifier = Modifier.size(18.dp), shape = CircleShape)
+            MagicSkeletonBlock(
+                pulse = pulse,
+                modifier = Modifier.width(BoardSkeletonTitleWidth).height(titleHeight),
+                shape = ChipShape,
+            )
+        }
+        MagicSkeletonBlock(
+            pulse = pulse,
+            modifier = Modifier.fillMaxWidth().height(BoardSkeletonBodyHeight),
+            shape = CardShape,
+        )
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Host — dispatch on widget type (exhaustive over all HomeWidgetType entries)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Renders one placed widget: its section header immediately, and its body inside a fixed-height
+ * [WidgetBodySlot] that shows the widget's own skeleton until [ready].
+ *
+ * Widgets that would draw nothing (feature flag off, confirmed-empty trending, resolved hero) are
+ * filtered out by [boardWidgetsToRender] before reaching here.
+ */
 @Composable
 @OptIn(ExperimentalSharedTransitionApi::class)
 fun HomeWidgetHost(
     widget: WidgetInstance,
     uiState: HomeUiState,
+    ready: Boolean,
+    metrics: HomeWidgetMetrics,
+    motion: HomeBoardMotion,
     onAction: (HomeAction) -> Unit,
+    modifier: Modifier = Modifier,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
-    // Deck Doctor Community/Archetype plan, Phase 5 — kept OUTSIDE HomeUiState on purpose, see
-    // [com.mmg.manahub.feature.home.presentation.HomeViewModel.trendingFlow]'s KDoc.
+    // Kept outside HomeUiState on purpose; see HomeViewModel.trendingFlow.
     trending: com.mmg.manahub.core.model.TrendingSnapshot? = null,
-    // Home widget board overhaul, TASK 5b — kept OUTSIDE HomeUiState for the same reason as
-    // [trending]; see [com.mmg.manahub.feature.home.presentation.HomeViewModel.communityDecksFlow]'s
-    // KDoc.
     communityDecks: List<com.mmg.manahub.core.model.CommunityDeckSummary>? = null,
     communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
-    // Daily Puzzle (ADR-006), Batch B2 — kept OUTSIDE HomeUiState for the same reason as [trending];
-    // see [com.mmg.manahub.feature.home.presentation.HomeViewModel.dailyPuzzleFlow]'s KDoc.
+    communityDecksFormat: CommunityDeckFormatFilter? = null,
     dailyPuzzle: DailyPuzzleWidgetState? = null,
-    // Competitive feature, Phase 5 — kept OUTSIDE HomeUiState for the same reason as [trending];
-    // see [com.mmg.manahub.feature.home.presentation.HomeViewModel.competitiveEnabledFlow]'s KDoc.
-    competitiveEnabled: Boolean = false,
+    rulesTipIndex: Int = 0,
 ) {
     val spacing = MaterialTheme.spacing
-    // Gamification widgets render nothing on the dashboard when the master toggle is off — they stay
-    // in the persisted layout (so they reappear if re-enabled) but are not shown.
-    if (widget.type.isGamification && !uiState.gamificationEnabled) return
-    // Daily Puzzle hidden for release (docs/hidden-features/daily-puzzle.md) — same treatment as
-    // gamification above: an existing board that already carries a DAILY_PUZZLE tile (persisted
-    // before the flag flipped) renders nothing rather than a broken/dead tile; the tile reappears
-    // once FeatureFlags.Puzzle.PUZZLE_ENABLED flips back to true.
-    if (widget.type == HomeWidgetType.DAILY_PUZZLE && !FeatureFlags.Puzzle.PUZZLE_ENABLED) return
-    // Competitive feature, Phase 5 — same treatment: an existing board that already carries a
-    // COMPETITIVE tile (persisted before the flag was turned on, or before a later disable) renders
-    // nothing rather than a broken/dead tile; the tile reappears the instant the flag flips true.
-    if (widget.type == HomeWidgetType.COMPETITIVE && !competitiveEnabled) return
-    // Phase 5: silently hidden (never an error state) while there's no trending data yet / the
-    // community engine is off / the Worker is unreachable — see HomeWidgetType.TRENDING_COMMANDERS'
-    // KDoc.
-    if (widget.type == HomeWidgetType.TRENDING_COMMANDERS && trending.isNullOrEmptyTrending()) return
-
-    Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-        if (widget.type != HomeWidgetType.CONTEXT_HERO) {
-            val titleText = stringResourceSafe(widget.type.defaultTitleRes)
-            val titleClickAction = widgetHeaderTitleClickAction(widget.type)
+    val type = widget.type
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+        if (type != HomeWidgetType.CONTEXT_HERO) {
+            val titleText = stringResourceSafe(type.defaultTitleRes)
+            val titleClickAction = widgetHeaderTitleClickAction(type)
             WidgetSectionHeader(
                 title = titleText,
-                icon = widget.type.icon,
+                icon = type.icon,
                 onClick = titleClickAction?.let { action -> { onAction(action) } },
                 onClickLabel = titleText,
                 trailingContent = widgetHeaderTrailingContent(
-                    type = widget.type,
+                    type = type,
                     uiState = uiState,
                     onAction = onAction,
                     communityDecksCategory = communityDecksCategory,
+                    communityDecksFormat = communityDecksFormat,
                 ),
             )
         }
 
-        Box {
-            when (widget.type) {
+        WidgetBodySlot(
+            type = type,
+            ready = ready,
+            height = metrics.bodyHeight(type),
+            motion = motion,
+            skeleton = { WidgetSkeleton(type, metrics, motion.pulse) },
+        ) {
+            when (type) {
                 HomeWidgetType.CONTEXT_HERO -> ContextHeroWidget(uiState.hero, onAction)
                 HomeWidgetType.QUICK_ACTIONS -> QuickActionsWidget(
                     actions = uiState.quickStartActions,
@@ -488,8 +563,9 @@ fun HomeWidgetHost(
                 )
                 HomeWidgetType.PROGRESSION_HUB -> ProgressionHubWidget(uiState.gamification, onAction)
                 HomeWidgetType.QUESTS_HUB -> QuestsHubWidget(uiState.gamification, onAction)
-                HomeWidgetType.GAME_STATS_HUB -> GameStatsHubWidget(uiState, onAction)
-                HomeWidgetType.COLLECTION_STATS_HUB -> CollectionStatsHubWidget(uiState, onAction)
+                HomeWidgetType.GAME_STATS_HUB -> GameStatsHubWidget(uiState, metrics.gameStatsSlideHeight, onAction)
+                HomeWidgetType.COLLECTION_STATS_HUB ->
+                    CollectionStatsHubWidget(uiState, metrics.collectionSlideHeight, onAction)
                 HomeWidgetType.YOUR_DECKS_SHELF -> DecksShelfWidget(uiState.decks, onAction)
                 HomeWidgetType.RECENTLY_ADDED -> RecentlyAddedWidget(
                     entries = uiState.recentlyAdded,
@@ -500,7 +576,6 @@ fun HomeWidgetHost(
                 HomeWidgetType.WISHLIST_PROGRESS -> WishlistWidget(
                     stats = uiState.wishlistStats,
                     isAuthenticated = uiState.isAuthenticated,
-                    authResolved = uiState.authResolved,
                     onAction = onAction,
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
@@ -508,6 +583,7 @@ fun HomeWidgetHost(
                 HomeWidgetType.DISCOVER_CARDS -> DiscoverCardsWidget(
                     cards = uiState.discoverCards,
                     loadState = uiState.discoverLoadState,
+                    rowHeight = metrics.cardThumbHeight,
                     onAction = onAction,
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
@@ -519,28 +595,26 @@ fun HomeWidgetHost(
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
                 )
-                HomeWidgetType.LATEST_SETS -> LatestSetsWidget(uiState.latestSets, onAction)
-                HomeWidgetType.MTG_NEWS -> NewsWidget(uiState.recentNews, uiState.newsFiltersActive, onAction)
-                HomeWidgetType.RULES_TIP -> RulesTipWidget()
+                HomeWidgetType.LATEST_SETS -> LatestSetsWidget(uiState.latestSets, metrics.draftSetTileHeight, onAction)
+                HomeWidgetType.MTG_NEWS ->
+                    NewsWidget(uiState.recentNews, uiState.newsFiltersActive, metrics.newsCardHeight, onAction)
+                HomeWidgetType.RULES_TIP -> RulesTipWidget(rulesTipIndex)
                 HomeWidgetType.FRIENDS -> FriendsWidget(
                     friends = uiState.friends,
                     friendCount = uiState.friendCount,
                     latestFriendRequestName = uiState.latestFriendRequestName,
                     isAuthenticated = uiState.isAuthenticated,
-                    authResolved = uiState.authResolved,
                     onAction = onAction,
                 )
                 HomeWidgetType.COMMUNITY_DECKS -> CommunityDecksWidget(
                     decks = communityDecks,
+                    seeAllHeight = metrics.deckTileWithOwnerHeight,
                     onAction = onAction,
                 )
-                HomeWidgetType.TRADES_HUB -> TradesHubWidget(uiState, onAction)
+                HomeWidgetType.TRADES_HUB -> TradesHubWidget(uiState, metrics.tradesSlideHeight, onAction)
                 HomeWidgetType.TRENDING_COMMANDERS -> TrendingCommandersWidget(trending, onAction)
                 HomeWidgetType.DAILY_PUZZLE -> DailyPuzzleWidget(dailyPuzzle, onAction)
                 HomeWidgetType.COMPETITIVE -> CompetitiveWidget(onAction)
-/*
-                HomeWidgetType.MULTI_CARD_ADD-> CompetitiveWidget (onAction)
-*/
             }
         }
     }
@@ -577,6 +651,9 @@ private fun widgetHeaderTitleClickAction(type: HomeWidgetType): HomeAction? = wh
     -> null
 }
 
+/** Commanders previewed by the trending widget ("top 3 of the week"). */
+private const val TRENDING_PREVIEW_COUNT = 3
+
 /** `true` when there is no trending data to show (null snapshot or an empty commanders list) —
  * the single guard [HomeWidgetHost] uses to hide [HomeWidgetType.TRENDING_COMMANDERS] entirely. */
 private fun com.mmg.manahub.core.model.TrendingSnapshot?.isNullOrEmptyTrending(): Boolean =
@@ -598,12 +675,9 @@ private fun TrendingCommandersWidget(
     val topCommanders = trending?.topCommanders.orEmpty()
     if (topCommanders.isEmpty()) return
 
-    WidgetShell(
-        onClick = { onAction(HomeAction.OpenCommunityDecks) },
-        onClickLabel = stringResourceSafe(R.string.widget_title_trending_commanders),
-    ) {
+    WidgetShell {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-            items(topCommanders.take(5)) { commander ->
+            items(topCommanders.take(TRENDING_PREVIEW_COUNT), key = { it.name }) { commander ->
                 DeckItem(
                     deck = DeckSummary(
                         id = commander.name,
@@ -644,7 +718,7 @@ private fun DailyPuzzleWidget(
     val spacing = MaterialTheme.spacing
 
     when (dailyPuzzle) {
-        null, DailyPuzzleWidgetState.Loading -> WidgetLoading()
+        null, DailyPuzzleWidgetState.Loading -> Unit
         DailyPuzzleWidgetState.Unavailable ->
             WidgetEmptyBody(stringResourceSafe(R.string.home_daily_puzzle_unavailable))
         is DailyPuzzleWidgetState.Loaded -> {
@@ -667,7 +741,9 @@ private fun DailyPuzzleWidget(
                         },
                         style = ty.bodyMedium,
                         color = mc.textPrimary,
-                        modifier = Modifier.padding(end = spacing.sm),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(end = spacing.sm),
                     )
                     MagicCtaButton(
                         onClick = { onAction(HomeAction.OpenDailyPuzzle) },
@@ -708,6 +784,8 @@ private fun CompetitiveWidget(onAction: (HomeAction) -> Unit) {
                 text = stringResourceSafe(R.string.home_widget_desc_competitive),
                 style = ty.bodyMedium,
                 color = mc.textPrimary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(end = spacing.sm),
             )
             MagicCtaButton(
@@ -731,6 +809,7 @@ private fun widgetHeaderTrailingContent(
     uiState: HomeUiState,
     onAction: (HomeAction) -> Unit,
     communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
+    communityDecksFormat: CommunityDeckFormatFilter? = null,
 ): (@Composable () -> Unit)? = when (type) {
     HomeWidgetType.QUICK_ACTIONS -> {
         {
@@ -743,10 +822,19 @@ private fun widgetHeaderTrailingContent(
     }
     HomeWidgetType.CARD_OF_THE_DAY -> {
         {
-            WidgetHeaderIconButton(
+            RollIconButton(
                 icon = Icons.Default.Refresh,
                 contentDescription = stringResource(R.string.home_random_refresh),
                 onClick = { onAction(HomeAction.RefreshRandomCard) },
+            )
+        }
+    }
+    HomeWidgetType.RULES_TIP -> {
+        {
+            RollIconButton(
+                icon = Icons.Default.Casino,
+                contentDescription = stringResource(R.string.home_rules_tip_roll_a11y),
+                onClick = { onAction(HomeAction.RollRulesTip) },
             )
         }
     }
@@ -793,15 +881,19 @@ private fun widgetHeaderTrailingContent(
             var showCategoryPicker by remember { mutableStateOf(false) }
             CommunityDecksCategoryAffordance(
                 category = communityDecksCategory,
+                format = communityDecksFormat,
                 onClick = { showCategoryPicker = true },
             )
             if (showCategoryPicker) {
                 CommunityDecksCategoryPickerSheet(
                     selected = communityDecksCategory,
+                    selectedFormat = communityDecksFormat,
                     onSelect = { category ->
                         onAction(HomeAction.SelectCommunityDecksCategory(category))
                         showCategoryPicker = false
                     },
+                    // A format pick keeps the sheet open so the category can be chosen next.
+                    onSelectFormat = { format -> onAction(HomeAction.SelectCommunityDecksFormat(format)) },
                     onDismiss = { showCategoryPicker = false },
                 )
             }
@@ -820,21 +912,96 @@ private fun WidgetHeaderIconButton(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    iconModifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
+    val mc = MaterialTheme.magicColors
     Box(
-        modifier = Modifier
+        modifier = modifier
             .minimumInteractiveComponentSize()
             .clip(CircleShape)
-            .clickable(onClickLabel = contentDescription, role = Role.Button, onClick = onClick),
+            .clickable(
+                enabled = enabled,
+                onClickLabel = contentDescription,
+                role = Role.Button,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = MaterialTheme.magicColors.primaryAccent,
-            modifier = Modifier.size(24.dp),
+            tint = if (enabled) mc.primaryAccent else mc.textDisabled,
+            modifier = iconModifier.size(24.dp),
         )
     }
+}
+
+/**
+ * Previous / next chevrons overlaid on a pager, each a ≥48dp [WidgetHeaderIconButton]; offset
+ * outwards so the glyphs line up with the pager's edges.
+ */
+@Composable
+private fun PagerChevrons(
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    onBack: () -> Unit,
+    onForward: () -> Unit,
+) {
+    val spacing = MaterialTheme.spacing
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        WidgetHeaderIconButton(
+            icon = Icons.Default.ChevronLeft,
+            contentDescription = stringResourceSafe(R.string.home_carousel_previous),
+            onClick = onBack,
+            enabled = canGoBack,
+            modifier = Modifier.offset(x = -spacing.md),
+        )
+        WidgetHeaderIconButton(
+            icon = Icons.Default.ChevronRight,
+            contentDescription = stringResourceSafe(R.string.home_carousel_next),
+            onClick = onForward,
+            enabled = canGoForward,
+            modifier = Modifier.offset(x = spacing.md),
+        )
+    }
+}
+
+/** Duration of the roll buttons' full icon spin. */
+private const val ROLL_SPIN_MS = 400
+
+/**
+ * A header icon button for "roll another" actions: the glyph spins a full turn on each tap (drawn
+ * in the graphics layer, so the header never re-lays out). Reduced motion skips the spin.
+ */
+@Composable
+private fun RollIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    val rotation = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val reducedMotion = isReducedMotionEnabled()
+    WidgetHeaderIconButton(
+        icon = icon,
+        contentDescription = contentDescription,
+        iconModifier = Modifier.graphicsLayer { rotationZ = rotation.value },
+        onClick = {
+            onClick()
+            if (!reducedMotion) {
+                scope.launch {
+                    rotation.snapTo(0f)
+                    rotation.animateTo(360f, tween(ROLL_SPIN_MS))
+                }
+            }
+        },
+    )
 }
 
 /**
@@ -1160,6 +1327,7 @@ internal fun FirstStepsCarousel(
                                     style = ty.bodySmall,
                                     color = mc.textSecondary,
                                     textAlign = TextAlign.Center,
+                                    minLines = 2,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -1171,7 +1339,7 @@ internal fun FirstStepsCarousel(
                         // observeSkippedFirstSteps DataStore mechanism as before.
                         Box(
                             modifier = Modifier
-                                .align(Alignment.TopStart)
+                                .align(Alignment.TopEnd)
                                 .minimumInteractiveComponentSize()
                                 .clip(CircleShape)
                                 .clickable(
@@ -1183,7 +1351,7 @@ internal fun FirstStepsCarousel(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = stringResourceSafe(R.string.first_step_dismiss),
-                                tint = mc.textSecondary.copy(alpha = 0.6f),
+                                tint = mc.textSecondary,
                                 modifier = Modifier.size(16.dp),
                             )
                         }
@@ -1192,42 +1360,12 @@ internal fun FirstStepsCarousel(
             }
 
             if (steps.size > 1) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronLeft,
-                        contentDescription = stringResourceSafe(R.string.home_carousel_previous),
-                        tint = mc.primaryAccent.copy(alpha = 0.4f),
-                        modifier = Modifier
-                            .offset(x = (-12).dp)
-                            .size(24.dp)
-                            .alpha(if (pagerState.currentPage > 0) 1f else 0.1f)
-                            .clip(CircleShape)
-                            .clickable(enabled = pagerState.currentPage > 0) {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(pagerState.currentPage - 1)
-                                }
-                            }
-                    )
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = stringResourceSafe(R.string.home_carousel_next),
-                        tint = mc.primaryAccent.copy(alpha = 0.4f),
-                        modifier = Modifier
-                            .offset(x = 12.dp)
-                            .size(24.dp)
-                            .alpha(if (pagerState.currentPage < steps.size - 1) 1f else 0.1f)
-                            .clip(CircleShape)
-                            .clickable(enabled = pagerState.currentPage < steps.size - 1) {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                                }
-                            }
-                    )
-                }
+                PagerChevrons(
+                    canGoBack = pagerState.currentPage > 0,
+                    canGoForward = pagerState.currentPage < steps.size - 1,
+                    onBack = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
+                    onForward = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
+                )
             }
         }
     }
@@ -1360,10 +1498,7 @@ private fun ProgressionHubWidget(gamification: HomeGamification?, onAction: (Hom
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
 
-    if (gamification == null) {
-        WidgetShell { WidgetLoading() }
-        return
-    }
+    if (gamification == null) return
 
     WidgetShell(
         onClick = { onAction(HomeAction.OpenProfileQuests) },
@@ -1458,10 +1593,7 @@ private fun ProgressionHubWidget(gamification: HomeGamification?, onAction: (Hom
 private fun QuestsHubWidget(gamification: HomeGamification?, onAction: (HomeAction) -> Unit) {
     val spacing = MaterialTheme.spacing
 
-    if (gamification == null) {
-        WidgetShell { WidgetLoading() }
-        return
-    }
+    if (gamification == null) return
 
     WidgetShell(
         onClick = { onAction(HomeAction.OpenProfileQuests) },
@@ -1640,7 +1772,6 @@ private fun QuickActionTile(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
-                letterSpacing = 1.sp
             )
         }
     }
@@ -1650,18 +1781,21 @@ private fun QuickActionTile(
 //  Auto-sliding hub scaffold — reused by the four hub widgets
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/** Height of every [HubSlide] in the current hub; provided by [AutoSlideHub]. */
+private val LocalHubSlideHeight = compositionLocalOf { HubSlideMinHeight }
+
 /**
- * A reusable auto-sliding pager used by the hub widgets (game stats, collection,
- * social, trades). Shows [slides] one at a time, auto-advancing every 4 seconds while
- * the user is not actively swiping. Renders [emptyContent] when [slides] is empty and
- * a spinner while [loadingWhen] is true.
+ * A reusable auto-sliding pager used by the hub widgets (game stats, collection, trades). Shows
+ * [slides] one at a time, auto-advancing every 4 seconds while the user is not actively swiping.
+ * Every slide renders at [slideHeight] (the hub's tallest slide, font-scale aware) so advancing
+ * never resizes the widget. Renders [emptyContent] when [slides] is empty.
  */
 @Composable
 private fun <T> AutoSlideHub(
     slides: List<T>,
+    slideHeight: Dp,
     slideContent: @Composable (T) -> Unit,
     emptyContent: @Composable () -> Unit = { WidgetEmptyBody(stringResourceSafe(R.string.home_widget_empty)) },
-    loadingWhen: Boolean = false,
     showDots: Boolean = true,
     showNavigationIcons: Boolean = false,
 ) {
@@ -1669,10 +1803,6 @@ private fun <T> AutoSlideHub(
     val spacing = MaterialTheme.spacing
     val coroutineScope = rememberCoroutineScope()
 
-    if (loadingWhen) {
-        WidgetLoading()
-        return
-    }
     if (slides.isEmpty()) {
         emptyContent()
         return
@@ -1706,7 +1836,9 @@ private fun <T> AutoSlideHub(
                         scaleY = scaleValue
                     }
                 ) {
-                    slideContent(slides[page])
+                    CompositionLocalProvider(LocalHubSlideHeight provides slideHeight) {
+                        slideContent(slides[page])
+                    }
                 }
             }
             if (showDots && slides.size > 1) {
@@ -1732,42 +1864,12 @@ private fun <T> AutoSlideHub(
         }
 
         if (showNavigationIcons && slides.size > 1) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ChevronLeft,
-                    contentDescription = stringResourceSafe(R.string.home_carousel_previous),
-                    tint = mc.primaryAccent.copy(alpha = 0.4f),
-                    modifier = Modifier
-                        .offset(x = (-12).dp)
-                        .size(24.dp)
-                        .alpha(if (pagerState.currentPage > 0) 1f else 0.1f)
-                        .clip(CircleShape)
-                        .clickable(enabled = pagerState.currentPage > 0) {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(pagerState.currentPage - 1)
-                            }
-                        }
-                )
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = stringResourceSafe(R.string.home_carousel_next),
-                    tint = mc.primaryAccent.copy(alpha = 0.4f),
-                    modifier = Modifier
-                        .offset(x = 12.dp)
-                        .size(24.dp)
-                        .alpha(if (pagerState.currentPage < slides.size - 1) 1f else 0.1f)
-                        .clip(CircleShape)
-                        .clickable(enabled = pagerState.currentPage < slides.size - 1) {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                            }
-                        }
-                )
-            }
+            PagerChevrons(
+                canGoBack = pagerState.currentPage > 0,
+                canGoForward = pagerState.currentPage < slides.size - 1,
+                onBack = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
+                onForward = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
+            )
         }
     }
 }
@@ -1778,7 +1880,7 @@ private fun HubSlide(content: @Composable ColumnScopeMarker.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(140.dp),
+            .height(LocalHubSlideHeight.current),
         verticalArrangement = Arrangement.Center,
     ) {
         ColumnScopeMarker.content()
@@ -1803,7 +1905,7 @@ private sealed interface GameStatsSlide {
 }
 
 @Composable
-private fun GameStatsHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> Unit) {
+private fun GameStatsHubWidget(uiState: HomeUiState, slideHeight: Dp, onAction: (HomeAction) -> Unit) {
     val slides = remember(
         uiState.winRate, uiState.bestDeck, uiState.nemesis, uiState.performanceDetails,
         uiState.playStreak, uiState.lastGameRecap, uiState.activeTournamentSummary,
@@ -1823,6 +1925,7 @@ private fun GameStatsHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> U
     WidgetShell {
         AutoSlideHub(
             slides = slides,
+            slideHeight = slideHeight,
             emptyContent = { WidgetEmptyBody(stringResourceSafe(R.string.home_win_rate_empty)) },
             slideContent = { slide -> GameStatsSlideContent(slide, onAction) },
             showDots = false,
@@ -1875,7 +1978,6 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                             text = stringResourceSafe(R.string.home_win_rate_record, stats.wins, stats.totalGames),
                             style = ty.labelSmall,
                             color = mc.textSecondary,
-                            letterSpacing = 1.sp
                         )
                         Text(
                             text = stringResourceSafe(R.string.home_win_rate_caption),
@@ -1927,7 +2029,6 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                                 text = stringResourceSafe(R.string.home_best_performer_caption),
                                 style = ty.labelSmall,
                                 color = mc.lifePositive,
-                                letterSpacing = 1.sp
                             )
                             Text(stats.deckName, style = ty.titleMedium.copy(fontWeight = FontWeight.Bold), color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
@@ -1967,7 +2068,6 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                                 text = stringResourceSafe(R.string.home_current_nemesis_caption),
                                 style = ty.labelSmall,
                                 color = mc.lifeNegative,
-                                letterSpacing = 1.sp
                             )
                             Text(stats.archetype, style = ty.titleMedium.copy(fontWeight = FontWeight.Bold), color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
@@ -2031,7 +2131,6 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                                 text = stringResourceSafe(R.string.home_latest_battle_caption),
                                 style = ty.labelSmall,
                                 color = mc.textSecondary,
-                                letterSpacing = 1.sp
                             )
                             Text(
                                 text = recap.deckName ?: recap.mode,
@@ -2135,9 +2234,10 @@ private fun AnimatedStatKPI(
             )
             Text(
                 text = label.uppercase(),
-                style = ty.labelSmall.copy(fontSize = CompactCaptionSize),
+                style = ty.labelSmall,
                 color = mc.textSecondary,
-                letterSpacing = 0.5.sp
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -2185,7 +2285,7 @@ private sealed interface CollectionSlide {
 }
 
 @Composable
-private fun CollectionStatsHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> Unit) {
+private fun CollectionStatsHubWidget(uiState: HomeUiState, slideHeight: Dp, onAction: (HomeAction) -> Unit) {
     val slides = remember(uiState.libraryStats, uiState.collectionByColor, uiState.collectionByRarity) {
         buildList {
             uiState.libraryStats?.let { add(CollectionSlide.Snapshot(it)) }
@@ -2196,6 +2296,7 @@ private fun CollectionStatsHubWidget(uiState: HomeUiState, onAction: (HomeAction
     WidgetShell {
         AutoSlideHub(
             slides = slides,
+            slideHeight = slideHeight,
             emptyContent = { WidgetEmptyBody(stringResourceSafe(R.string.home_collection_color_empty)) },
             slideContent = { slide -> CollectionSlideContent(slide, onAction) },
             showDots = false,
@@ -2247,10 +2348,6 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
             }
         }
         is CollectionSlide.Colors -> {
-            // F-12: these hex values are the official, fixed MTG brand WUBRG colors (mirroring
-            // the Stats screen's own pie chart) — never tokenized, since they represent the game's
-            // color pie identity itself rather than app theming, and stay constant across all 12
-            // ManaHub themes by design.
             val colorWhite = stringResourceSafe(R.string.stats_color_white)
             val colorBlue = stringResourceSafe(R.string.stats_color_blue)
             val colorBlack = stringResourceSafe(R.string.stats_color_black)
@@ -2277,12 +2374,12 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
                             },
                         colorMapper = { label ->
                             when (label) {
-                                colorWhite -> Color(0xFFF9FAFA)
-                                colorBlue -> Color(0xFF0E68AB)
-                                colorBlack -> Color(0xFF150B00)
-                                colorRed -> Color(0xFFD3202A)
-                                colorGreen -> Color(0xFF00733E)
-                                colorColorless -> Color(0xFF90ADBB)
+                                colorWhite -> mc.manaW
+                                colorBlue -> mc.manaU
+                                colorBlack -> mc.manaB
+                                colorRed -> mc.manaR
+                                colorGreen -> mc.manaG
+                                colorColorless -> mc.manaC
                                 else -> mc.primaryAccent
                             }
                         },
@@ -2293,7 +2390,7 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
             }
         }
         is CollectionSlide.Rarity -> {
-            // F-12: fixed rarity brand colors (silver/steel/gold/orange), same rationale as above.
+            // Same rarity palette as the shared RarityDot.
             val rarityCommon = stringResourceSafe(R.string.home_rarity_common)
             val rarityUncommon = stringResourceSafe(R.string.home_rarity_uncommon)
             val rarityRare = stringResourceSafe(R.string.home_rarity_rare)
@@ -2314,11 +2411,11 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
                         },
                         colorMapper = { label ->
                             when (label) {
-                                rarityCommon -> Color(0xFFC0C0C0)
-                                rarityUncommon -> Color(0xFFB0C4DE)
-                                rarityRare -> Color(0xFFC9A84C)
-                                rarityMythic -> Color(0xFFE8A030)
-                                else -> Color(0xFF9B6EFF)
+                                rarityCommon -> mc.textDisabled
+                                rarityUncommon -> mc.textSecondary
+                                rarityRare -> mc.goldMtg
+                                rarityMythic -> mc.primaryAccent
+                                else -> mc.secondaryAccent
                             }
                         },
                         isCompact = true
@@ -2341,7 +2438,7 @@ private fun StatBox(
     val spacing = MaterialTheme.spacing
     Surface(
         modifier = modifier,
-        color = mc.surfaceVariant.copy(alpha = 0.4f),
+        color = mc.textDisabled.copy(alpha = SUBTLE_FILL_ALPHA),
         shape = SmallCardShape,
         border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.1f))
     ) {
@@ -2359,10 +2456,11 @@ private fun StatBox(
             )
             Text(
                 text = label.uppercase(),
-                style = ty.labelSmall.copy(fontSize = CompactCaptionSize),
+                style = ty.labelSmall,
                 color = mc.textSecondary,
                 textAlign = TextAlign.Center,
-                letterSpacing = 0.5.sp
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -2376,12 +2474,9 @@ private fun StatBox(
 @Composable
 private fun DecksShelfWidget(decks: List<DeckSummary>?, onAction: (HomeAction) -> Unit) {
     val spacing = MaterialTheme.spacing
-    WidgetShell(onClick = { onAction(HomeAction.OpenDecks) }) {
-        // TASK 7b: null = still loading; distinguishes from "the user genuinely has zero decks".
-        if (decks == null) {
-            WidgetLoading()
-            return@WidgetShell
-        }
+    // The header title already opens the decks list; the row items are the body's tap targets.
+    if (decks == null) return
+    WidgetShell {
         if (decks.isEmpty()) {
             WidgetEmptyBody(stringResourceSafe(R.string.home_decks_empty))
             return@WidgetShell
@@ -2413,12 +2508,8 @@ private fun RecentlyAddedWidget(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val spacing = MaterialTheme.spacing
-    WidgetShell(onClick = { onAction(HomeAction.OpenLibrary) }) {
-        // TASK 7b: null = still loading; distinguishes from "the collection genuinely has nothing".
-        if (entries == null) {
-            WidgetLoading()
-            return@WidgetShell
-        }
+    if (entries == null) return
+    WidgetShell {
         if (entries.isEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
                 WidgetEmptyBody(stringResourceSafe(R.string.home_recently_added_empty))
@@ -2442,33 +2533,14 @@ private fun RecentlyAddedWidget(
                         sharedTransitionKey = uniqueKey
                     )
                     if (entry.quantity > 1) {
-                        QuantityBadge(
-                            quantity = entry.quantity,
+                        CopyBadge(
+                            label = stringResourceSafe(R.string.home_recently_added_quantity, entry.quantity),
                             modifier = Modifier.align(Alignment.TopEnd).padding(spacing.xxs),
                         )
                     }
                 }
             }
         }
-    }
-}
-
-/** Small accent-filled circular badge showing a copy count (e.g. "x3"), top-corner overlay. */
-@Composable
-private fun QuantityBadge(quantity: Int, modifier: Modifier = Modifier) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    Surface(
-        modifier = modifier,
-        color = mc.primaryAccent,
-        shape = ChipShape,
-    ) {
-        Text(
-            text = stringResourceSafe(R.string.home_recently_added_quantity, quantity),
-            style = ty.labelSmall,
-            color = mc.background,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-        )
     }
 }
 
@@ -2481,25 +2553,21 @@ private fun QuantityBadge(quantity: Int, modifier: Modifier = Modifier) {
 private fun WishlistWidget(
     stats: WishlistStats?,
     isAuthenticated: Boolean,
-    authResolved: Boolean,
     onAction: (HomeAction) -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
-    // TASK 7a: while the session is still resolving, show a spinner — never the gated placeholder.
-    if (!authResolved) {
-        WidgetShell { WidgetLoading() }
-        return
-    }
+    // The body slot only renders this once auth has resolved, so signed out here is definitive.
     if (!isAuthenticated) {
-        AccountGatedPlaceholder(stringResourceSafe(R.string.widget_title_wishlist)) { onAction(HomeAction.CreateAccount) }
+        AccountGatedPlaceholder(onSignIn = { onAction(HomeAction.CreateAccount) })
         return
     }
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    WidgetShell(onClick = { onAction(HomeAction.OpenWishlist) }) {
-        if (stats == null || stats.count == 0) {
+    if (stats == null) return
+    WidgetShell {
+        if (stats.count == 0) {
             WidgetEmptyBody(stringResourceSafe(R.string.home_wishlist_empty))
             return@WidgetShell
         }
@@ -2557,63 +2625,62 @@ private fun WishlistWidget(
 private fun DiscoverCardsWidget(
     cards: List<DiscoverCard>,
     loadState: DiscoverLoadState,
+    rowHeight: Dp,
     onAction: (HomeAction) -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
-    val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
-    WidgetShell(onClick = { onAction(HomeAction.SearchCard) }) {
+    WidgetShell {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(154.dp), // Fixed height matching card thumbs (110dp / 0.717)
-            contentAlignment = Alignment.Center
+                .height(rowHeight),
+            contentAlignment = Alignment.Center,
         ) {
-            when {
-                // Empty + loading: Show spinner in the center of the fixed-height area.
-                cards.isEmpty() && loadState == DiscoverLoadState.LOADING -> {
-                    MagicLoadingSpinner(size = MagicLoadingSize.Medium)
-                }
-                // Empty + not loading: Retry body.
-                cards.isEmpty() -> {
-                    WidgetRetryBody(
-                        message = stringResourceSafe(R.string.home_discover_unavailable),
-                        onRetry = { onAction(HomeAction.RefreshDiscover) },
-                    )
-                }
-                else -> {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                        modifier = Modifier.fillMaxSize(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        items(cards, key = { "discover|${it.id}" }) { card ->
-                            val uniqueKey = "discover|${card.id}"
-                            DiscoverCardThumb(
-                                card = card,
-                                onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId, uniqueKey)) },
-                                sharedTransitionScope = sharedTransitionScope,
-                                animatedVisibilityScope = animatedVisibilityScope,
-                                sharedTransitionKey = uniqueKey
-                            )
-                        }
+            if (cards.isEmpty()) {
+                // Only reached once the fetch settled without cards (loading shows the skeleton).
+                WidgetRetryBody(
+                    message = stringResourceSafe(R.string.home_discover_unavailable),
+                    onRetry = { onAction(HomeAction.RefreshDiscover) },
+                )
+            } else {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    items(cards, key = { "discover|${it.id}" }) { card ->
+                        val uniqueKey = "discover|${card.id}"
+                        DiscoverCardThumb(
+                            card = card,
+                            onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId, uniqueKey)) },
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            sharedTransitionKey = uniqueKey
+                        )
                     }
+                }
 
-                    // Background refresh: Overlay a small spinner so it doesn't push the list down.
-                    if (loadState == DiscoverLoadState.LOADING) {
-                        Surface(
-                            color = MaterialTheme.magicColors.background.copy(alpha = 0.7f),
-                            shape = CircleShape,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                MagicLoadingSpinner(size = MagicLoadingSize.XSmall)
-                            }
-                        }
-                    }
+                // A background refresh keeps the row and overlays a small spinner.
+                if (loadState == DiscoverLoadState.LOADING) {
+                    RefreshingBadge()
                 }
             }
+        }
+    }
+}
+
+/** Small spinner overlaid on content that is refreshing in the background. */
+@Composable
+private fun RefreshingBadge(modifier: Modifier = Modifier) {
+    Surface(
+        color = MaterialTheme.magicColors.background.copy(alpha = 0.7f),
+        shape = CircleShape,
+        modifier = modifier.size(32.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            MagicLoadingSpinner(size = MagicLoadingSize.XSmall)
         }
     }
 }
@@ -2630,9 +2697,9 @@ private fun DiscoverCardThumb(
     val mc = MaterialTheme.magicColors
     Box(
         modifier = Modifier
-            .width(110.dp)
+            .width(HomeCardThumbWidth)
             // Full MTG card aspect ratio (745:1040) so the whole card is shown.
-            .aspectRatio(0.717f)
+            .aspectRatio(HomeCardAspectRatio)
             .clip(SmallCardShape)
             .then(
                 if (sharedTransitionScope != null && animatedVisibilityScope != null) {
@@ -2643,12 +2710,13 @@ private fun DiscoverCardThumb(
                             ),
                             animatedVisibilityScope = animatedVisibilityScope,
                             clipInOverlayDuringTransition = OverlayClip(CardShape),
+                            boundsTransform = CardSharedBoundsTransform,
                             renderInOverlayDuringTransition = true,
                         )
                     }
                 } else Modifier
             )
-            .background(mc.surfaceVariant)
+            .background(mc.textDisabled.copy(alpha = SUBTLE_FILL_ALPHA))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -2671,6 +2739,37 @@ private fun DiscoverCardThumb(
 //  CARD_OF_THE_DAY (enum) → Random card widget: a single full card image, centered
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/** Width share of the Random card image within the widget. */
+private const val RANDOM_CARD_WIDTH_FRACTION = 0.62f
+
+/**
+ * The Random card's frame: a centered card-shaped box. Skeleton and content both draw inside it,
+ * so the widget keeps one geometry across loading, failure and content.
+ */
+@Composable
+private fun RandomCardFrame(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = MaterialTheme.spacing.xxs),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(RANDOM_CARD_WIDTH_FRACTION)
+                .aspectRatio(HomeCardAspectRatio)
+                .clip(CardShape)
+                .then(modifier),
+            contentAlignment = Alignment.Center,
+        ) {
+            content()
+        }
+    }
+}
+
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun RandomCardWidget(
@@ -2681,63 +2780,53 @@ private fun RandomCardWidget(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val mc = MaterialTheme.magicColors
-    WidgetShell(onClick = { card?.let { onAction(HomeAction.OpenCardDetail(it.scryfallId, "random_card|${it.scryfallId}")) } }) {
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.62f)
-                    .aspectRatio(0.717f) // Keep footprint identical during load/fail/show
-                    .clip(CardShape)
-                    .background(MaterialTheme.magicColors.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
-                when {
-                    loadState == DiscoverLoadState.LOADING -> {
-                        MagicLoadingSpinner(size = MagicLoadingSize.Medium)
-                    }
-                    card == null -> {
-                        WidgetRetryBody(
-                            message = stringResourceSafe(R.string.home_discover_unavailable),
-                            onRetry = { onAction(HomeAction.RefreshRandomCard) },
-                        )
-                    }
-                    else -> {
-                        Box(
-                            modifier = Modifier
-                                .then(
-                                    if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                                        with(sharedTransitionScope) {
-                                            Modifier.sharedBounds(
-                                                sharedContentState = rememberSharedContentState(
-                                                    key = "random_card|${card.scryfallId}"
-                                                ),
-                                                animatedVisibilityScope = animatedVisibilityScope,
-                                                clipInOverlayDuringTransition = OverlayClip(CardShape),
-                                                renderInOverlayDuringTransition = true,
-                                            )
-                                        }
-                                    } else Modifier
-                                )
-                        ) {
-                            if (card.imageUrl != null) {
-                                AsyncImage(
-                                    model = card.imageUrl,
-                                    contentDescription = card.name,
-                                    placeholder = painterResource(Res.drawable.mtg_card_back),
-                                    error = painterResource(Res.drawable.mtg_card_back),
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                            } else {
-                                Icon(Icons.Default.Style, contentDescription = null, tint = MaterialTheme.magicColors.textDisabled, modifier = Modifier.size(32.dp))
-                            }
-                        }
-                    }
-                }
-            }
+    if (card == null) {
+        // Only reached once the fetch failed (loading shows the skeleton).
+        RandomCardFrame(modifier = Modifier.background(mc.textDisabled.copy(alpha = SUBTLE_FILL_ALPHA))) {
+            WidgetRetryBody(
+                message = stringResourceSafe(R.string.home_discover_unavailable),
+                onRetry = { onAction(HomeAction.RefreshRandomCard) },
+            )
+        }
+        return
+    }
+    val transitionKey = "random_card|${card.scryfallId}"
+    // Shared bounds sit on the sized card box itself, so both ends of the transition measure the card.
+    val sharedModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        with(sharedTransitionScope) {
+            Modifier.sharedBounds(
+                sharedContentState = rememberSharedContentState(key = transitionKey),
+                animatedVisibilityScope = animatedVisibilityScope,
+                clipInOverlayDuringTransition = OverlayClip(CardShape),
+                boundsTransform = CardSharedBoundsTransform,
+                renderInOverlayDuringTransition = true,
+            )
+        }
+    } else {
+        Modifier
+    }
+    RandomCardFrame(
+        modifier = sharedModifier.clickable(
+            onClickLabel = card.name,
+            role = Role.Button,
+            onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId, transitionKey)) },
+        ),
+    ) {
+        if (card.imageUrl != null) {
+            AsyncImage(
+                model = card.imageUrl,
+                contentDescription = card.name,
+                placeholder = painterResource(Res.drawable.mtg_card_back),
+                error = painterResource(Res.drawable.mtg_card_back),
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Icon(Icons.Default.Style, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(32.dp))
+        }
+        // A re-roll keeps the current card and overlays a small spinner.
+        if (loadState == DiscoverLoadState.LOADING) {
+            RefreshingBadge()
         }
     }
 }
@@ -2746,10 +2835,11 @@ private fun RandomCardWidget(
  * Shared "See all" trailing tile for horizontal widget rows (Latest Sets, News).
  *
  * A prominent, clearly-tappable tile (≥48dp) with a chevron + label, consistent across
- * widgets. Full-height so it lines up with the cards it follows in the [LazyRow].
+ * widgets. [height] is the row's card height so the tile lines up with the cards it follows.
  */
 @Composable
 private fun SeeAllTile(
+    height: Dp,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -2759,7 +2849,7 @@ private fun SeeAllTile(
     Column(
         modifier = modifier
             .width(100.dp)
-            .height(110.dp)
+            .height(height)
             .clip(SmallCardShape)
             .background(
                 brush = Brush.radialGradient(
@@ -2810,30 +2900,25 @@ private fun SeeAllTile(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun LatestSetsWidget(sets: List<DraftSet>, onAction: (HomeAction) -> Unit) {
+private fun LatestSetsWidget(sets: List<DraftSet>?, tileHeight: Dp, onAction: (HomeAction) -> Unit) {
     val spacing = MaterialTheme.spacing
-    WidgetShell(onClick = { onAction(HomeAction.OpenDraftGuide) }) {
+    if (sets == null) return
+    WidgetShell {
         if (sets.isEmpty()) {
             WidgetEmptyBody(stringResourceSafe(R.string.home_latest_sets_empty))
             return@WidgetShell
         }
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
             items(sets, key = { it.id }) { set ->
                 DraftSetCard(
                     set = set,
                     isCompact = true,
                     onClick = { onAction(HomeAction.OpenDraftSetDetail(set)) },
-                    modifier = Modifier.width(160.dp).height(110.dp),
+                    modifier = Modifier.width(HomeDraftSetTileWidth).height(tileHeight),
                 )
             }
             item(key = "see_more") {
-                SeeAllTile(
-                    onClick = { onAction(HomeAction.OpenDraftGuide) },
-                    modifier = Modifier.width(100.dp).height(110.dp),
-                )
+                SeeAllTile(height = tileHeight, onClick = { onAction(HomeAction.OpenDraftGuide) })
             }
         }
     }
@@ -2847,34 +2932,37 @@ private fun LatestSetsWidget(sets: List<DraftSet>, onAction: (HomeAction) -> Uni
 private fun NewsWidget(
     news: List<NewsItem>?,
     filtersActive: Boolean,
+    cardHeight: Dp,
     onAction: (HomeAction) -> Unit,
 ) {
     val spacing = MaterialTheme.spacing
-    WidgetShell(onClick = { onAction(HomeAction.OpenNews) }) {
-        when {
-            news == null -> WidgetLoading()
+    if (news == null) return
+    WidgetShell {
+        if (news.isEmpty()) {
             // Empty list: offer to reset the (possibly over-restrictive) persisted filters.
-            news.isEmpty() -> NewsEmptyWithReset(filtersActive = filtersActive, onAction = onAction)
-            else -> LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                items(news.take(MAX_NEWS_PREVIEW), key = { it.id }) { item ->
-                    NewsItemCard(
-                        item = item,
-                        orientation = NewsItemOrientation.VERTICAL,
-                        placeholderPainter = painterResource(Res.drawable.mtg_card_back),
-                        modifier = Modifier.width(220.dp),
-                        onClick = { onAction(HomeAction.OpenNewsUrl(item.url)) },
-                    )
-                }
-                item(key = "see_more") {
-                    SeeAllTile(onClick = { onAction(HomeAction.OpenNews) })
-                }
+            NewsEmptyWithReset(filtersActive = filtersActive, onAction = onAction)
+            return@WidgetShell
+        }
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+            items(news.take(MAX_NEWS_PREVIEW), key = { it.id }) { item ->
+                NewsItemCard(
+                    item = item,
+                    orientation = NewsItemOrientation.VERTICAL,
+                    placeholderPainter = painterResource(Res.drawable.mtg_card_back),
+                    titleMinLines = NEWS_TITLE_LINES,
+                    modifier = Modifier.width(HomeNewsCardWidth).height(cardHeight),
+                    onClick = { onAction(HomeAction.OpenNewsUrl(item.url)) },
+                )
+            }
+            item(key = "see_more") {
+                SeeAllTile(height = cardHeight, onClick = { onAction(HomeAction.OpenNews) })
             }
         }
     }
 }
+
+/** News titles always reserve two lines so every card in the row has the same height. */
+private const val NEWS_TITLE_LINES = 2
 
 /**
  * Empty-state body for the News widget. Always offers a "Reset filters" button (per spec)
@@ -2883,157 +2971,175 @@ private fun NewsWidget(
  */
 @Composable
 private fun NewsEmptyWithReset(filtersActive: Boolean, onAction: (HomeAction) -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
         WidgetEmptyBody(stringResourceSafe(R.string.home_news_empty))
-        Surface(
-            color = mc.primaryAccent.copy(alpha = 0.15f),
-            shape = ButtonShape,
-            modifier = Modifier
-                .heightIn(min = 48.dp)
-                .clip(ButtonShape)
-                .clickable(
-                    onClickLabel = stringResourceSafe(R.string.home_news_reset_filters),
-                    role = Role.Button,
-                    onClick = { onAction(HomeAction.ResetNewsFilters) },
-                ),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-            ) {
+        MagicCtaButton(
+            onClick = { onAction(HomeAction.ResetNewsFilters) },
+            text = stringResourceSafe(R.string.home_news_reset_filters),
+            style = MagicCtaStyle.Outlined,
+            color = MagicCtaColor.Primary,
+            icon = {
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = null,
-                    tint = mc.primaryAccent,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(18.dp),
                 )
-                Text(
-                    text = stringResourceSafe(R.string.home_news_reset_filters),
-                    style = ty.labelSmall,
-                    color = mc.primaryAccent,
-                    maxLines = 1,
+            },
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  RULES_TIP — one tip at a time; the header's roll button picks another
+// ═══════════════════════════════════════════════════════════════════════════════
+
+private val RulesTipTitleBadgeSize = 22.dp
+
+/** Crossfade between two tips after a roll. */
+private const val RULES_TIP_CROSSFADE_MS = 180
+
+/** Body text style of a tip; also the style its height is measured with. */
+@Composable
+private fun rulesTipBodyStyle(): TextStyle {
+    val mc = MaterialTheme.magicColors
+    return MaterialTheme.magicTypography.bodySmall.copy(color = mc.textSecondary)
+}
+
+/**
+ * The tip card's fixed height for [width]: its chrome plus the tallest body in the whole catalog,
+ * plus one line of headroom for inline mana symbols (measured as plain text). Measured once per
+ * width, typography and font scale, so rolling a tip never resizes the widget.
+ */
+@Composable
+private fun rememberRulesTipCardHeight(width: Dp): Dp {
+    val measurer = rememberTextMeasurer(cacheSize = 0)
+    val density = LocalDensity.current
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    val bodyStyle = rulesTipBodyStyle()
+    return remember(width, density, ty, spacing, bodyStyle) {
+        with(density) {
+            val bodyWidthPx = (width - spacing.md * 2).roundToPx().coerceAtLeast(1)
+            val tallestBodyPx = RULES_TIPS_DAILY_ORDER.maxOf { tip ->
+                measurer.measure(tip.body, bodyStyle, constraints = Constraints(maxWidth = bodyWidthPx)).size.height
+            }
+            val chrome = spacing.md * 2 +
+                max(RulesTipTitleBadgeSize, ty.titleMedium.lineHeight.toDp()) + spacing.xs +
+                spacing.xxs * 2 + ty.labelSmall.lineHeight.toDp() + spacing.xs
+            chrome + tallestBodyPx.toDp() + bodyStyle.lineHeight.toDp()
+        }
+    }
+}
+
+@Composable
+private fun RulesTipWidget(tipIndex: Int) {
+    val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
+    val tips = RULES_TIPS_DAILY_ORDER
+    val tip = tips[tipIndex.coerceIn(0, tips.lastIndex)]
+    val reducedMotion = isReducedMotionEnabled()
+
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xxs)) {
+        Surface(
+            color = mc.surface.copy(alpha = 0.6f),
+            shape = SmallCardShape,
+            border = BorderStroke(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        mc.primaryAccent.copy(alpha = 0.15f),
+                        mc.primaryAccent.copy(alpha = 0.02f)
+                    )
                 )
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(rememberRulesTipCardHeight(maxWidth)),
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Decorative background icon
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                    contentDescription = null,
+                    tint = mc.primaryAccent.copy(alpha = 0.04f),
+                    modifier = Modifier
+                        .size(100.dp)
+                        .align(Alignment.BottomEnd)
+                        .offset(x = 20.dp, y = 20.dp)
+                        .rotate(-15f)
+                )
+                Crossfade(
+                    targetState = tip,
+                    animationSpec = tween(if (reducedMotion) 0 else RULES_TIP_CROSSFADE_MS),
+                    label = "rules-tip",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .semantics { liveRegion = LiveRegionMode.Polite },
+                ) { shown ->
+                    RulesTipContent(shown)
+                }
             }
         }
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  RULES_TIP — daily tip with HorizontalPager browsing
-// ═══════════════════════════════════════════════════════════════════════════════
-
 @Composable
-private fun RulesTipWidget() {
+private fun RulesTipContent(tip: RuleTip) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-
-    // Deterministic, dependency-free daily ordering (Home feature overhaul Phase 2.4): a
-    // fixed-seed shuffle avoids long same-category streaks (the catalog is grouped by category)
-    // while staying stable across recompositions and identical for every user on a given UTC day.
-    // Cycle length = catalog size; today's index is the epoch-day modulus INTO the shuffled list.
-    val shuffledTips = remember { MTG_TIPS_CATALOG.shuffled(Random(RULES_TIP_SHUFFLE_SEED)) }
-    val tipIndex = remember(shuffledTips) { (System.currentTimeMillis() / 86_400_000L % shuffledTips.size).toInt() }
-    val pagerState = rememberPagerState(initialPage = tipIndex, pageCount = { shuffledTips.size })
-
-    WidgetShell {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxWidth()
-        ) { page ->
-            val tip = shuffledTips[page]
-            val title = tip.title
-            val body = tip.body
-            Surface(
-                color = mc.surfaceVariant.copy(alpha = 0.25f),
-                shape = SmallCardShape,
-                border = BorderStroke(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            mc.primaryAccent.copy(alpha = 0.15f),
-                            mc.primaryAccent.copy(alpha = 0.02f)
-                        )
-                    )
-                ),
-                modifier = Modifier.fillMaxWidth().padding(start = 2.dp, end = 2.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(spacing.md),
+        verticalArrangement = Arrangement.spacedBy(spacing.xs)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(RulesTipTitleBadgeSize)
+                    .clip(CircleShape)
+                    .background(mc.primaryAccent.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
             ) {
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    // Decorative background icon
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                        contentDescription = null,
-                        tint = mc.primaryAccent.copy(alpha = 0.04f),
-                        modifier = Modifier
-                            .size(100.dp)
-                            .align(Alignment.BottomEnd)
-                            .offset(x = 20.dp, y = 20.dp)
-                            .rotate(-15f)
-                    )
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(spacing.md),
-                        verticalArrangement = Arrangement.spacedBy(spacing.xs)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(spacing.sm)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(22.dp)
-                                    .clip(CircleShape)
-                                    .background(mc.primaryAccent.copy(alpha = 0.12f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = mc.primaryAccent,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                            }
-                            Text(
-                                text = title,
-                                style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = mc.textPrimary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        // Category chip (Phase 2.4): uppercase labelSmall, accent-tinted, token-based.
-                        Surface(
-                            color = mc.primaryAccent.copy(alpha = 0.12f),
-                            shape = ChipShape,
-                        ) {
-                            Text(
-                                text = stringResourceSafe(tip.category.labelRes).uppercase(),
-                                style = ty.labelSmall,
-                                color = mc.primaryAccent,
-                                letterSpacing = 1.sp,
-                                modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
-                            )
-                        }
-
-                        OracleText(
-                            text = body,
-                            style = ty.bodySmall.copy(
-                                color = mc.textSecondary,
-                                lineHeight = RulesTipBodyLineHeight
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = mc.primaryAccent,
+                    modifier = Modifier.size(12.dp)
+                )
             }
+            Text(
+                text = tip.title,
+                style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = mc.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
         }
+        // Category chip (Phase 2.4): uppercase labelSmall, accent-tinted, token-based.
+        Surface(
+            color = mc.primaryAccent.copy(alpha = 0.12f),
+            shape = ChipShape,
+        ) {
+            Text(
+                text = stringResourceSafe(tip.category.labelRes).uppercase(),
+                style = ty.labelSmall,
+                color = mc.primaryAccent,
+                maxLines = 1,
+                modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
+            )
+        }
+        OracleText(
+            text = tip.body,
+            style = rulesTipBodyStyle(),
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
@@ -3051,28 +3157,18 @@ private fun FriendsWidget(
     friendCount: Int,
     latestFriendRequestName: String?,
     isAuthenticated: Boolean,
-    authResolved: Boolean,
     onAction: (HomeAction) -> Unit,
 ) {
-    // TASK 7a: while the session is still resolving, show a spinner — never the gated placeholder
-    // (which would otherwise flash before a real signed-in session lands).
-    if (!authResolved) {
-        WidgetShell { WidgetLoading() }
-        return
-    }
+    // The body slot only renders this once auth has resolved, so signed out here is definitive.
     if (!isAuthenticated) {
-        AccountGatedPlaceholder(stringResourceSafe(R.string.widget_title_friends)) { onAction(HomeAction.CreateAccount) }
+        AccountGatedPlaceholder(onSignIn = { onAction(HomeAction.CreateAccount) })
         return
     }
-    // TASK 7b: null = still loading the friend list.
-    if (friends == null) {
-        WidgetShell { WidgetLoading() }
-        return
-    }
+    if (friends == null) return
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    WidgetShell(onClick = { onAction(HomeAction.OpenFriends) }) {
+    WidgetShell {
         if (latestFriendRequestName != null) {
             Surface(
                 color = mc.primaryAccent.copy(alpha = 0.12f),
@@ -3138,15 +3234,12 @@ private fun FriendsWidget(
 @Composable
 private fun CommunityDecksWidget(
     decks: List<com.mmg.manahub.core.model.CommunityDeckSummary>?,
+    seeAllHeight: Dp,
     onAction: (HomeAction) -> Unit,
 ) {
     val spacing = MaterialTheme.spacing
+    if (decks == null) return
     WidgetShell {
-        // TASK 7b: null = still loading this category's decks.
-        if (decks == null) {
-            WidgetLoading()
-            return@WidgetShell
-        }
         if (decks.isEmpty()) {
             WidgetEmptyBody(stringResourceSafe(R.string.home_community_decks_empty))
             return@WidgetShell
@@ -3166,7 +3259,7 @@ private fun CommunityDecksWidget(
                 )
             }
             item(key = "see_more") {
-                SeeAllTile(onClick = { onAction(HomeAction.OpenCommunityDecks) })
+                SeeAllTile(height = seeAllHeight, onClick = { onAction(HomeAction.OpenCommunityDecks) })
             }
         }
     }
@@ -3187,21 +3280,30 @@ private fun com.mmg.manahub.core.model.CommunityDeckSummary.toDeckSummary(): Dec
 )
 
 /**
- * Community-decks widget category selector affordance. Shows the active category's title
- * + a chevron. The whole row is a ≥48dp tap target that re-opens the category picker.
+ * Community-decks widget selector affordance: "FORMAT · CATEGORY" on one line (ellipsized, capped
+ * at half the header so the widget title stays readable) + a chevron. The whole row is a ≥48dp
+ * tap target that opens the picker sheet.
  */
 @Composable
 private fun CommunityDecksCategoryAffordance(
     category: HomeCommunityDeckCategory,
+    format: CommunityDeckFormatFilter?,
     onClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    val label = stringResource(category.titleRes)
+    val formatLabel = format?.let { stringResource(it.displayResId) }
+        ?: stringResource(R.string.community_deck_filter_all_formats)
+    val label = stringResource(R.string.home_community_decks_selection, formatLabel, stringResource(category.titleRes))
 
     Row(
         modifier = Modifier
+            .layout { measurable, constraints ->
+                val cap = (constraints.maxWidth * HEADER_AFFORDANCE_MAX_WIDTH_FRACTION).toInt()
+                val placeable = measurable.measure(constraints.copy(maxWidth = minOf(constraints.maxWidth, cap)))
+                layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+            }
             .heightIn(min = 48.dp)
             .clip(ChipShape)
             .clickable(
@@ -3218,7 +3320,8 @@ private fun CommunityDecksCategoryAffordance(
             style = ty.labelMedium,
             color = mc.primaryAccent,
             maxLines = 1,
-            letterSpacing = 1.sp
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
         )
         Icon(
             imageVector = Icons.Default.ChevronRight,
@@ -3229,12 +3332,20 @@ private fun CommunityDecksCategoryAffordance(
     }
 }
 
-/** Category picker for the COMMUNITY_DECKS widget (TASK 5b), mirroring [SetPickerSheet]'s pattern. */
+/** Share of the header row the COMMUNITY_DECKS selector may take before it ellipsizes. */
+private const val HEADER_AFFORDANCE_MAX_WIDTH_FRACTION = 0.5f
+
+/**
+ * "Browse by" sheet for the COMMUNITY_DECKS widget: a single-select format row (picking one keeps
+ * the sheet open) above the category list (picking one closes it).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CommunityDecksCategoryPickerSheet(
     selected: HomeCommunityDeckCategory,
+    selectedFormat: CommunityDeckFormatFilter?,
     onSelect: (HomeCommunityDeckCategory) -> Unit,
+    onSelectFormat: (CommunityDeckFormatFilter?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -3248,7 +3359,7 @@ private fun CommunityDecksCategoryPickerSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = spacing.lg)
+                .verticalScroll(rememberScrollState())
                 .padding(top = spacing.xl, bottom = spacing.xl),
             verticalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
@@ -3256,92 +3367,95 @@ private fun CommunityDecksCategoryPickerSheet(
                 text = stringResourceSafe(R.string.home_community_decks_category_sheet_title),
                 style = ty.titleLarge,
                 color = mc.textPrimary,
-                modifier = Modifier.padding(bottom = spacing.xs),
+                modifier = Modifier.padding(horizontal = spacing.lg),
             )
 
-            // 2x2 Grid of category cards.
-            Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                HomeCommunityDeckCategory.entries.chunked(2).forEach { rowCategories ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(spacing.sm)
-                    ) {
-                        rowCategories.forEach { category ->
-                            CategorySelectionCard(
-                                category = category,
-                                isSelected = category == selected,
-                                onClick = { onSelect(category) },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
+            PickerSectionLabel(stringResourceSafe(R.string.home_community_decks_format_section))
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = spacing.lg),
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                item(key = COMMUNITY_DECKS_ALL_FORMATS_KEY) {
+                    FormatChip(
+                        label = stringResourceSafe(R.string.community_deck_filter_all_formats),
+                        selected = selectedFormat == null,
+                        onClick = { onSelectFormat(null) },
+                    )
+                }
+                items(CommunityDeckFormatFilter.entries, key = { it.name }) { format ->
+                    FormatChip(
+                        label = stringResource(format.displayResId),
+                        selected = format == selectedFormat,
+                        onClick = { onSelectFormat(format) },
+                    )
                 }
             }
 
-            Spacer(Modifier.height(spacing.sm))
+            PickerSectionLabel(stringResourceSafe(R.string.home_community_decks_category_section))
+            Column(
+                modifier = Modifier.padding(horizontal = spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                HomeCommunityDeckCategory.entries.forEach { category ->
+                    val isSelected = category == selected
+                    MagicSelectionItem(
+                        title = stringResource(category.titleRes),
+                        description = stringResource(category.descriptionRes),
+                        isSelected = isSelected,
+                        onClick = { onSelect(category) },
+                        icon = {
+                            Icon(
+                                imageVector = category.icon,
+                                contentDescription = null,
+                                tint = if (isSelected) mc.primaryAccent else mc.textSecondary,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        },
+                        modifier = Modifier.semantics {
+                            role = Role.RadioButton
+                            this.selected = isSelected
+                        },
+                    )
+                }
+            }
         }
     }
 }
 
-@Composable
-private fun CategorySelectionCard(
-    category: HomeCommunityDeckCategory,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
+private const val COMMUNITY_DECKS_ALL_FORMATS_KEY = "all_formats"
 
-    val icon = when (category) {
+@Composable
+private fun PickerSectionLabel(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.magicTypography.labelMedium,
+        color = MaterialTheme.magicColors.textSecondary,
+        modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg),
+    )
+}
+
+@Composable
+private fun FormatChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    MagicFilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = label,
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .semantics {
+                role = Role.RadioButton
+                this.selected = selected
+            },
+    )
+}
+
+private val HomeCommunityDeckCategory.icon: ImageVector
+    get() = when (this) {
         HomeCommunityDeckCategory.POPULAR -> Icons.Default.Whatshot
         HomeCommunityDeckCategory.RECENT -> Icons.Default.History
         HomeCommunityDeckCategory.UPDATED -> Icons.Default.Refresh
         HomeCommunityDeckCategory.PRIMERS -> Icons.AutoMirrored.Filled.MenuBook
     }
-
-    Surface(
-        color = if (isSelected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface.copy(alpha = 0.4f),
-        shape = SmallCardShape,
-        border = if (isSelected) BorderStroke(1.5.dp, mc.primaryAccent.copy(alpha = 0.5f)) else null,
-        modifier = modifier
-            .heightIn(min = 120.dp)
-            .clip(SmallCardShape)
-            .clickable(
-                onClickLabel = stringResource(category.titleRes),
-                role = Role.Button,
-                onClick = onClick
-            ),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(spacing.md),
-            verticalArrangement = Arrangement.spacedBy(spacing.xs)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (isSelected) mc.primaryAccent else mc.textSecondary,
-                modifier = Modifier.size(24.dp)
-            )
-            Text(
-                text = stringResource(category.titleRes),
-                style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = if (isSelected) mc.primaryAccent else mc.textPrimary,
-                maxLines = 1,
-            )
-            Text(
-                text = stringResource(category.descriptionRes),
-                style = ty.bodySmall,
-                color = mc.textSecondary,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  TRADES_HUB (account-gated)
@@ -3356,25 +3470,17 @@ private sealed interface TradesSlide {
 }
 
 @Composable
-private fun TradesHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> Unit) {
-    // TASK 7a: while the session is still resolving, show a spinner — never the gated placeholder.
-    if (!uiState.authResolved) {
-        WidgetShell { WidgetLoading() }
-        return
-    }
+private fun TradesHubWidget(uiState: HomeUiState, slideHeight: Dp, onAction: (HomeAction) -> Unit) {
+    // The body slot only renders this once auth has resolved, so signed out here is definitive.
     if (!uiState.isAuthenticated) {
-        AccountGatedPlaceholder(stringResourceSafe(R.string.widget_title_trades_hub)) { onAction(HomeAction.CreateAccount) }
+        AccountGatedPlaceholder(onSignIn = { onAction(HomeAction.CreateAccount) })
         return
     }
     val suggestionPreviews = uiState.tradeSuggestionPreviews
     val openForTrade = uiState.openForTradePreview
     val recentTrades = uiState.recentTrades
-    // TASK 7b: never render a section whose backing slice hasn't finished loading yet — wait for
-    // every slice once so the widget flips straight to its final content, with no partial swaps.
-    if (suggestionPreviews == null || openForTrade == null || recentTrades == null) {
-        WidgetShell { WidgetLoading() }
-        return
-    }
+    // Readiness waits for every slice, so this only guards a defensive partial state.
+    if (suggestionPreviews == null || openForTrade == null || recentTrades == null) return
     val slides = remember(uiState.tradeSummary, suggestionPreviews, openForTrade, recentTrades) {
         buildList {
             if (recentTrades.isNotEmpty()) {
@@ -3390,6 +3496,7 @@ private fun TradesHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> Unit
     WidgetShell {
         AutoSlideHub(
             slides = slides,
+            slideHeight = slideHeight,
             slideContent = { slide -> TradesSlideContent(slide, onAction) },
             showDots = false,
         )
@@ -3454,7 +3561,7 @@ private fun TradesSlideContent(
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
                     items(slide.previews, key = { "trade_sug|${it.id}" }) { preview ->
                         Column(
-                            modifier = Modifier.width(72.dp),
+                            modifier = Modifier.width(TradeSuggestionColumnWidth),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(spacing.xxs),
                         ) {
@@ -3558,14 +3665,13 @@ private fun StatKPI(
             Column {
                 Text(
                     text = value,
-                    style = ty.displayMedium.copy(fontSize = StatKpiValueSize),
+                    style = ty.displayMedium,
                     color = mc.textPrimary
                 )
                 Text(
                     text = label.uppercase(),
                     style = ty.labelSmall,
                     color = mc.textSecondary,
-                    letterSpacing = 1.sp
                 )
             }
         }
@@ -3652,10 +3758,12 @@ private fun ReducedTradeProposalRow(
 
     Surface(
         shape = SmallCardShape,
-        color = mc.surfaceVariant.copy(alpha = 0.3f),
+        color = mc.textDisabled.copy(alpha = SUBTLE_FILL_ALPHA),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .heightIn(min = 48.dp)
+            .clip(SmallCardShape)
+            .clickable(role = Role.Button, onClick = onClick)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xs),
@@ -3670,7 +3778,7 @@ private fun ReducedTradeProposalRow(
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = proposal.status.name.lowercase().replaceFirstChar { it.uppercase() },
+                    text = stringResourceSafe(proposal.status.labelRes),
                     style = ty.labelSmall,
                     color = statusTint
                 )
@@ -3691,51 +3799,18 @@ private fun ReducedTradeProposalRow(
     }
 }
 
-@Composable
-private fun FriendAvatarRow(friends: List<Friend>) {
-    val spacing = MaterialTheme.spacing
-    val mc = MaterialTheme.magicColors
-    Row(horizontalArrangement = Arrangement.spacedBy((-12).dp)) {
-        friends.take(4).forEach { friend ->
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(mc.background)
-                    .padding(1.dp)
-            ) {
-                AvatarImage(
-                    avatarUrl = friend.avatarUrl,
-                    initials = friend.nickname.take(1).uppercase(),
-                    size = 30
-                )
-            }
-        }
-        if (friends.size > 4) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(mc.background)
-                    .padding(1.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(mc.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "+${friends.size - 4}",
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.textSecondary
-                    )
-                }
-            }
-        }
+/** Display label of a trade status. */
+private val TradeStatus.labelRes: Int
+    get() = when (this) {
+        TradeStatus.DRAFT -> R.string.trades_status_draft
+        TradeStatus.PROPOSED -> R.string.trades_status_proposed
+        TradeStatus.CANCELLED -> R.string.trades_status_cancelled
+        TradeStatus.DECLINED -> R.string.trades_status_declined
+        TradeStatus.COUNTERED -> R.string.trades_status_countered
+        TradeStatus.ACCEPTED -> R.string.trades_status_accepted
+        TradeStatus.COMPLETED -> R.string.trades_status_completed
+        TradeStatus.REVOKED -> R.string.trades_status_revoked
     }
-}
 
 @Composable
 private fun PillButton(label: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -3826,7 +3901,7 @@ private const val MAX_NEWS_PREVIEW = 5
 private val QuickStartAction.navIcon: ImageVector
     get() = when (this) {
         QuickStartAction.SCAN_CARD -> Icons.Default.Camera
-        QuickStartAction.CREATE_DECK -> Icons.Default.Style
+        QuickStartAction.CREATE_DECK -> Icons.Default.AddCircle
         QuickStartAction.DRAFT_GUIDE -> Icons.Default.SportsEsports
         QuickStartAction.SEARCH_CARD -> Icons.Default.Search
         QuickStartAction.DECKS -> Icons.Default.Style
@@ -3845,7 +3920,7 @@ private val QuickStartAction.navLabel: String
     @ReadOnlyComposable
     get() = when (this) {
         QuickStartAction.SCAN_CARD -> stringResourceSafe(R.string.quick_start_scan_card)
-        QuickStartAction.CREATE_DECK -> stringResourceSafe(R.string.quick_start_my_decks)
+        QuickStartAction.CREATE_DECK -> stringResourceSafe(R.string.quick_start_new_deck)
         QuickStartAction.DRAFT_GUIDE -> stringResourceSafe(R.string.quick_start_draft_guides)
         QuickStartAction.SEARCH_CARD -> stringResourceSafe(R.string.quick_start_search_card)
         QuickStartAction.DECKS -> stringResourceSafe(R.string.quick_start_my_decks)
@@ -3861,7 +3936,7 @@ private val QuickStartAction.navLabel: String
 /** Maps a Quick Start action to its navigation intent. */
 private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
     QuickStartAction.SCAN_CARD -> HomeAction.ScanCard
-    QuickStartAction.CREATE_DECK -> HomeAction.OpenDecks
+    QuickStartAction.CREATE_DECK -> HomeAction.CreateDeck
     QuickStartAction.DRAFT_GUIDE -> HomeAction.DraftGuide
     QuickStartAction.SEARCH_CARD -> HomeAction.SearchCard
     QuickStartAction.DECKS -> HomeAction.OpenDecks
@@ -3874,49 +3949,3 @@ private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
     QuickStartAction.MULTI_ADD_CARD -> HomeAction.OpenMultiAdd
 
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Container — registers root bounds for drag hit-testing in the gallery
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/**
- * Renders a single placed widget. F-9 (Home feature overhaul Phase 3): the bounds-registry /
- * drag hit-testing API this used to expose (`onRegisterBounds` + the module-level
- * `findTargetIndex()`) was removed — the board itself is static; only the gallery sheet owns
- * add/remove/reorder, via its own local drag state (`WidgetGallerySheet.kt`).
- */
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-fun HomeWidgetContainer(
-    widget: WidgetInstance,
-    uiState: HomeUiState,
-    onAction: (HomeAction) -> Unit,
-    sharedTransitionScope: SharedTransitionScope? = null,
-    animatedVisibilityScope: AnimatedVisibilityScope? = null,
-    modifier: Modifier = Modifier,
-    // Deck Doctor Community/Archetype plan, Phase 5.
-    trending: com.mmg.manahub.core.model.TrendingSnapshot? = null,
-    // Home widget board overhaul, TASK 5b.
-    communityDecks: List<com.mmg.manahub.core.model.CommunityDeckSummary>? = null,
-    communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
-    // Daily Puzzle (ADR-006), Batch B2.
-    dailyPuzzle: DailyPuzzleWidgetState? = null,
-    // Competitive feature, Phase 5.
-    competitiveEnabled: Boolean = false,
-) {
-    Box(modifier = modifier) {
-        HomeWidgetHost(
-            widget = widget,
-            uiState = uiState,
-            onAction = onAction,
-            sharedTransitionScope = sharedTransitionScope,
-            animatedVisibilityScope = animatedVisibilityScope,
-            trending = trending,
-            communityDecks = communityDecks,
-            communityDecksCategory = communityDecksCategory,
-            dailyPuzzle = dailyPuzzle,
-            competitiveEnabled = competitiveEnabled,
-        )
-    }
-}
-

@@ -43,6 +43,50 @@ data class CollectionAddRequest(
 )
 
 /**
+ * One card line moved by a trade, applied through [UserCardRepository.applyTradeCollectionChanges].
+ *
+ * @property userCardIdRef the caller's OWN collection row the copies came from, or null when unknown
+ *   (the row is then matched by the attribute tuple). Never pass the counterparty's row id.
+ */
+data class TradeCollectionLine(
+    val scryfallId: String,
+    val isFoil: Boolean,
+    val condition: String,
+    val language: String,
+    val quantity: Int,
+    val userCardIdRef: String? = null,
+)
+
+/**
+ * Outcome of [UserCardRepository.applyTradeCollectionChanges].
+ *
+ * @property remoteOfferRemovals collection row ids whose already-synced open-for-trade offer was
+ *   deleted locally and must still be removed remotely, AFTER the local commit.
+ * @property refFallbackCount deductions whose [TradeCollectionLine.userCardIdRef] no longer matched
+ *   the traded variant and fell back to attribute matching.
+ * @property unmatchedDeductionCount deductions that matched no live collection row at all.
+ */
+data class TradeCollectionApplyResult(
+    val remoteOfferRemovals: List<String> = emptyList(),
+    val refFallbackCount: Int = 0,
+    val unmatchedDeductionCount: Int = 0,
+)
+
+/**
+ * Outcome of [UserCardRepository.decrementById].
+ *
+ * @property rowId the collection row that was decremented, or null when no live row matched.
+ * @property remainingQuantity copies left on that row (0 means it was soft-deleted); null when unknown.
+ * @property usedAttributeFallback true when the id did not identify the expected live variant and the
+ *   row was resolved by its attribute tuple instead.
+ */
+data class CollectionDecrementResult(
+    val rowId: String?,
+    val remainingQuantity: Int?,
+    val usedAttributeFallback: Boolean,
+)
+
+/**
  * Contract for all collection (user card) persistence operations.
  *
  * Sync is NOT part of this interface. The `SyncManager` owns the push/pull cycle. This repository
@@ -173,6 +217,58 @@ interface UserCardRepository {
         language: String,
         quantityToDeduct: Int,
     )
+
+    /**
+     * Removes [quantity] copies from the collection row identified by [id], soft-deleting the row
+     * only when nothing is left. Unlike [deleteCard], a partial trade never drops the whole row.
+     *
+     * When [id] is missing, deleted, owned by another user, or no longer holds the expected variant
+     * ([expectedScryfallId]/[isFoil]/[condition]/[language]), the live row with that attribute tuple
+     * is decremented instead and [CollectionDecrementResult.usedAttributeFallback] is set.
+     */
+    suspend fun decrementById(
+        id: String,
+        quantity: Int,
+        expectedScryfallId: String,
+        isFoil: Boolean,
+        condition: String,
+        language: String,
+        userId: String,
+    ): CollectionDecrementResult {
+        decrementOrRemove(userId, expectedScryfallId, isFoil, condition, language, quantity)
+        return CollectionDecrementResult(rowId = null, remainingQuantity = null, usedAttributeFallback = true)
+    }
+
+    /**
+     * Applies a trade's collection effect: every [deductions] line is removed (by its own row id
+     * when given, see [decrementById]) and every [additions] line is added via the [addOrIncrement]
+     * rules. Open-for-trade offers never exceed the copies left on their row: an offer is deleted when
+     * its row reaches zero and trimmed otherwise.
+     *
+     * [shouldApply] is evaluated first and [onApplied] last, both inside the same atomic write as the
+     * collection changes (one Room transaction on Android), so an idempotency gate and its completion
+     * marker can never disagree with the collection. No network call happens here.
+     *
+     * @return null when [shouldApply] returned false (nothing was written); throws when the write
+     *   failed, in which case nothing was written either.
+     */
+    suspend fun applyTradeCollectionChanges(
+        userId: String,
+        deductions: List<TradeCollectionLine>,
+        additions: List<TradeCollectionLine>,
+        shouldApply: suspend () -> Boolean,
+        onApplied: suspend () -> Unit,
+    ): TradeCollectionApplyResult? {
+        if (!shouldApply()) return null
+        deductions.forEach {
+            decrementOrRemove(userId, it.scryfallId, it.isFoil, it.condition, it.language, it.quantity)
+        }
+        additions.forEach {
+            addOrIncrement(it.scryfallId, it.isFoil, it.condition, it.language, isForTrade = false, userId, it.quantity)
+        }
+        onApplied()
+        return TradeCollectionApplyResult()
+    }
 
     /**
      * Card Versions & Languages, Phase 1A. Re-points the collection entry identified by [entryId]

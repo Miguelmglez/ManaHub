@@ -1,6 +1,5 @@
 package com.mmg.manahub.feature.trades.presentation
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,12 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -30,25 +27,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.AvatarImage
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicFilterChip
+import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.PullRefreshHeader
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.rememberPullRefreshState
 import com.mmg.manahub.core.ui.theme.CardShape
-import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -76,7 +72,7 @@ fun TradesHistoryScreen(
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                is TradesHistoryEvent.ShowMessage -> event.message?.let { toastState.show(it) }
+                is TradesHistoryEvent.ShowMessage -> event.message?.let { toastState.show(it, MagicToastType.ERROR) }
                 is TradesHistoryEvent.NavigateToThread ->
                     onOpenThread(event.proposalId, event.rootProposalId)
             }
@@ -144,17 +140,24 @@ private fun HistoryContent(
 
             // ── Main content ──────────────────────────────────────────────────
             when {
-                uiState.isLoading -> item(key = "loading") {
+                uiState.isLoading && uiState.proposals.isEmpty() -> item(key = "loading") {
                     Box(
                         modifier        = Modifier
                             .fillMaxWidth()
                             .height(240.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        MagicLoadingSpinner(
-                            modifier   = Modifier.size(32.dp),
-                        )
+                        MagicLoadingSpinner(size = MagicLoadingSize.Medium)
                     }
+                }
+
+                uiState.refreshFailed && uiState.proposals.isEmpty() -> item(key = "error") {
+                    InlineErrorState(
+                        message = stringResource(R.string.trades_history_load_error),
+                        retryLabel = stringResource(R.string.action_retry),
+                        onRetry = onRefresh,
+                        enabled = !uiState.isRefreshing,
+                    )
                 }
 
                 uiState.filtered.isEmpty() -> item(key = "empty") {
@@ -227,29 +230,26 @@ private fun HistoryProposalRow(
     // (trades audit §3.2, 2026-07-10) — the id is an internal identifier, not user-facing text.
     val unknownTraderLabel = stringResource(R.string.trades_history_unknown_trader)
     val otherPartyLabel = otherPartyFriend?.nickname ?: unknownTraderLabel
-    val otherPartyAvatarUrl = otherPartyFriend?.avatarUrl
-    val statusTint = proposal.status.tint(mc)
+    val otherPartyAvatarUrl = otherPartyFriend?.avatarUrl?.takeIf { it.isNotBlank() }
     val dateLabel = remember(proposal.updatedAt) { TimeAgoFormatter.format(proposal.updatedAt) }
 
     val isAwaitingTheirResponse = isProposer && proposal.status == TradeStatus.PROPOSED
     val isYourTurn = !isProposer && proposal.status == TradeStatus.PROPOSED
 
     Surface(
+        onClick  = onClick,
         shape    = CardShape,
         color    = mc.surface,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             modifier          = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OtherPartyAvatar(
-                avatarUrl  = otherPartyAvatarUrl,
-                label      = otherPartyLabel,
-                statusTint = statusTint,
-                mc         = mc,
+            AvatarImage(
+                avatarUrl = otherPartyAvatarUrl,
+                initials  = otherPartyLabel.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                size      = 40,
             )
             Spacer(Modifier.width(spacing.md))
             Column(modifier = Modifier.weight(1f)) {
@@ -269,104 +269,22 @@ private fun HistoryProposalRow(
                         Text(
                             text  = stringResource(R.string.trades_history_awaiting_response),
                             style = MaterialTheme.magicTypography.labelSmall,
-                            color = mc.textDisabled,
+                            color = mc.textSecondary,
                         )
                     }
                     isYourTurn -> {
                         Spacer(Modifier.height(spacing.xs))
-                        Surface(
-                            shape = ChipShape,
-                            color = mc.primaryAccent.copy(alpha = 0.15f),
-                        ) {
-                            Text(
-                                text     = stringResource(R.string.trades_history_your_turn),
-                                style    = MaterialTheme.magicTypography.labelSmall,
-                                color    = mc.primaryAccent,
-                                modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
-                            )
-                        }
+                        TradeAccentBadge(
+                            label  = stringResource(R.string.trades_history_your_turn),
+                            accent = mc.primaryAccent,
+                        )
                     }
                 }
             }
             Spacer(Modifier.width(spacing.sm))
-            StatusBadge(status = proposal.status)
+            TradeStatusBadge(status = proposal.status)
         }
     }
-}
-
-@Composable
-private fun OtherPartyAvatar(
-    avatarUrl:  String?,
-    label:      String,
-    statusTint: androidx.compose.ui.graphics.Color,
-    mc:         com.mmg.manahub.core.ui.theme.MagicColors,
-) {
-    val avatarModifier = Modifier
-        .size(40.dp)
-        .clip(CircleShape)
-
-    if (!avatarUrl.isNullOrBlank()) {
-        AsyncImage(
-            model              = avatarUrl,
-            contentDescription = null,
-            contentScale       = ContentScale.Crop,
-            modifier           = avatarModifier,
-        )
-    } else {
-        Surface(
-            shape    = CircleShape,
-            color    = mc.backgroundSecondary,
-            modifier = Modifier.size(40.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text  = label.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                    style = MaterialTheme.magicTypography.labelLarge,
-                    color = mc.textSecondary,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatusBadge(status: TradeStatus) {
-    val mc = MaterialTheme.magicColors
-    val spacing = MaterialTheme.spacing
-    Surface(
-        shape = ChipShape,
-        color = status.tint(mc).copy(alpha = 0.15f),
-    ) {
-        Text(
-            text     = status.label(),
-            style    = MaterialTheme.magicTypography.labelSmall,
-            color    = status.tint(mc),
-            modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xs),
-        )
-    }
-}
-
-@Composable
-private fun TradeStatus.label(): String = when (this) {
-    TradeStatus.COMPLETED -> stringResource(R.string.trade_status_completed)
-    TradeStatus.CANCELLED -> stringResource(R.string.trade_status_cancelled)
-    TradeStatus.DECLINED  -> stringResource(R.string.trade_status_declined)
-    TradeStatus.COUNTERED -> stringResource(R.string.trade_status_countered)
-    TradeStatus.ACCEPTED  -> stringResource(R.string.trade_status_accepted)
-    TradeStatus.PROPOSED  -> stringResource(R.string.trade_status_proposed)
-    TradeStatus.REVOKED   -> stringResource(R.string.trade_status_revoked)
-    TradeStatus.DRAFT     -> stringResource(R.string.trade_status_draft)
-}
-
-@Composable
-private fun TradeStatus.tint(mc: com.mmg.manahub.core.ui.theme.MagicColors) = when (this) {
-    TradeStatus.COMPLETED -> mc.lifePositive
-    TradeStatus.ACCEPTED  -> mc.primaryAccent
-    TradeStatus.CANCELLED,
-    TradeStatus.REVOKED   -> mc.lifeNegative
-    TradeStatus.DECLINED  -> mc.goldMtg
-    TradeStatus.COUNTERED -> mc.secondaryAccent
-    else                  -> mc.textSecondary
 }
 
 /**
@@ -380,7 +298,10 @@ private fun EmptyHistory(
     isLoggedIn: Boolean,
     onLoginClick: () -> Unit,
 ) {
-    val spacing = MaterialTheme.spacing
+    // EmptyState already pads itself on every side; this only pushes it below the filter row.
+    val modifier = Modifier
+        .fillMaxWidth()
+        .padding(top = MaterialTheme.spacing.xxl)
     if (!isLoggedIn) {
         EmptyState(
             icon        = Icons.Default.SwapHoriz,
@@ -388,35 +309,14 @@ private fun EmptyHistory(
             subtitle    = stringResource(R.string.trades_login_required_subtitle),
             actionLabel = stringResource(R.string.trades_login_required_action),
             onAction    = onLoginClick,
-            modifier    = Modifier
-                .fillMaxWidth()
-                .padding(top = spacing.xxl * 2, start = spacing.xxl, end = spacing.xxl),
+            modifier    = modifier,
         )
     } else {
-        Box(
-            modifier         = Modifier
-                .fillMaxWidth()
-                .padding(top = spacing.xxl * 2, start = spacing.xxl, end = spacing.xxl),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(spacing.sm),
-            ) {
-                Text(
-                    text      = stringResource(R.string.trades_history_empty),
-                    style     = MaterialTheme.magicTypography.bodyMedium,
-                    color     = MaterialTheme.magicColors.textSecondary,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(spacing.xs))
-                Text(
-                    text      = stringResource(R.string.trades_history_empty_hint),
-                    style     = MaterialTheme.magicTypography.labelSmall,
-                    color     = MaterialTheme.magicColors.textDisabled,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
+        EmptyState(
+            icon     = Icons.Default.SwapHoriz,
+            title    = stringResource(R.string.trades_history_empty),
+            subtitle = stringResource(R.string.trades_history_empty_hint),
+            modifier = modifier,
+        )
     }
 }

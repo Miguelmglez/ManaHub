@@ -232,3 +232,34 @@ val MTG_TIPS_CATALOG: List<RuleTip> = buildList {
 
 /** Total tip count — used by [RulesTipWidget]'s daily-selection modulus. */
 val MTG_TIPS_COUNT: Int get() = MTG_TIPS_CATALOG.size
+
+/**
+ * Fixed seed for the Rules Tip catalog's daily-order shuffle (Home feature overhaul Phase 2.4).
+ * A constant seed keeps the permutation stable across restarts and identical for every user.
+ */
+private const val RULES_TIP_SHUFFLE_SEED = 20260713L
+
+private const val DAY_MS = 86_400_000L
+
+/**
+ * The catalog in its fixed daily order: the catalog is grouped by category, so a seeded shuffle
+ * avoids long same-category streaks. Indices used by the Home Rules Tip widget point into this list.
+ */
+val RULES_TIPS_DAILY_ORDER: List<RuleTip> by lazy {
+    MTG_TIPS_CATALOG.shuffled(kotlin.random.Random(RULES_TIP_SHUFFLE_SEED))
+}
+
+/** Today's tip index into [RULES_TIPS_DAILY_ORDER] (UTC epoch day modulo the catalog size). */
+fun dailyRulesTipIndex(nowEpochMs: Long): Int =
+    Math.floorMod(nowEpochMs / DAY_MS, RULES_TIPS_DAILY_ORDER.size.toLong()).toInt()
+
+/**
+ * A random index into [RULES_TIPS_DAILY_ORDER] that differs from [current] (when more than one tip
+ * exists), for the widget's "roll another tip" action.
+ */
+fun rollRulesTipIndex(current: Int, random: kotlin.random.Random = kotlin.random.Random): Int {
+    val size = RULES_TIPS_DAILY_ORDER.size
+    if (size <= 1) return 0
+    val candidate = random.nextInt(size - 1)
+    return if (candidate >= current) candidate + 1 else candidate
+}
