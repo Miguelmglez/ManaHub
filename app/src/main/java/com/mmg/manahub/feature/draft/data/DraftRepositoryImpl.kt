@@ -1,8 +1,8 @@
 package com.mmg.manahub.feature.draft.data
-// COMMENTS_REVIEWED: 2026-09-22
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
@@ -14,6 +14,7 @@ import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import com.mmg.manahub.feature.draft.data.DraftRepositoryImpl.Companion.VALID_SET_CODE
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
+import com.mmg.manahub.core.data.local.entity.DraftSetEntity
 import com.mmg.manahub.core.data.remote.CloudflareContentClient
 import com.mmg.manahub.feature.draft.data.remote.toDomain
 import com.mmg.manahub.feature.draft.data.remote.toEntity
@@ -28,6 +29,8 @@ import com.mmg.manahub.core.model.SetTierList
 import com.mmg.manahub.core.model.TierCard
 import com.mmg.manahub.core.model.TierGroup
 import com.mmg.manahub.core.domain.repository.DraftRepository
+import com.mmg.manahub.core.util.recordSafeNonFatal
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -36,7 +39,6 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
-// Guide/tier-list JSON is file-cached per set and refreshed only when the sets-index content version changes (no TTL)
 class DraftRepositoryImpl(
     private val context: Context,
     private val scryfallApi: ScryfallClient,
@@ -46,10 +48,12 @@ class DraftRepositoryImpl(
     private val gson: Gson,
     private val draftPrefs: SharedPreferences,
     private val ioDispatcher: CoroutineDispatcher,
+    private val nowMillis: () -> Long = System::currentTimeMillis,
 ) : DraftRepository {
 
     companion object {
-        private const val CACHE_DURATION_MS = 24 * 60 * 60 * 1000L
+        private const val MANIFEST_CACHE_DURATION_MS = 5 * 60 * 1000L
+        private const val FAILURE_COOLDOWN_MS = 5 * 60 * 1000L
         private const val PREF_GUIDE_VERSION = "pref_draft_%s_guide_version"
         private const val PREF_TIER_VERSION = "pref_draft_%s_tier_version"
 
@@ -58,6 +62,12 @@ class DraftRepositoryImpl(
 
     private val guideMutexes = ConcurrentHashMap<String, Mutex>()
     private val tierMutexes = ConcurrentHashMap<String, Mutex>()
+    private val manifestMutex = Mutex()
+    @Volatile
+    private var manifestRefreshGeneration = 0L
+    private var lastManifestRefreshFailure: Exception? = null
+    private var lastManifestRefreshFailureAt: Long? = null
+    private val artifactRefreshFailures = ConcurrentHashMap<ArtifactFailureKey, TimedFailure>()
 
     private fun guideMutex(code: String) = guideMutexes.computeIfAbsent(code) { Mutex() }
     private fun tierMutex(code: String) = tierMutexes.computeIfAbsent(code) { Mutex() }
@@ -67,73 +77,74 @@ class DraftRepositoryImpl(
     private val parsedTierLists = ConcurrentHashMap<String, VersionedModel<SetTierList>>()
 
     private data class VersionedModel<T>(val version: String?, val model: T)
+    private data class TimedFailure(val error: Exception, val failedAt: Long)
+    private data class ArtifactFailureKey(
+        val setCode: String,
+        val artifactType: ArtifactType,
+        val remoteVersion: String,
+    )
+
+    private enum class ArtifactType(val telemetryValue: String) {
+        GUIDE("guide"),
+        TIER_LIST("tier_list"),
+    }
+
+    private sealed interface RemoteVersionLookup {
+        data class Present(val version: String) : RemoteVersionLookup
+        data object MissingSet : RemoteVersionLookup
+        data class Failure(val error: Exception) : RemoteVersionLookup
+    }
 
     override suspend fun getDraftableSets(forceRefresh: Boolean): DataResult<List<DraftSet>> {
         return withContext(ioDispatcher) {
+            val refreshFailure = ensureManifestFresh(forceRefresh)
             try {
-                val cachedTime = draftSetDao.getLastCachedTime()
-                val isCacheFresh = cachedTime != null &&
-                    (System.currentTimeMillis() - cachedTime) < CACHE_DURATION_MS
-
-                if (!forceRefresh && isCacheFresh) {
-                    val cached = draftSetDao.getAllSetsSnapshot()
-                    if (cached.isNotEmpty()) {
-                        return@withContext DataResult.Success(cached.map { it.toDomain() })
-                    }
-                }
-
-                val response = cloudflareClient.getSetsIndex()
-                val entities = response.sets.map { it.toEntity() }
-                draftSetDao.replaceAll(entities)
-
-                DataResult.Success(entities.map { it.toDomain() })
-            } catch (e: Exception) {
                 val cached = draftSetDao.getAllSetsSnapshot()
                 if (cached.isNotEmpty()) {
-                    DataResult.Success(cached.map { it.toDomain() }, isStale = true)
+                    DataResult.Success(
+                        data = cached.map { it.toDomain() },
+                        isStale = refreshFailure != null,
+                    )
                 } else {
-                    DataResult.Error(e.message ?: "Failed to load sets")
+                    DataResult.Error(refreshFailure?.message ?: "No draft sets are available")
                 }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                DataResult.Error(e.message ?: "Failed to load sets")
             }
         }
     }
 
     override suspend fun getSetGuide(setCode: String): DataResult<SetDraftGuide> {
         return withContext(ioDispatcher) {
+            val safeCode = sanitizeSetCode(setCode)
             try {
-                val safeCode = sanitizeSetCode(setCode)
+                val manifestFailure = ensureManifestFresh(forceRefresh = false)
                 guideMutex(safeCode).withLock {
                     val localFile = guideFile(safeCode)
-                    val storedVersion = draftPrefs.getString(PREF_GUIDE_VERSION.format(safeCode), null)
-                    val remoteVersion = getRemoteGuideVersion(safeCode)
-
-                    val needsRefresh = !localFile.exists() ||
-                        (remoteVersion != null && remoteVersion != storedVersion)
-
-                    if (needsRefresh) {
-                        parsedGuides.remove(safeCode)
-                        val jsonString = cloudflareClient.getSetGuide(safeCode)
-                        saveJsonToFile(jsonString, localFile)
-                        if (remoteVersion != null) {
-                            draftPrefs.edit()
-                                .putString(PREF_GUIDE_VERSION.format(safeCode), remoteVersion)
-                                .apply()
-                        }
-                    }
-
-                    if (!localFile.exists()) {
-                        DataResult.Error("Guide not available for $safeCode")
-                    } else {
-                        val currentVersion = if (needsRefresh) remoteVersion ?: storedVersion else storedVersion
-                        val cached = parsedGuides[safeCode]?.takeIf { it.version == currentVersion }
-                        val model = cached?.model ?: parseGuide(
-                            safeCode,
-                            gson.fromJson(localFile.readText(), JsonObject::class.java),
-                        ).also { parsedGuides[safeCode] = VersionedModel(currentVersion, it) }
-                        DataResult.Success(model)
-                    }
+                    val remoteVersion = manifestFailure?.let(RemoteVersionLookup::Failure)
+                        ?: getRemoteVersion(safeCode) { it.guideVersion }
+                    loadVersionedArtifact(
+                        safeCode = safeCode,
+                        artifactType = ArtifactType.GUIDE,
+                        localFile = localFile,
+                        preferenceKey = PREF_GUIDE_VERSION.format(safeCode),
+                        remoteVersionLookup = remoteVersion,
+                        parsedModels = parsedGuides,
+                        unavailableMessage = "Guide not available for $safeCode",
+                        fetch = { version -> cloudflareClient.getSetGuide(safeCode, version) },
+                        parse = { json -> parseAndValidateGuide(safeCode, json) },
+                    )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                reportArtifactFailure(
+                    safeCode = safeCode,
+                    artifactType = ArtifactType.GUIDE,
+                    error = e,
+                    staleFallback = false,
+                    tag = "draft_artifact_local_cache_failed",
+                )
                 DataResult.Error(e.message ?: "Failed to load guide for $setCode")
             }
         }
@@ -141,40 +152,34 @@ class DraftRepositoryImpl(
 
     override suspend fun getSetTierList(setCode: String): DataResult<SetTierList> {
         return withContext(ioDispatcher) {
+            val safeCode = sanitizeSetCode(setCode)
             try {
-                val safeCode = sanitizeSetCode(setCode)
+                val manifestFailure = ensureManifestFresh(forceRefresh = false)
                 tierMutex(safeCode).withLock {
                     val localFile = tierListFile(safeCode)
-                    val storedVersion = draftPrefs.getString(PREF_TIER_VERSION.format(safeCode), null)
-                    val remoteVersion = getRemoteTierVersion(safeCode)
-
-                    val needsRefresh = !localFile.exists() ||
-                        (remoteVersion != null && remoteVersion != storedVersion)
-
-                    if (needsRefresh) {
-                        parsedTierLists.remove(safeCode)
-                        val jsonString = cloudflareClient.getSetTierList(safeCode)
-                        saveJsonToFile(jsonString, localFile)
-                        if (remoteVersion != null) {
-                            draftPrefs.edit()
-                                .putString(PREF_TIER_VERSION.format(safeCode), remoteVersion)
-                                .apply()
-                        }
-                    }
-
-                    if (!localFile.exists()) {
-                        DataResult.Error("Tier list not available for $safeCode")
-                    } else {
-                        val currentVersion = if (needsRefresh) remoteVersion ?: storedVersion else storedVersion
-                        val cached = parsedTierLists[safeCode]?.takeIf { it.version == currentVersion }
-                        val model = cached?.model ?: parseTierList(
-                            safeCode,
-                            gson.fromJson(localFile.readText(), JsonObject::class.java),
-                        ).also { parsedTierLists[safeCode] = VersionedModel(currentVersion, it) }
-                        DataResult.Success(model)
-                    }
+                    val remoteVersion = manifestFailure?.let(RemoteVersionLookup::Failure)
+                        ?: getRemoteVersion(safeCode) { it.tierListVersion }
+                    loadVersionedArtifact(
+                        safeCode = safeCode,
+                        artifactType = ArtifactType.TIER_LIST,
+                        localFile = localFile,
+                        preferenceKey = PREF_TIER_VERSION.format(safeCode),
+                        remoteVersionLookup = remoteVersion,
+                        parsedModels = parsedTierLists,
+                        unavailableMessage = "Tier list not available for $safeCode",
+                        fetch = { version -> cloudflareClient.getSetTierList(safeCode, version) },
+                        parse = { json -> parseAndValidateTierList(safeCode, json) },
+                    )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                reportArtifactFailure(
+                    safeCode = safeCode,
+                    artifactType = ArtifactType.TIER_LIST,
+                    error = e,
+                    staleFallback = false,
+                    tag = "draft_artifact_local_cache_failed",
+                )
                 DataResult.Error(e.message ?: "Failed to load tier list for $setCode")
             }
         }
@@ -302,25 +307,478 @@ class DraftRepositoryImpl(
     private fun tierListFile(setCode: String): File =
         File(draftDir(setCode), "tier-list.json")
 
-    // Write-then-rename so a process kill mid-write never leaves truncated JSON behind
-    private fun saveJsonToFile(jsonString: String, file: File) {
-        val tmp = File(file.parent, "${file.name}.tmp")
-        try {
-            tmp.writeText(jsonString)
-            if (!tmp.renameTo(file)) {
-                file.writeText(tmp.readText())
+    private suspend fun ensureManifestFresh(forceRefresh: Boolean): Exception? {
+        val observedRefreshGeneration = manifestRefreshGeneration
+        val observedCachedTime = try {
+            draftSetDao.getLastCachedTime()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return manifestMutex.withLock {
+                if (manifestRefreshGeneration != observedRefreshGeneration) {
+                    return@withLock lastManifestRefreshFailure
+                }
+                if (!forceRefresh && isManifestFailureCoolingDown()) {
+                    return@withLock lastManifestRefreshFailure
+                }
+                registerManifestFailure(e, forceRefresh, staleFallback = false)
             }
+        }
+        if (!forceRefresh && isManifestFresh(observedCachedTime)) return null
+        if (!forceRefresh && isManifestFailureCoolingDown()) return lastManifestRefreshFailure
+
+        return manifestMutex.withLock {
+            if (manifestRefreshGeneration != observedRefreshGeneration) {
+                return@withLock lastManifestRefreshFailure
+            }
+            if (!forceRefresh && isManifestFailureCoolingDown()) {
+                return@withLock lastManifestRefreshFailure
+            }
+            val currentCachedTime = try {
+                draftSetDao.getLastCachedTime()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return@withLock registerManifestFailure(
+                    error = e,
+                    forceRefresh = forceRefresh,
+                    staleFallback = observedCachedTime != null,
+                )
+            }
+            val anotherCallerRefreshed = currentCachedTime != observedCachedTime &&
+                isManifestFresh(currentCachedTime)
+            if ((!forceRefresh && isManifestFresh(currentCachedTime)) || anotherCallerRefreshed) {
+                return@withLock null
+            }
+
+            val refreshFailure = try {
+                val response = cloudflareClient.getSetsIndex()
+                require(response.indexVersion.isNotBlank()) { "Draft sets manifest has no version" }
+                require(response.sets.isNotEmpty()) { "Draft sets manifest is empty" }
+                require(response.sets.map { it.code }.distinct().size == response.sets.size) {
+                    "Draft sets manifest contains duplicate set codes"
+                }
+                val cachedAt = nowMillis()
+                val entities = response.sets.map { entry ->
+                    require(VALID_SET_CODE.matches(entry.code)) {
+                        "Draft sets manifest contains an invalid set code"
+                    }
+                    require(entry.contentVersions.guide.isNotBlank()) {
+                        "Draft sets manifest contains a blank guide version"
+                    }
+                    require(entry.contentVersions.tierList.isNotBlank()) {
+                        "Draft sets manifest contains a blank tier-list version"
+                    }
+                    entry.toEntity().copy(cachedAt = cachedAt)
+                }
+                draftSetDao.replaceAll(entities)
+                null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                e
+            }
+            if (refreshFailure == null) {
+                lastManifestRefreshFailure = null
+                lastManifestRefreshFailureAt = null
+                manifestRefreshGeneration++
+                null
+            } else {
+                registerManifestFailure(
+                    error = refreshFailure,
+                    forceRefresh = forceRefresh,
+                    staleFallback = currentCachedTime != null,
+                )
+            }
+        }
+    }
+
+    private fun registerManifestFailure(
+        error: Exception,
+        forceRefresh: Boolean,
+        staleFallback: Boolean,
+    ): Exception {
+        lastManifestRefreshFailure = error
+        lastManifestRefreshFailureAt = nowMillis()
+        manifestRefreshGeneration++
+        reportManifestFailure(error, forceRefresh, staleFallback)
+        return error
+    }
+
+    private fun isManifestFailureCoolingDown(): Boolean {
+        val failedAt = lastManifestRefreshFailureAt ?: return false
+        val age = nowMillis() - failedAt
+        return lastManifestRefreshFailure != null && age in 0 until FAILURE_COOLDOWN_MS
+    }
+
+    private fun isManifestFresh(cachedAt: Long?): Boolean {
+        if (cachedAt == null) return false
+        val age = nowMillis() - cachedAt
+        return age in 0 until MANIFEST_CACHE_DURATION_MS
+    }
+
+    private suspend fun <T> loadVersionedArtifact(
+        safeCode: String,
+        artifactType: ArtifactType,
+        localFile: File,
+        preferenceKey: String,
+        remoteVersionLookup: RemoteVersionLookup,
+        parsedModels: ConcurrentHashMap<String, VersionedModel<T>>,
+        unavailableMessage: String,
+        fetch: suspend (String) -> String,
+        parse: (String) -> T,
+    ): DataResult<T> {
+        val storedVersion = draftPrefs.getString(preferenceKey, null)
+        val existingModel = parsedModels[safeCode]?.model ?: loadLocalArtifact(
+            safeCode = safeCode,
+            artifactType = artifactType,
+            localFile = localFile,
+            parse = parse,
+        )?.also { parsedModels[safeCode] = VersionedModel(storedVersion, it) }
+
+        val remoteVersion = when (remoteVersionLookup) {
+            RemoteVersionLookup.MissingSet -> {
+                clearArtifactCache(
+                    safeCode = safeCode,
+                    artifactType = artifactType,
+                    localFile = localFile,
+                    preferenceKey = preferenceKey,
+                    parsedModels = parsedModels,
+                )
+                return DataResult.Error(unavailableMessage)
+            }
+            is RemoteVersionLookup.Failure -> {
+                return existingModel?.let { DataResult.Success(it, isStale = true) }
+                    ?: DataResult.Error(remoteVersionLookup.error.message ?: unavailableMessage)
+            }
+            is RemoteVersionLookup.Present -> remoteVersionLookup.version
+        }
+
+        clearArtifactFailuresForOtherVersions(safeCode, artifactType, remoteVersion)
+        val needsRefresh = existingModel == null || !localFile.exists() ||
+            remoteVersion != storedVersion
+        if (!needsRefresh) return DataResult.Success(existingModel)
+
+        val failureKey = ArtifactFailureKey(safeCode, artifactType, remoteVersion)
+        if (existingModel != null && isArtifactFailureCoolingDown(failureKey)) {
+            return DataResult.Success(existingModel, isStale = true)
+        }
+
+        return try {
+            val downloadedJson = fetch(remoteVersion)
+            val downloadedModel = parse(downloadedJson)
+            replaceJsonFile(downloadedJson, localFile)
+            draftPrefs.edit().putString(preferenceKey, remoteVersion).apply()
+            parsedModels[safeCode] = VersionedModel(remoteVersion, downloadedModel)
+            artifactRefreshFailures.remove(failureKey)
+            reportArtifactReplacement(safeCode, artifactType)
+            DataResult.Success(downloadedModel)
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            artifactRefreshFailures[failureKey] = TimedFailure(e, nowMillis())
+            reportArtifactFailure(
+                safeCode = safeCode,
+                artifactType = artifactType,
+                error = e,
+                staleFallback = existingModel != null,
+                tag = "draft_artifact_refresh_failed",
+            )
+            existingModel?.let { DataResult.Success(it, isStale = true) }
+                ?: DataResult.Error(e.message ?: unavailableMessage)
+        }
+    }
+
+    private fun <T> loadLocalArtifact(
+        safeCode: String,
+        artifactType: ArtifactType,
+        localFile: File,
+        parse: (String) -> T,
+    ): T? {
+        val temporaryFile = File(localFile.parent, "${localFile.name}.tmp")
+        val backupFile = File(localFile.parent, "${localFile.name}.bak")
+        var mainFailure: Exception? = null
+
+        if (localFile.exists()) {
+            try {
+                val model = parse(localFile.readText())
+                cleanupRecoveryFiles(safeCode, artifactType, temporaryFile, backupFile)
+                return model
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                mainFailure = e
+            }
+        }
+
+        if (backupFile.exists() && backupFile.isFile) {
+            try {
+                val model = parse(backupFile.readText())
+                mainFailure?.let {
+                    reportArtifactFailure(
+                        safeCode,
+                        artifactType,
+                        it,
+                        staleFallback = true,
+                        tag = "draft_artifact_local_cache_failed",
+                    )
+                }
+                restoreBackup(
+                    safeCode = safeCode,
+                    artifactType = artifactType,
+                    localFile = localFile,
+                    temporaryFile = temporaryFile,
+                    backupFile = backupFile,
+                    parse = parse,
+                )
+                return model
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val failure = mainFailure ?: e
+                reportArtifactFailure(
+                    safeCode,
+                    artifactType,
+                    failure,
+                    staleFallback = false,
+                    tag = "draft_artifact_local_cache_failed",
+                )
+                return null
+            }
+        }
+
+        mainFailure?.let {
+            reportArtifactFailure(
+                safeCode,
+                artifactType,
+                it,
+                staleFallback = false,
+                tag = "draft_artifact_local_cache_failed",
+            )
+        }
+        return null
+    }
+
+    private fun <T> restoreBackup(
+        safeCode: String,
+        artifactType: ArtifactType,
+        localFile: File,
+        temporaryFile: File,
+        backupFile: File,
+        parse: (String) -> T,
+    ) {
+        try {
+            if (temporaryFile.exists() && !temporaryFile.delete()) {
+                throw IOException("Failed to clear temporary draft cache file")
+            }
+            backupFile.copyTo(localFile, overwrite = true)
+            parse(localFile.readText())
+            if (!backupFile.delete()) throw IOException("Failed to clear restored draft cache backup")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            reportArtifactFailure(
+                safeCode,
+                artifactType,
+                e,
+                staleFallback = true,
+                tag = "draft_artifact_local_cache_failed",
+            )
+        }
+    }
+
+    private fun cleanupRecoveryFiles(
+        safeCode: String,
+        artifactType: ArtifactType,
+        temporaryFile: File,
+        backupFile: File,
+    ) {
+        try {
+            listOf(temporaryFile, backupFile).forEach { recoveryFile ->
+                if (recoveryFile.exists() && !recoveryFile.delete()) {
+                    throw IOException("Failed to clear stale draft cache recovery file")
+                }
+            }
+        } catch (e: Exception) {
+            reportArtifactFailure(
+                safeCode,
+                artifactType,
+                e,
+                staleFallback = true,
+                tag = "draft_artifact_local_cache_failed",
+            )
+        }
+    }
+
+    private fun <T> clearArtifactCache(
+        safeCode: String,
+        artifactType: ArtifactType,
+        localFile: File,
+        preferenceKey: String,
+        parsedModels: ConcurrentHashMap<String, VersionedModel<T>>,
+    ) {
+        parsedModels.remove(safeCode)
+        artifactRefreshFailures.keys.removeAll { it.setCode == safeCode && it.artifactType == artifactType }
+        try {
+            val files = listOf(
+                localFile,
+                File(localFile.parent, "${localFile.name}.tmp"),
+                File(localFile.parent, "${localFile.name}.bak"),
+            )
+            files.forEach { file ->
+                if (file.exists() && !file.delete()) throw IOException("Failed to clear unpublished draft content")
+            }
+            draftPrefs.edit().remove(preferenceKey).apply()
+        } catch (e: Exception) {
+            reportArtifactFailure(
+                safeCode,
+                artifactType,
+                e,
+                staleFallback = false,
+                tag = "draft_artifact_local_cache_failed",
+            )
+        }
+    }
+
+    private fun isArtifactFailureCoolingDown(key: ArtifactFailureKey): Boolean {
+        val failure = artifactRefreshFailures[key] ?: return false
+        val age = nowMillis() - failure.failedAt
+        if (age in 0 until FAILURE_COOLDOWN_MS) return true
+        artifactRefreshFailures.remove(key, failure)
+        return false
+    }
+
+    private fun clearArtifactFailuresForOtherVersions(
+        safeCode: String,
+        artifactType: ArtifactType,
+        remoteVersion: String,
+    ) {
+        artifactRefreshFailures.keys.removeAll {
+            it.setCode == safeCode && it.artifactType == artifactType && it.remoteVersion != remoteVersion
+        }
+    }
+
+    private fun replaceJsonFile(jsonString: String, file: File) {
+        val tmp = File(file.parent, "${file.name}.tmp")
+        val backup = File(file.parent, "${file.name}.bak")
+        try {
+            if (tmp.exists() && !tmp.delete()) {
+                throw IOException("Failed to clear temporary draft cache file")
+            }
+            tmp.writeText(jsonString)
+            if (!file.exists()) {
+                if (!tmp.renameTo(file)) throw IOException("Failed to install draft cache file")
+                return
+            }
+
+            if (backup.exists() && !backup.delete()) {
+                throw IOException("Failed to clear draft cache backup")
+            }
+            if (!file.renameTo(backup)) throw IOException("Failed to back up draft cache file")
+
+            try {
+                if (!tmp.renameTo(file)) throw IOException("Failed to install draft cache file")
+            } catch (replacementFailure: Exception) {
+                try {
+                    if (file.exists() && !file.delete()) {
+                        throw IOException("Failed to remove incomplete draft cache file")
+                    }
+                    if (!backup.renameTo(file)) {
+                        backup.copyTo(file, overwrite = true)
+                    }
+                    if (backup.exists()) backup.delete()
+                } catch (restoreFailure: Exception) {
+                    replacementFailure.addSuppressed(restoreFailure)
+                }
+                throw replacementFailure
+            }
+            if (backup.exists()) backup.delete()
         } finally {
             if (tmp.exists()) tmp.delete()
         }
     }
 
-    // Versions come from the Room-cached sets index, avoiding a network round-trip per open
-    private suspend fun getRemoteGuideVersion(safeCode: String): String? =
-        draftSetDao.getSetByCode(safeCode)?.guideVersion
+    private suspend fun getRemoteVersion(
+        safeCode: String,
+        selectVersion: (DraftSetEntity) -> String,
+    ): RemoteVersionLookup = try {
+        val set = draftSetDao.getSetByCode(safeCode) ?: return RemoteVersionLookup.MissingSet
+        val version = selectVersion(set)
+        if (version.isBlank()) {
+            RemoteVersionLookup.Failure(IOException("Draft artifact version is blank"))
+        } else {
+            RemoteVersionLookup.Present(version)
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        RemoteVersionLookup.Failure(e)
+    }
 
-    private suspend fun getRemoteTierVersion(safeCode: String): String? =
-        draftSetDao.getSetByCode(safeCode)?.tierListVersion
+    private fun reportManifestFailure(
+        error: Exception,
+        forceRefresh: Boolean,
+        staleFallback: Boolean,
+    ) {
+        if (error is CancellationException) return
+        runCatching {
+            FirebaseCrashlytics.getInstance().apply {
+                setCustomKey("draft_manifest_force_refresh", forceRefresh)
+                setCustomKey("draft_manifest_stale_fallback", staleFallback)
+                log("draft_manifest_refresh_failed")
+            }
+            recordSafeNonFatal("draft_manifest_refresh_failed", error)
+        }
+    }
+
+    private fun reportArtifactFailure(
+        safeCode: String,
+        artifactType: ArtifactType,
+        error: Exception,
+        staleFallback: Boolean,
+        tag: String,
+    ) {
+        if (error is CancellationException) return
+        runCatching {
+            FirebaseCrashlytics.getInstance().apply {
+                setCustomKey("draft_artifact_set_code", safeCode)
+                setCustomKey("draft_artifact_type", artifactType.telemetryValue)
+                setCustomKey("draft_artifact_stale_fallback", staleFallback)
+                log(tag)
+            }
+            recordSafeNonFatal(tag, error)
+        }
+    }
+
+    private fun reportArtifactReplacement(
+        safeCode: String,
+        artifactType: ArtifactType,
+    ) {
+        runCatching {
+            FirebaseCrashlytics.getInstance().apply {
+                setCustomKey("draft_artifact_set_code", safeCode)
+                setCustomKey("draft_artifact_type", artifactType.telemetryValue)
+                log("draft_artifact_cache_replaced")
+            }
+        }
+    }
+
+    private fun parseAndValidateGuide(setCode: String, jsonString: String): SetDraftGuide {
+        val json = gson.fromJson(jsonString, JsonObject::class.java)
+            ?: throw IOException("Guide JSON is empty")
+        val guide = parseGuide(setCode, json)
+        require(guide.setName.isNotBlank()) { "Guide JSON has no set name" }
+        require(json.get("set_overview")?.isJsonObject == true) { "Guide JSON has no set overview" }
+        return guide
+    }
+
+    private fun parseAndValidateTierList(setCode: String, jsonString: String): SetTierList {
+        val json = gson.fromJson(jsonString, JsonObject::class.java)
+            ?: throw IOException("Tier-list JSON is empty")
+        val tierList = parseTierList(setCode, json)
+        require(tierList.setName.isNotBlank()) { "Tier-list JSON has no set name" }
+        require(json.get("categories")?.isJsonArray == true) { "Tier-list JSON has no categories" }
+        return tierList
+    }
 
     private fun parseGuide(setCode: String, json: JsonObject): SetDraftGuide {
         val metadata = json.getAsJsonObject("metadata")
@@ -355,6 +813,14 @@ class DraftRepositoryImpl(
                 colorLabel to cards
             } ?: emptyMap()
 
+        val keyUncommonsByColor = json.getAsJsonObject("key_uncommons_by_color")
+            ?.entrySet()
+            ?.associate { (colorLabel, cardsElement) ->
+                val cards = cardsElement.takeIf { it.isJsonArray }?.asJsonArray
+                    ?.map { parseArchetypeKeyCard(it.asJsonObject) } ?: emptyList()
+                colorLabel to cards
+            } ?: emptyMap()
+
         return SetDraftGuide(
             setCode = setCode.uppercase(),
             setName = setName,
@@ -367,6 +833,7 @@ class DraftRepositoryImpl(
             archetypes = archetypes,
             keyCommonsByColor = keyCommonsByColor,
             formatSpeed = formatSpeed,
+            keyUncommonsByColor = keyUncommonsByColor,
         )
     }
 

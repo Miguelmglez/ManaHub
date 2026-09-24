@@ -22,4 +22,5 @@ data class DraftSet(
     val tierListVersion: String,
     /** Non-null when the Worker has a booster.json for this set; null = not simulable. */
     val boosterVersion: String? = null,
+    val setImageUrl: String? = null,
 )

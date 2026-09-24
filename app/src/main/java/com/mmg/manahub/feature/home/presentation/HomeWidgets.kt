@@ -2758,8 +2758,8 @@ private fun SeeAllTile(
     val spacing = MaterialTheme.spacing
     Column(
         modifier = modifier
-            .width(96.dp)
-            .heightIn(min = 100.dp)
+            .width(100.dp)
+            .height(110.dp)
             .clip(SmallCardShape)
             .background(
                 brush = Brush.radialGradient(
@@ -2824,12 +2824,16 @@ private fun LatestSetsWidget(sets: List<DraftSet>, onAction: (HomeAction) -> Uni
             items(sets, key = { it.id }) { set ->
                 DraftSetCard(
                     set = set,
+                    isCompact = true,
                     onClick = { onAction(HomeAction.OpenDraftSetDetail(set)) },
-                    modifier = Modifier.width(180.dp),
+                    modifier = Modifier.width(160.dp).height(110.dp),
                 )
             }
             item(key = "see_more") {
-                SeeAllTile(onClick = { onAction(HomeAction.OpenDraftGuide) })
+                SeeAllTile(
+                    onClick = { onAction(HomeAction.OpenDraftGuide) },
+                    modifier = Modifier.width(100.dp).height(110.dp),
+                )
             }
         }
     }

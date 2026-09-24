@@ -1,11 +1,12 @@
 {
-  "index_version": "13",
-  "last_updated": "2026-09-23",
+  "index_version": "17",
+  "last_updated": "2026-09-24",
   "sets": [
     {
       "code": "hob",
       "name": "The Hobbit",
       "released_at": "2026-08-14",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/1/5/15ae4d50-be2f-412c-bb6b-b0a06b60474a.jpg?1783902783",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/hob.svg?1789358400",
       "content_versions": {
         "guide": "2026-09-17",
@@ -18,6 +19,7 @@
       "code": "msh",
       "name": "Marvel Super Heroes",
       "released_at": "2026-06-26",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/c/d/cddd314c-c271-475a-b076-01a8599c8015.jpg?1783902923",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/msh.svg?1789358400",
       "content_versions": {
         "guide": "2026-09-17",
@@ -29,6 +31,7 @@
     {
       "code": "sos",
       "name": "Secrets of Strixhaven",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/7/5/75961d36-acf6-425f-9698-0bf52af74f31.jpg?1783903694",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/sos.svg?1778472000",
       "released_at": "2026-04-24",
       "content_versions": {
@@ -41,6 +44,7 @@
     {
       "code": "tmt",
       "name": "Teenage Mutant Ninja Turtles",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/d/f/df2cdaa5-9ea0-4aa5-89d3-9edf40fa2a39.jpg?1783904068",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/tmt.svg?1778472000",
       "released_at": "2026-03-06",
       "content_versions": {
@@ -53,6 +57,7 @@
     {
       "code": "ecl",
       "name": "Lorwyn Eclipsed",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/7/1/7127164d-f2a3-4d79-b6db-93507ff5ab47.jpg?1783904470",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/ecl.svg?1778472000",
       "released_at": "2026-01-23",
       "content_versions": {
@@ -65,6 +70,7 @@
     {
       "code": "tla",
       "name": "Avatar: The Last Airbender",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/8/2/82866a0e-485a-4f7e-8c49-f7d9ff3f4ad4.jpg?1783904937",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/tla.svg?1778472000",
       "released_at": "2025-11-21",
       "content_versions": {
@@ -77,6 +83,7 @@
     {
       "code": "spm",
       "name": "Marvel's Spider-Man",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/0/8/08da9f92-0e25-4f39-aaa4-d8974af81a41.jpg?1783905354",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/spm.svg?1778472000",
       "released_at": "2025-09-26",
       "content_versions": {
@@ -87,16 +94,20 @@
     {
       "code": "eoe",
       "name": "Edge of Eternities",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/7/e/7e1fe101-f634-41e5-9aa4-e8d7474535dc.jpg?1783905997",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/eoe.svg?1778472000",
       "released_at": "2025-08-01",
       "content_versions": {
-        "guide": "August 8, 2025",
-        "tier_list": "August 26, 2025"
+        "guide": "2026-09-23-v2",
+        "tier_list": "2026-09-23",
+        "booster": "2026-09-23",
+        "engine": "2026-09-23"
       }
     },
     {
       "code": "fin",
       "name": "Final Fantasy",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/e/c/ecc1027a-8c07-44a0-bdde-fa2844cff694.jpg?1783906561",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/fin.svg?1778472000",
       "released_at": "2025-06-13",
       "content_versions": {
@@ -107,6 +118,7 @@
     {
       "code": "tdm",
       "name": "Tarkir: Dragonstorm",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/6/4/64a5d494-efa1-446b-bebe-2ad36e154376.jpg?1783907421",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/tdm.svg?1778472000",
       "released_at": "2025-04-11",
       "content_versions": {
@@ -119,6 +131,7 @@
     {
       "code": "dft",
       "name": "Aetherdrift",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/5/f/5fba3820-32ba-47e9-9fa8-f985ff471b3f.jpg?1783907854",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/dft.svg?1778472000",
       "released_at": "2025-02-14",
       "content_versions": {
@@ -129,6 +142,7 @@
     {
       "code": "inr",
       "name": "Innistrad Remastered",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/a/5/a577ba08-0aa8-45be-aa83-d5078770127c.jpg?1783908078",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/inr.svg?1778472000",
       "released_at": "2025-01-24",
       "content_versions": {
@@ -139,6 +153,7 @@
     {
       "code": "fdn",
       "name": "Foundations",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/c/e/ce860ed4-a5bd-4347-9eab-dd716ea84db1.jpg?1783909112",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/fdn.svg?1778472000",
       "released_at": "2024-11-15",
       "content_versions": {
@@ -149,17 +164,20 @@
     {
       "code": "dsk",
       "name": "Duskmourn: House of Horror",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/c/e/ce35e6fb-ff54-44c4-a216-7ddd37f46882.jpg?1783909465",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/dsk.svg?1778472000",
       "released_at": "2024-09-27",
       "content_versions": {
-        "guide": "October 11, 2024",
-        "tier_list": "2026-05-16",
-        "booster": "2026-06-03"
+        "guide": "2026-09-24",
+        "tier_list": "2026-09-24",
+        "booster": "2026-09-24",
+        "engine": "2026-09-24"
       }
     },
     {
       "code": "blb",
       "name": "Bloomburrow",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/3/9/390c96b3-68da-4a42-89ab-d9ccc79ce0dd.jpg?1783910745",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/blb.svg?1778472000",
       "released_at": "2024-08-02",
       "content_versions": {
@@ -171,6 +189,7 @@
     {
       "code": "mh3",
       "name": "Modern Horizons 3",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/mh3.svg?1778472000",
       "released_at": "2024-06-14",
       "content_versions": {
@@ -181,6 +200,7 @@
     {
       "code": "otj",
       "name": "Outlaws of Thunder Junction",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/3/5/358968f9-45bd-4022-b6bc-f1f7e0adf0e7.jpg?1783911857",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/otj.svg?1778472000",
       "released_at": "2024-04-19",
       "content_versions": {
@@ -191,6 +211,7 @@
     {
       "code": "mkm",
       "name": "Murders at Karlov Manor",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/c/b/cb1c8800-9d33-485c-b776-042003b9ea92.jpg?1783912894",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/mkm.svg?1778472000",
       "released_at": "2024-02-09",
       "content_versions": {
@@ -201,6 +222,7 @@
     {
       "code": "rvr",
       "name": "Ravnica Remastered",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/7/b/7be6bedd-8d38-4bd9-aa93-29f88a7f0126.jpg?1783913281",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/rvr.svg?1778472000",
       "released_at": "2024-01-12",
       "content_versions": {
@@ -211,6 +233,7 @@
     {
       "code": "lci",
       "name": "The Lost Caverns of Ixalan",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/7/2/72e805e9-69be-45c1-aa04-f460641a0c1e.jpg?1783913747",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/lci.svg?1778472000",
       "released_at": "2023-11-17",
       "content_versions": {
@@ -221,6 +244,7 @@
     {
       "code": "woe",
       "name": "Wilds of Eldraine",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/1/8/18c59776-e1f1-4197-a128-db1d603f56b7.jpg?1783915111",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/woe.svg?1778472000",
       "released_at": "2023-09-08",
       "content_versions": {
@@ -231,16 +255,20 @@
     {
       "code": "ltr",
       "name": "The Lord of the Rings: Tales of Middle-earth",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/d/5/d5806e68-1054-458e-866d-1f2470f682b2.jpg?1790109529",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/ltr.svg?1778472000",
       "released_at": "2023-06-23",
       "content_versions": {
-        "guide": "January 12, 2025",
-        "tier_list": "2026-05-16"
+        "guide": "2026-09-23",
+        "tier_list": "2026-09-23",
+        "booster": "2026-09-23",
+        "engine": "2026-09-23"
       }
     },
     {
       "code": "mom",
       "name": "March of the Machine",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/b/b/bbda000f-3cf7-48b6-96ff-c23a3a64eab5.jpg?1783916955",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/mom.svg?1778472000",
       "released_at": "2023-04-21",
       "content_versions": {
@@ -251,6 +279,7 @@
     {
       "code": "sir",
       "name": "Shadows over Innistrad Remastered",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/f/e/fe675f03-cbb5-4177-b7d7-64a30260ee2a.jpg?1783908191",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/sir.svg?1778472000",
       "released_at": "2023-03-21",
       "content_versions": {
@@ -261,6 +290,7 @@
     {
       "code": "one",
       "name": "Phyrexia: All Will Be One",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/4/a/4a1f905f-1d55-4d02-9d24-e58070793d3f.jpg?1783918003",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/one.svg?1778472000",
       "released_at": "2023-02-10",
       "content_versions": {
@@ -271,6 +301,7 @@
     {
       "code": "dmr",
       "name": "Dominaria Remastered",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/3/4/34a0203f-9cce-43a4-9cb7-8ce6647895cd.jpg?1783918468",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/dmr.svg?1778472000",
       "released_at": "2023-01-13",
       "content_versions": {
@@ -281,6 +312,7 @@
     {
       "code": "bro",
       "name": "The Brothers' War",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/1/c/1c95f8b8-faba-4412-8d8f-093e2ec903f0.jpg?1783920050",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/bro.svg?1778472000",
       "released_at": "2022-11-18",
       "content_versions": {
@@ -291,6 +323,7 @@
     {
       "code": "dmu",
       "name": "Dominaria United",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/d/6/d67be074-cdd4-41d9-ac89-0a0456c4e4b2.jpg?1783921327",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/dmu.svg?1778472000",
       "released_at": "2022-09-09",
       "content_versions": {
@@ -301,6 +334,7 @@
     {
       "code": "snc",
       "name": "Streets of New Capenna",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/2/1/21235916-2379-470c-b9ee-84246043d703.jpg?1783923073",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/snc.svg?1778472000",
       "released_at": "2022-04-29",
       "content_versions": {
@@ -311,6 +345,7 @@
     {
       "code": "neo",
       "name": "Kamigawa: Neon Dynasty",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/3/4/34d92077-d7b2-4996-848f-fd4917e2fb42.jpg?1783923827",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/neo.svg?1778472000",
       "released_at": "2022-02-18",
       "content_versions": {
@@ -321,6 +356,7 @@
     {
       "code": "dbl",
       "name": "Innistrad: Double Feature",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/8/8/8804973b-b733-417e-9bee-828efbcb4453.jpg?1783924232",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/dbl.svg?1778472000",
       "released_at": "2022-01-28",
       "content_versions": {
@@ -331,6 +367,7 @@
     {
       "code": "vow",
       "name": "Innistrad: Crimson Vow",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/4/5/457086c4-1b4e-4f79-8f2a-10b16174c8bb.jpg?1783924842",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/vow.svg?1778472000",
       "released_at": "2021-11-19",
       "content_versions": {
@@ -341,6 +378,7 @@
     {
       "code": "mid",
       "name": "Innistrad: Midnight Hunt",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/e/6/e6b9b8fc-c30d-49e7-bb6c-219380d73a82.jpg?1783925608",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/mid.svg?1778472000",
       "released_at": "2021-09-24",
       "content_versions": {
@@ -351,6 +389,7 @@
     {
       "code": "mh2",
       "name": "Modern Horizons 2",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/f/3/f3537373-ef54-4578-9d05-6216420ee349.jpg?1783926893",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/mh2.svg?1778472000",
       "released_at": "2021-06-18",
       "content_versions": {
@@ -361,6 +400,7 @@
     {
       "code": "stx",
       "name": "Strixhaven: School of Mages",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/d/e/de547f52-3798-4b3a-947d-24873251204b.jpg?1783927356",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/stx.svg?1778472000",
       "released_at": "2021-04-23",
       "content_versions": {
@@ -371,6 +411,7 @@
     {
       "code": "ktk",
       "name": "Khans of Tarkir",
+      "set_image_url": "https://cards.scryfall.io/art_crop/front/f/f/ffa2b070-952e-4242-83bb-3e73135ceeeb.jpg?1783939053",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/ktk.svg?1778472000",
       "released_at": "2014-09-26",
       "content_versions": {

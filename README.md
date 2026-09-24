@@ -129,7 +129,7 @@ Coming soon.
 | Architecture | MVVM + Clean Architecture, KMP-oriented (`:shared:core-*` commonMain + `:app` Android) |
 | Dependency Injection | Koin (new/migrated code) + Hilt (legacy, being phased out) |
 | Database | Room (exported schemas, DB v40) — Android-only (no wasm target); repo interfaces are shared |
-| Networking | Ktor (commonMain, js/wasm-ready) + kotlinx.serialization; a small Retrofit remnant remains only for `DraftModule` (Cloudflare manual JSON) |
+| Networking | Ktor (commonMain, js/wasm-ready) + kotlinx.serialization; Draft content is delivered from Cloudflare/R2 through a versioned sets manifest |
 | Backend (BaaS) | Supabase (auth + postgrest + realtime + edge functions) via Ktor client |
 | Image loading | Coil + SVG decoder |
 | Camera / OCR | CameraX + ML Kit Text Recognition (on-device) |

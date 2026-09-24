@@ -15,6 +15,7 @@ fun SetIndexEntryDto.toEntity(): DraftSetEntity = DraftSetEntity(
     guideVersion = contentVersions.guide,
     tierListVersion = contentVersions.tierList,
     boosterVersion = contentVersions.booster,
+    setImageUrl = setImage,
 )
 
 fun DraftSetEntity.toDomain(): DraftSet = DraftSet(
@@ -26,4 +27,5 @@ fun DraftSetEntity.toDomain(): DraftSet = DraftSet(
     guideVersion = guideVersion,
     tierListVersion = tierListVersion,
     boosterVersion = boosterVersion,
+    setImageUrl = setImageUrl,
 )

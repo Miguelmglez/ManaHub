@@ -15,10 +15,9 @@ import com.mmg.manahub.feature.draft.presentation.ui.DraftGuideRichTextSegment
 /** Top-level Guide sections; [id] is the stable expansion/list key. */
 enum class GuideSection(val id: String) {
     OVERVIEW("overview"),
-    COLOR_RANKING("colors"),
     MECHANICS("mechanics"),
     ARCHETYPES("archetypes"),
-    KEY_COMMONS("commons"),
+    COLOR_RANKING("colors"),
 }
 
 /** Guide editorial text parsed once, off the main thread. */
@@ -50,6 +49,8 @@ data class ColorRankingUi(
     val manaToken: String?,
     val title: GuideRichText,
     val note: GuideRichText?,
+    val keyCommons: List<GuideCardUi> = emptyList(),
+    val keyUncommons: List<GuideCardUi> = emptyList(),
 )
 
 /** One Mechanics sub-section. [isFlatExamples] swaps the "Overperformers" label for "Key Cards". */
@@ -80,13 +81,14 @@ data class ArchetypeUi(
     val cardsToAvoid: List<GuideCardUi>,
 )
 
-/** One Key Commons by Color sub-section. */
+/** Key cards grouped by rarity and color for the Color Ranking section. */
 @Immutable
-data class KeyCommonsGroupUi(
+data class KeyColorCardGroupUi(
     val id: String,
     val label: String,
     val manaToken: String?,
     val cards: List<GuideCardUi>,
+    val isUncommon: Boolean,
 )
 
 /** Render-ready Guide: rich text pre-parsed and every card pre-mapped. */
@@ -96,7 +98,7 @@ data class SetDraftGuideUiModel(
     val colorRanking: List<ColorRankingUi>,
     val mechanics: List<MechanicUi>,
     val archetypes: List<ArchetypeUi>,
-    val keyCommons: List<KeyCommonsGroupUi>,
+    val unrankedKeyCardGroups: List<KeyColorCardGroupUi>,
 )
 
 /** One tier of the Tier List with its cards pre-mapped. */
@@ -144,15 +146,39 @@ object SetDraftDetailUiModelBuilder {
             keyNotes = guide.keyGameplayNotes.filter { it.isNotBlank() }.map { it.toRichText() },
         )
 
+        fun buildColorGroups(
+            source: Map<String, List<ArchetypeKeyCard>>,
+            prefix: String,
+            isUncommon: Boolean,
+        ) = source.entries
+            .filter { (_, groupCards) -> groupCards.isNotEmpty() }
+            .mapIndexed { index, (colorLabel, groupCards) ->
+                KeyColorCardGroupUi(
+                    id = "$prefix:$index",
+                    label = colorLabel.replace(ANY_BRACED_TOKEN, "").trim().ifBlank { colorLabel },
+                    manaToken = MANA_TOKEN.find(colorLabel)?.groupValues?.getOrNull(1),
+                    cards = groupCards.mapIndexed { i, card -> card.toUi("$prefix-$index-$i") },
+                    isUncommon = isUncommon,
+                )
+            }
+
+        val allKeyCardGroups = buildColorGroups(guide.keyCommonsByColor, "commons", false) +
+            buildColorGroups(guide.keyUncommonsByColor, "uncommons", true)
+        val rankedManaTokens = guide.colorRanking.mapNotNull { MANA_TOKEN.find(it)?.groupValues?.getOrNull(1) }.toSet()
         val colorRanking = guide.colorRanking.mapIndexed { index, entry ->
+            val manaToken = MANA_TOKEN.find(entry)?.groupValues?.getOrNull(1)
+            val matchingGroups = if (manaToken == null) emptyList() else allKeyCardGroups.filter { it.manaToken == manaToken }
             ColorRankingUi(
                 id = "colors:$index",
                 rank = index + 1,
-                manaToken = MANA_TOKEN.find(entry)?.groupValues?.getOrNull(1),
+                manaToken = manaToken,
                 title = entry.replace(LEADING_MANA_TOKENS, "").trim().toRichText(),
                 note = guide.colorNotes[entry]?.toRichTextOrNull(),
+                keyCommons = matchingGroups.filterNot { it.isUncommon }.flatMap { it.cards },
+                keyUncommons = matchingGroups.filter { it.isUncommon }.flatMap { it.cards },
             )
         }
+        val unrankedKeyCardGroups = allKeyCardGroups.filter { it.manaToken !in rankedManaTokens }
 
         val mechanics = guide.mechanics.mapIndexed { index, mechanic ->
             val id = "mechanics:$index"
@@ -191,24 +217,12 @@ object SetDraftDetailUiModelBuilder {
             )
         }
 
-        val keyCommons = guide.keyCommonsByColor.entries
-            .filter { (_, groupCards) -> groupCards.isNotEmpty() }
-            .mapIndexed { index, (colorLabel, groupCards) ->
-                val id = "commons:$index"
-                KeyCommonsGroupUi(
-                    id = id,
-                    label = colorLabel.replace(ANY_BRACED_TOKEN, "").trim().ifBlank { colorLabel },
-                    manaToken = MANA_TOKEN.find(colorLabel)?.groupValues?.getOrNull(1),
-                    cards = groupCards.mapIndexed { i, card -> card.toUi("$id-$i") },
-                )
-            }
-
         return SetDraftGuideUiModel(
             overview = overview,
             colorRanking = colorRanking,
             mechanics = mechanics,
             archetypes = archetypes,
-            keyCommons = keyCommons,
+            unrankedKeyCardGroups = unrankedKeyCardGroups,
         )
     }
 

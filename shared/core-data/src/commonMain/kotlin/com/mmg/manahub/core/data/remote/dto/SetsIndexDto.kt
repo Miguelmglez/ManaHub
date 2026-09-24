@@ -34,6 +34,7 @@ data class SetIndexEntryDto(
     @SerialName("icon_svg_uri") val iconSvgUri: String,
     @SerialName("released_at") val releasedAt: String,
     @SerialName("content_versions") val contentVersions: ContentVersionsDto,
+    @SerialName("set_image_url") val setImage: String? = null,
 )
 
 /**

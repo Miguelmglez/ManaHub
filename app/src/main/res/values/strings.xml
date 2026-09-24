@@ -2632,7 +2632,8 @@
     <string name="draft_pick_order_rank">Pick #%1$d</string>
     <string name="draft_cards_to_avoid_label">Cards to Avoid</string>
     <string name="draft_archetype_win_rate">%1$.1f%% Win Rate</string>
-    <string name="draft_key_commons_by_color">Key Commons by Color</string>
+    <string name="draft_key_commons_label">Commons</string>
+    <string name="draft_key_uncommons_label">Uncommons</string>
     <string name="draft_guide_color_ranking">Color Ranking</string>
     <string name="draft_guide_state_expanded">Expanded</string>
     <string name="draft_guide_state_collapsed">Collapsed</string>

@@ -5,34 +5,34 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.mmg.manahub.core.data.cache.ManaSymbolStore
 import com.mmg.manahub.core.data.local.dao.CardDao
+import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
+import com.mmg.manahub.core.data.local.dao.ComboCacheDao
+import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
+import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
+import com.mmg.manahub.core.data.local.dao.CompetitiveLimitedRatingsCacheDao
+import com.mmg.manahub.core.data.local.dao.CompetitiveMetaCacheDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
+import com.mmg.manahub.core.data.local.dao.DraftSetDao
+import com.mmg.manahub.core.data.local.dao.FriendDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
+import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
+import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
 import com.mmg.manahub.core.data.local.dao.ManaSymbolDao
+import com.mmg.manahub.core.data.local.dao.NewsDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
+import com.mmg.manahub.core.data.local.dao.PuzzleDao
 import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
 import com.mmg.manahub.core.data.local.dao.TournamentDao
+import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
-import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
-import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
-import com.mmg.manahub.core.data.local.dao.ComboCacheDao
-import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
-import com.mmg.manahub.core.data.local.dao.PuzzleDao
-import com.mmg.manahub.core.data.local.dao.CompetitiveMetaCacheDao
-import com.mmg.manahub.core.data.local.dao.CompetitiveLimitedRatingsCacheDao
-import com.mmg.manahub.core.data.local.dao.DraftSetDao
-import com.mmg.manahub.core.data.local.dao.FriendDao
-import com.mmg.manahub.core.data.local.dao.NewsDao
-import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
-import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
-import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
-import com.mmg.manahub.core.data.cache.ManaSymbolStore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -159,6 +159,9 @@ object DatabaseModule {
                 // Deck Wizard Commander v3 plan, Phase 0 / E3: additive decks.posture_override
                 // column (the persisted posture pin, fixes F3).
                 MIGRATION_53_54,
+                // v54 → v55 lives as a top-level `val` in Migration_54_55.kt.
+                // Additive: draft_sets.setImageUrl column.
+                MIGRATION_54_55,
             )
             .build()
 

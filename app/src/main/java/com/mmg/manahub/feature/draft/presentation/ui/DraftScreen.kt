@@ -14,9 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -69,7 +68,7 @@ fun DraftScreen(
                     .fillMaxWidth()
                     .statusBarsPadding()
                     .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
                     Icon(
@@ -79,7 +78,7 @@ fun DraftScreen(
                     )
                 }
                 Text(
-                    text = stringResource(R.string.draft_title),
+                    text = "Latest sets",
                     style = typography.titleLarge,
                     color = colors.textPrimary,
                     modifier = Modifier.padding(start = 8.dp),
@@ -173,17 +172,15 @@ fun DraftScreen(
                 else -> {
                     val navBarBottom =
                         WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
+                    LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(
-                            start = 12.dp,
+                            start = 16.dp,
                             top = 12.dp,
-                            end = 12.dp,
+                            end = 16.dp,
                             bottom = 12.dp + navBarBottom
                         ),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(state.filteredSets, key = { it.id }) { set ->
                             DraftSetCard(
@@ -196,6 +193,7 @@ fun DraftScreen(
                                         set.releasedAt
                                     )
                                 },
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
                     }
