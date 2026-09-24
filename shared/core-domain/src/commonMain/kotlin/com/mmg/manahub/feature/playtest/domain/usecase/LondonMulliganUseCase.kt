@@ -57,8 +57,10 @@ class LondonMulliganUseCase {
         library: List<Card>,
         cardsToBottom: List<Int>,
     ): Pair<List<Card>, List<Card>> {
-        val bottomedCards = cardsToBottom.map { hand[it] }
-        val remainingHand = hand.filterIndexed { index, _ -> index !in cardsToBottom }
+        // A repeated index would copy one card into the library twice; an out-of-range one would throw.
+        val validIndices = cardsToBottom.distinct().filter { it in hand.indices }
+        val bottomedCards = validIndices.map { hand[it] }
+        val remainingHand = hand.filterIndexed { index, _ -> index !in validIndices }
         val newLibrary = library + bottomedCards
         return remainingHand to newLibrary
     }

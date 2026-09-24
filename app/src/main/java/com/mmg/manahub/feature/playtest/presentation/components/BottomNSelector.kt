@@ -81,7 +81,7 @@ fun BottomNSelector(
                 .padding(horizontal = 16.dp),
         ) {
             Text(
-                text     = stringResource(R.string.playtest_bottom_n_title, requiredCount),
+                text     = stringResource(R.string.playtest_bottom_n_title, effectiveRequired),
                 style    = ty.titleMedium,
                 color    = mc.textPrimary,
                 modifier = Modifier.padding(top = 24.dp, bottom = 4.dp),
@@ -90,7 +90,7 @@ fun BottomNSelector(
                 text  = stringResource(
                     R.string.playtest_bottom_n_progress,
                     selectedIndices.size,
-                    requiredCount,
+                    effectiveRequired,
                 ),
                 style = ty.bodyMedium,
                 color = mc.textSecondary,

@@ -2019,6 +2019,10 @@
     <string name="playtest_battle_field_empty_permanents">Play permanents here</string>
     <string name="playtest_battle_graveyard_label">Graveyard</string>
     <string name="playtest_battle_hand_label">Hand</string>
+    <string name="playtest_battle_action_play">Play</string>
+    <string name="playtest_battle_action_play_land">Play as Land</string>
+    <string name="playtest_battle_exile_label">Exile</string>
+    <string name="playtest_battle_action_return_to_hand">Return to Hand</string>
 
     <!-- ══════════════════════════════════════════
          TOURNAMENT SCREEN

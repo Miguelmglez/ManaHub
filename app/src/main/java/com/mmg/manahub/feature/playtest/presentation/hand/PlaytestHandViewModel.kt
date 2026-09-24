@@ -22,6 +22,7 @@ import com.mmg.manahub.feature.playtest.domain.usecase.LondonMulliganUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.SavePlaytestSurveyUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.SavePlaytestUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.drawWithForced
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -148,7 +149,8 @@ class PlaytestHandViewModel(
      * Only initialises once (if snapshot is already set, this is a no-op).
      */
     fun initWithSetup(setup: PlaytestSetup) {
-        if (_uiState.value.snapshot != null) return
+        // `setup`, not `snapshot`: the first draw is async, so a re-entry (e.g. rotation) mid-load would build twice.
+        if (_uiState.value.setup != null) return
         sessionStartedAt = System.currentTimeMillis()
         FirebaseCrashlytics.getInstance().apply {
             log("playtest_session_started: deckId=${setup.deckId} format=${setup.deckFormat} drawCount=${setup.drawCount} onThePlay=${setup.isOnThePlay}")
@@ -230,7 +232,8 @@ class PlaytestHandViewModel(
         val state = _uiState.value
         val snapshot = state.snapshot ?: return
         val setup = state.setup ?: return
-        val required = computeRequiredBottomCount(setup.drawCount, setup.startCount, snapshot.mulligansUsed)
+        // Same protection-aware count the selector confirms against: when every card is forced, there is nothing to bottom.
+        val required = effectiveRequiredBottomCount(snapshot, setup, state.customHandSelection)
         if (required > 0) {
             _uiState.update { it.copy(showBottomNSelector = true, selectedBottomIndices = emptySet()) }
         } else {
@@ -787,64 +790,76 @@ class PlaytestHandViewModel(
         previousBottomed: List<String>,
     ) {
         viewModelScope.launch {
-            val result = withContext(ioDispatcher) {
-                // Collect the first emission from the deck flow to get the current state.
-                val deckWithCards = deckRepository.observeDeckWithCards(setup.deckId)
-                    .first() ?: return@withContext null
+            val result = try {
+                withContext(ioDispatcher) {
+                    // Collect the first emission from the deck flow to get the current state.
+                    val deckWithCards = deckRepository.observeDeckWithCards(setup.deckId)
+                        .first() ?: return@withContext null
 
-                // Hydrate all cards in one batch query.
-                val scryfallIds = deckWithCards.mainboard.map { it.scryfallId }
-                val cardEntities = cardDao.getByIds(scryfallIds)
-                // Non-fatal: fewer cards returned than requested signals cache eviction or stale data.
-                if (cardEntities.size < scryfallIds.distinct().size) {
-                    FirebaseCrashlytics.getInstance().apply {
-                        log("playtest_card_cache_underfetch: requested=${scryfallIds.distinct().size} returned=${cardEntities.size}")
-                        setCustomKey("playtest_deck_id", setup.deckId)
-                        setCustomKey("playtest_format", setup.deckFormat)
-                        recordException(
-                            IllegalStateException(
-                                "[PlaytestHand] CardDao.getByIds returned ${cardEntities.size} of ${scryfallIds.distinct().size} requested cards"
+                    // Hydrate all cards in one batch query.
+                    val scryfallIds = deckWithCards.mainboard.map { it.scryfallId }
+                    val cardEntities = cardDao.getByIds(scryfallIds)
+                    // Non-fatal: fewer cards returned than requested signals cache eviction or stale data.
+                    if (cardEntities.size < scryfallIds.distinct().size) {
+                        FirebaseCrashlytics.getInstance().apply {
+                            log("playtest_card_cache_underfetch: requested=${scryfallIds.distinct().size} returned=${cardEntities.size}")
+                            setCustomKey("playtest_deck_id", setup.deckId)
+                            setCustomKey("playtest_format", setup.deckFormat)
+                            recordException(
+                                IllegalStateException(
+                                    "[PlaytestHand] CardDao.getByIds returned ${cardEntities.size} of ${scryfallIds.distinct().size} requested cards"
+                                )
                             )
-                        )
+                        }
                     }
-                }
-                val cardLookup = cardEntities.associate { it.scryfallId to it.toDomainCard() }
+                    val cardLookup = cardEntities.associate { it.scryfallId to it.toDomainCard() }
 
-                // Build and shuffle library (excluding commander).
-                val commanderId = setup.commanderCard?.scryfallId
-                val library = buildLibraryUseCase(
-                    mainboardSlots      = deckWithCards.mainboard,
-                    cardLookup          = cardLookup,
-                    commanderScryfallId = commanderId,
-                )
+                    // Build and shuffle library (excluding commander).
+                    val commanderId = setup.commanderCard?.scryfallId
+                    val library = buildLibraryUseCase(
+                        mainboardSlots      = deckWithCards.mainboard,
+                        cardLookup          = cardLookup,
+                        commanderScryfallId = commanderId,
+                    )
 
-                // Non-fatal: library size must match expected size (mainboard count minus commander).
-                val expectedSize = deckWithCards.mainboard
-                    .filter { it.scryfallId != commanderId }
-                    .sumOf { it.quantity }
-                if (library.size != expectedSize) {
-                    FirebaseCrashlytics.getInstance().apply {
-                        log("playtest_library_size_mismatch: expected=$expectedSize actual=${library.size}")
-                        setCustomKey("playtest_deck_id", setup.deckId)
-                        setCustomKey("playtest_format", setup.deckFormat)
-                        setCustomKey("playtest_library_size", library.size)
-                        recordException(
-                            IllegalStateException(
-                                "[PlaytestHand] Library size mismatch: expected=$expectedSize actual=${library.size}"
+                    // Non-fatal: library size must match expected size (mainboard count minus commander).
+                    val expectedSize = deckWithCards.mainboard
+                        .filter { it.scryfallId != commanderId }
+                        .sumOf { it.quantity }
+                    if (library.size != expectedSize) {
+                        FirebaseCrashlytics.getInstance().apply {
+                            log("playtest_library_size_mismatch: expected=$expectedSize actual=${library.size}")
+                            setCustomKey("playtest_deck_id", setup.deckId)
+                            setCustomKey("playtest_format", setup.deckFormat)
+                            setCustomKey("playtest_library_size", library.size)
+                            recordException(
+                                IllegalStateException(
+                                    "[PlaytestHand] Library size mismatch: expected=$expectedSize actual=${library.size}"
+                                )
                             )
-                        )
+                        }
                     }
+
+                    // Grouped mainboard (card + in-deck quantity, commander excluded) for the
+                    // "Custom your hand" sheet — derived from data already fetched above, no extra
+                    // network/DB round-trip.
+                    val mainboardCounts = deckWithCards.mainboard
+                        .filter { it.scryfallId != commanderId }
+                        .mapNotNull { slot -> cardLookup[slot.scryfallId]?.let { it to slot.quantity } }
+
+                    library to mainboardCounts
                 }
-
-                // Grouped mainboard (card + in-deck quantity, commander excluded) for the
-                // "Custom your hand" sheet — derived from data already fetched above, no extra
-                // network/DB round-trip.
-                val mainboardCounts = deckWithCards.mainboard
-                    .filter { it.scryfallId != commanderId }
-                    .mapNotNull { slot -> cardLookup[slot.scryfallId]?.let { it to slot.quantity } }
-
-                library to mainboardCounts
-            } ?: run {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                FirebaseCrashlytics.getInstance().apply {
+                    log("playtest_build_library_failed")
+                    setCustomKey("playtest_deck_id", setup.deckId)
+                    recordException(e)
+                }
+                null
+            }
+            if (result == null) {
                 _uiState.update { it.copy(isLoading = false, errorMessage = "Failed to load deck cards") }
                 return@launch
             }

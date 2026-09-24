@@ -165,8 +165,8 @@ fun CustomHandSheet(
             ) {
                 items(filteredCards, key = { it.first.scryfallId }) { (card, quantityInDeck) ->
                     val selectedCount = selection[card.scryfallId] ?: 0
-                    val othersSum = totalSelected - selectedCount
-                    val capReached = othersSum >= drawCount
+                    // Total, not "others": at the cap the VM clamps every + to a no-op, including this row's.
+                    val capReached = totalSelected >= drawCount
                     CustomHandRow(
                         card = card,
                         quantityInDeck = quantityInDeck,

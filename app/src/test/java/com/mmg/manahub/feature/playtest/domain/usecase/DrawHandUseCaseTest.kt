@@ -132,4 +132,14 @@ class DrawHandUseCaseTest {
         assertTrue(hand.isEmpty())
         assertEquals(10, remaining.size)
     }
+
+    @Test
+    fun `given a negative count when drawing then an empty hand is returned instead of throwing`() {
+        val library = makeLibrary(10)
+
+        val (hand, remaining) = useCase(library, count = -1)
+
+        assertTrue(hand.isEmpty())
+        assertEquals(10, remaining.size)
+    }
 }
