@@ -35,7 +35,7 @@ class PageFetchException(val reason: Reason, val httpCode: Int? = null) : IOExce
  * native Koin `single` in [com.mmg.manahub.feature.news.di.newsKoinModule].
  *
  * TODO(KMP): port to Ktor's js/wasm engine when News gains a web actual — this class stays
- * OkHttp/androidMain-only for now (see the News feature note in the module CLAUDE.md).
+ * OkHttp/androidMain-only for now (see `feature/today/CLAUDE.md`).
  *
  * @param httpsOnly only tests turn this off (MockWebServer serves plain HTTP).
  */

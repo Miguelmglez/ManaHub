@@ -132,7 +132,7 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
 - → memory: `feedback_sync_watermark_never_past_unapplied`, `feedback_setof_rpc_must_be_paginated`,
   `feedback_idempotency_gate_tests_own_completion`, `project_collection_sync_data_loss_2026-09`
 
-### Database (Room v56)
+### Database (Room v57)
 - DB file `mtg_collection.db`. The `UserCardEntity` → `CardEntity` FK was **removed in v53** (ADR-008);
   do not reintroduce it. It was `ON DELETE RESTRICT` from v38 to v52.
 - Migration chain 1→53, gaps at 7–10 and 15–17 covered by `fallbackToDestructiveMigration()` (dev-only;
@@ -142,7 +142,7 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
   (compact WUBRG string, not JSON) on `cards` (Deck Doctor Community/Archetype plan Phase 0.3, D14);
   v43–v49 = additive per-feature tables/columns (see each `Migration_x_y.kt`'s KDoc for what it
   added); v50 = `puzzle_results` table (Daily Puzzle, Batch B1); v51 = `competitive_meta_cache` +
-  `competitive_limited_ratings_cache` tables (Competitive feature, Worker-backed JSON-blob caches);
+  `competitive_limited_ratings_cache` tables (Competitive feature, dropped again in v57);
   v52 = Deck Analysis Engine v3 taxonomy migration (`ArchetypeId`/`ThemeId` renames, defensively
   parsed so stale persisted strings degrade rather than crash);
   **v53 = table recreate of `user_card_collection` to DROP its FK to `cards`** — the one migration
@@ -152,7 +152,9 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
   v1–24). Guarded by `Migration52To53Test`.
   v54 = additive `decks.posture_override`; v55 = additive `draft_sets.setImageUrl` (Draft);
   v56 = additive `trade_collection_sync.pending_apply` + nullable `owner_user_id` on
-  `local_wishlists`/`local_open_for_trade` (Trades audit H4/H8).
+  `local_wishlists`/`local_open_for_trade` (Trades audit H4/H8);
+  v57 = MTG Today: `news_saved_items` table + nullable `content_sources.site_url`, and DROPs the two
+  v51 Competitive cache tables (guarded by `Migration56To57Test`, `validateDroppedTables = true`).
   Every migration since v39 follows the same pattern: a top-level `val MIGRATION_x_y` in its own file,
   `CREATE TABLE IF NOT EXISTS …` / `ADD COLUMN … TEXT NOT NULL DEFAULT '…'` guarded by a
   `columnExists` check where applicable, CardDao upsert untouched → no CASCADE risk.
@@ -236,7 +238,7 @@ a hand-rolled equivalent of anything below is a review finding. Inventory (what 
   `LanguageSelectorSheet` · `VariantSelectorSheet` · `TradeSelectionSheet` · `CardPickerField` /
   `CardSearchField` · Android-only: `CardSearchSheet`, `CardQueueSheet`, `DeckCardQueueSheet`,
   `ShareProfileSheet`, `search/AdvancedSearchSheet` + its pickers (`SetPickerSheet`, `TagPickerSheet`, …).
-- **Content tiles:** `DeckItem` · `DraftSetCard` · `NewsItemCard` · game setup (`GameModeSelector`,
+- **Content tiles:** `DeckItem` · `DraftSetCard` · `NewsItemCard` (optional save toggle + overflow-menu slot) · game setup (`GameModeSelector`,
   `LayoutTemplateSelector`, `PlayerCountStepper`, `PlayerEditSheet`, `FloatingDelta`) · `MagicBottomBar` ·
   themed backgrounds (`HexGridBackground` + 5 palette backgrounds) · `InlineIcons` / `manaColorFor`.
 
@@ -364,10 +366,11 @@ visible rows — see `app/src/main/java/com/mmg/manahub/feature/collection/CLAUD
 ### Gamification (`core/gamification/`)
 Cross-cutting XP/levels/achievements/quests/streaks/cosmetics engine — see `app/src/main/java/com/mmg/manahub/core/gamification/CLAUDE.md`.
 
-### Competitive (`feature/competitive/`)
-Static curated deep-link catalog (tournament decklists, power rankings, trending decks, Limited
-ratings, deck-building tools, live streams) + event locator + Pro Tour news filter — zero live
-third-party API calls by design. See `app/src/main/java/com/mmg/manahub/feature/competitive/CLAUDE.md`.
+### MTG Today (`feature/today/` + `feature/news/` data)
+Feed · Events · Saved · Sources: news and videos from followed sources, upcoming set releases and
+editorial competitive links, device-local saved items, and "paste any URL" source management
+(replaced the old News screen and the Competitive feature, ADR-011). See
+`app/src/main/java/com/mmg/manahub/feature/today/CLAUDE.md`.
 ## Testing conventions
 
 - **Targeted testing — NEVER run the full test suite by default.** Run ONLY the test classes/packages
