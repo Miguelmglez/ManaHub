@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -42,6 +43,10 @@ class CommunityDeckDetailViewModel(
     private val importCoordinator: CommunityDeckImportCoordinator,
     private val userCardRepository: UserCardRepository,
 ) : ViewModel() {
+
+    private companion object {
+        const val PENDING_HYDRATION = "pending_hydration"
+    }
 
     private val crashlytics = FirebaseCrashlytics.getInstance()
 
@@ -74,6 +79,11 @@ class CommunityDeckDetailViewModel(
 
     /** (Re)loads the deck. Safe to call from a retry button. */
     fun loadDeck() {
+        if (archidektId <= 0) {
+            // A missing/corrupt nav arg can never resolve — don't spend an Archidekt request on it.
+            _uiState.value = CommunityDeckDetailUiState.Error("Deck not found on Archidekt")
+            return
+        }
         viewModelScope.launch {
             _uiState.value = CommunityDeckDetailUiState.Loading
             when (val result = getCommunityDeck(archidektId)) {
@@ -151,17 +161,23 @@ class CommunityDeckDetailViewModel(
      */
     private fun observeOwnedCardIdentityKeys() {
         viewModelScope.launch {
-            userCardRepository.observeCollection().collect { rows ->
-                val keys = rows.mapTo(mutableSetOf()) { it.card.oracleId.ifBlank { it.card.name } }
-                _ownedCardIdentityKeys.value = keys
-                _uiState.update { current ->
-                    if (current is CommunityDeckDetailUiState.Content) {
-                        current.copy(ownedCardIdentityKeys = keys)
-                    } else {
-                        current
+            userCardRepository.observeCollection()
+                .catch { e -> recordNonFatal("community_deck_owned_keys_flow_error", e) }
+                .collect { rows ->
+                    // ADR-008 placeholder rows carry no real card fields — exclude them from this aggregate.
+                    val keys = rows
+                        .filter { it.card.staleReason != PENDING_HYDRATION }
+                        .mapNotNull { row -> row.card.oracleId.ifBlank { row.card.name }.takeIf { it.isNotBlank() } }
+                        .toSet()
+                    _ownedCardIdentityKeys.value = keys
+                    _uiState.update { current ->
+                        if (current is CommunityDeckDetailUiState.Content) {
+                            current.copy(ownedCardIdentityKeys = keys)
+                        } else {
+                            current
+                        }
                     }
                 }
-            }
         }
     }
 

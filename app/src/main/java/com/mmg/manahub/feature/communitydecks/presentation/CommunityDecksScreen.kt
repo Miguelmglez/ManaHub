@@ -181,7 +181,7 @@ fun CommunityDecksScreen(
                     when (uiState.hubTab) {
                         CommunityHubTab.DISCOVER -> CommunityDiscoverBody(
                             state = uiState,
-                            onRetry = { viewModel.onSelectHubTab(CommunityHubTab.DISCOVER) },
+                            onRetry = viewModel::retryDiscover,
                             onTrendingCommanderClick = viewModel::onTrendingCommanderClick,
                             onTrendingCardClick = viewModel::onTrendingCardClick,
                             onDeckClick = viewModel::onDeckClick,

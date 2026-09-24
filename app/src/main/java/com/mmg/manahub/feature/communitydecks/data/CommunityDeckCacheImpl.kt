@@ -4,6 +4,7 @@ import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.cache.CachedDeckEntry
 import com.mmg.manahub.core.data.cache.CommunityDeckCache
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
+import com.mmg.manahub.core.data.repository.CachePolicy
 import com.mmg.manahub.core.data.remote.dto.ArchidektDeckDetailDto
 import com.mmg.manahub.feature.communitydecks.data.remote.toCacheEntity
 import kotlinx.coroutines.CancellationException
@@ -68,5 +69,14 @@ class CommunityDeckCacheImpl(
 
     override suspend fun insert(dto: ArchidektDeckDetailDto) {
         cacheDao.insert(dto.toCacheEntity())
+        // Each row is a full deck JSON blob and nothing else prunes this table; best-effort, never fails the insert.
+        try {
+            cacheDao.evictOlderThan(System.currentTimeMillis() - CachePolicy.EVICT_MS)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            crashReporter.log("community_deck_cache_evict_failed")
+            crashReporter.recordException(e)
+        }
     }
 }

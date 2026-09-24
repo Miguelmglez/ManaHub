@@ -169,6 +169,13 @@ class CommunityDecksSearchViewModel(
         if (tab == CommunityHubTab.DISCOVER && !discoverLoaded && _uiState.value.discoverEnabled) loadDiscover()
     }
 
+    /** Retry for the "Discover unavailable" state — [onSelectHubTab] only loads once, so it can't serve as retry. */
+    fun retryDiscover() {
+        if (_uiState.value.isDiscoverLoading || !_uiState.value.discoverEnabled) return
+        crashlytics.log("community_discover_retry")
+        loadDiscover()
+    }
+
     /**
      * Fetches every Discover section IN PARALLEL: trending commanders/cards (resolved to full
      * [Card]s for image tiles), popular/recent/recently-updated/primer decks, and a weekly-rotating
@@ -236,7 +243,8 @@ class CommunityDecksSearchViewModel(
             formats = deckFormat,
             primersOnly = primersOnly,
         ).toSearchFilters(deckName = null, orderBy = orderBy, page = 1, pageSize = DISCOVER_SECTION_SIZE)
-        (searchCommunityDecks(filters) as? DataResult.Success)?.data?.decks.orEmpty()
+        // Rows are keyed by archidektId, so a repeated deck would crash the LazyRow.
+        (searchCommunityDecks(filters) as? DataResult.Success)?.data?.decks.orEmpty().distinctBy { it.archidektId }
     }.getOrElse { emptyList() }
 
     /** Resolves trending card/commander names to full [Card]s in parallel; unresolved names are dropped. */
@@ -245,6 +253,8 @@ class CommunityDecksSearchViewModel(
             .map { name -> async { runCatching { cardRepository.getCardByExactName(name) }.getOrNull()?.getOrNull() } }
             .awaitAll()
             .filterNotNull()
+            // Two trending names can resolve to the same printing; tiles are keyed by scryfallId.
+            .distinctBy { it.scryfallId }
     }
 
 
@@ -436,8 +446,11 @@ class CommunityDecksSearchViewModel(
         }
         val results = (searchCards(query, page = 1) as? DataResult.Success)?.data?.cards.orEmpty()
         _uiState.update {
-            if (isCommander) it.copy(commanderResults = results, isCommanderSearching = false)
-            else it.copy(cardResults = results, isCardSearching = false)
+            // The field may have been cleared/edited while this request was in flight — drop stale results.
+            val currentQuery = if (isCommander) it.commanderQuery else it.cardQuery
+            val fresh = if (currentQuery == query) results else emptyList()
+            if (isCommander) it.copy(commanderResults = fresh, isCommanderSearching = false)
+            else it.copy(cardResults = fresh, isCardSearching = false)
         }
     }
 
@@ -562,7 +575,7 @@ class CommunityDecksSearchViewModel(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            results = result.data.decks,
+                            results = result.data.decks.distinctBy { deck -> deck.archidektId },
                             totalCount = result.data.totalCount,
                             hasMore = result.data.hasMore,
                             error = null,
@@ -587,7 +600,9 @@ class CommunityDecksSearchViewModel(
      * old page could land after the new search's results and get appended onto them.
      */
     fun loadMore() {
-        if (_uiState.value.isLoadingMore || !_uiState.value.hasMore) return
+        val current = _uiState.value
+        // A fresh search in flight owns currentPage; paging now would append (or skip) a page of the new query.
+        if (current.isLoading || current.isLoadingMore || !current.hasMore) return
 
         val nextPage = currentPage + 1
 
@@ -609,7 +624,8 @@ class CommunityDecksSearchViewModel(
                     _uiState.update {
                         it.copy(
                             isLoadingMore = false,
-                            results = it.results + result.data.decks,
+                            // Archidekt pages can overlap when the sort order shifts; results are keyed by archidektId.
+                            results = (it.results + result.data.decks).distinctBy { deck -> deck.archidektId },
                             hasMore = result.data.hasMore,
                         )
                     }

@@ -174,6 +174,20 @@ class CommunityDecksRepositoryImplTest {
     }
 
     @Test
+    fun `given the cache write fails after a successful fetch when getDeckById then the fetched deck is still returned`() = runTest {
+        coEvery { cache.getById(testDeckId) } returns null
+        coEvery { api.getDeckById(testDeckId) } returns buildDto()
+        coEvery { cache.insert(any()) } throws IllegalStateException("database or disk is full")
+
+        val result = repository.getDeckById(testDeckId)
+
+        assertTrue(result is DataResult.Success)
+        val success = result as DataResult.Success
+        assertEquals("Test Deck", success.data.name)
+        assertFalse(success.isStale)
+    }
+
+    @Test
     fun `given stale cache when getDeckById then fetches from API`() = runTest {
         // Arrange — stale cache entry (well beyond 24h).
         val staleTime = System.currentTimeMillis() - 48 * 60 * 60 * 1_000L

@@ -1,7 +1,9 @@
 package com.mmg.manahub.feature.communitydecks.domain
 
 import com.mmg.manahub.core.model.CommunityDeck
+import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.feature.communitydecks.domain.usecase.ImportCommunityDeckUseCase
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -87,15 +89,24 @@ class CommunityDeckImportCoordinator(
             stateFlow.value = ImportJobState.Running(processed = 0, total = totalPhysicalCards)
 
             jobs[archidektId] = appScope.launch {
-                val result = importCommunityDeck(
-                    deck = deck,
-                    onProgress = { processed, total -> stateFlow.value = ImportJobState.Running(processed, total) },
-                )
-                stateFlow.value = when (result) {
-                    is ImportCommunityDeckUseCase.ImportResult.Success ->
-                        ImportJobState.Success(result.deckId, result.resolvedCount, result.failedCount)
-                    is ImportCommunityDeckUseCase.ImportResult.Error ->
-                        ImportJobState.Error(result.message)
+                // Always land a terminal state: a stuck Running spins the UI forever and blocks every retry.
+                stateFlow.value = try {
+                    when (
+                        val result = importCommunityDeck(
+                            deck = deck,
+                            onProgress = { processed, total -> stateFlow.value = ImportJobState.Running(processed, total) },
+                        )
+                    ) {
+                        is ImportCommunityDeckUseCase.ImportResult.Success ->
+                            ImportJobState.Success(result.deckId, result.resolvedCount, result.failedCount)
+                        is ImportCommunityDeckUseCase.ImportResult.Error ->
+                            ImportJobState.Error(result.message)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    recordNonFatal("community_deck_import_crashed", e)
+                    ImportJobState.Error(e.message ?: "Import failed")
                 }
             }
         }
