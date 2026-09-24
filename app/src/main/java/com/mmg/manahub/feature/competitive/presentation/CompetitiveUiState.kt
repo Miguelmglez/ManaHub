@@ -90,7 +90,7 @@ data class CompetitiveUiState(
     val expandedCategories: Set<String> = CompetitiveTab.DEFAULT_EXPANDED_CATEGORIES,
 
     /** Persisted postal-code input for the event-locator CTA (DataStore-backed, see
-     * [com.mmg.manahub.core.data.local.UserPreferencesDataStore.competitivePostalCodeFlow]). */
+     * [com.mmg.manahub.core.data.local.UserPreferencesDataStore.eventsPostalCodeFlow]). */
     val postalCode: String = "",
 
     /** Pro Tour / high-level competitive news+videos, filtered from the already-cached News feed.

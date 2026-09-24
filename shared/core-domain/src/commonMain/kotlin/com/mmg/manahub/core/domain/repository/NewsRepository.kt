@@ -3,6 +3,8 @@ package com.mmg.manahub.core.domain.repository
 import com.mmg.manahub.core.model.news.ContentSource
 import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.model.news.RefreshResult
+import com.mmg.manahub.core.model.news.ResolvedSource
+import com.mmg.manahub.core.model.news.SavedNewsItem
 import com.mmg.manahub.core.model.news.SourceType
 import kotlinx.coroutines.flow.Flow
 
@@ -13,6 +15,10 @@ import kotlinx.coroutines.flow.Flow
 interface NewsRepository {
     fun observeNews(): Flow<List<NewsItem>>
     fun observeSources(): Flow<List<ContentSource>>
+
+    /** Saved snapshots, newest save first. */
+    fun observeSaved(): Flow<List<SavedNewsItem>>
+    fun observeSavedIds(): Flow<Set<String>>
 
     /**
      * Refreshes every stale enabled source (per-source watermark, ~1h TTL), or every enabled
@@ -41,4 +47,13 @@ interface NewsRepository {
      * format with no such element, or an unmapped language code — never throws.
      */
     suspend fun detectFeedLanguage(feedUrl: String): String?
+
+    suspend fun save(item: NewsItem)
+    suspend fun unsave(itemId: String)
+
+    /** Finds a feed behind a website, feed URL, YouTube channel link, `@handle` or channel id. */
+    suspend fun resolveSource(input: String): Result<ResolvedSource>
+
+    /** Follows [source] (reusing a matching unfollowed default), then refreshes it right away. */
+    suspend fun followResolvedSource(source: ResolvedSource, name: String, language: String): Result<ContentSource>
 }

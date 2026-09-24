@@ -64,6 +64,8 @@ private val KEY_NEWS_FILTER_TYPES      = stringSetPreferencesKey("news_filter_ty
 private val KEY_NEWS_FILTER_SOURCE_IDS = stringSetPreferencesKey("news_filter_source_ids")
 /** See [KEY_NEWS_FILTER_SOURCE_IDS]. Cleared whenever the allowlist is null or non-empty. */
 private val KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY = booleanPreferencesKey("news_filter_source_ids_explicit_empty")
+/** Set once the retired news filters were translated into followed sources (MTG Today). */
+private val KEY_NEWS_FOLLOW_MIGRATION_DONE = booleanPreferencesKey("news_follow_migration_done")
 private val KEY_PREFERRED_CURRENCY = stringPreferencesKey("preferred_currency")
 private val LAST_PRICE_REFRESH_KEY = longPreferencesKey("last_price_refresh")
 private val AVATAR_URL_KEY         = stringPreferencesKey("avatar_url")
@@ -144,10 +146,8 @@ private val KEY_GAMIFICATION_ENABLED = booleanPreferencesKey("gamification_enabl
  * as gamification's default-OFF and `PuzzleFeatureFlags.PUZZLE_ENABLED`.
  */
 private val KEY_COMPETITIVE_ENABLED = booleanPreferencesKey("competitive_enabled")
-/** Last postal code the user typed into the Competitive screen's event-locator CTA (Phase 5). Not
- * competitive-specific persistence infra — a single plain string field, so it reuses this
- * general-purpose store rather than a dedicated abstraction. */
-private val KEY_COMPETITIVE_POSTAL_CODE = stringPreferencesKey("competitive_postal_code")
+/** Last postal code typed into MTG Today › Events' event locator; the key keeps its original name so users keep it. */
+private val KEY_EVENTS_POSTAL_CODE = stringPreferencesKey("competitive_postal_code")
 /** Retired one-shot backfill guard; still removed on wipe so old installs do not keep it around. */
 private val KEY_GAMIFICATION_BACKFILL_DONE = booleanPreferencesKey("gamification_backfill_done")
 /** Account owning the local gamification store; absent = guest-owned (D3). */
@@ -229,6 +229,13 @@ private val KEY_TRADE_LIST_PUBLIC  = booleanPreferencesKey("trade_list_public")
 private data class UdtRecord(val k: String, val l: String, val c: String)
 private val udtListType = object : TypeToken<List<UdtRecord>>() {}.type
 private val gson = Gson()
+
+/** The retired News filter selection, read once by the follow migration. */
+data class LegacyNewsFilters(
+    val languages: Set<String>?,
+    val sourceIds: Set<String>?,
+    val explicitEmpty: Boolean,
+)
 
 @Singleton
 class UserPreferencesDataStore @Inject constructor(
@@ -386,6 +393,32 @@ class UserPreferencesDataStore @Inject constructor(
             } else {
                 prefs[KEY_NEWS_FILTER_SOURCE_IDS] = updated
             }
+        }
+    }
+
+    // ── News follow migration (MTG Today) ────────────────────────────────────────
+
+    suspend fun isNewsFollowMigrationDone(): Boolean =
+        context.userPrefsDataStore.data.first()[KEY_NEWS_FOLLOW_MIGRATION_DONE] == true
+
+    /** The retired filter selection; languages are projected to short codes, null when never persisted. */
+    suspend fun readLegacyNewsFilters(): LegacyNewsFilters {
+        val prefs = context.userPrefsDataStore.data.first()
+        return LegacyNewsFilters(
+            languages = prefs[KEY_NEWS_LANGUAGES]?.map { it.take(2).lowercase() }?.toSet()?.ifEmpty { null },
+            sourceIds = prefs[KEY_NEWS_FILTER_SOURCE_IDS]?.takeIf { it.isNotEmpty() },
+            explicitEmpty = prefs[KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY] == true,
+        )
+    }
+
+    /** Drops the legacy filter keys and marks the migration done in ONE edit, so a crash can never re-run it on empty keys. */
+    suspend fun completeNewsFollowMigration() {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs.remove(KEY_NEWS_LANGUAGES)
+            prefs.remove(KEY_NEWS_FILTER_TYPES)
+            prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS)
+            prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY)
+            prefs[KEY_NEWS_FOLLOW_MIGRATION_DONE] = true
         }
     }
 
@@ -714,14 +747,13 @@ class UserPreferencesDataStore @Inject constructor(
         context.userPrefsDataStore.edit { it[KEY_COMPETITIVE_ENABLED] = enabled }
     }
 
-    /** Last postal code typed into the Competitive screen's event-locator CTA. Empty until set. */
-    val competitivePostalCodeFlow: Flow<String> = context.userPrefsDataStore.data
-        .map { prefs -> prefs[KEY_COMPETITIVE_POSTAL_CODE] ?: "" }
+    /** Last postal code typed into the Events tab's event locator. Empty until set. */
+    val eventsPostalCodeFlow: Flow<String> = context.userPrefsDataStore.data
+        .map { prefs -> prefs[KEY_EVENTS_POSTAL_CODE] ?: "" }
         .catch { emit("") }
 
-    /** Persists [postalCode] for the event-locator CTA. */
-    suspend fun setCompetitivePostalCode(postalCode: String) {
-        context.userPrefsDataStore.edit { it[KEY_COMPETITIVE_POSTAL_CODE] = postalCode }
+    suspend fun setEventsPostalCode(postalCode: String) {
+        context.userPrefsDataStore.edit { it[KEY_EVENTS_POSTAL_CODE] = postalCode }
     }
 
     /** Account that owns the local gamification store, or null for a guest-owned store (D3). */

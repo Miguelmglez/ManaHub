@@ -63,6 +63,7 @@ import com.mmg.manahub.core.data.local.entity.FriendRequestEntity
 import com.mmg.manahub.core.data.local.entity.OutgoingFriendRequestEntity
 import com.mmg.manahub.core.data.local.entity.ContentSourceEntity
 import com.mmg.manahub.core.data.local.entity.NewsArticleEntity
+import com.mmg.manahub.core.data.local.entity.NewsSavedItemEntity
 import com.mmg.manahub.core.data.local.dao.NewsDao
 import com.mmg.manahub.core.data.local.entity.NewsVideoEntity
 import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
@@ -123,8 +124,10 @@ import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
         // ratings caches, backed by the manahub-competitive Cloudflare Worker (v51)
         CompetitiveMetaCacheEntity::class,
         CompetitiveLimitedRatingsCacheEntity::class,
+        // MTG Today saved items (v57)
+        NewsSavedItemEntity::class,
     ],
-    version = 56,
+    version = 57,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)

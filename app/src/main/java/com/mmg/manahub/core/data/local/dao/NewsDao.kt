@@ -8,6 +8,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.mmg.manahub.core.data.local.entity.ContentSourceEntity
 import com.mmg.manahub.core.data.local.entity.NewsArticleEntity
+import com.mmg.manahub.core.data.local.entity.NewsSavedItemEntity
 import com.mmg.manahub.core.data.local.entity.NewsVideoEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -86,4 +87,22 @@ interface NewsDao {
             "WHERE id = :id"
     )
     suspend fun updateFetchWatermark(id: String, fetchedAt: Long, etag: String?, lastModified: String?)
+
+    @Query("UPDATE content_sources SET site_url = :siteUrl WHERE id = :id")
+    suspend fun updateSiteUrl(id: String, siteUrl: String?)
+
+    // ── Saved items ──────────────────────────────────────────────────────────
+
+    @Query("SELECT * FROM news_saved_items ORDER BY saved_at DESC")
+    fun observeSaved(): Flow<List<NewsSavedItemEntity>>
+
+    @Query("SELECT id FROM news_saved_items")
+    fun observeSavedIds(): Flow<List<String>>
+
+    // IGNORE keeps the first snapshot and its saved_at; ids are stable per item.
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertSaved(item: NewsSavedItemEntity)
+
+    @Query("DELETE FROM news_saved_items WHERE id = :id")
+    suspend fun deleteSaved(id: String)
 }

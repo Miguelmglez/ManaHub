@@ -4,6 +4,8 @@ import com.mmg.manahub.core.domain.repository.NewsRepository
 import com.mmg.manahub.core.model.news.ContentSource
 import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.model.news.RefreshResult
+import com.mmg.manahub.core.model.news.ResolvedSource
+import com.mmg.manahub.core.model.news.SavedNewsItem
 import com.mmg.manahub.core.model.news.SourceType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +20,8 @@ class FakeNewsRepository : NewsRepository {
 
     val newsFlow = MutableStateFlow<List<NewsItem>>(emptyList())
     val sourcesFlow = MutableStateFlow<List<ContentSource>>(emptyList())
+    val savedFlow = MutableStateFlow<List<SavedNewsItem>>(emptyList())
+    val savedIdsFlow = MutableStateFlow<Set<String>>(emptySet())
 
     var refreshAllResult: Result<RefreshResult> = Result.success(RefreshResult(0, 0, 0))
     var refreshSourceResult: Result<Unit> = Result.success(Unit)
@@ -26,6 +30,10 @@ class FakeNewsRepository : NewsRepository {
     )
     var validateFeedResult: Result<Int> = Result.success(1)
     var detectFeedLanguageResult: String? = null
+    var resolveSourceResult: Result<ResolvedSource>? = null
+    var followResolvedSourceResult: Result<ContentSource> = Result.success(
+        ContentSource(id = "followed", name = "name", feedUrl = "https://example.com/feed", type = SourceType.ARTICLE),
+    )
 
     var lastRefreshAllForce: Boolean? = null
     var lastRefreshSourceId: String? = null
@@ -35,12 +43,21 @@ class FakeNewsRepository : NewsRepository {
     var lastDeleteSourceId: String? = null
     var lastValidateFeedArgs: Pair<String, SourceType>? = null
     var lastDetectFeedLanguageUrl: String? = null
+    val savedItems = mutableListOf<NewsItem>()
+    val unsavedIds = mutableListOf<String>()
+    var lastResolveInput: String? = null
+    var lastFollowArgs: FollowArgs? = null
 
     data class AddCustomSourceArgs(val name: String, val feedUrl: String, val type: SourceType, val language: String)
+    data class FollowArgs(val source: ResolvedSource, val name: String, val language: String)
 
     override fun observeNews(): Flow<List<NewsItem>> = newsFlow
 
     override fun observeSources(): Flow<List<ContentSource>> = sourcesFlow
+
+    override fun observeSaved(): Flow<List<SavedNewsItem>> = savedFlow
+
+    override fun observeSavedIds(): Flow<Set<String>> = savedIdsFlow
 
     override suspend fun refreshAll(force: Boolean): Result<RefreshResult> {
         lastRefreshAllForce = force
@@ -79,5 +96,23 @@ class FakeNewsRepository : NewsRepository {
     override suspend fun detectFeedLanguage(feedUrl: String): String? {
         lastDetectFeedLanguageUrl = feedUrl
         return detectFeedLanguageResult
+    }
+
+    override suspend fun save(item: NewsItem) {
+        savedItems += item
+    }
+
+    override suspend fun unsave(itemId: String) {
+        unsavedIds += itemId
+    }
+
+    override suspend fun resolveSource(input: String): Result<ResolvedSource> {
+        lastResolveInput = input
+        return resolveSourceResult ?: error("resolveSourceResult not configured")
+    }
+
+    override suspend fun followResolvedSource(source: ResolvedSource, name: String, language: String): Result<ContentSource> {
+        lastFollowArgs = FollowArgs(source, name, language)
+        return followResolvedSourceResult
     }
 }

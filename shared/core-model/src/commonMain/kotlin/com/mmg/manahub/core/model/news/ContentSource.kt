@@ -1,10 +1,6 @@
 package com.mmg.manahub.core.model.news
 
-/**
- * A news / content feed source configuration. Moved from `:app` feature/news/domain/model
- * during the KMP migration so that the [NewsRepository] interface (`:shared:core-domain`)
- * can reference it from `commonMain`.
- */
+/** A news feed source; [isEnabled] means "followed" (the feed only shows followed sources). */
 data class ContentSource(
     val id: String,
     val name: String,
@@ -14,4 +10,11 @@ data class ContentSource(
     val isDefault: Boolean = true,
     val iconUrl: String? = null,
     val language: String = "en",
-)
+    val siteUrl: String? = null,
+    val lastFetchedAt: Long = 0L,
+) {
+    companion object {
+        /** Short language codes the News feature understands (matches [language]). */
+        val SUPPORTED_LANGUAGES = listOf("en", "es", "de")
+    }
+}

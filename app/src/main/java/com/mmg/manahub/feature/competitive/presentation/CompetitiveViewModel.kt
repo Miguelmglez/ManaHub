@@ -50,7 +50,7 @@ class CompetitiveViewModel(
         crashlytics.setCustomKey("competitive_selected_format", _uiState.value.selectedFormat.id)
         crashlytics.setCustomKey("competitive_selected_tab", _uiState.value.selectedTab.id)
         viewModelScope.launch {
-            userPrefsDataStore.competitivePostalCodeFlow.collect { postalCode ->
+            userPrefsDataStore.eventsPostalCodeFlow.collect { postalCode ->
                 _uiState.update { it.copy(postalCode = postalCode) }
             }
         }
@@ -76,7 +76,7 @@ class CompetitiveViewModel(
     /** Updates and persists the event-locator postal code. */
     fun onPostalCodeChanged(postalCode: String) {
         _uiState.update { it.copy(postalCode = postalCode) }
-        viewModelScope.launch { userPrefsDataStore.setCompetitivePostalCode(postalCode) }
+        viewModelScope.launch { userPrefsDataStore.setEventsPostalCode(postalCode) }
     }
 
     /** Switches the active tab (Tournaments/Metagame/Hub) grouping [ResourceCategory]. No-op if

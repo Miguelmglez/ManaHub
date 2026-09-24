@@ -27,9 +27,8 @@ import org.koin.dsl.module
  * ## Bridge / shared singletons (all resolved via `get()`)
  * - `GetNewsFeedUseCase`, `RefreshNewsFeedUseCase`, `ManageSourcesUseCase` — natively Koin-built in
  *   `SharedDomainKoinModule` (batch 2).
- * - `UserPreferencesDataStore` — already in `coreBridgeKoinModule`; now also consumed by
- *   [NewsRepositoryImpl] itself (News feature improvements Phase 5, F6) to prune a deleted custom
- *   source's id out of the persisted filter allowlist.
+ * - `UserPreferencesDataStore` — already in `coreBridgeKoinModule`; also consumed by
+ *   [NewsRepositoryImpl] for the one-time legacy-filter → follow migration.
  * - `OkHttpClient` — the app-wide client, promoted into `coreBridgeKoinModule` this batch (was only a
  *   Hilt `ManaHubApp` field used for the Coil image loader; now also feeds [NewsFeedService]).
  *

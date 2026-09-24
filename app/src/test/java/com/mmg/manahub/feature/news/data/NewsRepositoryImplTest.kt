@@ -2,18 +2,25 @@ package com.mmg.manahub.feature.news.data
 
 import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.data.local.LegacyNewsFilters
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.NewsDao
 import com.mmg.manahub.core.data.local.entity.ContentSourceEntity
 import com.mmg.manahub.core.data.local.entity.NewsArticleEntity
+import com.mmg.manahub.core.data.local.entity.NewsSavedItemEntity
 import com.mmg.manahub.core.data.local.entity.NewsVideoEntity
-import com.mmg.manahub.core.model.news.NewsFilterPrefs
+import com.mmg.manahub.core.model.news.NewsItem
+import com.mmg.manahub.core.model.news.ResolvedSource
+import com.mmg.manahub.core.model.news.SourceResolveError
+import com.mmg.manahub.core.model.news.SourceResolveException
 import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.feature.news.data.local.DefaultSources
 import com.mmg.manahub.feature.news.data.parser.RssFeedParser
 import com.mmg.manahub.feature.news.data.parser.YouTubeRssFeedParser
 import com.mmg.manahub.feature.news.data.remote.FeedFetchResult
+import com.mmg.manahub.feature.news.data.remote.FetchedPage
 import com.mmg.manahub.feature.news.data.remote.NewsFeedService
+import com.mmg.manahub.feature.news.data.remote.PageFetchException
 import io.mockk.CapturingSlot
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -22,6 +29,8 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.unmockkStatic
+import io.mockk.verify
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -32,7 +41,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Unit tests for [NewsRepositoryImpl] — News feature improvements Phase 1 (per-source
@@ -50,12 +58,17 @@ import java.util.concurrent.atomic.AtomicInteger
  * GROUP 8 — refreshAll: Crashlytics non-fatal is keyed by source id, never the feed URL
  * GROUP 9 — refreshSource (F9)
  * GROUP 10 — addCustomSource: language persistence + HTTPS validation
- * GROUP 11 — deleteSource: F6 allowlist pruning
+ * GROUP 11 — deleteSource: custom sources only
  * GROUP 12 — detectFeedLanguage
  * GROUP 13 — validateFeed
  * GROUP 14 — observeNews / observeSources / toggleSource
  * GROUP 15 — reconcileDefaultSources (dead-source cleanup fix, 2026-07-16): feedUrl drift
  *            rewrite + watermark reset, retired-id cleanup, idempotency, custom sources untouched
+ * GROUP 16 — saved items (snapshot mapping, save/unsave, id set)
+ * GROUP 17 — one-time legacy filter → follow migration
+ * GROUP 18 — default follow policy when seeding + site URLs (catalog for defaults, feed link for custom)
+ * GROUP 19 — resolveSource ("paste any URL")
+ * GROUP 20 — followResolvedSource (dedupe, follow, refresh-on-follow)
  */
 class NewsRepositoryImplTest {
 
@@ -68,6 +81,7 @@ class NewsRepositoryImplTest {
     private lateinit var repository: NewsRepositoryImpl
 
     private val oneHourMs = 60 * 60 * 1000L
+    private var deviceLanguage = "en"
 
     @Before
     fun setUp() {
@@ -77,9 +91,14 @@ class NewsRepositoryImplTest {
         val crashlytics = mockk<FirebaseCrashlytics>(relaxed = true)
         every { FirebaseCrashlytics.getInstance() } returns crashlytics
 
-        repository = NewsRepositoryImpl(newsDao, feedService, rssParser, ytParser, userPrefsDataStore)
+        repository = NewsRepositoryImpl(
+            newsDao, feedService, rssParser, ytParser, userPrefsDataStore,
+            deviceLanguage = { deviceLanguage },
+            nowMs = { System.currentTimeMillis() },
+        )
 
-        every { userPrefsDataStore.observeNewsFilters() } returns flowOf(NewsFilterPrefs.DEFAULT)
+        coEvery { userPrefsDataStore.isNewsFollowMigrationDone() } returns true
+        coEvery { userPrefsDataStore.completeNewsFollowMigration() } returns Unit
         every { rssParser.parse(any(), any(), any()) } returns emptyList()
         every { ytParser.parse(any(), any(), any()) } returns emptyList()
     }
@@ -530,49 +549,36 @@ class NewsRepositoryImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 11 — deleteSource: F6 allowlist pruning
+    //  GROUP 11 — deleteSource: custom only, no filter bookkeeping any more
     // ══════════════════════════════════════════════════════════════════════════
 
-    // NOTE (fix batch, 2026-07-14): pruneSourceFromFilterAllowlist now delegates the whole
-    // read-modify-write to UserPreferencesDataStore.pruneNewsFilterSourceId in a SINGLE atomic
-    // `edit{}` transaction (see that method's KDoc) instead of round-tripping through
-    // observeNewsFilters().first() + setNewsFilters() here — a stale-snapshot read-then-write
-    // could clobber a concurrent filter-apply's language/type change. The "was the id actually
-    // in the allowlist" branching that used to be asserted at THIS layer now lives inside
-    // pruneNewsFilterSourceId itself, so these tests only assert that deleteSource calls (or
-    // doesn't call) that method with the right id.
-
     @Test
-    fun `given deleting a custom source then pruneNewsFilterSourceId is called with its id`() = runTest {
+    fun `given deleting a custom source then it is deleted`() = runTest {
         val custom = articleSource(id = "custom-1").copy(isDefault = false)
-        coEvery { newsDao.getAllSources() } returns listOf(custom)
-        coEvery { userPrefsDataStore.pruneNewsFilterSourceId(any()) } returns Unit
+        coEvery { newsDao.getSourceById("custom-1") } returns custom
 
         repository.deleteSource("custom-1")
 
         coVerify(exactly = 1) { newsDao.deleteSource(custom) }
-        coVerify(exactly = 1) { userPrefsDataStore.pruneNewsFilterSourceId("custom-1") }
     }
 
     @Test
-    fun `given deleting a default source then it is not deleted and pruneNewsFilterSourceId is never called`() = runTest {
+    fun `given deleting a default source then it is not deleted`() = runTest {
         val default = articleSource(id = "default-1").copy(isDefault = true)
-        coEvery { newsDao.getAllSources() } returns listOf(default)
+        coEvery { newsDao.getSourceById("default-1") } returns default
 
         repository.deleteSource("default-1")
 
         coVerify(exactly = 0) { newsDao.deleteSource(any()) }
-        coVerify(exactly = 0) { userPrefsDataStore.pruneNewsFilterSourceId(any()) }
     }
 
     @Test
     fun `given deleting a source id that does not exist then it is a no-op`() = runTest {
-        coEvery { newsDao.getAllSources() } returns emptyList()
+        coEvery { newsDao.getSourceById("ghost") } returns null
 
         repository.deleteSource("ghost")
 
         coVerify(exactly = 0) { newsDao.deleteSource(any()) }
-        coVerify(exactly = 0) { userPrefsDataStore.pruneNewsFilterSourceId(any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -850,5 +856,482 @@ class NewsRepositoryImplTest {
 
         coVerify(exactly = 1) { newsDao.updateSource(match { it.id == "default_article_mtggoldfish" }) }
         coVerify(exactly = 1) { newsDao.deleteSourcesByIds(listOf("default_article_gatheringmagic")) }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 16 — saved items
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private val savedArticle = NewsItem.Article(
+        id = "a1", title = "Title", description = "Desc", imageUrl = "https://img", publishedAt = 10L,
+        sourceName = "Blog", sourceId = "src-1", url = "https://example.com/a1", author = "Ann",
+    )
+
+    private val savedVideo = NewsItem.Video(
+        id = "v1", title = "Video", description = "Desc", imageUrl = null, publishedAt = 20L,
+        sourceName = "Chan", sourceId = "src-2", url = "https://www.youtube.com/watch?v=v1",
+        videoId = "v1", channelName = "Channel", duration = "12:00",
+    )
+
+    @Test
+    fun `given an article when save then a snapshot entity with savedAt is inserted`() = runTest {
+        val slot = slot<NewsSavedItemEntity>()
+        coEvery { newsDao.insertSaved(capture(slot)) } returns Unit
+        val before = System.currentTimeMillis()
+
+        repository.save(savedArticle)
+
+        with(slot.captured) {
+            assertEquals("a1", id)
+            assertEquals("ARTICLE", kind)
+            assertEquals("Ann", author)
+            assertNull(videoId)
+            assertTrue(savedAt >= before)
+        }
+    }
+
+    @Test
+    fun `given a saved video entity when observeSaved then it maps back to a Video`() = runTest {
+        val entity = NewsSavedItemEntity(
+            id = "v1", kind = "VIDEO", title = "Video", description = "Desc", imageUrl = null, publishedAt = 20L,
+            sourceId = "src-2", sourceName = "Chan", url = "https://www.youtube.com/watch?v=v1", author = null,
+            videoId = "v1", channelName = "Channel", duration = "12:00", savedAt = 99L,
+        )
+        every { newsDao.observeSaved() } returns flowOf(listOf(entity))
+
+        repository.observeSaved().test {
+            val saved = awaitItem().single()
+            assertEquals(savedVideo, saved.item)
+            assertEquals(99L, saved.savedAt)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `given saved ids when observeSavedIds then they are exposed as a set`() = runTest {
+        every { newsDao.observeSavedIds() } returns flowOf(listOf("a1", "v1"))
+
+        repository.observeSavedIds().test {
+            assertEquals(setOf("a1", "v1"), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `given unsave then the snapshot is deleted by id`() = runTest {
+        repository.unsave("a1")
+
+        coVerify(exactly = 1) { newsDao.deleteSaved("a1") }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 17 — one-time legacy filter → follow migration
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun source(id: String, language: String, enabled: Boolean = true) =
+        articleSource(id = id, enabled = enabled).copy(language = language, isDefault = true)
+
+    private fun givenMigrationPending(legacy: LegacyNewsFilters, sources: List<ContentSourceEntity>) {
+        coEvery { userPrefsDataStore.isNewsFollowMigrationDone() } returns false
+        coEvery { userPrefsDataStore.readLegacyNewsFilters() } returns legacy
+        coEvery { newsDao.getAllSources() } returns sources
+        coEvery { newsDao.getEnabledSources() } returns emptyList()
+    }
+
+    @Test
+    fun `given legacy English only when refreshAll then Spanish and German sources are unfollowed once`() = runTest {
+        givenMigrationPending(
+            LegacyNewsFilters(languages = setOf("en"), sourceIds = null, explicitEmpty = false),
+            listOf(source("en1", "en"), source("es1", "es"), source("de1", "de")),
+        )
+
+        repository.refreshAll()
+
+        coVerify(exactly = 1) { newsDao.setSourceEnabled("es1", false) }
+        coVerify(exactly = 1) { newsDao.setSourceEnabled("de1", false) }
+        coVerify(exactly = 0) { newsDao.setSourceEnabled("en1", any()) }
+        coVerify(exactly = 1) { userPrefsDataStore.completeNewsFollowMigration() }
+    }
+
+    @Test
+    fun `given no persisted legacy languages when migrating then the old English-only default applies`() = runTest {
+        givenMigrationPending(
+            LegacyNewsFilters(languages = null, sourceIds = null, explicitEmpty = false),
+            listOf(source("en1", "en"), source("es1", "es")),
+        )
+
+        repository.refreshAll()
+
+        coVerify(exactly = 1) { newsDao.setSourceEnabled("es1", false) }
+    }
+
+    @Test
+    fun `given a legacy allowlist when migrating then only allowlisted sources in a selected language stay followed`() = runTest {
+        givenMigrationPending(
+            LegacyNewsFilters(languages = setOf("en", "es"), sourceIds = setOf("es1"), explicitEmpty = false),
+            listOf(source("en1", "en"), source("es1", "es")),
+        )
+
+        repository.refreshAll()
+
+        coVerify(exactly = 1) { newsDao.setSourceEnabled("en1", false) }
+        coVerify(exactly = 0) { newsDao.setSourceEnabled("es1", any()) }
+    }
+
+    @Test
+    fun `given a fresh install with no sources when migrating then only the flag is set`() = runTest {
+        givenMigrationPending(LegacyNewsFilters(null, null, false), emptyList())
+
+        repository.refreshAll()
+
+        coVerify(exactly = 0) { newsDao.setSourceEnabled(any(), any()) }
+        coVerify(exactly = 0) { userPrefsDataStore.readLegacyNewsFilters() }
+        coVerify(exactly = 1) { userPrefsDataStore.completeNewsFollowMigration() }
+    }
+
+    @Test
+    fun `given the migration fails when refreshAll then the refresh still succeeds and the flag stays unset`() = runTest {
+        givenMigrationPending(LegacyNewsFilters(null, null, false), listOf(source("en1", "en")))
+        coEvery { userPrefsDataStore.readLegacyNewsFilters() } throws RuntimeException("disk")
+
+        val result = repository.refreshAll()
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 0) { userPrefsDataStore.completeNewsFollowMigration() }
+    }
+
+    @Test
+    fun `given the migration is already done when observing sources then legacy filters are never read`() = runTest {
+        every { newsDao.observeSources() } returns flowOf(emptyList())
+
+        repository.observeSources().test {
+            awaitItem()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerify(exactly = 0) { userPrefsDataStore.readLegacyNewsFilters() }
+    }
+
+    @Test
+    fun `given a pending migration when observing sources then it runs before the first emission`() = runTest {
+        givenMigrationPending(LegacyNewsFilters(setOf("en"), null, false), listOf(source("en1", "en"), source("es1", "es")))
+        every { newsDao.observeSources() } returns flowOf(emptyList())
+
+        repository.observeSources().test {
+            awaitItem()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerify(exactly = 1) { newsDao.setSourceEnabled("es1", false) }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 18 — default follow policy + site URLs
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given a Spanish device when seeding defaults then English and Spanish defaults start followed but not German`() = runTest {
+        deviceLanguage = "es"
+        val slot = slot<List<ContentSourceEntity>>()
+        coEvery { newsDao.insertSourcesIfAbsent(capture(slot)) } returns Unit
+        coEvery { newsDao.getEnabledSources() } returns emptyList()
+
+        repository.refreshAll()
+
+        val byLanguage = slot.captured.groupBy { it.language }
+        assertTrue(byLanguage.getValue("en").all { it.isEnabled })
+        assertTrue(byLanguage.getValue("es").all { it.isEnabled })
+        assertTrue(byLanguage.getValue("de").none { it.isEnabled })
+    }
+
+    @Test
+    fun `given every default in the catalog then each has an https site url`() {
+        assertTrue(DefaultSources.all.all { it.siteUrl?.startsWith("https://") == true })
+    }
+
+    @Test
+    fun `given a persisted default without a site url when refreshAll then the catalog site url is filled in`() = runTest {
+        val catalog = DefaultSources.all.first { it.id == "default_article_scg" }
+        coEvery { newsDao.getAllSources() } returns listOf(catalog.copy(siteUrl = null, isEnabled = false))
+        coEvery { newsDao.getEnabledSources() } returns emptyList()
+
+        repository.refreshAll()
+
+        coVerify(exactly = 1) {
+            newsDao.updateSource(match { it.siteUrl == catalog.siteUrl && !it.isEnabled && it.feedUrl == catalog.feedUrl })
+        }
+    }
+
+    private val rssWithChannelLink = """
+        <rss version="2.0"><channel><title>Blog</title><link>https://custom.example.com/</link>
+        <item><title>A</title><link>https://custom.example.com/a</link></item></channel></rss>
+    """.trimIndent()
+
+    @Test
+    fun `given a custom article source fetched with a new channel link then its site url is persisted`() = runTest {
+        val custom = articleSource(id = "custom_1")
+        coEvery { newsDao.getEnabledSources() } returns listOf(custom)
+        coEvery { feedService.fetchFeed(any(), any(), any()) } returns fetched(body = rssWithChannelLink)
+
+        repository.refreshAll()
+
+        coVerify(exactly = 1) { newsDao.updateSiteUrl("custom_1", "https://custom.example.com/") }
+    }
+
+    @Test
+    fun `given a default article source when fetched then the feed link never overrides the catalog site url`() = runTest {
+        val default = articleSource(id = "default_x").copy(isDefault = true)
+        coEvery { newsDao.getEnabledSources() } returns listOf(default)
+        coEvery { feedService.fetchFeed(any(), any(), any()) } returns fetched(body = rssWithChannelLink)
+
+        repository.refreshAll()
+
+        coVerify(exactly = 0) { newsDao.updateSiteUrl(any(), any()) }
+    }
+
+    @Test
+    fun `given the persisted site url already matches when fetched then nothing is written`() = runTest {
+        val custom = articleSource(id = "custom_1").copy(siteUrl = "https://custom.example.com/")
+        coEvery { newsDao.getEnabledSources() } returns listOf(custom)
+        coEvery { feedService.fetchFeed(any(), any(), any()) } returns fetched(body = rssWithChannelLink)
+
+        repository.refreshAll()
+
+        coVerify(exactly = 0) { newsDao.updateSiteUrl(any(), any()) }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 19 — resolveSource
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private val channelId = "UC8ZGymAvfP97qJabgqUkz4A"
+    private val youTubeFeedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=$channelId"
+
+    private val spanishRss = """
+        <?xml version="1.0"?><rss version="2.0"><channel><title>Blog de Magic</title>
+        <link>https://blog.example.com</link><language>es-ES</language>
+        <item><title>A</title><link>https://blog.example.com/a</link></item></channel></rss>
+    """.trimIndent()
+
+    private val youTubeAtom = """
+        <feed xmlns="http://www.w3.org/2005/Atom"><title>Magic: The Gathering</title>
+        <link rel="alternate" href="https://www.youtube.com/channel/$channelId"/><entry><title>V</title></entry></feed>
+    """.trimIndent()
+
+    private fun page(body: String, finalUrl: String) = Result.success(FetchedPage(body, finalUrl, "text/html"))
+
+    private fun articleEntity(id: String, publishedAt: Long) =
+        NewsArticleEntity(id, "Title $id", "D", null, publishedAt, "Blog de Magic", "preview", "https://blog.example.com/$id", null)
+
+    private fun resolveError(result: Result<*>): SourceResolveError? =
+        (result.exceptionOrNull() as? SourceResolveException)?.error
+
+    @Test
+    fun `given a direct feed url then name language site and a newest-first preview of three come from the feed`() = runTest {
+        coEvery { feedService.fetchPage("https://blog.example.com/feed") } returns page(spanishRss, "https://blog.example.com/feed/")
+        every { rssParser.parse(spanishRss, any(), "Blog de Magic") } returns
+            listOf(articleEntity("1", 1L), articleEntity("2", 4L), articleEntity("3", 3L), articleEntity("4", 2L))
+
+        val resolved = repository.resolveSource("blog.example.com/feed").getOrThrow()
+
+        assertEquals("Blog de Magic", resolved.name)
+        assertEquals("https://blog.example.com/feed/", resolved.feedUrl)
+        assertEquals("https://blog.example.com", resolved.siteUrl)
+        assertEquals("es", resolved.language)
+        assertEquals(SourceType.ARTICLE, resolved.type)
+        assertEquals(listOf("2", "3", "4"), resolved.preview.map { it.id })
+    }
+
+    @Test
+    fun `given a website with an autodiscovery link then its feed is fetched`() = runTest {
+        val html = """<html><head><link rel="alternate" type="application/rss+xml" href="/rss.xml"></head></html>"""
+        coEvery { feedService.fetchPage("https://blog.example.com") } returns page(html, "https://blog.example.com/")
+        coEvery { feedService.fetchPage("https://blog.example.com/rss.xml") } returns page(spanishRss, "https://blog.example.com/rss.xml")
+        every { rssParser.parse(any(), any(), any()) } returns listOf(articleEntity("1", 1L))
+
+        val resolved = repository.resolveSource("http://blog.example.com").getOrThrow()
+
+        assertEquals("https://blog.example.com/rss.xml", resolved.feedUrl)
+    }
+
+    @Test
+    fun `given a website without autodiscovery then fallback paths are probed until one is a feed`() = runTest {
+        coEvery { feedService.fetchPage(any()) } returns page("<html></html>", "https://blog.example.com/")
+        coEvery { feedService.fetchPage("https://blog.example.com/feed/") } returns page(spanishRss, "https://blog.example.com/feed/")
+        every { rssParser.parse(any(), any(), any()) } returns listOf(articleEntity("1", 1L))
+
+        val resolved = repository.resolveSource("https://blog.example.com").getOrThrow()
+
+        assertEquals("https://blog.example.com/feed/", resolved.feedUrl)
+        coVerify(exactly = 0) { feedService.fetchPage("https://blog.example.com/rss") }
+    }
+
+    @Test
+    fun `given a website with no feed anywhere then NO_FEED_FOUND after at most one page and six probes`() = runTest {
+        coEvery { feedService.fetchPage(any()) } returns page("<html></html>", "https://blog.example.com/")
+
+        val result = repository.resolveSource("https://blog.example.com")
+
+        assertEquals(SourceResolveError.NO_FEED_FOUND, resolveError(result))
+        coVerify(exactly = 7) { feedService.fetchPage(any()) }
+    }
+
+    @Test
+    fun `given a YouTube handle then the channel page is fetched once and its feed resolved as a video source`() = runTest {
+        val html = """<link rel="canonical" href="https://www.youtube.com/channel/$channelId">"""
+        coEvery { feedService.fetchPage("https://www.youtube.com/@magic") } returns page(html, "https://www.youtube.com/@magic")
+        coEvery { feedService.fetchPage(youTubeFeedUrl) } returns page(youTubeAtom, youTubeFeedUrl)
+        every { ytParser.parse(youTubeAtom, any(), any()) } returns
+            listOf(NewsVideoEntity("v1", "V", "D", null, 1L, "Magic: The Gathering", "preview", "https://y/v1", "Magic"))
+
+        val resolved = repository.resolveSource("@magic").getOrThrow()
+
+        assertEquals(SourceType.VIDEO, resolved.type)
+        assertEquals(youTubeFeedUrl, resolved.feedUrl)
+        assertEquals("https://www.youtube.com/channel/$channelId", resolved.siteUrl)
+        assertEquals("Magic: The Gathering", resolved.name)
+        coVerify(exactly = 1) { feedService.fetchPage("https://www.youtube.com/@magic") }
+    }
+
+    @Test
+    fun `given a YouTube handle page that 404s then YOUTUBE_CHANNEL_NOT_FOUND`() = runTest {
+        coEvery { feedService.fetchPage(any()) } returns
+            Result.failure(PageFetchException(PageFetchException.Reason.HTTP_ERROR, httpCode = 404))
+
+        assertEquals(SourceResolveError.YOUTUBE_CHANNEL_NOT_FOUND, resolveError(repository.resolveSource("@ghost")))
+    }
+
+    @Test
+    fun `given a YouTube page without a channel id then YOUTUBE_CHANNEL_NOT_FOUND`() = runTest {
+        coEvery { feedService.fetchPage(any()) } returns page("<html>consent</html>", "https://consent.youtube.com")
+
+        assertEquals(SourceResolveError.YOUTUBE_CHANNEL_NOT_FOUND, resolveError(repository.resolveSource("@magic")))
+    }
+
+    @Test
+    fun `given a channel the user already follows then ALREADY_FOLLOWING without any network call`() = runTest {
+        coEvery { newsDao.getAllSources() } returns listOf(
+            articleSource(id = "default_video_mtg_official").copy(feedUrl = youTubeFeedUrl, type = "VIDEO", isEnabled = true),
+        )
+
+        val result = repository.resolveSource(channelId)
+
+        assertEquals(SourceResolveError.ALREADY_FOLLOWING, resolveError(result))
+        coVerify(exactly = 0) { feedService.fetchPage(any()) }
+    }
+
+    @Test
+    fun `given a feed with no items then EMPTY_FEED`() = runTest {
+        coEvery { feedService.fetchPage(any()) } returns page(spanishRss, "https://blog.example.com/feed")
+        every { rssParser.parse(any(), any(), any()) } returns emptyList()
+
+        assertEquals(SourceResolveError.EMPTY_FEED, resolveError(repository.resolveSource("https://blog.example.com/feed")))
+    }
+
+    @Test
+    fun `given a redirect to plain http then NOT_HTTPS`() = runTest {
+        coEvery { feedService.fetchPage(any()) } returns Result.failure(PageFetchException(PageFetchException.Reason.NOT_HTTPS))
+
+        assertEquals(SourceResolveError.NOT_HTTPS, resolveError(repository.resolveSource("https://blog.example.com")))
+    }
+
+    @Test
+    fun `given a network failure then UNREACHABLE and nothing is reported to Crashlytics`() = runTest {
+        val crashlytics = mockk<FirebaseCrashlytics>(relaxed = true)
+        every { FirebaseCrashlytics.getInstance() } returns crashlytics
+        coEvery { feedService.fetchPage(any()) } returns Result.failure(java.net.UnknownHostException("blog.example.com"))
+
+        assertEquals(SourceResolveError.UNREACHABLE, resolveError(repository.resolveSource("https://blog.example.com")))
+        verify(exactly = 0) { crashlytics.recordException(any()) }
+    }
+
+    @Test
+    fun `given an unexpected failure then UNREACHABLE and the non-fatal carries no url`() = runTest {
+        val crashlytics = mockk<FirebaseCrashlytics>(relaxed = true)
+        every { FirebaseCrashlytics.getInstance() } returns crashlytics
+        val recorded = slot<Throwable>()
+        every { crashlytics.recordException(capture(recorded)) } returns Unit
+        coEvery { feedService.fetchPage(any()) } returns
+            Result.failure(IllegalStateException("boom for https://secret.example.com/feed"))
+
+        val result = repository.resolveSource("https://secret.example.com/feed")
+
+        assertEquals(SourceResolveError.UNREACHABLE, resolveError(result))
+        var cause: Throwable? = recorded.captured
+        while (cause != null) {
+            assertFalse(cause.message.orEmpty().contains("secret.example.com"))
+            cause = cause.cause
+        }
+    }
+
+    @Test
+    fun `given text that is not a link then INVALID_INPUT without any network call`() = runTest {
+        assertEquals(SourceResolveError.INVALID_INPUT, resolveError(repository.resolveSource("magic news")))
+        coVerify(exactly = 0) { feedService.fetchPage(any()) }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 20 — followResolvedSource
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private val resolvedBlog = ResolvedSource(
+        name = "Blog de Magic",
+        feedUrl = "https://blog.example.com/feed/",
+        siteUrl = "https://blog.example.com",
+        type = SourceType.ARTICLE,
+        language = "es",
+        preview = emptyList(),
+    )
+
+    @Test
+    fun `given a new feed when following then a followed custom source is inserted and refreshed right away`() = runTest {
+        val inserted = slot<List<ContentSourceEntity>>()
+        coEvery { newsDao.insertSourcesIfAbsent(capture(inserted)) } returns Unit
+        coEvery { newsDao.getSourceById(any()) } answers { inserted.captured.single() }
+        coEvery { feedService.fetchFeed(any(), any(), any()) } returns fetched()
+
+        val followed = repository.followResolvedSource(resolvedBlog, name = "My Blog", language = "es").getOrThrow()
+
+        with(inserted.captured.single()) {
+            assertTrue(id.startsWith("custom_"))
+            assertEquals("My Blog", name)
+            assertEquals("https://blog.example.com/feed/", feedUrl)
+            assertEquals("ARTICLE", type)
+            assertEquals("es", language)
+            assertEquals("https://blog.example.com", siteUrl)
+            assertTrue(isEnabled)
+            assertFalse(isDefault)
+        }
+        assertEquals("My Blog", followed.name)
+        coVerify(exactly = 1) { feedService.fetchFeed("https://blog.example.com/feed/", any(), any()) }
+    }
+
+    @Test
+    fun `given the feed matches an unfollowed default when following then the default is followed instead of duplicated`() = runTest {
+        val default = articleSource(id = "default_blog", enabled = false).copy(isDefault = true, feedUrl = "https://www.blog.example.com/feed")
+        coEvery { newsDao.getAllSources() } returns listOf(default)
+
+        val followed = repository.followResolvedSource(resolvedBlog, name = "ignored", language = "es").getOrThrow()
+
+        assertEquals("default_blog", followed.id)
+        coVerify(exactly = 1) { newsDao.setSourceEnabled("default_blog", true) }
+        coVerify(exactly = 0) { newsDao.insertSourcesIfAbsent(any()) }
+    }
+
+    @Test
+    fun `given the feed is already followed when following then ALREADY_FOLLOWING`() = runTest {
+        coEvery { newsDao.getAllSources() } returns listOf(articleSource(id = "custom_1").copy(feedUrl = "https://blog.example.com/feed"))
+
+        val result = repository.followResolvedSource(resolvedBlog, name = "x", language = "en")
+
+        assertEquals(SourceResolveError.ALREADY_FOLLOWING, resolveError(result))
+    }
+
+    @Test
+    fun `given a non https feed when following then NOT_HTTPS and nothing is persisted`() = runTest {
+        val result = repository.followResolvedSource(resolvedBlog.copy(feedUrl = "http://blog.example.com/feed"), "x", "en")
+
+        assertEquals(SourceResolveError.NOT_HTTPS, resolveError(result))
+        coVerify(exactly = 0) { newsDao.insertSourcesIfAbsent(any()) }
     }
 }

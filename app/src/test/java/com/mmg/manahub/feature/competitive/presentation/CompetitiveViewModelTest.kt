@@ -49,8 +49,8 @@ class CompetitiveViewModelTest {
         // doesn't throw. Mirrors HomeViewModelTest's setup.
         mockkStatic(FirebaseCrashlytics::class)
         every { FirebaseCrashlytics.getInstance() } returns crashlyticsMock
-        every { userPrefsDataStore.competitivePostalCodeFlow } returns flowOf("")
-        coEvery { userPrefsDataStore.setCompetitivePostalCode(any()) } returns Unit
+        every { userPrefsDataStore.eventsPostalCodeFlow } returns flowOf("")
+        coEvery { userPrefsDataStore.setEventsPostalCode(any()) } returns Unit
         every { getProTourContent() } returns flowOf(emptyList())
     }
 
@@ -112,7 +112,7 @@ class CompetitiveViewModelTest {
     @Test
     fun `postal code flow updates uiState reactively`() = runTest(dispatcher) {
         val postalFlow = MutableStateFlow("")
-        every { userPrefsDataStore.competitivePostalCodeFlow } returns postalFlow
+        every { userPrefsDataStore.eventsPostalCodeFlow } returns postalFlow
 
         val viewModel = buildViewModel()
         advanceUntilIdle()
