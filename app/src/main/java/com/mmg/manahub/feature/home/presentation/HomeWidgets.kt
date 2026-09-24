@@ -1,31 +1,12 @@
 package com.mmg.manahub.feature.home.presentation
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.EaseOutCubic
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.material.icons.filled.Casino
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.max
-import com.mmg.manahub.core.ui.CardSharedBoundsTransform
-import com.mmg.manahub.core.ui.components.MagicSkeletonBlock
-import com.mmg.manahub.core.ui.components.MagicSkeletonPulse
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -41,6 +22,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -54,17 +36,22 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -77,6 +64,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -94,16 +82,21 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -115,21 +108,30 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.max
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.svg.SvgDecoder
 import com.mmg.manahub.R
-import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.model.Friend
@@ -138,23 +140,30 @@ import com.mmg.manahub.core.model.QuickStartAction
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
 import com.mmg.manahub.core.model.news.NewsItem
+import com.mmg.manahub.core.ui.CardSharedBoundsTransform
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.AvatarImage
 import com.mmg.manahub.core.ui.components.CircularDistribution
+import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.components.DraftSetCard
+import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.components.MagicSelectionItem
+import com.mmg.manahub.core.ui.components.MagicSkeletonBlock
+import com.mmg.manahub.core.ui.components.MagicSkeletonPulse
 import com.mmg.manahub.core.ui.components.NewsItemCard
 import com.mmg.manahub.core.ui.components.NewsItemOrientation
 import com.mmg.manahub.core.ui.components.OracleText
 import com.mmg.manahub.core.ui.components.search.SetPickerSheet
 import com.mmg.manahub.core.ui.isReducedMotionEnabled
 import com.mmg.manahub.core.ui.mtg_card_back
-import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.SmallCardShape
@@ -163,22 +172,11 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.TimeAgoFormatter
+import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckFormatFilter
+import com.mmg.manahub.feature.communitydecks.presentation.displayResId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
-import androidx.compose.material.icons.filled.AddCircle
-import androidx.compose.material.icons.filled.Lock
-import com.mmg.manahub.core.ui.components.CopyBadge
-import com.mmg.manahub.core.ui.components.EmptyState
-import com.mmg.manahub.core.ui.components.InlineErrorState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
-import com.mmg.manahub.core.ui.components.MagicFilterChip
-import com.mmg.manahub.core.ui.components.MagicSelectionItem
-import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckFormatFilter
-import com.mmg.manahub.feature.communitydecks.presentation.displayResId
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Home widget host + body slot + shared chrome
@@ -647,7 +645,6 @@ private fun widgetHeaderTitleClickAction(type: HomeWidgetType): HomeAction? = wh
     HomeWidgetType.RULES_TIP,
     HomeWidgetType.CONTEXT_HERO,
     HomeWidgetType.COMPETITIVE,
-   // HomeWidgetType.MULTI_CARD_ADD,
     -> null
 }
 
@@ -832,7 +829,7 @@ private fun widgetHeaderTrailingContent(
     HomeWidgetType.RULES_TIP -> {
         {
             RollIconButton(
-                icon = Icons.Default.Casino,
+                icon = Icons.Default.Refresh,
                 contentDescription = stringResource(R.string.home_rules_tip_roll_a11y),
                 onClick = { onAction(HomeAction.RollRulesTip) },
             )
