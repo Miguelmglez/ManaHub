@@ -16,7 +16,7 @@ shared UI component inventory in CLAUDE.md. Everything below was deliberately le
 - [ ] **On-device verification**: nothing was checked visually (no emulator). Check the Home staggered
       reveal, fixed slot heights (NeonVoid + HallowedPrint), Rules Tip roll, Card Detail return
       transition, widget gallery add/remove/move, double-back toast, trades screens.
-- [ ] **`Migration54To55Test`** compiles but was never executed (instrumented). Regenerate the Room
+- [ ] **`Migration55To56Test`** compiles but was never executed (instrumented). Regenerate the Room
       schema JSON locally.
 
 ## 2. Web parity

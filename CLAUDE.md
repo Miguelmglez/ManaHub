@@ -132,7 +132,7 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
 - → memory: `feedback_sync_watermark_never_past_unapplied`, `feedback_setof_rpc_must_be_paginated`,
   `feedback_idempotency_gate_tests_own_completion`, `project_collection_sync_data_loss_2026-09`
 
-### Database (Room v55)
+### Database (Room v56)
 - DB file `mtg_collection.db`. The `UserCardEntity` → `CardEntity` FK was **removed in v53** (ADR-008);
   do not reintroduce it. It was `ON DELETE RESTRICT` from v38 to v52.
 - Migration chain 1→53, gaps at 7–10 and 15–17 covered by `fallbackToDestructiveMigration()` (dev-only;
@@ -150,8 +150,9 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
   indices; those index names must match Room's generated names byte for byte or
   `runMigrationsAndValidate` crash-loops every user at launch (destructive fallback covers only
   v1–24). Guarded by `Migration52To53Test`.
-  v54 = additive `decks.posture_override`; v55 = additive `trade_collection_sync.pending_apply` +
-  nullable `owner_user_id` on `local_wishlists`/`local_open_for_trade` (Trades audit H4/H8).
+  v54 = additive `decks.posture_override`; v55 = additive `draft_sets.setImageUrl` (Draft);
+  v56 = additive `trade_collection_sync.pending_apply` + nullable `owner_user_id` on
+  `local_wishlists`/`local_open_for_trade` (Trades audit H4/H8).
   Every migration since v39 follows the same pattern: a top-level `val MIGRATION_x_y` in its own file,
   `CREATE TABLE IF NOT EXISTS …` / `ADD COLUMN … TEXT NOT NULL DEFAULT '…'` guarded by a
   `columnExists` check where applicable, CardDao upsert untouched → no CASCADE risk.

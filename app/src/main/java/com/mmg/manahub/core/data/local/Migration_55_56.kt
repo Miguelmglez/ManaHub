@@ -4,12 +4,12 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
- * v54 → v55 — Trades audit 2026-09-23 (H4 + H8). Purely ADDITIVE, three columns:
+ * v55 → v56 — Trades audit 2026-09-23 (H4 + H8). Purely ADDITIVE, three columns:
  *  - `trade_collection_sync.pending_apply` — `INTEGER NOT NULL DEFAULT 0`. A row with 1 records the
  *    user's choice to update the collection once the trade reaches COMPLETED; existing rows are
  *    applied records, so the default 0 keeps their meaning.
  *  - `local_wishlists.owner_user_id` and `local_open_for_trade.owner_user_id` — `TEXT` nullable, no
- *    default. NULL means a guest row (or a pre-v55 row whose owner is unknown); the account-switch
+ *    default. NULL means a guest row (or a pre-v56 row whose owner is unknown); the account-switch
  *    cleanup treats unknown-owner synced rows as re-downloadable.
  *
  * No table is recreated, so `CardDao`'s upsert and every index are untouched. Each `ADD COLUMN` is
@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * types/defaults mirror what Room generates for the entity fields so `runMigrationsAndValidate`
  * passes. Top-level `val` so the instrumented `MigrationTestHelper` test can reference it.
  */
-val MIGRATION_54_55 = object : Migration(54, 55) {
+val MIGRATION_55_56 = object : Migration(55, 56) {
     override fun migrate(db: SupportSQLiteDatabase) {
         if (!columnExists(db, "trade_collection_sync", "pending_apply")) {
             db.execSQL("ALTER TABLE `trade_collection_sync` ADD COLUMN `pending_apply` INTEGER NOT NULL DEFAULT 0")

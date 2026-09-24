@@ -13,18 +13,18 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Instrumented test for the v54 → v55 migration ([MIGRATION_54_55]).
+ * Instrumented test for the v55 → v56 migration ([MIGRATION_55_56]).
  *
  * Verifies that the migration adds `trade_collection_sync.pending_apply` (existing records default
  * to 0, i.e. still "applied") and the nullable `owner_user_id` on `local_wishlists` and
  * `local_open_for_trade` (existing rows default to NULL, never a fabricated owner), and that the
- * result validates against Room's v55 schema.
+ * result validates against Room's v56 schema.
  *
  * Schemas are loaded from androidTest assets (see `sourceSets.androidTest.assets` in
  * app/build.gradle.kts). Requires a connected device/emulator (`./gradlew connectedAndroidTest`).
  */
 @RunWith(AndroidJUnit4::class)
-class Migration54To55Test {
+class Migration55To56Test {
 
     @get:Rule
     val helper = MigrationTestHelper(
@@ -35,8 +35,8 @@ class Migration54To55Test {
     )
 
     @Test
-    fun migrate54to55_addsTradeColumns_andPreservesExistingRows() {
-        helper.createDatabase(TEST_DB, 54).apply {
+    fun migrate55to56_addsTradeColumns_andPreservesExistingRows() {
+        helper.createDatabase(TEST_DB, 55).apply {
             insert("trade_collection_sync", SQLiteDatabase.CONFLICT_REPLACE, ContentValues().apply {
                 put("proposal_id", "proposal-1")
                 put("user_id", "user-1")
@@ -64,7 +64,7 @@ class Migration54To55Test {
             close()
         }
 
-        val db = helper.runMigrationsAndValidate(TEST_DB, 55, /* validateDroppedTables = */ true, MIGRATION_54_55)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 56, /* validateDroppedTables = */ true, MIGRATION_55_56)
 
         db.query("SELECT pending_apply FROM trade_collection_sync WHERE proposal_id = 'proposal-1'").use { cursor ->
             assertEquals(1, cursor.count)
