@@ -3,10 +3,8 @@ package com.mmg.manahub.feature.decks.presentation
 // COMMENTS_REVIEWED: 2026-09-16
 
 import com.mmg.manahub.core.model.DeckFormat
-import com.mmg.manahub.feature.decks.presentation.components.DeckAddCardsMethod
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -149,93 +147,5 @@ class DeckStudioScreenLogicTest {
         )
     }
 
-    @Test
-    fun `manual search stays pending while method sheet is mounted and opens after dismissal`() {
-        assertNull(
-            resolvePendingDeckAddCardsAction(
-                method = DeckAddCardsMethod.MANUAL_SEARCH,
-                methodSheetVisible = true,
-                isDestinationResumed = true,
-                isNavigatingToScanner = false,
-                deckId = "deck-1",
-            ),
-        )
-        assertEquals(
-            PendingDeckAddCardsAction.OpenManualSearch,
-            resolvePendingDeckAddCardsAction(
-                method = DeckAddCardsMethod.MANUAL_SEARCH,
-                methodSheetVisible = false,
-                isDestinationResumed = true,
-                isNavigatingToScanner = false,
-                deckId = "deck-1",
-            ),
-        )
-    }
 
-    @Test
-    fun `scanner navigation stays pending while method sheet is mounted and resolves after dismissal`() {
-        assertNull(
-            resolvePendingDeckAddCardsAction(
-                method = DeckAddCardsMethod.SCAN_CARDS,
-                methodSheetVisible = true,
-                isDestinationResumed = true,
-                isNavigatingToScanner = false,
-                deckId = "deck-1",
-            ),
-        )
-        assertEquals(
-            PendingDeckAddCardsAction.NavigateToScanner("deck-1"),
-            resolvePendingDeckAddCardsAction(
-                method = DeckAddCardsMethod.SCAN_CARDS,
-                methodSheetVisible = false,
-                isDestinationResumed = true,
-                isNavigatingToScanner = false,
-                deckId = "deck-1",
-            ),
-        )
-    }
-
-    @Test
-    fun `pending action waits for resumed destination`() {
-        assertNull(
-            resolvePendingDeckAddCardsAction(
-                method = DeckAddCardsMethod.MANUAL_SEARCH,
-                methodSheetVisible = false,
-                isDestinationResumed = false,
-                isNavigatingToScanner = false,
-                deckId = "deck-1",
-            ),
-        )
-    }
-
-    @Test
-    fun `scanner navigation requires a non-blank deck id and idle navigation state`() {
-        assertNull(
-            resolvePendingDeckAddCardsAction(
-                method = DeckAddCardsMethod.SCAN_CARDS,
-                methodSheetVisible = false,
-                isDestinationResumed = true,
-                isNavigatingToScanner = false,
-                deckId = null,
-            ),
-        )
-        assertNull(
-            resolvePendingDeckAddCardsAction(
-                method = DeckAddCardsMethod.SCAN_CARDS,
-                methodSheetVisible = false,
-                isDestinationResumed = true,
-                isNavigatingToScanner = false,
-                deckId = "   ",
-            ),
-        )
-        assertNull(
-            resolvePendingDeckAddCardsAction(
-                method = DeckAddCardsMethod.SCAN_CARDS,
-                methodSheetVisible = false,
-                isDestinationResumed = true,
-                isNavigatingToScanner = true,
-                deckId = "deck-1",
-            ),
-        )
-    }
 }

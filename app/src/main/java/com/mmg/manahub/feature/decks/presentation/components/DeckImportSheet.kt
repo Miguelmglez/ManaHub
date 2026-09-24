@@ -26,14 +26,15 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,7 @@ import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import kotlinx.coroutines.launch
 
 /**
  * Bottom sheet where the user can paste a Moxfield/Arena list to import (decks and the Collection
@@ -75,14 +77,30 @@ fun DeckImportSheet(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     var pastedText by remember { mutableStateOf("") }
+    var isClosingProgrammatically by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { value ->
+            if (value == SheetValue.Hidden && !isClosingProgrammatically) {
+                false
+            } else {
+                true
+            }
+        },
+    )
+    val closeSheet: () -> Unit = {
+        scope.launch {
+            isClosingProgrammatically = true
+            sheetState.hide()
+            onDismiss()
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor   = mc.backgroundSecondary,
-        sheetState       = rememberModalBottomSheetState(
-            skipPartiallyExpanded = true,
-            confirmValueChange = { it != SheetValue.Hidden }
-        ),
+        sheetState       = sheetState,
         dragHandle = null,
     ) {
         Column(
@@ -99,7 +117,7 @@ fun DeckImportSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = onDismiss,
+                    onClick = closeSheet,
                     modifier = Modifier.offset(x = (-12).dp)
                 ) {
                     Icon(
@@ -108,12 +126,12 @@ fun DeckImportSheet(
                         tint = mc.textSecondary
                     )
                 }
+                Text(
+                    text  = title,
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
+                )
             }
-            Text(
-                text  = title,
-                style = ty.titleMedium,
-                color = mc.textPrimary,
-            )
 
             Text(
                 text  = hint,
@@ -194,7 +212,7 @@ fun DeckImportSheet(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     OutlinedButton(
-                        onClick  = onDismiss,
+                        onClick  = closeSheet,
                         modifier = Modifier.weight(1f),
                         shape    = RoundedCornerShape(8.dp),
                     ) {

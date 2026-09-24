@@ -57,8 +57,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.UploadFile
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -67,6 +65,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -80,16 +79,18 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
@@ -182,33 +183,13 @@ import com.mmg.manahub.feature.decks.presentation.components.TribeOption
 import com.mmg.manahub.feature.decks.presentation.components.WarningOverlay
 import com.mmg.manahub.feature.decks.presentation.components.groupCards
 import com.mmg.manahub.feature.decks.presentation.components.label
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.koin.androidx.compose.koinViewModel
 
 // CardSearchSheet's own tab indices for a 2-tab (no Wishlist) sheet.
 private const val ADD_CARDS_TAB_COLLECTION = 0
 private const val ADD_CARDS_TAB_ALL_CARDS = 1
-
-internal sealed interface PendingDeckAddCardsAction {
-    data object OpenManualSearch: PendingDeckAddCardsAction
-    data class NavigateToScanner(val deckId: String): PendingDeckAddCardsAction
-}
-
-internal fun resolvePendingDeckAddCardsAction(
-    method: DeckAddCardsMethod?,
-    methodSheetVisible: Boolean,
-    isDestinationResumed: Boolean,
-    isNavigatingToScanner: Boolean,
-    deckId: String?,
-): PendingDeckAddCardsAction? {
-    if (method == null || methodSheetVisible || !isDestinationResumed) return null
-
-    return when (method) {
-        DeckAddCardsMethod.MANUAL_SEARCH -> PendingDeckAddCardsAction.OpenManualSearch
-        DeckAddCardsMethod.SCAN_CARDS -> deckId?.takeIf {it.isNotBlank()}
-            ?.takeIf {!isNavigatingToScanner}?.let(PendingDeckAddCardsAction::NavigateToScanner)
-    }
-}
 
 /**
  * The unified "Deck Studio" editor surface (Phase 1).
@@ -304,7 +285,7 @@ fun DeckStudioScreen(
     var showAddCardsSheet by rememberSaveable {mutableStateOf(false)}
     var showAddCardsMethodSheet by rememberSaveable {mutableStateOf(false)}
     var isNavigatingToScanner by rememberSaveable {mutableStateOf(false)}
-    var pendingAddCardsMethod by remember {mutableStateOf<DeckAddCardsMethod?>(null)}
+    var showOverflowSheet by rememberSaveable {mutableStateOf(false)}
     var showCommanderSearchSheet by rememberSaveable {mutableStateOf(false)}
 
     // CardSearchSheet renders in its own window ABOVE the NavHost, so it would stay on top (owning
@@ -345,47 +326,9 @@ fun DeckStudioScreen(
     // CardTag keys) through CardSearchSheet's onFilterCollectionByTags(Set<String>) -> Unit param
     // shape -- the VM resolves the real SectionMembership.predicate from it directly.
     val sectionBrowseTagKeys = remember(sectionBrowseSectionId) { setOfNotNull(sectionBrowseSectionId) }
-    LaunchedEffect(pendingAddCardsMethod, showAddCardsMethodSheet, isDestinationResumed) {
-        val pendingMethod = pendingAddCardsMethod ?: return@LaunchedEffect
-        resolvePendingDeckAddCardsAction(
-            method = pendingMethod,
-            methodSheetVisible = showAddCardsMethodSheet,
-            isDestinationResumed = isDestinationResumed,
-            isNavigatingToScanner = isNavigatingToScanner,
-            deckId = uiState.deck?.id,
-        ) ?: return@LaunchedEffect
-
-        withFrameNanos { }
-
-        val action = resolvePendingDeckAddCardsAction(
-            method = pendingMethod,
-            methodSheetVisible = showAddCardsMethodSheet,
-            isDestinationResumed = isDestinationResumed,
-            isNavigatingToScanner = isNavigatingToScanner,
-            deckId = uiState.deck?.id,
-        ) ?: return@LaunchedEffect
-        pendingAddCardsMethod = null
-
-        when (action) {
-            PendingDeckAddCardsAction.OpenManualSearch -> {
-                sectionBrowseSectionId = null
-                addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
-                viewModel.clearActiveStructuredSearchFragment()
-                viewModel.showCollectionCards()
-                showAddCardsSheet = true
-            }
-
-            is PendingDeckAddCardsAction.NavigateToScanner -> {
-                isNavigatingToScanner = true
-                FirebaseCrashlytics.getInstance().log("deck_studio_scanner_opened")
-                FirebaseCrashlytics.getInstance().setCustomKey("scanner_entry_source", "deck_studio")
-                onNavigateToScanner(action.deckId)
-            }
-        }
-    }
+    var showImportSheet by remember { mutableStateOf(false) }
     var showBasicLandsSheet by remember {mutableStateOf(false)}
     var showEditDeckSheet by remember {mutableStateOf(false)}
-    var showImportSheet by remember {mutableStateOf(false)}
     var showDeleteDialog by remember {mutableStateOf(false)}
     // Deck Wizard v4 (R15): "Build from seed" is rendered ONLY on the empty-deck state card
     // (nothing to lose, per resolveWizardNavDecision below it never confirms); "Rebuild with the
@@ -477,7 +420,6 @@ fun DeckStudioScreen(
             }
 
             showAddCardsMethodSheet -> {
-                pendingAddCardsMethod = null
                 showAddCardsMethodSheet = false
             }
 
@@ -493,6 +435,7 @@ fun DeckStudioScreen(
                 showCommanderSearchSheet = false; viewModel.clearAddCardsState()
             }
 
+            showOverflowSheet -> showOverflowSheet = false
             showBasicLandsSheet -> showBasicLandsSheet = false
             showEditDeckSheet -> showEditDeckSheet = false
             showImportSheet -> showImportSheet = false
@@ -565,6 +508,8 @@ fun DeckStudioScreen(
         }
     }
 
+    val shareChooserTitle = stringResource(R.string.deckbuilder_share_chooser)
+
     Box(modifier = Modifier.fillMaxSize()) {
         androidx.compose.material3.Scaffold(
             containerColor = mc.background,
@@ -586,7 +531,7 @@ fun DeckStudioScreen(
                             context.startActivity(
                                 Intent.createChooser(
                                     intent,
-                                    context.getString(R.string.deckbuilder_share_chooser)
+                                    shareChooserTitle
                                 )
                             )
                         }
@@ -598,6 +543,7 @@ fun DeckStudioScreen(
                     // R15: "Rebuild with the Wizard" only renders for a non-empty deck.
                     isEmptyDeck = uiState.isEmptyDeck,
                     onRebuildWithWizard = handleRebuildWithWizard,
+                    onMoreOptionsClick = { showOverflowSheet = true },
                 )
             },
             bottomBar = {
@@ -629,7 +575,6 @@ fun DeckStudioScreen(
                 ) {
                     FloatingActionButton(
                         onClick = {
-                            pendingAddCardsMethod = null
                             showAddCardsMethodSheet = true
                         },
                         containerColor = mc.primaryAccent,
@@ -1046,7 +991,58 @@ fun DeckStudioScreen(
         DeckAddCardsMethodSheet(
             scanEnabled = uiState.deck?.id?.isNotBlank() == true,
             onDismiss = {showAddCardsMethodSheet = false},
-            onMethodSelected = {pendingAddCardsMethod = it},
+            onMethodSelected = { method ->
+                showAddCardsMethodSheet = false
+                when (method) {
+                    DeckAddCardsMethod.MANUAL_SEARCH -> {
+                        sectionBrowseSectionId = null
+                        addCardsSheetTab = ADD_CARDS_TAB_COLLECTION
+                        viewModel.clearActiveStructuredSearchFragment()
+                        viewModel.showCollectionCards()
+                        showAddCardsSheet = true
+                    }
+                    DeckAddCardsMethod.SCAN_CARDS -> {
+                        uiState.deck?.id?.takeIf { it.isNotBlank() }?.let { deckId ->
+                            isNavigatingToScanner = true
+                            FirebaseCrashlytics.getInstance().log("deck_studio_scanner_opened")
+                            FirebaseCrashlytics.getInstance().setCustomKey("scanner_entry_source", "deck_studio")
+                            onNavigateToScanner(deckId)
+                        }
+                    }
+                    DeckAddCardsMethod.IMPORT_LIST -> {
+                        showImportSheet = true
+                    }
+                }
+            },
+        )
+    }
+
+    if (showOverflowSheet) {
+        DeckStudioOptionsSheet(
+            onDismiss = { showOverflowSheet = false },
+            onEdit = { showEditDeckSheet = true },
+            showRebuildWithWizard = FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED && !uiState.isEmptyDeck && wizardAvailableForFormat,
+            onRebuildWithWizard = handleRebuildWithWizard,
+            showInspirations = FeatureFlags.Decks.DISCOVERIES_V2_ENABLED,
+            onBrowseInspirations = { viewModel.openInspirations() },
+            shareEnabled = !uiState.isEmptyDeck,
+            onShare = {
+                val text = viewModel.exportDeckToText()
+                if (text != null) {
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, text)
+                    }
+                    context.startActivity(
+                        Intent.createChooser(
+                            intent,
+                            shareChooserTitle
+                        )
+                    )
+                }
+            },
+            onSelectCards = { uiState.deck?.id?.let(onNavigateToSelectCards) },
+            onDeleteDeck = { showDeleteDialog = true },
         )
     }
 
@@ -1171,11 +1167,11 @@ private fun DeckStudioTopBar(
     // from seed" option (never this overflow menu, see the deleted item below).
     isEmptyDeck: Boolean = false,
     onRebuildWithWizard: () -> Unit = {},
+    onMoreOptionsClick: () -> Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    var showOverflow by remember {mutableStateOf(false)}
     Surface(color = mc.backgroundSecondary) {
         Row(
             modifier = Modifier
@@ -1215,160 +1211,12 @@ private fun DeckStudioTopBar(
                     }
                 }
             }
-            // Overflow menu (Phase 3 + Group D): "Build from seed" (seed sheet),
-            // "Browse inspirations" (Discoveries sheet), and "Share" — relocated here
-            // from standalone icon buttons to keep ≤4 primary actions in the bar.
-            Box {
-                IconButton(onClick = {showOverflow = true}) {
-                    Icon(
-                        Icons.Default.MoreVert,
-                        contentDescription = stringResource(R.string.deck_studio_more_options),
-                        tint = mc.textSecondary,
-                    )
-                }
-                DropdownMenu(
-                    expanded = showOverflow,
-                    onDismissRequest = {showOverflow = false},
-                ) {
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = stringResource(R.string.deck_studio_edit_deck),
-                                style = ty.bodyMedium,
-                                color = mc.textPrimary,
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = null,
-                                tint = mc.textSecondary,
-                            )
-                        },
-                        onClick = {
-                            showOverflow = false
-                            onEdit()
-                        },
-                    )
-                    // Deck Wizard v4 (R15): "Build from seed" was REMOVED from this overflow menu --
-                    // it now renders ONLY on the empty-deck state card (EmptyDeckState below),
-                    // never here, so the two entry points can no longer both appear on the same
-                    // empty deck. Gated on DECK_BUILDER_V2_ENABLED && !isEmptyDeck && wizardAvailable:
-                    // a deck that still has cards, in a format the wizard can build (every format
-                    // but Draft since the 60-card wave), is the ONLY case this item exists for.
-                    if (FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED && !isEmptyDeck && wizardAvailable) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = stringResource(R.string.deck_studio_rebuild_with_wizard),
-                                    style = ty.bodyMedium,
-                                    color = mc.textPrimary,
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Refresh,
-                                    contentDescription = null,
-                                    tint = mc.textSecondary,
-                                )
-                            },
-                            onClick = {
-                                showOverflow = false
-                                onRebuildWithWizard()
-                            },
-                        )
-                    }
-                    // Deck Builder v2 (plan D10/§3.7): visible when Discoveries v2 is enabled. The
-                    // legacy discoverSynergies content's sibling flag was RETIRED in WS7.2
-                    // (2026-07-28) -- the sheet's content (see the ModalBottomSheet above) has
-                    // exactly one branch now.
-                    if (FeatureFlags.Decks.DISCOVERIES_V2_ENABLED) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = stringResource(R.string.deck_studio_inspirations),
-                                    style = ty.bodyMedium,
-                                    color = mc.textPrimary,
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = mc.textSecondary,
-                                )
-                            },
-                            onClick = {
-                                showOverflow = false
-                                onBrowseInspirations()
-                            },
-                        )
-                    }
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = stringResource(R.string.deck_studio_share_deck),
-                                style = ty.bodyMedium,
-                                color = if (shareEnabled) mc.textPrimary else mc.textDisabled,
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Share,
-                                contentDescription = null,
-                                tint = if (shareEnabled) mc.textSecondary else mc.textDisabled,
-                            )
-                        },
-                        enabled = shareEnabled,
-                        onClick = {
-                            showOverflow = false
-                            onShare()
-                        },
-                    )
-
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = "Delete Deck",
-                                style = ty.bodyMedium,
-                                color = mc.lifeNegative,
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = null,
-                                tint = mc.lifeNegative,
-                            )
-                        },
-                        onClick = {
-                            showOverflow = false
-                            onDeleteDeck()
-                        },
-                    )
-
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = stringResource(R.string.deckstudio_select_cards),
-                                style = ty.bodyMedium,
-                                color = if (shareEnabled) mc.textPrimary else mc.textDisabled,
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.CollectionsBookmark,
-                                contentDescription = null,
-                                tint = if (shareEnabled) mc.textSecondary else mc.textDisabled,
-                            )
-                        },
-                        enabled = shareEnabled,
-                        onClick = {
-                            showOverflow = false
-                            onSelectCards()
-                        },
-                    )
-                }
+            IconButton(onClick = onMoreOptionsClick) {
+                Icon(
+                    Icons.Default.MoreVert,
+                    contentDescription = stringResource(R.string.deck_studio_more_options),
+                    tint = mc.textSecondary,
+                )
             }
         }
     }
@@ -3155,3 +3003,170 @@ private val GroupingMode.displayResId: Int
         GroupingMode.COST -> R.string.deckbuilder_group_cmc
         GroupingMode.TAG -> R.string.deckbuilder_group_tag
     }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DeckStudioOptionsSheet(
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit,
+    showRebuildWithWizard: Boolean,
+    onRebuildWithWizard: () -> Unit,
+    showInspirations: Boolean,
+    onBrowseInspirations: () -> Unit,
+    shareEnabled: Boolean,
+    onShare: () -> Unit,
+    onSelectCards: () -> Unit,
+    onDeleteDeck: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    var isClosingProgrammatically by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { value ->
+            if (value == SheetValue.Hidden && !isClosingProgrammatically) {
+                false
+            } else {
+                true
+            }
+        },
+    )
+
+    val closeSheet: (action: () -> Unit) -> Unit = { action ->
+        scope.launch {
+            isClosingProgrammatically = true
+            sheetState.hide()
+            onDismiss()
+            action()
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = BottomSheetShape,
+        containerColor = mc.backgroundSecondary,
+        dragHandle = null,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = spacing.lg, vertical = spacing.md),
+            verticalArrangement = Arrangement.spacedBy(spacing.xs),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(
+                    onClick = {
+                        scope.launch {
+                            isClosingProgrammatically = true
+                            sheetState.hide()
+                            onDismiss()
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_close),
+                        tint = mc.textSecondary,
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.deck_studio_more_options),
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
+                )
+            }
+
+            DeckStudioOptionRow(
+                icon = Icons.Default.Edit,
+                title = stringResource(R.string.deck_studio_edit_deck),
+                onClick = { closeSheet(onEdit) },
+            )
+
+            if (showRebuildWithWizard) {
+                DeckStudioOptionRow(
+                    icon = Icons.Default.Refresh,
+                    title = stringResource(R.string.deck_studio_rebuild_with_wizard),
+                    onClick = { closeSheet(onRebuildWithWizard) },
+                )
+            }
+
+            if (showInspirations) {
+                DeckStudioOptionRow(
+                    icon = Icons.Default.AutoAwesome,
+                    title = stringResource(R.string.deck_studio_inspirations),
+                    onClick = { closeSheet(onBrowseInspirations) },
+                )
+            }
+
+            DeckStudioOptionRow(
+                icon = Icons.Default.Share,
+                title = stringResource(R.string.deck_studio_share_deck),
+                enabled = shareEnabled,
+                onClick = { closeSheet(onShare) },
+            )
+
+            DeckStudioOptionRow(
+                icon = Icons.Default.CollectionsBookmark,
+                title = stringResource(R.string.deckstudio_select_cards),
+                enabled = shareEnabled,
+                onClick = { closeSheet(onSelectCards) },
+            )
+
+            DeckStudioOptionRow(
+                icon = Icons.Default.Delete,
+                title = stringResource(R.string.deckdetail_menu_delete),
+                enabled = true,
+                onClick = { closeSheet(onDeleteDeck) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeckStudioOptionRow(
+    icon: ImageVector,
+    title: String,
+    enabled: Boolean = true,
+    iconTint: Color? = null,
+    textColor: Color? = null,
+    onClick: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    val effectiveIconTint = iconTint ?: if (enabled) mc.textSecondary else mc.textDisabled
+    val effectiveTextColor = textColor ?: if (enabled) mc.textPrimary else mc.textDisabled
+
+    Surface(
+        shape = CardShape,
+        color = mc.surface,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.sm + spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.md),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = effectiveIconTint,
+                modifier = Modifier.size(24.dp),
+            )
+            Text(
+                text = title,
+                style = ty.bodyMedium,
+                color = effectiveTextColor,
+            )
+        }
+    }
+}

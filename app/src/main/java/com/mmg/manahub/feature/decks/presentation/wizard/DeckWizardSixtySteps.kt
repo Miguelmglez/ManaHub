@@ -29,6 +29,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Badge
@@ -43,11 +44,14 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -682,12 +686,24 @@ private fun StrategyPickColorSheet(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var isClosingProgrammatically by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { value ->
+            if (value == SheetValue.Hidden && !isClosingProgrammatically) {
+                false
+            } else {
+                true
+            }
+        },
+    )
+    val scope = rememberCoroutineScope()
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         shape = BottomSheetShape,
         containerColor = mc.background,
+        dragHandle = null,
     ) {
         Column(
             modifier = Modifier
@@ -698,7 +714,27 @@ private fun StrategyPickColorSheet(
                 .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
-            Text(strategy.displayName, style = ty.titleLarge, color = mc.textPrimary)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(
+                    onClick = {
+                        scope.launch {
+                            isClosingProgrammatically = true
+                            sheetState.hide()
+                            onDismiss()
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_close),
+                        tint = mc.textSecondary,
+                    )
+                }
+                Text(strategy.displayName, style = ty.titleLarge, color = mc.textPrimary)
+            }
             Text(
                 stringResource(R.string.deck_wizard_color_combos_title),
                 style = ty.bodyMedium,
@@ -712,7 +748,14 @@ private fun StrategyPickColorSheet(
                     MagicSelectionItem(
                         title = ColorCombinationNames.nameFor(combo.colors),
                         isSelected = combo.colors == selectedColors,
-                        onClick = { onSelectCombo(combo) },
+                        onClick = {
+                            scope.launch {
+                                isClosingProgrammatically = true
+                                sheetState.hide()
+                                onDismiss()
+                                onSelectCombo(combo)
+                            }
+                        },
                         icon = { ColorIdentitySymbols(colors = combo.colors) },
                     )
                 }

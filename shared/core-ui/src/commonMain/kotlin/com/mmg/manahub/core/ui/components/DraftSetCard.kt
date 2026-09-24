@@ -39,6 +39,7 @@ import coil3.compose.LocalPlatformContext
 import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.ui.theme.CardCornerRadius
 import com.mmg.manahub.core.ui.theme.CardShape
@@ -115,7 +116,7 @@ fun DraftSetCard(
                             error = fallbackPainter,
                             fallback = fallbackPainter,
                         )
-                        if (set.boosterVersion != null) {
+                        if (FeatureFlags.Draft.SIMULATOR_ENABLED && set.boosterVersion != null) {
                             Icon(
                                 imageVector = Icons.Default.AutoAwesome,
                                 contentDescription = null,
@@ -292,7 +293,7 @@ fun DraftSetCard(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
-                                if (set.boosterVersion != null) {
+                                if (FeatureFlags.Draft.SIMULATOR_ENABLED && set.boosterVersion != null) {
                                     Icon(
                                         imageVector = Icons.Default.AutoAwesome,
                                         contentDescription = null,
