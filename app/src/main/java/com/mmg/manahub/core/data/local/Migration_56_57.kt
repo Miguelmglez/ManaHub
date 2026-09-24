@@ -3,7 +3,7 @@ package com.mmg.manahub.core.data.local
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-/** v56 → v57 (MTG Today): creates `news_saved_items` and adds `content_sources.site_url`. */
+/** v56 → v57 (MTG Today): creates `news_saved_items`, adds `content_sources.site_url`, drops both Competitive caches. */
 val MIGRATION_56_57 = object : Migration(56, 57) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Must stay byte-identical to Room's generated SQL for NewsSavedItemEntity or runMigrationsAndValidate fails.
@@ -17,6 +17,8 @@ val MIGRATION_56_57 = object : Migration(56, 57) {
         if (!columnExists(db, "content_sources", "site_url")) {
             db.execSQL("ALTER TABLE `content_sources` ADD COLUMN `site_url` TEXT")
         }
+        db.execSQL("DROP TABLE IF EXISTS `competitive_meta_cache`")
+        db.execSQL("DROP TABLE IF EXISTS `competitive_limited_ratings_cache`")
     }
 
     private fun columnExists(

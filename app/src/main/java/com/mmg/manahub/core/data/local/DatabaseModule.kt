@@ -11,8 +11,6 @@ import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
 import com.mmg.manahub.core.data.local.dao.ComboCacheDao
 import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
-import com.mmg.manahub.core.data.local.dao.CompetitiveLimitedRatingsCacheDao
-import com.mmg.manahub.core.data.local.dao.CompetitiveMetaCacheDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
@@ -147,8 +145,7 @@ object DatabaseModule {
                 MIGRATION_49_50,
                 // v50 → v51 lives as a top-level `val` in Migration_50_51.kt (same
                 // reason). Additive: creates the competitive_meta_cache and
-                // competitive_limited_ratings_cache tables (Competitive feature,
-                // Phase 2, manahub-competitive Cloudflare Worker).
+                // competitive_limited_ratings_cache tables (dropped again in v57).
                 MIGRATION_50_51,
                 // v51 → v52 lives as a top-level `val` in Migration_51_52.kt (same reason).
                 // Clears archetype_override/themes_override on every deck (never migrated) --
@@ -171,7 +168,8 @@ object DatabaseModule {
                 // local_wishlists / local_open_for_trade (all additive).
                 MIGRATION_55_56,
                 // v56 → v57 lives as a top-level `val` in Migration_56_57.kt (same reason).
-                // MTG Today: news_saved_items table + content_sources.site_url.
+                // MTG Today: news_saved_items table + content_sources.site_url; drops the two
+                // Competitive cache tables.
                 MIGRATION_56_57,
             )
             .build()
@@ -801,6 +799,4 @@ object DatabaseModule {
     @Provides fun provideComboCacheDao(db: MtgDatabase): ComboCacheDao = db.comboCacheDao()
     @Provides fun provideCardStrategyTagsCacheDao(db: MtgDatabase): CardStrategyTagsCacheDao = db.cardStrategyTagsCacheDao()
     @Provides fun providePuzzleDao(db: MtgDatabase): PuzzleDao = db.puzzleDao()
-    @Provides fun provideCompetitiveMetaCacheDao(db: MtgDatabase): CompetitiveMetaCacheDao = db.competitiveMetaCacheDao()
-    @Provides fun provideCompetitiveLimitedRatingsCacheDao(db: MtgDatabase): CompetitiveLimitedRatingsCacheDao = db.competitiveLimitedRatingsCacheDao()
 }

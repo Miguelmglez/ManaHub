@@ -27,10 +27,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * crash is safe.
  *
  * Top-level `val` (mirroring [MIGRATION_49_50]) so the instrumented MigrationTestHelper test can
- * reference it directly. Column names/types mirror EXACTLY what Room generates for the new
- * [com.mmg.manahub.core.data.local.entity.CompetitiveMetaCacheEntity] and
- * [com.mmg.manahub.core.data.local.entity.CompetitiveLimitedRatingsCacheEntity] so
- * `runMigrationsAndValidate` passes.
+ * reference it directly. Column names/types mirror what Room generated for the (since deleted)
+ * `CompetitiveMetaCacheEntity`/`CompetitiveLimitedRatingsCacheEntity`; both tables are dropped
+ * again by [MIGRATION_56_57].
  */
 val MIGRATION_50_51 = object : Migration(50, 51) {
     override fun migrate(db: SupportSQLiteDatabase) {
