@@ -81,7 +81,7 @@ class GamificationDaoConcurrencyTest {
     // ── C1: no lost update under concurrency ──────────────────────────────────
 
     @Test
-    fun `many concurrent grants with distinct keys never lose an update`() = runBlocking {
+    fun manyConcurrentGrantsWithDistinctKeysNeverLoseAnUpdate() = runBlocking {
         val grants = 200
         val amountEach = 7
 
@@ -119,7 +119,7 @@ class GamificationDaoConcurrencyTest {
     // ── Duplicate key is a no-op ──────────────────────────────────────────────
 
     @Test
-    fun `a duplicate idempotency key is a no-op and does not double-grant`() = runBlocking {
+    fun aDuplicateIdempotencyKeyIsANoOpAndDoesNotDoubleGrant() = runBlocking {
         val first = dao.grantXpAtomically(
             txn = makeTxn(key = "dup", amount = 10),
             amount = 10,

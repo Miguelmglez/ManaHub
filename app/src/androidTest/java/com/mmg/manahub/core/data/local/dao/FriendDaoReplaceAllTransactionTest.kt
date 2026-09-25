@@ -8,12 +8,13 @@ import com.mmg.manahub.core.data.local.MtgDatabase
 import com.mmg.manahub.core.data.local.entity.FriendEntity
 import com.mmg.manahub.core.data.local.entity.FriendRequestEntity
 import com.mmg.manahub.core.data.local.entity.OutgoingFriendRequestEntity
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -69,8 +70,14 @@ class FriendDaoReplaceAllTransactionTest {
     @Test
     fun observersNeverSeeTheClearedIntermediateState() = runBlocking {
         dao.replaceAll(listOf(friend("fs-1", "user-a")), emptyList(), emptyList())
-        val emissions = async { dao.observeFriends().take(2).toList() }
-        yield()
+        val initialEmission = CompletableDeferred<Unit>()
+        val emissions = async {
+            dao.observeFriends()
+                .onEach { if (it.size == 1) initialEmission.complete(Unit) }
+                .take(2)
+                .toList()
+        }
+        initialEmission.await()
 
         dao.replaceAll(listOf(friend("fs-1", "user-a"), friend("fs-2", "user-b")), null, null)
 

@@ -134,7 +134,7 @@ class CardDaoStrategyTagsBackfillTest {
     // ── Tests ────────────────────────────────────────────────────────────────
 
     @Test
-    fun `card with blank oracle id is excluded even when owned`() = runBlocking {
+    fun cardWithBlankOracleIdIsExcludedEvenWhenOwned() = runBlocking {
         cardDao.insertIgnore(makeCard("card-blank-oracle", oracleId = ""))
         insertCollectionRow("card-blank-oracle")
 
@@ -144,7 +144,7 @@ class CardDaoStrategyTagsBackfillTest {
     }
 
     @Test
-    fun `card already present in the strategy tags cache is excluded`() = runBlocking {
+    fun cardAlreadyPresentInTheStrategyTagsCacheIsExcluded() = runBlocking {
         cardDao.insertIgnore(makeCard("card-already-cached", oracleId = "oracle-cached"))
         insertCollectionRow("card-already-cached")
         insertCacheRow("oracle-cached")
@@ -158,7 +158,7 @@ class CardDaoStrategyTagsBackfillTest {
     }
 
     @Test
-    fun `card owned via live collection and never resolved is included`() = runBlocking {
+    fun cardOwnedViaLiveCollectionAndNeverResolvedIsIncluded() = runBlocking {
         cardDao.insertIgnore(makeCard("card-collection", oracleId = "oracle-collection"))
         insertCollectionRow("card-collection")
 
@@ -168,7 +168,7 @@ class CardDaoStrategyTagsBackfillTest {
     }
 
     @Test
-    fun `card only present in a soft-deleted collection row is excluded`() = runBlocking {
+    fun cardOnlyPresentInASoftDeletedCollectionRowIsExcluded() = runBlocking {
         cardDao.insertIgnore(makeCard("card-soft-deleted", oracleId = "oracle-soft-deleted"))
         insertCollectionRow("card-soft-deleted", isDeleted = true)
 
@@ -178,7 +178,7 @@ class CardDaoStrategyTagsBackfillTest {
     }
 
     @Test
-    fun `card owned via wishlist and never resolved is included`() = runBlocking {
+    fun cardOwnedViaWishlistAndNeverResolvedIsIncluded() = runBlocking {
         cardDao.insertIgnore(makeCard("card-wishlist", oracleId = "oracle-wishlist"))
         insertWishlistRow("card-wishlist")
 
@@ -188,7 +188,7 @@ class CardDaoStrategyTagsBackfillTest {
     }
 
     @Test
-    fun `card owned via a deck and never resolved is included`() = runBlocking {
+    fun cardOwnedViaADeckAndNeverResolvedIsIncluded() = runBlocking {
         cardDao.insertIgnore(makeCard("card-deck", oracleId = "oracle-deck"))
         insertDeckCardRow("card-deck")
 
@@ -198,7 +198,7 @@ class CardDaoStrategyTagsBackfillTest {
     }
 
     @Test
-    fun `card with a real oracle id that is not owned anywhere is excluded`() = runBlocking {
+    fun cardWithARealOracleIdThatIsNotOwnedAnywhereIsExcluded() = runBlocking {
         cardDao.insertIgnore(makeCard("card-not-owned", oracleId = "oracle-not-owned"))
         // No collection/wishlist/deck row inserted for this card.
 
@@ -208,7 +208,7 @@ class CardDaoStrategyTagsBackfillTest {
     }
 
     @Test
-    fun `result is capped at the requested limit`() = runBlocking {
+    fun resultIsCappedAtTheRequestedLimit() = runBlocking {
         repeat(5) { i ->
             val id = "card-$i"
             cardDao.insertIgnore(makeCard(id, oracleId = "oracle-$i"))
@@ -221,7 +221,7 @@ class CardDaoStrategyTagsBackfillTest {
     }
 
     @Test
-    fun `a card owned in more than one place is returned only once`() = runBlocking {
+    fun aCardOwnedInMoreThanOnePlaceIsReturnedOnlyOnce() = runBlocking {
         cardDao.insertIgnore(makeCard("card-multi-owned", oracleId = "oracle-multi-owned"))
         insertCollectionRow("card-multi-owned")
         insertWishlistRow("card-multi-owned")

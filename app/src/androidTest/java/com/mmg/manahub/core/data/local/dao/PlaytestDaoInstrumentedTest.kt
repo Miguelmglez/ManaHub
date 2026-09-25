@@ -116,7 +116,7 @@ class PlaytestDaoInstrumentedTest {
     // ── Group 1: saveTestAtomically ───────────────────────────────────────────
 
     @Test
-    fun `given session and card stats when saveTestAtomically then new session id is returned`() = runTest {
+    fun givenSessionAndCardStatsWhenSaveTestAtomicallyThenNewSessionIdIsReturned() = runTest {
         val cardStats = listOf(makeCardStat("bolt"), makeCardStat("birds"))
 
         val sessionId = dao.saveTestAtomically(makeSession(), cardStats)
@@ -125,7 +125,7 @@ class PlaytestDaoInstrumentedTest {
     }
 
     @Test
-    fun `given session and card stats when saveTestAtomically then getCardStatsForSession returns all rows with correct sessionId`() = runTest {
+    fun givenSessionAndCardStatsWhenSaveTestAtomicallyThenGetCardStatsForSessionReturnsAllRowsWithCorrectSessionId() = runTest {
         val cardStats = listOf(
             makeCardStat("bolt", copiesInOpeningHand = 2),
             makeCardStat("birds", copiesInOpeningHand = 1),
@@ -143,7 +143,7 @@ class PlaytestDaoInstrumentedTest {
     }
 
     @Test
-    fun `given session with no card stats when saveTestAtomically then session is saved and getCardStatsForSession returns empty`() = runTest {
+    fun givenSessionWithNoCardStatsWhenSaveTestAtomicallyThenSessionIsSavedAndGetCardStatsForSessionReturnsEmpty() = runTest {
         val sessionId = dao.saveTestAtomically(makeSession(), emptyList())
 
         assertTrue("session id must be > 0 even with no card stats", sessionId > 0L)
@@ -153,7 +153,7 @@ class PlaytestDaoInstrumentedTest {
     }
 
     @Test
-    fun `given two sessions saved when getCardStatsForSession called for each then stats are scoped correctly`() = runTest {
+    fun givenTwoSessionsSavedWhenGetCardStatsForSessionCalledForEachThenStatsAreScopedCorrectly() = runTest {
         val statsForSession1 = listOf(makeCardStat("bolt"))
         val statsForSession2 = listOf(makeCardStat("birds"), makeCardStat("land"))
 
@@ -171,7 +171,7 @@ class PlaytestDaoInstrumentedTest {
     // ── Group 2: CASCADE DELETE ───────────────────────────────────────────────
 
     @Test
-    fun `given session with card stats and survey answers when session is deleted then all child rows are removed`() = runTest {
+    fun givenSessionWithCardStatsAndSurveyAnswersWhenSessionIsDeletedThenAllChildRowsAreRemoved() = runTest {
         val cardStats = listOf(makeCardStat("bolt"), makeCardStat("birds"))
         val sessionId = dao.saveTestAtomically(makeSession(), cardStats)
 
@@ -200,7 +200,7 @@ class PlaytestDaoInstrumentedTest {
     }
 
     @Test
-    fun `given two sessions when one session is deleted then only its child rows are removed`() = runTest {
+    fun givenTwoSessionsWhenOneSessionIsDeletedThenOnlyItsChildRowsAreRemoved() = runTest {
         val statsForSession1 = listOf(makeCardStat("bolt"))
         val statsForSession2 = listOf(makeCardStat("birds"))
 
@@ -220,7 +220,7 @@ class PlaytestDaoInstrumentedTest {
     // ── Group 3: observeTestCountForDeck ─────────────────────────────────────
 
     @Test
-    fun `given no sessions for deck when observeTestCountForDeck called then emits 0`() = runTest {
+    fun givenNoSessionsForDeckWhenObserveTestCountForDeckCalledThenEmits0() = runTest {
         dao.observeTestCountForDeck("deck-empty").test {
             assertEquals("initial count must be 0 for a deck with no sessions", 0, awaitItem())
             cancelAndIgnoreRemainingEvents()
@@ -228,7 +228,7 @@ class PlaytestDaoInstrumentedTest {
     }
 
     @Test
-    fun `given sessions saved one by one when observeTestCountForDeck observed then count increments`() = runTest {
+    fun givenSessionsSavedOneByOneWhenObserveTestCountForDeckObservedThenCountIncrements() = runTest {
         dao.observeTestCountForDeck("deck-1").test {
             assertEquals(0, awaitItem())
 
@@ -243,7 +243,7 @@ class PlaytestDaoInstrumentedTest {
     }
 
     @Test
-    fun `given sessions for multiple decks when observeTestCountForDeck called for one deck then only that deck is counted`() = runTest {
+    fun givenSessionsForMultipleDecksWhenObserveTestCountForDeckCalledForOneDeckThenOnlyThatDeckIsCounted() = runTest {
         dao.saveTestAtomically(makeSession(deckId = "deck-A"), emptyList())
         dao.saveTestAtomically(makeSession(deckId = "deck-A"), emptyList())
         dao.saveTestAtomically(makeSession(deckId = "deck-B"), emptyList())
@@ -262,7 +262,7 @@ class PlaytestDaoInstrumentedTest {
     // ── Group 4: observeCardAppearanceStatsForDeck ────────────────────────────
 
     @Test
-    fun `given multiple saved tests with same scryfallId when observeCardAppearanceStatsForDeck called then copies are summed`() = runTest {
+    fun givenMultipleSavedTestsWithSameScryfallIdWhenObserveCardAppearanceStatsForDeckCalledThenCopiesAreSummed() = runTest {
         // Test 1: 2 copies of "bolt" in hand.
         val id1 = dao.saveTestAtomically(
             makeSession(deckId = "deck-1"),
@@ -295,7 +295,7 @@ class PlaytestDaoInstrumentedTest {
     }
 
     @Test
-    fun `given no saved tests for deck when observeCardAppearanceStatsForDeck called then emits empty list`() = runTest {
+    fun givenNoSavedTestsForDeckWhenObserveCardAppearanceStatsForDeckCalledThenEmitsEmptyList() = runTest {
         dao.observeCardAppearanceStatsForDeck("deck-empty").test {
             assertTrue("must emit empty list when no tests saved", awaitItem().isEmpty())
             cancelAndIgnoreRemainingEvents()
@@ -303,7 +303,7 @@ class PlaytestDaoInstrumentedTest {
     }
 
     @Test
-    fun `given saved tests for multiple decks when observeCardAppearanceStatsForDeck for one deck then only that deck aggregated`() = runTest {
+    fun givenSavedTestsForMultipleDecksWhenObserveCardAppearanceStatsForDeckForOneDeckThenOnlyThatDeckAggregated() = runTest {
         dao.saveTestAtomically(
             makeSession(deckId = "deck-A"),
             listOf(makeCardStat("bolt", copiesInOpeningHand = 3)),
@@ -328,7 +328,7 @@ class PlaytestDaoInstrumentedTest {
     // ── Group 5: observeCardAppearanceStatsForDeckAndCard ─────────────────────
 
     @Test
-    fun `given card never appeared when observeCardAppearanceStatsForDeckAndCard called then emits null`() = runTest {
+    fun givenCardNeverAppearedWhenObserveCardAppearanceStatsForDeckAndCardCalledThenEmitsNull() = runTest {
         // Save a session with "birds" but query for "bolt" which was never saved.
         dao.saveTestAtomically(
             makeSession(deckId = "deck-1"),
@@ -345,7 +345,7 @@ class PlaytestDaoInstrumentedTest {
     }
 
     @Test
-    fun `given card appeared in multiple tests when observeCardAppearanceStatsForDeckAndCard called then emits aggregate row`() = runTest {
+    fun givenCardAppearedInMultipleTestsWhenObserveCardAppearanceStatsForDeckAndCardCalledThenEmitsAggregateRow() = runTest {
         dao.saveTestAtomically(
             makeSession(deckId = "deck-1"),
             listOf(
@@ -371,7 +371,7 @@ class PlaytestDaoInstrumentedTest {
     }
 
     @Test
-    fun `given no saved tests for deck when observeCardAppearanceStatsForDeckAndCard called then emits null`() = runTest {
+    fun givenNoSavedTestsForDeckWhenObserveCardAppearanceStatsForDeckAndCardCalledThenEmitsNull() = runTest {
         dao.observeCardAppearanceStatsForDeckAndCard("deck-empty", "bolt").test {
             assertNull("must emit null when deck has no tests", awaitItem())
             cancelAndIgnoreRemainingEvents()
@@ -381,7 +381,7 @@ class PlaytestDaoInstrumentedTest {
     // ── Group 6: replacePlaytestSurveyAnswers idempotency ─────────────────────
 
     @Test
-    fun `given survey answers saved twice for same session when replacePlaytestSurveyAnswers called then rows are NOT accumulated`() = runTest {
+    fun givenSurveyAnswersSavedTwiceForSameSessionWhenReplacePlaytestSurveyAnswersCalledThenRowsAreNOTAccumulated() = runTest {
         // Mirrors the SurveyAnswerDao.replaceAnswersForSession pattern.
         val sessionId = dao.saveTestAtomically(makeSession(), emptyList())
 
@@ -407,7 +407,7 @@ class PlaytestDaoInstrumentedTest {
     }
 
     @Test
-    fun `given survey saved then replaced with empty list when replacePlaytestSurveyAnswers called then all rows removed`() = runTest {
+    fun givenSurveySavedThenReplacedWithEmptyListWhenReplacePlaytestSurveyAnswersCalledThenAllRowsRemoved() = runTest {
         val sessionId = dao.saveTestAtomically(makeSession(), emptyList())
 
         val answers = listOf(
@@ -426,7 +426,7 @@ class PlaytestDaoInstrumentedTest {
     }
 
     @Test
-    fun `given survey answers for two sessions when replace called for one then only that session is affected`() = runTest {
+    fun givenSurveyAnswersForTwoSessionsWhenReplaceCalledForOneThenOnlyThatSessionIsAffected() = runTest {
         val id1 = dao.saveTestAtomically(makeSession(), emptyList())
         val id2 = dao.saveTestAtomically(makeSession(), emptyList())
 

@@ -111,7 +111,7 @@ class CardDaoCascadeRegressionTest {
     // ── Regression: CardDao.upsert() must never cascade-delete the user's collection ──
 
     @Test
-    fun `given a card already in the users collection when upsert refreshes it then the collection row survives`() = runBlocking {
+    fun givenACardAlreadyInTheUsersCollectionWhenUpsertRefreshesItThenTheCollectionRowSurvives() = runBlocking {
         // Arrange — insert the card, then a collection row that FK-references it.
         cardDao.upsert(makeCard("card-1", priceUsd = 1.0))
         insertCollectionRow("card-1")
@@ -132,7 +132,7 @@ class CardDaoCascadeRegressionTest {
     }
 
     @Test
-    fun `given multiple cards already in the collection when upsertAll refreshes the chunk then every collection row survives`() = runBlocking {
+    fun givenMultipleCardsAlreadyInTheCollectionWhenUpsertAllRefreshesTheChunkThenEveryCollectionRowSurvives() = runBlocking {
         // Arrange — three cards, each with a collection row referencing it (mirrors
         // SyncManager.ensureCardsExist's chunked upsertAll call).
         val ids = listOf("card-a", "card-b", "card-c")
@@ -150,7 +150,7 @@ class CardDaoCascadeRegressionTest {
     }
 
     @Test
-    fun `given a brand new card with no prior row when upsert runs then it is inserted normally`() = runBlocking {
+    fun givenABrandNewCardWithNoPriorRowWhenUpsertRunsThenItIsInsertedNormally() = runBlocking {
         // Sanity check on the other branch of upsert()'s @Transaction: insertIgnore succeeds
         // (id != -1L), so updateCard must NOT be reached for a genuinely new row.
         cardDao.upsert(makeCard("card-new", priceUsd = 5.0))

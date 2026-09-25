@@ -226,6 +226,9 @@ branch color on the active theme or `isSystemInDarkTheme()`.
   `MaterialTheme.spacing`, shapes via named tokens (`CardShape`, `ChipShape`, `ButtonShape`,
   `BottomSheetShape`). **Never** use `MaterialTheme.colorScheme`/`typography` directly, and never
   hardcode a `Color`, `dp` font size, or shape.
+- Reserve `textDisabled` for genuinely disabled controls. Informational subtitles, including
+  `EmptyState` guidance, use a readable text token such as `textSecondary`; disabled styling made
+  the Stats empty-state instruction illegible on dark palettes.
 - `magicTypography` has **no `titleSmall`** (use `titleMedium` for small headers). Available:
   display{Large,Medium}, title{Large,Medium}, label{Large,Medium,Small}, body{Large,Medium,Small}.
 - New theme = a `MagicColors` + `MagicTypography` instance + a branch in `MagicTheme`'s `when(theme)`.
@@ -411,6 +414,10 @@ third-party API calls by design. See `app/src/main/java/com/mmg/manahub/feature/
   (schema migration, data-loss surface).
 - Unit tests: MockK (`io.mockk`) + Turbine (`app.cash.turbine`). Instrumented Room tests: in-memory DB
   on device/emulator. Test classes mirror source package paths.
+- Instrumented `androidTest` method names must be DEX-safe identifiers without spaces. Kotlin
+  backtick names with spaces compile to JVM classes but D8 rejects their generated coroutine class
+  names when the app targets DEX versions below 040. For Room Flow timing assertions, await an
+  explicit first-emission signal before mutating the DAO; `yield()` does not prove subscription.
 - **`testDebugUnitTest --tests "<pattern>"` compiles the ENTIRE `src/test` source set first** — a compile
   error in any unrelated test file fails the whole run and zero tests execute. To verify one suite in
   isolation when others are broken, temporarily move the broken files aside, run, then restore.
