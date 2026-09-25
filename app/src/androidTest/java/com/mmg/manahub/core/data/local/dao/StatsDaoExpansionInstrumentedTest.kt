@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,6 +60,8 @@ class StatsDaoExpansionInstrumentedTest {
         legalityModern: String = "not_legal",
         legalityStandard: String = "not_legal",
         setCode: String = "tst",
+        releasedAt: String = "2020-01-01",
+        artist: String? = null,
     ) {
         db.cardDao().upsert(
             CardEntity(
@@ -82,7 +85,7 @@ class StatsDaoExpansionInstrumentedTest {
                 setName = "Test Set",
                 collectorNumber = "1",
                 rarity = "common",
-                releasedAt = "2020-01-01",
+                releasedAt = releasedAt,
                 imageNormal = null,
                 imageArtCrop = null,
                 imageBackNormal = null,
@@ -95,7 +98,7 @@ class StatsDaoExpansionInstrumentedTest {
                 legalityModern = legalityModern,
                 legalityCommander = legalityCommander,
                 flavorText = null,
-                artist = null,
+                artist = artist,
                 scryfallUri = "https://scryfall.com/test",
             )
         )
@@ -118,6 +121,34 @@ class StatsDaoExpansionInstrumentedTest {
                 createdAt = createdAt,
             )
         )
+    }
+
+    @Test
+    fun observeTotals_countsUncachedOwnershipWhileCardFieldAggregatesSkipIt() = runTest {
+        insertCard("cached", priceUsd = 4.0)
+        insertCollectionRow("cached-row", "cached", quantity = 2)
+        insertCollectionRow("uncached-row", "uncached", quantity = 3)
+
+        val totals = statsDao.observeTotals(null, null, null).first()
+
+        assertEquals(5, totals.totalCards)
+        assertEquals(2, totals.uniqueCards)
+        assertEquals(8.0, statsDao.observeTotalValueUsd(null, null, null).first(), 0.0001)
+        assertEquals(2, statsDao.observeTotals("[]", null, null).first().totalCards)
+    }
+
+    @Test
+    fun cardValueProjections_includeOwnedQuantityForSingleRowsAndArtistGroups() = runTest {
+        insertCard("old", priceUsd = 2.0, releasedAt = "2010-01-01", artist = "Artist")
+        insertCard("new", priceUsd = 3.0, releasedAt = "2020-01-01", artist = "Artist")
+        insertCollectionRow("old-row", "old", quantity = 2)
+        insertCollectionRow("new-row-a", "new", quantity = 3)
+        insertCollectionRow("new-row-b", "new", quantity = 4)
+
+        assertEquals(2, statsDao.observeOldestCard(null, null, null).first()?.quantity)
+        assertTrue(statsDao.observeNewestCard(null, null, null).first()?.quantity in setOf(3, 4))
+        val artistCards = statsDao.observeCardsByArtist("Artist", null, null, null, 10).first()
+        assertEquals(7, artistCards.first { it.scryfallId == "new" }.quantity)
     }
 
     // ── observeUniqueCardPrices ──────────────────────────────────────────────────

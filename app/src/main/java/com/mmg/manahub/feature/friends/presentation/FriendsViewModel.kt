@@ -135,6 +135,9 @@ class FriendsViewModel(
                     searchJob?.cancel()
                     _uiState.update {
                         it.copy(
+                            friends = emptyList(),
+                            pendingRequests = emptyList(),
+                            outgoingRequests = emptyList(),
                             hasRefreshed = false,
                             refreshFailed = false,
                             inFlightRequestIds = emptySet(),

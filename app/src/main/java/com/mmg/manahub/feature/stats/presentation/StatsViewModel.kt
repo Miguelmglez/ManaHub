@@ -107,6 +107,8 @@ class StatsViewModel(
     private var tradeJob: Job? = null
     private var lastTradeVisibilityRefreshAt = 0L
     private var tradeOwnerUserId: String? = null
+    private var displayedOwnerUserId: String? = null
+    private var hasDisplayedOwner = false
 
     private companion object {
         /** "Recent form" strip shows up to the last 10 games (Phase 3, 2026-07 stats expansion). */
@@ -240,7 +242,7 @@ class StatsViewModel(
             .onStart { emit(uiState.value.hasGameStats) }
 
     /**
-     * The Games tab's 12-flow `combine`, gated to [StatsTab.GAMES] via `flatMapLatest` — this is
+     * The Games tab's combined queries, gated to [StatsTab.GAMES] via `flatMapLatest` — this is
      * the pipeline named in the backend perf plan (WS5a) as the primary Room/memory offender when
      * left running regardless of the selected tab. `null` while off-tab; the bridging collector in
      * [init] ignores `null`.
@@ -409,9 +411,8 @@ class StatsViewModel(
      * Cheap, ALWAYS-ON gate for [StatsUiState.hasTradeStats] — mirrors [hasGameStatsFlow]'s
      * "not tab-scoped" reasoning (see class doc): the TRADES tab must be able to appear before it
      * has ever been selected. Performs a ONE-SHOT resolution of the auth session
-     * (`.first { it !is Loading }`), matching `HomeViewModel`'s established pattern — a
-     * sign-in/sign-out that happens LATER in the same Stats session is not picked up. Deliberately
-     * does NOT trigger the expensive per-thread item fetch (that stays fully lazy — see
+     * reactively so a later sign-in or sign-out updates visibility. Deliberately does NOT
+     * trigger the expensive per-thread item fetch (that stays fully lazy — see
      * [loadTradeStats]), only the cheap metadata call needed to know whether any COMPLETED
      * proposal exists at all.
      */
@@ -494,7 +495,7 @@ class StatsViewModel(
     /** Retries the TRADES tab fetch after an [TradeStatsUiState.Error]. */
     fun retryTradeStats() = loadTradeStats()
 
-    val uiState: StateFlow<StatsUiState> = combine(
+    private val statsContentFlow: Flow<StatsUiState> = combine(
         combine(_uiState, collectionStatsPipeline, collectionSetsPipeline) { base, stats, sets ->
             val currentStats = stats?.takeIf { it.first == base.currency }?.second
             base.copy(
@@ -521,7 +522,30 @@ class StatsViewModel(
             playerCountWinrates = games?.playerCountWinrates ?: base.playerCountWinrates,
             recentForm = games?.recentForm ?: base.recentForm,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatsUiState())
+    }
+
+    val uiState: StateFlow<StatsUiState> = authRepository.sessionState
+        .map { session -> (session as? SessionState.Authenticated)?.user?.id }
+        .distinctUntilChanged()
+        .flatMapLatest { userId ->
+            flow {
+                if (hasDisplayedOwner && displayedOwnerUserId != userId) {
+                    tradeJob?.cancel()
+                    _selectedTab.value = StatsTab.COLLECTION
+                    val cleared = StatsUiState(currency = _uiState.value.currency)
+                    _uiState.value = cleared
+                    emit(cleared)
+                }
+                displayedOwnerUserId = userId
+                hasDisplayedOwner = true
+                emitAll(statsContentFlow)
+            }
+        }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000, replayExpirationMillis = 0),
+            StatsUiState(),
+        )
 
     init {
         observePreferredCurrency()

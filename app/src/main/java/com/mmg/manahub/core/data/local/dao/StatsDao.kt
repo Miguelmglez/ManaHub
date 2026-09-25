@@ -258,7 +258,8 @@ interface StatsDao {
 
     @Query("""
         SELECT c.scryfall_id AS scryfallId, c.name AS name,
-               c.image_art_crop AS imageArtCrop, uc.is_foil AS isFoil,
+               c.image_art_crop AS imageArtCrop, c.image_normal AS imageNormal,
+               uc.is_foil AS isFoil, uc.quantity AS quantity,
                c.color_identity AS colorIdentity, c.set_code AS setCode,
                c.set_name AS setName, c.rarity AS rarity,
                CASE WHEN uc.is_foil = 1 AND c.price_usd_foil IS NOT NULL
@@ -279,7 +280,8 @@ interface StatsDao {
 
     @Query("""
         SELECT c.scryfall_id AS scryfallId, c.name AS name,
-               c.image_art_crop AS imageArtCrop, uc.is_foil AS isFoil,
+               c.image_art_crop AS imageArtCrop, c.image_normal AS imageNormal,
+               uc.is_foil AS isFoil, uc.quantity AS quantity,
                c.color_identity AS colorIdentity, c.set_code AS setCode,
                c.set_name AS setName, c.rarity AS rarity,
                CASE WHEN uc.is_foil = 1 AND c.price_usd_foil IS NOT NULL
@@ -515,6 +517,7 @@ interface StatsDao {
     @Query("""
         SELECT c.scryfall_id AS scryfallId, c.name AS name, c.image_art_crop AS imageArtCrop,
                c.image_normal AS imageNormal, MAX(uc.is_foil) AS isFoil,
+               SUM(uc.quantity) AS quantity,
                c.color_identity AS colorIdentity, c.set_code AS setCode,
                c.set_name AS setName, c.rarity AS rarity,
                CASE WHEN MAX(uc.is_foil) = 1 AND c.price_usd_foil IS NOT NULL

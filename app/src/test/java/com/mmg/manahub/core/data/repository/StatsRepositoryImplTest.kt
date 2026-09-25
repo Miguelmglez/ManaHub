@@ -3,6 +3,7 @@ package com.mmg.manahub.core.data.repository
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.core.data.local.entity.projection.CardValueProjection
+import com.mmg.manahub.core.data.local.entity.projection.ColorCountProjection
 import com.mmg.manahub.core.data.local.entity.projection.DuplicateCardProjection
 import com.mmg.manahub.core.data.local.entity.projection.FormatCoverageProjection
 import com.mmg.manahub.core.data.local.entity.projection.TotalsProjection
@@ -11,6 +12,7 @@ import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.model.PreferredCurrency
+import com.mmg.manahub.core.model.MtgColor
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -177,6 +179,58 @@ class StatsRepositoryImplTest {
         val stats = repo().observeCollectionStats(PreferredCurrency.USD, null, null).first()
 
         assertEquals(0f, stats.valueConcentrationTop10Percent)
+    }
+
+    @Test
+    fun `value concentration weights each distinct card price by owned quantity`() = runTest {
+        every { statsDao.observeTotalValueUsd(any(), any(), any()) } returns flowOf(100.0)
+        every { statsDao.observeMostValuableCards(any(), any(), any(), any(), any()) } returns flowOf(listOf(
+            cardValueProjection("a", priceUsd = 10.0).copy(quantity = 3),
+            cardValueProjection("b", priceUsd = 20.0).copy(quantity = 1),
+        ))
+
+        val stats = repo().observeCollectionStats(PreferredCurrency.USD, null, null).first()
+
+        assertEquals(0.5f, stats.valueConcentrationTop10Percent, 0.0001f)
+    }
+
+    @Test
+    fun `invalid prices do not corrupt card values or concentration`() = runTest {
+        every { statsDao.observeTotalValueUsd(any(), any(), any()) } returns flowOf(100.0)
+        every { statsDao.observeUniqueCardPrices(any(), any(), any()) } returns flowOf(listOf(
+            UniqueCardPriceProjection("nan", Double.NaN, 1.0),
+            UniqueCardPriceProjection("infinite", Double.POSITIVE_INFINITY, 1.0),
+            UniqueCardPriceProjection("negative", -4.0, 1.0),
+            UniqueCardPriceProjection("valid", 8.0, 1.0),
+        ))
+        every { statsDao.observeMostValuableCards(any(), any(), any(), any(), any()) } returns flowOf(listOf(
+            cardValueProjection("nan", Double.NaN),
+            cardValueProjection("infinite", Double.POSITIVE_INFINITY),
+            cardValueProjection("negative", -4.0),
+            cardValueProjection("valid", 8.0).copy(quantity = 2),
+        ))
+
+        val stats = repo().observeCollectionStats(PreferredCurrency.USD, null, null).first()
+
+        assertEquals(8.0, stats.avgCardValue, 0.0001)
+        assertEquals(8.0, stats.medianCardValue, 0.0001)
+        assertEquals(0.16f, stats.valueConcentrationTop10Percent, 0.0001f)
+    }
+
+    @Test
+    fun `multicolor counts are color affinities while total cards stays distinct`() = runTest {
+        every { statsDao.observeTotals(any(), any(), any()) } returns flowOf(TotalsProjection(100, 100))
+        every { statsDao.observeCountByColorIdentity(any(), any(), any()) } returns flowOf(listOf(
+            ColorCountProjection("[\"W\",\"U\"]", 50),
+            ColorCountProjection("[\"R\"]", 50),
+        ))
+
+        val stats = repo().observeCollectionStats(PreferredCurrency.USD, null, null).first()
+
+        assertEquals(100, stats.totalCards)
+        assertEquals(50, stats.byColor[MtgColor.W])
+        assertEquals(50, stats.byColor[MtgColor.U])
+        assertEquals(50, stats.byColor[MtgColor.R])
     }
 
     @Test

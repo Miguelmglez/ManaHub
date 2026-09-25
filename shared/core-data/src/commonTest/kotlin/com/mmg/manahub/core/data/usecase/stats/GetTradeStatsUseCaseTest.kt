@@ -225,6 +225,8 @@ class GetTradeStatsUseCaseTest {
         assertEquals(2, stats.cardsSent)
         assertEquals(3, stats.cardsReceived)
         assertEquals(-5.0, stats.netValueDelta, 0.0001) // received 15 - sent 20
+        assertEquals(-5.0, stats.netValueDeltaUsd!!, 0.0001)
+        assertEquals(-4.5, stats.netValueDeltaEur!!, 0.0001)
         assertEquals(PreferredCurrency.USD, stats.currency)
     }
 

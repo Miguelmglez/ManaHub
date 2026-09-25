@@ -72,6 +72,14 @@ Features with their own data layer (Draft, News) add `data/`, `domain/`, `di/` s
 
 ## Kotlin Multiplatform migration (IN PROGRESS — Android + Web)
 
+**Web implementation is paused by user direction (2026-09-25).** Until the user explicitly asks to
+resume it, do not edit `wasmJsMain` or `:webApp`, port Android features to web, run web builds, or
+expand this restoration with web-only changes. Record web implications in
+`docs/web-gamification-restore-debt-2026-09-25.md` and continue the Android scope. During this pause,
+the web-build clause in the definition of done below is deferred; Android compilation and affected
+tests remain required. This prevents a paused platform from repeatedly interrupting Android work
+while preserving a concrete backlog for the eventual web session.
+
 The project is migrating to **KMP, targeting Android + Web (Compose Multiplatform / `wasmJs`)**.
 iOS/Desktop are out of scope for now but the structure must not preclude them. **DI is moving Hilt →
 Koin.** Master plan (status, decisions, Android debt, web roadmap): `docs/plans/kmp-migration-plan.md`;
@@ -147,6 +155,10 @@ guest. Legacy account data may predate the owner marker and survive sign-out, so
 show it under a new account by claiming `owner == null` alone. Require verified guest provenance,
 quarantine or wipe ambiguous legacy rows, and gate cache reads as well as writes by owner. Serialize
 session transitions so an old clear or claim job cannot modify the next account's cache.
+Account-owned UI `StateFlow`s must clear their visible state on every session identity change and
+expire replay after their last observer stops. A retained ViewModel can otherwise show account A's
+last screen value for a frame when account B returns from the navigation back stack, even if the
+underlying Room query is correctly scoped to B. Cancel old account jobs before subscribing to B.
 
 ### Database (Room v56)
 - DB file `mtg_collection.db`. The `UserCardEntity` → `CardEntity` FK was **removed in v53** (ADR-008);

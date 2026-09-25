@@ -1106,7 +1106,7 @@ private fun FriendsSummaryRow(
             }
             Spacer(modifier = Modifier.width(spacing.sm))
         }
-        Text(text = friendCount.toString(), style = MaterialTheme.magicTypography.bodySmall, color = mc.textSecondary)
+        Text(text = friendCount.toString(), style = MaterialTheme.magicTypography.labelMedium, color = mc.textSecondary)
         Spacer(modifier = Modifier.width(spacing.sm))
     }
 }

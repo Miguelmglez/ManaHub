@@ -82,7 +82,7 @@ abstract class FriendDao {
      * Requests shadowed by a friend are dropped, so no id is ever in two lists.
      */
     @Transaction
-    suspend fun replaceAll(
+    open suspend fun replaceAll(
         friends: List<FriendEntity>?,
         incoming: List<FriendRequestEntity>?,
         outgoing: List<OutgoingFriendRequestEntity>?,
@@ -105,7 +105,7 @@ abstract class FriendDao {
 
     /** Drops every friends-feature row (sign-out, account switch, account deletion). */
     @Transaction
-    suspend fun clearAll() {
+    open suspend fun clearAll() {
         clearFriends()
         clearRequests()
         clearOutgoingRequests()

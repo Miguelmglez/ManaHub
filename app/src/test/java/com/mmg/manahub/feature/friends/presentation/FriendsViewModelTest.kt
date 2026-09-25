@@ -137,6 +137,39 @@ class FriendsViewModelTest {
     }
 
     @Test
+    fun `signing out clears cached friendship rows before repository flows update`() = runTest {
+        signIn()
+        friends.value = listOf(Friend("fs-a", "user-a", "A", "#AAAAAA", null))
+        incoming.value = listOf(FriendRequest("fs-b", "user-b", "B", "#BBBBBB", null))
+        outgoing.value = listOf(OutgoingFriendRequest("fs-c", "user-c", "C", "#CCCCCC", null))
+        assertEquals(1, viewModel.uiState.value.friends.size)
+        assertEquals(1, viewModel.uiState.value.pendingRequests.size)
+        assertEquals(1, viewModel.uiState.value.outgoingRequests.size)
+
+        sessionState.value = SessionState.Unauthenticated
+
+        assertFalse(viewModel.uiState.value.isLoggedIn)
+        assertTrue(viewModel.uiState.value.friends.isEmpty())
+        assertTrue(viewModel.uiState.value.pendingRequests.isEmpty())
+        assertTrue(viewModel.uiState.value.outgoingRequests.isEmpty())
+    }
+
+    @Test
+    fun `switching accounts clears prior friendship rows before new refresh completes`() = runTest {
+        signIn()
+        friends.value = listOf(Friend("fs-a", "user-a", "A", "#AAAAAA", null))
+        assertEquals(1, viewModel.uiState.value.friends.size)
+        coEvery { friendRepo.refreshAll("user-other") } coAnswers {
+            CompletableDeferred<Result<Unit>>().await()
+        }
+
+        sessionState.value = SessionState.Authenticated(me.copy(id = "user-other"))
+
+        assertEquals("user-other", viewModel.uiState.value.currentUserId)
+        assertTrue(viewModel.uiState.value.friends.isEmpty())
+    }
+
+    @Test
     fun `a failed refresh keeps the cache and offers a retry`() = runTest {
         coEvery { friendRepo.refreshAll(any()) } returns Result.failure(IllegalStateException("offline"))
         signIn()
