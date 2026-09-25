@@ -132,8 +132,8 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
   truncates at 1000 with no signal to the client. Paginate on `(updated_at, id)` — tie-safe — keeping
   the window filter and the cursor as separate predicates, and cap the page size **server-side**.
   Drain via `PagedSync.drainPages` (`:shared:core-data` commonMain). The gamification client now
-  uses `get_*_page` RPCs; their 2026-09 migrations must reach production
-  before the release flag is enabled. Legacy unpaginated RPCs remain for shipped clients.
+  uses `get_*_page` RPCs; their 2026-09 migrations were deployed on 2026-09-25. Keep the release
+  flag off pending device and release-candidate verification. Legacy unpaginated RPCs remain for shipped clients.
 - **Ownership data never depends on cache metadata.** A `user_card_collection` row inserts whether or
   not its `CardEntity` is cached; unresolved ids get a `stale_reason = "pending_hydration"`
   placeholder so the row stays visible and counted. Consumers that aggregate card fields (stats,
@@ -517,6 +517,9 @@ Apply to every new migration/RPC/trigger/view:
    policy expression; writes to a table whose UPDATE/DELETE policy is intentionally `false`; bootstrap
    writes before the caller is a participant; cross-user session cleanup; reading a materialized view).
 10. `enqueue_notification` is permanently REVOKE-protected (accepts arbitrary `recipient_id`).
+11. `friendships` inserts must create only `PENDING` rows, and neither participant ID may change
+    after insert. Enforce both in RLS and a database trigger: a client that can forge `ACCEPTED`
+    or rewrite a participant can read another user's friend-only collection through valid RPCs.
 
 → memory: `feedback_supabase_security_audit_2026-06-02`
 

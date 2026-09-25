@@ -157,10 +157,14 @@ not unbounded `*_changes_since`. Ledger order uses server-assigned `server_seq`;
 server-set `changed_at` plus a stable primary-key tie breaker. The client persists a cursor after
 each applied page, pushes in slices of at most 500, and advances the local ledger watermark only
 over confirmed pushes and contiguous applied pulls. Old RPCs stay available for shipped clients.
-The new migrations must be deployed before enabling the release flag. A local store belongs to one
-account; switching accounts wipes that store before a full pull. A null owner can claim only
+P0 and P1b–P1e were deployed and verified in production on 2026-09-25; P1a is a schema snapshot,
+not a migration to replay. The release flag remains off pending device and release-candidate
+verification. A local store belongs to one account; switching accounts wipes that store before a
+full pull. A null owner can claim only
 verified guest progress: an upgraded legacy store may have account A's data without the new
 owner key, so null alone is not proof of guest origin.
+The post-deployment advisors returned project-wide security and unused-index warnings; these need
+separate triage before a release candidate and did not identify a P1e-specific failure.
 Availability for an authenticated session must also require the store owner to equal that
 session's user id. A signed-out guest may use only a separately verified guest store; an old
 account's retained store must remain inaccessible to guest UI and event processing.
