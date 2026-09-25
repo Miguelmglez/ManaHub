@@ -26,9 +26,10 @@ interface StatsDao {
     @Query("""
         SELECT COALESCE(SUM(uc.quantity), 0) AS totalCards, COUNT(DISTINCT uc.scryfall_id) AS uniqueCards
         FROM user_card_collection uc
-        INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
+        LEFT JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
-          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
+          AND ((:colorFilter IS NULL AND :setFilter IS NULL)
+               OR (c.scryfall_id IS NOT NULL AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')))
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
@@ -39,8 +40,8 @@ interface StatsDao {
 
     @Query("""
         SELECT COALESCE(SUM(uc.quantity * CASE
-            WHEN uc.is_foil = 1 AND c.price_usd_foil IS NOT NULL THEN c.price_usd_foil
-            ELSE COALESCE(c.price_usd, 0) END), 0)
+            WHEN uc.is_foil = 1 AND c.price_usd_foil >= 0 THEN c.price_usd_foil
+            WHEN c.price_usd >= 0 THEN c.price_usd ELSE 0 END), 0)
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
@@ -54,8 +55,8 @@ interface StatsDao {
 
     @Query("""
         SELECT COALESCE(SUM(uc.quantity * CASE
-            WHEN uc.is_foil = 1 AND c.price_eur_foil IS NOT NULL THEN c.price_eur_foil
-            ELSE COALESCE(c.price_eur, 0) END), 0)
+            WHEN uc.is_foil = 1 AND c.price_eur_foil >= 0 THEN c.price_eur_foil
+            WHEN c.price_eur >= 0 THEN c.price_eur ELSE 0 END), 0)
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
@@ -70,6 +71,7 @@ interface StatsDao {
     @Query("""
         SELECT c.scryfall_id AS scryfallId, c.name AS name,
                c.image_art_crop AS imageArtCrop, c.image_normal AS imageNormal, uc.is_foil AS isFoil,
+               SUM(uc.quantity) AS quantity,
                c.color_identity AS colorIdentity, c.set_code AS setCode,
                c.set_name AS setName, c.rarity AS rarity,
                CASE WHEN uc.is_foil = 1 AND c.price_usd_foil IS NOT NULL
@@ -84,6 +86,7 @@ interface StatsDao {
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
                OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
+        GROUP BY c.scryfall_id, uc.is_foil
         ORDER BY
             CASE WHEN :useEur = 1 THEN priceEur ELSE priceUsd END DESC
         LIMIT :limit

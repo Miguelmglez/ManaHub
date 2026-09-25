@@ -1,10 +1,15 @@
 package com.mmg.manahub.feature.profile.presentation
 
-import androidx.compose.animation.animateContentSize
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,7 +17,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,7 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -34,19 +38,13 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -63,50 +61,88 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.update.AppUpdateState
+import com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog
+import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics
+import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
 import com.mmg.manahub.core.model.CollectionStats
 import com.mmg.manahub.core.model.PreferredCurrency
+import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicLoadingSize
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.core.ui.components.ManaTabItem
+import com.mmg.manahub.core.ui.components.ManaTabRow
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.onOverlayScrim
+import com.mmg.manahub.core.ui.theme.overlayScrim
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.PriceFormatter
+import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.feature.auth.presentation.AccountSection
-import com.mmg.manahub.feature.auth.presentation.AuthUiState
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
 import com.mmg.manahub.feature.auth.presentation.LoginSheet
 import com.mmg.manahub.feature.gamification.presentation.AvatarFrameRing
 import com.mmg.manahub.feature.gamification.presentation.BadgeEmblem
 import com.mmg.manahub.feature.gamification.presentation.TitleText
 import org.koin.androidx.compose.koinViewModel
+import java.util.Locale
 import kotlin.math.roundToInt
 
-/** Tabs shown under the Profile hero (Phase 2 adds Quests; Phase 3 adds Rewards). */
-enum class ProfileTab { OVERVIEW, ACHIEVEMENTS, QUESTS, REWARDS }
+/** Tabs shown under the Profile hero; every tab but [OVERVIEW] needs gamification. */
+enum class ProfileTab {
+    OVERVIEW, ACHIEVEMENTS, QUESTS, REWARDS;
 
-@OptIn(ExperimentalMaterial3Api::class)
+    companion object {
+        /** Maps the `?tab=` route argument to a tab; unknown or missing values open [OVERVIEW]. */
+        fun fromRouteArg(value: String?): ProfileTab = when (value?.lowercase()) {
+            "achievements" -> ACHIEVEMENTS
+            "quests" -> QUESTS
+            "rewards" -> REWARDS
+            else -> OVERVIEW
+        }
+    }
+}
+
+/** The tab actually shown: any gamification tab falls back to [ProfileTab.OVERVIEW] while unavailable. */
+internal fun resolveProfileTab(selected: ProfileTab, gamificationAvailable: Boolean): ProfileTab =
+    if (gamificationAvailable) selected else ProfileTab.OVERVIEW
+
+private val HERO_MAX_HEIGHT = 360.dp
+private const val HERO_DEFAULT_RATIO = 1.77f
+private const val HERO_MIN_RATIO = 1.2f
+private const val HERO_MAX_RATIO = 2.5f
+private const val MAX_TOP_VALUE_SYMBOLS = 3
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel = koinViewModel(),
@@ -114,35 +150,37 @@ fun ProfileScreen(
     onSettingsClick: () -> Unit,
     onStatsClick: () -> Unit,
     onFriendsClick: () -> Unit,
-    /** Navigates to the account-management screen (Phase 4b) — sign-out/delete-account/security live there. */
+    /** Navigates to the account-management screen; sign-out/delete-account/security live there. */
     onManageAccountClick: () -> Unit,
-    /** Initial tab to open on (deep-linked from Home widgets in Phase 2). Default = Overview. */
+    /** Tab requested by a deep link; applied once gamification is known to be available. */
     initialTab: ProfileTab = ProfileTab.OVERVIEW,
-    onBack:()->Unit
+    onBack: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sessionState by authViewModel.sessionState.collectAsStateWithLifecycle()
-    val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
-    val mc = MaterialTheme.magicColors
-    var showProfileEdit by remember { mutableStateOf(false) }
-    var showFeedbackSheet by remember { mutableStateOf(false) }
-    var showLoginSheet by remember { mutableStateOf(false) }
-    var loginSheetInitialTab by remember { mutableIntStateOf(0) }
-    var showAccountSheet by remember { mutableStateOf(false) }
-
-    val context = LocalContext.current
-    val activity = context as? androidx.activity.ComponentActivity
     val appUpdateState by viewModel.appUpdateState.collectAsStateWithLifecycle()
+    val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
+    val context = LocalContext.current
+
+    var showProfileEdit by rememberSaveable { mutableStateOf(false) }
+    var showFeedbackSheet by rememberSaveable { mutableStateOf(false) }
+    var showLoginSheet by rememberSaveable { mutableStateOf(false) }
+    var loginSheetInitialTab by rememberSaveable { mutableIntStateOf(0) }
+    var showAccountSheet by rememberSaveable { mutableStateOf(false) }
+
+    var selectedTab by rememberSaveable { mutableStateOf(ProfileTab.OVERVIEW) }
+    var initialTabApplied by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(uiState.gamificationEnabled) {
+        if (uiState.gamificationEnabled && !initialTabApplied) {
+            selectedTab = initialTab
+            initialTabApplied = true
+        }
+    }
+    val activeTab = resolveProfileTab(selectedTab, uiState.gamificationEnabled)
 
     if (showProfileEdit) {
-        ProfileEditSheet(
-            onDismiss = { showProfileEdit = false },
-            onNicknameUpdate = if (sessionState is SessionState.Authenticated) {
-                authViewModel::updateNickname
-            } else {
-                null
-            }
-        )
+        ProfileEditSheet(onDismiss = { showProfileEdit = false })
     }
 
     if (showFeedbackSheet) {
@@ -160,10 +198,7 @@ fun ProfileScreen(
     }
 
     if (showAccountSheet) {
-        val sheetState = rememberModalBottomSheetState(
-            skipPartiallyExpanded = true,
-            confirmValueChange = { it != SheetValue.Hidden }
-        )
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
             onDismissRequest = { showAccountSheet = false },
             sheetState = sheetState,
@@ -172,14 +207,16 @@ fun ProfileScreen(
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, start = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = spacing.sm, start = spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = { showAccountSheet = false }) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = stringResource(R.string.action_cancel),
-                            tint = mc.textSecondary
+                            tint = mc.textSecondary,
                         )
                     }
                 }
@@ -204,7 +241,7 @@ fun ProfileScreen(
                         showProfileEdit = true
                     },
                     onFetchShareLink = viewModel::fetchShareLink,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.sm),
                     playerName = uiState.playerName,
                     avatarUrl = uiState.avatarUrl,
                 )
@@ -213,184 +250,82 @@ fun ProfileScreen(
         }
     }
 
-    // Reset ui state after account deletion so the screen returns to Idle cleanly.
-    // The sessionState Flow will automatically emit Unauthenticated after the account is removed.
-    LaunchedEffect(authUiState) {
-        if (authUiState is AuthUiState.AccountDeleted) {
-            showAccountSheet = false
-            authViewModel.resetUiState()
-        }
-    }
-
-    // Quest-claim feedback. The one-shot Channel is collected here and surfaced via MagicToast.
     val toastState = rememberMagicToastState()
     val claimSuccessTemplate = stringResource(R.string.quests_claim_success)
     val claimFailedMessage = stringResource(R.string.quests_claim_failed)
     val badgeCapTemplate = stringResource(R.string.reward_badge_cap_reached)
-    LaunchedEffect(Unit) {
+    val storeUnavailableMessage = stringResource(R.string.profile_rate_app_unavailable)
+    LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
-                is ProfileViewModel.Event.QuestClaimed ->
-                    toastState.show(
-                        message = String.format(claimSuccessTemplate, event.xpAwarded),
-                        type = MagicToastType.SUCCESS,
-                    )
+                is ProfileViewModel.Event.QuestClaimed -> toastState.show(
+                    message = String.format(claimSuccessTemplate, event.xpAwarded),
+                    type = MagicToastType.SUCCESS,
+                )
                 ProfileViewModel.Event.QuestClaimFailed ->
                     toastState.show(message = claimFailedMessage, type = MagicToastType.ERROR)
-                is ProfileViewModel.Event.BadgeCapReached ->
-                    toastState.show(
-                        message = String.format(badgeCapTemplate, event.maxBadges),
-                        type = MagicToastType.INFO,
-                    )
+                is ProfileViewModel.Event.BadgeCapReached -> toastState.show(
+                    message = String.format(badgeCapTemplate, event.maxBadges),
+                    type = MagicToastType.INFO,
+                )
             }
         }
     }
 
+    val groupedAchievements = remember(uiState.achievements) {
+        groupAchievementsByCategory(uiState.achievements)
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
-    Scaffold(
-        containerColor = mc.background,
-        contentWindowInsets = WindowInsets(0),
-        topBar = {
-            Surface(
-                color = mc.backgroundSecondary,
-                modifier = Modifier.fillMaxWidth(),
+        Scaffold(
+            containerColor = mc.background,
+            contentWindowInsets = WindowInsets(0),
+            topBar = {
+                ProfileTopBar(onBack = onBack, onSettingsClick = onSettingsClick)
+            },
+        ) { padding ->
+            val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            val isSignedIn = sessionState is SessionState.Authenticated
+
+            // One list: the hero scrolls away with every tab's content (P-20).
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = PaddingValues(bottom = spacing.xxl + navBarBottom),
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .height(56.dp)
-                        .padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back),
-                            tint = mc.textPrimary,
-                        )
+                item(key = "profile_hero") {
+                    ProfileHeroSection(
+                        name = uiState.playerName,
+                        avatarUrl = uiState.avatarUrl,
+                        gameTag = (sessionState as? SessionState.Authenticated)?.user?.gameTag,
+                        progression = uiState.progression.takeIf { uiState.gamificationEnabled },
+                        equipped = if (uiState.gamificationEnabled) uiState.equipped else EquippedCosmetics.NONE,
+                        onEditClick = {
+                            if (isSignedIn) showAccountSheet = true else showProfileEdit = true
+                        },
+                    )
+                }
+
+                if (uiState.gamificationEnabled) {
+                    stickyHeader(key = "profile_tabs") {
+                        ProfileTabRow(selectedTab = activeTab, onTabSelected = { selectedTab = it })
                     }
-                    Text(
-                        text = stringResource(R.string.profile_title),
-                        style = MaterialTheme.magicTypography.titleLarge,
-                        color = mc.textPrimary,
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
-                        tint = mc.textPrimary,
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .size(24.dp)
-                            .clickable(onClick = onSettingsClick),
-                    )
-
-                }
-            }
-        },
-    ) { padding ->
-        val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-
-        // Tab selection lives in the screen (transient UI state). When gamification is OFF the tab
-        // row is hidden entirely and only the Overview content is shown — gamification disappears.
-        var selectedTab by rememberSaveable(uiState.gamificationEnabled) {
-            mutableStateOf(if (uiState.gamificationEnabled) initialTab else ProfileTab.OVERVIEW)
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            // ── Hero (always visible, above the tab row) ──────────────────────
-            ProfileHeroSection(
-                name = uiState.playerName,
-                avatarUrl = uiState.avatarUrl,
-                gameTag = (sessionState as? SessionState.Authenticated)?.user?.gameTag,
-                progression = uiState.progression.takeIf { uiState.gamificationEnabled },
-                // Equipped cosmetics are purely additive overlays; pass NONE when gamification is off
-                // so the hero renders byte-for-byte as before.
-                equipped = if (uiState.gamificationEnabled) uiState.equipped else com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.NONE,
-                onEditClick = {
-                    if (sessionState is SessionState.Authenticated) {
-                        showAccountSheet = true
-                    } else {
-                        showProfileEdit = true
-                    }
-                },
-            )
-
-            // ── Tab row (only when gamification is enabled) ───────────────────
-            if (uiState.gamificationEnabled) {
-                ProfileTabRow(
-                    selectedTab = selectedTab,
-                    onTabSelected = { selectedTab = it },
-                )
-            }
-
-            // ── Tab content ───────────────────────────────────────────────────
-            val bottomInset = PaddingValues(bottom = 32.dp + navBarBottom)
-            when {
-                uiState.gamificationEnabled && selectedTab == ProfileTab.ACHIEVEMENTS -> {
-                    AchievementsTab(
-                        achievements = uiState.achievements,
-                        contentPadding = bottomInset,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 8.dp),
-                    )
                 }
 
-                uiState.gamificationEnabled && selectedTab == ProfileTab.QUESTS -> {
-                    QuestsTab(
-                        board = uiState.questBoard,
-                        streak = uiState.streak,
-                        onClaim = viewModel::claimQuest,
-                        contentPadding = bottomInset,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 8.dp),
-                    )
-                }
-
-                uiState.gamificationEnabled && selectedTab == ProfileTab.REWARDS -> {
-                    RewardsTab(
-                        board = uiState.rewardsBoard,
-                        onEquip = viewModel::onEquip,
-                        onUnequip = viewModel::onUnequip,
-                        contentPadding = bottomInset,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 8.dp),
-                    )
-                }
-
-                else -> {
-                    OverviewTabContent(
+                when (activeTab) {
+                    ProfileTab.OVERVIEW -> overviewItems(
                         uiState = uiState,
-                        sessionState = sessionState,
-                        viewModel = viewModel,
-                        contentPadding = bottomInset,
+                        isSignedIn = isSignedIn,
+                        isSignedOut = sessionState is SessionState.Unauthenticated,
                         appUpdateState = appUpdateState,
                         onFriendsClick = onFriendsClick,
                         onStatsClick = onStatsClick,
+                        onRetryStats = viewModel::retryStats,
                         onUpdateClick = viewModel::onUpdateClick,
                         onRateClick = {
-                            val reviewManager = com.google.android.play.core.review.ReviewManagerFactory.create(context)
-                            val request = reviewManager.requestReviewFlow()
-                            request.addOnCompleteListener { task ->
-                                if (task.isSuccessful) {
-                                    val reviewInfo = task.result
-                                    activity?.let { reviewManager.launchReviewFlow(it, reviewInfo) }
-                                } else {
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=${context.packageName}"))
-                                    try {
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=${context.packageName}")))
-                                    }
-                                }
+                            if (!openStoreListing(context)) {
+                                toastState.show(message = storeUnavailableMessage, type = MagicToastType.ERROR)
                             }
                         },
                         onFeedbackClick = { showFeedbackSheet = true },
@@ -398,188 +333,235 @@ fun ProfileScreen(
                             loginSheetInitialTab = 0
                             showLoginSheet = true
                         },
-                        modifier = Modifier.fillMaxSize(),
+                    )
+
+                    ProfileTab.ACHIEVEMENTS -> achievementsTabItems(groupedAchievements)
+
+                    ProfileTab.QUESTS -> questsTabItems(
+                        board = uiState.questBoard,
+                        streak = uiState.streak,
+                        claimingIds = uiState.claimingQuestIds,
+                        onClaim = viewModel::claimQuest,
+                    )
+
+                    ProfileTab.REWARDS -> rewardsTabItems(
+                        board = uiState.rewardsBoard,
+                        onEquip = viewModel::onEquip,
+                        onUnequip = viewModel::onUnequip,
                     )
                 }
             }
         }
-    }
         MagicToastHost(toastState)
+    }
+}
+
+/**
+ * Opens the Play Store listing (store app first, then the web page). An explicit "Rate" tap must not
+ * use the In-App Review flow: once its quota is spent it succeeds without showing anything (P-15).
+ *
+ * @return false when neither the store nor a browser could be opened.
+ */
+private fun openStoreListing(context: Context): Boolean {
+    val packageName = context.packageName
+    val targets = listOf(
+        "market://details?id=$packageName",
+        "https://play.google.com/store/apps/details?id=$packageName",
+    )
+    for (target in targets) {
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
+            return true
+        } catch (_: ActivityNotFoundException) {
+            // Try the next target.
+        }
+    }
+    recordNonFatal("profile_rate_store_unavailable")
+    return false
+}
+
+// ── Top bar ─────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun ProfileTopBar(onBack: () -> Unit, onSettingsClick: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    Surface(color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(56.dp)
+                .padding(horizontal = MaterialTheme.spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.action_back),
+                    tint = mc.textPrimary,
+                )
+            }
+            Text(
+                text = stringResource(R.string.profile_title),
+                style = MaterialTheme.magicTypography.titleLarge,
+                color = mc.textPrimary,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(onClick = onSettingsClick) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = stringResource(R.string.settings_title),
+                    tint = mc.textPrimary,
+                )
+            }
+        }
     }
 }
 
 // ── Tab row ─────────────────────────────────────────────────────────────────────
 
-/**
- * The Profile tab selector (Overview / Achievements). Shown only when gamification is enabled.
- * Stateless: selection is hoisted to the screen. Uses MagicTheme tokens and exposes selected-state
- * semantics; each tab is a full-height (≥48dp) row.
- */
-@OptIn(ExperimentalMaterial3Api::class)
+/** The Profile tab selector, shown only when gamification is available. Stateless. */
 @Composable
 private fun ProfileTabRow(
     selectedTab: ProfileTab,
     onTabSelected: (ProfileTab) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
-    val mc = MaterialTheme.magicColors
-    TabRow(
-        selectedTabIndex = selectedTab.ordinal,
-        modifier = modifier.fillMaxWidth(),
-        containerColor = mc.background,
-        contentColor = mc.primaryAccent,
-        indicator = { positions ->
-            TabRowDefaults.SecondaryIndicator(
-                modifier = Modifier.tabIndicatorOffset(positions[selectedTab.ordinal]),
-                color = mc.primaryAccent,
-            )
-        },
-        divider = {},
-    ) {
-        ProfileTab.entries.forEach { tab ->
-            val labelRes = when (tab) {
-                ProfileTab.OVERVIEW -> R.string.profile_tab_overview
-                ProfileTab.ACHIEVEMENTS -> R.string.profile_tab_achievements
-                ProfileTab.QUESTS -> R.string.profile_tab_quests
-                ProfileTab.REWARDS -> R.string.profile_tab_rewards
-            }
-            val selected = tab == selectedTab
-            Tab(
-                selected = selected,
-                onClick = { onTabSelected(tab) },
-                modifier = Modifier.height(48.dp),
-                selectedContentColor = mc.primaryAccent,
-                unselectedContentColor = mc.textSecondary,
-            ) {
-                Text(
-                    text = stringResource(labelRes),
-                    style = MaterialTheme.magicTypography.labelLarge,
-                )
-            }
+    val items = ProfileTab.entries.map { tab ->
+        val labelRes = when (tab) {
+            ProfileTab.OVERVIEW -> R.string.profile_tab_overview
+            ProfileTab.ACHIEVEMENTS -> R.string.profile_tab_achievements
+            ProfileTab.QUESTS -> R.string.profile_tab_quests
+            ProfileTab.REWARDS -> R.string.profile_tab_rewards
         }
+        ManaTabItem(
+            label = stringResource(labelRes).uppercase(),
+            selected = tab == selectedTab,
+            onClick = { onTabSelected(tab) },
+        )
     }
+    ManaTabRow(items = items, modifier = Modifier.fillMaxWidth())
 }
 
-// ── Overview tab content ─────────────────────────────────────────────────────────
+// ── Overview tab ────────────────────────────────────────────────────────────────
 
-/**
- * The Overview tab — the original Profile body (friends, KPIs, collection summary, update/rate/
- * feedback rows, footer), moved verbatim into a tab. Account-gated rows behave exactly as before.
- * Stateless wrapper: state + actions are hoisted from the screen.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun OverviewTabContent(
+/** Emits the Overview tab (friends, KPIs, collection summary, app rows, footer) as keyed items. */
+private fun LazyListScope.overviewItems(
     uiState: ProfileViewModel.UiState,
-    sessionState: SessionState,
-    viewModel: ProfileViewModel,
-    contentPadding: PaddingValues,
+    isSignedIn: Boolean,
+    isSignedOut: Boolean,
     appUpdateState: AppUpdateState,
     onFriendsClick: () -> Unit,
     onStatsClick: () -> Unit,
+    onRetryStats: () -> Unit,
     onUpdateClick: () -> Unit,
     onRateClick: () -> Unit,
     onFeedbackClick: () -> Unit,
     onLoginClick: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = contentPadding,
-    ) {
+    if (isSignedIn) {
+        item(key = "overview_friends") {
+            FriendsSummaryRow(
+                friendCount = uiState.friendCount,
+                pendingCount = uiState.pendingFriendCount,
+                onClick = onFriendsClick,
+                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg, vertical = MaterialTheme.spacing.xs),
+            )
+        }
+    }
 
+    item(key = "overview_kpis") {
+        ProfileKpiSection(
+            uiState = uiState,
+            onStatsClick = onStatsClick,
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg),
+        )
+    }
 
-        // ── Friends ───────────────────────────────────────────────────────
-        if (sessionState is SessionState.Authenticated) {
-            item {
-                FriendsSummaryRow(
-                    friendCount = uiState.friendCount,
-                    pendingCount = uiState.pendingFriendCount,
-                    onClick = onFriendsClick,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                )
-            }
+    when {
+        uiState.isLoading -> item(key = "overview_stats_loading") {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(MaterialTheme.spacing.lg),
+                contentAlignment = Alignment.Center,
+            ) { MagicLoadingSpinner(size = MagicLoadingSize.Small) }
         }
 
-        // ── KPI grid ──────────────────────────────────────────────────────
-        item {
-            ProfileKpiSection(
-                uiState = uiState,
-                favouriteColor = uiState.favouriteColor,
-                mostValuableColor = uiState.mostValuableColor,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .clickable { onStatsClick() },
+        uiState.statsError -> item(key = "overview_stats_error") {
+            InlineErrorState(
+                message = stringResource(R.string.profile_stats_error),
+                retryLabel = stringResource(R.string.action_retry),
+                onRetry = onRetryStats,
+                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg, vertical = MaterialTheme.spacing.sm),
             )
         }
 
-        // ── Collection summary ────────────────────────────────────────────
-        uiState.collectionStats?.let { stats ->
-            item {
+        else -> uiState.collectionStats?.let { stats ->
+            item(key = "overview_collection_summary") {
                 CollectionSummarySection(
                     stats = stats,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    viewModel = viewModel,
+                    currency = uiState.preferredCurrency,
+                    modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg, vertical = MaterialTheme.spacing.sm),
                 )
             }
         }
+    }
 
-        // ── App Update ────────────────────────────────────────────────────
-        val updateRowLabel = when (appUpdateState) {
-            is AppUpdateState.Available -> "New app update available"
-            AppUpdateState.Downloading -> "Downloading update…"
-            AppUpdateState.Downloaded -> "Update ready — tap to restart"
-            AppUpdateState.None, is AppUpdateState.Forced -> null
-        }
-        if (updateRowLabel != null) {
-            item {
-                AppUpdateRow(
-                    label = updateRowLabel,
-                    onClick = onUpdateClick,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                )
-            }
-        }
-
-        // ── Rate the app ──────────────────────────────────────────────────
-        item {
-            RateAppRow(
-                onClick = onRateClick,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+    val updateLabelRes = when (appUpdateState) {
+        is AppUpdateState.Available -> R.string.profile_update_available
+        AppUpdateState.Downloading -> R.string.profile_update_downloading
+        AppUpdateState.Downloaded -> R.string.profile_update_ready
+        AppUpdateState.None, is AppUpdateState.Forced -> null
+    }
+    if (updateLabelRes != null) {
+        item(key = "overview_update") {
+            ProfileLinkRow(
+                icon = Icons.Default.SystemUpdate,
+                iconTint = MaterialTheme.magicColors.primaryAccent,
+                label = stringResource(updateLabelRes),
+                onClick = onUpdateClick,
+                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg, vertical = MaterialTheme.spacing.xs),
             )
         }
+    }
 
-        // ── Send feedback ─────────────────────────────────────────────────
-        item {
-            SendFeedbackRow(
-                onClick = onFeedbackClick,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+    item(key = "overview_rate") {
+        ProfileLinkRow(
+            icon = Icons.Default.Star,
+            iconTint = MaterialTheme.magicColors.goldMtg,
+            label = stringResource(R.string.profile_rate_app),
+            onClick = onRateClick,
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg, vertical = MaterialTheme.spacing.xs),
+        )
+    }
+
+    item(key = "overview_feedback") {
+        ProfileLinkRow(
+            icon = Icons.AutoMirrored.Filled.Send,
+            iconTint = MaterialTheme.magicColors.primaryAccent,
+            label = stringResource(R.string.feedback_title),
+            onClick = onFeedbackClick,
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg, vertical = MaterialTheme.spacing.xs),
+        )
+    }
+
+    if (isSignedOut) {
+        item(key = "overview_login") {
+            LoginCtaCard(
+                onClick = onLoginClick,
+                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg, vertical = MaterialTheme.spacing.sm),
             )
         }
+    }
 
-        // ── Login CTA ─────────────────────────────────────────────────────
-        if (sessionState is SessionState.Unauthenticated) {
-            item {
-                LoginCtaCard(
-                    onClick = onLoginClick,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
-        }
-
-        // ── Footer ────────────────────────────────────────────────────────
-        item {
-            AppInfoFooter(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-        }
+    item(key = "overview_footer") {
+        AppInfoFooter(modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg, vertical = MaterialTheme.spacing.sm))
     }
 }
 
 // ── Login CTA Card ─────────────────────────────────────────────────────────────
 
-/**
- * A visually attractive card shown to unauthenticated users to encourage sign-in.
- * Uses MagicCtaButton and a themed background to stand out.
- */
+/** Card shown to signed-out users to encourage sign-in. */
 @Composable
 private fun LoginCtaCard(
     onClick: () -> Unit,
@@ -591,21 +573,17 @@ private fun LoginCtaCard(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = CardShape,
         color = mc.surface,
         tonalElevation = 2.dp,
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
-            // Background themed accent
             Box(
                 modifier = Modifier
                     .matchParentSize()
                     .background(
                         brush = Brush.linearGradient(
-                            colors = listOf(
-                                mc.primaryAccent.copy(alpha = 0.08f),
-                                mc.background,
-                            ),
+                            colors = listOf(mc.primaryAccent.copy(alpha = 0.08f), mc.background),
                         ),
                     ),
             )
@@ -613,9 +591,9 @@ private fun LoginCtaCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(spacing.md),
+                    .padding(spacing.lg),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing.md),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
@@ -644,245 +622,202 @@ private fun LoginCtaCard(
 
 // ── Hero section ──────────────────────────────────────────────────────────────
 
+/**
+ * The profile hero: avatar art (or a gradient with the initial), name, equipped cosmetics, game tag
+ * and the XP ring. Everything drawn over the photo uses scrim-safe ink so it reads on all 12 palettes.
+ *
+ * @param progression drives the XP ring; null hides it (gamification unavailable or not loaded).
+ * @param equipped cosmetic overlays; [EquippedCosmetics.NONE] renders the plain hero.
+ */
 @Composable
 private fun ProfileHeroSection(
     name: String,
     avatarUrl: String?,
-    /** Server-generated game tag (e.g. "#A3KX9Z"). Displayed as a badge next to the name. */
-    gameTag: String? = null,
-    /**
-     * Gamification progression for the read-only XP ring (ADR-002, Phase 0). When null the ring
-     * and level chip are not drawn — the caller passes null while gamification is disabled or the
-     * progression flow has not yet emitted.
-     */
-    progression: com.mmg.manahub.core.gamification.domain.model.PlayerProgression? = null,
-    /**
-     * The player's equipped cosmetics (Phase 3). All four overlays are purely additive: when this is
-     * [com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.NONE] the hero renders exactly
-     * as it did pre-Phase-3. The caller passes NONE while gamification is disabled.
-     */
-    equipped: com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics =
-        com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.NONE,
+    gameTag: String?,
+    progression: PlayerProgression?,
+    equipped: EquippedCosmetics,
     onEditClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
 
-    // Resolve the equipped cosmetics against the static catalog (ownership is guarded at equip time).
-    val equippedTitle = remember(equipped.titleId) {
-        equipped.titleId?.let { com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog.byId(it) }
-    }
-    val equippedBadges = remember(equipped.badgeIds) {
-        equipped.badgeIds.mapNotNull { com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog.byId(it) }
-    }
-    val equippedFrame = remember(equipped.avatarFrameId) {
-        equipped.avatarFrameId?.let { com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog.byId(it) }
-    }
-    val equippedRing = remember(equipped.levelRingStyleId) {
-        equipped.levelRingStyleId?.let { com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog.byId(it) }
-    }
+    val equippedTitle = remember(equipped.titleId) { equipped.titleId?.let { UnlockableCatalog.byId(it) } }
+    val equippedBadges = remember(equipped.badgeIds) { equipped.badgeIds.mapNotNull { UnlockableCatalog.byId(it) } }
+    val equippedFrame = remember(equipped.avatarFrameId) { equipped.avatarFrameId?.let { UnlockableCatalog.byId(it) } }
+    val equippedRing = remember(equipped.levelRingStyleId) { equipped.levelRingStyleId?.let { UnlockableCatalog.byId(it) } }
 
-    // State to track the image's aspect ratio (defaults to 16:9)
-    var imageRatio by remember(avatarUrl) { mutableFloatStateOf(1.77f) }
+    var imageRatio by remember(avatarUrl) { mutableFloatStateOf(HERO_DEFAULT_RATIO) }
+    var avatarFailed by remember(avatarUrl) { mutableStateOf(false) }
+    val showAvatar = avatarUrl != null && !avatarFailed
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
-            .padding(horizontal = 8.dp, vertical = 8.dp)
             .fillMaxWidth()
-            // Use a dynamic aspect ratio constrained to reasonable limits
-            .aspectRatio(imageRatio.coerceIn(1.2f, 2.5f))
-            .animateContentSize()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onEditClick() },
+            .padding(spacing.sm),
     ) {
-        // Background: planeswalker art or fallback gradient
-        if (avatarUrl != null) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(avatarUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                alignment = Alignment.TopCenter,
-                onSuccess = { state ->
-                    val size = state.painter.intrinsicSize
-                    if (size.width > 0 && size.height > 0) {
-                        imageRatio = size.width / size.height
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
+        val heroHeight = (maxWidth / imageRatio.coerceIn(HERO_MIN_RATIO, HERO_MAX_RATIO))
+            .coerceAtMost(HERO_MAX_HEIGHT)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(heroHeight)
+                .clip(CardShape)
+                .clickable(
+                    onClickLabel = stringResource(R.string.profile_edit_title),
+                    role = Role.Button,
+                    onClick = onEditClick,
+                ),
+        ) {
+            if (showAvatar) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(avatarUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
+                    onSuccess = { state ->
+                        val size = state.painter.intrinsicSize
+                        if (size.width > 0 && size.height > 0) imageRatio = size.width / size.height
+                    },
+                    onError = { avatarFailed = true },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(mc.primaryAccent.copy(alpha = 0.3f), mc.background),
+                            ),
+                        ),
+                ) {
+                    ThemeBackground(modifier = Modifier.fillMaxSize())
+                    Text(
+                        text = name.take(1).uppercase().ifEmpty { "✦" },
+                        style = MaterialTheme.magicTypography.lifeNumberMd,
+                        color = mc.primaryAccent.copy(alpha = 0.3f),
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
+            }
+
+            // Bottom-up scrim so the name reads over any artwork.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        brush = Brush.radialGradient(
+                        brush = Brush.verticalGradient(
                             colors = listOf(
-                                mc.primaryAccent.copy(alpha = 0.3f),
-                                mc.background,
+                                mc.overlayScrim.copy(alpha = 0f),
+                                mc.overlayScrim.copy(alpha = 0f),
+                                mc.overlayScrim.copy(alpha = 0.5f),
+                                mc.overlayScrim.copy(alpha = 0.85f),
                             ),
                         ),
                     ),
-            ) {
-                ThemeBackground(modifier = Modifier.fillMaxSize())
-                Text(
-                    text = name.take(1).uppercase().ifEmpty { "✦" },
-                    style = MaterialTheme.magicTypography.lifeNumberMd.copy(
-                        fontSize = 72.sp,
-                        color = mc.primaryAccent.copy(alpha = 0.3f)
-                    ),
-                    modifier = Modifier.align(Alignment.Center),
-                )
-            }
-        }
-
-        // Dark gradient overlay (bottom→top) for text legibility
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.5f),
-                            Color.Black.copy(alpha = 0.85f),
-                        ),
-                    ),
-                ),
-        )
-
-
-        // Equipped avatar frame (Phase 3) — drawn AROUND the avatar as a full-bounds overlay so the
-        // existing aspect-ratio layout is untouched. Decorative; no semantics.
-        if (equippedFrame != null) {
-            AvatarFrameRing(
-                renderSpec = equippedFrame.renderSpec,
-                modifier = Modifier.fillMaxSize(),
             )
-        }
 
-        // Accessibility summary for the equipped cosmetics (name + title + badge count). The visual
-        // title/badges are decorative, so without this a screen reader would only hear "edit profile"
-        // from the clickable hero Box. Built here (composable context) and merged onto the name Column.
-        val resolvedName = name.ifEmpty { stringResource(R.string.game_setup_default_player_name) }
-        val badgeCount = equippedBadges.size
-            .coerceAtMost(com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.MAX_EQUIPPED_BADGES)
-        val equippedTitleName = equippedTitle?.displayName
-        val badgesEquippedText = if (badgeCount > 0) {
-            pluralStringResource(R.plurals.profile_hero_badges_equipped, badgeCount, badgeCount)
-        } else {
-            null
-        }
-        val equippedCosmeticsA11y = buildString {
-            append(resolvedName)
-            equippedTitleName?.let { append(", "); append(it) }
-            badgesEquippedText?.let { append(", "); append(it) }
-        }
+            if (equippedFrame != null) {
+                AvatarFrameRing(renderSpec = equippedFrame.renderSpec, modifier = Modifier.fillMaxSize())
+            }
 
-        // Name (+ equipped title under it) + badges + game tag badge — bottom.
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Column(
+            val resolvedName = name.ifEmpty { stringResource(R.string.game_setup_default_player_name) }
+            val badgeCount = equippedBadges.size.coerceAtMost(EquippedCosmetics.MAX_EQUIPPED_BADGES)
+            val badgesEquippedText = if (badgeCount > 0) {
+                pluralStringResource(R.plurals.profile_hero_badges_equipped, badgeCount, badgeCount)
+            } else {
+                null
+            }
+            val heroA11y = buildString {
+                append(resolvedName)
+                equippedTitle?.displayName?.let { append(", "); append(it) }
+                badgesEquippedText?.let { append(", "); append(it) }
+            }
+
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .semantics(mergeDescendants = true) {
-                        contentDescription = equippedCosmeticsA11y
-                    },
+                    .align(Alignment.BottomStart)
+                    .padding(spacing.md)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
             ) {
-                Text(
-                    text = resolvedName,
-                    style = MaterialTheme.magicTypography.titleLarge.copy(
-                        fontSize = 26.sp,
-                        color = Color.White
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-
-                // Equipped title (Phase 3) — styled text under the nickname. Null → nothing.
-                if (equippedTitle != null) {
-                    TitleText(
-                        renderSpec = equippedTitle.renderSpec,
-                        text = equippedTitle.displayName,
-                        style = MaterialTheme.magicTypography.labelLarge,
-                        modifier = Modifier.padding(top = 2.dp),
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clearAndSetSemantics { contentDescription = heroA11y },
+                ) {
+                    Text(
+                        text = resolvedName,
+                        style = MaterialTheme.magicTypography.displayMedium,
+                        color = mc.onOverlayScrim,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+
+                    // Title cosmetics are tuned for surfaces, so they get a solid surface chip (P-06).
+                    if (equippedTitle != null) {
+                        Surface(
+                            shape = ChipShape,
+                            color = mc.surface,
+                            modifier = Modifier.padding(top = spacing.xxs),
+                        ) {
+                            TitleText(
+                                renderSpec = equippedTitle.renderSpec,
+                                text = equippedTitle.displayName,
+                                style = MaterialTheme.magicTypography.labelLarge,
+                                modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
+                            )
+                        }
+                    }
+
+                    if (equippedBadges.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.padding(top = spacing.xs),
+                            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            equippedBadges
+                                .take(EquippedCosmetics.MAX_EQUIPPED_BADGES)
+                                .forEach { badge -> BadgeEmblem(renderSpec = badge.renderSpec, size = 22.dp) }
+                        }
+                    }
                 }
 
-                // Equipped badges (Phase 3) — up to 3 small emblems near the name.
-                if (equippedBadges.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        // Defensively clamp to the equip cap so an over-filled list can never render
-                        // more than the allowed number of badges in the hero.
-                        equippedBadges
-                            .take(com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.MAX_EQUIPPED_BADGES)
-                            .forEach { badge ->
-                                BadgeEmblem(
-                                    renderSpec = badge.renderSpec,
-                                    size = 22.dp,
-                                )
-                            }
+                if (gameTag != null) {
+                    Surface(shape = ChipShape, color = mc.primaryAccent) {
+                        Text(
+                            text = gameTag,
+                            color = mc.onAccent,
+                            style = MaterialTheme.magicTypography.labelSmall,
+                            modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
+                        )
                     }
                 }
             }
 
-            // Game tag badge — displayed only when the user is authenticated and has a tag.
-            if (gameTag != null) {
-                Box(
+            if (progression != null) {
+                val span = progression.xpForNextLevel
+                val ringProgress = if (span > 0L) progression.xpIntoLevel.toFloat() / span.toFloat() else 0f
+                ProfileLevelRing(
+                    level = progression.level,
+                    progress = ringProgress,
+                    contentDescription = stringResource(
+                        R.string.profile_level_ring_a11y,
+                        progression.level,
+                        progression.xpIntoLevel,
+                        progression.xpForNextLevel,
+                    ),
+                    ringStyle = equippedRing?.renderSpec?.ringStyle,
+                    ringRenderSpec = equippedRing?.renderSpec,
                     modifier = Modifier
-                        .background(
-                            color = mc.primaryAccent.copy(alpha = 0.25f),
-                            shape = RoundedCornerShape(6.dp),
-                        )
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
-                ) {
-                    Text(
-                        text = gameTag,
-                        color = mc.primaryAccent,
-                        style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 11.sp),
-                    )
-                }
+                        .align(Alignment.TopEnd)
+                        .padding(spacing.md),
+                )
             }
-        }
-
-        // Read-only XP ring + level chip (ADR-002, Phase 0). Overlaid top-end of the hero.
-        // Only drawn when gamification is enabled AND progression has emitted (caller passes null
-        // otherwise, so the hero renders with no ring as a neutral fallback).
-        if (progression != null) {
-            val span = progression.xpForNextLevel
-            val ringProgress = if (span > 0L) {
-                progression.xpIntoLevel.toFloat() / span.toFloat()
-            } else {
-                0f
-            }
-            ProfileLevelRing(
-                level = progression.level,
-                progress = ringProgress,
-                contentDescription = stringResource(
-                    R.string.profile_level_ring_a11y,
-                    progression.level,
-                    progression.xpIntoLevel,
-                    progression.xpForNextLevel,
-                ),
-                // Equipped level-ring style (Phase 3). Null → SOLID (today's primaryAccent arc).
-                ringStyle = equippedRing?.renderSpec?.ringStyle,
-                ringRenderSpec = equippedRing?.renderSpec,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp),
-            )
         }
     }
 }
@@ -892,13 +827,19 @@ private fun ProfileHeroSection(
 @Composable
 private fun ProfileKpiSection(
     uiState: ProfileViewModel.UiState,
-    favouriteColor: String?,
-    mostValuableColor: String?,
+    onStatsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = MaterialTheme.spacing
     Column(
-        modifier = modifier.padding(top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier
+            .padding(top = spacing.sm)
+            .clickable(
+                onClickLabel = stringResource(R.string.profile_open_stats_a11y),
+                role = Role.Button,
+                onClick = onStatsClick,
+            ),
+        verticalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
         if (uiState.totalGames > 0) {
             SectionTitle(stringResource(R.string.profile_section_game_stats))
@@ -906,60 +847,51 @@ private fun ProfileKpiSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(IntrinsicSize.Max),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
             ) {
                 KpiCell(
                     stringResource(R.string.profile_stat_games),
                     uiState.totalGames.toString(),
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
+                    Modifier.weight(1f).fillMaxHeight(),
                 )
                 KpiCell(
                     stringResource(R.string.profile_stat_wins),
                     uiState.totalWins.toString(),
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
+                    Modifier.weight(1f).fillMaxHeight(),
                 )
                 KpiCell(
                     stringResource(R.string.profile_stat_win_pct),
                     "${(uiState.winRate * 100).roundToInt()}%",
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
+                    Modifier.weight(1f).fillMaxHeight(),
                 )
             }
         }
-        SectionTitle(stringResource(R.string.profile_section_collection_stats))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Max),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            KpiCell(
-                stringResource(R.string.profile_stat_unique_cards),
-                (uiState.collectionStats?.uniqueCards ?: 0).toString(),
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                accent = true
-            )
-            ColorStatCard(
-                label = stringResource(R.string.profile_stat_fav_color),
-                colorCode = favouriteColor,
+        val stats = uiState.collectionStats
+        if (stats != null) {
+            SectionTitle(stringResource(R.string.profile_section_collection_stats))
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-            )
-            ColorStatCard(
-                label = stringResource(R.string.profile_stat_top_value),
-                colorCode = mostValuableColor,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-            )
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                KpiCell(
+                    stringResource(R.string.profile_stat_unique_cards),
+                    stats.uniqueCards.toString(),
+                    Modifier.weight(1f).fillMaxHeight(),
+                    accent = true,
+                )
+                ColorStatCard(
+                    label = stringResource(R.string.profile_stat_fav_color),
+                    colors = uiState.favouriteColor?.let { listOf(it) },
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+                ColorStatCard(
+                    label = stringResource(R.string.profile_stat_top_value),
+                    colors = uiState.mostValuableColors,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+            }
         }
     }
 }
@@ -972,117 +904,100 @@ private fun KpiCell(
     accent: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(CardShape)
             .background(mc.surface)
-            .padding(vertical = 12.dp, horizontal = 8.dp),
+            .padding(vertical = spacing.md, horizontal = spacing.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.spacedBy(spacing.xxs, Alignment.CenterVertically),
     ) {
-        Text(
-            value,
-            style = MaterialTheme.magicTypography.titleLarge,
-            color = if (accent) mc.goldMtg else mc.primaryAccent,
-        )
-        Text(
-            label,
-            style = MaterialTheme.magicTypography.labelSmall,
-            color = mc.textSecondary,
-            textAlign = TextAlign.Center,
-        )
+        Text(value, style = MaterialTheme.magicTypography.titleLarge, color = if (accent) mc.goldMtg else mc.primaryAccent)
+        Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary, textAlign = TextAlign.Center)
     }
 }
 
-// ── Color stat card ───────────────────────────────────────────────────────────
-
+/**
+ * A KPI cell showing colour symbols. A multicolour identity shows up to [MAX_TOP_VALUE_SYMBOLS]
+ * individual symbols (Scryfall has no "M" symbol, P-16); null shows a dash.
+ */
 @Composable
 private fun ColorStatCard(
     label: String,
-    colorCode: String?,
+    colors: List<String>?,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(CardShape)
             .background(mc.surface)
-            .padding(vertical = 12.dp, horizontal = 8.dp),
+            .padding(vertical = spacing.md, horizontal = spacing.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.spacedBy(spacing.xxs, Alignment.CenterVertically),
     ) {
-        if (colorCode != null) {
-            ManaSymbolImage(token = colorCode, size = 26.dp)
-        } else {
-            Text("—", style = MaterialTheme.magicTypography.titleLarge, color = mc.primaryAccent)
+        when {
+            colors.isNullOrEmpty() ->
+                Text("—", style = MaterialTheme.magicTypography.titleLarge, color = mc.primaryAccent)
+            colors.size == 1 -> ManaSymbolImage(token = colors.first(), size = 26.dp)
+            else -> Row(
+                horizontalArrangement = Arrangement.spacedBy(spacing.xxs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                colors.take(MAX_TOP_VALUE_SYMBOLS).forEach { ManaSymbolImage(token = it, size = 20.dp) }
+                if (colors.size > MAX_TOP_VALUE_SYMBOLS) {
+                    Text(
+                        text = "+${colors.size - MAX_TOP_VALUE_SYMBOLS}",
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = mc.textSecondary,
+                    )
+                }
+            }
         }
-        Text(
-            label,
-            style = MaterialTheme.magicTypography.labelSmall,
-            color = mc.textSecondary,
-            textAlign = TextAlign.Center,
-        )
+        Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary, textAlign = TextAlign.Center)
     }
 }
-
 
 // ── Collection summary ────────────────────────────────────────────────────────
 
 @Composable
 private fun CollectionSummarySection(
     stats: CollectionStats,
+    currency: PreferredCurrency,
     modifier: Modifier = Modifier,
-    viewModel: ProfileViewModel,
 ) {
     val mc = MaterialTheme.magicColors
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val currency = uiState.preferredCurrency
-
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    val spacing = MaterialTheme.spacing
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
         SectionTitle(stringResource(R.string.profile_collection_summary))
-        Surface(shape = RoundedCornerShape(14.dp), color = mc.surface) {
+        Surface(shape = CardShape, color = mc.surface) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp),
+                    .padding(spacing.md),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column {
-                    Text(
-                        stringResource(R.string.profile_total_cards),
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.textSecondary
-                    )
-                    Text(
-                        stats.totalCards.toString(),
-                        style = MaterialTheme.magicTypography.titleMedium,
-                        color = mc.textPrimary
-                    )
+                    Text(stringResource(R.string.profile_total_cards), style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                    Text(stats.totalCards.toString(), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
                 }
                 Column(horizontalAlignment = Alignment.End) {
+                    Text(stringResource(R.string.profile_est_value), style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
                     Text(
-                        stringResource(R.string.profile_est_value),
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.textSecondary
-                    )
-                    val formattedPrice = PriceFormatter.format(
-                        amount = if (currency == PreferredCurrency.EUR) stats.totalValueEur else stats.totalValueUsd,
-                        currency = currency
-                    )
-                    Text(
-                        text = formattedPrice,
+                        text = PriceFormatter.format(
+                            amount = if (currency == PreferredCurrency.EUR) stats.totalValueEur else stats.totalValueUsd,
+                            currency = currency,
+                        ),
                         style = MaterialTheme.magicTypography.titleMedium,
-                        color = mc.goldMtg
+                        color = mc.goldMtg,
                     )
                 }
             }
         }
     }
 }
-
 
 // ── Sections ──────────────────────────────────────────────────────────────────
 
@@ -1096,158 +1011,59 @@ private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-
 @Composable
 private fun AppInfoFooter(modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
-    val version = remember { com.mmg.manahub.BuildConfig.VERSION_NAME }
-    val versionType = remember { com.mmg.manahub.BuildConfig.BUILD_TYPE.capitalize() }
-    val build = remember { com.mmg.manahub.BuildConfig.VERSION_CODE }
+    val versionType = remember { BuildConfig.BUILD_TYPE.replaceFirstChar { it.titlecase(Locale.ROOT) } }
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs),
     ) {
         Text(
-            text = stringResource(R.string.profile_version, version, versionType,build),
+            text = stringResource(R.string.profile_version, BuildConfig.VERSION_NAME, versionType, BuildConfig.VERSION_CODE),
             style = MaterialTheme.magicTypography.labelSmall,
-            color = mc.textDisabled
+            color = mc.textDisabled,
         )
         Text(
             text = stringResource(R.string.profile_developed_by),
             style = MaterialTheme.magicTypography.labelSmall,
             color = mc.textDisabled,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
     }
 }
 
-// ── Send Feedback row ─────────────────────────────────────────────────────────
+// ── Link rows ─────────────────────────────────────────────────────────────────
 
-/**
- * A tappable row that opens the feedback sheet.
- *
- * Styled consistently with the rest of the profile screen — icon on the left,
- * label in the centre, and a chevron arrow on the right.
- */
+/** A tappable settings-style row (≥48dp): leading icon, label, optional trailing content, chevron. */
 @Composable
-private fun SendFeedbackRow(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    Surface(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = mc.surface,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.Send,
-                contentDescription = null,
-                tint = mc.primaryAccent,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = stringResource(R.string.feedback_title),
-                style = MaterialTheme.magicTypography.bodyMedium,
-                color = mc.textPrimary,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = mc.textDisabled,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-    }
-}
-
-// ── App Update row ────────────────────────────────────────────────────────────
-
-@Composable
-private fun AppUpdateRow(
+private fun ProfileLinkRow(
+    icon: ImageVector,
+    iconTint: Color,
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    trailing: @Composable () -> Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
-    Surface(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = mc.surface,
-    ) {
+    val spacing = MaterialTheme.spacing
+    Surface(onClick = onClick, modifier = modifier.fillMaxWidth(), shape = CardShape, color = mc.surface) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp),
+                .padding(horizontal = spacing.md, vertical = spacing.lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = Icons.Default.SystemUpdate,
-                contentDescription = null,
-                tint = mc.primaryAccent,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
+            Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(spacing.md))
             Text(
                 text = label,
                 style = MaterialTheme.magicTypography.bodyMedium,
                 color = mc.textPrimary,
                 modifier = Modifier.weight(1f),
             )
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = mc.textDisabled,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-    }
-}
-
-// ── Rate App row ──────────────────────────────────────────────────────────────
-
-@Composable
-private fun RateAppRow(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    Surface(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = mc.surface,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Default.Star,
-                contentDescription = null,
-                tint = mc.goldMtg,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "Rate the app",
-                style = MaterialTheme.magicTypography.bodyMedium,
-                color = mc.textPrimary,
-                modifier = Modifier.weight(1f),
-            )
+            trailing()
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
@@ -1266,54 +1082,31 @@ private fun FriendsSummaryRow(
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
-    Surface(
+    val spacing = MaterialTheme.spacing
+    ProfileLinkRow(
+        icon = Icons.Default.Group,
+        iconTint = mc.primaryAccent,
+        label = stringResource(R.string.friends_title),
         onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = mc.surface,
+        modifier = modifier,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Default.Group,
-                contentDescription = null,
-                tint = mc.primaryAccent,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = stringResource(R.string.friends_title),
-                style = MaterialTheme.magicTypography.bodyMedium,
-                color = mc.textPrimary,
-                modifier = Modifier.weight(1f),
-            )
-            if (pendingCount > 0) {
-                Badge(containerColor = mc.primaryAccent) {
-                    Text(
-                        pendingCount.toString(),
-                        color = Color.White,
-                        style = MaterialTheme.magicTypography.labelSmall,
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
+        if (pendingCount > 0) {
+            val pendingA11y = pluralStringResource(R.plurals.profile_pending_friend_requests, pendingCount, pendingCount)
+            Surface(
+                shape = ChipShape,
+                color = mc.primaryAccent,
+                modifier = Modifier.semantics { contentDescription = pendingA11y },
+            ) {
+                Text(
+                    text = pendingCount.toString(),
+                    color = mc.onAccent,
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
+                )
             }
-            Text(
-                text = friendCount.toString(),
-                style = MaterialTheme.magicTypography.bodySmall,
-                color = mc.textSecondary,
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = mc.textDisabled,
-                modifier = Modifier.size(20.dp),
-            )
+            Spacer(modifier = Modifier.width(spacing.sm))
         }
+        Text(text = friendCount.toString(), style = MaterialTheme.magicTypography.bodySmall, color = mc.textSecondary)
+        Spacer(modifier = Modifier.width(spacing.sm))
     }
 }
-

@@ -100,6 +100,10 @@ class GameSessionRepositoryImpl(
     override fun observeLocalWins(): Flow<Int> =
         dao.observeLocalWins()
 
+    override fun observeLocalDraws(): Flow<Int> = dao.observeLocalDraws()
+
+    override fun observeLocalSessionOutcomes(): Flow<List<Boolean?>> = dao.observeLocalSessionOutcomes()
+
     override fun observeLocalSessionHistory(limit: Int): Flow<List<SessionHistoryEntry>> =
         dao.observeLocalSessionHistory(limit).map { rows ->
             rows.map { row ->
@@ -112,6 +116,7 @@ class GameSessionRepositoryImpl(
                     winnerName    = row.winnerName,
                     surveyStatus  = row.surveyStatus,
                     localIsWinner = row.localIsWinner,
+                    isDraw       = row.isDraw,
                     localDeckId   = row.localDeckId,
                     localDeckName = row.localDeckName,
                     opponentCount = row.opponentCount.coerceAtLeast(0),
@@ -152,7 +157,9 @@ class GameSessionRepositoryImpl(
         dao.observeLocalAvgWinTurn()
 
     override fun observeCurrentStreak(): Flow<Int> =
-        dao.observeLocalSessionOutcomes().map { outcomes -> outcomes.takeWhile { it }.size }
+        dao.observeLocalSessionOutcomes().map { outcomes ->
+            outcomes.takeWhile { it != false }.count { it == true }
+        }
 
     override fun observePendingSurveyCount(): Flow<Int> =
         dao.observePendingSurveyCount()

@@ -334,4 +334,40 @@ class AchievementEvaluatorTest {
         type = StreakTracker.TYPE_DAILY_ACTIVITY, current = current, longest = current,
         lastActiveDate = "2026-06-12", freezeTokens = 0,
     )
+
+    // ── Restore P5: friends DERIVED, CollectionChanged re-evaluation ───────────────
+
+    @Test
+    fun `a replayed FriendAdded still unlocks FIRST_FRIEND from the friends cache count`() = runTest {
+        coEvery { statsDao.friendsCount() } returns 1
+
+        val unlocks = evaluator.process(
+            ProgressionEvent.FriendAdded(friendId = "user-b", occurredAt = fixedInstant),
+            includeCounters = false,
+        )
+
+        assertTrue(unlocks.any { it.id == "FIRST_FRIEND" && it.tier == 1 })
+    }
+
+    @Test
+    fun `FRIENDS_5 never advances past the real friend count however often a friend is re-added`() = runTest {
+        coEvery { statsDao.friendsCount() } returns 4
+
+        repeat(3) {
+            evaluator.process(ProgressionEvent.FriendAdded(friendId = "user-b", occurredAt = fixedInstant))
+        }
+
+        coVerify(exactly = 0) { dao.grantXpAtomically(match { it.idempotencyKey.startsWith("achievement:FRIENDS_5") }, any(), any(), any()) }
+    }
+
+    @Test
+    fun `CollectionChanged re-evaluates collection achievements only`() = runTest {
+        coEvery { statsDao.totalCardsOwned() } returns 100
+
+        val unlocks = evaluator.process(ProgressionEvent.CollectionChanged(occurredAt = fixedInstant))
+
+        assertTrue(unlocks.any { it.id == "CARDS_OWNED" && it.tier == 1 })
+        coVerify(exactly = 0) { statsDao.totalGames() }
+        coVerify(exactly = 0) { statsDao.friendsCount() }
+    }
 }

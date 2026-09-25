@@ -58,6 +58,7 @@ fun syncKoinModule(statsDao: StatsDao): Module = module {
             syncPrefs = get(),
             statsDao = get(),
             friendRepo = get(),
+            userPreferencesRepository = get(),
         )
     }
 

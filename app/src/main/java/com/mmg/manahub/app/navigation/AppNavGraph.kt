@@ -85,6 +85,7 @@ import com.mmg.manahub.feature.friends.presentation.FriendsScreen
 import com.mmg.manahub.feature.friends.presentation.detail.FriendDetailScreen
 import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherScreen
 import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherViewModel
+import com.mmg.manahub.feature.friends.presentation.invite.InviteErrorReason
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.presentation.GamePlayScreen
 import com.mmg.manahub.feature.game.presentation.GameSettings
@@ -275,17 +276,19 @@ fun AppNavGraph(
                     inviteToastState.show(msg, MagicToastType.SUCCESS)
                 }
                 is InviteDispatcherViewModel.UiEvent.InviteError -> {
-                    val msg = when {
-                        event.isSelfInvite -> context.getString(R.string.friends_invite_self)
-                        event.isInvalidCode -> context.getString(R.string.friends_invite_invalid)
-                        else -> context.getString(R.string.friends_invite_error)
+                    val msg = when (event.reason) {
+                        InviteErrorReason.SELF_INVITE -> context.getString(R.string.friends_invite_self)
+                        InviteErrorReason.INVALID_CODE -> context.getString(R.string.friends_invite_invalid)
+                        InviteErrorReason.SESSION_EXPIRED -> context.getString(R.string.friends_invite_session_expired)
+                        InviteErrorReason.GENERIC -> context.getString(R.string.friends_invite_error)
                     }
                     inviteToastState.show(msg, MagicToastType.ERROR)
                 }
                 InviteDispatcherViewModel.UiEvent.NavigateAway -> {
-                    // Navigate to Profile, removing the invite screen from the back stack.
+                    // Replace the invite screen with Profile; single-top so an existing Profile is not stacked twice.
                     navController.navigate(Screen.Profile.baseRoute) {
                         popUpTo(Screen.FriendsInvite.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             }
@@ -1070,13 +1073,8 @@ fun AppNavGraph(
                     },
                 ),
             ) { backStackEntry ->
-                // Optional deep-link tab argument: "achievements" → Achievements tab,
-                // "quests" → Quests tab, else Overview.
-                val initialTab = when (backStackEntry.arguments?.getString("tab")?.lowercase()) {
-                    "achievements" -> ProfileTab.ACHIEVEMENTS
-                    "quests" -> ProfileTab.QUESTS
-                    else -> ProfileTab.OVERVIEW
-                }
+                // A gamification tab only opens once gamification is known to be available.
+                val initialTab = ProfileTab.fromRouteArg(backStackEntry.arguments?.getString("tab"))
                 ProfileScreen(
                     onSettingsClick = { navController.navigate(Screen.Settings.route) },
                     onStatsClick = { navController.navigate(Screen.Stats.route) },
@@ -1111,8 +1109,12 @@ fun AppNavGraph(
                         // Sign-out/delete-account both leave the user unauthenticated — return to
                         // Profile's Unauthenticated card rather than staying on an account screen
                         // that no longer makes sense.
-                        navController.navigate(Screen.Profile.baseRoute) {
-                            popUpTo(Screen.AccountManagement.route) { inclusive = true }
+                        // Return to the existing Profile entry instead of stacking a second one (P-22).
+                        if (!navController.popBackStack(Screen.Profile.route, inclusive = false)) {
+                            navController.navigate(Screen.Profile.baseRoute) {
+                                popUpTo(Screen.AccountManagement.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         }
                     },
                 )
@@ -1288,15 +1290,7 @@ fun AppNavGraph(
                 ),
             ) { backStack ->
                 val code = backStack.arguments?.getString("code") ?: ""
-                InviteDispatcherScreen(
-                    code = code,
-                    onNavigateAway = {
-                        navController.navigate(Screen.Profile.baseRoute) {
-                            popUpTo(Screen.FriendsInvite.route) { inclusive = true }
-                        }
-                    },
-                    inviteVm = inviteVm,
-                )
+                InviteDispatcherScreen(code = code, inviteVm = inviteVm)
             }
 
             // ── Trades shared list (deep link) ────────────────────────────────

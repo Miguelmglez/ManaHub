@@ -40,11 +40,20 @@ interface GameSessionRepository {
     /** Emits the [limit] most-recent sessions, most-recent first. */
     fun observeRecentSessions(limit: Int = 10): Flow<List<SessionDetail>>
 
-    /** Total number of finished sessions. */
+    /**
+     * Number of finished sessions that have a local seat (`is_local = 1`). This is the games-played
+     * count; win rates exclude draws separately. Sessions without a local seat are excluded.
+     */
     fun observeTotalGames(): Flow<Int>
 
     /** Count of sessions won by the local seat (`is_local = 1`); name-agnostic. */
     fun observeLocalWins(): Flow<Int>
+
+    /** Count of local-seat sessions recorded as draws. */
+    fun observeLocalDraws(): Flow<Int>
+
+    /** All local-seat outcomes, newest first; null represents a draw. */
+    fun observeLocalSessionOutcomes(): Flow<List<Boolean?>>
 
     /** Session history resolved against the local seat, most-recent first. */
     fun observeLocalSessionHistory(limit: Int = 50): Flow<List<SessionHistoryEntry>>

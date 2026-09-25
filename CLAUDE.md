@@ -123,14 +123,30 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
 - **Every `RETURNS SETOF` RPC must be keyset-paginated below `db-max-rows`.** PostgREST silently
   truncates at 1000 with no signal to the client. Paginate on `(updated_at, id)` — tie-safe — keeping
   the window filter and the cursor as separate predicates, and cap the page size **server-side**.
-  Drain via `PagedSync.drainPages` (`:shared:core-data` commonMain). Still unpaginated: the five
-  gamification `*_changes_since` RPCs.
+  Drain via `PagedSync.drainPages` (`:shared:core-data` commonMain). The gamification client now
+  uses `get_*_page` RPCs; their 2026-09 migrations must reach production
+  before the release flag is enabled. Legacy unpaginated RPCs remain for shipped clients.
 - **Ownership data never depends on cache metadata.** A `user_card_collection` row inserts whether or
   not its `CardEntity` is cached; unresolved ids get a `stale_reason = "pending_hydration"`
   placeholder so the row stays visible and counted. Consumers that aggregate card fields (stats,
   price refresh, deck analysis) must exclude placeholders.
 - → memory: `feedback_sync_watermark_never_past_unapplied`, `feedback_setof_rpc_must_be_paginated`,
   `feedback_idempotency_gate_tests_own_completion`, `project_collection_sync_data_loss_2026-09`
+
+### Local game statistics
+Personal game totals and derived gamification counts include only sessions with an `is_local = 1`
+seat; a nonlocal or tournament session cannot become the user's game merely because it has a
+`game_sessions` row. Detect draws by `winnerId = -1`, never `winnerName = "Draw"` (a valid player name).
+Draws count as games but not as decisive games for win percentage, and a draw
+neither extends nor breaks a win streak. Keep Stats, Profile, Home, and achievements consistent so
+one recorded session cannot produce conflicting numbers or undeserved rewards.
+
+### Account-owned local caches
+An absent owner key on an upgraded installation is not proof that persisted data belongs to a
+guest. Legacy account data may predate the owner marker and survive sign-out, so never upload or
+show it under a new account by claiming `owner == null` alone. Require verified guest provenance,
+quarantine or wipe ambiguous legacy rows, and gate cache reads as well as writes by owner. Serialize
+session transitions so an old clear or claim job cannot modify the next account's cache.
 
 ### Database (Room v56)
 - DB file `mtg_collection.db`. The `UserCardEntity` → `CardEntity` FK was **removed in v53** (ADR-008);
@@ -410,7 +426,9 @@ valuable user metrics:
   `FirebaseCrashlytics.getInstance()`. Events/keys are `snake_case` (`action_context_result`); ≤3-4
   custom keys per operation; instrumentation is **ADDITIVE**, never a substitute for existing error
   handling; **NEVER log PII** (emails, real names, tokens, raw free-text queries — log length/enum-id
-  only). The auditor's running spec lives in `.claude/agent-memory/crashlytics-ux-auditor/` (keys/events
+  only). For external errors, strip the nested cause as well as the outer message: Crashlytics records
+  the whole throwable graph, so wrapping a remote error with a safe message can still leak its response.
+  The auditor's running spec lives in `.claude/agent-memory/crashlytics-ux-auditor/` (keys/events
   already defined — consult it to avoid duplicates).
 - → memory: `feedback_telemetry_review_on_every_feature`
 

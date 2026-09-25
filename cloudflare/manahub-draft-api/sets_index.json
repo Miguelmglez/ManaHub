@@ -1,5 +1,5 @@
 {
-  "index_version": "19",
+  "index_version": "21",
   "last_updated": "2026-09-24",
   "sets": [
     {
@@ -124,10 +124,10 @@
       "icon_svg_uri": "https://svgs.scryfall.io/sets/tdm.svg?1778472000",
       "released_at": "2025-04-11",
       "content_versions": {
-        "guide": "2026-09-07",
-        "tier_list": "2026-09-07",
-        "booster": "2026-09-07",
-        "engine": "2026-09-07"
+        "guide": "2026-09-24",
+        "tier_list": "2026-09-24",
+        "booster": "2026-09-24",
+        "engine": "2026-09-24"
       }
     },
     {
@@ -159,8 +159,10 @@
       "icon_svg_uri": "https://svgs.scryfall.io/sets/fdn.svg?1778472000",
       "released_at": "2024-11-15",
       "content_versions": {
-        "guide": "December 27, 2024",
-        "tier_list": "2026-05-16"
+        "guide": "2026-09-24",
+        "tier_list": "2026-09-24",
+        "booster": "2026-09-24",
+        "engine": "2026-09-24"
       }
     },
     {

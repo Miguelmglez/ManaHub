@@ -215,7 +215,7 @@ class DeckWizardViewModelTest {
         every { appContext.resources } returns resources
         every { resources.getQuantityString(any(), any(), *anyVararg()) } returns "TPL"
         every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-        coEvery { deckRepository.createDeck(any(), any(), any()) } returns "wizard-deck-1"
+        coEvery { deckRepository.createDeck(any(), any(), any(), any()) } returns "wizard-deck-1"
         // Default: no analysis available (degrades PLAN_SECTIONS to its error state) -- tests that
         // need a real DeckAnalysis re-stub this call with their own fixture.
         coEvery {
@@ -1193,7 +1193,7 @@ class DeckWizardViewModelTest {
         assertTrue(vm.uiState.value.choiceSelections.isEmpty())
         coVerify(exactly = 0) { buildCommanderDeckUseCase.finalize(any(), any(), any(), any()) }
         coVerify(exactly = 0) { deckRepository.persistWizardBuild(any(), any(), any(), any(), any(), any(), any(), any()) }
-        coVerify(exactly = 0) { deckRepository.createDeck(any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.createDeck(any(), any(), any(), any()) }
     }
 
     // ── Deck Wizard 60-card wave (v6), plan §5 Phase 5.4, run C2 -- new test coverage per plan §6 ──
@@ -1525,7 +1525,7 @@ class DeckWizardViewModelTest {
 
         coVerify(exactly = 0) { deckRepository.updateDeck(any()) }
         coVerify(exactly = 1) { deckRepository.persistWizardBuild(eq("existing-deck-1"), any(), any(), any(), any(), any(), any(), any()) }
-        coVerify(exactly = 0) { deckRepository.createDeck(any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.createDeck(any(), any(), any(), any()) }
     }
 
     @Test
@@ -2136,7 +2136,7 @@ class DeckWizardViewModelTest {
 
         coVerify(exactly = 0) { deckRepository.updateDeck(any()) }
         coVerify(exactly = 2) { deckRepository.persistWizardBuild(eq("cmd-deck-1"), any(), any(), any(), any(), any(), any(), eq("cmd-1")) }
-        coVerify(exactly = 0) { deckRepository.createDeck(any(), any(), any()) }
+        coVerify(exactly = 0) { deckRepository.createDeck(any(), any(), any(), any()) }
         assertNull(vm.uiState.value.buildError)
     }
 

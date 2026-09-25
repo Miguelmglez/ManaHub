@@ -7,6 +7,7 @@ data class CardValueProjection(
     val priceUsd:      Double,
     val priceEur:      Double,
     val isFoil:        Boolean,
+    val quantity:      Int = 1,
     val imageArtCrop:  String?,
     val colorIdentity: String = "",
     val setCode:       String = "",

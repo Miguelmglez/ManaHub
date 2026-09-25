@@ -53,7 +53,7 @@ class StatsRepositoryImplTest {
         every { statsDao.observeCountByTypeLine(any(), any(), any()) } returns flowOf(emptyList())
         every { statsDao.observeManaCurve(any(), any(), any()) } returns flowOf(emptyList())
         every { statsDao.observeCountBySet(any(), any(), any()) } returns flowOf(emptyList())
-        every { deckDao.observeDeckCount() } returns flowOf(0)
+        every { deckDao.observeDeckCount(any()) } returns flowOf(0)
         every { statsDao.observeTotalFoil(any(), any(), any()) } returns flowOf(0)
         every { statsDao.observeTotalFullArt(any(), any(), any()) } returns flowOf(0)
         every { statsDao.observeTopArtist(any(), any(), any()) } returns flowOf(null)

@@ -424,15 +424,22 @@ class HomeViewModel(
         )
     }
 
-    private val statsSnapshotState: StateFlow<StatsSnapshot?> = combine(
+    private val outcomeTotalsFlow = combine(
         gameSessionRepository.observeLocalWins().catch { emit(0) },
+        gameSessionRepository.observeTotalGames().catch { emit(0) },
+        gameSessionRepository.observeLocalDraws().catch { emit(0) },
+    ) { wins, games, draws -> wins to (games - draws).coerceAtLeast(0) }
+
+    private val statsSnapshotState: StateFlow<StatsSnapshot?> = combine(
+        outcomeTotalsFlow,
         historyState.filterNotNull(),
         gameSessionRepository.observeDeckStats().catch { emit(emptyList()) },
         gameSessionRepository.observeMostFrequentElimination().catch { emit(null) },
         performanceFlow,
-    ) { wins, history, deckStats, nemesis, performance ->
+    ) { totals, history, deckStats, nemesis, performance ->
         StatsSnapshot(
-            localWins = wins,
+            localWins = totals.first,
+            decisiveGames = totals.second,
             history = history,
             deckStats = deckStats,
             nemesis = nemesis,
@@ -1488,7 +1495,8 @@ class HomeViewModel(
         } else {
             null
         }
-        val hero = visibleSteps?.let { resolveHero(it) } ?: HomeHeroState.Loading
+        val claimableQuests = data.gamification?.takeIf { it.enabled }?.data?.claimableCount ?: 0
+        val hero = resolveHero(visibleSteps, claimableQuests)
 
         val activity = core.activity
         val accountPrefs = core.account.prefs
@@ -1586,12 +1594,12 @@ class HomeViewModel(
     // ── Stats → widget model mappers ────────────────────────────────────────────
 
     private fun toWinRate(stats: StatsSnapshot): WinRateStats? {
-        val total = stats.history.size
+        val total = stats.decisiveGames
         if (total == 0) return null
         return WinRateStats(
             wins = stats.localWins,
             totalGames = total,
-            recentResults = stats.history.take(WIN_SPARK_COUNT).map { it.localIsWinner },
+            recentResults = stats.history.filterNot { it.isDraw }.take(WIN_SPARK_COUNT).map { it.localIsWinner },
         )
     }
 
@@ -1689,11 +1697,15 @@ class HomeViewModel(
     }
 
     /**
-     * The hero is pinned to the First Steps welcome (product decision: only Welcome and Loading are
-     * shown). Non-empty [visibleSteps] shows the carousel; empty shows the one-time completion card.
+     * Claimable quests (gamification available, D13) take the hero above the First Steps welcome.
+     * Otherwise non-empty [visibleSteps] shows the carousel, empty shows the one-time completion card,
+     * and null (inputs not yet certain) keeps the hero loading.
      */
-    private fun resolveHero(visibleSteps: List<FirstStepItem>): HomeHeroState =
-        HomeHeroState.Welcome(steps = visibleSteps)
+    private fun resolveHero(visibleSteps: List<FirstStepItem>?, claimableQuests: Int): HomeHeroState = when {
+        claimableQuests > 0 -> HomeHeroState.QuestsReady(count = claimableQuests)
+        visibleSteps != null -> HomeHeroState.Welcome(steps = visibleSteps)
+        else -> HomeHeroState.Loading
+    }
 
     private fun resolveNudge(
         isAuthenticated: Boolean,
@@ -1786,6 +1798,7 @@ class HomeViewModel(
 
     private data class StatsSnapshot(
         val localWins: Int,
+        val decisiveGames: Int,
         val history: List<SessionHistoryEntry>,
         val deckStats: List<DeckStats>,
         val nemesis: EliminationStats?,

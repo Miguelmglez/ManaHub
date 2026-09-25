@@ -124,6 +124,13 @@ offline; account only adds Phase-4 sync). The durable design doc is `docs/adr/AD
   `title_tournament_champion` unavailable until a local tournament seat exists; `PUZZLE_SOLVER` follows
   `FeatureFlags.Puzzle`): unavailable entries are hidden, never evaluated, generated, backfilled or granted.
   Catalog copy/threshold invariants live in `shared/core-domain` commonTest.
+- **Emission points (restore P5):** `TradeCompleted(rootProposalId)` when a refresh first observes COMPLETED
+  (never on accept); `DeckCreated(source)` on the deck's first persisted mainboard card, XP + build-deck quest
+  only for `DeckCreationSource.isUserAuthored` (BUILT/WIZARD); queue commits emit `CardScanned` for SCANNED
+  entries and `CardsAdded` for MANUAL ones (first copy of a new row = unique only); `FriendAdded(otherUserId)`
+  on accept (server returned the row), invite success and a refresh that finds a new friend over a non-empty
+  cache; `FIRST_FRIEND`/`FRIENDS_5` are DERIVED from the friends cache; zero-XP `CollectionChanged` (import
+  commit, sync pull) only re-evaluates DERIVED collection achievements.
 - → memory: `project_gamification_phase0`, `project_gamification_phase1`,
   `project_gamification_phase1_chunkB_ui`, `project_gamification_phase2`, `project_gamification_phase3`,
   `project_gamification_phase4`, `feedback_gamification_xp_idempotency`,

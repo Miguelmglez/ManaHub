@@ -2,33 +2,32 @@ package com.mmg.manahub.feature.profile.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
-import com.mmg.manahub.feature.game.domain.model.DeckStats
-import com.mmg.manahub.feature.game.domain.model.SessionDetail
-import com.mmg.manahub.core.model.CollectionStats
-import com.mmg.manahub.core.model.MtgColor
-import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
+import com.mmg.manahub.core.domain.update.AppUpdateState
+import com.mmg.manahub.core.domain.update.AppUpdateStatusProvider
+import com.mmg.manahub.core.gamification.domain.GamificationAvailability
 import com.mmg.manahub.core.gamification.domain.catalog.UnlockableKind
 import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
+import com.mmg.manahub.core.gamification.domain.model.ClaimResult
 import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics
 import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
 import com.mmg.manahub.core.gamification.domain.model.QuestBoard
 import com.mmg.manahub.core.gamification.domain.model.RewardUiModel
 import com.mmg.manahub.core.gamification.domain.model.RewardsBoard
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
-import com.mmg.manahub.core.gamification.domain.GamificationAvailability
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
-import com.mmg.manahub.core.gamification.domain.model.ClaimResult
 import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
-import com.mmg.manahub.core.domain.auth.SessionState
-import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.core.domain.repository.FriendRepository
-import com.mmg.manahub.core.domain.update.AppUpdateState
-import com.mmg.manahub.core.domain.update.AppUpdateStatusProvider
+import com.mmg.manahub.core.model.CollectionColorAffinity
+import com.mmg.manahub.core.model.CollectionStats
+import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
-import com.mmg.manahub.feature.settings.presentation.PreferencesState
+import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -36,31 +35,31 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
-// ── Enums ─────────────────────────────────────────────────────────────────────
-
-enum class PlayStyle(val label: String, val icon: String) {
-    AGGRO("Aggressor", "⚔"),
-    CONTROL("Strategist", "🛡"),
-    MIDRANGE("Midrange", "♟"),
-    BALANCED("Balanced", "⚖"),
-}
-
-// ── ViewModel ─────────────────────────────────────────────────────────────────
-
+/**
+ * Backs the Profile screen: identity, game/collection KPIs, friends counts and the gamification tabs.
+ *
+ * Every gamification read is scoped to [GamificationAvailability.availableFlow]: while it is false no
+ * gamification Room flow is collected and every gamification field holds its empty value.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProfileViewModel(
     private val statsRepo: StatsRepository,
     private val gameSessionRepo: GameSessionRepository,
-    private val surveyAnswerDao: SurveyAnswerDao,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val friendRepository: FriendRepository,
     private val authRepository: AuthRepository,
@@ -69,71 +68,68 @@ class ProfileViewModel(
     private val shareInviteUseCase: ShareInviteUseCase,
     private val appUpdateStatusProvider: AppUpdateStatusProvider,
     private val gamificationAvailability: GamificationAvailability,
+    private val crashReporter: CrashReporter,
 ) : ViewModel() {
 
+    /**
+     * Profile screen state.
+     *
+     * @property isLoading true until the collection stats first resolve (or fail).
+     * @property statsError true when the collection stats flow failed; the Overview shows a retry.
+     * @property mostValuableColors colour identity of the most valuable card (`["C"]` when colourless),
+     *   or null when there is no priced card.
+     * @property totalGames sessions with a local seat; draws are excluded from the win-rate denominator.
+     * @property gamificationEnabled false until availability resolves true; hides every gamification surface.
+     * @property claimingQuestIds quest instances whose claim is in flight (the Claim button is disabled).
+     */
     data class UiState(
         val playerName: String = "Wizard",
-        val playStyle: PlayStyle = PlayStyle.BALANCED,
         val isLoading: Boolean = true,
+        val statsError: Boolean = false,
         val avatarUrl: String? = null,
-        // Collection
         val collectionStats: CollectionStats? = null,
         val favouriteColor: String? = null,
-        val mostValuableColor: String? = null,
-        // Game stats
+        val mostValuableColors: List<String>? = null,
         val totalGames: Int = 0,
         val totalWins: Int = 0,
-        val avgLifeOnWin: Double = 0.0,
-        val avgLifeOnLoss: Double = 0.0,
-        val currentStreak: Int = 0,
-        val favoriteMode: String = "",
-        val avgDurationMs: Double = 0.0,
-        val mostFrequentElimination: String = "",
-        val avgWinTurn: Double = 0.0,
-        // Survey insights
-        val surveyCount: Int = 0,
-        val manaIssueCount: Int = 0,
-        val avgHandRating: Double = 0.0,
-        val favoriteWinStyle: String = "",
-        // Decks + sessions
-        val deckStats: List<DeckStats> = emptyList(),
-        val recentSessions: List<SessionDetail> = emptyList(),
-        // Achievements (gamification Phase 1 — rich model from the catalog + persisted progress)
-        val achievements: List<AchievementUiModel> = emptyList(),
-        val preferredCurrency: com.mmg.manahub.core.model.PreferredCurrency = com.mmg.manahub.core.model.PreferredCurrency.USD,
-        // Friends
+        val totalDraws: Int = 0,
+        val preferredCurrency: PreferredCurrency = PreferredCurrency.USD,
         val friendCount: Int = 0,
         val pendingFriendCount: Int = 0,
-        // Gamification (ADR-002, Phase 0) — read-only hero ring + level
-        /** Null until the progression flow first emits; the migration seeds a level-1 row. */
-        val progression: PlayerProgression? = null,
-        /** Master gamification switch; when false the hero ring + level chip are hidden. */
         val gamificationEnabled: Boolean = false,
-        // Quests (gamification Phase 2) — drive the Quests tab.
-        /** Active daily + weekly quest board. Empty until the first emission. */
+        val progression: PlayerProgression? = null,
+        val achievements: List<AchievementUiModel> = emptyList(),
         val questBoard: QuestBoard = QuestBoard.empty,
-        /** Daily-activity streak (count + freeze tokens). */
-        val streak: StreakUiModel = StreakUiModel(current = 0, longest = 0, freezeTokens = 0),
-        // Rewards / cosmetics (gamification Phase 3) — drive the Rewards tab + hero overlays.
-        /** Every cosmetic grouped by kind, flagged owned/equipped. Empty until the first emission. */
+        val streak: StreakUiModel = EMPTY_STREAK,
         val rewardsBoard: RewardsBoard = RewardsBoard.EMPTY,
-        /** The player's currently-equipped cosmetics (title/badges/frame/ring). */
         val equipped: EquippedCosmetics = EquippedCosmetics.NONE,
+        val claimingQuestIds: Set<String> = emptySet(),
     ) {
-        val winRate: Float get() = if (totalGames > 0) totalWins.toFloat() / totalGames else 0f
+        /** Local-seat wins over local-seat games; 0 when no game was played. */
+        val winRate: Float get() = (totalGames - totalDraws).takeIf { it > 0 }
+            ?.let { totalWins.toFloat() / it } ?: 0f
     }
 
-    /** One-shot side effects for the Profile screen (e.g. quest-claim toasts). */
+    /** One-shot side effects for the Profile screen. */
     sealed interface Event {
-        /** A quest reward was successfully claimed; [xpAwarded] XP was granted. */
+        /** A quest reward was claimed; [xpAwarded] XP was granted. */
         data class QuestClaimed(val xpAwarded: Int) : Event
 
-        /** A quest claim could not be completed (already claimed, not completed, or not found). */
+        /** A quest claim failed (not completed, not found, or a storage error). */
         data object QuestClaimFailed : Event
 
         /** The player tried to equip a 4th badge; the cap is [EquippedCosmetics.MAX_EQUIPPED_BADGES]. */
         data class BadgeCapReached(val maxBadges: Int) : Event
     }
+
+    private data class GamificationSlice(
+        val progression: PlayerProgression?,
+        val achievements: List<AchievementUiModel>,
+        val questBoard: QuestBoard,
+        val streak: StreakUiModel,
+        val rewardsBoard: RewardsBoard,
+        val equipped: EquippedCosmetics,
+    )
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -143,246 +139,107 @@ class ProfileViewModel(
     private val _events = Channel<Event>(Channel.BUFFERED)
     val events: Flow<Event> = _events.receiveAsFlow()
 
-    private val _prefsState = MutableStateFlow(PreferencesState())
-    val prefsState: StateFlow<PreferencesState> = _prefsState.asStateFlow()
-
     /** App-wide update status owned by the single app update controller. */
     val appUpdateState: StateFlow<AppUpdateState> = appUpdateStatusProvider.state
 
-    /** Starts the update path matching [appUpdateState] (download, restart to install, or store). */
-    fun onUpdateClick() = appUpdateStatusProvider.requestUpdate()
+    private val statsRetry = MutableStateFlow(0)
+
+    // Serializes equip/unequip so each read-modify-write sees the previous one's result (P-09).
+    private val equipMutex = Mutex()
 
     init {
-        // ── Preferences ───────────────────────────────────────────────────────
         userPreferencesDataStore.avatarUrlFlow
             .onEach { url -> _uiState.update { it.copy(avatarUrl = url) } }
-            .catch { /* ignore */ }
+            .catch { reportFlowError("avatar", it) }
             .launchIn(viewModelScope)
 
-        userPreferencesDataStore.preferencesFlow
-            .onEach { prefs ->
-                _uiState.update { it.copy(preferredCurrency = prefs.preferredCurrency) }
-            }
-            .catch { /* ignore */ }
+        userPreferencesDataStore.playerNameFlow
+            .distinctUntilChanged()
+            .onEach { name -> _uiState.update { it.copy(playerName = name) } }
+            .catch { reportFlowError("player_name", it) }
             .launchIn(viewModelScope)
 
-
-        // ── Gamification (ADR-002, Phase 0) ─────────────────────────────────────
-        gamificationRepository.observeProgression()
-            .onEach { progression -> _uiState.update { it.copy(progression = progression) } }
-            .catch { /* ignore — hero falls back to no ring */ }
-            .launchIn(viewModelScope)
-
-        // ── Achievements (ADR-002, Phase 1) ─────────────────────────────────────
-        // Single source of truth: the gamification repo joins the catalog with persisted progress.
-        // Replaces the old CheckAchievementsUseCase + NOW-merge workaround (unlockedAt is now a real,
-        // persisted epoch-millis stamped once by the evaluator/backfill).
-        gamificationRepository.observeAchievements()
-            .onEach { achievements -> _uiState.update { it.copy(achievements = achievements) } }
-            .catch { /* ignore — achievements section stays empty */ }
-            .launchIn(viewModelScope)
-
-        gamificationAvailability.availableFlow
-            .onEach { enabled -> _uiState.update { it.copy(gamificationEnabled = enabled) } }
-            .catch { /* ignore — the hidden default stays */ }
-            .launchIn(viewModelScope)
-
-        // ── Quests (ADR-002, Phase 2) ───────────────────────────────────────────
-        gamificationRepository.observeActiveQuests()
-            .onEach { board -> _uiState.update { it.copy(questBoard = board) } }
-            .catch { /* ignore — Quests tab falls back to its empty state */ }
-            .launchIn(viewModelScope)
-
-        gamificationRepository.observeDailyActivityStreak()
-            .onEach { streak -> _uiState.update { it.copy(streak = streak) } }
-            .catch { /* ignore — streak header falls back to a zeroed value */ }
-            .launchIn(viewModelScope)
-
-        // ── Rewards / cosmetics (ADR-002, Phase 3) ──────────────────────────────
-        gamificationRepository.observeRewards()
-            .onEach { board -> _uiState.update { it.copy(rewardsBoard = board) } }
-            .catch { /* ignore — Rewards tab falls back to its empty state */ }
-            .launchIn(viewModelScope)
-
-        gamificationRepository.observeEquippedCosmetics()
-            .onEach { equipped -> _uiState.update { it.copy(equipped = equipped) } }
-            .catch { /* ignore — hero falls back to no equipped cosmetics */ }
-            .launchIn(viewModelScope)
-
-        // ── Collection stats ──────────────────────────────────────────────────
-        userPreferencesDataStore.preferencesFlow
+        val currencyFlow = userPreferencesDataStore.preferencesFlow
             .map { it.preferredCurrency }
             .distinctUntilChanged()
+
+        currencyFlow
+            .onEach { currency -> _uiState.update { it.copy(preferredCurrency = currency) } }
+            .catch { reportFlowError("preferences", it) }
+            .launchIn(viewModelScope)
+
+        combine(currencyFlow, statsRetry) { currency, _ -> currency }
             .flatMapLatest { currency ->
                 statsRepo.observeCollectionStats(currency)
-                    .catch { _uiState.update { it.copy(isLoading = false) } }
-            }
-            .onEach { stats ->
-                _uiState.update {
-                    it.copy(
-                        collectionStats = stats,
-                        isLoading = false,
-                        favouriteColor = stats.computeFavouriteColor(),
-                        mostValuableColor = stats.computeMostValuableColor(),
-                    )
-                }
+                    .onEach { stats ->
+                        _uiState.update {
+                            it.copy(
+                                collectionStats = stats,
+                                isLoading = false,
+                                statsError = false,
+                                favouriteColor = stats.computeFavouriteColor(),
+                                mostValuableColors = stats.computeMostValuableColors(),
+                            )
+                        }
+                    }
+                    .catch { e ->
+                        reportFlowError("collection_stats", e)
+                        _uiState.update { it.copy(isLoading = false, statsError = true) }
+                    }
             }
             .launchIn(viewModelScope)
 
-        // ── Game stats ────────────────────────────────────────────────────────
         gameSessionRepo.observeTotalGames()
             .onEach { n -> _uiState.update { it.copy(totalGames = n) } }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
-        // ── Resolved Player Name (Auth > Local) ─────────────────────────────
-        val resolvedNameFlow = userPreferencesDataStore.playerNameFlow
-            .distinctUntilChanged()
-
-        resolvedNameFlow
-            .onEach { name -> _uiState.update { it.copy(playerName = name) } }
-            .catch { /* ignore */ }
+            .catch { reportFlowError("total_games", it) }
             .launchIn(viewModelScope)
 
         gameSessionRepo.observeLocalWins()
             .onEach { wins -> _uiState.update { it.copy(totalWins = wins) } }
-            .catch { /* ignore */ }
+            .catch { reportFlowError("local_wins", it) }
             .launchIn(viewModelScope)
 
-        gameSessionRepo.observeAvgLifeOnWin()
-            .onEach { v -> _uiState.update { it.copy(avgLifeOnWin = v ?: 0.0) } }
-            .catch { /* ignore */ }
+        gameSessionRepo.observeLocalDraws()
+            .onEach { draws -> _uiState.update { it.copy(totalDraws = draws) } }
+            .catch { reportFlowError("local_draws", it) }
             .launchIn(viewModelScope)
 
-        gameSessionRepo.observeAvgLifeOnLoss()
-            .onEach { v -> _uiState.update { it.copy(avgLifeOnLoss = v ?: 0.0) } }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
-        gameSessionRepo.observeCurrentStreak()
-            .onEach { streak -> _uiState.update { it.copy(currentStreak = streak) } }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
-        gameSessionRepo.observeFavoriteMode()
-            .onEach { mc -> _uiState.update { it.copy(favoriteMode = mc?.mode ?: "") } }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
-        gameSessionRepo.observeAvgDurationMs()
-            .onEach { v -> _uiState.update { it.copy(avgDurationMs = v ?: 0.0) } }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
-        gameSessionRepo.observeMostFrequentElimination()
-            .onEach { ec ->
-                _uiState.update {
-                    it.copy(
-                        mostFrequentElimination = ec?.eliminationReason ?: ""
-                    )
-                }
-            }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
-        gameSessionRepo.observeAvgWinTurn()
-            .onEach { v -> _uiState.update { it.copy(avgWinTurn = v ?: 0.0) } }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
-        gameSessionRepo.observeDeckStats()
-            .onEach { ds -> _uiState.update { it.copy(deckStats = ds.sortedByDescending { it.wins }) } }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
-        gameSessionRepo.observeRecentSessions(5)
-            .onEach { sessions -> _uiState.update { it.copy(recentSessions = sessions) } }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
-        // ── Survey insights ───────────────────────────────────────────────────
-        surveyAnswerDao.observeSurveyCount()
-            .onEach { n -> _uiState.update { it.copy(surveyCount = n) } }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
-        surveyAnswerDao.observeManaIssueCount()
-            .onEach { n -> _uiState.update { it.copy(manaIssueCount = n) } }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
-        surveyAnswerDao.observeAvgHandRating()
-            .onEach { v -> _uiState.update { it.copy(avgHandRating = v ?: 0.0) } }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
-        surveyAnswerDao.observeFavoriteWinStyle()
-            .onEach { ac -> _uiState.update { it.copy(favoriteWinStyle = ac?.answer ?: "") } }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
-        // ── Friends ───────────────────────────────────────────────────────────
         friendRepository.observeFriendCount()
             .onEach { count -> _uiState.update { it.copy(friendCount = count) } }
-            .catch { /* ignore */ }
+            .catch { reportFlowError("friend_count", it) }
             .launchIn(viewModelScope)
 
         friendRepository.observePendingCount()
             .onEach { count -> _uiState.update { it.copy(pendingFriendCount = count) } }
-            .catch { /* ignore */ }
+            .catch { reportFlowError("pending_friend_count", it) }
             .launchIn(viewModelScope)
 
-        // ── Refresh Friends & Requests ───────────────────────────────────────
-        // Load counts whenever the session becomes authenticated.
-        authRepository.sessionState
-            .onEach { session ->
-                if (session is SessionState.Authenticated) {
-                    val userId = session.user.id
-                    // Refresh friends and requests to ensure the UI shows up-to-date counts
-                    // after login or when returning to the profile screen.
-                    friendRepository.refreshFriends(userId)
-                    friendRepository.refreshRequests(userId)
-                }
-            }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
-        // ── Derived: play style ───────────────────────────────────────────────
-        _uiState
-            .map { s -> Triple(s.avgWinTurn, s.favoriteMode, s.mostFrequentElimination) }
-            .distinctUntilChanged()
-            .onEach { (avgWinTurn, _, favoriteElim) ->
-                _uiState.update { it.copy(playStyle = detectPlayStyle(avgWinTurn, favoriteElim)) }
-            }
-            .launchIn(viewModelScope)
-    }
-
-    // ── Public actions ────────────────────────────────────────────────────────
-
-    fun savePlayerName(name: String) {
-        val trimmed = name.trim()
-        if (trimmed.isBlank()) return
-        val previousName = _uiState.value.playerName
-        _uiState.update { it.copy(playerName = trimmed) }
+        // Refresh once per real account (not on every token refresh); a sign-out cancels it (P-24).
         viewModelScope.launch {
-            try {
-                userPreferencesDataStore.savePlayerName(trimmed)
-            } catch (e: Exception) {
-                // DataStore write failed — roll back the optimistic update so
-                // the UI stays consistent with what is actually persisted.
-                _uiState.update { it.copy(playerName = previousName) }
-            }
+            authRepository.sessionState
+                .map { session ->
+                    (session as? SessionState.Authenticated)?.user?.takeUnless { it.isAnonymous }?.id
+                }
+                .distinctUntilChanged()
+                .catch { reportFlowError("session", it) }
+                .collectLatest { userId -> if (userId != null) refreshFriends(userId) }
         }
+
+        observeGamification()
     }
 
+    /** Starts the update path matching [appUpdateState] (download, restart to install, or store). */
+    fun onUpdateClick() = appUpdateStatusProvider.requestUpdate()
+
+    /** Re-subscribes the collection stats after a failure. */
+    fun retryStats() {
+        _uiState.update { it.copy(isLoading = true, statsError = false) }
+        statsRetry.update { it + 1 }
+    }
 
     /**
-     * Resolves the current user's invite share link (wraps [ShareInviteUseCase] /
-     * `FriendRepository.getMyShareUrl`) for [com.mmg.manahub.core.ui.components.ShareProfileSheet],
-     * which is opened from [com.mmg.manahub.feature.auth.presentation.AccountSection] hosted by
-     * this screen. Fails fast (without hitting the network) when the session isn't authenticated —
-     * the sheet is only reachable from the authenticated card, so this is a defensive guard rather
-     * than an expected path.
+     * Resolves the current user's invite share link for the share sheet opened from the account card.
+     * Fails fast (without hitting the network) when the session isn't authenticated.
      */
     suspend fun fetchShareLink(): Result<String> {
         val userId = (authRepository.sessionState.value as? SessionState.Authenticated)?.user?.id
@@ -391,116 +248,183 @@ class ProfileViewModel(
     }
 
     /**
-     * Claims a completed quest's XP reward (gamification Phase 2). Delegates to the idempotent
-     * repository path and emits a one-shot [Event] for the UI to surface as a toast. The reactive
-     * [observeActiveQuests] flow re-emits with the CLAIMED status, so no optimistic UI mutation is
-     * needed here.
+     * Claims a completed quest's XP reward. A second tap while the first claim is in flight is ignored,
+     * and [ClaimResult.AlreadyClaimed] is silent, so a double tap never shows success then failure (P-08).
      */
     fun claimQuest(instanceId: String) {
+        var started = false
+        _uiState.update { state ->
+            if (instanceId in state.claimingQuestIds) {
+                state
+            } else {
+                started = true
+                state.copy(claimingQuestIds = state.claimingQuestIds + instanceId)
+            }
+        }
+        if (!started) return
+
         viewModelScope.launch {
-            val result = runCatching { claimQuestRewardUseCase(instanceId) }
-                .getOrElse { ClaimResult.NotFound }
-            val event = when (result) {
-                is ClaimResult.Claimed -> Event.QuestClaimed(result.xpAwarded)
-                ClaimResult.AlreadyClaimed,
-                ClaimResult.NotCompleted,
-                ClaimResult.NotFound,
-                -> Event.QuestClaimFailed
-            }
-            _events.send(event)
-        }
-    }
-
-    // ── Rewards / cosmetics actions (gamification Phase 3) ──────────────────────
-
-    /**
-     * Equips [reward], routing by its [RewardUiModel.kind]. Single-slot kinds (TITLE / AVATAR_FRAME /
-     * LEVEL_RING_STYLE) replace the current selection. BADGE is multi-slot, capped at
-     * [EquippedCosmetics.MAX_EQUIPPED_BADGES]: when the cap is already reached the equip is rejected and
-     * a [Event.BadgeCapReached] one-shot is emitted (the user must unequip a badge first). Unowned
-     * cosmetics are additionally guarded at the repository layer, so a race can never equip an
-     * unearned item.
-     */
-    fun onEquip(reward: RewardUiModel) {
-        when (reward.kind) {
-            UnlockableKind.TITLE -> viewModelScope.launch {
-                runCatching { gamificationRepository.equipTitle(reward.id) }
-            }
-
-            UnlockableKind.AVATAR_FRAME -> viewModelScope.launch {
-                runCatching { gamificationRepository.equipAvatarFrame(reward.id) }
-            }
-
-            UnlockableKind.LEVEL_RING_STYLE -> viewModelScope.launch {
-                runCatching { gamificationRepository.equipLevelRingStyle(reward.id) }
-            }
-
-            UnlockableKind.BADGE -> {
-                val current = _uiState.value.equipped.badgeIds
-                if (reward.id in current) return // already equipped — no-op
-                if (current.size >= EquippedCosmetics.MAX_EQUIPPED_BADGES) {
-                    viewModelScope.launch {
-                        _events.send(Event.BadgeCapReached(EquippedCosmetics.MAX_EQUIPPED_BADGES))
+            try {
+                when (val result = claimQuestRewardUseCase(instanceId)) {
+                    is ClaimResult.Claimed -> _events.send(Event.QuestClaimed(result.xpAwarded))
+                    ClaimResult.AlreadyClaimed -> Unit
+                    ClaimResult.NotCompleted, ClaimResult.NotFound -> {
+                        crashReporter.log("profile_quest_claim_rejected")
+                        _events.send(Event.QuestClaimFailed)
                     }
-                    return
                 }
-                val next = current + reward.id
-                viewModelScope.launch { runCatching { gamificationRepository.equipBadges(next) } }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                recordFailure("profile_quest_claim_failed", e)
+                _events.send(Event.QuestClaimFailed)
+            } finally {
+                _uiState.update { it.copy(claimingQuestIds = it.claimingQuestIds - instanceId) }
             }
         }
     }
 
     /**
-     * Unequips [reward], routing by kind. Single-slot kinds clear the slot (pass null); BADGE removes
-     * only [reward] from the equipped list, preserving the others.
+     * Equips [reward]. Single-slot kinds replace the selection; BADGE appends to the equipped list
+     * (capped at [EquippedCosmetics.MAX_EQUIPPED_BADGES], emitting [Event.BadgeCapReached] when full).
+     * Ownership is guarded in the repository.
      */
-    fun onUnequip(reward: RewardUiModel) {
+    fun onEquip(reward: RewardUiModel) = launchEquip {
         when (reward.kind) {
-            UnlockableKind.TITLE -> viewModelScope.launch {
-                runCatching { gamificationRepository.equipTitle(null) }
-            }
-
-            UnlockableKind.AVATAR_FRAME -> viewModelScope.launch {
-                runCatching { gamificationRepository.equipAvatarFrame(null) }
-            }
-
-            UnlockableKind.LEVEL_RING_STYLE -> viewModelScope.launch {
-                runCatching { gamificationRepository.equipLevelRingStyle(null) }
-            }
-
+            UnlockableKind.TITLE -> gamificationRepository.equipTitle(reward.id)
+            UnlockableKind.AVATAR_FRAME -> gamificationRepository.equipAvatarFrame(reward.id)
+            UnlockableKind.LEVEL_RING_STYLE -> gamificationRepository.equipLevelRingStyle(reward.id)
             UnlockableKind.BADGE -> {
-                val next = _uiState.value.equipped.badgeIds.filterNot { it == reward.id }
-                viewModelScope.launch { runCatching { gamificationRepository.equipBadges(next) } }
+                val current = gamificationRepository.observeEquippedCosmetics().first().badgeIds
+                when {
+                    reward.id in current -> Unit
+                    current.size >= EquippedCosmetics.MAX_EQUIPPED_BADGES ->
+                        _events.send(Event.BadgeCapReached(EquippedCosmetics.MAX_EQUIPPED_BADGES))
+                    else -> gamificationRepository.equipBadges(current + reward.id)
+                }
             }
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private fun detectPlayStyle(avgWinTurn: Double, favoriteElim: String): PlayStyle = when {
-        avgWinTurn in 1.0..7.0 -> PlayStyle.AGGRO
-        favoriteElim == "COMMANDER_DAMAGE" -> PlayStyle.MIDRANGE
-        avgWinTurn > 12.0 -> PlayStyle.CONTROL
-        else -> PlayStyle.BALANCED
-    }
-
-    private fun CollectionStats.computeFavouriteColor(): String? =
-        byColor
-            .filterKeys { it != MtgColor.COLORLESS }
-            .maxByOrNull { it.value }
-            ?.key
-            ?.name  // "W","U","B","R","G"
-
-    private fun CollectionStats.computeMostValuableColor(): String? {
-        val identity = mostValuableCards.firstOrNull()?.colorIdentity ?: return null
-        val parsed = identity
-            .removeSurrounding("[", "]").split(",")
-            .map { it.trim().removeSurrounding("\"") }.filter { it.isNotEmpty() }
-        return when {
-            parsed.isEmpty() -> "C"
-            parsed.size > 1 -> "M"
-            else -> parsed.first()
+    /** Unequips [reward]: single-slot kinds clear the slot; BADGE removes only [reward]. */
+    fun onUnequip(reward: RewardUiModel) = launchEquip {
+        when (reward.kind) {
+            UnlockableKind.TITLE -> gamificationRepository.equipTitle(null)
+            UnlockableKind.AVATAR_FRAME -> gamificationRepository.equipAvatarFrame(null)
+            UnlockableKind.LEVEL_RING_STYLE -> gamificationRepository.equipLevelRingStyle(null)
+            UnlockableKind.BADGE -> {
+                val current = gamificationRepository.observeEquippedCosmetics().first().badgeIds
+                if (reward.id in current) gamificationRepository.equipBadges(current - reward.id)
+            }
         }
     }
 
+    private fun launchEquip(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            equipMutex.withLock {
+                try {
+                    block()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    recordFailure("profile_equip_failed", e)
+                }
+            }
+        }
+    }
+
+    private fun observeGamification() {
+        gamificationAvailability.availableFlow
+            .catch { e ->
+                reportFlowError("gamification_availability", e)
+                emit(false)
+            }
+            .distinctUntilChanged()
+            .flatMapLatest { available ->
+                if (!available) flowOf(null) else gamificationSliceFlow()
+            }
+            .onEach { slice ->
+                _uiState.update { state ->
+                    if (slice == null) {
+                        state.copy(
+                            gamificationEnabled = false,
+                            progression = null,
+                            achievements = emptyList(),
+                            questBoard = QuestBoard.empty,
+                            streak = EMPTY_STREAK,
+                            rewardsBoard = RewardsBoard.EMPTY,
+                            equipped = EquippedCosmetics.NONE,
+                            claimingQuestIds = emptySet(),
+                        )
+                    } else {
+                        state.copy(
+                            gamificationEnabled = true,
+                            progression = slice.progression,
+                            achievements = slice.achievements,
+                            questBoard = slice.questBoard,
+                            streak = slice.streak,
+                            rewardsBoard = slice.rewardsBoard,
+                            equipped = slice.equipped,
+                        )
+                    }
+                }
+            }
+            .launchIn(viewModelScope)
+    }
+
+    private fun gamificationSliceFlow(): Flow<GamificationSlice> {
+        val progression = gamificationRepository.observeProgression()
+            .map<PlayerProgression, PlayerProgression?> { it }
+            .catch { reportFlowError("gamification_progression", it); emit(null) }
+        val achievements = gamificationRepository.observeAchievements()
+            .catch { reportFlowError("gamification_achievements", it); emit(emptyList()) }
+        val quests = gamificationRepository.observeActiveQuests()
+            .catch { reportFlowError("gamification_quests", it); emit(QuestBoard.empty) }
+        val streak = gamificationRepository.observeDailyActivityStreak()
+            .catch { reportFlowError("gamification_streak", it); emit(EMPTY_STREAK) }
+        val rewards = gamificationRepository.observeRewards()
+            .catch { reportFlowError("gamification_rewards", it); emit(RewardsBoard.EMPTY) }
+        val equipped = gamificationRepository.observeEquippedCosmetics()
+            .catch { reportFlowError("gamification_equipped", it); emit(EquippedCosmetics.NONE) }
+
+        val progressFlows = combine(progression, achievements, quests, streak) { p, a, q, s ->
+            GamificationSlice(p, a, q, s, RewardsBoard.EMPTY, EquippedCosmetics.NONE)
+        }
+        return combine(progressFlows, rewards, equipped) { slice, r, e ->
+            slice.copy(rewardsBoard = r, equipped = e)
+        }
+    }
+
+    private suspend fun refreshFriends(userId: String) {
+        try {
+            // Same atomic refresh as the Friends screen, so an accepted id never stays in the outgoing list.
+            friendRepository.refreshAll(userId)
+                .onFailure { e -> recordFailure("profile_friends_refresh_failed", e) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            recordFailure("profile_friends_refresh_failed", e)
+        }
+    }
+
+    private fun reportFlowError(source: String, e: Throwable) {
+        if (e is CancellationException) throw e
+        crashReporter.setCustomKey("profile_flow_error_source", source)
+        recordFailure("profile_flow_failed", e)
+    }
+
+    private fun recordFailure(tag: String, e: Throwable) {
+        crashReporter.log(tag)
+        crashReporter.recordException(RuntimeException("[$tag] ${e::class.simpleName}"))
+    }
+
+    // Shared with CollectionStatsSyncWorker so friends see the same colours as the owner.
+    private fun CollectionStats.computeFavouriteColor(): String? = CollectionColorAffinity.favouriteColorCode(byColor)
+
+    private fun CollectionStats.computeMostValuableColors(): List<String>? =
+        mostValuableCards.firstOrNull()?.colorIdentity?.let(CollectionColorAffinity::identityCodes)
+
+    private companion object {
+        val EMPTY_STREAK = StreakUiModel(current = 0, longest = 0, freezeTokens = 0)
+    }
 }

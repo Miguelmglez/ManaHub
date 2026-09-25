@@ -51,7 +51,6 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Camera
-import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -3292,7 +3291,7 @@ private fun CommunityDecksCategoryAffordance(
     val spacing = MaterialTheme.spacing
     val formatLabel = format?.let { stringResource(it.displayResId) }
         ?: stringResource(R.string.community_deck_filter_all_formats)
-    val label = stringResource(R.string.home_community_decks_selection, formatLabel, stringResource(category.titleRes))
+    val label = stringResource(R.string.home_community_decks_selection, formatLabel)
 
     Row(
         modifier = Modifier
@@ -3312,6 +3311,12 @@ private fun CommunityDecksCategoryAffordance(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.xs),
     ) {
+        Icon(
+            imageVector = category.icon,
+            contentDescription = null,
+            tint = mc.primaryAccent,
+            modifier = Modifier.size(16.dp),
+        )
         Text(
             text = label.uppercase(),
             style = ty.labelMedium,

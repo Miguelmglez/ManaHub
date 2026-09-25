@@ -186,7 +186,7 @@ class GamificationSyncManager(
         crashReporter.apply {
             log("gamification_sync_failed")
             setCustomKey("gamification_sync_error_type", error::class.simpleName ?: "Unknown")
-            recordException(error)
+            recordException(RuntimeException("[gamification_sync_failed] ${error::class.simpleName}"))
         }
     }
 

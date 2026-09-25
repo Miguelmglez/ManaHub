@@ -205,6 +205,7 @@ class HomeViewModelTest {
 
         // Phase 2 stats flows.
         every { gameSessionRepository.observeLocalWins() } returns flowOf(0)
+        every { gameSessionRepository.observeLocalDraws() } returns flowOf(0)
         every { gameSessionRepository.observeLocalSessionHistory(any()) } returns flowOf(emptyList())
         every { gameSessionRepository.observeDeckStats() } returns flowOf(emptyList())
         every { gameSessionRepository.observeMostFrequentElimination() } returns flowOf(null)
@@ -1447,7 +1448,7 @@ class HomeViewModelTest {
         }
 
     @Test
-    fun `claimable quests are counted even though the hero stays pinned to Welcome`() =
+    fun `claimable quests take the hero above the welcome (D13)`() =
         runTest(testDispatcher) {
             questBoardFlow.value = QuestBoard(
                 daily = listOf(quest("d1", status = "COMPLETED"), quest("d2", status = "COMPLETED")),
@@ -1458,8 +1459,40 @@ class HomeViewModelTest {
             backgroundScope.launch { vm.state.collect {} }
             advanceUntilIdle()
 
-            assertTrue(vm.state.value.hero is HomeHeroState.Welcome)
+            assertEquals(HomeHeroState.QuestsReady(count = 2), vm.state.value.hero)
             assertEquals(2, vm.state.value.gamification?.claimableCount)
+        }
+
+    @Test
+    fun `claimable quests never take the hero while gamification is unavailable`() =
+        runTest(testDispatcher) {
+            gamificationEnabledFlow.value = false
+            questBoardFlow.value = QuestBoard(
+                daily = listOf(quest("d1", status = "COMPLETED")),
+                weekly = emptyList(),
+            )
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value.hero is HomeHeroState.Welcome)
+            assertFalse(vm.state.value.gamificationEnabled)
+        }
+
+    @Test
+    fun `the hero returns to the welcome once every quest is claimed`() =
+        runTest(testDispatcher) {
+            questBoardFlow.value = QuestBoard(daily = listOf(quest("d1", status = "COMPLETED")), weekly = emptyList())
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+            assertTrue(vm.state.value.hero is HomeHeroState.QuestsReady)
+
+            questBoardFlow.value = QuestBoard(daily = listOf(quest("d1", status = "CLAIMED")), weekly = emptyList())
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value.hero is HomeHeroState.Welcome)
         }
 
     @Test
@@ -2401,6 +2434,28 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertEquals(3, vm.state.value.lastGameRecap?.opponentCount)
+    }
+
+    @Test
+    fun `win rate excludes draws from its denominator`() = runTest(testDispatcher) {
+        totalGamesFlow.value = 2
+        every { gameSessionRepository.observeLocalWins() } returns flowOf(1)
+        every { gameSessionRepository.observeLocalDraws() } returns flowOf(1)
+        every { gameSessionRepository.observeLocalSessionHistory(any()) } returns flowOf(
+            listOf(
+                com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry(
+                    sessionId = 1L, mode = "COMMANDER", totalTurns = 5, durationMs = 1_000L,
+                    playedAt = 1_000L, winnerName = "Local", surveyStatus = "COMPLETED",
+                    localIsWinner = true, localDeckId = null, localDeckName = null,
+                ),
+            ),
+        )
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(100, vm.state.value.winRate?.percentage)
+        assertEquals(1, vm.state.value.winRate?.totalGames)
     }
 
     // ── First Steps: buildVisibleSteps condition table (Phase 2.2) ─────────────

@@ -2,158 +2,156 @@ package com.mmg.manahub.feature.friends.presentation.invite
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.PendingInviteStore
-import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.feature.friends.domain.usecase.AcceptInviteUseCase
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
+/** Why an invite could not be accepted; the host maps each value to its copy. */
+enum class InviteErrorReason { SELF_INVITE, INVALID_CODE, SESSION_EXPIRED, GENERIC }
+
 /**
- * Activity-scoped ViewModel that processes incoming friend invite deep links.
+ * Activity-scoped ViewModel that processes friend invite deep links.
  *
- * Responsibilities:
- * - If the user is already authenticated when the link arrives, process the code immediately.
- * - If not authenticated, persist the code in [PendingInviteStore] and navigate away.
- * - After the user logs in, the [combine] collector in [init] detects both conditions and
- *   processes the pending code automatically without requiring the user to reopen the link.
+ * A signed-in user's code is accepted immediately. Otherwise the code is persisted in
+ * [PendingInviteStore] and accepted automatically once a session exists. The stored code is dropped
+ * only on success or a permanent refusal, so a transient failure never loses it.
  *
- * KMP migration — Phase 1 Hilt→Koin cutover: this VM is resolved by Koin via
- * [com.mmg.manahub.feature.friends.di.friendsKoinModule]. It must stay **Activity-scoped** so the
- * same instance survives the InviteDispatcher → Profile/Login navigation and can process a pending
- * invite code after the user logs in. `AppNavGraph` therefore resolves it with
- * `koinViewModel(viewModelStoreOwner = activity)` (the exact equivalent of the old `hiltViewModel(activity)`).
+ * Must stay Activity-scoped (`koinViewModel(viewModelStoreOwner = activity)` in `AppNavGraph`) so a
+ * rotation mid-RPC reuses this instance, whose in-flight guard then ignores the re-run.
  */
 class InviteDispatcherViewModel(
     private val acceptInviteUseCase: AcceptInviteUseCase,
     private val pendingInviteStore: PendingInviteStore,
     private val authRepo: AuthRepository,
+    private val crashReporter: CrashReporter,
 ) : ViewModel() {
-
-    // ── Session state cache ───────────────────────────────────────────────────
-
-    private val _sessionState: MutableStateFlow<SessionState> =
-        MutableStateFlow(SessionState.Loading)
-    val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
-
-    // ── One-time UI events ────────────────────────────────────────────────────
 
     sealed interface UiEvent {
         /** The invite was accepted. [inviterNickname] may be null if the profile had no nickname. */
         data class InviteAccepted(val inviterNickname: String?) : UiEvent
 
-        /** The invite could not be accepted due to a known error. */
-        data class InviteError(val isSelfInvite: Boolean, val isInvalidCode: Boolean) : UiEvent
+        /** The invite could not be accepted. */
+        data class InviteError(val reason: InviteErrorReason) : UiEvent
 
-        /** Tells the composable to navigate away from the invite screen. */
+        /** Leave the invite screen; only sent for codes opened through it. */
         data object NavigateAway : UiEvent
     }
 
     private val _events = Channel<UiEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
 
-    // ── Tracks which code is currently being processed to avoid duplicates ────
-    private val _processingCode = MutableStateFlow<String?>(null)
+    // Main-thread confined: every read and write happens on viewModelScope's Main dispatcher.
+    private var processingCode: String? = null
+    private val acceptedCodes = mutableSetOf<String>()
+    // Codes whose last attempt failed transiently; the auto-processor skips them so offline never loops.
+    private val failedCodes = mutableSetOf<String>()
 
     init {
-        // Mirror session state so we can read it synchronously in handleInviteCode().
-        authRepo.sessionState
-            .onEach { state -> _sessionState.value = state }
-            .launchIn(viewModelScope)
-
-        // Auto-process a pending code as soon as the user becomes authenticated.
-        combine(authRepo.sessionState, pendingInviteStore.flow) { session, code ->
-            session to code
-        }
-            .onEach { (session, code) ->
-                if (session is SessionState.Authenticated && code != null &&
-                    _processingCode.value != code &&
-                    isValidReferralCode(code)
-                ) {
-                    processCode(code)
-                } else if (code != null && !isValidReferralCode(code)) {
-                    // Stale invalid code in store — clear it silently.
-                    pendingInviteStore.clear()
+        combine(authRepo.sessionState, pendingInviteStore.flow) { session, code -> session to code }
+            .onEach { (session, stored) ->
+                val code = stored?.let(::normalize) ?: return@onEach
+                when {
+                    !isValidReferralCode(code) -> pendingInviteStore.clear()
+                    session is SessionState.Authenticated && canAutoProcess(code) -> processCode(code, fromScreen = false)
                 }
             }
+            .catch { e -> crashReporter.recordException(RuntimeException("[invite_pending_flow_failed] ${e::class.simpleName}")) }
             .launchIn(viewModelScope)
     }
 
-    // ── Public API ────────────────────────────────────────────────────────────
-
     /**
-     * Entry point called by [InviteDispatcherScreen] when the composable first appears.
-     *
-     * - If authenticated → process the code immediately.
-     * - If not authenticated → save the code and emit [UiEvent.NavigateAway] so the user
-     *   is sent to Profile/Login; the code will be processed after login via [init].
-     *
-     * The code is validated against the Crockford base32 format before any processing.
-     * Invalid codes are rejected immediately without a network call.
+     * Entry point of [InviteDispatcherScreen]. Codes are case-insensitive; a code already being
+     * processed or already accepted is ignored, so a recreated screen never sends a second request.
      */
-    fun handleInviteCode(code: String) {
+    fun handleInviteCode(rawCode: String) {
+        val code = normalize(rawCode)
+        crashReporter.log("invite_link_received")
         if (!isValidReferralCode(code)) {
+            crashReporter.log("invite_link_invalid_format")
             viewModelScope.launch {
-                _events.send(UiEvent.InviteError(isSelfInvite = false, isInvalidCode = true))
+                _events.send(UiEvent.InviteError(InviteErrorReason.INVALID_CODE))
                 _events.send(UiEvent.NavigateAway)
             }
             return
         }
-        val currentSession = _sessionState.value
+        if (code == processingCode) return
+        if (code in acceptedCodes) {
+            viewModelScope.launch { _events.send(UiEvent.NavigateAway) }
+            return
+        }
+        failedCodes -= code
+        processingCode = code
         viewModelScope.launch {
-            if (currentSession is SessionState.Authenticated) {
-                processCode(code)
+            // Loading is not signed out: wait for the session to resolve before deciding.
+            val session = authRepo.sessionState.first { it !is SessionState.Loading }
+            if (session is SessionState.Authenticated) {
+                processCode(code, fromScreen = true)
             } else {
+                crashReporter.log("invite_deferred_until_sign_in")
+                processingCode = null
                 pendingInviteStore.save(code)
                 _events.send(UiEvent.NavigateAway)
             }
         }
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    private fun canAutoProcess(code: String): Boolean =
+        code != processingCode && code !in acceptedCodes && code !in failedCodes
 
-    /**
-     * Returns true when [code] matches the 8-character Crockford base32 format used for
-     * referral codes. Rejects codes with invalid characters or wrong length before any
-     * network call is made.
-     */
-    private fun isValidReferralCode(code: String): Boolean =
-        code.length == 8 && code.all { it in "23456789ABCDEFGHJKMNPQRSTVWXYZ" }
-
-    /**
-     * Clears any pending code and calls [acceptInviteUseCase].
-     *
-     * On success emits [UiEvent.InviteAccepted] then [UiEvent.NavigateAway].
-     * On failure inspects the error message for known ERRCODE tokens and emits
-     * [UiEvent.InviteError] then [UiEvent.NavigateAway].
-     */
-    private suspend fun processCode(code: String) {
-        // Guard: mark as being processed to prevent the combine from re-triggering.
-        _processingCode.value = code
-        pendingInviteStore.clear()
-
+    private suspend fun processCode(code: String, fromScreen: Boolean) {
+        processingCode = code
         val result = acceptInviteUseCase(code)
-
         if (result.isSuccess) {
-            val inviterNickname = result.getOrNull()?.inviterNickname
-            _events.send(UiEvent.InviteAccepted(inviterNickname))
+            crashReporter.log("invite_accept_success")
+            acceptedCodes += code
+            pendingInviteStore.clear()
+            _events.send(UiEvent.InviteAccepted(result.getOrNull()?.inviterNickname))
         } else {
-            val message = result.exceptionOrNull()?.message ?: ""
-            val isSelfInvite = message.contains("SELF_INVITE", ignoreCase = true)
-            val isInvalidCode = message.contains("INVALID_CODE", ignoreCase = true)
-            _events.send(UiEvent.InviteError(isSelfInvite = isSelfInvite, isInvalidCode = isInvalidCode))
+            val reason = reasonOf(result.exceptionOrNull())
+            crashReporter.log("invite_accept_failed_${reason.name.lowercase()}")
+            when (reason) {
+                // Permanent: retrying the same code can never succeed.
+                InviteErrorReason.SELF_INVITE, InviteErrorReason.INVALID_CODE -> pendingInviteStore.clear()
+                else -> {
+                    failedCodes += code
+                    pendingInviteStore.save(code)
+                }
+            }
+            _events.send(UiEvent.InviteError(reason))
         }
+        processingCode = null
+        if (fromScreen) _events.send(UiEvent.NavigateAway)
+    }
 
-        // Do NOT reset _processingCode to null — the guard must stay set until the
-        // ViewModel is cleared. Resetting it creates a re-entry window before
-        // NavigateAway actually removes the screen from the back stack.
-        _events.send(UiEvent.NavigateAway)
+    private fun reasonOf(error: Throwable?): InviteErrorReason {
+        val message = error?.message.orEmpty()
+        return when {
+            message.contains("SELF_INVITE", ignoreCase = true) -> InviteErrorReason.SELF_INVITE
+            message.contains("INVALID_CODE", ignoreCase = true) -> InviteErrorReason.INVALID_CODE
+            message.contains("NOT_AUTHENTICATED", ignoreCase = true) -> InviteErrorReason.SESSION_EXPIRED
+            else -> InviteErrorReason.GENERIC
+        }
+    }
+
+    companion object {
+        private const val REFERRAL_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ"
+        private const val REFERRAL_LENGTH = 8
+
+        /** Crockford base32 is case-insensitive and links are often lowercased, so codes compare uppercased. */
+        fun normalize(code: String): String = code.trim().uppercase()
+
+        /** True for an 8-character code over the referral alphabet (already [normalize]d). */
+        fun isValidReferralCode(code: String): Boolean =
+            code.length == REFERRAL_LENGTH && code.all { it in REFERRAL_ALPHABET }
     }
 }

@@ -539,6 +539,17 @@
     <string name="stats_section_deck_performance">Deck Performance</string>
     <string name="stats_section_matchups">Matchup win rates</string>
     <string name="stats_section_history">History</string>
+    <string name="stats_clear_set_filter">Clear set filter</string>
+    <string name="stats_open_deck">Open deck</string>
+    <string name="stats_game_options">Game options</string>
+    <string name="stats_result_win">W</string>
+    <string name="stats_result_loss">L</string>
+    <string name="stats_result_draw">D</string>
+    <string name="stats_color_distribution_hint">Percent of cards containing each color</string>
+    <string name="stats_collection_error">Collection statistics are unavailable</string>
+    <string name="stats_collection_empty_title">No cards yet</string>
+    <string name="stats_collection_empty_subtitle">Add cards to see your collection statistics</string>
+    <string name="stats_games_error">Game statistics are unavailable</string>
     <string name="stats_empty_decks_subtitle">Associate games with decks via the post-game survey to see deck stats here</string>
     <string name="stats_empty_history_subtitle">Recorded game sessions will appear here</string>
 
@@ -1730,6 +1741,25 @@
 
     <!-- Profile Editing -->
     <string name="profile_edit_title">Edit Profile</string>
+    <string name="profile_edit_save_failed">Couldn\'t save your profile. Check your connection and try again.</string>
+    <string name="profile_edit_discard_title">Discard changes?</string>
+    <string name="profile_edit_discard_text">Your unsaved profile changes will be lost.</string>
+    <string name="profile_edit_remove_avatar_title">Remove photo?</string>
+    <string name="profile_edit_remove_avatar_text">Your profile will show your initial instead of the artwork.</string>
+    <string name="profile_edit_remove_avatar_failed">Couldn\'t remove your photo. Check your connection and try again.</string>
+    <string name="profile_rate_app">Rate the app</string>
+    <string name="profile_rate_app_unavailable">Couldn\'t open the Play Store.</string>
+    <string name="profile_update_available">New app update available</string>
+    <string name="profile_update_downloading">Downloading update…</string>
+    <string name="profile_update_ready">Update ready — tap to restart</string>
+    <string name="profile_stats_error">Couldn\'t load your collection stats.</string>
+    <string name="profile_open_stats_a11y">Open stats</string>
+    <plurals name="profile_pending_friend_requests">
+        <item quantity="one">%1$d pending friend request</item>
+        <item quantity="other">%1$d pending friend requests</item>
+    </plurals>
+    <string name="feedback_discard_title">Discard feedback?</string>
+    <string name="feedback_discard_text">Your message and attachment will be lost.</string>
     <string name="profile_edit_avatar_label">Profile Avatar</string>
     <string name="profile_edit_avatar_filter_label">Filter planeswalkers by color</string>
     <string name="profile_edit_avatar_remove">Remove photo</string>
@@ -3012,6 +3042,25 @@
     <string name="friends_invite_success">Now you are friends with %1$s</string>
     <string name="friends_invite_success_generic">New friendship accepted!</string>
     <string name="friends_invite_error">Could not accept the invitation</string>
+    <string name="friends_invite_session_expired">Sign in again to accept the invitation</string>
+    <string name="friends_error_already_linked">You are already friends with this player, or a request is pending.</string>
+    <string name="friends_error_self_request">That is your own game tag.</string>
+    <string name="friends_error_not_permitted">Complete your profile to send friend requests.</string>
+    <string name="friends_error_request_gone">That request no longer exists.</string>
+    <string name="friends_search_invalid">Game tags are 6 letters or numbers.</string>
+    <string name="friends_search_failed">Could not search right now. Check your connection.</string>
+    <string name="friends_refresh_failed">Could not refresh your friends. Showing saved data.</string>
+    <string name="friends_result_self">This is you</string>
+    <string name="friends_result_already_friends">Already friends</string>
+    <string name="friends_result_request_pending">Request pending</string>
+    <string name="friends_result_accept_request">Accept request</string>
+    <string name="friends_accept_request_hint">Accept friend request from %1$s</string>
+    <string name="friends_decline_request_hint">Decline friend request from %1$s</string>
+    <string name="friends_open_friend_action">Open friend</string>
+    <string name="friends_detail_more_options">More options</string>
+    <string name="friends_detail_not_found_title">Not in your friends list</string>
+    <string name="friends_detail_not_found_body">This player is no longer in your friends list.</string>
+    <string name="friend_stats_no_data_title">No stats yet</string>
     <!-- Friend detail screen -->
     <string name="friend_detail_tab_folder">Folder</string>
     <string name="friend_detail_tab_stats">Stats</string>
@@ -3067,22 +3116,13 @@
     <string name="friend_history_tab_trades">Trades</string>
     <string name="friend_history_tab_games">Games</string>
     <string name="friend_history_trades_empty">No trades yet with %1$s</string>
-    <string name="friend_history_games_coming_soon">Coming soon — multiplayer games will be tracked when online sessions launch.</string>
-    <string name="friend_history_games_empty">No online games played with %1$s yet.</string>
-    <string name="friend_history_games_error">Could not load match history. Check your connection.</string>
-    <string name="friend_history_games_title">%1$d games played</string>
-    <string name="friend_history_games_wins">Wins</string>
-    <string name="friend_history_games_losses">Losses</string>
-    <string name="friend_history_games_winrate">Win rate</string>
-    <string name="friend_history_games_last_played">Last played %1$s</string>
     <string name="friend_history_trade_row_cards_offered_received">%1$d cards offered / %2$d cards received</string>
     <string name="friend_history_trade_row_updated">Updated %1$s</string>
-    <string name="friend_stats_error">Could not load stats. Tap to retry.</string>
+    <string name="friend_stats_error">Could not load stats.</string>
+    <string name="friend_stats_collection_value">Collection value</string>
     <string name="friend_stats_no_data">%1$s hasn\'t shared their stats yet.</string>
     <string name="friend_stats_total_cards">Total cards</string>
     <string name="friend_stats_unique_cards">Unique cards</string>
-    <string name="friend_stats_value_eur">Value (EUR)</string>
-    <string name="friend_stats_value_usd">Value (USD)</string>
     <string name="friend_stats_favourite_color">Favourite color</string>
     <string name="friend_stats_most_valuable_color">Most valuable color</string>
     <string name="friend_stats_section_colour_affinity">Colour Affinity</string>
@@ -3569,7 +3609,7 @@
     <!-- Home widget board overhaul, TASK 5b — Community Decks widget -->
     <string name="home_community_decks_empty">No community decks available right now.</string>
     <string name="home_community_decks_category_a11y">Choose format and category</string>
-    <string name="home_community_decks_selection">%1$s · %2$s</string>
+    <string name="home_community_decks_selection">%1$s</string>
     <string name="home_community_decks_format_section">Format</string>
     <string name="home_community_decks_category_section">Category</string>
     <string name="home_community_decks_category_sheet_title">Browse by</string>

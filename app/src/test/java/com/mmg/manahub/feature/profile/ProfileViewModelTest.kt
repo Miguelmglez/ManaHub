@@ -3,7 +3,6 @@ package com.mmg.manahub.feature.profile
 import com.mmg.manahub.util.testGamificationAvailability
 import app.cash.turbine.test
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.model.CardValue
 import com.mmg.manahub.core.model.CollectionStats
 import com.mmg.manahub.core.model.MtgColor
@@ -28,9 +27,14 @@ import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.core.domain.update.AppUpdateState
 import com.mmg.manahub.core.domain.update.AppUpdateStatusProvider
-import com.mmg.manahub.feature.profile.presentation.PlayStyle
 import com.mmg.manahub.feature.profile.presentation.ProfileViewModel
 import com.mmg.manahub.util.TestFixtures
+import com.mmg.manahub.core.common.CrashReporter
+import com.mmg.manahub.core.gamification.domain.catalog.UnlockableKind
+import com.mmg.manahub.core.gamification.domain.model.RewardUiModel
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.first
+import org.junit.Assert.assertFalse
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -86,7 +90,7 @@ class ProfileViewModelTest {
 
     private val statsRepo                = mockk<StatsRepository>()
     private val gameSessionRepo          = mockk<GameSessionRepository>()
-    private val surveyAnswerDao          = mockk<SurveyAnswerDao>()
+    private val crashReporter            = mockk<CrashReporter>(relaxed = true)
     private val userPreferencesDataStore = mockk<UserPreferencesDataStore>(relaxed = true)
     private val authRepository           = mockk<AuthRepository>(relaxed = true)
     private val friendRepository         = mockk<FriendRepository>(relaxed = true)
@@ -180,6 +184,7 @@ class ProfileViewModelTest {
         avgWinTurn: Double = 0.0,
         favoriteElim: String = "",
     ) {
+        coEvery { friendRepository.refreshAll(any()) } returns Result.success(Unit)
         every { userPreferencesDataStore.playerNameFlow }  returns playerNameFlow
         every { userPreferencesDataStore.avatarUrlFlow }   returns avatarUrlFlow
         every { userPreferencesDataStore.preferencesFlow } returns preferencesFlow
@@ -194,6 +199,7 @@ class ProfileViewModelTest {
         every { statsRepo.observeCollectionStats(any()) }   returns flowOf(collectionStats)
         every { gameSessionRepo.observeTotalGames() }       returns flowOf(totalGames)
         every { gameSessionRepo.observeLocalWins() }        returns flowOf(totalWins)
+        every { gameSessionRepo.observeLocalDraws() }       returns flowOf(0)
         every { gameSessionRepo.observeAvgLifeOnWin() }     returns flowOf(null)
         every { gameSessionRepo.observeAvgLifeOnLoss() }    returns flowOf(null)
         every { gameSessionRepo.observeCurrentStreak() }    returns flowOf(0)
@@ -207,10 +213,6 @@ class ProfileViewModelTest {
         every { gameSessionRepo.observeDeckStats() }        returns flowOf(emptyList())
         every { gameSessionRepo.observeRecentSessions(any()) } returns flowOf(emptyList())
 
-        every { surveyAnswerDao.observeSurveyCount() }      returns flowOf(0)
-        every { surveyAnswerDao.observeManaIssueCount() }   returns flowOf(0)
-        every { surveyAnswerDao.observeAvgHandRating() }    returns flowOf(null)
-        every { surveyAnswerDao.observeFavoriteWinStyle() } returns flowOf(null)
 
         every { friendRepository.observeFriendCount() }     returns flowOf(0)
         every { friendRepository.observePendingCount() }    returns flowOf(0)
@@ -219,7 +221,6 @@ class ProfileViewModelTest {
     private fun buildViewModel(): ProfileViewModel = ProfileViewModel(
         statsRepo                = statsRepo,
         gameSessionRepo          = gameSessionRepo,
-        surveyAnswerDao          = surveyAnswerDao,
         userPreferencesDataStore = userPreferencesDataStore,
         friendRepository         = friendRepository,
         authRepository           = authRepository,
@@ -228,6 +229,7 @@ class ProfileViewModelTest {
         shareInviteUseCase       = shareInviteUseCase,
         appUpdateStatusProvider  = appUpdateStatusProvider,
         gamificationAvailability = testGamificationAvailability(gamificationEnabledFlow),
+        crashReporter            = crashReporter,
     )
 
     // ── Setup / Teardown ─────────────────────────────────────────────────────
@@ -240,145 +242,6 @@ class ProfileViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 1 — savePlayerName
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given blank name when savePlayerName then DataStore savePlayerName is NOT called`() = runTest {
-        // Arrange
-        wireDefaultMocks()
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-
-        // Act
-        viewModel.savePlayerName("   ")
-        advanceUntilIdle()
-
-        // Assert: guard prevents the DataStore write
-        coVerify(exactly = 0) { userPreferencesDataStore.savePlayerName(any()) }
-    }
-
-    @Test
-    fun `given empty string when savePlayerName then DataStore savePlayerName is NOT called`() = runTest {
-        // Arrange
-        wireDefaultMocks()
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-
-        // Act
-        viewModel.savePlayerName("")
-        advanceUntilIdle()
-
-        // Assert
-        coVerify(exactly = 0) { userPreferencesDataStore.savePlayerName(any()) }
-    }
-
-    @Test
-    fun `given valid name when savePlayerName then state is updated optimistically`() = runTest {
-        // Arrange
-        wireDefaultMocks()
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-
-        // Act
-        viewModel.savePlayerName("Gandalf")
-        advanceUntilIdle()
-
-        // Assert: optimistic update (state changes immediately, before DataStore confirms)
-        assertEquals("Gandalf", viewModel.uiState.value.playerName)
-    }
-
-    @Test
-    fun `given valid name when savePlayerName then DataStore_savePlayerName is called with trimmed name`() = runTest {
-        // Arrange
-        wireDefaultMocks()
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-
-        // Act: name has surrounding spaces that should be trimmed
-        viewModel.savePlayerName("  Gandalf  ")
-        advanceUntilIdle()
-
-        // Assert: saved with trim applied
-        coVerify(exactly = 1) { userPreferencesDataStore.savePlayerName("Gandalf") }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 2 — detectPlayStyle (tested via flow observation in init)
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given avgWinTurn between 1 and 7 when ViewModel initializes then playStyle is AGGRO`() = runTest {
-        // Arrange
-        wireDefaultMocks(avgWinTurn = 5.0, favoriteElim = "")
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-
-        // Assert: turn 5 is in the aggro range (1..7)
-        assertEquals(PlayStyle.AGGRO, viewModel.uiState.value.playStyle)
-    }
-
-    @Test
-    fun `given avgWinTurn 1 (boundary) when ViewModel initializes then playStyle is AGGRO`() = runTest {
-        // Arrange: exact lower boundary of AGGRO range
-        wireDefaultMocks(avgWinTurn = 1.0)
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-
-        assertEquals(PlayStyle.AGGRO, viewModel.uiState.value.playStyle)
-    }
-
-    @Test
-    fun `given avgWinTurn 7 (boundary) when ViewModel initializes then playStyle is AGGRO`() = runTest {
-        // Arrange: exact upper boundary of AGGRO range
-        wireDefaultMocks(avgWinTurn = 7.0)
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-
-        assertEquals(PlayStyle.AGGRO, viewModel.uiState.value.playStyle)
-    }
-
-    @Test
-    fun `given favoriteElim COMMANDER_DAMAGE and avgWinTurn outside aggro range when ViewModel initializes then playStyle is MIDRANGE`() = runTest {
-        // Arrange: avgWinTurn=9 is outside aggro range; COMMANDER_DAMAGE → MIDRANGE
-        wireDefaultMocks(avgWinTurn = 9.0, favoriteElim = "COMMANDER_DAMAGE")
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-
-        assertEquals(PlayStyle.MIDRANGE, viewModel.uiState.value.playStyle)
-    }
-
-    @Test
-    fun `given avgWinTurn greater than 12 and no COMMANDER_DAMAGE when ViewModel initializes then playStyle is CONTROL`() = runTest {
-        // Arrange: long games → CONTROL
-        wireDefaultMocks(avgWinTurn = 15.0, favoriteElim = "")
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-
-        assertEquals(PlayStyle.CONTROL, viewModel.uiState.value.playStyle)
-    }
-
-    @Test
-    fun `given avgWinTurn 8 and no special elimination when ViewModel initializes then playStyle is BALANCED`() = runTest {
-        // Arrange: turn 8 is outside aggro, no COMMANDER_DAMAGE, not >12 → BALANCED
-        wireDefaultMocks(avgWinTurn = 8.0, favoriteElim = "")
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-
-        assertEquals(PlayStyle.BALANCED, viewModel.uiState.value.playStyle)
-    }
-
-    @Test
-    fun `given avgWinTurn 0 (default) when ViewModel initializes then playStyle is BALANCED`() = runTest {
-        // Arrange: 0.0 is not in 1..7 range (range is inclusive from 1.0) → BALANCED
-        wireDefaultMocks(avgWinTurn = 0.0)
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-
-        assertEquals(PlayStyle.BALANCED, viewModel.uiState.value.playStyle)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -415,6 +278,16 @@ class ProfileViewModelTest {
         advanceUntilIdle()
 
         // Assert: perfect win rate
+        assertEquals(1.0f, viewModel.uiState.value.winRate, 0.001f)
+    }
+
+    @Test
+    fun `given one win and one draw winRate excludes the draw`() = runTest {
+        wireDefaultMocks(totalGames = 2, totalWins = 1)
+        every { gameSessionRepo.observeLocalDraws() } returns flowOf(1)
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
         assertEquals(1.0f, viewModel.uiState.value.winRate, 0.001f)
     }
 
@@ -569,19 +442,19 @@ class ProfileViewModelTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given mostValuableCard with multi-color identity when collectionStats emits then mostValuableColor is M`() = runTest {
-        // Arrange: colorIdentity contains two colors → "M" (multicolor)
+    fun `given mostValuableCard with multi-color identity when collectionStats emits then mostValuableColors lists both`() = runTest {
+        // Scryfall has no "M" symbol, so every colour of the identity is kept (P-16)
         val cardValue = buildCardValue(colorIdentity = "[\"R\", \"G\"]")
         val stats = buildEmptyCollectionStats(mostValuableCards = listOf(cardValue))
         wireDefaultMocks(collectionStats = stats)
         viewModel = buildViewModel()
         advanceUntilIdle()
 
-        assertEquals("M", viewModel.uiState.value.mostValuableColor)
+        assertEquals(listOf("R", "G"), viewModel.uiState.value.mostValuableColors)
     }
 
     @Test
-    fun `given mostValuableCard with empty colorIdentity when collectionStats emits then mostValuableColor is C`() = runTest {
+    fun `given mostValuableCard with empty colorIdentity when collectionStats emits then mostValuableColors is C`() = runTest {
         // Arrange: empty colorIdentity → colorless → "C"
         val cardValue = buildCardValue(colorIdentity = "[]")
         val stats = buildEmptyCollectionStats(mostValuableCards = listOf(cardValue))
@@ -589,11 +462,11 @@ class ProfileViewModelTest {
         viewModel = buildViewModel()
         advanceUntilIdle()
 
-        assertEquals("C", viewModel.uiState.value.mostValuableColor)
+        assertEquals(listOf("C"), viewModel.uiState.value.mostValuableColors)
     }
 
     @Test
-    fun `given mostValuableCard with single color identity when collectionStats emits then mostValuableColor is that color`() = runTest {
+    fun `given mostValuableCard with single color identity when collectionStats emits then mostValuableColors is that color`() = runTest {
         // Arrange
         val cardValue = buildCardValue(colorIdentity = "[\"U\"]")
         val stats = buildEmptyCollectionStats(mostValuableCards = listOf(cardValue))
@@ -601,22 +474,22 @@ class ProfileViewModelTest {
         viewModel = buildViewModel()
         advanceUntilIdle()
 
-        assertEquals("U", viewModel.uiState.value.mostValuableColor)
+        assertEquals(listOf("U"), viewModel.uiState.value.mostValuableColors)
     }
 
     @Test
-    fun `given no mostValuableCards when collectionStats emits then mostValuableColor is null`() = runTest {
+    fun `given no mostValuableCards when collectionStats emits then mostValuableColors is null`() = runTest {
         // Arrange: empty list → first() returns null → function returns null
         val stats = buildEmptyCollectionStats(mostValuableCards = emptyList())
         wireDefaultMocks(collectionStats = stats)
         viewModel = buildViewModel()
         advanceUntilIdle()
 
-        assertNull(viewModel.uiState.value.mostValuableColor)
+        assertNull(viewModel.uiState.value.mostValuableColors)
     }
 
     @Test
-    fun `given mostValuableCard with Red single color when collectionStats emits then mostValuableColor is R`() = runTest {
+    fun `given mostValuableCard with Red single color when collectionStats emits then mostValuableColors is R`() = runTest {
         // Arrange
         val cardValue = buildCardValue(colorIdentity = "[\"R\"]")
         val stats = buildEmptyCollectionStats(mostValuableCards = listOf(cardValue))
@@ -624,19 +497,18 @@ class ProfileViewModelTest {
         viewModel = buildViewModel()
         advanceUntilIdle()
 
-        assertEquals("R", viewModel.uiState.value.mostValuableColor)
+        assertEquals(listOf("R"), viewModel.uiState.value.mostValuableColors)
     }
 
     @Test
-    fun `given mostValuableCard with 5-color identity when collectionStats emits then mostValuableColor is M`() = runTest {
-        // Arrange: WUBRG identity → multicolor → "M"
+    fun `given mostValuableCard with 5-color identity when collectionStats emits then mostValuableColors keeps all five`() = runTest {
         val cardValue = buildCardValue(colorIdentity = "[\"W\", \"U\", \"B\", \"R\", \"G\"]")
         val stats = buildEmptyCollectionStats(mostValuableCards = listOf(cardValue))
         wireDefaultMocks(collectionStats = stats)
         viewModel = buildViewModel()
         advanceUntilIdle()
 
-        assertEquals("M", viewModel.uiState.value.mostValuableColor)
+        assertEquals(listOf("W", "U", "B", "R", "G"), viewModel.uiState.value.mostValuableColors)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -799,5 +671,201 @@ class ProfileViewModelTest {
         viewModel.onUpdateClick()
 
         verify(exactly = 1) { appUpdateStatusProvider.requestUpdate() }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 9 — P6 audit fixes
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun badge(id: String) = RewardUiModel(
+        id = id,
+        kind = UnlockableKind.BADGE,
+        displayName = id,
+        renderSpec = mockk(relaxed = true),
+        isOwned = true,
+        isEquipped = false,
+        unlockRule = com.mmg.manahub.core.gamification.domain.catalog.UnlockRule.LevelAtLeast(1),
+    )
+
+    private fun authUser(id: String = "user-1", isAnonymous: Boolean = false) =
+        com.mmg.manahub.core.domain.auth.AuthUser(
+            id = id,
+            email = null,
+            nickname = "Jace",
+            gameTag = null,
+            avatarUrl = null,
+            provider = "email",
+            isAnonymous = isAnonymous,
+        )
+
+    @Test
+    fun `win rate uses the local-seat game count from the repository (D12)`() = runTest {
+        // 2 local wins; the repository already excludes the 2 sessions without a local seat.
+        wireDefaultMocks(totalGames = 2, totalWins = 2)
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        assertEquals(2, viewModel.uiState.value.totalGames)
+        assertEquals(1f, viewModel.uiState.value.winRate, 0.001f)
+    }
+
+    @Test
+    fun `two concurrent claims of one quest emit exactly one QuestClaimed and no failure (P-08)`() = runTest {
+        wireDefaultMocks()
+        val gate = CompletableDeferred<Unit>()
+        coEvery { claimQuestRewardUseCase("q1") } coAnswers {
+            gate.await()
+            ClaimResult.Claimed(xpAwarded = 50, newLevel = 2, leveledUp = false)
+        }
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            viewModel.claimQuest("q1")
+            viewModel.claimQuest("q1")
+            advanceUntilIdle()
+            assertTrue("q1" in viewModel.uiState.value.claimingQuestIds)
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertTrue(awaitItem() is ProfileViewModel.Event.QuestClaimed)
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 1) { claimQuestRewardUseCase("q1") }
+        assertTrue(viewModel.uiState.value.claimingQuestIds.isEmpty())
+    }
+
+    @Test
+    fun `AlreadyClaimed is silent`() = runTest {
+        wireDefaultMocks()
+        coEvery { claimQuestRewardUseCase("q1") } returns ClaimResult.AlreadyClaimed
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            viewModel.claimQuest("q1")
+            advanceUntilIdle()
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `a claim failure is reported without the exception message`() = runTest {
+        wireDefaultMocks()
+        coEvery { claimQuestRewardUseCase("q1") } throws IllegalStateException("user text")
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.claimQuest("q1")
+        advanceUntilIdle()
+
+        verify {
+            crashReporter.recordException(match { it.message == "[profile_quest_claim_failed] IllegalStateException" })
+        }
+    }
+
+    @Test
+    fun `two badge equips before the equipped flow re-emits keep both badges (P-09)`() = runTest {
+        wireDefaultMocks()
+        equippedCosmeticsFlow.value = EquippedCosmetics.NONE.copy(badgeIds = listOf("x"))
+        coEvery { gamificationRepository.equipBadges(any()) } answers {
+            equippedCosmeticsFlow.value = equippedCosmeticsFlow.value.copy(badgeIds = firstArg())
+        }
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.onEquip(badge("A"))
+        viewModel.onEquip(badge("B"))
+        advanceUntilIdle()
+
+        assertEquals(listOf("x", "A", "B"), gamificationRepository.observeEquippedCosmetics().first().badgeIds)
+    }
+
+    @Test
+    fun `unequip then equip in quick succession does not bring the removed badge back (P-09)`() = runTest {
+        wireDefaultMocks()
+        equippedCosmeticsFlow.value = EquippedCosmetics.NONE.copy(badgeIds = listOf("x"))
+        coEvery { gamificationRepository.equipBadges(any()) } answers {
+            equippedCosmeticsFlow.value = equippedCosmeticsFlow.value.copy(badgeIds = firstArg())
+        }
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.onUnequip(badge("x"))
+        viewModel.onEquip(badge("y"))
+        advanceUntilIdle()
+
+        assertEquals(listOf("y"), equippedCosmeticsFlow.value.badgeIds)
+    }
+
+    @Test
+    fun `gamification flows are not collected while unavailable (G-17)`() = runTest {
+        wireDefaultMocks()
+        gamificationEnabledFlow.value = false
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        verify(exactly = 0) { gamificationRepository.observeProgression() }
+        verify(exactly = 0) { gamificationRepository.observeActiveQuests() }
+        verify(exactly = 0) { gamificationRepository.observeEquippedCosmetics() }
+        assertFalse(viewModel.uiState.value.gamificationEnabled)
+    }
+
+    @Test
+    fun `turning gamification off clears every gamification field`() = runTest {
+        wireDefaultMocks()
+        questBoardFlow.value = QuestBoard(daily = listOf(quest("d1")), weekly = emptyList())
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+        assertEquals(1, viewModel.uiState.value.questBoard.daily.size)
+
+        gamificationEnabledFlow.value = false
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.gamificationEnabled)
+        assertTrue(viewModel.uiState.value.questBoard.daily.isEmpty())
+        assertNull(viewModel.uiState.value.progression)
+    }
+
+    @Test
+    fun `a collection stats failure surfaces an error and retry resubscribes (P-17)`() = runTest {
+        wireDefaultMocks()
+        every { statsRepo.observeCollectionStats(any()) } returns
+            kotlinx.coroutines.flow.flow<CollectionStats> { throw IllegalStateException("db") } andThen
+            flowOf(buildEmptyCollectionStats())
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.statsError)
+        assertFalse(viewModel.uiState.value.isLoading)
+
+        viewModel.retryStats()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.statsError)
+        assertEquals(0, viewModel.uiState.value.collectionStats?.uniqueCards)
+    }
+
+    @Test
+    fun `friends refresh runs once per real account, not on every session emission (P-24)`() = runTest {
+        wireDefaultMocks()
+        val user = authUser()
+        viewModel = buildViewModel()
+        sessionStateFlow.value = SessionState.Authenticated(user)
+        advanceUntilIdle()
+        sessionStateFlow.value = SessionState.Authenticated(user.copy(nickname = "Renamed"))
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { friendRepository.refreshAll(user.id) }
+    }
+
+    @Test
+    fun `anonymous sessions do not refresh friends`() = runTest {
+        wireDefaultMocks()
+        viewModel = buildViewModel()
+        sessionStateFlow.value = SessionState.Authenticated(authUser(isAnonymous = true))
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { friendRepository.refreshAll(any()) }
     }
 }

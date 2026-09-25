@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.gamification.engine
 
 import com.mmg.manahub.core.data.local.dao.GamificationDao
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.entity.EntitlementEntity
 import com.mmg.manahub.core.data.local.entity.PlayerProgressionEntity
 import com.mmg.manahub.core.gamification.domain.LevelCurve
@@ -9,6 +10,7 @@ import com.mmg.manahub.core.gamification.domain.model.ProgressionOutcome
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -32,6 +34,7 @@ import kotlinx.datetime.TimeZone
 class EntitlementGranterTest {
 
     private lateinit var dao: GamificationDao
+    private val crashReporter = mockk<CrashReporter>(relaxed = true)
     private lateinit var granter: EntitlementGranter
 
     private val fixedInstant: Instant = Instant.parse("2026-06-13T10:00:00Z")
@@ -40,7 +43,7 @@ class EntitlementGranterTest {
     @Before
     fun setUp() {
         dao = mockk(relaxed = true)
-        granter = EntitlementGranter(dao, FixedClock(fixedInstant))
+        granter = EntitlementGranter(dao, FixedClock(fixedInstant), crashReporter)
 
         // Default: own nothing, every insert succeeds (rowId 1 = newly inserted), no progression row.
         coEvery { dao.hasEntitlement(any()) } returns false
@@ -140,6 +143,22 @@ class EntitlementGranterTest {
         val granted = granter.grant(levelUpOutcome(level = 5))
 
         assertTrue("rowId -1 must not count as newly granted", granted.isEmpty())
+    }
+
+    @Test
+    fun `a failed entitlement reports a safe error and does not stop later grants`() = runTest {
+        coEvery { dao.hasEntitlement("title_aggressor") } throws IllegalStateException("user supplied detail")
+
+        val granted = granter.grant(levelUpOutcome(level = 5)).map { it.value }
+
+        assertTrue("frame_bronze must still be granted", "frame_bronze" in granted)
+        verify { crashReporter.log("gamification_entitlement_grant_failed") }
+        verify { crashReporter.setCustomKey("gamification_entitlement_id", "title_aggressor") }
+        verify {
+            crashReporter.recordException(match { error ->
+                error.message?.contains("user supplied detail") == false && error.cause == null
+            })
+        }
     }
 
     // ── Retroactive reconcile ─────────────────────────────────────────────────────────

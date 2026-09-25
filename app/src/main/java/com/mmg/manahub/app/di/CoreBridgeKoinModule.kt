@@ -33,6 +33,8 @@ import com.mmg.manahub.core.domain.repository.DraftSimRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.feature.draft.data.DraftRepositoryImpl
 import com.mmg.manahub.feature.draft.data.DraftSimRepositoryImpl
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.feature.friends.data.repository.DataStoreFriendsCacheOwnerStore
 import com.mmg.manahub.feature.friends.data.repository.FriendRepositoryImpl
 import com.mmg.manahub.feature.game.data.repository.GameSessionRepositoryImpl
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
@@ -49,6 +51,7 @@ import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.map
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
@@ -92,7 +95,10 @@ fun coreBridgeKoinModule(
             applicationScope = get(),
             ioDispatcher = Dispatchers.IO,
             // Resolved lazily: GamificationLocalStore lives in gamificationEngineKoinModule.
-            onAccountDeleted = { get<GamificationLocalStore>().wipe() },
+            onAccountDeleted = {
+                get<FriendRepository>().clearLocalCache()
+                get<GamificationLocalStore>().wipe()
+            },
         )
     }
 
@@ -122,6 +128,11 @@ fun coreBridgeKoinModule(
             cardRepo = get(),
             progressionEventBus = get(),
             crashReporter = get(),
+            cacheOwner = DataStoreFriendsCacheOwnerStore(get()),
+            activeUserId = { (get<AuthRepository>().sessionState.value as? SessionState.Authenticated)?.user?.id },
+            activeSessionFlow = get<AuthRepository>().sessionState.map {
+                (it as? SessionState.Authenticated)?.user?.id
+            },
         )
     }
 

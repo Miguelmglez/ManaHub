@@ -27,12 +27,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -62,11 +66,16 @@ fun CircularDistribution(
     modifier: Modifier = Modifier,
     isColor: Boolean = false,
     isCompact: Boolean = false,
+    displayTotal: Int? = null,
 ) {
     if (data.isEmpty()) return
     val total = data.values.sum().toFloat().coerceAtLeast(1f)
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val chartColors = data.keys.associateWith { label ->
+        ensureChartContrast(colorMapper(label), mc.surface, mc.textPrimary)
+    }
+    val chartDescription = data.entries.joinToString(", ") { (label, count) -> "$label: $count" }
 
     val animationProgress = remember { Animatable(0f) }
     LaunchedEffect(data) {
@@ -85,7 +94,7 @@ fun CircularDistribution(
     val outerStrokeWidth = if (isCompact) 0.5.dp else 0.8.dp
 
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().semantics { contentDescription = chartDescription },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
@@ -115,9 +124,9 @@ fun CircularDistribution(
                     sortedData.forEach { (label, count) ->
                         val sweepAngle = (count / total) * 360f * animationProgress.value
                         if (sweepAngle <= 0f) return@forEach
-                        val baseColor = colorMapper(label)
+                        val baseColor = chartColors.getValue(label)
                         drawArc(
-                            color = baseColor.copy(alpha = 0.75f),
+                            color = baseColor,
                             startAngle = startAngle,
                             sweepAngle = sweepAngle,
                             useCenter = false,
@@ -133,7 +142,7 @@ fun CircularDistribution(
                     sortedData.forEach { (label, count) ->
                         val sweepAngle = (count / total) * 360f * animationProgress.value
                         if (sweepAngle <= 0f) return@forEach
-                        val baseColor = colorMapper(label)
+                        val baseColor = chartColors.getValue(label)
 
                         // Outer stroke
                         val outerDiameter = ringDiameter + strokePx
@@ -189,9 +198,9 @@ fun CircularDistribution(
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = total.toInt().toString(),
+                        text = (displayTotal ?: total.toInt()).toString(),
                         style = if (isCompact) ty.labelLarge.copy(fontWeight = FontWeight.Bold)
-                        else ty.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 36.sp),
+                        else ty.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = mc.textPrimary
                     )
                     if (!isCompact) {
@@ -229,7 +238,7 @@ fun CircularDistribution(
                 else data.entries.sortedByDescending { it.value }
 
                 items.forEach { (label, count) ->
-                    val percentage = (count / total * 100).toInt()
+                    val percentage = (count / (displayTotal?.toFloat()?.coerceAtLeast(1f) ?: total) * 100).toInt()
                     val colorCode = if (isColor) {
                         when (label) {
                             whiteName     -> "W"
@@ -253,7 +262,7 @@ fun CircularDistribution(
                                 modifier = Modifier
                                     .size(if (isCompact) 8.dp else 10.dp)
                                     .clip(CircleShape)
-                                    .background(colorMapper(label))
+                                    .background(chartColors.getValue(label))
                             )
                         }
 
@@ -277,4 +286,20 @@ fun CircularDistribution(
             }
         }
     }
+}
+
+private fun ensureChartContrast(color: Color, surface: Color, ink: Color): Color {
+    val base = color.compositeOver(surface)
+    if (contrastRatio(base, surface) >= 3f) return base
+    for (step in 1..10) {
+        val candidate = lerp(base, ink, step / 10f)
+        if (contrastRatio(candidate, surface) >= 3f) return candidate
+    }
+    return ink
+}
+
+private fun contrastRatio(first: Color, second: Color): Float {
+    val lighter = maxOf(first.luminance(), second.luminance())
+    val darker = minOf(first.luminance(), second.luminance())
+    return (lighter + 0.05f) / (darker + 0.05f)
 }

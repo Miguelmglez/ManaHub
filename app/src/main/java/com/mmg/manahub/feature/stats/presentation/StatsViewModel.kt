@@ -32,20 +32,23 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 
 /** Collection tab's "available sets + set completion" pipeline result (see [StatsViewModel]). */
 private typealias CollectionSetsResult = Pair<List<MagicSet>, List<SetCompletion>>
@@ -101,7 +104,9 @@ class StatsViewModel(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(StatsUiState())
-    val uiState: StateFlow<StatsUiState> = _uiState.asStateFlow()
+    private var tradeJob: Job? = null
+    private var lastTradeVisibilityRefreshAt = 0L
+    private var tradeOwnerUserId: String? = null
 
     private companion object {
         /** "Recent form" strip shows up to the last 10 games (Phase 3, 2026-07 stats expansion). */
@@ -113,6 +118,8 @@ class StatsViewModel(
      * off this flow (see class doc). [onTabSelected] is the only writer.
      */
     private val _selectedTab = MutableStateFlow(StatsTab.COLLECTION)
+    private val collectionRetry = MutableStateFlow(0)
+    private val gameRetry = MutableStateFlow(0)
 
     // ── Collection tab pipelines (tab-scoped to StatsTab.COLLECTION) ───────────
 
@@ -121,23 +128,25 @@ class StatsViewModel(
      * arrived — the bridging collector in [init] ignores `null` so switching tabs away and back
      * never wipes out the last-displayed [StatsUiState.stats] (Room resubscribes fast; no flicker).
      */
-    private val collectionStatsPipeline: StateFlow<CollectionStats?> =
+    private val collectionStatsPipeline: Flow<Pair<com.mmg.manahub.core.model.PreferredCurrency, CollectionStats>?> =
         _selectedTab.flatMapLatest { tab ->
-            if (tab != StatsTab.COLLECTION) return@flatMapLatest flowOf<CollectionStats?>(null)
+            if (tab != StatsTab.COLLECTION) return@flatMapLatest flowOf<Pair<com.mmg.manahub.core.model.PreferredCurrency, CollectionStats>?>(null)
             combine(
                 userPreferencesDataStore.preferredCurrencyFlow,
                 _uiState.map { it.selectedColor }.distinctUntilChanged(),
                 _uiState.map { it.selectedSet?.code }.distinctUntilChanged(),
             ) { currency, color, setCode -> Triple(currency, color, setCode) }
+                .combine(collectionRetry) { filters, _ -> filters }
                 .flatMapLatest { (currency, color, setCode) ->
                     getStats(currency, color, setCode)
                         .debounce(300)
+                        .map { currency to it }
                         .catch { e ->
                             recordSafeNonFatal("stats_collection_pipeline", e)
                             _uiState.update { it.copy(error = e.message, isLoading = false) }
                         }
                 }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        }.onStart { emit(null) }
 
     /**
      * Fetches every Scryfall set ONCE for the ViewModel's whole life (`SharingStarted.Lazily`,
@@ -160,7 +169,7 @@ class StatsViewModel(
      * The two Room queries here ([getSetCodes], [getSetCompletionCounts]) ARE tab-scoped to
      * [StatsTab.COLLECTION] — only the Scryfall fetch itself is shared/always-on.
      */
-    private val collectionSetsPipeline: StateFlow<CollectionSetsResult?> =
+    private val collectionSetsPipeline: Flow<CollectionSetsResult?> =
         _selectedTab.flatMapLatest { tab ->
             if (tab != StatsTab.COLLECTION) return@flatMapLatest flowOf<CollectionSetsResult?>(null)
             combine(
@@ -168,7 +177,8 @@ class StatsViewModel(
                 allSetsSharedFlow,
                 getSetCompletionCounts(),
             ) { codes, allSets, ownedCounts ->
-                val available = if (codes.isEmpty()) emptyList() else allSets.filter { it.code in codes }
+                val codeSet = codes.toSet()
+                val available = if (codeSet.isEmpty()) emptyList() else allSets.filter { it.code in codeSet }
                 val completions = available
                     .mapNotNull { set -> ownedCounts[set.code]?.let { owned -> SetCompletion(set, owned) } }
                     .filter { it.set.cardCount > 0 }
@@ -176,23 +186,28 @@ class StatsViewModel(
                     .take(5)
                 available to completions
             }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        }.onStart { emit(null) }
 
     private fun observePreferredCurrency() {
         viewModelScope.launch {
             var isFirstEmission = true
             userPreferencesDataStore.preferredCurrencyFlow.collect { currency ->
                 _uiState.update { it.copy(currency = currency) }
-                // Trade net-value is currency-denominated. A currency change AFTER the trade
-                // stats were already fetched (skip the initial emission) must not silently keep
-                // showing a figure in the old currency: re-fetch immediately if the TRADES tab is
-                // the one currently visible, otherwise just invalidate so the next activation
-                // re-fetches (mirrors the lazy-fetch-on-activation contract).
-                if (!isFirstEmission && _uiState.value.tradeStats !is TradeStatsUiState.Idle) {
-                    if (_uiState.value.selectedTab == StatsTab.TRADES) {
-                        loadTradeStats()
-                    } else {
-                        _uiState.update { it.copy(tradeStats = TradeStatsUiState.Idle) }
+                if (!isFirstEmission) {
+                    val tradeState = _uiState.value.tradeStats
+                    val cached = (tradeState as? TradeStatsUiState.Content)?.stats
+                    val cachedDelta = when (currency) {
+                        com.mmg.manahub.core.model.PreferredCurrency.USD -> cached?.netValueDeltaUsd
+                        com.mmg.manahub.core.model.PreferredCurrency.EUR -> cached?.netValueDeltaEur
+                    }
+                    when {
+                        cached != null && cachedDelta != null -> _uiState.update {
+                            it.copy(tradeStats = TradeStatsUiState.Content(
+                                cached.copy(currency = currency, netValueDelta = cachedDelta)
+                            ))
+                        }
+                        tradeState !is TradeStatsUiState.Idle && _uiState.value.selectedTab == StatsTab.TRADES -> loadTradeStats()
+                        tradeState !is TradeStatsUiState.Idle -> _uiState.update { it.copy(tradeStats = TradeStatsUiState.Idle) }
                     }
                 }
                 isFirstEmission = false
@@ -215,11 +230,14 @@ class StatsViewModel(
      * heavy 12-flow combine below. Kept off the tab-scoping so the GAMES tab can appear in the tab
      * row before it has ever been selected (see class doc).
      */
-    private val hasGameStatsFlow: StateFlow<Boolean> =
+    private val hasGameStatsFlow: Flow<Boolean> =
         gameSessionRepository.observeTotalGames()
             .map { it > 0 }
             .distinctUntilChanged()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+            .onEach { has ->
+                if (!has && _selectedTab.value == StatsTab.GAMES) onTabSelected(StatsTab.COLLECTION)
+            }
+            .onStart { emit(uiState.value.hasGameStats) }
 
     /**
      * The Games tab's 12-flow `combine`, gated to [StatsTab.GAMES] via `flatMapLatest` — this is
@@ -227,8 +245,8 @@ class StatsViewModel(
      * left running regardless of the selected tab. `null` while off-tab; the bridging collector in
      * [init] ignores `null`.
      */
-    private val gameStatsPipeline: StateFlow<GameStatsResult?> =
-        _selectedTab.flatMapLatest { tab ->
+    private val gameStatsPipeline: Flow<GameStatsResult?> =
+        combine(_selectedTab, gameRetry) { tab, _ -> tab }.flatMapLatest { tab ->
             if (tab != StatsTab.GAMES) return@flatMapLatest flowOf<GameStatsResult?>(null)
             // Win/loss, history, and per-deck stats are resolved against the local seat
             // (is_local = 1), not a playerName match (see ADR-001). The stored seat name
@@ -247,8 +265,10 @@ class StatsViewModel(
                 deckRepository.observeAllDecks().distinctUntilChanged(),
                 gameSessionRepository.observeWinrateByMode().distinctUntilChanged(),
                 gameSessionRepository.observeWinrateByPlayerCount().distinctUntilChanged(),
+                gameSessionRepository.observeLocalDraws().distinctUntilChanged(),
+                gameSessionRepository.observeLocalSessionOutcomes().distinctUntilChanged(),
             ) { args ->
-                // combine with 12 flows uses the array variant
+                // combine with multiple flows uses the array variant
                 @Suppress("UNCHECKED_CAST")
                 val totalGames   = args[0] as Int
                 val wins         = args[1] as Int
@@ -262,19 +282,21 @@ class StatsViewModel(
                 val allDecks     = args[9] as List<com.mmg.manahub.core.model.Deck>
                 val modeWinrates = args[10] as List<ModeWinrate>
                 val playerCountWinrates = args[11] as List<PlayerCountWinrate>
+                val draws = args[12] as Int
+                val outcomes = args[13] as List<Boolean?>
 
                 val deckNameById = allDecks.associate { it.id to it.name }
 
                 val gameStats = GameStats(
                     totalGames       = totalGames,
                     wins             = wins,
-                    winrate          = if (totalGames > 0) wins.toFloat() / totalGames else 0f,
+                    winrate          = if (totalGames > draws) wins.toFloat() / (totalGames - draws) else 0f,
                     avgDurationMs    = avgDuration?.toLong() ?: 0L,
                     favoriteMode     = favoriteMode?.mode,
                     mostFrequentLoss = mostLoss?.eliminationReason,
                     pendingSurveys   = pending,
-                    currentStreak    = computeCurrentStreak(history),
-                    bestStreak       = computeBestStreak(history),
+                    currentStreak    = computeCurrentStreak(outcomes),
+                    bestStreak       = computeBestStreak(outcomes),
                 )
 
                 val historyItems = history.map { row ->
@@ -285,6 +307,7 @@ class StatsViewModel(
                         durationMs    = row.durationMs,
                         winnerName    = row.winnerName,
                         isWin         = row.localIsWinner,
+                        isDraw        = row.isDraw,
                         surveyStatus  = runCatching { SurveyStatus.valueOf(row.surveyStatus) }.getOrDefault(SurveyStatus.PENDING),
                         deckId        = row.localDeckId,
                         deckName      = row.localDeckId?.let { deckNameById[it] },
@@ -327,12 +350,15 @@ class StatsViewModel(
                 // reverse so the strip renders chronologically with the most-recent game last.
                 val recentForm = history.take(RECENT_FORM_LIMIT)
                     .reversed()
-                    .map { RecentFormEntry(sessionId = it.sessionId, isWin = it.localIsWinner) }
+                    .map { RecentFormEntry(sessionId = it.sessionId, isWin = it.localIsWinner, isDraw = it.isDraw) }
 
                 GameStatsResult(gameStats, historyItems, deckPerf, matchups, modeWinrateItems, playerCountItems, recentForm)
             }
-                .catch { e -> recordSafeNonFatal("stats_game_pipeline", e) }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+                .catch { e ->
+                    recordSafeNonFatal("stats_game_pipeline", e)
+                    _uiState.update { it.copy(gameError = true) }
+                }
+        }.onStart { emit(null) }
 
     /** Internal carrier for the game-stats pipeline output (combine emits a single object). */
     private data class GameStatsResult(
@@ -349,10 +375,11 @@ class StatsViewModel(
      * Consecutive wins ending at the most recent game (front of [historyDesc], which is ordered
      * most-recent-first). 0 if the most recent game was a loss or there is no history.
      */
-    private fun computeCurrentStreak(historyDesc: List<SessionHistoryEntry>): Int {
+    private fun computeCurrentStreak(historyDesc: List<Boolean?>): Int {
         var streak = 0
-        for (row in historyDesc) {
-            if (row.localIsWinner) streak++ else break
+        for (outcome in historyDesc) {
+            if (outcome == false) break
+            if (outcome == true) streak++
         }
         return streak
     }
@@ -362,14 +389,14 @@ class StatsViewModel(
      * contiguous run is a contiguous run regardless of scan direction), so this works the same
      * whether [history] is ascending or descending.
      */
-    private fun computeBestStreak(history: List<SessionHistoryEntry>): Int {
+    private fun computeBestStreak(history: List<Boolean?>): Int {
         var best = 0
         var running = 0
-        for (row in history) {
-            if (row.localIsWinner) {
+        for (outcome in history) {
+            if (outcome == true) {
                 running++
                 best = maxOf(best, running)
-            } else {
+            } else if (outcome == false) {
                 running = 0
             }
         }
@@ -388,21 +415,43 @@ class StatsViewModel(
      * [loadTradeStats]), only the cheap metadata call needed to know whether any COMPLETED
      * proposal exists at all.
      */
-    private val hasTradeStatsFlow: StateFlow<Boolean> = flow {
-        val session = authRepository.sessionState.first { it !is SessionState.Loading }
-        val userId = (session as? SessionState.Authenticated)?.takeIf { !it.user.isAnonymous }?.user?.id
-        if (userId == null) {
-            emit(false)
-            return@flow
+    private val hasTradeStatsFlow: Flow<Boolean> = authRepository.sessionState
+        .filter { it !is SessionState.Loading }
+        .map { session ->
+            (session as? SessionState.Authenticated)?.takeIf { !it.user.isAnonymous }?.user?.id
         }
-        runCatching { tradesRepository.refreshProposals(userId) }
-            .onFailure { e -> recordSafeNonFatal("stats_trades_visibility_refresh", e) }
-        emitAll(
-            tradesRepository.observeAllProposals()
-                .map { proposals -> proposals.any { it.status == TradeStatus.COMPLETED } }
-                .distinctUntilChanged()
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+        .distinctUntilChanged()
+        .onEach { userId ->
+            if (userId != tradeOwnerUserId) {
+                tradeJob?.cancel()
+                tradeOwnerUserId = userId
+                lastTradeVisibilityRefreshAt = 0L
+                _uiState.update { it.copy(tradeStats = TradeStatsUiState.Idle) }
+            }
+        }
+        .flatMapLatest { userId ->
+            if (userId == null) return@flatMapLatest flowOf(false)
+            flow {
+                emit(false)
+                val now = System.currentTimeMillis()
+                if (now - lastTradeVisibilityRefreshAt >= 5 * 60_000L) {
+                    runCatching { tradesRepository.refreshProposals(userId) }
+                        .onSuccess { lastTradeVisibilityRefreshAt = now }
+                        .onFailure { e ->
+                            if (e is CancellationException) throw e
+                            recordSafeNonFatal("stats_trades_visibility_refresh", e)
+                        }
+                }
+                emitAll(tradesRepository.observeAllProposals()
+                    .map { proposals -> proposals.any { proposal ->
+                        proposal.status == TradeStatus.COMPLETED &&
+                            (proposal.proposerId == userId || proposal.receiverId == userId)
+                    } }
+                    .distinctUntilChanged())
+            }
+        }.onEach { has ->
+        if (!has && _selectedTab.value == StatsTab.TRADES) onTabSelected(StatsTab.COLLECTION)
+    }.onStart { emit(false) }
 
     /** Resolves the current non-anonymous authenticated user id, or null if not eligible. */
     private fun currentAuthenticatedUserId(): String? =
@@ -423,13 +472,21 @@ class StatsViewModel(
             _uiState.update { it.copy(tradeStats = TradeStatsUiState.Error) }
             return
         }
-        viewModelScope.launch {
+        tradeJob?.cancel()
+        tradeJob = viewModelScope.launch {
             _uiState.update { it.copy(tradeStats = TradeStatsUiState.Loading) }
-            getTradeStats(userId, _uiState.value.currency)
-                .onSuccess { stats -> _uiState.update { it.copy(tradeStats = TradeStatsUiState.Content(stats)) } }
+            val currency = _uiState.value.currency
+            getTradeStats(userId, currency)
+                .onSuccess { stats ->
+                    if (_uiState.value.currency == currency && currentAuthenticatedUserId() == userId) {
+                        _uiState.update { it.copy(tradeStats = TradeStatsUiState.Content(stats)) }
+                    }
+                }
                 .onFailure { e ->
-                    recordSafeNonFatal("stats_trade_pipeline", e)
-                    _uiState.update { it.copy(tradeStats = TradeStatsUiState.Error) }
+                    if (currentAuthenticatedUserId() == userId) {
+                        recordSafeNonFatal("stats_trade_pipeline", e)
+                        _uiState.update { it.copy(tradeStats = TradeStatsUiState.Error) }
+                    }
                 }
         }
     }
@@ -437,45 +494,36 @@ class StatsViewModel(
     /** Retries the TRADES tab fetch after an [TradeStatsUiState.Error]. */
     fun retryTradeStats() = loadTradeStats()
 
-    // ── Bridging collectors: fold each pipeline's StateFlow into [_uiState] ────
+    val uiState: StateFlow<StatsUiState> = combine(
+        combine(_uiState, collectionStatsPipeline, collectionSetsPipeline) { base, stats, sets ->
+            val currentStats = stats?.takeIf { it.first == base.currency }?.second
+            base.copy(
+                stats = currentStats,
+                error = if (currentStats != null) null else base.error,
+                isLoading = currentStats == null && base.error == null,
+                availableSets = sets?.first ?: base.availableSets,
+                setCompletions = sets?.second ?: base.setCompletions,
+            )
+        },
+        hasGameStatsFlow,
+        gameStatsPipeline,
+        hasTradeStatsFlow,
+    ) { base, hasGames, games, hasTrades ->
+        base.copy(
+            hasGameStats = hasGames,
+            hasTradeStats = hasTrades,
+            gameStats = games?.gameStats ?: base.gameStats,
+            gameError = if (games != null) false else base.gameError,
+            sessionHistory = games?.history ?: base.sessionHistory,
+            deckPerformance = games?.deckPerformance ?: base.deckPerformance,
+            archetypeMatchups = games?.matchups ?: base.archetypeMatchups,
+            modeWinrates = games?.modeWinrates ?: base.modeWinrates,
+            playerCountWinrates = games?.playerCountWinrates ?: base.playerCountWinrates,
+            recentForm = games?.recentForm ?: base.recentForm,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatsUiState())
 
     init {
-        viewModelScope.launch {
-            collectionStatsPipeline.collect { stats ->
-                if (stats != null) _uiState.update { it.copy(stats = stats, isLoading = false) }
-            }
-        }
-        viewModelScope.launch {
-            collectionSetsPipeline.collect { result ->
-                if (result != null) {
-                    val (available, completions) = result
-                    _uiState.update { it.copy(availableSets = available, setCompletions = completions) }
-                }
-            }
-        }
-        viewModelScope.launch {
-            hasGameStatsFlow.collect { has -> _uiState.update { it.copy(hasGameStats = has) } }
-        }
-        viewModelScope.launch {
-            gameStatsPipeline.collect { result ->
-                if (result != null) {
-                    _uiState.update {
-                        it.copy(
-                            gameStats           = result.gameStats,
-                            sessionHistory      = result.history,
-                            deckPerformance     = result.deckPerformance,
-                            archetypeMatchups   = result.matchups,
-                            modeWinrates        = result.modeWinrates,
-                            playerCountWinrates = result.playerCountWinrates,
-                            recentForm          = result.recentForm,
-                        )
-                    }
-                }
-            }
-        }
-        viewModelScope.launch {
-            hasTradeStatsFlow.collect { has -> _uiState.update { it.copy(hasTradeStats = has) } }
-        }
         observePreferredCurrency()
         observeLastPriceRefresh()
     }
@@ -500,7 +548,17 @@ class StatsViewModel(
         }
     }
 
-    fun onErrorDismissed() = _uiState.update { it.copy(error = null) }
+    fun onErrorDismissed() = retryCollectionStats()
+
+    fun retryCollectionStats() {
+        _uiState.update { it.copy(error = null, isLoading = true) }
+        collectionRetry.value++
+    }
+
+    fun retryGameStats() {
+        _uiState.update { it.copy(gameError = false) }
+        gameRetry.value++
+    }
 
     /**
      * Switches the visible tab. Updates [_selectedTab] — the single source of truth every

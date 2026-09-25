@@ -15,6 +15,8 @@ import com.mmg.manahub.core.model.FriendCardCursor
 import com.mmg.manahub.core.model.FriendCardSearchException
 import com.mmg.manahub.core.model.FriendCardSearchParams
 import com.mmg.manahub.core.model.FriendshipGoneException
+import com.mmg.manahub.core.model.FriendRequestException
+import kotlinx.datetime.Instant
 import com.mmg.manahub.core.data.remote.dto.FriendshipDto
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.statement.bodyAsText
@@ -45,14 +47,14 @@ class FriendRemoteDataSource(
         withContext(dispatcherProvider.io) {
             runCatching {
                 val orFilter = "(user_id_1.eq.$currentUserId,user_id_2.eq.$currentUserId)"
-                val friendships = client.getFriendships(or = orFilter)
+                val friendships = drainFriendships { afterId ->
+                    client.getFriendships(or = orFilter, afterId = afterId, limit = FRIENDSHIP_PAGE_SIZE)
+                }
                 if (friendships.isEmpty()) return@runCatching emptyList()
                 val otherIds = friendships
                     .map { if (it.userId1 == currentUserId) it.userId2 else it.userId1 }
                     .distinct()
-                val profiles = client
-                    .getProfilesByIds(idFilter = "in.(${otherIds.joinToString(",")})")
-                    .associateBy { it.id }
+                val profiles = fetchProfiles(otherIds)
                 friendships.map { fs ->
                     val otherId = if (fs.userId1 == currentUserId) fs.userId2 else fs.userId1
                     val profile = profiles[otherId]
@@ -72,12 +74,15 @@ class FriendRemoteDataSource(
     suspend fun getPendingRequests(currentUserId: String): Result<List<FriendRequestWithProfile>> =
         withContext(dispatcherProvider.io) {
             runCatching {
-                val requests = client.getPendingRequests(userId2Filter = "eq.$currentUserId")
+                val requests = drainFriendships { afterId ->
+                    client.getPendingRequests(
+                        userId2Filter = "eq.$currentUserId",
+                        afterId = afterId,
+                        limit = FRIENDSHIP_PAGE_SIZE,
+                    )
+                }
                 if (requests.isEmpty()) return@runCatching emptyList()
-                val senderIds = requests.map { it.userId1 }.distinct()
-                val profiles = client
-                    .getProfilesByIds(idFilter = "in.(${senderIds.joinToString(",")})")
-                    .associateBy { it.id }
+                val profiles = fetchProfiles(requests.map { it.userId1 }.distinct())
                 requests.map { fs ->
                     val profile = profiles[fs.userId1]
                     FriendRequestWithProfile(
@@ -88,7 +93,7 @@ class FriendRemoteDataSource(
                             ?: UNKNOWN_DISPLAY_NAME,
                         fromGameTag = profile?.gameTag ?: "",
                         fromAvatarUrl = profile?.avatarUrl,
-                        createdAt = 0L,
+                        createdAt = fs.createdAtMillis(),
                     )
                 }
             }
@@ -102,15 +107,22 @@ class FriendRemoteDataSource(
         }
 
     /**
-     * Sends a friend request. With Ktor `expectSuccess = true`, non-2xx responses
-     * throw automatically -- the wrapping [runCatching] catches them.
+     * Sends a friend request. A duplicate pair, a self request or an RLS refusal fails with the
+     * matching [FriendRequestException]; any other failure keeps its original exception.
      */
     suspend fun sendFriendRequest(fromUserId: String, toUserId: String): Result<Unit> =
         withContext(dispatcherProvider.io) {
-            runCatching {
-                client.sendFriendRequest(
-                    body = SendFriendRequestDto(fromUserId, toUserId),
-                )
+            try {
+                client.sendFriendRequest(body = SendFriendRequestDto(fromUserId, toUserId))
+                Result.success(Unit)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ResponseException) {
+                val body = runCatching { e.response.bodyAsText() }.getOrDefault("")
+                Result.failure(FriendRequestErrors.fromResponse(e.response.status.value, body) ?: e)
+            } catch (e: Throwable) {
+                // Throwable, not Exception: a failed wasm fetch surfaces as kotlin.Error.
+                Result.failure(e)
             }
         }
 
@@ -311,12 +323,15 @@ class FriendRemoteDataSource(
     suspend fun getOutgoingRequests(currentUserId: String): Result<List<OutgoingRequestWithProfile>> =
         withContext(dispatcherProvider.io) {
             runCatching {
-                val requests = client.getOutgoingPendingRequests(userId1Filter = "eq.$currentUserId")
+                val requests = drainFriendships { afterId ->
+                    client.getOutgoingPendingRequests(
+                        userId1Filter = "eq.$currentUserId",
+                        afterId = afterId,
+                        limit = FRIENDSHIP_PAGE_SIZE,
+                    )
+                }
                 if (requests.isEmpty()) return@runCatching emptyList()
-                val receiverIds = requests.map { it.userId2 }.distinct()
-                val profiles = client
-                    .getProfilesByIds(idFilter = "in.(${receiverIds.joinToString(",")})")
-                    .associateBy { it.id }
+                val profiles = fetchProfiles(requests.map { it.userId2 }.distinct())
                 requests.map { fs ->
                     val profile = profiles[fs.userId2]
                     OutgoingRequestWithProfile(
@@ -327,11 +342,52 @@ class FriendRemoteDataSource(
                             ?: UNKNOWN_DISPLAY_NAME,
                         toGameTag = profile?.gameTag ?: "",
                         toAvatarUrl = profile?.avatarUrl,
-                        createdAt = 0L,
+                        createdAt = fs.createdAtMillis(),
                     )
                 }
             }
         }
+
+    // PostgREST truncates silently at db-max-rows, so every friendships read is keyset-paged on id.
+    private suspend fun drainFriendships(fetchPage: suspend (afterId: String?) -> List<FriendshipDto>): List<FriendshipDto> {
+        val rows = mutableListOf<FriendshipDto>()
+        var afterId: String? = null
+        repeat(MAX_FRIENDSHIP_PAGES) {
+            val page = fetchPage(afterId)
+            rows += page
+            if (page.size < FRIENDSHIP_PAGE_SIZE) return rows
+            afterId = page.last().id
+        }
+        return rows
+    }
+
+    // One in.() per chunk keeps the request URL bounded however many friends there are.
+    private suspend fun fetchProfiles(ids: List<String>): Map<String, UserSearchResultDto> =
+        ids.chunked(PROFILE_LOOKUP_CHUNK)
+            .flatMap { chunk -> client.getProfilesByIds(idFilter = "in.(${chunk.joinToString(",")})") }
+            .associateBy { it.id }
+
+    private fun FriendshipDto.createdAtMillis(): Long =
+        runCatching { Instant.parse(createdAt).toEpochMilliseconds() }.getOrDefault(0L)
+
+    internal companion object {
+        const val FRIENDSHIP_PAGE_SIZE = 500
+        const val MAX_FRIENDSHIP_PAGES = 20
+        const val PROFILE_LOOKUP_CHUNK = 100
+    }
+}
+
+/** Maps a failed friend-request insert to a [FriendRequestException] when the cause is known. */
+internal object FriendRequestErrors {
+    private val ALREADY_LINKED_MARKERS = listOf("23505", "friendships_canonical_pair_uidx", "friendships_pair_unique")
+    private val SELF_MARKERS = listOf("friendships_check")
+
+    fun fromResponse(status: Int, body: String): Throwable? = when {
+        status == 409 || ALREADY_LINKED_MARKERS.any { body.contains(it) } -> FriendRequestException.AlreadyLinked()
+        SELF_MARKERS.any { body.contains(it) } -> FriendRequestException.SelfRequest()
+        status == 403 || body.contains("42501") -> FriendRequestException.NotPermitted()
+        else -> null
+    }
 }
 
 /** A friend entry enriched with profile details. */

@@ -15,12 +15,12 @@ import com.mmg.manahub.core.model.FriendCard
 import com.mmg.manahub.core.model.FriendCardCursor
 import com.mmg.manahub.core.model.FriendCardSearchException
 import com.mmg.manahub.core.model.FriendCardSearchParams
-import com.mmg.manahub.core.model.FriendMatchHistory
 import com.mmg.manahub.core.model.FriendStats
+import com.mmg.manahub.core.model.FriendshipGoneException
+import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.withMetadata
-import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.feature.friends.domain.usecase.SearchFriendCardsUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -30,12 +30,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
@@ -56,6 +58,9 @@ enum class FolderSubTab(val listValue: String) {
     WISHLIST("wishlist"),
     TRADE("trade"),
 }
+
+/** One-shot feedback of the friend detail screen; the screen maps each value to its copy. */
+enum class FriendDetailMessage { REMOVE_FAILED }
 
 /** Why the Folder tab's card list could not be shown. */
 enum class FolderCardsError {
@@ -79,6 +84,7 @@ class FriendDetailViewModel(
     private val tradesRepo: TradesRepository,
     private val authRepo: AuthRepository,
     private val crashReporter: CrashReporter,
+    preferredCurrency: Flow<PreferredCurrency> = flowOf(PreferredCurrency.USD),
     private val timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
 ) : ViewModel() {
 
@@ -106,15 +112,15 @@ class FriendDetailViewModel(
         val resultsVersion: Int = 0,
         /** Rows of the list the server could not evaluate against the active filters yet. */
         val unindexedCount: Int = 0,
-        val toastMessage: String? = null,
-        val toastType: MagicToastType = MagicToastType.ERROR,
+        val message: FriendDetailMessage? = null,
+        val isRemoving: Boolean = false,
         val tradeHistory: List<TradeProposal> = emptyList(),
         val friendStats: FriendStats? = null,
         val isLoadingStats: Boolean = false,
         val statsError: Boolean = false,
-        val gameHistory: FriendMatchHistory? = null,
-        val isLoadingGameHistory: Boolean = false,
-        val gameHistoryError: Boolean = false,
+        /** True once a stats fetch succeeded, even when the friend has no stats row yet. */
+        val statsLoaded: Boolean = false,
+        val preferredCurrency: PreferredCurrency = PreferredCurrency.USD,
     ) {
         private val hasEffectiveName: Boolean
             get() = FriendCardSearchMapper.normalizeName(searchText).isNotEmpty()
@@ -182,24 +188,27 @@ class FriendDetailViewModel(
     private val resultCache = LinkedHashMap<SearchRequest, CachedResult>()
     private val attemptedHydrationIds = mutableSetOf<String>()
 
+    // Set once NavigateBack was sent, so no second path can pop another screen.
+    private var leaving = false
+
     init {
-        if (friendUserId.isBlank()) {
-            viewModelScope.launch { _events.send(UiEvent.NavigateBack) }
-        } else {
-            setup()
-        }
+        preferredCurrency
+            .onEach { currency -> _uiState.update { it.copy(preferredCurrency = currency) } }
+            .catch { e -> reportFlowError("currency", e) }
+            .launchIn(viewModelScope)
+        if (friendUserId.isBlank()) navigateBackOnce() else setup()
     }
 
     private fun setup() {
+        // A friend missing from the cache renders a "not your friend" state; the screen never auto-pops.
         friendRepo.observeFriends()
             .onEach { friends ->
                 val found = friends.firstOrNull { it.userId == friendUserId }
-                // Removed externally by the peer: leave instead of showing a blank screen.
-                val hadFriend = !_uiState.value.isLoadingFriend && _uiState.value.friend != null
-                if (found == null && hadFriend) {
-                    _events.send(UiEvent.NavigateBack)
-                }
                 _uiState.update { it.copy(friend = found, isLoadingFriend = false) }
+            }
+            .catch { e ->
+                reportFlowError("friends", e)
+                _uiState.update { it.copy(isLoadingFriend = false) }
             }
             .launchIn(viewModelScope)
 
@@ -229,6 +238,7 @@ class FriendDetailViewModel(
         }
             .distinctUntilChanged()
             .onEach { filtered -> _uiState.update { it.copy(tradeHistory = filtered) } }
+            .catch { e -> reportFlowError("trades", e) }
             .launchIn(viewModelScope)
 
         observeCardRequests()
@@ -330,26 +340,13 @@ class FriendDetailViewModel(
         loadMoreJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoadingMore = true) }
             crashReporter.log("friend_cards_search_load_more")
-            val result = searchFriendCards(friendUserId, request.list.listValue, request.params, cursor, PAGE_SIZE)
-            // A newer request superseded this page; its rows belong to a list/query no longer shown.
-            if (gen != generation) return@launch
-            result.fold(
-                onSuccess = { page ->
-                    currentCursor = page.nextCursor
-                    val merged = (_uiState.value.cards + page.cards).dedupedByRow()
-                    resultCache[request]?.let { entry ->
-                        resultCache[request] = entry.copy(
-                            cards = (entry.cards + page.cards).dedupedByRow(),
-                            cursor = page.nextCursor,
-                            hasMore = page.hasMore,
-                        )
-                    }
-                    _uiState.update {
-                        it.copy(cards = merged, hasMoreCards = page.hasMore, isLoadingMore = false)
-                    }
-                    hydrateInBackground(page.unresolvedIds)
-                },
-                onFailure = { e ->
+            var pageCursor: FriendCardCursor = cursor
+            var emptyMerges = 0
+            while (true) {
+                val result = searchFriendCards(friendUserId, request.list.listValue, request.params, pageCursor, PAGE_SIZE)
+                // A newer request superseded this page; its rows belong to a list/query no longer shown.
+                if (gen != generation) return@launch
+                val page = result.getOrElse { e ->
                     val error = reportFailure(e, "friend_cards_search_load_more_error")
                     _uiState.update {
                         if (error.isTerminal()) {
@@ -358,8 +355,31 @@ class FriendDetailViewModel(
                             it.copy(isLoadingMore = false, loadMoreFailed = true)
                         }
                     }
-                },
-            )
+                    return@launch
+                }
+                currentCursor = page.nextCursor
+                val before = _uiState.value.cards.size
+                val merged = (_uiState.value.cards + page.cards).dedupedByRow()
+                resultCache[request]?.let { entry ->
+                    resultCache[request] = entry.copy(
+                        cards = (entry.cards + page.cards).dedupedByRow(),
+                        cursor = page.nextCursor,
+                        hasMore = page.hasMore,
+                    )
+                }
+                hydrateInBackground(page.unresolvedIds)
+                val next = page.nextCursor
+                // A page of already-shown rows (a restarted cursor) never re-arms the scroll trigger, so keep going.
+                if (merged.size == before && page.hasMore && next != null && ++emptyMerges < MAX_EMPTY_MERGE_PAGES) {
+                    crashReporter.log("friend_cards_search_load_more_no_new_rows")
+                    pageCursor = next
+                    continue
+                }
+                _uiState.update {
+                    it.copy(cards = merged, hasMoreCards = page.hasMore && next != null, isLoadingMore = false)
+                }
+                break
+            }
         }
     }
 
@@ -432,43 +452,31 @@ class FriendDetailViewModel(
         if (tab == FriendTab.FOLDER && previous != FriendTab.FOLDER) reloadToken.value++
         if (tab == FriendTab.STATS) {
             val current = _uiState.value
-            if (current.friendStats == null && !current.isLoadingStats && !current.statsError) {
+            if (!current.statsLoaded && !current.isLoadingStats && !current.statsError) {
                 loadStats()
             }
         }
     }
 
     fun retryStats() {
+        if (_uiState.value.isLoadingStats) return
         loadStats()
-    }
-
-    fun retryGameHistory() {
-        loadGameHistory()
     }
 
     private fun loadStats() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingStats = true, statsError = false) }
             val result = friendRepo.getFriendStats(friendUserId)
+            result.exceptionOrNull()?.let { error ->
+                crashReporter.log("friend_stats_load_failed")
+                crashReporter.recordException(RuntimeException("[friend_stats_load_failed] ${error::class.simpleName}"))
+            }
             _uiState.update {
                 it.copy(
                     friendStats = result.getOrNull(),
                     isLoadingStats = false,
                     statsError = result.isFailure,
-                )
-            }
-        }
-    }
-
-    private fun loadGameHistory() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingGameHistory = true, gameHistoryError = false) }
-            val result = friendRepo.getFriendMatchHistory(friendUserId)
-            _uiState.update {
-                it.copy(
-                    gameHistory = result.getOrNull(),
-                    isLoadingGameHistory = false,
-                    gameHistoryError = result.isFailure,
+                    statsLoaded = result.isSuccess,
                 )
             }
         }
@@ -480,29 +488,57 @@ class FriendDetailViewModel(
     }
 
     /**
-     * Removes the current friend; on success navigates back, on failure shows [errorMsg].
+     * Removes the current friend and navigates back exactly once. A friendship already gone on the
+     * server also leaves, after a refresh drops it from the cache.
      */
-    fun removeFriend(errorMsg: String) {
-        val friendshipId = _uiState.value.friend?.id ?: return
+    fun removeFriend() {
+        val state = _uiState.value
+        val friendshipId = state.friend?.id ?: return
+        if (state.isRemoving || leaving) return
+        _uiState.update { it.copy(isRemoving = true) }
         viewModelScope.launch {
             val result = friendRepo.removeFriend(friendshipId)
-            if (result.isSuccess) {
-                _events.send(UiEvent.NavigateBack)
-            } else {
-                _uiState.update {
-                    it.copy(toastMessage = errorMsg, toastType = MagicToastType.ERROR)
+            val error = result.exceptionOrNull()
+            when {
+                error == null -> {
+                    crashReporter.log("friend_remove_success")
+                    navigateBackOnce()
+                }
+                error is FriendshipGoneException -> {
+                    crashReporter.log("friend_remove_already_gone")
+                    val userId = currentUserId()
+                    if (userId != null) friendRepo.refreshFriends(userId)
+                    navigateBackOnce()
+                }
+                else -> {
+                    crashReporter.log("friend_remove_failed")
+                    _uiState.update { it.copy(isRemoving = false, message = FriendDetailMessage.REMOVE_FAILED) }
                 }
             }
         }
     }
 
-    fun clearToast() {
-        _uiState.update { it.copy(toastMessage = null, toastType = MagicToastType.ERROR) }
+    fun clearMessage() {
+        _uiState.update { it.copy(message = null) }
+    }
+
+    private fun navigateBackOnce() {
+        if (leaving) return
+        leaving = true
+        _events.trySend(UiEvent.NavigateBack)
+    }
+
+    private fun currentUserId(): String? = (authRepo.sessionState.value as? SessionState.Authenticated)?.user?.id
+
+    private fun reportFlowError(source: String, e: Throwable) {
+        crashReporter.setCustomKey("friend_detail_flow_error_source", source)
+        crashReporter.recordException(RuntimeException("[friend_detail_flow_failed] ${e::class.simpleName}"))
     }
 
     private suspend fun fetchUnindexedCount(request: SearchRequest): Int =
-        searchFriendCards.unindexedCount(friendUserId, request.list.listValue).getOrElse {
-            crashReporter.log("friend_cards_unindexed_count_error")
+        searchFriendCards.unindexedCount(friendUserId, request.list.listValue).getOrElse { error ->
+            crashReporter.log("friend_cards_unindexed_count_failed")
+            crashReporter.recordException(RuntimeException("[friend_cards_unindexed_count_failed] ${error::class.simpleName}"))
             0
         }
 
@@ -572,6 +608,8 @@ class FriendDetailViewModel(
 
     private companion object {
         const val PAGE_SIZE = 50
+        // Bounds the auto-advance over pages of already-shown rows (a one-time cursor restart re-reads them).
+        const val MAX_EMPTY_MERGE_PAGES = 20
         const val TYPING_DEBOUNCE_MS = 450L
         // Coalesces bursts of chip removals / list switches into one request.
         const val CHANGE_DEBOUNCE_MS = 150L

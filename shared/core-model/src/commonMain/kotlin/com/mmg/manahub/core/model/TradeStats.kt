@@ -26,6 +26,8 @@ data class TradeStats(
     val netValueDelta: Double,
     val currency: PreferredCurrency,
     val topPartner: TradePartnerSummary?,
+    val netValueDeltaUsd: Double? = null,
+    val netValueDeltaEur: Double? = null,
 )
 
 /** Completed-trade volume with one counterparty, keyed by their auth user id. */

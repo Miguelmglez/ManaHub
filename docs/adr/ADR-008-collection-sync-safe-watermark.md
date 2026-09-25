@@ -69,9 +69,11 @@ Page size is 500 with a **server-side** cap, so a client bug can never re-enter 
 The client advances its cursor from the last row of each page (never from a computed maximum) and
 terminates on a short page, with a hard page cap as a runaway guard.
 
-Applied to collection and decks. The gamification `*_changes_since` RPCs share the defect and are
-scheduled behind them; `xp_transactions` is the highest-risk remaining one because it grows
-monotonically and never tombstones.
+Applied to collection and decks. The 2026-09 gamification restoration adds server-capped
+`get_*_page` RPCs and migrates the Android client to them, using `server_seq` for the append-only
+XP ledger and `(changed_at, primary key)` for mutable tables. The old `*_changes_since` RPCs remain
+for shipped clients. The new migrations are written but must be applied before the release flag is
+enabled; repository code alone does not close the production risk.
 
 ## Decision 3 — Ownership records never depend on cache metadata
 

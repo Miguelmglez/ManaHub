@@ -95,7 +95,7 @@ class CommitImportedCardsUseCaseTest {
      * AddCard/Scanner queue and the progression bus alone.
      */
     @Test
-    fun `a full import cycle never touches the shared queue and publishes no progression event`() = runTest {
+    fun `a full import cycle never touches the shared queue and publishes only CollectionChanged`() = runTest {
         coEvery { userCardRepository.addOrIncrementBatch(any(), any()) } answers {
             firstArg<List<CollectionAddRequest>>().map { AddOutcome.CREATED_NEW }
         }
@@ -108,7 +108,7 @@ class CommitImportedCardsUseCaseTest {
         val collector = launch { progressionEventBus.events.collect { published += it } }
         val importActions = CardQueueActions(
             queueRepository = importQueue,
-            committer = CommitImportedCardsUseCase(userCardRepository),
+            committer = CommitImportedCardsUseCase(userCardRepository, progressionEventBus = progressionEventBus),
             addToWishlist = mockk(relaxed = true),
         )
 
@@ -123,7 +123,9 @@ class CommitImportedCardsUseCaseTest {
         assertEquals(AddAllToCollectionResult.Success(1), outcome)
         assertTrue(importQueue.queue.value.isEmpty())
         assertEquals(sharedSnapshot, sharedQueue.queue.value)
-        assertTrue("an import is neither a scan nor a manual add: no XP", published.isEmpty())
+        // An import is neither a scan nor a manual add: only the zero-XP re-evaluation trigger (G-25).
+        assertEquals(1, published.size)
+        assertTrue(published.single() is ProgressionEvent.CollectionChanged)
         collector.cancel()
     }
 

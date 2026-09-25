@@ -31,7 +31,7 @@ import org.koin.dsl.module
  * - [GamificationRepository] — shared with the Home island.
  * - `FriendRepository` — shared with the Friends island.
  *
- * [SurveyAnswerDao] is a Profile-only singleton bridged here.
+ * [SurveyAnswerDao] is bridged here for the Survey island (`surveyKoinModule` resolves it).
  *
  * ## KMP migration — Hilt→Koin cutover batch 4
  * [ClaimQuestRewardUseCase] is no longer bridged from `ManaHubApp` — it is now a NATIVE Koin single in
@@ -72,7 +72,6 @@ fun profileKoinModule(
         ProfileViewModel(
             statsRepo = get(),
             gameSessionRepo = get(),
-            surveyAnswerDao = get(),
             userPreferencesDataStore = get(),
             friendRepository = get(),
             authRepository = get(),
@@ -84,6 +83,7 @@ fun profileKoinModule(
             shareInviteUseCase = get(),
             appUpdateStatusProvider = get(),
             gamificationAvailability = get(),
+            crashReporter = get(),
         )
     }
 
@@ -93,6 +93,7 @@ fun profileKoinModule(
             scryfallRemoteDataSource = get(),
             userPreferencesDataStore = get(),
             authRepository = get(),
+            crashReporter = get(),
         )
     }
 }

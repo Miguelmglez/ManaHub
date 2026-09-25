@@ -23,6 +23,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -164,7 +166,12 @@ fun ManaCurveChart(
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(CANVAS_HEIGHT),
+                .height(CANVAS_HEIGHT)
+                .semantics {
+                    contentDescription = buckets.mapIndexed { index, count ->
+                        "${if (index == 7) "7 or more" else index.toString()} mana: $count"
+                    }.joinToString(", ")
+                },
         ) {
             val barCount      = 8
             val spacing       = BAR_SPACING_DP.toPx()

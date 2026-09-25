@@ -421,7 +421,7 @@ internal fun SeedsAddedPill(
             shape = ChipShape,
             color = mc.primaryAccent.copy(alpha = 0.14f),
             modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.xs).heightIn(min = 48.dp)
-                .semantics { contentDescription = pillDescription },
+                .semantics { this.contentDescription = pillDescription },
         ) {
             Box(Modifier.fillMaxWidth().padding(spacing.sm), contentAlignment = Alignment.Center) {
                 AnimatedContent(

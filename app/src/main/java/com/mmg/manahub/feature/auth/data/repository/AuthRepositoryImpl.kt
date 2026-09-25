@@ -144,6 +144,7 @@ class AuthRepositoryImpl(
                 flowOf(state)
             } else {
                 flow {
+                    claimCachedIdentity(state.user.id)
                     // Fast emit: only emit immediately when the nickname is already known from
                     // in-memory session metadata (i.e. email/password users whose nickname is
                     // embedded in the token). For Google users the in-memory metadata may reflect
@@ -173,7 +174,8 @@ class AuthRepositoryImpl(
                                 profileCompleted = profile.profileCompleted,
                                 hasPassword = hasPassword,
                             )
-                            syncToDataStore(enrichedUser)
+                            // The fetched row is authoritative: a null avatar is a removal (P-12).
+                            syncToDataStore(enrichedUser, avatarAuthoritative = true)
                             syncPrivacyFlagsToDataStore(profile)
                             emit(SessionState.Authenticated(enrichedUser))
                         } else {
@@ -805,7 +807,11 @@ class AuthRepositoryImpl(
 
     override suspend fun signOut(): AuthResult<Unit> = withContext(ioDispatcher) {
         runCatching {
+            val hadAuthenticatedSession = supabaseAuth.currentUserOrNull() != null
             supabaseAuth.signOut()
+            if (hadAuthenticatedSession || userPreferencesDataStore.hasAccountProfileIdentity()) {
+                userPreferencesDataStore.clearProfileIdentity()
+            }
             clearLocalPrivacyFlags()
             AuthResult.Success(Unit)
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
@@ -813,7 +819,12 @@ class AuthRepositoryImpl(
 
     /** Best-effort sign-out that also drops the account-scoped local caches (privacy flags). */
     private suspend fun signOutLocally(scope: SignOutScope) {
+        val hadAuthenticatedSession = supabaseAuth.currentUserOrNull() != null
         runCatching { supabaseAuth.signOut(scope) }
+        if (hadAuthenticatedSession || userPreferencesDataStore.hasAccountProfileIdentity()) {
+            runCatching { userPreferencesDataStore.clearProfileIdentity() }
+                .onFailure { e -> if (e is CancellationException) throw e }
+        }
         clearLocalPrivacyFlags()
     }
 
@@ -854,19 +865,33 @@ class AuthRepositoryImpl(
      * This ensures [ProfileViewModel.uiState.playerName] and [avatarUrl] are updated
      * from the server data without requiring the user to manually refresh.
      */
-    private suspend fun syncToDataStore(user: AuthUser) {
+    private suspend fun syncToDataStore(user: AuthUser, avatarAuthoritative: Boolean = false) {
         try {
-            // Only update DataStore if the server actually has values. 
-            // This prevents overwriting a valid local nickname/avatar with null 
-            // during the very first authenticated emit (before profile enrichment).
+            userPreferencesDataStore.claimProfileIdentity(user.id)
+            // A null nickname never overwrites the local one (first authenticated emit, before
+            // enrichment). A null avatar is written only when [user] comes from a fetched profile
+            // row, where null means "removed"; elsewhere it means "not known".
             user.nickname?.takeIf { it.isNotBlank() }?.let {
                 userPreferencesDataStore.savePlayerName(it)
             }
-            user.avatarUrl?.let {
-                userPreferencesDataStore.saveAvatarUrl(it)
+            if (user.avatarUrl != null || avatarAuthoritative) {
+                userPreferencesDataStore.saveAvatarUrl(user.avatarUrl)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             // Non-fatal: DataStore write failures must not surface to the user.
+        }
+    }
+
+    /** Drops a different account's cached nickname/avatar before this account's values sync in. */
+    private suspend fun claimCachedIdentity(userId: String) {
+        try {
+            userPreferencesDataStore.claimProfileIdentity(userId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            recordNonFatal("auth_cached_identity_claim_failed", e)
         }
     }
 

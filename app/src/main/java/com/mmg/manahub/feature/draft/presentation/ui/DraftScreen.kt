@@ -78,7 +78,7 @@ fun DraftScreen(
                     )
                 }
                 Text(
-                    text = "Latest sets",
+                    text = "Set guides",
                     style = typography.titleLarge,
                     color = colors.textPrimary,
                     modifier = Modifier.padding(start = 8.dp),

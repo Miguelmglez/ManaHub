@@ -22,6 +22,7 @@ import com.mmg.manahub.core.data.local.entity.projection.UniqueCardPriceProjecti
 import com.mmg.manahub.core.data.local.entity.projection.VariantCardProjection
 import com.mmg.manahub.core.model.CardType
 import com.mmg.manahub.core.model.CardValue
+import com.mmg.manahub.core.model.CollectionColorAffinity
 import com.mmg.manahub.core.model.CollectionStats
 import com.mmg.manahub.core.model.CollectionSummary
 import com.mmg.manahub.core.model.MtgColor
@@ -39,6 +40,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 
 class StatsRepositoryImpl(
@@ -58,9 +60,10 @@ class StatsRepositoryImpl(
      * All stats queries re-subscribe automatically when the session changes.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val currentUserIdFlow = authRepository.sessionState.map { state ->
-        (state as? SessionState.Authenticated)?.user?.id
-    }
+    private val currentUserIdFlow = authRepository.sessionState
+        .filter { it !is SessionState.Loading }
+        .map { state -> (state as? SessionState.Authenticated)?.user?.id }
+        .distinctUntilChanged()
 
     @Suppress("UNCHECKED_CAST")
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -88,41 +91,48 @@ class StatsRepositoryImpl(
                     else statsDao.observeCardsByArtist(artist, colorCode, setFilter, userId, limit = ARTIST_GALLERY_LIMIT)
                 }
 
+            val tagsFlow = statsDao.observeAllCollectionTags(colorCode, setFilter, userId)
+                .distinctUntilChanged()
+                .map(::parseTagCounts)
+            val keywordsFlow = statsDao.observeAllCollectionKeywords(colorCode, setFilter, userId)
+                .distinctUntilChanged()
+                .map(::parseKeywordCounts)
+
             combine(
-                statsDao.observeTotals(colorCode, setFilter, userId),
-                statsDao.observeTotalValueUsd(colorCode, setFilter, userId),
-                statsDao.observeTotalValueEur(colorCode, setFilter, userId),
-                statsDao.observeMostValuableCards(limit = 10, useEur = useEur, colorFilter = colorCode, setFilter = setFilter, userId = userId),
-                statsDao.observeCountByColorIdentity(colorCode, setFilter, userId),
-                statsDao.observeCountByRarity(colorCode, setFilter, userId),
-                statsDao.observeCountByTypeLine(colorCode, setFilter, userId),
-                statsDao.observeManaCurve(colorCode, setFilter, userId),
-                statsDao.observeCountBySet(colorCode, setFilter, userId),
-                deckDao.observeDeckCount(),
+                statsDao.observeTotals(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeTotalValueUsd(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeTotalValueEur(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeMostValuableCards(limit = 10, useEur = useEur, colorFilter = colorCode, setFilter = setFilter, userId = userId).distinctUntilChanged(),
+                statsDao.observeCountByColorIdentity(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeCountByRarity(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeCountByTypeLine(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeManaCurve(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeCountBySet(colorCode, setFilter, userId).distinctUntilChanged(),
+                deckDao.observeDeckCount(userId).distinctUntilChanged(),
                 // Innovative stats
-                statsDao.observeTotalFoil(colorCode, setFilter, userId),
-                statsDao.observeTotalFullArt(colorCode, setFilter, userId),
-                statsDao.observeTopArtist(colorCode, setFilter, userId),
-                statsDao.observeAvgManaValue(colorCode, setFilter, userId),
-                statsDao.observeAvgPower(colorCode, setFilter, userId),
-                statsDao.observeAvgToughness(colorCode, setFilter, userId),
-                statsDao.observeOldestCard(colorCode, setFilter, userId),
-                statsDao.observeNewestCard(colorCode, setFilter, userId),
+                statsDao.observeTotalFoil(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeTotalFullArt(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeTopArtist(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeAvgManaValue(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeAvgPower(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeAvgToughness(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeOldestCard(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeNewestCard(colorCode, setFilter, userId).distinctUntilChanged(),
                 // New set and tag stats
-                statsDao.observeTopSetByCount(colorCode, setFilter, userId),
-                statsDao.observeTopSetByValue(colorCode, setFilter, useEur, userId),
-                statsDao.observeAllCollectionTags(colorCode, setFilter, userId),
+                statsDao.observeTopSetByCount(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeTopSetByValue(colorCode, setFilter, useEur, userId).distinctUntilChanged(),
+                tagsFlow,
                 // Phase 2 (2026-07 stats expansion)
-                statsDao.observeUniqueCardPrices(colorCode, setFilter, userId),
-                statsDao.observeTotalFoilValueUsd(colorCode, setFilter, userId),
-                statsDao.observeTotalFoilValueEur(colorCode, setFilter, userId),
-                statsDao.observeMostDuplicatedCard(colorCode, setFilter, userId),
-                statsDao.observeFormatCoverage(colorCode, setFilter, userId),
-                statsDao.observeAllCollectionKeywords(colorCode, setFilter, userId),
+                statsDao.observeUniqueCardPrices(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeTotalFoilValueUsd(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeTotalFoilValueEur(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeMostDuplicatedCard(colorCode, setFilter, userId).distinctUntilChanged(),
+                statsDao.observeFormatCoverage(colorCode, setFilter, userId).distinctUntilChanged(),
+                keywordsFlow,
                 // Hall of Fame enrichment (2026-07 stats expansion)
-                statsDao.observeMostVariantsCard(colorCode, setFilter, userId),
-                artistCardsFlow,
-                statsDao.observeCountByDecade(colorCode, setFilter, userId),
+                statsDao.observeMostVariantsCard(colorCode, setFilter, userId).distinctUntilChanged(),
+                artistCardsFlow.distinctUntilChanged(),
+                statsDao.observeCountByDecade(colorCode, setFilter, userId).distinctUntilChanged(),
             ) { args: Array<Any?> ->
                 val totals    = args[0] as TotalsProjection
                 val valueUsd  = args[1] as Double
@@ -146,45 +156,23 @@ class StatsRepositoryImpl(
 
                 val topSetCount  = args[18] as SetCountProjection?
                 val topSetValue  = args[19] as SetValueProjection?
-                val allTags      = args[20] as List<TagProjection>
+                val tagMap       = args[20] as Map<String, Int>
 
                 val uniqueCardPrices  = args[21] as List<UniqueCardPriceProjection>
                 val foilValueUsd      = args[22] as Double
                 val foilValueEur      = args[23] as Double
                 val duplicateProj     = args[24] as DuplicateCardProjection?
                 val formatCoverageProj = args[25] as FormatCoverageProjection
-                val keywordProjs      = args[26] as List<KeywordsProjection>
+                val keywordMap   = args[26] as Map<String, Int>
 
                 val variantsProj      = args[27] as VariantCardProjection?
                 val artistCards       = args[28] as List<CardValueProjection>
                 val decadeRows        = args[29] as List<DecadeCountProjection>
 
-                // Process tags to find strategy distribution
-                val tagMap = mutableMapOf<String, Int>()
-                var tagParseFailures = 0
-                allTags.forEach { tagProj ->
-                    val rawTags = tagProj.tags ?: return@forEach
-                    try {
-                        val records: List<TagRecord> = gson.fromJson(rawTags, tagListType)
-                        records.forEach { record ->
-                            // Only count "strategy" or "synergy" tags for innovation
-                            val cat = record.category.lowercase()
-                            if (cat == "strategy" || cat == "synergy" || cat == "archetype") {
-                                tagMap[record.key] = (tagMap[record.key] ?: 0) + 1
-                            }
-                        }
-                    } catch (e: Exception) {
-                        tagParseFailures++
-                    }
-                }
-                if (tagParseFailures > 0) {
-                    recordSafeNonFatal("stats_tag_parse_batch", RuntimeException("Failed to parse tags for $tagParseFailures cards"))
-                }
-
                 // Distinct-card avg/median value (active currency), unique cards priced > 0.
                 val activePrices = uniqueCardPrices
                     .map { if (useEur) it.priceEur else it.priceUsd }
-                    .filter { it > 0.0 }
+                    .filter { it.isFinite() && it > 0.0 }
                     .sorted()
                 val avgCardValue = if (activePrices.isNotEmpty()) activePrices.average() else 0.0
                 val medianCardValue = if (activePrices.isNotEmpty()) {
@@ -197,12 +185,15 @@ class StatsRepositoryImpl(
                 // Ratios come from separate Room Flows combined via combine(...), which can emit
                 // out of sync during a refreshPrices() call — coerce to guard against a transient
                 // >100% reading (see CLAUDE.md-linked review findings, 2026-07-23 Stats expansion).
-                val foilValueSharePercent = if (activeTotalValue > 0.0)
-                    (activeFoilValue / activeTotalValue).toFloat().coerceIn(0f, 1f) else 0f
+                val foilValueSharePercent = if (activeTotalValue.isFinite() && activeTotalValue > 0.0)
+                    (activeFoilValue / activeTotalValue).toFloat().takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f else 0f
 
-                val top10Sum = topCards.take(10).sumOf { if (useEur) it.priceEur else it.priceUsd }
+                val top10Sum = topCards.take(10).sumOf {
+                    val price = if (useEur) it.priceEur else it.priceUsd
+                    if (price.isFinite() && price >= 0.0) price * it.quantity else 0.0
+                }
                 val valueConcentrationTop10Percent = if (activeTotalValue > 0.0)
-                    (top10Sum / activeTotalValue).toFloat().coerceIn(0f, 1f) else 0f
+                    (top10Sum / activeTotalValue).toFloat().takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f else 0f
 
                 val formatCoverage = mapOf(
                     "Commander" to formatCoverageProj.commanderCount,
@@ -210,22 +201,6 @@ class StatsRepositoryImpl(
                     "Standard"  to formatCoverageProj.standardCount,
                 )
 
-                val keywordMap = mutableMapOf<String, Int>()
-                var keywordParseFailures = 0
-                keywordProjs.forEach { proj ->
-                    val raw = proj.keywords ?: return@forEach
-                    try {
-                        val keywords: List<String> = gson.fromJson(raw, keywordListType)
-                        keywords.forEach { kw ->
-                            if (kw.isNotBlank()) keywordMap[kw] = (keywordMap[kw] ?: 0) + 1
-                        }
-                    } catch (e: Exception) {
-                        keywordParseFailures++
-                    }
-                }
-                if (keywordParseFailures > 0) {
-                    recordSafeNonFatal("stats_keyword_parse_batch", RuntimeException("Failed to parse keywords for $keywordParseFailures cards"))
-                }
                 val keywordDistribution = keywordMap.entries
                     .sortedByDescending { it.value }.take(10).associate { it.key to it.value }
 
@@ -370,28 +345,46 @@ class StatsRepositoryImpl(
         rarity        = rarity,
     )
 
-    private fun List<ColorCountProjection>.toColorMap(): Map<MtgColor, Int> {
-        val result = mutableMapOf<MtgColor, Int>()
-        for (row in this) {
-            val parsed = row.colorIdentity
-                .removeSurrounding("[", "]").split(",")
-                .map { it.trim().removeSurrounding("\"") }.filter { it.isNotEmpty() }
-            if (parsed.isEmpty()) {
-                result[MtgColor.COLORLESS] = (result[MtgColor.COLORLESS] ?: 0) + row.count
-            } else {
-                // Multi-color cards (e.g. W/U) count toward each color they contain.
-                for (colorStr in parsed) {
-                    val color = when (colorStr) {
-                        "W" -> MtgColor.W; "U" -> MtgColor.U; "B" -> MtgColor.B
-                        "R" -> MtgColor.R; "G" -> MtgColor.G
-                        else -> null
+    private fun parseTagCounts(rows: List<TagProjection>): Map<String, Int> {
+        val counts = mutableMapOf<String, Int>()
+        var failures = 0
+        rows.forEach { row ->
+            val raw = row.tags ?: return@forEach
+            try {
+                val tags: List<TagRecord> = gson.fromJson(raw, tagListType)
+                tags.forEach { tag ->
+                    if (tag.category.lowercase() in setOf("strategy", "synergy", "archetype")) {
+                        counts[tag.key] = (counts[tag.key] ?: 0) + 1
                     }
-                    color?.let { result[it] = (result[it] ?: 0) + row.count }
                 }
+            } catch (_: Exception) {
+                failures++
             }
         }
-        return result
+        if (failures > 0) recordSafeNonFatal("stats_tag_parse_batch", RuntimeException("Failed to parse tags for $failures cards"))
+        return counts
     }
+
+    private fun parseKeywordCounts(rows: List<KeywordsProjection>): Map<String, Int> {
+        val counts = mutableMapOf<String, Int>()
+        var failures = 0
+        rows.forEach { row ->
+            val raw = row.keywords ?: return@forEach
+            try {
+                val keywords: List<String> = gson.fromJson(raw, keywordListType)
+                keywords.filter { it.isNotBlank() }.forEach { keyword ->
+                    counts[keyword] = (counts[keyword] ?: 0) + 1
+                }
+            } catch (_: Exception) {
+                failures++
+            }
+        }
+        if (failures > 0) recordSafeNonFatal("stats_keyword_parse_batch", RuntimeException("Failed to parse keywords for $failures cards"))
+        return counts
+    }
+
+    private fun List<ColorCountProjection>.toColorMap(): Map<MtgColor, Int> =
+        CollectionColorAffinity.countByColor(map { it.colorIdentity to it.count })
 
     private fun List<RarityCountProjection>.toRarityMap(): Map<Rarity, Int> =
         associate { row ->

@@ -57,12 +57,17 @@ import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.core.util.recordNonFatal
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.card.ResolveCardStrategyTagsUseCase
 import com.mmg.manahub.core.gamification.di.gamificationEngineKoinModule
 import com.mmg.manahub.core.gamification.domain.GamificationBackendGate
+import com.mmg.manahub.core.gamification.domain.GamificationAccountScope
+import com.mmg.manahub.core.gamification.domain.GamificationAvailability
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.app.lifecycle.AppForegroundTracker
 import com.mmg.manahub.core.nearby.domain.repository.NearbySessionRepository
 import com.mmg.manahub.core.online.domain.usecase.AdvancePhaseUseCase
@@ -123,6 +128,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.tasks.await
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
@@ -150,6 +159,8 @@ class ManaHubApp : Application(), KoinComponent {
 
     // Lazy Koin resolution: read only after startKoin() in onCreate().
     private val gamificationBackendGate: GamificationBackendGate by inject()
+    private val gamificationAccountScope: GamificationAccountScope by inject()
+    private val gamificationAvailability: GamificationAvailability by inject()
     private val appForegroundTracker: AppForegroundTracker by inject()
 
     // ── KMP migration — Hilt→Koin cutover batch 5 ───────────────────────────────────────────────
@@ -164,6 +175,7 @@ class ManaHubApp : Application(), KoinComponent {
     private val remoteConfigRepository: RemoteConfigRepository by inject()
     private val wishlistRepository: WishlistRepository by inject()
     private val openForTradeRepository: OpenForTradeRepository by inject()
+    private val friendRepository: FriendRepository by inject()
 
     @Inject lateinit var tagDictionaryRepo: TagDictionaryRepository
     @Inject lateinit var workManager: WorkManager
@@ -610,6 +622,33 @@ class ManaHubApp : Application(), KoinComponent {
         // Gamification backend lifecycle (ADR-005 D1): engine, workers, catch-up, account scoping and
         // sync all run only while GamificationAvailability is AVAILABLE; see GamificationBackendGate.
         registerActivityLifecycleCallbacks(appForegroundTracker)
+        if (FeatureFlags.Gamification.ENABLED) {
+            appScope.launch {
+                combine(
+                    authRepository.sessionState,
+                    gamificationAvailability.settingsVisibleFlow,
+                    userPreferencesDataStore.gamificationEnabledFlow,
+                ) { session, visible, optedIn -> Triple(session, visible, optedIn) }
+                    .distinctUntilChangedBy { (session, visible, optedIn) ->
+                        Triple((session as? SessionState.Authenticated)?.user?.id, session is SessionState.Unauthenticated, visible && optedIn)
+                    }
+                    .collectLatest { (session, visible, optedIn) ->
+                        if (visible && optedIn) {
+                            try {
+                                when (session) {
+                                    is SessionState.Authenticated -> gamificationAccountScope.onSignedIn(session.user.id)
+                                    is SessionState.Unauthenticated -> gamificationAccountScope.onGuestActive()
+                                    else -> Unit
+                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                recordSafeNonFatal("gamification_guest_scope_failed", e)
+                            }
+                        }
+                    }
+            }
+        }
         gamificationBackendGate.start(appScope)
 
         PriceRefreshWorker.scheduleDailyRefresh(workManager)
@@ -632,6 +671,21 @@ class ManaHubApp : Application(), KoinComponent {
         // (profile enrichment) re-triggering the first-login pull for the SAME user, while still
         // firing again if a DIFFERENT user signs in after a sign-out.
         var previousUserId: String? = null
+        appScope.launch {
+            authRepository.sessionState.collectLatest { state ->
+                try {
+                    when (state) {
+                        is SessionState.Authenticated -> friendRepository.claimLocalCache(state.user.id)
+                        is SessionState.Unauthenticated -> friendRepository.clearLocalCache()
+                        else -> Unit
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    recordSafeNonFatal("friends_cache_account_scope_failed", e)
+                }
+            }
+        }
         appScope.launch {
             authRepository.sessionState.collect { state ->
                 when (state) {

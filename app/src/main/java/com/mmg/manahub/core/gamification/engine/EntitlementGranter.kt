@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.gamification.engine
 
 import com.mmg.manahub.core.data.local.dao.GamificationDao
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.entity.EntitlementEntity
 import com.mmg.manahub.core.gamification.domain.LevelCurve
 import com.mmg.manahub.core.gamification.domain.catalog.Unlockable
@@ -8,6 +9,7 @@ import com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog
 import com.mmg.manahub.core.gamification.domain.catalog.UnlockableId
 import com.mmg.manahub.core.gamification.domain.model.ProgressionOutcome
 import kotlinx.datetime.Clock
+import kotlinx.coroutines.CancellationException
 
 /**
  * Grants unlockable-cosmetic entitlements when the player's state satisfies a catalog rule (ADR-002
@@ -32,6 +34,7 @@ import kotlinx.datetime.Clock
 class EntitlementGranter(
     private val dao: GamificationDao,
     private val clock: Clock,
+    private val crashReporter: CrashReporter,
 ) {
 
     /**
@@ -99,6 +102,11 @@ class EntitlementGranter(
                 )
                 // rowId == -1 means a concurrent insert already added it → not a new grant.
                 if (rowId != -1L) granted += unlockable.id
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                crashReporter.log("gamification_entitlement_grant_failed")
+                crashReporter.setCustomKey("gamification_entitlement_id", unlockable.id.value)
+                crashReporter.recordException(RuntimeException("[gamification_entitlement_grant_failed] ${error::class.simpleName}"))
             }
         }
         return granted

@@ -4,7 +4,6 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -34,9 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
@@ -44,6 +43,9 @@ import com.mmg.manahub.core.gamification.domain.model.QuestBoard
 import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -51,101 +53,79 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 
 /**
- * The Quests tab body (ADR-002, Phase 2). Renders a streak header followed by the active daily and
- * weekly quests. Each quest exposes a determinate progress bar, a progress label, and a Claim CTA
- * when completed (or a "Claimed" state once taken).
- *
- * Stateless: the caller (ProfileScreen) hoists [board] + [streak] from the ViewModel and provides the
- * [onClaim] handler. Uses a single [LazyColumn] keyed by quest [QuestUiModel.instanceId] (stable, never
- * duplicated) and the shared [EmptyState] for the empty case.
+ * Emits the Quests tab as items of the Profile screen's single [androidx.compose.foundation.lazy.LazyColumn]:
+ * a streak header followed by the active daily and weekly quests, each its own keyed item.
  *
  * @param board the active quest board (daily + weekly).
  * @param streak the daily-activity streak (count + freeze tokens).
+ * @param claimingIds quest instances whose claim is in flight; their Claim button shows progress.
  * @param onClaim invoked with the quest instance id when the user taps Claim.
- * @param contentPadding bottom inset so the list clears the nav bar.
  */
-@Composable
-fun QuestsTab(
+fun LazyListScope.questsTabItems(
     board: QuestBoard,
     streak: StreakUiModel,
+    claimingIds: Set<String>,
     onClaim: (instanceId: String) -> Unit,
-    modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(0.dp),
 ) {
-    val noQuests = board.daily.isEmpty() && board.weekly.isEmpty()
+    item(key = "quests_streak_header") {
+        StreakHeader(
+            streak = streak,
+            modifier = Modifier.padding(
+                start = MaterialTheme.spacing.lg,
+                end = MaterialTheme.spacing.lg,
+                top = MaterialTheme.spacing.sm,
+                bottom = MaterialTheme.spacing.xs,
+            ),
+        )
+    }
 
-    LazyColumn(
-        modifier = modifier.fillMaxWidth(),
-        contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
-    ) {
-        item(key = "streak_header") {
-            StreakHeader(
-                streak = streak,
-                modifier = Modifier.padding(
-                    start = MaterialTheme.spacing.lg,
-                    end = MaterialTheme.spacing.lg,
-                    top = MaterialTheme.spacing.sm,
-                    bottom = MaterialTheme.spacing.xs,
-                ),
+    if (board.daily.isEmpty() && board.weekly.isEmpty()) {
+        item(key = "quests_empty") {
+            EmptyState(
+                icon = Icons.Default.Flag,
+                title = stringResource(R.string.quests_empty_title),
+                subtitle = stringResource(R.string.quests_empty_desc),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = MaterialTheme.spacing.xxl),
             )
         }
+        return
+    }
 
-        if (noQuests) {
-            item(key = "empty") {
-                EmptyState(
-                    icon = Icons.Default.Flag,
-                    title = stringResource(R.string.quests_empty_title),
-                    subtitle = stringResource(R.string.quests_empty_desc),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = MaterialTheme.spacing.xxl),
-                )
-            }
-            return@LazyColumn
-        }
+    questSection(key = "daily", titleRes = R.string.quests_section_daily, quests = board.daily, claimingIds, onClaim)
+    questSection(key = "weekly", titleRes = R.string.quests_section_weekly, quests = board.weekly, claimingIds, onClaim)
+}
 
-        if (board.daily.isNotEmpty()) {
-            item(key = "header_daily") {
-                QuestSectionHeader(
-                    titleRes = R.string.quests_section_daily,
-                    modifier = Modifier.padding(
-                        start = MaterialTheme.spacing.lg,
-                        end = MaterialTheme.spacing.lg,
-                        top = MaterialTheme.spacing.md,
-                        bottom = MaterialTheme.spacing.xs,
-                    ),
-                )
-            }
-            items(items = board.daily, key = { it.instanceId }) { quest ->
-                QuestRow(
-                    quest = quest,
-                    onClaim = onClaim,
-                    modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg),
-                )
-            }
-        }
-
-        if (board.weekly.isNotEmpty()) {
-            item(key = "header_weekly") {
-                QuestSectionHeader(
-                    titleRes = R.string.quests_section_weekly,
-                    modifier = Modifier.padding(
-                        start = MaterialTheme.spacing.lg,
-                        end = MaterialTheme.spacing.lg,
-                        top = MaterialTheme.spacing.md,
-                        bottom = MaterialTheme.spacing.xs,
-                    ),
-                )
-            }
-            items(items = board.weekly, key = { it.instanceId }) { quest ->
-                QuestRow(
-                    quest = quest,
-                    onClaim = onClaim,
-                    modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg),
-                )
-            }
-        }
+private fun LazyListScope.questSection(
+    key: String,
+    @StringRes titleRes: Int,
+    quests: List<QuestUiModel>,
+    claimingIds: Set<String>,
+    onClaim: (instanceId: String) -> Unit,
+) {
+    if (quests.isEmpty()) return
+    item(key = "quests_header_$key", contentType = "quest_header") {
+        QuestSectionHeader(
+            titleRes = titleRes,
+            modifier = Modifier.padding(
+                start = MaterialTheme.spacing.lg,
+                end = MaterialTheme.spacing.lg,
+                top = MaterialTheme.spacing.md,
+                bottom = MaterialTheme.spacing.xs,
+            ),
+        )
+    }
+    items(items = quests, key = { "quest_${it.instanceId}" }, contentType = { "quest_row" }) { quest ->
+        QuestRow(
+            quest = quest,
+            isClaiming = quest.instanceId in claimingIds,
+            onClaim = onClaim,
+            modifier = Modifier.padding(
+                horizontal = MaterialTheme.spacing.lg,
+                vertical = MaterialTheme.spacing.xs,
+            ),
+        )
     }
 }
 
@@ -264,6 +244,7 @@ fun QuestRow(
     quest: QuestUiModel,
     onClaim: (instanceId: String) -> Unit,
     modifier: Modifier = Modifier,
+    isClaiming: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
     val title = quest.title
@@ -354,7 +335,11 @@ fun QuestRow(
 
             // Trailing CTA / state.
             when {
-                quest.isClaimable -> ClaimButton(title = title, onClick = { onClaim(quest.instanceId) })
+                quest.isClaimable -> ClaimButton(
+                    title = title,
+                    isClaiming = isClaiming,
+                    onClick = { onClaim(quest.instanceId) },
+                )
                 quest.isClaimed -> ClaimedBadge()
                 else -> Unit // in-progress: no trailing control
             }
@@ -362,37 +347,24 @@ fun QuestRow(
     }
 }
 
-/** Filled "Claim" button (≥48dp). */
+/** Filled "Claim" button (≥48dp); shows progress and ignores taps while the claim is in flight. */
 @Composable
-private fun ClaimButton(title: String, onClick: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    Surface(
-        shape = ChipShape,
-        color = mc.primaryAccent,
+private fun ClaimButton(title: String, isClaiming: Boolean, onClick: () -> Unit) {
+    val claimA11y = stringResource(R.string.quests_claim_a11y, title)
+    MagicCtaButton(
+        onClick = onClick,
+        text = stringResource(R.string.quests_claim).uppercase(),
+        isLoading = isClaiming,
+        style = MagicCtaStyle.Filled,
+        color = MagicCtaColor.PrimarySolid,
+        contentPadding = PaddingValues(
+            horizontal = MaterialTheme.spacing.md,
+            vertical = MaterialTheme.spacing.sm,
+        ),
         modifier = Modifier
             .heightIn(min = 48.dp)
-            .clip(ChipShape)
-            .clickable(
-                onClickLabel = stringResource(R.string.quests_claim_a11y, title),
-                role = Role.Button,
-                onClick = onClick,
-            ),
-    ) {
-        Box(
-            modifier = Modifier.padding(
-                horizontal = MaterialTheme.spacing.md,
-                vertical = MaterialTheme.spacing.sm,
-            ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = stringResource(R.string.quests_claim).uppercase(),
-                style = MaterialTheme.magicTypography.labelMedium,
-                color = mc.background,
-                maxLines = 1,
-            )
-        }
-    }
+            .semantics { contentDescription = claimA11y },
+    )
 }
 
 /** Static "Claimed" state with a check glyph (gold accent). */
