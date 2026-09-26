@@ -22,11 +22,11 @@ import com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.core.domain.usecase.home.GetAccountNudgeUseCase
+import com.mmg.manahub.core.gamification.domain.GamificationAvailability
 import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
 import com.mmg.manahub.core.gamification.domain.model.QuestBoard
 import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
-import com.mmg.manahub.core.gamification.domain.GamificationAvailability
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.model.CollectionSummary
 import com.mmg.manahub.core.model.CommunityDeckSearchFilters
@@ -64,6 +64,10 @@ import com.mmg.manahub.feature.game.domain.model.DeckStats
 import com.mmg.manahub.feature.game.domain.model.EliminationStats
 import com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
+import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.HOME_TRADE_SUGGESTION_PREVIEW_LIMIT
+import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.MAX_NEWS
+import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.MIN_DISCOVER_SET_CARDS
+import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.SUGGESTIONS_MAX_AGE_MS
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
@@ -165,7 +169,6 @@ class HomeViewModel(
     private val crashlytics = FirebaseCrashlytics.getInstance()
 
     /** Set once after the board first resolves, so session context keys are attached lazily. */
-    private var sessionContextKeysSet = false
 
     /** Guards the First Steps completion-flag write so one app session issues it at most once. */
     private var firstStepsCompletionMarkSeenDispatched = false
@@ -225,7 +228,6 @@ class HomeViewModel(
         map<T, T?> { it }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     private fun reportFlowError(source: String, error: Throwable) {
-        crashlytics.setCustomKey("home_flow_error_source", source)
         recordSafeNonFatal("home_flow_$source", error)
         crashlytics.log("home_flow_error: $source")
     }
@@ -1294,7 +1296,7 @@ class HomeViewModel(
 
     /** Persists the Home COMMUNITY_DECKS widget's format filter (null = every format). */
     private fun selectCommunityDecksFormat(format: CommunityDeckFormatFilter?) {
-        crashlytics.log("home_community_decks_format_selected: ${format?.name ?: "all"}")
+        crashlytics.log("home_community_decks_format_selected: ${format?.name ?: "m"}")
         persistPreference("home_community_decks_format") {
             userPrefsDataStore.saveHomeCommunityDecksFormat(format?.name)
         }
@@ -1393,16 +1395,24 @@ class HomeViewModel(
     // Every mutation is a transform applied INSIDE the DataStore edit to the currently stored
     // layout, serialized by [layoutMutex]: two fast taps can never both start from one stale snapshot.
 
-    private fun mutateLayout(transform: (List<WidgetInstance>) -> List<WidgetInstance>) {
+    private fun mutateLayout(
+        event: String? = null,
+        transform: (List<WidgetInstance>) -> List<WidgetInstance>,
+    ) {
         viewModelScope.launch {
             try {
                 layoutMutex.withLock {
                     val default = defaultLayoutFor(authGate.value is AuthGate.SignedIn)
+                    var changed = false
                     userPrefsDataStore.updateHomeLayout(default.map { it.toPersisted() }) { stored ->
-                        transform(stored.toInstancesWithMigration())
+                        val current = stored.toInstancesWithMigration()
+                        val updated = transform(current)
                             .distinctBy { it.type.persistedId }
                             .map { it.toPersisted() }
+                        changed = updated != stored
+                        updated
                     }
+                    if (changed) event?.let(crashlytics::log)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -1423,14 +1433,12 @@ class HomeViewModel(
     }
 
     private fun addWidget(type: HomeWidgetType) {
-        crashlytics.log("home_widget_added: ${type.persistedId}")
-        mutateLayout { current -> current.withWidgetAdded(type) }
+        mutateLayout(event = "home_widget_added: ${type.persistedId}") { current -> current.withWidgetAdded(type) }
     }
 
     private fun removeWidget(type: HomeWidgetType) {
-        crashlytics.log("home_widget_removed: ${type.persistedId}")
         if (type.isAlwaysPresent) return
-        mutateLayout { current -> current.filterNot { it.type == type } }
+        mutateLayout(event = "home_widget_removed: ${type.persistedId}") { current -> current.filterNot { it.type == type } }
     }
 
     private fun replaceLayout(layout: List<WidgetInstance>) {
@@ -1529,10 +1537,9 @@ class HomeViewModel(
             persistPreference("first_steps_completion") { userPrefsDataStore.markFirstStepsCompletionSeen() }
         }
 
-        if (boardReady && !sessionContextKeysSet) {
+        if (boardReady) {
             crashlytics.setCustomKey("home_is_authenticated", signedIn)
             crashlytics.setCustomKey("home_hero_type", hero::class.simpleName ?: "Unknown")
-            sessionContextKeysSet = true
         }
         data.layout?.let { crashlytics.setCustomKey("home_layout_widget_count", it.size) }
 

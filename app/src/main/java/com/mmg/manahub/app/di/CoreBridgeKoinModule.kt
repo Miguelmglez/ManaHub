@@ -215,7 +215,8 @@ fun coreBridgeKoinModule(
         WishlistRepositoryImpl(
             dao = get(),
             remote = get(),
-            currentUserId = { authRepository.getCurrentUser()?.id },
+            currentUserId = { (authRepository.sessionState.value as? SessionState.Authenticated)?.user?.id },
+            sessionUserId = authRepository.sessionState.map { (it as? SessionState.Authenticated)?.user?.id },
         )
     }
     single<OpenForTradeRepository> {
@@ -223,7 +224,8 @@ fun coreBridgeKoinModule(
         OpenForTradeRepositoryImpl(
             dao = get(),
             remote = get(),
-            currentUserId = { authRepository.getCurrentUser()?.id },
+            currentUserId = { (authRepository.sessionState.value as? SessionState.Authenticated)?.user?.id },
+            sessionUserId = authRepository.sessionState.map { (it as? SessionState.Authenticated)?.user?.id },
         )
     }
 

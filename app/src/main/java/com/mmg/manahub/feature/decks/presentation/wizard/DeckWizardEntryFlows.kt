@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Icon
@@ -30,11 +31,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.theme.CardShape
-import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -95,21 +96,37 @@ private fun EntryFlowCard(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    Surface(onClick = onClick, shape = CardShape, color = mc.surface, modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        onClick = onClick,
+        shape = CardShape,
+        color = mc.surface,
+        border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
         Row(
             modifier = Modifier.padding(spacing.lg).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
-            Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.14f)) {
-                Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(22.dp))
+            Surface(
+                shape = CircleShape,
+                color = mc.primaryAccent.copy(alpha = 0.12f),
+                border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.25f)),
+            ) {
+                Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(24.dp))
                 }
             }
             Column(Modifier.weight(1f)) {
-                Text(title, style = ty.titleMedium, color = mc.textPrimary)
+                Text(title, style = ty.titleMedium, fontWeight = FontWeight.SemiBold, color = mc.textPrimary)
                 Text(subtitle, style = ty.bodySmall, color = mc.textSecondary, modifier = Modifier.padding(top = spacing.xxs))
             }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = mc.textDisabled,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }

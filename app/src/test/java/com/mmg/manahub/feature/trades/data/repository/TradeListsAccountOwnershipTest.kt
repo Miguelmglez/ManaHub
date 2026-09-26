@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.trades.data.repository
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
+import com.mmg.manahub.core.data.local.TradeListOwner
 import com.mmg.manahub.core.data.local.entity.LocalOpenForTradeEntity
 import com.mmg.manahub.core.data.local.entity.LocalWishlistEntity
 import com.mmg.manahub.core.data.remote.dto.OpenForTradeEntryDto
@@ -19,6 +20,9 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.unmockkStatic
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -28,7 +32,7 @@ import org.junit.Test
 
 /**
  * Trades audit 2026-09-23, H8: a previous account's wishlist / open-for-trade rows must never be
- * shown to, or migrated into, the next account. Guest rows (null owner) still migrate.
+ * shown to, or migrated into, the next account. Explicit guest rows still migrate.
  */
 class TradeListsAccountOwnershipTest {
 
@@ -38,6 +42,7 @@ class TradeListsAccountOwnershipTest {
     private val offerRemote = mockk<OpenForTradeRemoteDataSource>(relaxed = true)
 
     private var signedInUser: String? = "user-b"
+    private val sessionUserId = MutableStateFlow<String?>("user-b")
     private lateinit var wishlistRepository: WishlistRepositoryImpl
     private lateinit var offerRepository: OpenForTradeRepositoryImpl
 
@@ -45,8 +50,8 @@ class TradeListsAccountOwnershipTest {
     fun setUp() {
         mockkStatic(FirebaseCrashlytics::class)
         every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
-        wishlistRepository = WishlistRepositoryImpl(wishlistDao, wishlistRemote, currentUserId = { signedInUser })
-        offerRepository = OpenForTradeRepositoryImpl(offerDao, offerRemote, currentUserId = { signedInUser })
+        wishlistRepository = WishlistRepositoryImpl(wishlistDao, wishlistRemote, currentUserId = { signedInUser }, sessionUserId = sessionUserId)
+        offerRepository = OpenForTradeRepositoryImpl(offerDao, offerRemote, currentUserId = { signedInUser }, sessionUserId = sessionUserId)
     }
 
     @After
@@ -56,27 +61,28 @@ class TradeListsAccountOwnershipTest {
 
     private fun guestWish(id: String) = LocalWishlistEntity(
         id = id, scryfallId = "card-1", isFoil = null, condition = null, language = null, synced = false,
+        ownerUserId = TradeListOwner.GUEST,
     )
 
     @Test
     fun `given a new account when wishlist migrates then foreign rows are evicted before reading what to push`() = runTest {
-        coEvery { wishlistDao.getUnsynced() } returns listOf(guestWish("guest-1"))
+        coEvery { wishlistDao.getUnsynced("user-b") } returns listOf(guestWish("guest-1"))
         coEvery { wishlistRemote.batchAddWishlistEntries(any()) } returns Result.success(Unit)
 
         wishlistRepository.migrateLocalToRemote("user-b")
 
         coVerifyOrder {
             wishlistDao.deleteForeignAccountRows("user-b")
-            wishlistDao.getUnsynced()
-            wishlistDao.markSynced(listOf("guest-1"))
+            wishlistDao.getUnsynced("user-b")
+            wishlistDao.markSynced(listOf("guest-1"), "user-b")
             wishlistDao.stampOwner(listOf("guest-1"), "user-b")
         }
     }
 
     @Test
     fun `given open-for-trade migrates then foreign rows are evicted first and migrated rows are claimed`() = runTest {
-        coEvery { offerDao.getUnsynced() } returns listOf(
-            LocalOpenForTradeEntity(id = "offer-1", localCollectionId = "row-1", scryfallId = "card-1"),
+        coEvery { offerDao.getUnsynced("user-b") } returns listOf(
+            LocalOpenForTradeEntity(id = "offer-1", localCollectionId = "row-1", scryfallId = "card-1", ownerUserId = TradeListOwner.GUEST),
         )
         coEvery { offerRemote.batchAddOpenForTradeEntries(any()) } returns Result.success(Unit)
 
@@ -84,7 +90,7 @@ class TradeListsAccountOwnershipTest {
 
         coVerifyOrder {
             offerDao.deleteForeignAccountRows("user-b")
-            offerDao.getUnsynced()
+            offerDao.getUnsynced("user-b")
             offerDao.stampOwner(listOf("offer-1"), "user-b")
         }
     }
@@ -119,7 +125,7 @@ class TradeListsAccountOwnershipTest {
 
     @Test
     fun `given a signed-in user when adding to the wishlist then the new row is owned by that user`() = runTest {
-        coEvery { wishlistDao.getByAttributes(any(), any(), any(), any(), any()) } returns null
+        coEvery { wishlistDao.getByAttributes(any(), any(), any(), any(), any(), any()) } returns null
         val inserted = slot<LocalWishlistEntity>()
         coEvery { wishlistDao.insert(capture(inserted)) } returns Unit
 
@@ -131,14 +137,50 @@ class TradeListsAccountOwnershipTest {
     }
 
     @Test
-    fun `given a guest when adding an open-for-trade offer then the row stays ownerless`() = runTest {
+    fun `given a guest when adding an open-for-trade offer then the row has explicit provenance`() = runTest {
         signedInUser = null
-        coEvery { offerDao.getByCollectionId(any()) } returns null
+        coEvery { offerDao.getByCollectionId(any(), any()) } returns null
         val saved = slot<LocalOpenForTradeEntity>()
         coEvery { offerDao.upsert(capture(saved)) } returns Unit
 
         offerRepository.addLocal("card-1", "row-1", 1, false, "NM", "en")
 
-        assertTrue(saved.captured.ownerUserId == null)
+        assertEquals(TradeListOwner.GUEST, saved.captured.ownerUserId)
+    }
+
+    @Test
+    fun `wishlist observation switches owner query with the authenticated session`() = runTest {
+        every { wishlistDao.observeAllWithCard("user-b") } returns flowOf(emptyList())
+        every { wishlistDao.observeAllWithCard("user-c") } returns flowOf(emptyList())
+
+        wishlistRepository.observeLocal().first()
+        sessionUserId.value = "user-c"
+        wishlistRepository.observeLocal().first()
+
+        io.mockk.verify { wishlistDao.observeAllWithCard("user-b") }
+        io.mockk.verify { wishlistDao.observeAllWithCard("user-c") }
+    }
+
+    @Test
+    fun `signed-out observation reads only explicitly marked guest rows`() = runTest {
+        sessionUserId.value = null
+        every { offerDao.observeAllWithCard(TradeListOwner.GUEST) } returns flowOf(emptyList())
+
+        offerRepository.observeLocal().first()
+
+        io.mockk.verify { offerDao.observeAllWithCard(TradeListOwner.GUEST) }
+    }
+
+    @Test
+    fun `stale account eviction cannot delete the newly signed-in account rows`() = runTest {
+        signedInUser = "user-c"
+
+        val wishlistResult = wishlistRepository.evictForeignAccountRows("user-b")
+        val offerResult = offerRepository.evictForeignAccountRows("user-b")
+
+        assertTrue(wishlistResult.isFailure)
+        assertTrue(offerResult.isFailure)
+        coVerify(exactly = 0) { wishlistDao.deleteForeignAccountRows(any()) }
+        coVerify(exactly = 0) { offerDao.deleteForeignAccountRows(any()) }
     }
 }

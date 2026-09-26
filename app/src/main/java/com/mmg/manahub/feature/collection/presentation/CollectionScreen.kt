@@ -4,6 +4,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
+import com.mmg.manahub.core.ui.components.MagicActiveFiltersBar
 import com.mmg.manahub.core.ui.components.MagicToastState
 import com.mmg.manahub.feature.collection.presentation.importexport.CollectionExportHost
 import com.mmg.manahub.feature.collection.presentation.importexport.CollectionImportHost
@@ -633,25 +634,12 @@ private fun CardsTabContent(
 
             // Active filters indicator
             AnimatedVisibility(visible = filterCount > 0) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        stringResource(R.string.collection_active_filters, filterCount),
-                        style = MaterialTheme.magicTypography.bodySmall,
-                        color = mc.primaryAccent,
-                    )
-                    MagicCtaButton(
-                        onClick = onClearFilters,
-                        text = stringResource(R.string.collection_clear_filters),
-                        style = MagicCtaStyle.Ghost,
-                        color = MagicCtaColor.Error,
-                    )
-                }
+                MagicActiveFiltersBar(
+                    text = stringResource(R.string.collection_active_filters, filterCount),
+                    clearLabel = stringResource(R.string.collection_clear_filters),
+                    onClear = onClearFilters,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
             }
 
             // Same honesty rule as the empty state: a rendered list that silently drops uncached

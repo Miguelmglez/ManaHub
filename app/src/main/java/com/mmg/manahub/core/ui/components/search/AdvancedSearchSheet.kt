@@ -641,7 +641,8 @@ fun AdvancedSearchSheet(
                             selectedColors = uiState.selectedColors,
                             onToggleColor = viewModel::toggleColor,
                             modifier = Modifier.fillMaxWidth(),
-                            colors = listOf("W", "U", "B", "R", "G", "C")
+                            isMultiColorExclusive = false,
+                            colors = listOf("M","W", "U", "B", "R", "G", "C")
                         )
 
                         var showColorModePicker by remember { mutableStateOf(false) }

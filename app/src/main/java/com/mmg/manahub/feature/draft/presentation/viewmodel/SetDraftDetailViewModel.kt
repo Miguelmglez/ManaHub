@@ -181,7 +181,7 @@ class SetDraftDetailViewModel(
     fun toggleTierListColorFilter(color: String) {
         _uiState.update { state ->
             val newFilter = when {
-                color == "All" -> emptySet()
+                color == "M" -> emptySet()
                 color in state.tierListColorFilter -> state.tierListColorFilter - color
                 else -> state.tierListColorFilter + color
             }

@@ -68,7 +68,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -675,7 +674,7 @@ private fun CatalogRow(
                     text = stringResource(R.string.home_account_gated_lock),
                     style = MagicCtaStyle.Outlined,
                     color = MagicCtaColor.Primary,
-                    contentPadding = PaddingValues(horizontal = spacing.md, vertical = spacing.md),
+                    contentPadding = PaddingValues(horizontal = spacing.md, vertical = spacing.xs),
                 )
             }
         }
@@ -683,21 +682,14 @@ private fun CatalogRow(
 }
 
 /**
- * The row's Add / Remove toggle. Both labels are laid out invisibly underneath so the button keeps
- * one size when it flips, and the row's text never re-flows.
+ * The row's Add / Remove toggle. Renders the action button directly, sizing naturally to content.
  */
 @Composable
 private fun AddRemoveButton(isAdded: Boolean, onAdd: () -> Unit, onRemove: () -> Unit) {
-    val ghost = Modifier.alpha(0f).clearAndSetSemantics { }
-    Box {
-        GalleryActionButton(isAdded = true, onClick = {}, enabled = false, modifier = ghost)
-        GalleryActionButton(isAdded = false, onClick = {}, enabled = false, modifier = ghost)
-        GalleryActionButton(
-            isAdded = isAdded,
-            onClick = if (isAdded) onRemove else onAdd,
-            modifier = Modifier.matchParentSize(),
-        )
-    }
+    GalleryActionButton(
+        isAdded = isAdded,
+        onClick = if (isAdded) onRemove else onAdd,
+    )
 }
 
 @Composable
@@ -714,7 +706,7 @@ private fun GalleryActionButton(
         enabled = enabled,
         style = MagicCtaStyle.Outlined,
         color = if (isAdded) MagicCtaColor.Error else MagicCtaColor.Primary,
-        contentPadding = PaddingValues(horizontal = spacing.md, vertical = spacing.md),
+        contentPadding = PaddingValues(horizontal = spacing.md, vertical = spacing.xs),
         icon = {
             Icon(
                 imageVector = if (isAdded) Icons.Default.Close else Icons.Default.Add,

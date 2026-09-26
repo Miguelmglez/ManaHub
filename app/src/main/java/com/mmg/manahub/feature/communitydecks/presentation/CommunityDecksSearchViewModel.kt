@@ -116,6 +116,19 @@ class CommunityDecksSearchViewModel(
         }
 
         viewModelScope.launch {
+            userPreferences.homeCommunityDecksFormatFlow.collect { formatName ->
+                val format = formatName?.let { name ->
+                    CommunityDeckFormatFilter.entries.firstOrNull { it.name == name }
+                }
+                val formatChanged = _uiState.value.selectedDiscoveryFormat != format
+                _uiState.update { it.copy(selectedDiscoveryFormat = format) }
+                if (formatChanged && discoverLoaded && _uiState.value.discoverEnabled && !openedViaByCardDeepLink) {
+                    loadDiscover()
+                }
+            }
+        }
+
+        viewModelScope.launch {
             // `distinctUntilChanged()` runs BEFORE `filter` (bug fix) so a blank reset — e.g.
             // `onClearAdvancedFilters`'s `commanderQueryFlow.value = ""` — still advances
             // distinctUntilChanged's "last seen" baseline even though the blank value itself never
@@ -236,11 +249,11 @@ class CommunityDecksSearchViewModel(
     /** One Discover section's decks; any failure (exception or [DataResult.Error]) degrades to empty. */
     private suspend fun fetchDecks(
         orderBy: String,
-        deckFormat: CommunityDeckFormatFilter = CommunityDeckFormatFilter.COMMANDER,
+        deckFormat: CommunityDeckFormatFilter? = null,
         primersOnly: Boolean = false,
     ): List<CommunityDeckSummary> = runCatching {
         val filters = CommunityAdvancedFilters(
-            formats = deckFormat,
+            formats = deckFormat ?: CommunityDeckFormatFilter.COMMANDER,
             primersOnly = primersOnly,
         ).toSearchFilters(deckName = null, orderBy = orderBy, page = 1, pageSize = DISCOVER_SECTION_SIZE)
         // Rows are keyed by archidektId, so a repeated deck would crash the LazyRow.
@@ -353,14 +366,16 @@ class CommunityDecksSearchViewModel(
         if (switchingAwayFromCommander) commanderQueryFlow.value = ""
     }
 
-    fun onSelectDiscoveryFormat(format: CommunityDeckFormatFilter){
-        if (_uiState.value.selectedDiscoveryFormat == format){
+    fun onSelectDiscoveryFormat(format: CommunityDeckFormatFilter?) {
+        if (_uiState.value.selectedDiscoveryFormat == format) {
             return
         } else {
             _uiState.update { it.copy(selectedDiscoveryFormat = format) }
+            viewModelScope.launch {
+                userPreferences.saveHomeCommunityDecksFormat(format?.name)
+            }
             loadDiscover()
         }
-
     }
     // ── Advanced search filters (Phase 2) ───────────────────────────────────────────
     // NOTE (Advanced Search sheet rework, 2026-08-18): "Deck format" (`onSearchDeckFilterUpdated`)

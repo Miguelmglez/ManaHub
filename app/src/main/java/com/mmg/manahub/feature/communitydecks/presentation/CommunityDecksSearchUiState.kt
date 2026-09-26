@@ -71,7 +71,7 @@ data class CommunityDecksSearchUiState(
     val recentDecks: List<CommunityDeckSummary> = emptyList(),
     val updatedDecks: List<CommunityDeckSummary> = emptyList(),
     val primerDecks: List<CommunityDeckSummary> = emptyList(),
-    val selectedDiscoveryFormat: CommunityDeckFormatFilter = CommunityDeckFormatFilter.COMMANDER,
+    val selectedDiscoveryFormat: CommunityDeckFormatFilter? = null,
 
     // ── Search — advanced filters (Phase 2) ────────────────────────────────────────
     val advancedFilters: CommunityAdvancedFilters = CommunityAdvancedFilters(),
@@ -154,7 +154,7 @@ fun CommunityAdvancedFilters.toSearchFilters(
     // from a previous format that WAS Commander.
     commanderName = commander?.name?.takeIf { formats == CommunityDeckFormatFilter.COMMANDER },
     ownerUsername = ownerUsername.takeIf { it.isNotBlank() },
-    deckFormatId = formats.apiId,
+    deckFormatId = formats?.apiId,
     edhBracket = edhBracket.takeIf { formats == CommunityDeckFormatFilter.COMMANDER },
     colors = colors,
     size = deckSize.toIntOrNull(),

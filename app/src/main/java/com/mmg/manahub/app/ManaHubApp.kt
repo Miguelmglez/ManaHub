@@ -693,15 +693,13 @@ class ManaHubApp : Application(), KoinComponent {
                         CollectionSyncWorker.schedulePeriodicSync(workManager)
                         if (previousUserId != state.user.id) {
                             previousUserId = state.user.id
-                            CollectionSyncWorker.enqueueFirstLoginSync(workManager)
                             val userId = state.user.id
                             // Another account's wishlist/offers must not show up or migrate here.
-                            appScope.launch {
-                                wishlistRepository.evictForeignAccountRows(userId)
-                                    .onFailure { e -> recordNonFatal("trade_lists_evict_foreign_rows_failed", e) }
-                                openForTradeRepository.evictForeignAccountRows(userId)
-                                    .onFailure { e -> recordNonFatal("trade_lists_evict_foreign_rows_failed", e) }
-                            }
+                            wishlistRepository.evictForeignAccountRows(userId)
+                                .onFailure { e -> recordNonFatal("trade_lists_evict_foreign_rows_failed", e) }
+                            openForTradeRepository.evictForeignAccountRows(userId)
+                                .onFailure { e -> recordNonFatal("trade_lists_evict_foreign_rows_failed", e) }
+                            CollectionSyncWorker.enqueueFirstLoginSync(workManager)
                         }
                         appScope.launch {
                             runCatching {

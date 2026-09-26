@@ -127,7 +127,7 @@ class UserCardRepositoryImplUpdateEntryTest {
         coEvery { database.withTransaction<Any?>(capture(block)) } coAnswers { block.captured.invoke() }
 
         // No offer linked by default; individual tests override this per-collection-id as needed.
-        coEvery { localOpenForTradeDao.getByCollectionId(any()) } returns null
+        coEvery { localOpenForTradeDao.getByCollectionId(any(), any()) } returns null
 
         repository = UserCardRepositoryImpl(
             userCardCollectionDao      = userCardCollectionDao,
@@ -213,7 +213,7 @@ class UserCardRepositoryImplUpdateEntryTest {
         val survivor = buildEntity(id = "survivor-1", scryfallId = "card-b", userId = "user-1", quantity = 3, isDeleted = false)
         every { userCardCollectionDao.getById("edit-1") } returns edited
         every { userCardCollectionDao.getByCompositeKey("user-1", "card-b", false, "NM", "en") } returns survivor
-        coEvery { localOpenForTradeDao.getByCollectionId("edit-1") } returns null
+        coEvery { localOpenForTradeDao.getByCollectionId("edit-1", any()) } returns null
 
         repository.updateEntryWithMerge("edit-1", "card-b", false, "NM", "en", 2, "user-1")
 
@@ -309,8 +309,8 @@ class UserCardRepositoryImplUpdateEntryTest {
 
         val fromOffer = buildOffer(id = "offer-from", localCollectionId = "edit-1", scryfallId = "card-a", quantity = 3)
         val toOffer = buildOffer(id = "offer-to", localCollectionId = "survivor-1", scryfallId = "card-b", quantity = 2)
-        coEvery { localOpenForTradeDao.getByCollectionId("edit-1") } returns fromOffer
-        coEvery { localOpenForTradeDao.getByCollectionId("survivor-1") } returns toOffer
+        coEvery { localOpenForTradeDao.getByCollectionId("edit-1", any()) } returns fromOffer
+        coEvery { localOpenForTradeDao.getByCollectionId("survivor-1", any()) } returns toOffer
 
         // mergedQuantity (quantityCap) = survivor.quantity(1) + quantity(2) = 3.
         // fromOffer(3) + toOffer(2) = 5, capped at 3.
@@ -319,7 +319,7 @@ class UserCardRepositoryImplUpdateEntryTest {
         coVerify(exactly = 1) {
             localOpenForTradeDao.upsert(match { it.id == "offer-to" && it.quantity == 3 && !it.synced })
         }
-        coVerify(exactly = 1) { localOpenForTradeDao.deleteByCollectionId("edit-1") }
+        coVerify(exactly = 1) { localOpenForTradeDao.deleteByCollectionId("edit-1", any()) }
     }
 
     @Test
@@ -330,8 +330,8 @@ class UserCardRepositoryImplUpdateEntryTest {
         every { userCardCollectionDao.getByCompositeKey("user-1", "card-b", false, "NM", "en") } returns survivor
 
         val fromOffer = buildOffer(id = "offer-from", localCollectionId = "edit-1", scryfallId = "card-a", quantity = 5)
-        coEvery { localOpenForTradeDao.getByCollectionId("edit-1") } returns fromOffer
-        coEvery { localOpenForTradeDao.getByCollectionId("survivor-1") } returns null
+        coEvery { localOpenForTradeDao.getByCollectionId("edit-1", any()) } returns fromOffer
+        coEvery { localOpenForTradeDao.getByCollectionId("survivor-1", any()) } returns null
 
         // mergedQuantity (quantityCap) = survivor.quantity(2) + quantity(2) = 4. fromOffer(5) capped at 4.
         repository.updateEntryWithMerge("edit-1", "card-b", false, "NM", "en", 2, "user-1")
@@ -341,7 +341,7 @@ class UserCardRepositoryImplUpdateEntryTest {
                 it.id == "offer-from" && it.localCollectionId == "survivor-1" && it.scryfallId == "card-b" && it.quantity == 4 && !it.synced
             })
         }
-        coVerify(exactly = 0) { localOpenForTradeDao.deleteByCollectionId(any()) }
+        coVerify(exactly = 0) { localOpenForTradeDao.deleteByCollectionId(any(), any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -356,8 +356,8 @@ class UserCardRepositoryImplUpdateEntryTest {
         every { userCardCollectionDao.getByCompositeKey("user-1", "card-b", false, "NM", "en") } returns deletedSurvivor
 
         val fromOffer = buildOffer(id = "offer-from", localCollectionId = "edit-1", scryfallId = "card-a", quantity = 6)
-        coEvery { localOpenForTradeDao.getByCollectionId("edit-1") } returns fromOffer
-        coEvery { localOpenForTradeDao.getByCollectionId("revive-1") } returns null
+        coEvery { localOpenForTradeDao.getByCollectionId("edit-1", any()) } returns fromOffer
+        coEvery { localOpenForTradeDao.getByCollectionId("revive-1", any()) } returns null
 
         // Revive branch's quantityCap is the plain edit `quantity` (2), NOT a sum with the stale row.
         repository.updateEntryWithMerge("edit-1", "card-b", false, "NM", "en", 2, "user-1")
@@ -380,7 +380,7 @@ class UserCardRepositoryImplUpdateEntryTest {
         every { userCardCollectionDao.getByCompositeKey("user-1", "card-a", true, "LP", "en") } returns null
 
         val offer = buildOffer(id = "offer-1", localCollectionId = "edit-1", scryfallId = "card-a", quantity = 5, synced = true)
-        coEvery { localOpenForTradeDao.getByCollectionId("edit-1") } returns offer
+        coEvery { localOpenForTradeDao.getByCollectionId("edit-1", any()) } returns offer
 
         // In-place edit lowers the collection quantity to 2; the offer (previously 5) must be capped.
         repository.updateEntryWithMerge("edit-1", "card-a", true, "lp", "en", 2, "user-1")
@@ -390,7 +390,7 @@ class UserCardRepositoryImplUpdateEntryTest {
                 it.id == "offer-1" && it.quantity == 2 && it.isFoil && it.condition == "LP" && !it.synced
             })
         }
-        coVerify(exactly = 0) { localOpenForTradeDao.deleteByCollectionId(any()) }
+        coVerify(exactly = 0) { localOpenForTradeDao.deleteByCollectionId(any(), any()) }
     }
 
     @Test
@@ -398,7 +398,7 @@ class UserCardRepositoryImplUpdateEntryTest {
         val edited = buildEntity(id = "edit-1", scryfallId = "card-a", userId = "user-1", quantity = 5)
         every { userCardCollectionDao.getById("edit-1") } returns edited
         every { userCardCollectionDao.getByCompositeKey("user-1", "card-a", false, "NM", "en") } returns null
-        coEvery { localOpenForTradeDao.getByCollectionId("edit-1") } returns null
+        coEvery { localOpenForTradeDao.getByCollectionId("edit-1", any()) } returns null
 
         repository.updateEntryWithMerge("edit-1", "card-a", false, "NM", "en", 2, "user-1")
 
@@ -428,6 +428,6 @@ class UserCardRepositoryImplUpdateEntryTest {
 
     private fun coVerifyNoOfferWrites() {
         coVerify(exactly = 0) { localOpenForTradeDao.upsert(any()) }
-        coVerify(exactly = 0) { localOpenForTradeDao.deleteByCollectionId(any()) }
+        coVerify(exactly = 0) { localOpenForTradeDao.deleteByCollectionId(any(), any()) }
     }
 }

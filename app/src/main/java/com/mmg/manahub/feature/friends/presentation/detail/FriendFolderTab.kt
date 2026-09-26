@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.friends.presentation.detail
 
+import com.mmg.manahub.core.ui.components.MagicActiveFiltersBar
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -65,9 +67,6 @@ import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.InlineErrorState
-import com.mmg.manahub.core.ui.components.MagicCtaButton
-import com.mmg.manahub.core.ui.components.MagicCtaColor
-import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.MagicLoadingFooter
 import com.mmg.manahub.core.ui.components.MagicLoadingSize
@@ -140,13 +139,22 @@ fun FriendFolderTab(
         }
 
         AnimatedVisibility(visible = uiState.activeCriteriaCount > 0) {
-            ActiveCriteriaRow(
-                criteria = uiState.advancedQuery.criteria,
-                showNameExact = uiState.nameExact && !uiState.showMinLengthHint && uiState.searchText.isNotBlank(),
-                onRemove = actions.onRemoveCriterion,
-                onClearNameExact = actions.onClearNameExact,
-                onClearAll = actions.onClearSearch,
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.xs),
+                verticalArrangement = Arrangement.spacedBy(spacing.xs),
+            ) {
+                MagicActiveFiltersBar(
+                    text = stringResource(R.string.collection_active_filters, uiState.activeCriteriaCount),
+                    clearLabel = stringResource(R.string.collection_clear_filters),
+                    onClear = actions.onClearSearch,
+                )
+                ActiveCriteriaRow(
+                    criteria = uiState.advancedQuery.criteria,
+                    showNameExact = uiState.nameExact && !uiState.showMinLengthHint && uiState.searchText.isNotBlank(),
+                    onRemove = actions.onRemoveCriterion,
+                    onClearNameExact = actions.onClearNameExact,
+                )
+            }
         }
 
         if (uiState.isLoadingCards && uiState.cards.isNotEmpty()) {
@@ -452,12 +460,10 @@ private fun ActiveCriteriaRow(
     showNameExact: Boolean,
     onRemove: (SearchCriterion) -> Unit,
     onClearNameExact: () -> Unit,
-    onClearAll: () -> Unit,
 ) {
     val spacing = MaterialTheme.spacing
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = spacing.lg),
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -469,14 +475,6 @@ private fun ActiveCriteriaRow(
         // Criteria are value objects and may repeat, so the index is part of the key.
         itemsIndexed(criteria, key = { index, criterion -> "$index:${criterion.hashCode()}" }) { _, criterion ->
             RemovableCriterionChip(criterion.displayLabel()) { onRemove(criterion) }
-        }
-        item(key = "clear_all") {
-            MagicCtaButton(
-                onClick = onClearAll,
-                text = stringResource(R.string.collection_clear_filters),
-                style = MagicCtaStyle.Ghost,
-                color = MagicCtaColor.Error,
-            )
         }
     }
 }

@@ -412,7 +412,7 @@ class UserCardRepositoryImpl @Inject constructor(
                 if (rowId == null) {
                     unmatched++
                 } else {
-                    trimOpenForTradeOffer(rowId, line, decrement.remainingQuantity ?: 0)
+                    trimOpenForTradeOffer(rowId, userId, decrement.remainingQuantity ?: 0)
                         ?.let { remoteOfferRemovals += it }
                 }
             }
@@ -465,7 +465,7 @@ class UserCardRepositoryImpl @Inject constructor(
             byRef.isFoil == isFoil &&
             byRef.condition.equals(normalizedCondition, ignoreCase = true) &&
             byRef.language.equals(normalizedLanguage, ignoreCase = true) &&
-            (byRef.userId.isNullOrBlank() || byRef.userId == userId)
+            byRef.userId == userId
         val target = if (refMatches) {
             byRef
         } else {
@@ -494,19 +494,12 @@ class UserCardRepositoryImpl @Inject constructor(
      */
     private suspend fun trimOpenForTradeOffer(
         rowId: String,
-        line: TradeCollectionLine,
+        userId: String,
         remaining: Int,
     ): String? {
-        val offer = localOpenForTradeDao.getByCollectionId(rowId)
-            ?: localOpenForTradeDao.getByAttributes(
-                scryfallId = line.scryfallId,
-                isFoil = line.isFoil,
-                condition = line.condition.uppercase().trim(),
-                language = line.language.lowercase().trim(),
-            )
-            ?: return null
+        val offer = localOpenForTradeDao.getByCollectionId(rowId, userId) ?: return null
         if (remaining == 0) {
-            localOpenForTradeDao.deleteById(offer.id)
+            localOpenForTradeDao.deleteById(offer.id, userId)
             return offer.localCollectionId.takeIf { offer.synced }
         }
         // The remote offer is one row per collection row, so trimming the local count needs no push.
@@ -555,6 +548,7 @@ class UserCardRepositoryImpl @Inject constructor(
             val normalizedCondition = condition.uppercase().trim()
             val normalizedLanguage = language.lowercase().trim()
             val resolvedUserId = userId ?: edited.userId
+            val offerOwnerId = com.mmg.manahub.core.data.local.TradeListOwner.key(resolvedUserId)
 
             val survivorCandidate = if (!resolvedUserId.isNullOrBlank()) {
                 userCardCollectionDao.getByCompositeKey(
@@ -575,6 +569,7 @@ class UserCardRepositoryImpl @Inject constructor(
                     userCardCollectionDao.softDelete(entryId, now)
                     repointOpenForTradeOffer(
                         fromCollectionId = entryId,
+                        ownerUserId = offerOwnerId,
                         toCollectionId = survivorCandidate.id,
                         toScryfallId = newScryfallId,
                         isFoil = isFoil,
@@ -594,6 +589,7 @@ class UserCardRepositoryImpl @Inject constructor(
                     userCardCollectionDao.softDelete(entryId, now)
                     repointOpenForTradeOffer(
                         fromCollectionId = entryId,
+                        ownerUserId = offerOwnerId,
                         toCollectionId = survivorCandidate.id,
                         toScryfallId = newScryfallId,
                         isFoil = isFoil,
@@ -615,7 +611,7 @@ class UserCardRepositoryImpl @Inject constructor(
                             updatedAt = now,
                         )
                     )
-                    val offer = localOpenForTradeDao.getByCollectionId(entryId)
+                    val offer = localOpenForTradeDao.getByCollectionId(entryId, offerOwnerId)
                     if (offer != null) {
                         localOpenForTradeDao.upsert(
                             offer.copy(
@@ -649,6 +645,7 @@ class UserCardRepositoryImpl @Inject constructor(
      */
     private suspend fun repointOpenForTradeOffer(
         fromCollectionId: String,
+        ownerUserId: String,
         toCollectionId: String,
         toScryfallId: String,
         isFoil: Boolean,
@@ -656,8 +653,8 @@ class UserCardRepositoryImpl @Inject constructor(
         language: String,
         quantityCap: Int,
     ) {
-        val fromOffer = localOpenForTradeDao.getByCollectionId(fromCollectionId) ?: return
-        val toOffer = localOpenForTradeDao.getByCollectionId(toCollectionId)
+        val fromOffer = localOpenForTradeDao.getByCollectionId(fromCollectionId, ownerUserId) ?: return
+        val toOffer = localOpenForTradeDao.getByCollectionId(toCollectionId, ownerUserId)
         if (toOffer != null) {
             val cappedQuantity = (toOffer.quantity + fromOffer.quantity).coerceAtMost(quantityCap)
             localOpenForTradeDao.upsert(
@@ -669,7 +666,7 @@ class UserCardRepositoryImpl @Inject constructor(
                     synced = false,
                 )
             )
-            localOpenForTradeDao.deleteByCollectionId(fromCollectionId)
+            localOpenForTradeDao.deleteByCollectionId(fromCollectionId, ownerUserId)
         } else {
             localOpenForTradeDao.upsert(
                 fromOffer.copy(

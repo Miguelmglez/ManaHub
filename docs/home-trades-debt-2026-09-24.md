@@ -19,16 +19,8 @@ shared UI component inventory in CLAUDE.md. Everything below was deliberately le
 - [ ] **`Migration55To56Test`** compiles but was never executed (instrumented). Regenerate the Room
       schema JSON locally.
 
-## 2. Web parity
-- [ ] `WebAuthRepository` still maps `SessionStatus.RefreshFailure` → `Unauthenticated` (Android fixed in
-      92631436). Owner: `kmp-web-fullstack-dev`. An unverified partial implementation was discarded; its
-      approach: keep `lastAuthenticated` (set/cleared in `.onEach` before `stateIn`); on `RefreshFailure`
-      return `lastAuthenticated ?: auth.sessionManager.loadSession()?.toAuthenticatedState() ?:
-      Unauthenticated`; never `currentSessionOrNull()` (null during RefreshFailure in supabase-kt 3.5);
-      `catch (Throwable)` with `CancellationException` rethrown (wasm fetch failures are `kotlin.Error`).
-      Verify with `:shared:core-data:compileKotlinWasmJs` + web distribution build.
 
-## 3. Backend (Supabase) — needs `backend-supabase-expert` + user approval
+## 2. Backend (Supabase) — needs `backend-supabase-expert` + user approval
 - [ ] Trades H2(e): per-participant `collection_applied_at` on `trade_participants` so the "already
       applied" gate works across devices/reinstalls (today it is local Room only).
 - [ ] Trades H4: reject `revoke_acceptance` once either party has marked completed.
@@ -42,7 +34,7 @@ shared UI component inventory in CLAUDE.md. Everything below was deliberately le
       status only checks the owner still exists (no real sharing flag).
 - [ ] The five gamification `*_changes_since` RPCs are still unpaginated (pre-existing, ADR-008).
 
-## 4. Trades client leftovers
+## 3. Trades client leftovers
 - [ ] L6: a composed proposal is lost on process death (needs a serializable `SavedStateHandle` model).
 - [ ] H4 auto-apply of a pending collection change only runs while the trade screen is open; otherwise
       the "Update collection" button remains the fallback.
@@ -50,7 +42,7 @@ shared UI component inventory in CLAUDE.md. Everything below was deliberately le
       is logged and can leave one wishlist row stale.
 - [ ] `FloatingActionButton` in `TradesScreen` has no shared equivalent in the component inventory.
 
-## 5. Home leftovers
+## 4. Home leftovers
 - [ ] L5: Trending shows commander deck counts with the cards icon — needs a `DeckItem` change.
 - [ ] Dead/undecided code: `triggerActionRequiredNudge` (no callers → ACTION_REQUIRED nudge unreachable),
       `ResetLayout` (no UI trigger), `HomeAction.MoveWidget` (VM handler kept, UI no longer uses it).
@@ -63,7 +55,7 @@ shared UI component inventory in CLAUDE.md. Everything below was deliberately le
 - [ ] No unit tests for `UserPreferencesDataStore` Home keys (L8 cooldown expiry) — no test infra.
 - [ ] Community Decks header "ALL FORMATS · POPULAR" can ellipsize the category on narrow phones.
 
-## 6. Shared UI component gaps (app-wide; not changed to avoid regressions)
+## 5. Shared UI component gaps (app-wide; not changed to avoid regressions)
 - [ ] `MagicSegmentedControl`: 44 dp (< 48 dp target), no tab/selected semantics, unselected text uses
       `textDisabled`.
 - [ ] `EmptyState` subtitle uses `textDisabled` (low contrast).
@@ -71,13 +63,7 @@ shared UI component inventory in CLAUDE.md. Everything below was deliberately le
 - [ ] `InlineErrorState` retry text target < 48 dp tall (button semantics added only).
 - [ ] `CopyBadge` background `surfaceVariant` is ~1.1:1 on HallowedPrint.
 
-## 7. Repository hygiene
-- [ ] Committed code on `feature/deck-wizard` references files that exist only as **untracked** files in
-      the main checkout (`app/.../app/update/`, `app/.../core/config/`,
-      `core/online/.../StatusParsing.kt`, `RealtimeConnectException.kt`, `GameResultOrdering.kt`,
-      `shared/core-domain/.../config/`, `.../update/`, `shared/core-ui/.../ForceUpdateScreen.kt`). A fresh
-      clone/worktree does not compile until they are committed.
-- [ ] `Migration_54_55.kt` (Draft, draft_sets.setImageUrl) is registered by committed code but untracked in the main checkout — commit it.
+## 6. Repository hygiene
 - [ ] `shared/core-model/.../core/FeatureFlags.kt` is untracked in the main checkout while 813eb03f deleted the `app/` copy — `DraftSetCard` (core-ui) does not compile without it; commit it.
 - [ ] Learnings not yet written to memory: supabase-kt `RefreshFailure` ≠ sign-out and
       `currentSessionOrNull()` is null during it; supabase-kt 3.5 `filter {}` with two top-level `or {}`

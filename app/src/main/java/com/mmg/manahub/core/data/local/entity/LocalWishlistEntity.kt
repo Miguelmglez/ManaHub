@@ -41,7 +41,7 @@ data class LocalWishlistEntity(
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),
 
-    // Account that created or downloaded the row; null = guest row, migrated to whoever signs in.
+    // Null denotes ambiguous legacy ownership; new guest rows use an explicit owner key.
     @ColumnInfo(name = "owner_user_id")
     val ownerUserId: String? = null,
 )

@@ -1352,7 +1352,7 @@ class TradeProposalViewModel(
                             log("trade_proposal_send_failed: isCounter=${snapshot.isCounterMode}")
                             setCustomKey("trade_proposer_item_count", snapshot.proposerItems.size)
                             setCustomKey("trade_receiver_item_count", snapshot.receiverItems.size)
-                            recordException(e)
+                            recordException(IllegalStateException("Trade proposal send failed: ${e::class.simpleName ?: "Unknown"}"))
                         }
                         // Raw e.message is never surfaced — only a typed TradeError's
                         // pre-resolved friendly text is (audit §5.1).

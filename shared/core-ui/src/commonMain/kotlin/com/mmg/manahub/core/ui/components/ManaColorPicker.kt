@@ -31,8 +31,9 @@ fun ManaColorPicker(
     itemSize: Dp = 44.dp,
     symbolSize: Dp = 32.dp,
     spacing: Dp = 8.dp,
+    isMultiColorExclusive: Boolean = true,
     horizontalArrangement: Arrangement.Horizontal = Arrangement.spacedBy(spacing),
-    colors: List<String> = listOf("All", "W", "U", "B", "R", "G", "C")
+    colors: List<String> = listOf("M", "W", "U", "B", "R", "G", "C")
 ) {
     Row(
         modifier = modifier,
@@ -42,7 +43,7 @@ fun ManaColorPicker(
         colors.forEach { color ->
             ManaColorItem(
                 color = color,
-                isSelected = if (color == "All") selectedColors.isEmpty() else selectedColors.contains(color),
+                isSelected =  if (color == "M" && isMultiColorExclusive) selectedColors.isEmpty() else selectedColors.contains(color),
                 onClick = { onToggleColor(color) },
                 itemSize = itemSize,
                 symbolSize = symbolSize,
@@ -65,7 +66,7 @@ fun ManaColorItem(
     symbolSize: Dp = 32.dp,
 ) {
     val mc = MaterialTheme.magicColors
-    val manaColor = if (color == "All") mc.goldMtg else manaColorFor(color, mc)
+    val manaColor = if (color == "M") mc.goldMtg else manaColorFor(color, mc)
     
     // For Black ("B"), use a light gray selection color to improve visibility on dark backgrounds
     val selectionColor = if (color == "B") Color.LightGray else manaColor
@@ -85,10 +86,10 @@ fun ManaColorItem(
             .clickable { onClick() },
         contentAlignment = Alignment.Center,
     ) {
-        if (color == "All") {
+        if (color == "M") {
             androidx.compose.material3.Icon(
                 painter = androidx.compose.ui.graphics.vector.rememberVectorPainter(CounterIcon),
-                contentDescription = "All",
+                contentDescription = "M",
                 modifier = Modifier.size(symbolSize),
                 tint = mc.goldMtg
             )

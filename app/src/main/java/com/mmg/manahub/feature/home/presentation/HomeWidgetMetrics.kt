@@ -33,8 +33,8 @@ internal val HubSlideMinHeight: Dp = 140.dp
 /** Width of a trade-suggestion column; its thumbnail is squeezed to this width. */
 internal val TradeSuggestionColumnWidth: Dp = 72.dp
 
-private val QuickActionTileMinHeight = 84.dp
-private val QuickActionIconSize = 28.dp
+private val QuickActionTileMinHeight = 88.dp
+private val QuickActionIconSize = 38.dp
 private val LevelBadgeSize = 48.dp
 private val ProgressBarHeight = 6.dp
 private val StreakIconSize = 14.dp

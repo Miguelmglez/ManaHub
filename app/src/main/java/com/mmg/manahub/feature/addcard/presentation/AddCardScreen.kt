@@ -105,27 +105,28 @@ import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardQueueSheet
 import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.ui.components.CardRow
+import com.mmg.manahub.core.ui.components.CardRowSelectionStyle
 import com.mmg.manahub.core.ui.components.EditQueuedCardSheet
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
 import com.mmg.manahub.core.ui.components.HexGridBackground
-import com.mmg.manahub.core.ui.components.LanguageSelectorSheet
 import com.mmg.manahub.core.ui.components.InlineErrorState
+import com.mmg.manahub.core.ui.components.LanguageSelectorSheet
+import com.mmg.manahub.core.ui.components.MagicActiveFiltersBar
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicProgressBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
-import com.mmg.manahub.core.ui.components.CardRow
-import com.mmg.manahub.core.ui.components.CardRowSelectionStyle
-import com.mmg.manahub.core.ui.components.SubtleSelectionBorderWidth
-import com.mmg.manahub.core.ui.components.subtleSelectionBorderColor
 import com.mmg.manahub.core.ui.components.SetSymbol
+import com.mmg.manahub.core.ui.components.SubtleSelectionBorderWidth
 import com.mmg.manahub.core.ui.components.VariantSelectorSheet
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
+import com.mmg.manahub.core.ui.components.subtleSelectionBorderColor
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -159,6 +160,8 @@ fun AddCardScreen(
     var showAdvancedSearch by rememberSaveable { mutableStateOf(false) }
     var showLanguageSheet by rememberSaveable { mutableStateOf(false) }
     val toastState = rememberMagicToastState()
+    val multiSelectEnabledText = stringResource(R.string.addcard_multi_select_enabled)
+    val multiSelectDisabledText = stringResource(R.string.addcard_multi_select_disabled)
 
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -249,7 +252,13 @@ fun AddCardScreen(
                     }
                     IconToggleButton(
                         checked = isMultiSelectMode,
-                        onCheckedChange = { viewModel.onToggleMultiSelectMode() },
+                        onCheckedChange = { checked ->
+                            viewModel.onToggleMultiSelectMode()
+                            toastState.show(
+                                if (checked) multiSelectEnabledText else multiSelectDisabledText,
+                                MagicToastType.INFO,
+                            )
+                        },
                     ) {
                         Icon(
                             imageVector = Icons.Default.Checklist,
@@ -547,30 +556,12 @@ private fun SearchSurface(
 
         // ── Active filters indicator ─────────────────────────────────────────
         AnimatedVisibility(visible = uiState.activeFilterCount > 0) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.collection_active_filters, uiState.activeFilterCount),
-                    style = ty.bodyMedium,
-                    color = mc.primaryAccent,
-                    modifier = Modifier.weight(1f)
-                )
-                TextButton(
-                    onClick = onClearFilters,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                ) {
-                    Text(
-                        stringResource(R.string.collection_clear_filters),
-                        style = ty.labelMedium,
-                        color = mc.lifeNegative,
-                    )
-                }
-            }
+            MagicActiveFiltersBar(
+                text = stringResource(R.string.collection_active_filters, uiState.activeFilterCount),
+                clearLabel = stringResource(R.string.collection_clear_filters),
+                onClear = onClearFilters,
+                modifier = Modifier.padding(vertical = 4.dp),
+            )
         }
 
 

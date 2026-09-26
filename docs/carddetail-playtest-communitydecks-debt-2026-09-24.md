@@ -57,7 +57,6 @@ copied into memory files per the `memory-protocol` skill.
       `dp`/`RoundedCornerShape` — component-inventory findings, pre-existing.
 - [ ] CardDetail retry after an initial-load failure skips the one-shot English-first redirect (cosmetic:
       the shared-element transition has already run by then).
-- [ ] Web `CardDetailScreen` error state has no retry (owner: `kmp-web-fullstack-dev`).
 - [ ] `PlaytestSetupViewModel` re-runs `getByIds` + identity inference on every
       `observeAllDeckSummaries` emission (any deck change), and a DAO failure there is unguarded.
 - [ ] `BuildLibraryUseCase` silently drops uncached cards (telemetry only; the user sees a smaller deck).

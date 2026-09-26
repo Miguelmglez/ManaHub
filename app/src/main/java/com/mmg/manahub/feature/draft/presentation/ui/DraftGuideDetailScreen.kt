@@ -687,7 +687,7 @@ private fun LazyListScope.archetypeItems(archetype: ArchetypeUi, context: GuideL
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (archetype.tier.isNotBlank()) {
+            /*if (archetype.tier.isNotBlank()) {
                 Surface(
                     shape = ChipShape,
                     color = tierColor.copy(alpha = 0.2f),
@@ -702,7 +702,7 @@ private fun LazyListScope.archetypeItems(archetype: ArchetypeUi, context: GuideL
                         modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
                     )
                 }
-            }
+            }*/
         }
     }
     if (!expanded) return
@@ -716,7 +716,7 @@ private fun LazyListScope.archetypeItems(archetype: ArchetypeUi, context: GuideL
             modifier = Modifier
                 .animateItem()
                 .fillMaxWidth()
-                .padding(start = MaterialTheme.spacing.lg, top = MaterialTheme.spacing.sm),
+                .padding(top = MaterialTheme.spacing.sm),
         ) {
             Column(
                 modifier = Modifier
@@ -895,14 +895,16 @@ private fun LabelRow(text: String, tone: LabelTone) {
 
 private fun LazyListScope.labelItem(key: String, text: String, tone: LabelTone) {
     item(key = key, contentType = CONTENT_TYPE_LABEL) {
+        Spacer(Modifier.height(12.dp))
         LabelRow(text = text, tone = tone)
+        Spacer(Modifier.height(4.dp))
     }
 }
 
 @Composable
 private fun LazyItemScope.subHeaderModifier(): Modifier = Modifier
     .animateItem()
-    .padding(start = MaterialTheme.spacing.sm, top = MaterialTheme.spacing.sm)
+    .padding(top = MaterialTheme.spacing.sm)
 
 @Composable
 private fun LazyItemScope.contentModifier(): Modifier = Modifier

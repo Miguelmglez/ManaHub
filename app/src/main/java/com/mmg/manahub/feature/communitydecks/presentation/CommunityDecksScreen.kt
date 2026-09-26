@@ -561,7 +561,7 @@ private fun CommunityDeckResultsGrid(
         onTrendingCommanderClick: (Card) -> Unit,
         onTrendingCardClick: (Card) -> Unit,
         onDeckClick: (Int) -> Unit,
-        onDiscoveryFormatUpdate: (CommunityDeckFormatFilter) -> Unit,
+        onDiscoveryFormatUpdate: (CommunityDeckFormatFilter?) -> Unit,
         modifier: Modifier = Modifier,
     ) {
         val mc = MaterialTheme.magicColors
@@ -606,13 +606,18 @@ private fun CommunityDeckResultsGrid(
             verticalArrangement = Arrangement.spacedBy(spacing.lg),
         ) {
             item(key = "format_filter") {
+                val formatItems = listOf<CommunityDeckFormatFilter?>(null) + CommunityDeckFormatFilter.entries
                 ManaHubBottomSheetSelector(
                     icon = Icons.Default.Layers,
-                    valueText =  stringResource(state.selectedDiscoveryFormat.displayResId),
-                    items = CommunityDeckFormatFilter.entries,
+                    valueText = state.selectedDiscoveryFormat?.let { stringResource(it.displayResId) }
+                        ?: stringResource(R.string.community_deck_filter_all_formats),
+                    items = formatItems,
                     selectedItem = state.selectedDiscoveryFormat,
-                    onSelect =  onDiscoveryFormatUpdate,
-                    itemLabel = { stringResource(it.displayResId) },
+                    onSelect = onDiscoveryFormatUpdate,
+                    itemLabel = { format ->
+                        if (format == null) stringResource(R.string.community_deck_filter_all_formats)
+                        else stringResource(format.displayResId)
+                    },
                     label = "Format:",
                     modifier = Modifier.fillMaxWidth(),
                 )

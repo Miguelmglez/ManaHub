@@ -1,11 +1,13 @@
 package com.mmg.manahub.feature.home.presentation
 
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.max
@@ -15,6 +17,7 @@ import com.mmg.manahub.core.ui.isReducedMotionEnabled
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,6 +48,7 @@ import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Insights
@@ -711,19 +715,12 @@ fun QuickStartCustomizeSheet(
                 ) {
                     rowActions.forEach { action ->
                         val isSelected = action in selection
-                        MagicFilterChip(
+                        QuickStartCustomizationTile(
+                            action = action,
                             selected = isSelected,
                             onClick = {
                                 if (isSelected) selection.remove(action)
                                 else if (selection.size < 4) selection.add(action)
-                            },
-                            label = action.label,
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = if (isSelected) Icons.Default.Check else action.icon,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                )
                             },
                             modifier = Modifier.weight(1f),
                         )
@@ -740,6 +737,99 @@ fun QuickStartCustomizeSheet(
                 enabled = canSave,
                 modifier = Modifier.fillMaxWidth()
             )
+        }
+    }
+}
+
+@Composable
+private fun QuickStartCustomizationTile(
+    action: QuickStartAction,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    val backgroundColor by animateColorAsState(
+        targetValue = if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surfaceVariant.copy(alpha = 0.25f),
+        label = "custom_tile_bg"
+    )
+
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) mc.primaryAccent else mc.textPrimary,
+        label = "custom_tile_content"
+    )
+
+    val borderStroke = if (selected) {
+        BorderStroke(
+            1.5.dp,
+            Brush.horizontalGradient(listOf(mc.primaryAccent, mc.secondaryAccent))
+        )
+    } else {
+        BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f))
+    }
+
+    Surface(
+        color = backgroundColor,
+        shape = CardShape,
+        border = borderStroke,
+        modifier = modifier
+            .heightIn(min = 58.dp)
+            .clip(CardShape)
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = spacing.md, vertical = spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (selected) mc.primaryAccent.copy(alpha = 0.2f)
+                        else mc.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = action.icon,
+                    contentDescription = null,
+                    tint = if (selected) mc.primaryAccent else mc.textSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Text(
+                text = action.label,
+                style = ty.labelLarge.copy(
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                ),
+                color = contentColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = mc.primaryAccent,
+                    modifier = Modifier.size(20.dp)
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .border(1.5.dp, mc.textDisabled.copy(alpha = 0.4f), CircleShape)
+                )
+            }
         }
     }
 }

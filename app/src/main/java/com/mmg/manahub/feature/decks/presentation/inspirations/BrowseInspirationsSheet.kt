@@ -29,10 +29,9 @@ import com.mmg.manahub.core.ui.components.DeckCardQueueSheet
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicSegmentedControl
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastState
-import com.mmg.manahub.core.ui.components.ManaTabItem
-import com.mmg.manahub.core.ui.components.ManaTabRow
 import com.mmg.manahub.core.ui.theme.BottomSheetShape
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -136,19 +135,17 @@ internal fun BrowseInspirationsSheet(
                         modifier = Modifier.padding(top = spacing.xxs, bottom = spacing.sm),
                     )
                 }
-                ManaTabRow(
-                    items = listOf(
-                        ManaTabItem(
-                            label = stringResource(R.string.deck_studio_inspirations_tab_strategies),
-                            selected = state.tab == InspirationsTab.STRATEGIES,
-                            onClick = { actions.onSelectTab(InspirationsTab.STRATEGIES) },
-                        ),
-                        ManaTabItem(
-                            label = stringResource(R.string.deck_studio_inspirations_tab_combos),
-                            selected = state.tab == InspirationsTab.COMBOS,
-                            onClick = { actions.onSelectTab(InspirationsTab.COMBOS) },
-                        ),
+                MagicSegmentedControl(
+                    options = listOf(
+                        stringResource(R.string.deck_studio_inspirations_tab_strategies),
+                        stringResource(R.string.deck_studio_inspirations_tab_combos),
                     ),
+                    selectedIndex = if (state.tab == InspirationsTab.STRATEGIES) 0 else 1,
+                    onOptionSelected = { index ->
+                        val selectedTab = if (index == 0) InspirationsTab.STRATEGIES else InspirationsTab.COMBOS
+                        actions.onSelectTab(selectedTab)
+                    },
+                    modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.xs),
                 )
 
                 Box(Modifier.weight(1f).fillMaxWidth()) {

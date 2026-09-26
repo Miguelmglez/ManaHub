@@ -132,6 +132,8 @@
     <string name="addcard_language_button">Search language: %1$s. Tap to change.</string>
     <string name="addcard_language_sheet_title">Search language</string>
     <string name="addcard_multi_select_title">Select multiple</string>
+    <string name="addcard_multi_select_enabled">Multi-select enabled</string>
+    <string name="addcard_multi_select_disabled">Multi-select disabled</string>
     <string name="addcard_multi_select_toggle_cd">Select multiple cards</string>
     <string name="addcard_multi_select_toggle_action">Select or deselect card</string>
     <string name="addcard_multi_select_open_details">Open card details</string>
@@ -3816,7 +3818,6 @@
          FIRST STEPS CAROUSEL (Home hero widget)
     ═══════════════════════════════════════════ -->
     <string name="first_steps_section_label">Get Started</string>
-    <string name="first_steps_cta_label">Let\'s go</string>
     <string name="first_step_skip">Skip</string>
     <string name="first_steps_all_done_title">You\'re all set!</string>
     <string name="first_steps_all_done_subtitle">Explore more from the dashboard.</string>
