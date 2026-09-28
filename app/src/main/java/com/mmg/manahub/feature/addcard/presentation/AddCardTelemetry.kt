@@ -18,8 +18,33 @@ enum class DeckSourceLoadFailure(val id: String) {
     EXCEPTION("exception"),
 }
 
+internal enum class AddCardSearchOrigin(val id: String) {
+    TEXT("text"),
+    ADVANCED("advanced"),
+    COMBINED("combined"),
+}
+
 /** Crashlytics breadcrumbs of AddCard's multi-select mode. Counts are bucketed; no card data is logged. */
 internal object AddCardTelemetry {
+
+    fun searchFailed(origin: AddCardSearchOrigin, effectiveQuery: String, page: Int, message: String) {
+        val category = if (message == "SCRYFALL_404") "not_found" else "other"
+        log("addcard_search_failed: ${searchMetadata(origin, effectiveQuery, page)} category=$category")
+    }
+
+    fun searchEmptyConfirmed(origin: AddCardSearchOrigin, effectiveQuery: String, page: Int) =
+        log("addcard_search_empty_404: ${searchMetadata(origin, effectiveQuery, page)}")
+
+    private fun searchMetadata(origin: AddCardSearchOrigin, effectiveQuery: String, page: Int): String {
+        val operators = Regex("(?i)(?:^|\\s)(c|id|set|t|mv|lang|order)(?::|[<>=])")
+            .findAll(effectiveQuery)
+            .map { it.groupValues[1].lowercase() }
+            .distinct()
+            .sorted()
+            .joinToString("_")
+            .ifEmpty { "none" }
+        return "origin=${origin.id} page=${countBucket(page)} length=${countBucket(effectiveQuery.length)} operators=$operators"
+    }
 
     fun multiSelectToggled(enabled: Boolean) =
         log("addcard_multiselect_toggled: ${if (enabled) "on" else "off"}")

@@ -937,7 +937,7 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             val layout = vm.state.value.layout
-            assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+            assertEquals(HomeWidgetType.GREETING_HEADER, layout.first().type)
             // The signed-out default surfaces discovery widgets, not signed-in hubs.
             assertTrue(layout.any { it.type == HomeWidgetType.LATEST_SETS })
             assertTrue(layout.any { it.type == HomeWidgetType.CARD_OF_THE_DAY })
@@ -955,7 +955,7 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             val layout = vm.state.value.layout
-            assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+            assertEquals(HomeWidgetType.GREETING_HEADER, layout.first().type)
             assertTrue(layout.any { it.type == HomeWidgetType.YOUR_DECKS_SHELF })
             assertTrue(layout.any { it.type == HomeWidgetType.COLLECTION_STATS_HUB })
         }
@@ -1137,6 +1137,7 @@ class HomeViewModelTest {
 
         assertEquals(
             listOf(
+                WidgetInstance(HomeWidgetType.GREETING_HEADER, WidgetSize.MEDIUM),
                 WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
                 WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM),
             ),
@@ -1154,7 +1155,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val ids = vm.state.value.layout.map { it.type }
-        assertEquals(listOf(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.GAME_STATS_HUB), ids)
+        assertEquals(listOf(HomeWidgetType.GREETING_HEADER, HomeWidgetType.CONTEXT_HERO, HomeWidgetType.GAME_STATS_HUB), ids)
     }
 
     @Test
@@ -1166,9 +1167,12 @@ class HomeViewModelTest {
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
 
-        // The HUGE token is dropped; only game_stats_hub survives.
+        // The HUGE token is dropped; only game_stats_hub survives (plus GREETING_HEADER migration).
         assertEquals(
-            listOf(WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM)),
+            listOf(
+                WidgetInstance(HomeWidgetType.GREETING_HEADER, WidgetSize.MEDIUM),
+                WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM),
+            ),
             vm.state.value.layout,
         )
     }
@@ -1251,7 +1255,7 @@ class HomeViewModelTest {
 
         val layout = vm.state.value.layout
         assertTrue(layout.isNotEmpty())
-        assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+        assertEquals(HomeWidgetType.GREETING_HEADER, layout.first().type)
     }
 
     // ── ResetLayout produces correct auth-appropriate default ─────────────────
@@ -1270,7 +1274,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val layout = vm.state.value.layout
-        assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+        assertEquals(HomeWidgetType.GREETING_HEADER, layout.first().type)
         assertFalse(layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
         assertTrue(layout.any { it.type == HomeWidgetType.LATEST_SETS })
     }
@@ -2693,6 +2697,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val expected = listOf(
+            HomeWidgetType.GREETING_HEADER,
             HomeWidgetType.CONTEXT_HERO, HomeWidgetType.QUICK_ACTIONS,
             HomeWidgetType.COLLECTION_STATS_HUB, HomeWidgetType.COMMUNITY_DECKS,
             HomeWidgetType.CARD_OF_THE_DAY, HomeWidgetType.DISCOVER_CARDS,
@@ -2711,6 +2716,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val expected = listOf(
+            HomeWidgetType.GREETING_HEADER,
             HomeWidgetType.CONTEXT_HERO, HomeWidgetType.QUICK_ACTIONS,
             HomeWidgetType.COMMUNITY_DECKS,
             HomeWidgetType.YOUR_DECKS_SHELF, HomeWidgetType.COLLECTION_STATS_HUB, HomeWidgetType.RECENTLY_ADDED,
@@ -2764,7 +2770,7 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             assertEquals(
-                listOf(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.RULES_TIP),
+                listOf(HomeWidgetType.GREETING_HEADER, HomeWidgetType.CONTEXT_HERO, HomeWidgetType.RULES_TIP),
                 vm.state.value.layout.map { it.type },
             )
         }

@@ -79,6 +79,7 @@ class TradesRemoteDataSource(
         includesReviewFromProposer: Boolean,
         includesReviewFromReceiver: Boolean,
         autoSend: Boolean,
+        clientRequestId: String? = null,
     ): Result<String> = safeCall {
         val params = buildJsonObject {
             put("p_receiver_id", receiverId)
@@ -86,8 +87,13 @@ class TradesRemoteDataSource(
             put("p_includes_review_from_proposer", includesReviewFromProposer)
             put("p_includes_review_from_receiver", includesReviewFromReceiver)
             put("p_auto_send", autoSend)
+            if (clientRequestId != null) put("p_client_request_id", clientRequestId)
         }
         supabaseClient.postgrest.rpc("create_proposal", params).decodeAs<String>()
+    }.let { result ->
+        if (clientRequestId != null && result.exceptionOrNull().isMissingRpcOverload()) {
+            createProposal(receiverId, items, includesReviewFromProposer, includesReviewFromReceiver, autoSend)
+        } else result
     }
 
     suspend fun editProposal(
@@ -137,6 +143,7 @@ class TradesRemoteDataSource(
         parentProposalId: String,
         items: List<TradeItemRequestDto>,
         reviewFlags: ReviewFlags,
+        clientRequestId: String? = null,
     ): Result<String> = safeCall {
         val params = buildJsonObject {
             put("p_parent_proposal_id", parentProposalId)
@@ -145,8 +152,13 @@ class TradesRemoteDataSource(
                 put("from_proposer", reviewFlags.fromProposer)
                 put("from_receiver", reviewFlags.fromReceiver)
             })
+            if (clientRequestId != null) put("p_client_request_id", clientRequestId)
         }
         supabaseClient.postgrest.rpc("counter_proposal", params).decodeAs<String>()
+    }.let { result ->
+        if (clientRequestId != null && result.exceptionOrNull().isMissingRpcOverload()) {
+            counterProposal(parentProposalId, items, reviewFlags)
+        } else result
     }
 
     suspend fun acceptProposal(proposalId: String): Result<Unit> = safeCall {
@@ -178,4 +190,7 @@ class TradesRemoteDataSource(
             // Trade RPC errors carry a typed token in the message; everything else passes through.
             throw if (e is RestException) parseTradeError(e.message) else e
         }
+
+    private fun Throwable?.isMissingRpcOverload(): Boolean =
+        this?.message?.contains("PGRST202") == true
 }

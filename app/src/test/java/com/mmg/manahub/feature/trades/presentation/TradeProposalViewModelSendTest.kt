@@ -41,6 +41,8 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -121,6 +123,7 @@ class TradeProposalViewModelSendTest {
         editingProposalId: String? = null,
         parentProposalId: String? = null,
         rootProposalId: String? = null,
+        restoredState: SavedStateHandle? = null,
     ): TradeProposalViewModel {
         val args = buildMap<String, String> {
             if (receiverId.isNotBlank()) put("receiverId", receiverId)
@@ -129,7 +132,7 @@ class TradeProposalViewModelSendTest {
             rootProposalId?.let { put("rootProposalId", it) }
         }
         return TradeProposalViewModel(
-            savedStateHandle = SavedStateHandle(args),
+            savedStateHandle = restoredState ?: SavedStateHandle(args),
             authRepository = authRepository,
             tradesRepository = tradesRepository,
             createProposal = createProposal,
@@ -161,7 +164,7 @@ class TradeProposalViewModelSendTest {
             assertEquals(R.string.trades_error_not_logged_in, event.messageRes)
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -204,7 +207,7 @@ class TradeProposalViewModelSendTest {
             assertEquals(R.string.trades_error_initial_asymmetry, event.messageRes)
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), any(), any()) }
     }
 
     // =========================================================================
@@ -217,13 +220,13 @@ class TradeProposalViewModelSendTest {
         val vm = createViewModel(receiverId = FRIEND_USER_ID)
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer(); vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(any(), any(), any(), any(), any()) } returns Result.success("new-id")
+        coEvery { createProposal(any(), any(), any(), any(), any(), any()) } returns Result.success("new-id")
 
         vm.onSendProposal()
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { createProposal(any(), any(), any(), any(), true) }
-        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), false) }
+        coVerify(exactly = 1) { createProposal(any(), any(), any(), any(), true, any()) }
+        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), false, any()) }
     }
 
     @Test
@@ -233,7 +236,7 @@ class TradeProposalViewModelSendTest {
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer()
         vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(FRIEND_USER_ID, any(), true, true, true) } returns Result.success("new-proposal-id")
+        coEvery { createProposal(FRIEND_USER_ID, any(), true, true, true, any()) } returns Result.success("new-proposal-id")
 
         vm.events.test {
             vm.onSendProposal()
@@ -260,7 +263,7 @@ class TradeProposalViewModelSendTest {
             cancelAndIgnoreRemainingEvents()
         }
         coVerify(exactly = 1) { editProposal("editing-id", any(), any(), any()) }
-        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -270,7 +273,7 @@ class TradeProposalViewModelSendTest {
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer()
         vm.toggleReviewCollectionReceiver()
-        coEvery { counterProposal("parent-id", any(), any()) } returns Result.success("counter-id")
+        coEvery { counterProposal("parent-id", any(), any(), any()) } returns Result.success("counter-id")
 
         vm.events.test {
             vm.onSendProposal()
@@ -287,7 +290,7 @@ class TradeProposalViewModelSendTest {
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer()
         vm.toggleReviewCollectionReceiver()
-        coEvery { counterProposal("parent-id", any(), any()) } returns Result.success("")
+        coEvery { counterProposal("parent-id", any(), any(), any()) } returns Result.success("")
 
         vm.events.test {
             vm.onSendProposal()
@@ -307,7 +310,7 @@ class TradeProposalViewModelSendTest {
         val vm = createViewModel(receiverId = FRIEND_USER_ID)
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer(); vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(any(), any(), any(), any(), any()) } returns Result.failure(TradeError.ProposalVersionMismatch)
+        coEvery { createProposal(any(), any(), any(), any(), any(), any()) } returns Result.failure(TradeError.ProposalVersionMismatch)
 
         vm.events.test {
             vm.onSendProposal()
@@ -325,7 +328,7 @@ class TradeProposalViewModelSendTest {
         val vm = createViewModel(receiverId = FRIEND_USER_ID)
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer(); vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(any(), any(), any(), any(), any()) } returns Result.failure(TradeError.InitialAsymmetryNotAllowed)
+        coEvery { createProposal(any(), any(), any(), any(), any(), any()) } returns Result.failure(TradeError.InitialAsymmetryNotAllowed)
 
         vm.events.test {
             vm.onSendProposal()
@@ -342,7 +345,7 @@ class TradeProposalViewModelSendTest {
         val vm = createViewModel(receiverId = FRIEND_USER_ID)
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer(); vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(any(), any(), any(), any(), any()) } returns Result.failure(TradeError.NotFriends)
+        coEvery { createProposal(any(), any(), any(), any(), any(), any()) } returns Result.failure(TradeError.NotFriends)
 
         vm.events.test {
             vm.onSendProposal()
@@ -359,7 +362,7 @@ class TradeProposalViewModelSendTest {
         val vm = createViewModel(receiverId = FRIEND_USER_ID)
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer(); vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(any(), any(), any(), any(), any()) } returns
+        coEvery { createProposal(any(), any(), any(), any(), any(), any()) } returns
             Result.failure(RuntimeException("raw_internal_server_sentinel"))
 
         vm.events.test {
@@ -381,13 +384,43 @@ class TradeProposalViewModelSendTest {
         val vm = createViewModel(receiverId = FRIEND_USER_ID)
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer(); vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(any(), any(), any(), any(), any()) } returns Result.success("new-id")
+        coEvery { createProposal(any(), any(), any(), any(), any(), any()) } returns Result.success("new-id")
 
         vm.onSendProposal()
         vm.onSendProposal()
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { createProposal(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 1) { createProposal(any(), any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `given process recreation then composed review draft and request key survive retry`() = runTest {
+        sessionFlow.value = authenticated(MY_USER_ID)
+        val savedState = SavedStateHandle(mapOf("receiverId" to FRIEND_USER_ID))
+        val first = createViewModel(receiverId = FRIEND_USER_ID, restoredState = savedState)
+        advanceUntilIdle()
+        first.toggleReviewCollectionProposer()
+        first.toggleReviewCollectionReceiver()
+        coEvery { createProposal(any(), any(), any(), any(), any(), any()) } returns Result.failure(TradeError.NotFriends)
+
+        first.onSendProposal()
+        advanceUntilIdle()
+        val requestId = savedState.get<String>("proposalRequestId")
+        assertNotNull(requestId)
+        val restoredHandle = SavedStateHandle(mapOf(
+            "receiverId" to FRIEND_USER_ID,
+            "proposalDraft" to savedState.get<String>("proposalDraft"),
+            "proposalRequestId" to requestId,
+            "proposalRequestFingerprint" to savedState.get<String>("proposalRequestFingerprint"),
+        ))
+        val restored = createViewModel(receiverId = FRIEND_USER_ID, restoredState = restoredHandle)
+        advanceUntilIdle()
+        assertTrue(restored.uiState.value.includesReviewFromProposer)
+        assertTrue(restored.uiState.value.includesReviewFromReceiver)
+
+        restored.onSendProposal()
+        advanceUntilIdle()
+        coVerify(exactly = 2) { createProposal(any(), any(), any(), any(), any(), requestId) }
     }
 
 }

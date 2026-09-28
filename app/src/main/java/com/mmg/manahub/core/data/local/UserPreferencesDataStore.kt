@@ -77,6 +77,12 @@ private val KEY_APP_THEME   = stringPreferencesKey("app_theme")
 private val KEY_TAG_AUTO_THRESHOLD    = floatPreferencesKey("tag_auto_threshold")
 private val KEY_TAG_SUGGEST_THRESHOLD = floatPreferencesKey("tag_suggest_threshold")
 private val KEY_TAG_OVERRIDES_JSON    = stringPreferencesKey("tag_dictionary_overrides")
+private val KEY_CARD_MECHANIC_CATALOG_JSON = stringPreferencesKey("card_mechanic_catalog")
+private val KEY_CARD_MECHANIC_REFRESH_OWNER = stringPreferencesKey("card_mechanic_refresh_owner")
+private val KEY_CARD_MECHANIC_REFRESH_SIGNATURE = stringPreferencesKey("card_mechanic_refresh_signature")
+private val KEY_CARD_MECHANIC_REFRESH_CURSOR = stringPreferencesKey("card_mechanic_refresh_cursor")
+private val KEY_CARD_MECHANIC_REFRESH_COMPLETE = booleanPreferencesKey("card_mechanic_refresh_complete")
+private val KEY_CARD_MECHANIC_REFRESH_CHECKPOINTS = stringPreferencesKey("card_mechanic_refresh_checkpoints")
 private val KEY_USER_DEFINED_TAGS     = stringPreferencesKey("user_defined_tags")
 private val KEY_COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mode")
 /** Persisted "Group by" selection for the Collection "Cards" tab. */
@@ -238,6 +244,14 @@ private val KEY_TRADE_LIST_PUBLIC  = booleanPreferencesKey("trade_list_public")
 private data class UdtRecord(val k: String, val l: String, val c: String)
 private val udtListType = object : TypeToken<List<UdtRecord>>() {}.type
 private val gson = Gson()
+private val mechanicCheckpointListType = object : TypeToken<List<CardMechanicRefreshCheckpoint>>() {}.type
+
+data class CardMechanicRefreshCheckpoint(
+    val ownerUserId: String = "",
+    val signature: String = "",
+    val cursor: String = "",
+    val complete: Boolean = false,
+)
 
 @Singleton
 class UserPreferencesDataStore @Inject constructor(
@@ -574,6 +588,53 @@ class UserPreferencesDataStore @Inject constructor(
     suspend fun saveTagDictionaryOverrides(json: String) {
         context.userPrefsDataStore.edit { it[KEY_TAG_OVERRIDES_JSON] = json }
     }
+
+    val cardMechanicCatalogFlow: Flow<String> = context.userPrefsDataStore.data
+        .map { it[KEY_CARD_MECHANIC_CATALOG_JSON] ?: "[]" }
+
+    suspend fun saveCardMechanicCatalog(json: String) {
+        context.userPrefsDataStore.edit { it[KEY_CARD_MECHANIC_CATALOG_JSON] = json }
+    }
+
+    val cardMechanicRefreshCheckpointFlow: Flow<List<CardMechanicRefreshCheckpoint>> =
+        context.userPrefsDataStore.data.map { prefs ->
+            val legacy = CardMechanicRefreshCheckpoint(
+                ownerUserId = prefs[KEY_CARD_MECHANIC_REFRESH_OWNER].orEmpty(),
+                signature = prefs[KEY_CARD_MECHANIC_REFRESH_SIGNATURE].orEmpty(),
+                cursor = prefs[KEY_CARD_MECHANIC_REFRESH_CURSOR].orEmpty(),
+                complete = prefs[KEY_CARD_MECHANIC_REFRESH_COMPLETE] ?: false,
+            )
+            decodeMechanicCheckpoints(prefs[KEY_CARD_MECHANIC_REFRESH_CHECKPOINTS]).ifEmpty {
+                listOfNotNull(legacy.takeIf { it.ownerUserId.isNotBlank() && it.signature.isNotBlank() })
+            }
+        }
+
+    suspend fun saveCardMechanicRefreshCheckpoint(checkpoint: CardMechanicRefreshCheckpoint) {
+        context.userPrefsDataStore.edit { prefs ->
+            val saved = decodeMechanicCheckpoints(prefs[KEY_CARD_MECHANIC_REFRESH_CHECKPOINTS])
+            val legacy = CardMechanicRefreshCheckpoint(
+                ownerUserId = prefs[KEY_CARD_MECHANIC_REFRESH_OWNER].orEmpty(),
+                signature = prefs[KEY_CARD_MECHANIC_REFRESH_SIGNATURE].orEmpty(),
+                cursor = prefs[KEY_CARD_MECHANIC_REFRESH_CURSOR].orEmpty(),
+                complete = prefs[KEY_CARD_MECHANIC_REFRESH_COMPLETE] ?: false,
+            )
+            val previous = saved.ifEmpty {
+                listOfNotNull(legacy.takeIf { it.ownerUserId.isNotBlank() && it.signature.isNotBlank() })
+            }
+            prefs[KEY_CARD_MECHANIC_REFRESH_CHECKPOINTS] = gson.toJson(
+                previous.filterNot { it.ownerUserId == checkpoint.ownerUserId } + checkpoint,
+            )
+            prefs.remove(KEY_CARD_MECHANIC_REFRESH_OWNER)
+            prefs.remove(KEY_CARD_MECHANIC_REFRESH_SIGNATURE)
+            prefs.remove(KEY_CARD_MECHANIC_REFRESH_CURSOR)
+            prefs.remove(KEY_CARD_MECHANIC_REFRESH_COMPLETE)
+        }
+    }
+
+    private fun decodeMechanicCheckpoints(json: String?): List<CardMechanicRefreshCheckpoint> =
+        runCatching<List<CardMechanicRefreshCheckpoint>> {
+            gson.fromJson(json ?: "[]", mechanicCheckpointListType) ?: emptyList()
+        }.getOrDefault(emptyList())
 
     // ── User-defined tags ─────────────────────────────────────────────────────
 

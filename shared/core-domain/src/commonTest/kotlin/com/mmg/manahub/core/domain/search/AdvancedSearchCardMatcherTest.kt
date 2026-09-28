@@ -38,6 +38,25 @@ class AdvancedSearchCardMatcherTest {
         colorIdentity = listOf("G"),
     )
 
+    @Test
+    fun `multicolor is independent of letter comparison and chosen field`() {
+        val monoWithMulticolorIdentity = card(id = "split", name = "Split", colors = listOf("W"), colorIdentity = listOf("W", "U"))
+        val blueWhite = card(id = "wu", name = "Blue White", colors = listOf("W", "U"), colorIdentity = listOf("W", "U"))
+        val blueBlack = card(id = "ub", name = "Blue Black", colors = listOf("U", "B"), colorIdentity = listOf("U", "B"))
+        val colorless = card(id = "none", name = "None", colors = emptyList(), colorIdentity = emptyList())
+        for (mode in ColorMatchMode.entries) {
+            assertTrue(AdvancedSearchCardMatcher.matchesCriterion(blueWhite, SearchCriterion.Colors(setOf("M"), mode)))
+            assertFalse(AdvancedSearchCardMatcher.matchesCriterion(monoWithMulticolorIdentity, SearchCriterion.Colors(setOf("M"), mode)))
+            assertTrue(AdvancedSearchCardMatcher.matchesCriterion(monoWithMulticolorIdentity, SearchCriterion.ColorIdentity(setOf("M"), mode)))
+            assertFalse(AdvancedSearchCardMatcher.matchesCriterion(colorless, SearchCriterion.Colors(setOf("M"), mode)))
+        }
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(blueWhite, SearchCriterion.Colors(setOf("M", "W"), ColorMatchMode.AT_LEAST)))
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(blueBlack, SearchCriterion.Colors(setOf("M", "W"), ColorMatchMode.AT_LEAST)))
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(blueWhite, SearchCriterion.Colors(setOf("M", "W"), ColorMatchMode.EXACTLY)))
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(blueWhite, SearchCriterion.Colors(setOf("M", "W", "U"), ColorMatchMode.EXACTLY)))
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(blueWhite, SearchCriterion.Colors(setOf("M", "W"), ColorMatchMode.ANY_OF)))
+    }
+
     // ── Basic criteria ────────────────────────────────────────────────────────
 
     @Test

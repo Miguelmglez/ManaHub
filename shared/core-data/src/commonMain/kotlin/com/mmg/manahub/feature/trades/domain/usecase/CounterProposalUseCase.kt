@@ -9,6 +9,11 @@ class CounterProposalUseCase(private val repo: TradesRepository) {
     suspend operator fun invoke(
         parentProposalId: String,
         items: List<TradeItemRequestDto>,
-        reviewFlags: ReviewFlags
-    ) = repo.counterProposal(parentProposalId, items, reviewFlags)
+        reviewFlags: ReviewFlags,
+        clientRequestId: String? = null,
+    ) = if (clientRequestId == null) {
+        repo.counterProposal(parentProposalId, items, reviewFlags)
+    } else {
+        repo.counterProposalWithRequestId(parentProposalId, items, reviewFlags, clientRequestId)
+    }
 }

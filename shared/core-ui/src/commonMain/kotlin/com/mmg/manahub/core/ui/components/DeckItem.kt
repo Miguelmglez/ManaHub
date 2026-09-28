@@ -268,14 +268,14 @@ fun DeckItem(
                     }
                 }
 
-                if (!reduced) {
+                if (!reduced && deck.cardCount >= 7) {
                     if (onPlaytest != null) {
                         IconButton(onClick = onPlaytest) {
                             Icon(
                                 Icons.Default.VideogameAsset,
                                 contentDescription = "Start Playtest",
                                 tint = mc.secondaryAccent,
-                                modifier = Modifier.padding(end =MaterialTheme.spacing.md).size(24.dp),
+                                modifier = Modifier.padding(end =MaterialTheme.spacing.md).size(40.dp),
                             )
                         }
 
@@ -286,7 +286,7 @@ fun DeckItem(
                                 Icons.Default.Delete,
                                 contentDescription = "Delete",
                                 tint = mc.textDisabled,
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(24.dp),
                             )
                         }
                     }

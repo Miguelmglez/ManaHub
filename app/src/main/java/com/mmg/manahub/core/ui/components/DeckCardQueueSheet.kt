@@ -37,11 +37,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.PreferredCurrency
@@ -50,6 +53,7 @@ import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import kotlinx.coroutines.launch
 
 /**
  * One row of a [DeckCardQueueSheet] — a card plus the quantity/collection state the sheet needs to
@@ -106,6 +110,7 @@ fun DeckCardQueueSheet(
     clearAllDescription: String = stringResource(R.string.card_queue_clear_all),
     searchPlaceholder: String = stringResource(R.string.card_queue_search_placeholder),
     listState: LazyListState = rememberLazyListState(),
+    isListInverted: Boolean = false,
     toastMessage: String? = null,
     toastType: MagicToastType = MagicToastType.INFO,
     onToastDismissed: () -> Unit = {},
@@ -120,6 +125,15 @@ fun DeckCardQueueSheet(
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
     )
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset = available
+        }
+    }
     fun requestDismiss() {
         scope.launch {
             sheetState.hide()
@@ -131,6 +145,9 @@ fun DeckCardQueueSheet(
         if (searchQuery.isBlank()) items
         else items.filter { it.card.name.contains(searchQuery, ignoreCase = true) }
     }
+
+    val effectiveListState = remember(isListInverted) { LazyListState(0, 0) }
+
     val sheetToastState = rememberMagicToastState()
 
     LaunchedEffect(toastMessage) {
@@ -148,7 +165,11 @@ fun DeckCardQueueSheet(
         dragHandle = null,
     ) {
         Box(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(nestedScrollConnection)
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(start = spacing.xs, end = spacing.sm, top = spacing.sm),
                     verticalAlignment = Alignment.CenterVertically,
@@ -203,12 +224,12 @@ fun DeckCardQueueSheet(
                         title = if (showNoMatches) noMatchesTitle ?: emptyTitle else emptyTitle,
                         subtitle = if (showNoMatches) noMatchesSubtitle ?: emptySubtitle else emptySubtitle,
                         icon = Icons.Rounded.Style,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
                 } else {
                     LazyColumn(
                         modifier = Modifier.weight(1f),
-                        state = listState,
+                        state = effectiveListState,
                         verticalArrangement = Arrangement.spacedBy(spacing.sm),
                     ) {
                         items(filteredItems, key = { it.id }) { item ->

@@ -124,6 +124,8 @@
     <string name="addcard_search_min_chars">Type at least 2 characters to search</string>
     <string name="addcard_no_results">No cards found</string>
     <string name="addcard_no_results_subtitle">Try searching in another language\nor check the spelling</string>
+    <string name="addcard_server_unavailable_title">Server currently unavailable</string>
+    <string name="addcard_server_unavailable_subtitle">Scryfall is currently unavailable. Try again in a moment.</string>
     <string name="addcard_index_title">Browse the MTG universe!</string>
     <string name="addcard_index_subtitle">Type the name of a card or open the Advanced search to find by its attributes</string>
 
@@ -316,7 +318,7 @@
     <string name="tagdictionary_labels_section">Labels</string>
     <string name="tagdictionary_patterns_hint">One rule per line. Combine required terms with \' + \'. Prefix a term with \'!\' to exclude. Example: gain + life + !gain control</string>
     <string name="tagdictionary_patterns_en_label">Patterns</string>
-    <string name="tagdictionary_system_readonly">System tag · read-only</string>
+    <string name="tagdictionary_system_category_readonly">%1$s · System tag · read-only</string>
     <string name="tagdictionary_create_custom_tag">Create custom tag</string>
     <string name="tagdictionary_create_custom_tag_description">Create custom tag</string>
     <string name="tagdictionary_create_label_hint">Give your custom tag a name</string>
@@ -2566,6 +2568,11 @@
     <string name="advsearch_colormatch_picker_title">Color match</string>
     <string name="advsearch_section_tags">Tags</string>
     <string name="advsearch_tags_hint">Any card or user tag</string>
+    <string name="advsearch_collection_tags_title">Collection tags</string>
+    <string name="advsearch_global_tags_title">Card mechanics</string>
+    <string name="advsearch_tags_search_hint">Search tags by name or key</string>
+    <string name="advsearch_tags_empty">No tags available</string>
+    <string name="advsearch_tags_no_matches">No matching tags</string>
     <string name="advsearch_section_function">Card function</string>
     <string name="advsearch_function_hint">e.g. Ramp, Board Wipe, Recursion…</string>
     <string name="advsearch_function_selected_count">%1$d functions selected</string>
@@ -3671,6 +3678,7 @@
     <string name="home_gallery_category_social">Social</string>
     <string name="home_gallery_category_tournament">Tournament</string>
     <string name="home_gallery_category_community">Community</string>
+    <string name="home_widget_desc_greeting_header">Displays personalized greeting title and profile picture button.</string>
     <string name="home_widget_desc_context_hero">Your most relevant next action</string>
     <string name="home_widget_desc_quick_actions">One-tap shortcuts</string>
     <string name="home_widget_desc_game_stats_hub">Win rate, best deck and nemesis</string>
@@ -3695,6 +3703,7 @@
     <string name="quick_start_scan_card">Scan Card</string>
     <string name="quick_start_deck_builder">Deck Builder</string>
     <string name="quick_start_draft_guides">Draft Guides</string>
+    <string name="quick_start_import_collection">Import collection</string>
     <string name="quick_start_search_card">Search Card</string>
     <string name="quick_start_my_decks">My Decks</string>
     <string name="quick_start_new_deck">New Deck</string>
@@ -3722,7 +3731,7 @@
     <string name="quick_start_sheet_trades">Trades</string>
     <string name="quick_start_sheet_community">Community Decks</string>
     <string name="quick_start_sheet_settings">Settings</string>
-    <string name="quick_start_sheet_multi_add">Add multiple cards</string>
+    <string name="quick_start_sheet_multi_add">Add cards</string>
 
     <!-- Home feature overhaul — account nudge card -->
     <string name="home_nudge_title">Protect &amp; connect</string>
@@ -3750,6 +3759,7 @@
     <string name="tip_category_modern_mechanics">Modern Mechanics</string>
 
     <!-- Widget titles -->
+    <string name="widget_title_greeting_header">Greeting</string>
     <string name="widget_title_context_hero">Today</string>
     <string name="widget_title_quick_actions">Quick actions</string>
     <string name="widget_title_continue">Continue</string>
@@ -4325,8 +4335,8 @@
     <string name="collection_export_format_moxfield_desc">Moxfield collection import</string>
     <string name="collection_export_format_manabox">ManaBox CSV (.csv)</string>
     <string name="collection_export_format_manabox_desc">Includes Scryfall IDs</string>
-    <string name="collection_export_save">Save to device</string>
-    <string name="collection_export_share">Share file</string>
+    <string name="collection_export_save">Save</string>
+    <string name="collection_export_share">Share</string>
     <string name="collection_export_share_chooser">Share collection export</string>
     <plurals name="collection_export_saved">
         <item quantity="one">Exported %d row</item>

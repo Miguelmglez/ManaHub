@@ -59,7 +59,6 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.card.ResolveCardStrategyTagsUseCase
@@ -90,6 +89,8 @@ import com.mmg.manahub.core.sync.PriceRefreshWorker
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.di.syncKoinModule
 import com.mmg.manahub.core.tagging.TagDictionaryRepository
+import com.mmg.manahub.core.tagging.CardMechanicCatalogRepository
+import com.mmg.manahub.core.tagging.CardMechanicCatalogRehydrator
 import com.mmg.manahub.core.ui.components.search.di.searchWidgetsKoinModule
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceCommandRecognizer
@@ -121,6 +122,7 @@ import com.mmg.manahub.feature.survey.di.surveyKoinModule
 import com.mmg.manahub.feature.tagdictionary.di.tagDictionaryKoinModule
 import com.mmg.manahub.feature.tournament.di.tournamentKoinModule
 import com.mmg.manahub.feature.trades.di.tradesKoinModule
+import com.mmg.manahub.feature.trades.domain.usecase.TradePendingApplyCoordinator
 import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import io.github.jan.supabase.SupabaseClient
@@ -176,6 +178,9 @@ class ManaHubApp : Application(), KoinComponent {
     private val wishlistRepository: WishlistRepository by inject()
     private val openForTradeRepository: OpenForTradeRepository by inject()
     private val friendRepository: FriendRepository by inject()
+    private val cardMechanicCatalogRepository: CardMechanicCatalogRepository by inject()
+    private val tradePendingApplyCoordinator: TradePendingApplyCoordinator by inject()
+    private val cardMechanicCatalogRehydrator: CardMechanicCatalogRehydrator by inject()
 
     @Inject lateinit var tagDictionaryRepo: TagDictionaryRepository
     @Inject lateinit var workManager: WorkManager
@@ -598,13 +603,30 @@ class ManaHubApp : Application(), KoinComponent {
         }
 
         appScope.launch { remoteConfigRepository.refresh() }
+        tradePendingApplyCoordinator.start(appScope)
 
         appScope.launch {
             runCatching { syncManaSymbols() }
             runCatching { tagDictionaryRepo.loadAndApply() }
+            runCatching { cardMechanicCatalogRepository.loadCached() }
+            runCatching { cardMechanicCatalogRepository.refresh() }
             // Builds the Collection import review queue here so its (potentially MB-scale) restore
             // never runs on the main thread when composition first resolves the single.
             runCatching { collectionImportQueue.queue.value }
+        }
+        appScope.launch {
+            combine(authRepository.sessionState, cardMechanicCatalogRepository.entries) { session, catalog ->
+                (session as? SessionState.Authenticated)?.user?.id to catalog
+            }.collectLatest { (ownerUserId, catalog) ->
+                if (ownerUserId == null || catalog.isEmpty()) return@collectLatest
+                try {
+                    cardMechanicCatalogRehydrator.rehydrate(ownerUserId, catalog)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (e: Exception) {
+                    recordSafeNonFatal("card_mechanic_catalog_rehydration_failed", e)
+                }
+            }
         }
         // Backend & Performance Optimization plan, WS1+WS3 Part B item 8 (2026-07-28): the
         // oracle-id + strategy-tags opportunistic backfills that used to run inline here (Edge-case
@@ -696,9 +718,9 @@ class ManaHubApp : Application(), KoinComponent {
                             val userId = state.user.id
                             // Another account's wishlist/offers must not show up or migrate here.
                             wishlistRepository.evictForeignAccountRows(userId)
-                                .onFailure { e -> recordNonFatal("trade_lists_evict_foreign_rows_failed", e) }
+                                .onFailure { e -> recordSafeNonFatal("trade_lists_evict_foreign_rows_failed", e) }
                             openForTradeRepository.evictForeignAccountRows(userId)
-                                .onFailure { e -> recordNonFatal("trade_lists_evict_foreign_rows_failed", e) }
+                                .onFailure { e -> recordSafeNonFatal("trade_lists_evict_foreign_rows_failed", e) }
                             CollectionSyncWorker.enqueueFirstLoginSync(workManager)
                         }
                         appScope.launch {

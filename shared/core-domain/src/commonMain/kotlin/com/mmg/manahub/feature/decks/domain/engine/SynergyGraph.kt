@@ -192,7 +192,7 @@ object SynergyGraph {
      * which is dynamically keyed per deck -- see [buildAxisState]). Declaration order is this
      * phase's own [DeckSynergyGraph.axes] display order. */
     private val STATIC_AXES: List<AxisKey> = listOf(
-        "LIFE", "DEATH", "TOKENS", "COUNTERS", "LANDFALL", "GRAVEYARD", "ETB", "SPELLS",
+        "LIFE", "DEATH", "TOKENS", "COUNTERS", "LANDFALL", "GRAVEYARD", "GRAVEYARD_EXIT", "ETB", "SPELLS",
         "ARTIFACTS", "ENCHANTMENTS", "ATTACHED", "ATTACK", "PLANESWALKERS", "GROUP", "MILL_OPP",
         "LOCK",
     )
@@ -236,6 +236,7 @@ object SynergyGraph {
         "COUNTERS" to AxisIdeal(producerIdeal = 8 /* PROVISIONAL */, payoffIdeal = 13 /* PLUS1_COUNTERS counters_payoff ideal */),
         "LANDFALL" to AxisIdeal(producerIdeal = 8 /* PROVISIONAL, land-based-ramp subset of LANDFALL's ramp=16 */, payoffIdeal = 11 /* LANDFALL landfall_payoff ideal */),
         "GRAVEYARD" to AxisIdeal(producerIdeal = 10 /* REANIMATOR graveyard_enabler ideal */, payoffIdeal = 8 /* PROVISIONAL, combined reanimation/self_mill_payoff/recursion */),
+        "GRAVEYARD_EXIT" to AxisIdeal(producerIdeal = 6, payoffIdeal = 4),
         "ETB" to AxisIdeal(producerIdeal = 10 /* BLINK blink_effect ideal */, payoffIdeal = 18 /* BLINK etb_payoff ideal */),
         "SPELLS" to AxisIdeal(producerIdeal = 14 /* PROVISIONAL, instant/sorcery density */, payoffIdeal = 13 /* SPELLSLINGER spell_payoff ideal */),
         "ARTIFACTS" to AxisIdeal(producerIdeal = 14 /* PROVISIONAL, artifact density */, payoffIdeal = 12 /* ARTIFACTS artifact_payoff ideal */),
@@ -356,8 +357,9 @@ object SynergyGraph {
         roleConfidence.forEach { (roleKey, confidence) ->
             if (confidence <= 0f) return@forEach
             val spec = ROLE_SPECS_BY_KEY[roleKey] ?: return@forEach
-            spec.produces.forEach { axis -> produces.credit(substituteTribe(axis, dominantTribeAxis), confidence) }
-            spec.consumes.forEach { axis -> consumes.credit(substituteTribe(axis, dominantTribeAxis), confidence) }
+            val combatConfidence = if (roleKey == "pseudo_evasion") confidence.coerceAtMost(0.5f) else confidence
+            spec.produces.forEach { axis -> produces.credit(substituteTribe(axis, dominantTribeAxis), combatConfidence) }
+            spec.consumes.forEach { axis -> consumes.credit(substituteTribe(axis, dominantTribeAxis), combatConfidence) }
             spec.amplifies.forEach { axis -> amplifies.credit(substituteTribe(axis, dominantTribeAxis), confidence) }
         }
 

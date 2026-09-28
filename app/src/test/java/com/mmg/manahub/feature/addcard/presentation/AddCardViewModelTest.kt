@@ -60,6 +60,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -1081,4 +1082,67 @@ class AddCardViewModelTest {
         coVerify(exactly = 0) { searchCards(any(), any()) }
         assertEquals(listOf("bolt-1"), vm.uiState.value.results.map { it.scryfallId })
     }
+    @Test
+    fun clearingAdvancedCriteriaKeepsTheSeparateOutsideText() = runTest(dispatcher) {
+        val panelQuery = AdvancedSearchQuery(criteria = listOf(SearchCriterion.Name("Meren")))
+        every { buildScryfallQuery(panelQuery) } returns "name:meren"
+        coEvery { searchCards(any(), any()) } returns DataResult.Success(
+            PaginatedCards(emptyList(), false, 0)
+        )
+
+        viewModel.onQueryChange("bolt")
+        viewModel.onAdvancedQuerySearch(panelQuery)
+        assertEquals("bolt", viewModel.uiState.value.query)
+        assertEquals(panelQuery, viewModel.uiState.value.activeQuery)
+        advanceUntilIdle()
+        coVerify(exactly = 1) { searchCards("bolt name:meren", 1) }
+
+        viewModel.onClearFilters()
+        assertEquals("bolt", viewModel.uiState.value.query)
+        assertEquals(null, viewModel.uiState.value.activeQuery)
+        advanceUntilIdle()
+        coVerify(exactly = 1) { searchCards("bolt", 1) }
+    }
+
+    @Test
+    fun stalePageIsDiscardedAfterTheOutsideQueryChanges() = runTest(dispatcher) {
+        val oldPage = CompletableDeferred<DataResult<PaginatedCards>>()
+        coEvery { searchCards("bolt", 1) } returns DataResult.Success(
+            PaginatedCards(listOf(bolt), true, 2)
+        )
+        coEvery { searchCards("bolt", 2) } coAnswers { oldPage.await() }
+        coEvery { searchCards("counter", 1) } returns DataResult.Success(
+            PaginatedCards(listOf(counterspell), false, 1)
+        )
+
+        viewModel.onQueryChange("bolt")
+        advanceUntilIdle()
+        viewModel.loadNextPage()
+        runCurrent()
+        viewModel.onQueryChange("counter")
+        oldPage.complete(DataResult.Success(PaginatedCards(listOf(counterspell), false, 2)))
+        advanceUntilIdle()
+
+        assertEquals(listOf("counter-1"), viewModel.uiState.value.results.map { it.scryfallId })
+        assertEquals(1, viewModel.uiState.value.currentPage)
+        assertFalse(viewModel.uiState.value.isLoadingMore)
+    }
+
+    @Test
+    fun confirmedEmptySearchShowsNoErrorButOtherFailuresRemainVisible() = runTest(dispatcher) {
+        coEvery { searchCards("no matches", 1) } returns DataResult.Success(
+            PaginatedCards(emptyList(), false, 0)
+        )
+        coEvery { searchCards("broken", 1) } returns DataResult.Error("Invalid search syntax")
+
+        viewModel.onQueryChange("no matches")
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.results.isEmpty())
+        assertEquals(null, viewModel.uiState.value.error)
+
+        viewModel.onQueryChange("broken")
+        advanceUntilIdle()
+        assertEquals("Invalid search syntax", viewModel.uiState.value.error)
+    }
+
 }

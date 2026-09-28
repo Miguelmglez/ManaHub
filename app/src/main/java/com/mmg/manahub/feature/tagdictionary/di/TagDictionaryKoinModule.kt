@@ -1,6 +1,11 @@
 package com.mmg.manahub.feature.tagdictionary.di
 
 import com.mmg.manahub.core.tagging.TagDictionaryRepository
+import com.mmg.manahub.core.tagging.CardMechanicCatalogRepository
+import com.mmg.manahub.core.tagging.CardMechanicCatalogRehydrator
+import com.mmg.manahub.core.data.remote.CardMechanicCatalogRemoteDataSource
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.feature.tagdictionary.presentation.TagDictionaryViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
@@ -37,12 +42,20 @@ fun tagDictionaryKoinModule(
     // (UserPreferencesDataStore is shared → bridged in coreBridgeKoinModule, not here, and resolved
     //  below via get().)
     single { tagDictionaryRepository }
+    single { CardMechanicCatalogRepository(get(), CardMechanicCatalogRemoteDataSource(get())) }
+    single {
+        val authRepository = get<AuthRepository>()
+        CardMechanicCatalogRehydrator(get(), get()) {
+            (authRepository.sessionState.value as? SessionState.Authenticated)?.user?.id
+        }
+    }
 
     // ── The Koin island: TagDictionaryViewModel is now resolved by Koin, not Hilt. ──
     viewModel {
         TagDictionaryViewModel(
             dictionaryRepo = get(),
             prefs = get(),
+            mechanicCatalog = get(),
         )
     }
 }

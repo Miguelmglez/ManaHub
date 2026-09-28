@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.scanner.presentation.components
 // COMMENTS_REVIEWED: 2026-09-17
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,17 +17,21 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -71,6 +76,8 @@ fun DeckScannerQueueSheet(
     onToggleAutoDeleteOnAdd: () -> Unit,
     onIncrementQuantity: (QueuedCard) -> Unit,
     onDecrementQuantity: (QueuedCard) -> Unit,
+    isListInverted: Boolean,
+    updateSorting: () -> Unit
 ) {
     val entriesById = remember(cards) { cards.associateBy { it.id } }
     val foilLabel = stringResource(R.string.scanner_edit_foil_value)
@@ -112,6 +119,8 @@ fun DeckScannerQueueSheet(
                 checked = isAutoDeleteOnAddEnabled,
                 enabled = !isCommitting,
                 onCheckedChange = { _ -> onToggleAutoDeleteOnAdd() },
+                updateSorting = updateSorting,
+                isListInverted = isListInverted
             )
         },
         rowActions = { item ->
@@ -249,11 +258,17 @@ private fun DeckScannerSettingsToggleRow(
     checked: Boolean,
     enabled: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    updateSorting:()->Unit,
+    isListInverted:Boolean,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     val autoDeleteDescription = stringResource(R.string.scanner_deck_queue_auto_delete_a11y)
+    val rotationAngle by animateFloatAsState(
+        targetValue = if (isListInverted) 180f else 0f,
+        label = "IconRotation"
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -280,5 +295,14 @@ private fun DeckScannerSettingsToggleRow(
                 contentDescription = autoDeleteDescription
             },
         )
+
+        IconButton(onClick = updateSorting) {
+            Icon(
+                painter = painterResource(R.drawable.ic_list_arrow),
+                contentDescription = "Invert list items",
+                modifier = Modifier.rotate(rotationAngle),
+                tint = mc.textSecondary
+            )
+        }
     }
 }

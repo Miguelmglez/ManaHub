@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -55,8 +56,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -121,6 +127,8 @@ fun CardQueueSheet(
     onIncrementQuantity: (QueuedCard) -> Unit,
     onDecrementQuantity: (QueuedCard) -> Unit,
     listState: LazyListState = rememberLazyListState(),
+    isListInverted: Boolean,
+    updateSorting: () -> Unit
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -129,12 +137,23 @@ fun CardQueueSheet(
         skipPartiallyExpanded = true,
         confirmValueChange = { it != SheetValue.Hidden }
     )
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset = available
+        }
+    }
     var searchQuery by remember { mutableStateOf("") }
 
     val filtered = remember(cards, searchQuery) {
         if (searchQuery.isBlank()) cards
         else cards.filter { it.card.name.contains(searchQuery, ignoreCase = true) }
     }
+
+    val effectiveListState = remember(isListInverted) { LazyListState(0, 0) }
 
     val sheetToastState = rememberMagicToastState()
     val currentOnToastShown by rememberUpdatedState(onToastShown)
@@ -152,7 +171,11 @@ fun CardQueueSheet(
         dragHandle = null,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(nestedScrollConnection)
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -184,6 +207,8 @@ fun CardQueueSheet(
                         subtitle = stringResource(R.string.scanner_queue_auto_delete_desc),
                         checked = isAutoDeleteOnAddEnabled,
                         onCheckedChange = { onToggleAutoDeleteOnAdd() },
+                        updateSorting = updateSorting,
+                        isListInverted = isListInverted
                     )
                 }
 
@@ -206,7 +231,7 @@ fun CardQueueSheet(
 
                 Spacer(Modifier.height(spacing.lg))
 
-                LazyColumn(modifier = Modifier.weight(1f), state = listState) {
+                LazyColumn(modifier = Modifier.weight(1f), state = effectiveListState) {
                     items(filtered, key = { it.id }) { entry ->
                         QueueCardItem(
                             entry = entry,
@@ -575,8 +600,14 @@ private fun QueueToggleRow(
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    isListInverted: Boolean,
+    updateSorting: () -> Unit
 ) {
     val mc = MaterialTheme.magicColors
+    val rotationAngle by animateFloatAsState(
+        targetValue = if (isListInverted) 180f else 0f,
+        label = "IconRotation"
+    )
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -587,5 +618,15 @@ private fun QueueToggleRow(
             Text(text = subtitle, style = MaterialTheme.magicTypography.bodySmall, color = mc.textSecondary)
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+
+
+        IconButton(onClick = updateSorting) {
+            Icon(
+                painter = androidx.compose.ui.res.painterResource(R.drawable.ic_list_arrow),
+                contentDescription = "Invert list items",
+                modifier = Modifier.rotate(rotationAngle),
+                tint = mc.textSecondary
+            )
+        }
     }
 }

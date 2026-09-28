@@ -58,12 +58,22 @@ object TagDictionary {
     /** Mutable map so [applyOverrides] can replace entries at runtime. */
     @Volatile
     private var entries: Map<String, TagDictionaryEntry> = baseEntries.associateBy { it.key }
+    @Volatile
+    private var remoteEntries: List<TagDictionaryEntry> = emptyList()
+    private var customOverrides: List<TagOverride> = emptyList()
 
     // ── Public API ───────────────────────────────────────────────────────────
 
     fun all(): Collection<TagDictionaryEntry> = entries.values
 
+    fun remoteCatalogEntries(): Collection<TagDictionaryEntry> = remoteEntries.toList()
+
     fun get(key: String): TagDictionaryEntry? = entries[key]
+
+    fun applyRemoteEntries(remote: List<TagDictionaryEntry>) {
+        remoteEntries = remote
+        rebuildEntries()
+    }
 
     /** Reverse search: find canonical keys whose label or key contains [term]. */
     fun findKeysByTerm(term: String): List<String> {
@@ -81,12 +91,21 @@ object TagDictionary {
 
     /** Apply persisted user overrides on top of the base entries. */
     fun applyOverrides(overrides: List<TagOverride>) {
-        if (overrides.isEmpty()) {
-            entries = baseEntries.associateBy { it.key }
-            return
-        }
+        customOverrides = overrides
+        rebuildEntries()
+    }
+
+    private fun rebuildEntries() {
         val merged = baseEntries.associateBy { it.key }.toMutableMap()
-        overrides.forEach { ov ->
+        remoteEntries.forEach { remote ->
+            val base = merged[remote.key]
+            merged[remote.key] = if (base == null) remote else base.copy(
+                category = remote.category,
+                labels = base.labels + remote.labels,
+                rules = remote.rules.ifEmpty { base.rules },
+            )
+        }
+        customOverrides.forEach { ov ->
             val parsedRules = ov.patterns.mapNotNull { parseRuleLine(it) }
             val base = merged[ov.key]
             if (base != null) {
@@ -428,7 +447,12 @@ private val baseEntries: List<TagDictionaryEntry> = buildList {
         rule(anyOf = listOf("creatures you control get +", "other creatures you control get +")),
     )))
     add(strat("evasion", TagCategory.ROLE, "Evasion", 0.90f, listOf(
-        rule(anyOf = listOf("can't be blocked", "is unblockable")),
+        rule(anyOf = listOf("flying", "menace", "plainswalk", "islandwalk", "swampwalk", "mountainwalk", "forestwalk", "nonbasic landwalk", "shadow", "fear", "intimidate", "skulk", "can't be blocked", "is unblockable"),
+            typeLineAnyOf = listOf("creature")),
+    )))
+    add(strat("pseudo_evasion", TagCategory.ROLE, "Combat Pressure", 0.80f, listOf(
+        rule(anyOf = listOf("trample", "deathtouch", "first strike", "double strike"),
+            typeLineAnyOf = listOf("creature")),
     )))
     add(strat("cost_reduction", TagCategory.ROLE, "Cost Reduction", 0.90f, listOf(
         rule(anyOf = listOf("cost {1} less to cast", "cost {2} less to cast", "spells you cast cost")),
@@ -615,10 +639,26 @@ private val baseEntries: List<TagDictionaryEntry> = buildList {
         // catches phrasings like "whenever ~ or another creature you control dies" (Zulaport
         // Cutthroat-style triggers naming the source card itself).
         rule(allOf = listOf("creature you control dies")),
+        rule(anyOf = listOf("whenever a creature dies", "whenever another creature dies", "or another creature dies", "whenever one or more creatures die", "whenever ~ dies")),
     )))
     add(strat("graveyard_enabler", TagCategory.ROLE, "Graveyard Enabler", 0.80f, listOf(
         rule(allOf = listOf("of your library into your graveyard"), confidence = 0.85f),
         rule(allOf = listOf("you may discard a card"), confidence = 0.60f),
+        rule(anyOf = listOf("mill a card", "mill two cards", "mill three cards", "mill four cards", "mill five cards", "you mill", "surveil"), confidence = 0.80f),
+        rule(anyOf = listOf("discard a card:", "discard your hand", "discard a card, then draw", "draw a card, then discard"), confidence = 0.75f),
+    )))
+    add(strat("leave_graveyard_payoff", TagCategory.ROLE, "Graveyard Exit Payoff", 0.88f, listOf(
+        rule(allOf = listOf("whenever", "leave your graveyard")),
+        rule(allOf = listOf("whenever", "leaves your graveyard")),
+    )))
+    add(strat("graveyard_exit_source", TagCategory.ROLE, "Graveyard Exit Source", 0.82f, listOf(
+        rule(allOf = listOf("return", "from your graveyard", "to your hand")),
+        rule(allOf = listOf("return", "from your graveyard", "to the battlefield")),
+        rule(allOf = listOf("return", "from a graveyard", "to the battlefield")),
+        rule(allOf = listOf("put", "from your graveyard", "to the battlefield")),
+        rule(allOf = listOf("put", "from a graveyard", "to the battlefield")),
+        rule(allOf = listOf("cast", "from your graveyard")),
+        rule(allOf = listOf("cast", "from a graveyard")),
     )))
     add(strat("reanimation", TagCategory.ROLE, "Reanimation", 0.90f, listOf(
         // Deliberately not anchored to an exact "from your/a graveyard" phrase — real
@@ -644,7 +684,9 @@ private val baseEntries: List<TagDictionaryEntry> = buildList {
         rule(allOf = listOf("whenever you gain life")),
     )))
     add(strat("counters_payoff", TagCategory.ROLE, "Counters Payoff", 0.85f, listOf(
-        rule(allOf = listOf("+1/+1 counter")),
+        rule(allOf = listOf("whenever", "+1/+1 counter"), noneOf = listOf("put a +1/+1 counter")),
+        rule(allOf = listOf("for each +1/+1 counter")),
+        rule(allOf = listOf("with a +1/+1 counter on it")),
     )))
     add(strat("spell_payoff", TagCategory.ROLE, "Spell Payoff", 0.85f, listOf(
         rule(anyOf = listOf(
@@ -738,8 +780,11 @@ private val baseEntries: List<TagDictionaryEntry> = buildList {
     )))
     add(strat("counters_source", TagCategory.ROLE, "Counters Source", 0.80f, listOf(
         rule(allOf = listOf("put a +1/+1 counter"), confidence = 0.85f),
-        rule(allOf = listOf("proliferate"), confidence = 0.80f),
+        rule(anyOf = listOf("put two +1/+1 counters", "put three +1/+1 counters", "put x +1/+1 counters", "put that many +1/+1 counters", "distribute two +1/+1 counters", "enters with a +1/+1 counter", "enters with two +1/+1 counters", "enters with three +1/+1 counters"), confidence = 0.85f),
         rule(anyOf = listOf("adapt", "evolve", "outlast"), confidence = 0.75f),
+    )))
+    add(strat("proliferate_source", TagCategory.ROLE, "Proliferate", 0.85f, listOf(
+        rule(allOf = listOf("proliferate")),
     )))
     add(strat("treasure_source", TagCategory.ROLE, "Treasure Source", 0.90f, listOf(
         rule(anyOf = listOf("treasure token", "gold token", "powerstone token")),

@@ -8,11 +8,7 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
@@ -52,8 +48,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
@@ -63,6 +59,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -296,10 +293,23 @@ private fun WidgetSectionHeader(
 
 /** Inline empty-message body for an otherwise-loaded widget. */
 @Composable
-private fun WidgetEmptyBody(message: String) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    Text(text = message, style = ty.bodySmall, color = mc.textSecondary)
+private fun WidgetEmptyBody(
+    message: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    icon: ImageVector? = null,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    EmptyState(
+        title = message,
+        subtitle = subtitle,
+        icon = icon,
+        actionLabel = actionLabel,
+        onAction = onAction,
+        compact = true,
+        modifier = modifier.fillMaxSize(),
+    )
 }
 
 /**
@@ -539,7 +549,7 @@ fun HomeWidgetHost(
     val spacing = MaterialTheme.spacing
     val type = widget.type
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-        if (type != HomeWidgetType.CONTEXT_HERO) {
+        if (type != HomeWidgetType.CONTEXT_HERO && type != HomeWidgetType.GREETING_HEADER) {
             val titleText = stringResourceSafe(type.defaultTitleRes)
             val titleClickAction = widgetHeaderTitleClickAction(type)
             WidgetSectionHeader(
@@ -560,11 +570,12 @@ fun HomeWidgetHost(
         WidgetBodySlot(
             type = type,
             ready = ready,
-            height = metrics.bodyHeight(type),
+            height = metrics.bodyHeight(type, uiState.quickStartActions.size),
             motion = motion,
             skeleton = { WidgetSkeleton(type, metrics, motion.pulse) },
         ) {
             when (type) {
+                HomeWidgetType.GREETING_HEADER -> HomeTopBar(uiState, onAvatarClick = { onAction(HomeAction.OpenProfile) })
                 HomeWidgetType.CONTEXT_HERO -> ContextHeroWidget(uiState.hero, onAction)
                 HomeWidgetType.QUICK_ACTIONS -> QuickActionsWidget(
                     actions = uiState.quickStartActions,
@@ -606,7 +617,7 @@ fun HomeWidgetHost(
                 )
                 HomeWidgetType.LATEST_SETS -> LatestSetsWidget(uiState.latestSets, metrics.draftSetTileHeight, onAction)
                 HomeWidgetType.MTG_NEWS ->
-                    NewsWidget(uiState.recentNews, uiState.newsFiltersActive, metrics.newsCardHeight, onAction)
+                    NewsWidget(uiState.recentNews, metrics.newsCardHeight, onAction)
                 HomeWidgetType.RULES_TIP -> RulesTipWidget(rulesTipIndex)
                 HomeWidgetType.FRIENDS -> FriendsWidget(
                     friends = uiState.friends,
@@ -655,6 +666,7 @@ private fun widgetHeaderTitleClickAction(type: HomeWidgetType): HomeAction? = wh
     HomeWidgetType.CARD_OF_THE_DAY,
     HomeWidgetType.RULES_TIP,
     HomeWidgetType.CONTEXT_HERO,
+    HomeWidgetType.GREETING_HEADER,
     HomeWidgetType.COMPETITIVE,
     -> null
 }
@@ -728,7 +740,11 @@ private fun DailyPuzzleWidget(
     when (dailyPuzzle) {
         null, DailyPuzzleWidgetState.Loading -> Unit
         DailyPuzzleWidgetState.Unavailable ->
-            WidgetEmptyBody(stringResourceSafe(R.string.home_daily_puzzle_unavailable))
+            WidgetEmptyBody(
+                message = stringResourceSafe(R.string.home_daily_puzzle_unavailable),
+                actionLabel = stringResourceSafe(R.string.retry),
+                onAction = { onAction(HomeAction.OpenDailyPuzzle) },
+            )
         is DailyPuzzleWidgetState.Loaded -> {
             WidgetShell(
                 onClick = { onAction(HomeAction.OpenDailyPuzzle) },
@@ -1140,16 +1156,6 @@ private fun ContextHeroWidget(hero: HomeHeroState, onAction: (HomeAction) -> Uni
     val (title, subtitle, cta) = heroWidgetCopy(hero)
     val isActive = hero is HomeHeroState.ActiveGame || hero is HomeHeroState.ActiveDraft
 
-    val infiniteTransition = rememberInfiniteTransition(label = "hero-pulse")
-    val animatedPulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
-        label = "pulse",
-    )
-    // F-13: reduced-motion users see the static end state (full opacity), not a pulsing dot.
-    val pulseAlpha = if (isReducedMotionEnabled()) 1f else animatedPulseAlpha
-
     Surface(
         color = mc.surface.copy(alpha = 0.6f),
         shape = CardShape,
@@ -1172,7 +1178,7 @@ private fun ContextHeroWidget(hero: HomeHeroState, onAction: (HomeAction) -> Uni
                         modifier = Modifier
                             .size(10.dp)
                             .clip(CircleShape)
-                            .background(mc.lifePositive.copy(alpha = pulseAlpha)),
+                            .background(mc.lifePositive),
                     )
                 }
                 Text(
@@ -1275,9 +1281,6 @@ internal fun FirstStepsCarousel(
                 pageSpacing = spacing.md,
             ) { page ->
                 val step = steps.getOrNull(page) ?: steps.first()
-                val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
-                val alphaValue = (1f - 0.35f * abs(pageOffset)).coerceIn(0.4f, 1f)
-                val scaleValue = (1f - 0.08f * abs(pageOffset)).coerceIn(0.92f, 1f)
 
                 Surface(
                     color = Color.Transparent,
@@ -1295,6 +1298,9 @@ internal fun FirstStepsCarousel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .graphicsLayer {
+                            val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+                            val alphaValue = (1f - 0.35f * abs(pageOffset)).coerceIn(0.4f, 1f)
+                            val scaleValue = (1f - 0.08f * abs(pageOffset)).coerceIn(0.92f, 1f)
                             alpha = alphaValue
                             scaleX = scaleValue
                             scaleY = scaleValue
@@ -1656,7 +1662,11 @@ private fun QuestsHubWidget(gamification: HomeGamification?, onAction: (HomeActi
         onClickLabel = stringResource(R.string.home_quests_open_a11y),
     ) {
         if (gamification.topQuests.isEmpty()) {
-            WidgetEmptyBody(stringResourceSafe(R.string.home_quests_empty))
+            WidgetEmptyBody(
+                message = stringResourceSafe(R.string.home_quests_empty),
+                actionLabel = stringResourceSafe(R.string.home_progression_open_a11y),
+                onAction = { onAction(HomeAction.OpenProfileQuests) },
+            )
             return@WidgetShell
         }
         Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
@@ -1845,8 +1855,7 @@ private fun QuickActionTile(
                 text = action.navLabel.uppercase(),
                 style = ty.labelSmall.copy(fontWeight = FontWeight.Bold),
                 color = mc.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                maxLines = 2,
                 textAlign = TextAlign.Center,
             )
         }
@@ -1903,12 +1912,11 @@ private fun <T> AutoSlideHub(
             contentPadding = PaddingValues(horizontal = spacing.sm),
             pageSpacing = spacing.xs,
         ) { page ->
-            val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
-            val alphaValue = (1f - abs(pageOffset)).coerceIn(0f, 1f)
-            val scaleValue = (1f - 0.2f * abs(pageOffset)).coerceIn(0.8f, 1f)
-
             Box(
                 modifier = Modifier.graphicsLayer {
+                    val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+                    val alphaValue = (1f - abs(pageOffset)).coerceIn(0f, 1f)
+                    val scaleValue = (1f - 0.2f * abs(pageOffset)).coerceIn(0.8f, 1f)
                     alpha = alphaValue
                     scaleX = scaleValue
                     scaleY = scaleValue
@@ -2057,21 +2065,11 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            val infiniteTransition = rememberInfiniteTransition(label = "best-deck-glow")
-                            val animatedGlowScale by infiniteTransition.animateFloat(
-                                initialValue = 1f,
-                                targetValue = 1.4f,
-                                animationSpec = infiniteRepeatable(tween(2000), RepeatMode.Reverse),
-                                label = "glow"
-                            )
-                            // F-13: reduced-motion users see the static end state, not a pulsing glow.
-                            val glowScale = if (isReducedMotionEnabled()) 1.4f else animatedGlowScale
                             Box(
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .graphicsLayer(scaleX = glowScale, scaleY = glowScale)
+                                    .size(56.dp)
                                     .clip(CircleShape)
-                                    .background(mc.lifePositive.copy(alpha = 0.1f))
+                                    .background(mc.lifePositive.copy(alpha = 0.12f))
                             )
                             Surface(
                                 modifier = Modifier.size(48.dp),
@@ -2306,23 +2304,13 @@ private fun AnimatedStatKPI(
 private fun AnimatedResultPulse(won: Boolean) {
     val mc = MaterialTheme.magicColors
     val color = if (won) mc.lifePositive else mc.lifeNegative
-    
-    val infiniteTransition = rememberInfiniteTransition(label = "result-pulse")
-    val animatedAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 0.6f,
-        animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse),
-        label = "pulse"
-    )
-    // F-13: reduced-motion users see the static end state, not a pulsing halo.
-    val alpha = if (isReducedMotionEnabled()) 0.6f else animatedAlpha
 
     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(24.dp)) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(CircleShape)
-                .background(color.copy(alpha = alpha))
+                .background(color.copy(alpha = 0.3f))
         )
         Box(
             modifier = Modifier
@@ -2414,22 +2402,27 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
             val colorColorless = stringResourceSafe(R.string.stats_color_colorless)
             val colorUnknown = stringResourceSafe(R.string.stats_color_unknown)
 
+            val colorDistribution = remember(
+                slide.byColor, colorWhite, colorBlue, colorBlack, colorRed, colorGreen, colorColorless, colorUnknown
+            ) {
+                slide.byColor.entries.associate { (code, count) ->
+                    val label = when (code) {
+                        "W" -> colorWhite
+                        "U" -> colorBlue
+                        "B" -> colorBlack
+                        "R" -> colorRed
+                        "G" -> colorGreen
+                        "C" -> colorColorless
+                        else -> colorUnknown
+                    }
+                    label to count
+                }
+            }
+
             HubSlide {
                 ClickableBox(onClick = { onAction(HomeAction.OpenLibrary) }) {
                     CircularDistribution(
-                        data = slide.byColor.entries
-                            .associate { (code, count) ->
-                                val label = when (code) {
-                                    "W" -> colorWhite
-                                    "U" -> colorBlue
-                                    "B" -> colorBlack
-                                    "R" -> colorRed
-                                    "G" -> colorGreen
-                                    "C" -> colorColorless
-                                    else -> colorUnknown
-                                }
-                                label to count
-                            },
+                        data = colorDistribution,
                         colorMapper = { label ->
                             when (label) {
                                 colorWhite -> mc.manaW
@@ -2454,19 +2447,25 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
             val rarityRare = stringResourceSafe(R.string.home_rarity_rare)
             val rarityMythic = stringResourceSafe(R.string.home_rarity_mythic)
 
+            val rarityDistribution = remember(
+                slide.byRarity, rarityCommon, rarityUncommon, rarityRare, rarityMythic
+            ) {
+                slide.byRarity.entries.associate { entry ->
+                    val label = when (entry.key) {
+                        "MYTHIC" -> rarityMythic
+                        "RARE" -> rarityRare
+                        "UNCOMMON" -> rarityUncommon
+                        "COMMON" -> rarityCommon
+                        else -> entry.key
+                    }
+                    label to entry.value
+                }
+            }
+
             HubSlide {
                 ClickableBox(onClick = { onAction(HomeAction.OpenLibrary) }) {
                     CircularDistribution(
-                        data = slide.byRarity.entries.associate { entry ->
-                            val label = when (entry.key) {
-                                "MYTHIC" -> rarityMythic
-                                "RARE" -> rarityRare
-                                "UNCOMMON" -> rarityUncommon
-                                "COMMON" -> rarityCommon
-                                else -> entry.key
-                            }
-                            label to entry.value
-                        },
+                        data = rarityDistribution,
                         colorMapper = { label ->
                             when (label) {
                                 rarityCommon -> mc.textDisabled
@@ -2536,7 +2535,11 @@ private fun DecksShelfWidget(decks: List<DeckSummary>?, onAction: (HomeAction) -
     if (decks == null) return
     WidgetShell {
         if (decks.isEmpty()) {
-            WidgetEmptyBody(stringResourceSafe(R.string.home_decks_empty))
+            WidgetEmptyBody(
+                message = stringResourceSafe(R.string.home_decks_empty),
+                actionLabel = stringResourceSafe(R.string.quick_start_new_deck),
+                onAction = { onAction(HomeAction.CreateDeck) },
+            )
             return@WidgetShell
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
@@ -2569,14 +2572,11 @@ private fun RecentlyAddedWidget(
     if (entries == null) return
     WidgetShell {
         if (entries.isEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                WidgetEmptyBody(stringResourceSafe(R.string.home_recently_added_empty))
-                PillButton(
-                    label = stringResourceSafe(R.string.home_recently_added_cta),
-                    icon = Icons.Default.Camera,
-                    onClick = { onAction(HomeAction.ScanCard) },
-                )
-            }
+            WidgetEmptyBody(
+                message = stringResourceSafe(R.string.home_recently_added_empty),
+                actionLabel = stringResourceSafe(R.string.home_recently_added_cta),
+                onAction = { onAction(HomeAction.ScanCard) },
+            )
             return@WidgetShell
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
@@ -2620,7 +2620,11 @@ private fun WishlistWidget(
     if (stats == null) return
     WidgetShell {
         if (stats.count == 0) {
-            WidgetEmptyBody(stringResourceSafe(R.string.home_wishlist_empty))
+            WidgetEmptyBody(
+                message = stringResourceSafe(R.string.home_wishlist_empty),
+                actionLabel = stringResourceSafe(R.string.quick_start_search_card),
+                onAction = { onAction(HomeAction.SearchCard) },
+            )
             return@WidgetShell
         }
         
@@ -2684,46 +2688,64 @@ private fun DiscoverCardsWidget(
 ) {
     val spacing = MaterialTheme.spacing
     WidgetShell {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(rowHeight),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (loadState == DiscoverLoadState.LOADING || cards.isEmpty()) {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                    modifier = Modifier.fillMaxSize(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    userScrollEnabled = false,
+        when {
+            loadState == DiscoverLoadState.FAILED -> {
+                WidgetEmptyBody(
+                    message = stringResourceSafe(R.string.addcard_server_unavailable_title),
+                    actionLabel = stringResourceSafe(R.string.retry),
+                    onAction = { onAction(HomeAction.RefreshDiscover) },
+                )
+            }
+            loadState == DiscoverLoadState.LOADED && cards.isEmpty() -> {
+                WidgetEmptyBody(
+                    message = stringResourceSafe(R.string.home_widget_empty),
+                    actionLabel = stringResourceSafe(R.string.retry),
+                    onAction = { onAction(HomeAction.RefreshDiscover) },
+                )
+            }
+            else -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(rowHeight),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    items(SKELETON_ROW_TILES) {
-                        Image(
-                            painter = painterResource(Res.drawable.mtg_card_back),
-                            contentDescription = null,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier
-                                .width(HomeCardThumbWidth)
-                                .aspectRatio(HomeCardAspectRatio)
-                                .clip(SmallCardShape),
-                        )
-                    }
-                }
-            } else {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                    modifier = Modifier.fillMaxSize(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    items(cards, key = { "discover|${it.id}" }) { card ->
-                        val uniqueKey = "discover|${card.id}"
-                        DiscoverCardThumb(
-                            card = card,
-                            onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId, uniqueKey)) },
-                            sharedTransitionScope = sharedTransitionScope,
-                            animatedVisibilityScope = animatedVisibilityScope,
-                            sharedTransitionKey = uniqueKey
-                        )
+                    if (loadState == DiscoverLoadState.LOADING) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                            modifier = Modifier.fillMaxSize(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            userScrollEnabled = false,
+                        ) {
+                            items(SKELETON_ROW_TILES) {
+                                Image(
+                                    painter = painterResource(Res.drawable.mtg_card_back),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .width(HomeCardThumbWidth)
+                                        .aspectRatio(HomeCardAspectRatio)
+                                        .clip(SmallCardShape),
+                                )
+                            }
+                        }
+                    } else {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                            modifier = Modifier.fillMaxSize(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            items(cards, key = { "discover|${it.id}" }) { card ->
+                                val uniqueKey = "discover|${card.id}"
+                                DiscoverCardThumb(
+                                    card = card,
+                                    onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId, uniqueKey)) },
+                                    sharedTransitionScope = sharedTransitionScope,
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                    sharedTransitionKey = uniqueKey
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -2828,6 +2850,14 @@ private fun RandomCardWidget(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val mc = MaterialTheme.magicColors
+    if (loadState == DiscoverLoadState.FAILED || (loadState == DiscoverLoadState.LOADED && card == null)) {
+        WidgetEmptyBody(
+            message = stringResourceSafe(R.string.error_unknown),
+            actionLabel = stringResourceSafe(R.string.retry),
+            onAction = { onAction(HomeAction.RefreshRandomCard) },
+        )
+        return
+    }
     if (loadState == DiscoverLoadState.LOADING || card == null) {
         RandomCardFrame {
             Image(
@@ -2950,7 +2980,11 @@ private fun LatestSetsWidget(sets: List<DraftSet>?, tileHeight: Dp, onAction: (H
     if (sets == null) return
     WidgetShell {
         if (sets.isEmpty()) {
-            WidgetEmptyBody(stringResourceSafe(R.string.home_latest_sets_empty))
+            WidgetEmptyBody(
+                message = stringResourceSafe(R.string.home_latest_sets_empty),
+                actionLabel = stringResourceSafe(R.string.quick_start_draft_guides),
+                onAction = { onAction(HomeAction.OpenDraftGuide) },
+            )
             return@WidgetShell
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
@@ -2976,7 +3010,6 @@ private fun LatestSetsWidget(sets: List<DraftSet>?, tileHeight: Dp, onAction: (H
 @Composable
 private fun NewsWidget(
     news: List<NewsItem>?,
-    filtersActive: Boolean,
     cardHeight: Dp,
     onAction: (HomeAction) -> Unit,
 ) {
@@ -2984,8 +3017,11 @@ private fun NewsWidget(
     if (news == null) return
     WidgetShell {
         if (news.isEmpty()) {
-            // Empty list: offer to reset the (possibly over-restrictive) persisted filters.
-            NewsEmptyWithReset(filtersActive = filtersActive, onAction = onAction)
+            WidgetEmptyBody(
+                message = stringResourceSafe(R.string.home_news_empty),
+                actionLabel = stringResourceSafe(R.string.home_news_reset_filters),
+                onAction = { onAction(HomeAction.ResetNewsFilters) },
+            )
             return@WidgetShell
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
@@ -3008,32 +3044,6 @@ private fun NewsWidget(
 
 /** News titles always reserve two lines so every card in the row has the same height. */
 private const val NEWS_TITLE_LINES = 2
-
-/**
- * Empty-state body for the News widget. Always offers a "Reset filters" button (per spec)
- * so the user can recover when the persisted filters hide everything; the message hints at
- * filtering when [filtersActive].
- */
-@Composable
-private fun NewsEmptyWithReset(filtersActive: Boolean, onAction: (HomeAction) -> Unit) {
-    val spacing = MaterialTheme.spacing
-    Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-        WidgetEmptyBody(stringResourceSafe(R.string.home_news_empty))
-        MagicCtaButton(
-            onClick = { onAction(HomeAction.ResetNewsFilters) },
-            text = stringResourceSafe(R.string.home_news_reset_filters),
-            style = MagicCtaStyle.Outlined,
-            color = MagicCtaColor.Primary,
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-            },
-        )
-    }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  RULES_TIP — one tip at a time; the header's roll button picks another
@@ -3238,7 +3248,11 @@ private fun FriendsWidget(
             }
         }
         if (friends.isEmpty()) {
-            WidgetEmptyBody(stringResourceSafe(R.string.home_friends_empty))
+            WidgetEmptyBody(
+                message = stringResourceSafe(R.string.home_friends_empty),
+                actionLabel = stringResourceSafe(R.string.quick_start_friends),
+                onAction = { onAction(HomeAction.OpenFriends) },
+            )
             return@WidgetShell
         }
         Text(
@@ -3286,7 +3300,11 @@ private fun CommunityDecksWidget(
     if (decks == null) return
     WidgetShell {
         if (decks.isEmpty()) {
-            WidgetEmptyBody(stringResourceSafe(R.string.home_community_decks_empty))
+            WidgetEmptyBody(
+                message = stringResourceSafe(R.string.home_community_decks_empty),
+                actionLabel = stringResourceSafe(R.string.quick_start_community),
+                onAction = { onAction(HomeAction.OpenCommunityDecks) },
+            )
             return@WidgetShell
         }
         LazyRow(
@@ -3952,7 +3970,8 @@ private const val MAX_NEWS_PREVIEW = 5
 private val QuickStartAction.navIcon: ImageVector
     get() = when (this) {
         QuickStartAction.SCAN_CARD -> Icons.Default.Camera
-        QuickStartAction.CREATE_DECK -> Icons.Default.AddCircle
+        QuickStartAction.IMPORT_COLLECTION -> Icons.Default.ImportExport
+        QuickStartAction.CREATE_DECK -> Icons.Default.Bookmarks
         QuickStartAction.DRAFT_GUIDE -> Icons.Default.SportsEsports
         QuickStartAction.SEARCH_CARD -> Icons.Default.Search
         QuickStartAction.DECKS -> Icons.Default.Style
@@ -3971,8 +3990,9 @@ private val QuickStartAction.navLabel: String
     @ReadOnlyComposable
     get() = when (this) {
         QuickStartAction.SCAN_CARD -> stringResourceSafe(R.string.quick_start_scan_card)
-        QuickStartAction.CREATE_DECK -> stringResourceSafe(R.string.quick_start_new_deck)
+        QuickStartAction.IMPORT_COLLECTION -> stringResourceSafe(R.string.quick_start_import_collection)
         QuickStartAction.DRAFT_GUIDE -> stringResourceSafe(R.string.quick_start_draft_guides)
+        QuickStartAction.CREATE_DECK -> stringResourceSafe(R.string.quick_start_new_deck)
         QuickStartAction.SEARCH_CARD -> stringResourceSafe(R.string.quick_start_search_card)
         QuickStartAction.DECKS -> stringResourceSafe(R.string.quick_start_my_decks)
         QuickStartAction.NEWS -> stringResourceSafe(R.string.quick_start_news)
@@ -3987,7 +4007,7 @@ private val QuickStartAction.navLabel: String
 /** Maps a Quick Start action to its navigation intent. */
 private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
     QuickStartAction.SCAN_CARD -> HomeAction.ScanCard
-    QuickStartAction.CREATE_DECK -> HomeAction.CreateDeck
+    QuickStartAction.IMPORT_COLLECTION -> HomeAction.OpenImportCollection
     QuickStartAction.DRAFT_GUIDE -> HomeAction.DraftGuide
     QuickStartAction.SEARCH_CARD -> HomeAction.SearchCard
     QuickStartAction.DECKS -> HomeAction.OpenDecks
@@ -3998,5 +4018,7 @@ private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
     QuickStartAction.COMMUNITY_DECKS -> HomeAction.OpenCommunityDecks
     QuickStartAction.SETTINGS -> HomeAction.OpenSettings
     QuickStartAction.MULTI_ADD_CARD -> HomeAction.OpenMultiAdd
-
+    QuickStartAction.CREATE_DECK -> HomeAction.CreateDeck
 }
+
+

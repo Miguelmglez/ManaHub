@@ -217,6 +217,8 @@ fun coreBridgeKoinModule(
             remote = get(),
             currentUserId = { (authRepository.sessionState.value as? SessionState.Authenticated)?.user?.id },
             sessionUserId = authRepository.sessionState.map { (it as? SessionState.Authenticated)?.user?.id },
+            syncDao = get(),
+            tradeWishlistCleanup = get(),
         )
     }
     single<OpenForTradeRepository> {

@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.ui.components.search
 
+import androidx.lifecycle.SavedStateHandle
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
@@ -8,6 +9,8 @@ import com.mmg.manahub.core.model.ColorMatchMode
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.SearchCriterion
+import com.mmg.manahub.core.model.SearchOrder
+import com.mmg.manahub.core.model.SearchDirection
 import com.mmg.manahub.core.model.SetType
 import io.mockk.every
 import io.mockk.mockk
@@ -62,10 +65,11 @@ class AdvancedSearchViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun createVm() = AdvancedSearchViewModel(
+    private fun createVm(handle: SavedStateHandle = SavedStateHandle()) = AdvancedSearchViewModel(
         scryfallDataSource = scryfallDataSource,
         buildQuery = BuildScryfallQueryUseCase(),
         userPreferencesDataStore = userPreferences,
+        savedStateHandle = handle,
     )
 
     // ── The reported defect ───────────────────────────────────────────────────
@@ -293,4 +297,47 @@ class AdvancedSearchViewModelTest {
 
             assertEquals(listOf(SearchCriterion.Name("Bolt")), vm.uiState.value.currentQuery.criteria)
         }
+    @Test
+    fun sectionExpansionSurvivesReopenAndRecreationPerScreen() = runTest(dispatcher) {
+        val handle = SavedStateHandle()
+        val first = createVm(handle)
+        advanceUntilIdle()
+
+        first.setSectionExpanded("collection:colors", false)
+        first.setSectionExpanded("collection:name", true)
+        first.setSectionExpanded("wizard_commander:colors", true)
+        first.seedFrom(AdvancedSearchQuery(criteria = listOf(SearchCriterion.Name("Bolt"))))
+        first.seedFrom(AdvancedSearchQuery())
+
+        assertEquals(false, first.sectionExpansion.value["collection:colors"])
+        assertEquals(true, first.sectionExpansion.value["collection:name"])
+        assertEquals(true, first.sectionExpansion.value["wizard_commander:colors"])
+
+        val recreated = createVm(handle)
+        advanceUntilIdle()
+        assertEquals(first.sectionExpansion.value, recreated.sectionExpansion.value)
+        recreated.setSectionExpanded("collection:colors", true)
+        assertEquals(true, recreated.sectionExpansion.value["collection:colors"])
+        assertEquals(true, recreated.sectionExpansion.value["wizard_commander:colors"])
+    }
+
+    @Test
+    fun clearRemovesPanelCriteriaAndSortWhileKeepingWizardLocks() = runTest(dispatcher) {
+        val vm = createVm()
+        advanceUntilIdle()
+        val locked = SearchCriterion.Format(listOf("commander"))
+        vm.setLockedCriteria(listOf(locked, SearchCriterion.CommanderEligible))
+        vm.setName("Meren")
+        vm.toggleColor("M")
+        vm.setOrder(SearchOrder.PRICE_EUR, SearchDirection.DESC)
+
+        vm.clearAll()
+
+        assertEquals(listOf(locked, SearchCriterion.CommanderEligible), vm.uiState.value.currentQuery.criteria)
+        assertEquals("", vm.uiState.value.nameValue)
+        assertTrue(vm.uiState.value.selectedColors.isEmpty())
+        assertEquals(SearchOrder.NAME, vm.uiState.value.currentQuery.orderBy)
+        assertEquals(SearchDirection.ASC, vm.uiState.value.currentQuery.direction)
+    }
+
 }

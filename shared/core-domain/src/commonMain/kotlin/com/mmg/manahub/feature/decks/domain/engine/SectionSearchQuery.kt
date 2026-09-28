@@ -299,7 +299,10 @@ object SectionSearchQuery {
     // (a raw type-line density signal, not a role -- see SynergyGraph.structuralProducerAxes).
 
     private val ENGINE_PRODUCER_ROLE_OVERRIDES: Map<AxisKey, Set<RoleKey>> = mapOf("ENGINE" to setOf("counterspell", "protection"))
-    private val ENGINE_PAYOFF_ROLE_OVERRIDES: Map<AxisKey, Set<RoleKey>> = mapOf("ENGINE" to setOf("finisher"))
+    private val ENGINE_PAYOFF_ROLE_OVERRIDES: Map<AxisKey, Set<RoleKey>> = mapOf(
+        "ENGINE" to setOf("finisher"),
+        "PLANESWALKERS" to setOf("protection", "proliferate_source"),
+    )
     private val ENGINE_PRODUCER_TYPE_FRAGMENT: Map<AxisKey, String> = mapOf(
         "SPELLS" to "(t:instant or t:sorcery)",
         "ARTIFACTS" to "t:artifact",
@@ -329,22 +332,14 @@ object SectionSearchQuery {
         return orJoinFragments(roles.mapNotNull { ROLE_ORACLE_FRAGMENTS[it] })
     }
 
-    /** Unions every role's [ROLE_CRITERIA] entry that is a single [SearchCriterion.CardFunction]
-     * (CardFunction's own OR semantics, `matchAll = false`, make this a real "any of these roles"
-     * union); when no role in the axis's set qualifies, falls back to the first role with ANY
-     * [ROLE_CRITERIA] entry so the query stays non-degenerate rather than losing precision to null —
-     * a documented simplification vs. the exhaustive union the string-path [engineFragment] builds. */
+    /** Retains every role alternative, including mixed function, Oracle and structural rules. */
     private fun engineCriteria(sectionId: String): List<SearchCriterion>? {
         val (axis, side) = parseEngineSectionId(sectionId) ?: return null
         val isProducerSide = side == "producers"
         if (isProducerSide) ENGINE_PRODUCER_TYPE_CRITERIA[axis]?.let { return listOf(it) }
         val roles = engineRoleKeys(axis, isProducerSide)
-        val functionOnlyRoles = roles.filter { (ROLE_CRITERIA[it]?.singleOrNull() as? SearchCriterion.CardFunction) != null }
-        if (functionOnlyRoles.isNotEmpty()) {
-            val tags = functionOnlyRoles.flatMap { (ROLE_CRITERIA.getValue(it).single() as SearchCriterion.CardFunction).functions }.toSet()
-            return listOf(SearchCriterion.CardFunction(tags))
-        }
-        return roles.firstNotNullOfOrNull { ROLE_CRITERIA[it] }
+        val alternatives = roles.mapNotNull { ROLE_CRITERIA[it] }
+        return alternatives.takeIf { it.isNotEmpty() }?.let { listOf(SearchCriterion.AnyOf(it)) }
     }
 
     private fun parseEngineSectionId(sectionId: String): Pair<AxisKey, String>? {
@@ -551,6 +546,15 @@ object SectionSearchQuery {
         "haste_source" to listOf(DetectionRule(anyOf = listOf(
             "creatures you control have haste", "other creatures you control have haste", "gains haste", "gain haste",
         ))),
+        "graveyard_exit_source" to listOf(DetectionRule(anyOf = listOf(
+            "return target card from your graveyard", "return a card from your graveyard",
+            "from your graveyard to your hand", "from your graveyard to the battlefield", "harmonize",
+        ))),
+        "leave_graveyard_payoff" to listOf(DetectionRule(allOf = listOf("leave your graveyard"))),
+        "pseudo_evasion" to listOf(DetectionRule(anyOf = listOf(
+            "trample", "deathtouch", "first strike", "double strike",
+        ))),
+        "proliferate_source" to listOf(DetectionRule(allOf = listOf("proliferate"))),
     )
 
     private val DICTIONARY_TRANSLATED_FRAGMENTS: Map<RoleKey, String> =

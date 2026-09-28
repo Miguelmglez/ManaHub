@@ -1,11 +1,13 @@
 package com.mmg.manahub.tools.tagpipeline.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 
 /**
  * One JSONL output row of the offline tag pipeline (Deck Engine Unification plan, RUN 5 / D5,
  * plan §5 Phase 5a). Mirrors the plan's own schema verbatim:
- * `{ oracle_id, tags, themes, archetypes, tribes, sources, generated_at, pipeline_version }`.
+ * `{ oracle_id, tags, suggestions, input_fingerprint, themes, archetypes, tribes, sources,
+ * generated_at, pipeline_version }`.
  *
  * This is the payload shape the parallel `backend-supabase-expert` agent's `card_strategy_tags`
  * table (plan §5 Phase 5b) is expected to store as JSONB, keyed by [oracleId] — cross-check the two
@@ -31,6 +33,8 @@ data class CardStrategyTagsRow(
      *  threshold the in-app auto-tag flow uses) and the curated Scryfall-Tagger-mapped tags
      *  ([com.mmg.manahub.tools.tagpipeline.mapping.TaggerTagMapping]). */
     val tags: List<String>,
+    val suggestions: List<CardStrategyTagSuggestion> = emptyList(),
+    @SerialName("input_fingerprint") val inputFingerprint: String = "",
     /** Sorted, deduped bare tribe words — [com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
      *  .tribeKeys] with the `tribe:` prefix stripped (the prefix is a fingerprint-key convention
      *  internal to the app's scoring engine, not meaningful in a standalone bulk export). */
@@ -66,10 +70,15 @@ data class CardStrategyTagsRow(
     val pipelineVersion: Int,
 )
 
+@Serializable
+data class CardStrategyTagSuggestion(val key: String, val confidence: Float)
+
 /** Builds a [CardStrategyTagsRow], enforcing the determinism rules documented on the type. */
 fun buildCardStrategyTagsRow(
     oracleId: String,
     tags: Set<String>,
+    suggestions: List<CardStrategyTagSuggestion> = emptyList(),
+    inputFingerprint: String = "",
     tribes: Set<String>,
     themes: Map<String, Float> = emptyMap(),
     archetypes: Map<String, Float> = emptyMap(),
@@ -80,6 +89,8 @@ fun buildCardStrategyTagsRow(
 ): CardStrategyTagsRow = CardStrategyTagsRow(
     oracleId = oracleId,
     tags = tags.sorted(),
+    suggestions = suggestions.distinctBy { it.key }.sortedBy { it.key },
+    inputFingerprint = inputFingerprint,
     tribes = tribes.sorted(),
     themes = themes.toSortedMap(),
     archetypes = archetypes.toSortedMap(),

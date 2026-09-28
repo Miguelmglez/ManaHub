@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.home.presentation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.EmojiEvents
@@ -43,6 +44,15 @@ enum class HomeWidgetType(
 ) {
 
     // ── Activity ────────────────────────────────────────────────────────────────
+    GREETING_HEADER(
+        persistedId = "greeting_header",
+        defaultTitleRes = R.string.widget_title_greeting_header,
+        supportedSizes = setOf(WidgetSize.MEDIUM),
+        category = WidgetCategory.ACTIVITY,
+        audience = WidgetAudience.ALL,
+        icon = Icons.Default.AccountCircle,
+        isAlwaysPresent = true,
+    ),
     CONTEXT_HERO(
         persistedId = "context_hero",
         defaultTitleRes = R.string.widget_title_context_hero,

@@ -79,6 +79,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaSize
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.SmallCardShape
@@ -674,6 +675,7 @@ private fun CatalogRow(
                     text = stringResource(R.string.home_account_gated_lock),
                     style = MagicCtaStyle.Outlined,
                     color = MagicCtaColor.Primary,
+                    size = MagicCtaSize.Compact,
                     contentPadding = PaddingValues(horizontal = spacing.md, vertical = spacing.xs),
                 )
             }
@@ -706,6 +708,7 @@ private fun GalleryActionButton(
         enabled = enabled,
         style = MagicCtaStyle.Outlined,
         color = if (isAdded) MagicCtaColor.Error else MagicCtaColor.Primary,
+        size = MagicCtaSize.Compact,
         contentPadding = PaddingValues(horizontal = spacing.md, vertical = spacing.xs),
         icon = {
             Icon(
@@ -763,6 +766,7 @@ private val HomeWidgetType.description: String
     @Composable
     @ReadOnlyComposable
     get() = when (this) {
+        HomeWidgetType.GREETING_HEADER -> stringResource(R.string.home_widget_desc_greeting_header)
         HomeWidgetType.CONTEXT_HERO -> stringResource(R.string.home_widget_desc_context_hero)
         HomeWidgetType.QUICK_ACTIONS -> stringResource(R.string.home_widget_desc_quick_actions)
         HomeWidgetType.PROGRESSION_HUB -> stringResource(R.string.home_widget_desc_progression_hub)

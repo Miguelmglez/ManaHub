@@ -49,6 +49,7 @@ fun HomeWidgetType.isReady(state: HomeUiState, extras: HomeWidgetExtras): Boolea
             state.cardOfTheDay != null || state.randomCardLoadState == DiscoverLoadState.FAILED
         HomeWidgetType.LATEST_SETS -> state.latestSets != null
         HomeWidgetType.MTG_NEWS -> state.recentNews != null
+        HomeWidgetType.GREETING_HEADER,
         HomeWidgetType.RULES_TIP -> true
         HomeWidgetType.TRADES_HUB ->
             state.recentTrades != null &&

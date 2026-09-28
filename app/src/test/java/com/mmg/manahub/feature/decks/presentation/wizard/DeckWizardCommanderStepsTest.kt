@@ -136,6 +136,32 @@ class DeckWizardCommanderStepsTest {
         assertTrue(locked.all { l -> built.criteria.any { it::class == l::class } })
     }
 
+    @Test
+    fun clearingCommanderPanelCriteriaKeepsOutsideNameAndLockedFormat() {
+        val locked = commanderLockedCriteria(DeckFormat.COMMANDER)
+        val beforeClear = DeckWizardUiState(
+            commanderQuery = "Meren",
+            commanderStructuredQuery = AdvancedSearchQuery(
+                criteria = locked + SearchCriterion.ColorIdentity(setOf("G"))
+            ),
+        )
+        assertTrue(buildCommanderSearchQuery(beforeClear, locked)!!.criteria.any {
+            it is SearchCriterion.ColorIdentity
+        })
+
+        val afterClear = beforeClear.copy(
+            commanderStructuredQuery = AdvancedSearchQuery(criteria = locked)
+        )
+        val query = buildCommanderSearchQuery(afterClear, locked)!!
+
+        assertEquals("Meren", afterClear.commanderQuery)
+        assertEquals(SearchCriterion.Name("Meren"), query.criteria.last())
+        assertFalse(query.criteria.any { it is SearchCriterion.ColorIdentity })
+        assertTrue(locked.all { criterion ->
+            query.criteria.any { it::class == criterion::class }
+        })
+    }
+
     // ── commanderOwnedIds (W2.1, G2 -- Scryfall results still show ownership) ────
 
     @Test

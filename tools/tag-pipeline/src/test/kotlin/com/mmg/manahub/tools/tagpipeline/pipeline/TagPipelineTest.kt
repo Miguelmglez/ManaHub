@@ -97,6 +97,24 @@ class TagPipelineTest {
     }
 
     @Test
+    fun `suggested strategy roles retain key and confidence without becoming confirmed tags`() {
+        val card = cardDto(
+            id = "scry-suggestion", oracleId = "oracle-suggestion", name = "Self Mill Card",
+            oracleText = "Put the top three cards of your library into your graveyard.",
+        )
+        val row = TagPipeline().buildRows(
+            cardDtos = sequenceOf(card),
+            oracleTagRows = emptySequence(),
+            themeIndexByCardName = emptyMap(),
+            generatedAt = "2026-09-27T00:00:00Z",
+        ).single()
+
+        assertTrue(row.suggestions.any { it.key == "graveyard_enabler" && it.confidence >= 0.60f })
+        assertFalse("graveyard_enabler" in row.tags)
+        assertTrue(row.inputFingerprint.isNotBlank())
+    }
+
+    @Test
     fun `a card with a blank oracle_id is skipped, never crashes the run`() {
         val noOracleId = cardDto(id = "scry-3", oracleId = "", name = "Weird Card")
         val pipeline = TagPipeline()

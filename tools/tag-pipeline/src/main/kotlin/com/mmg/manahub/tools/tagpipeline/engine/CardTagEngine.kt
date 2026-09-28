@@ -4,6 +4,7 @@ import com.mmg.manahub.core.data.tagging.StrategyAnalyzer
 import com.mmg.manahub.core.data.tagging.TagDictionary
 import com.mmg.manahub.core.data.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.SuggestedTag
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 
 /**
@@ -30,9 +31,14 @@ class CardTagEngine {
         strategyAnalyzer = StrategyAnalyzer(entriesProvider = { TagDictionary.all() }),
     )
 
+    fun analyze(card: Card): SuggestTagsUseCase.Result = suggestTagsUseCase(card)
+
     /** The production auto-confirmed [com.mmg.manahub.core.model.CardTag] keys for [card]. */
     fun confirmedTagKeys(card: Card): Set<String> =
-        suggestTagsUseCase(card).confirmed.map { it.key }.toSet()
+        analyze(card).confirmed.map { it.key }.toSet()
+
+    fun suggestedTags(card: Card): List<SuggestedTag> =
+        analyze(card).suggested
 
     /**
      * Bare tribe words (the `tribe:` fingerprint prefix stripped — see

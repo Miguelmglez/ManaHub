@@ -20,14 +20,15 @@ import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.QueuedCard
+import com.mmg.manahub.feature.collection.presentation.importexport.CollectionImportViewModel.Companion.MAX_IMPORT_QUEUE_ENTRIES
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -88,7 +89,7 @@ class CollectionImportViewModel(
 
     init {
         viewModelScope.launch {
-            queueRepository.queue.collect { queue -> _uiState.update { it.copy(queue = queue) } }
+            queueRepository.queue.collect { queue -> _uiState.update { it.withQueue(queue) } }
         }
         viewModelScope.launch {
             queueActions.isCommitting.collect { v -> _uiState.update { it.copy(isCommitting = v) } }
@@ -542,6 +543,26 @@ class CollectionImportViewModel(
 
     fun onCloseExpandedImage() {
         _uiState.update { it.copy(expandedVariantImageUrl = null) }
+    }
+
+    private fun CollectionImportUiState.withQueue(cards: List<QueuedCard>): CollectionImportUiState {
+        val effectiveCards = if (isListInverted) cards.reversed() else cards
+        return copy(
+            queue = effectiveCards,
+            isQueueSheetVisible = isQueueSheetVisible && cards.isNotEmpty(),
+        )
+    }
+
+    fun updateSorting() {
+        _uiState.update { state ->
+            val newInverted = !state.isListInverted
+            val rawCards = queueRepository.queue.value
+            val cardsToUse = if (newInverted) rawCards.reversed() else rawCards
+            state.copy(
+                isListInverted = newInverted,
+                queue = cardsToUse
+            )
+        }
     }
 
     // The owned-card key set is collection-sized; drop it as soon as the screen is gone, since a

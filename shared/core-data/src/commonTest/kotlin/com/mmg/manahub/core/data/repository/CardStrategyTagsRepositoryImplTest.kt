@@ -6,6 +6,7 @@ import com.mmg.manahub.core.data.cache.CachedCardStrategyTagsEntry
 import com.mmg.manahub.core.data.cache.CardStrategyTagsCache
 import com.mmg.manahub.core.data.remote.CardStrategyTagsRemoteDataSourceContract
 import com.mmg.manahub.core.data.remote.dto.CardStrategyTagsPayloadDto
+import com.mmg.manahub.core.data.remote.dto.CardStrategyTagSuggestionDto
 import com.mmg.manahub.core.data.remote.dto.CardStrategyTagsRowDto
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsSubmission
@@ -110,9 +111,29 @@ class CardStrategyTagsRepositoryImplTest {
     private fun row(oracleId: String, tags: List<String> = listOf("removal")) = CardStrategyTagsRowDto(
         oracleId = oracleId,
         payload = CardStrategyTagsPayloadDto(tags = tags),
-        pipelineVersion = "1",
+        pipelineVersion = "2",
         generatedAt = "2026-07-21T00:00:00Z",
     )
+
+    @Test
+    fun `remote payload exposes valid suggestions and rejects malformed confidence`() = runTest {
+        val remoteRow = CardStrategyTagsRowDto(
+            oracleId = "oracle-suggestions",
+            payload = CardStrategyTagsPayloadDto(
+                suggestions = listOf(
+                    CardStrategyTagSuggestionDto("graveyard_enabler", 0.80f),
+                    CardStrategyTagSuggestionDto("invalid", 0.20f),
+                ),
+            ),
+            pipelineVersion = "2",
+            generatedAt = "2026-09-27T00:00:00Z",
+        )
+        val result = repository(FakeRemote(behavior = { remoteRow })).getStrategyTags(remoteRow.oracleId)
+
+        val found = assertIs<CardStrategyTagsResult.Found>(result)
+        assertEquals(listOf("graveyard_enabler"), found.suggestions.map { it.tag.key })
+        assertEquals(0.80f, found.suggestions.single().confidence)
+    }
 
     // ── Blank oracleId ───────────────────────────────────────────────────────
 
@@ -133,7 +154,7 @@ class CardStrategyTagsRepositoryImplTest {
     fun `given a fresh cache entry when getStrategyTags then remote is never called`() = runTest {
         val cache = FakeCache()
         val payloadJson = json.encodeToString(CardStrategyTagsPayloadDto.serializer(), CardStrategyTagsPayloadDto(tags = listOf("removal")))
-        cache.store["oracle-1"] = CachedCardStrategyTagsEntry("oracle-1", payloadJson, "1", "2026-07-21T00:00:00Z", fetchedAt = 1_000_000L)
+        cache.store["oracle-1"] = CachedCardStrategyTagsEntry("oracle-1", payloadJson, "2", "2026-07-21T00:00:00Z", fetchedAt = 1_000_000L)
         val remote = FakeRemote()
         val repo = repository(remote, cache, clock = { 1_000_000L + 1_000L })
 
@@ -146,6 +167,35 @@ class CardStrategyTagsRepositoryImplTest {
     }
 
     // ── Cache miss -> remote fetch ───────────────────────────────────────────
+
+    @Test
+    fun `given a recent v1 cache when v2 is available then it refreshes immediately`() = runTest {
+        val cache = FakeCache()
+        val payloadJson = json.encodeToString(CardStrategyTagsPayloadDto.serializer(), CardStrategyTagsPayloadDto(tags = listOf("ramp")))
+        cache.store["oracle-v1"] = CachedCardStrategyTagsEntry("oracle-v1", payloadJson, "1", "old", fetchedAt = 1_000_000L)
+        val remote = FakeRemote(behavior = { row("oracle-v1", tags = listOf("removal")) })
+
+        val result = repository(remote, cache, clock = { 1_001_000L }).getStrategyTags("oracle-v1")
+
+        assertIs<CardStrategyTagsResult.Found>(result)
+        assertEquals(listOf(CardTag.REMOVAL), result.tags)
+        assertEquals("2", cache.store.getValue("oracle-v1").pipelineVersion)
+        assertEquals(1, remote.callCount)
+    }
+
+    @Test
+    fun `given a recent v1 cache when remote fails then previous tags remain available`() = runTest {
+        val cache = FakeCache()
+        val payloadJson = json.encodeToString(CardStrategyTagsPayloadDto.serializer(), CardStrategyTagsPayloadDto(tags = listOf("ramp")))
+        cache.store["oracle-v1"] = CachedCardStrategyTagsEntry("oracle-v1", payloadJson, "1", "old", fetchedAt = 1_000_000L)
+
+        val result = repository(FakeRemote(), cache, clock = { 1_001_000L }).getStrategyTags("oracle-v1")
+
+        assertIs<CardStrategyTagsResult.Found>(result)
+        assertEquals(listOf(CardTag.RAMP), result.tags)
+        assertTrue(result.isStale)
+        assertEquals("1", cache.store.getValue("oracle-v1").pipelineVersion)
+    }
 
     @Test
     fun `given no cache entry when getStrategyTags then the remote row is fetched and cached`() = runTest {
@@ -312,7 +362,7 @@ class CardStrategyTagsRepositoryImplTest {
                 CardStrategyTagsPayloadDto.serializer(),
                 CardStrategyTagsPayloadDto(tags = listOf("ramp")),
             ),
-            pipelineVersion = "1",
+            pipelineVersion = "2",
             generatedAt = "2026-07-21T00:00:00Z",
             fetchedAt = 1_999_000L,
         )
@@ -324,6 +374,28 @@ class CardStrategyTagsRepositoryImplTest {
         assertEquals(listOf(listOf("oracle-2")), remote.requestedChunks)
         assertEquals(listOf("ramp"), (results.getValue("oracle-1") as CardStrategyTagsResult.Found).tags.map { it.key })
         assertIs<CardStrategyTagsResult.Found>(results.getValue("oracle-2"))
+    }
+
+    @Test
+    fun `given a fresh v1 cache when getStrategyTagsBatch then the row is refreshed`() = runTest {
+        val cache = FakeCache()
+        cache.store["oracle-v1"] = CachedCardStrategyTagsEntry(
+            oracleId = "oracle-v1",
+            payloadJson = json.encodeToString(
+                CardStrategyTagsPayloadDto.serializer(),
+                CardStrategyTagsPayloadDto(tags = listOf("ramp")),
+            ),
+            pipelineVersion = "1",
+            generatedAt = "2026-07-21T00:00:00Z",
+            fetchedAt = 1_999_000L,
+        )
+        val remote = FakeBatchRemote(rows = mapOf("oracle-v1" to row("oracle-v1", tags = listOf("removal"))))
+
+        val result = repository(remote, cache).getStrategyTagsBatch(setOf("oracle-v1"))
+
+        assertEquals(listOf(listOf("oracle-v1")), remote.requestedChunks)
+        assertEquals("2", cache.store.getValue("oracle-v1").pipelineVersion)
+        assertEquals(listOf("removal"), (result.getValue("oracle-v1") as CardStrategyTagsResult.Found).tags.map { it.key })
     }
 
     @Test

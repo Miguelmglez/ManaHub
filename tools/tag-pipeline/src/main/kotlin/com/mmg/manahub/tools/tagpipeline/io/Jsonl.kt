@@ -36,14 +36,15 @@ val PIPELINE_JSON: Json = Json {
  * [gzip] controls whether the file is decompressed while streaming (Scryfall's `jsonl_download_uri`
  * files are always `.gz`).
  */
-fun <T> readJsonl(path: Path, serializer: KSerializer<T>, gzip: Boolean = true): Sequence<T> {
+fun <T> readJsonl(path: Path, serializer: KSerializer<T>, gzip: Boolean = true, strict: Boolean = false): Sequence<T> {
     val rawInput = Files.newInputStream(path)
     val input = if (gzip) GZIPInputStream(rawInput) else rawInput
     val reader = input.bufferedReader(StandardCharsets.UTF_8)
     return reader.lineSequence()
         .filter { it.isNotBlank() }
         .mapNotNull { line ->
-            runCatching { PIPELINE_JSON.decodeFromString(serializer, line) }.getOrNull()
+            val decoded = runCatching { PIPELINE_JSON.decodeFromString(serializer, line) }
+            if (strict) decoded.getOrThrow() else decoded.getOrNull()
         }
         // Closing the reader when the sequence is exhausted would require a `use{}` around the
         // whole terminal operation at the call site; instead each caller is expected to fully

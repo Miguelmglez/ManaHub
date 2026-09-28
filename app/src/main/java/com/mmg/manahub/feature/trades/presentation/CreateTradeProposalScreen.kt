@@ -49,6 +49,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +76,8 @@ import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.AvatarImage
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.CardSearchSheet
+import com.mmg.manahub.core.ui.components.CopyBadge
+import com.mmg.manahub.core.ui.components.SectionHeader
 import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
 import com.mmg.manahub.core.ui.components.MagicLoadingFooter
 import com.mmg.manahub.core.ui.components.InlineErrorState
@@ -144,6 +147,8 @@ fun CreateTradeProposalScreen(
     var editingItem by remember { mutableStateOf<TradeItemDraft?>(null) }
     var showEditSheet by remember { mutableStateOf(false) }
     var showLoginSheet by remember { mutableStateOf(false) }
+    var proposerSectionExpanded by rememberSaveable { mutableStateOf(true) }
+    var receiverSectionExpanded by rememberSaveable { mutableStateOf(true) }
     val noFriendMsg = stringResource(R.string.trades_friend_required)
     val openSearch: (TradeSide) -> Unit = { side ->
         if (uiState.selectedFriend == null) {
@@ -264,62 +269,66 @@ fun CreateTradeProposalScreen(
 
                 // ── "You send" section header ─────────────────────────────────────
                 item(key = "you_send_header") {
-                    Text(
-                        text = stringResource(R.string.trades_you_offer_section),
-                        style = MaterialTheme.magicTypography.labelLarge,
-                        color = mc.textSecondary,
+                    SectionHeader(
+                        title = stringResource(R.string.trades_you_offer_section),
+                        expanded = proposerSectionExpanded,
+                        onToggle = { proposerSectionExpanded = !proposerSectionExpanded },
+                        titleColor = mc.textSecondary,
+                        trailing = { CopyBadge(label = uiState.proposerItems.size.toString()) },
                     )
                 }
 
-                // ── Proposer-match suggestions (inline, above "They get" items) ──
-                if (uiState.selectedFriend != null && uiState.proposerMatches.isNotEmpty()) {
-                    item(key = "proposer_suggestions") {
-                        InlineSuggestionsRow(
-                            label   = stringResource(R.string.trades_suggested_for_them),
-                            matches = uiState.proposerMatches,
-                            onCardClick = onNavigateToCardDetail,
-                            onAdd   = { row ->
-                                viewModel.addSuggestionToProposer(
-                                    row.toTradeItemDraft(isInCollection = row.isOwned || row.offerEntry != null)
-                                )
-                            },
-                        )
+                if (proposerSectionExpanded) {
+                    // ── Proposer-match suggestions (inline, above "They get" items) ──
+                    if (uiState.selectedFriend != null && uiState.proposerMatches.isNotEmpty()) {
+                        item(key = "proposer_suggestions") {
+                            InlineSuggestionsRow(
+                                label   = stringResource(R.string.trades_suggested_for_them),
+                                matches = uiState.proposerMatches,
+                                onCardClick = onNavigateToCardDetail,
+                                onAdd   = { row ->
+                                    viewModel.addSuggestionToProposer(
+                                        row.toTradeItemDraft(isInCollection = row.isOwned || row.offerEntry != null)
+                                    )
+                                },
+                            )
+                        }
                     }
-                }
 
-                // ── Review collection toggle (proposer side only, shown before items) ──
-                item(key = "you_send_review") {
-                    ReviewCollectionToggle(
-                        label   = stringResource(R.string.trades_review_collection_proposer),
-                        checked = uiState.includesReviewFromProposer,
-                        onToggle = viewModel::toggleReviewCollectionProposer,
-                    )
-                }
-
-                if (uiState.proposerItems.isEmpty() && !uiState.includesReviewFromProposer) {
-                    item(key = "proposer_empty") {
-                        SideEmptyState(
-                            title = stringResource(R.string.trades_proposer_empty_cta),
-                            onAdd = { openSearch(TradeSide.PROPOSER) },
-                        )
-                    }
-                } else {
-                    items(uiState.proposerItems, key = { "pi_${it.id}" }) { item ->
-                        TradeItemDraftRow(
-                            item     = item,
-                            onClick  = {
-                                editingItem = item
-                                showEditSheet = true
-                            },
-                            onRemove = { viewModel.removeProposerItem(item.id) },
+                    // ── Review collection toggle (proposer side only, shown before items) ──
+                    item(key = "you_send_review") {
+                        ReviewCollectionToggle(
+                            label   = stringResource(R.string.trades_review_collection_proposer),
+                            checked = uiState.includesReviewFromProposer,
+                            onToggle = viewModel::toggleReviewCollectionProposer,
                         )
                     }
 
-                    item(key = "they_get_add") {
-                        AddItemButton(
-                            enabled = uiState.selectedFriend != null,
-                            onClick = { openSearch(TradeSide.PROPOSER) },
-                        )
+                    if (uiState.proposerItems.isEmpty() && !uiState.includesReviewFromProposer) {
+                        item(key = "proposer_empty") {
+                            SideEmptyState(
+                                title = stringResource(R.string.trades_proposer_empty_cta),
+                                onAdd = { openSearch(TradeSide.PROPOSER) },
+                            )
+                        }
+                    } else {
+                        items(uiState.proposerItems, key = { "pi_${it.id}" }) { item ->
+                            TradeItemDraftRow(
+                                item     = item,
+                                onClick  = {
+                                    editingItem = item
+                                    showEditSheet = true
+                                },
+                                onRemove = { viewModel.removeProposerItem(item.id) },
+                            )
+                        }
+
+                        item(key = "they_get_add") {
+                            AddItemButton(
+                                enabled = uiState.selectedFriend != null,
+                                onClick = { openSearch(TradeSide.PROPOSER) },
+                            )
+                        }
                     }
                 }
 
@@ -347,56 +356,61 @@ fun CreateTradeProposalScreen(
 
                 item(key = "friend_send_header") {
                     val friendName = uiState.selectedFriend?.nickname
-                    Text(
-                        text = if (friendName != null)
-                            stringResource(R.string.trades_named_sends, friendName)
-                        else
-                            stringResource(R.string.trades_they_offer_section),
-                        style = MaterialTheme.magicTypography.labelLarge,
-                        color = mc.textSecondary,
+                    val friendSendTitle = if (friendName != null)
+                        stringResource(R.string.trades_named_sends, friendName)
+                    else
+                        stringResource(R.string.trades_they_offer_section)
+                    SectionHeader(
+                        title = friendSendTitle,
+                        expanded = receiverSectionExpanded,
+                        onToggle = { receiverSectionExpanded = !receiverSectionExpanded },
+                        titleColor = mc.textSecondary,
+                        trailing = { CopyBadge(label = uiState.receiverItems.size.toString()) },
                     )
                 }
 
-                // ── Receiver-match suggestions (inline, above "You get" items) ────
-                if (uiState.selectedFriend != null && uiState.receiverMatches.isNotEmpty()) {
-                    item(key = "receiver_suggestions") {
-                        InlineSuggestionsRow(
-                            label   = stringResource(R.string.trades_suggested_for_you),
-                            matches = uiState.receiverMatches,
-                            onCardClick = onNavigateToCardDetail,
-                            onAdd   = { row ->
-                                viewModel.addSuggestionToReceiver(
-                                    row.toTradeItemDraft(isInCollection = row.offerEntry != null)
-                                )
-                            },
-                        )
-                    }
-                }
-
-                if (uiState.receiverItems.isEmpty()) {
-                    item(key = "receiver_empty") {
-                        SideEmptyState(
-                            title = stringResource(R.string.trades_receiver_empty_cta),
-                            onAdd = { openSearch(TradeSide.RECEIVER) },
-                        )
-                    }
-                } else {
-                    items(uiState.receiverItems, key = { "ri_${it.id}" }) { item ->
-                        TradeItemDraftRow(
-                            item     = item,
-                            onClick  = {
-                                editingItem = item
-                                showEditSheet = true
-                            },
-                            onRemove = { viewModel.removeReceiverItem(item.id) },
-                        )
+                if (receiverSectionExpanded) {
+                    // ── Receiver-match suggestions (inline, above "You get" items) ────
+                    if (uiState.selectedFriend != null && uiState.receiverMatches.isNotEmpty()) {
+                        item(key = "receiver_suggestions") {
+                            InlineSuggestionsRow(
+                                label   = stringResource(R.string.trades_suggested_for_you),
+                                matches = uiState.receiverMatches,
+                                onCardClick = onNavigateToCardDetail,
+                                onAdd   = { row ->
+                                    viewModel.addSuggestionToReceiver(
+                                        row.toTradeItemDraft(isInCollection = row.offerEntry != null)
+                                    )
+                                },
+                            )
+                        }
                     }
 
-                    item(key = "you_get_add") {
-                        AddItemButton(
-                            enabled = uiState.selectedFriend != null,
-                            onClick = { openSearch(TradeSide.RECEIVER) },
-                        )
+                    if (uiState.receiverItems.isEmpty()) {
+                        item(key = "receiver_empty") {
+                            SideEmptyState(
+                                title = stringResource(R.string.trades_receiver_empty_cta),
+                                onAdd = { openSearch(TradeSide.RECEIVER) },
+                            )
+                        }
+                    } else {
+                        items(uiState.receiverItems, key = { "ri_${it.id}" }) { item ->
+                            TradeItemDraftRow(
+                                item     = item,
+                                onClick  = {
+                                    editingItem = item
+                                    showEditSheet = true
+                                },
+                                onRemove = { viewModel.removeReceiverItem(item.id) },
+                            )
+                        }
+
+                        item(key = "you_get_add") {
+                            AddItemButton(
+                                enabled = uiState.selectedFriend != null,
+                                onClick = { openSearch(TradeSide.RECEIVER) },
+                            )
+                        }
                     }
                 }
 
@@ -441,6 +455,8 @@ fun CreateTradeProposalScreen(
             isSearchingScryfall = uiState.isSearchingScryfall,
             onQueryChange = viewModel::onAddCardsQueryChange,
             onScryfallSearch = viewModel::searchScryfallDirect,
+            onAdvancedSearch = viewModel::applyAdvancedSearch,
+            appliedAdvancedQuery = uiState.activeAdvancedQuery,
             friendName = null, // title is now controlled via explicit title param
             wishlistTabLabel = wishlistLabel,
             offerTabLabel = offerLabel,

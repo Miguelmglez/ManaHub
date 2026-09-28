@@ -1,21 +1,11 @@
 package com.mmg.manahub.feature.home.presentation
 
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.max
-import com.mmg.manahub.core.FeatureFlags
-import com.mmg.manahub.core.ui.components.rememberMagicSkeletonPulse
-import com.mmg.manahub.core.ui.isReducedMotionEnabled
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,9 +27,12 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
@@ -47,11 +40,10 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Camera
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SportsEsports
@@ -77,6 +69,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -84,16 +79,19 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.max
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.core.model.QuickStartAction
-import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.AvatarImage
+import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
-import com.mmg.manahub.core.ui.components.MagicFilterChip
+import com.mmg.manahub.core.ui.components.rememberMagicSkeletonPulse
+import com.mmg.manahub.core.ui.isReducedMotionEnabled
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.coloredShadow
@@ -139,23 +137,25 @@ fun HomeScreen(
     val widgetReadiness by viewModel.widgetReadiness.collectAsStateWithLifecycle()
     val widgetExtras by viewModel.widgetExtrasFlow.collectAsStateWithLifecycle()
     val rulesTipIndex by viewModel.rulesTipIndexFlow.collectAsStateWithLifecycle()
-    var showCustomizeSheet by remember { mutableStateOf(false) }
-    var showGallerySheet by remember { mutableStateOf(false) }
+    var showCustomizeSheet by remember {mutableStateOf(false)}
+    var showGallerySheet by remember {mutableStateOf(false)}
 
     // Additive telemetry: leave a breadcrumb when the Home screen is first composed so crash reports
     // can show that the user was on Home. Fires once per entry (keyed on Unit).
-    LaunchedEffect(Unit) { FirebaseCrashlytics.getInstance().log("screen_viewed: home") }
+    LaunchedEffect(Unit) {FirebaseCrashlytics.getInstance().log("screen_viewed: home")}
 
-    val availableQuickStartActions = remember { QuickStartAction.entries.toList() }
+    val availableQuickStartActions = remember {QuickStartAction.entries.toList()}
 
-    val effectiveQuickStartActions = remember(uiState.quickStartActions, availableQuickStartActions) {
-        val valid = uiState.quickStartActions.filter { it in availableQuickStartActions }.toMutableList()
-        if (valid.size < 4) {
-            val remaining = availableQuickStartActions.filter { it !in valid }
-            valid.addAll(remaining.take(4 - valid.size))
+    val effectiveQuickStartActions =
+        remember(uiState.quickStartActions, availableQuickStartActions) {
+            val valid =
+                uiState.quickStartActions.filter {it in availableQuickStartActions}.toMutableList()
+            if (valid.size < 4) {
+                val remaining = availableQuickStartActions.filter {it !in valid}
+                valid.addAll(remaining.take(4 - valid.size))
+            }
+            valid.take(4)
         }
-        valid.take(4)
-    }
 
     // The active game override is disabled for now (user request: only show Welcome and Loading).
     val effectiveState = remember(uiState, effectiveQuickStartActions) {
@@ -173,21 +173,21 @@ fun HomeScreen(
         widgetExtras = widgetExtras,
         rulesTipIndex = rulesTipIndex,
         revealTracker = viewModel.revealTracker,
-        onAction = { action ->
+        onAction = {action->
             when (action) {
                 HomeAction.CustomizeQuickStart -> showCustomizeSheet = true
                 is HomeAction.SaveQuickStart -> {
                     viewModel.saveQuickStartActions(action.actions)
                     showCustomizeSheet = false
                 }
+
                 HomeAction.DismissAccountNudge -> viewModel.dismissAccountNudge()
                 is HomeAction.SkipFirstStep -> viewModel.onAction(action)
                 HomeAction.OpenWidgetGallery -> showGallerySheet = true
                 // Resolve the "most recent deck" here — this is the only layer with access to
                 // uiState.decks (the static FirstStepItem catalog can't bake a dynamic id in).
                 // uiState.decks is nullable while loading (TASK 7b) — null-safe firstOrNull.
-                HomeAction.PlaytestRecentDeck ->
-                    onAction(HomeAction.NavigatePlaytest(uiState.decks?.firstOrNull()?.id))
+                HomeAction.PlaytestRecentDeck -> onAction(HomeAction.NavigatePlaytest(uiState.decks?.firstOrNull()?.id))
                 // Board mutations + discover/news/community-decks widget actions are handled in
                 // the ViewModel.
                 is HomeAction.MoveWidget,
@@ -202,7 +202,7 @@ fun HomeScreen(
                 is HomeAction.SelectCommunityDecksFormat,
                 HomeAction.RollRulesTip,
                 HomeAction.ResetNewsFilters,
-                -> viewModel.onAction(action)
+                    -> viewModel.onAction(action)
                 // RateApp needs an Activity context to launch the store; resolve it upstream.
                 HomeAction.RateApp -> onAction(action)
                 else -> onAction(action)
@@ -215,35 +215,37 @@ fun HomeScreen(
 
     if (showCustomizeSheet) {
         // Breadcrumb: the quick-start customize sheet was opened (fires once per open).
-        LaunchedEffect(Unit) { FirebaseCrashlytics.getInstance().log("home_quick_start_customize_opened") }
+        LaunchedEffect(Unit) {
+            FirebaseCrashlytics.getInstance().log("home_quick_start_customize_opened")
+        }
 
         QuickStartCustomizeSheet(
             allActions = availableQuickStartActions,
             selectedActions = effectiveState.quickStartActions,
-            onSave = { selected ->
+            onSave = {selected->
                 viewModel.saveQuickStartActions(selected)
                 showCustomizeSheet = false
             },
-            onDismiss = { showCustomizeSheet = false },
+            onDismiss = {showCustomizeSheet = false},
         )
     }
 
     if (showGallerySheet) {
         // Breadcrumb: the widget gallery sheet was opened (fires once per open).
-        LaunchedEffect(Unit) { FirebaseCrashlytics.getInstance().log("home_widget_gallery_opened") }
+        LaunchedEffect(Unit) {FirebaseCrashlytics.getInstance().log("home_widget_gallery_opened")}
         WidgetGallerySheet(
             currentLayout = uiState.layout,
             isAuthenticated = uiState.isAuthenticated,
             gamificationEnabled = uiState.gamificationEnabled,
             competitiveEnabled = competitiveEnabled,
-            onAddWidget = { type -> viewModel.onAction(HomeAction.AddWidget(type)) },
-            onRemoveWidget = { type -> viewModel.onAction(HomeAction.RemoveWidget(type)) },
-            onUpdateLayout = { layout -> viewModel.onAction(HomeAction.UpdateLayout(layout)) },
+            onAddWidget = {type-> viewModel.onAction(HomeAction.AddWidget(type))},
+            onRemoveWidget = {type-> viewModel.onAction(HomeAction.RemoveWidget(type))},
+            onUpdateLayout = {layout-> viewModel.onAction(HomeAction.UpdateLayout(layout))},
             onCreateAccount = {
                 showGallerySheet = false
                 onAction(HomeAction.CreateAccount)
             },
-            onDismiss = { showGallerySheet = false },
+            onDismiss = {showGallerySheet = false},
         )
     }
 }
@@ -268,7 +270,7 @@ fun HomeScreen(
     widgetReadiness: Map<HomeWidgetType, Boolean> = emptyMap(),
     widgetExtras: HomeWidgetExtras = HomeWidgetExtras(),
     rulesTipIndex: Int = 0,
-    revealTracker: WidgetRevealTracker = remember { WidgetRevealTracker() },
+    revealTracker: WidgetRevealTracker = remember {WidgetRevealTracker()},
 ) {
     val spacing = MaterialTheme.spacing
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -284,7 +286,7 @@ fun HomeScreen(
     }
     // Keeps the hero slot while a just-emptied welcome plays its completion card, then releases it.
     val heroHasSteps = (uiState.hero as? HomeHeroState.Welcome)?.steps?.isNotEmpty() == true
-    var holdCompletedHero by remember { mutableStateOf(false) }
+    var holdCompletedHero by remember {mutableStateOf(false)}
     LaunchedEffect(heroHasSteps) {
         if (heroHasSteps) {
             holdCompletedHero = true
@@ -323,19 +325,26 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(spacing.lg),
             horizontalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
-            item(key = HOME_KEY_TOP_BAR, span = { GridItemSpan(maxLineSpan) }) {
-                HomeTopBar(
-                    uiState = uiState,
-                    onAvatarClick = { onAction(HomeAction.OpenProfile) },
-                )
-            }
-
             if (!uiState.boardReady) {
-                // Same grid, padding and top bar as the real board, so resolving it shifts nothing.
+                val greetingWidget = widgets.firstOrNull {it.type == HomeWidgetType.GREETING_HEADER}
+                if (greetingWidget != null) {
+                    item(
+                        key = homeWidgetKey(greetingWidget.type),
+                        span = {GridItemSpan(maxLineSpan)}) {
+                        HomeWidgetHost(
+                            widget = greetingWidget,
+                            uiState = uiState,
+                            ready = true,
+                            metrics = metrics,
+                            motion = motion,
+                            onAction = onAction,
+                        )
+                    }
+                }
                 items(
                     count = HOME_BOARD_SKELETON_COUNT,
-                    key = { "$HOME_KEY_SKELETON_PREFIX$it" },
-                    span = { GridItemSpan(maxLineSpan) },
+                    key = {"$HOME_KEY_SKELETON_PREFIX$it"},
+                    span = {GridItemSpan(maxLineSpan)},
                 ) {
                     HomeBoardSkeletonItem(
                         pulse = pulse,
@@ -348,9 +357,9 @@ fun HomeScreen(
             // Every widget is MEDIUM (full width) after the consolidation.
             items(
                 items = widgets,
-                key = { homeWidgetKey(it.type) },
-                span = { GridItemSpan(maxLineSpan) },
-            ) { widget ->
+                key = {homeWidgetKey(it.type)},
+                span = {GridItemSpan(maxLineSpan)},
+            ) {widget->
                 HomeWidgetHost(
                     widget = widget,
                     uiState = uiState,
@@ -371,12 +380,12 @@ fun HomeScreen(
             }
 
             if (uiState.layout.isEmpty()) {
-                item(key = HOME_KEY_EMPTY, span = { GridItemSpan(maxLineSpan) }) {
+                item(key = HOME_KEY_EMPTY, span = {GridItemSpan(maxLineSpan)}) {
                     EmptyState(
                         title = stringResource(R.string.home_empty_title),
                         subtitle = stringResource(R.string.home_empty_message),
                         actionLabel = stringResource(R.string.home_add_widgets),
-                        onAction = { onAction(HomeAction.OpenWidgetGallery) },
+                        onAction = {onAction(HomeAction.OpenWidgetGallery)},
                         modifier = Modifier
                             .fillMaxWidth()
                             .then(if (boardFrozen) Modifier else Modifier.animateItem()),
@@ -384,21 +393,21 @@ fun HomeScreen(
                 }
             }
 
-            uiState.accountNudge?.let { nudge ->
-                item(key = HOME_KEY_NUDGE, span = { GridItemSpan(maxLineSpan) }) {
+            uiState.accountNudge?.let {nudge->
+                item(key = HOME_KEY_NUDGE, span = {GridItemSpan(maxLineSpan)}) {
                     AccountNudgeCard(
                         nudge = nudge,
-                        onCreateAccount = { onAction(HomeAction.CreateAccount) },
-                        onDismiss = { onAction(HomeAction.DismissAccountNudge) },
+                        onCreateAccount = {onAction(HomeAction.CreateAccount)},
+                        onDismiss = {onAction(HomeAction.DismissAccountNudge)},
                         modifier = if (boardFrozen) Modifier else Modifier.animateItem(),
                     )
                 }
             }
 
             // Entry point to the widget gallery (add / remove / reorder) at the bottom.
-            item(key = HOME_KEY_EDIT_WIDGETS, span = { GridItemSpan(maxLineSpan) }) {
+            item(key = HOME_KEY_EDIT_WIDGETS, span = {GridItemSpan(maxLineSpan)}) {
                 EditWidgetsButton(
-                    onClick = { onAction(HomeAction.OpenWidgetGallery) },
+                    onClick = {onAction(HomeAction.OpenWidgetGallery)},
                     modifier = if (boardFrozen) Modifier else Modifier.animateItem(),
                 )
             }
@@ -409,7 +418,6 @@ fun HomeScreen(
 /** Completion card time (ContextHeroWidget waits 1.5 s, then plays its exit) before the slot goes. */
 private const val HERO_COMPLETION_HOLD_MS = 2_000L
 
-private const val HOME_KEY_TOP_BAR = "home_top_bar"
 private const val HOME_KEY_EMPTY = "home_empty"
 private const val HOME_KEY_NUDGE = "home_nudge"
 private const val HOME_KEY_EDIT_WIDGETS = "home_edit_widgets"
@@ -446,7 +454,7 @@ private val HomeAvatarSize = 56.dp
 private const val GREETING_FADE_MS = 220
 
 @Composable
-private fun HomeTopBar(
+internal fun HomeTopBar(
     uiState: HomeUiState,
     onAvatarClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -459,7 +467,7 @@ private fun HomeTopBar(
     val greeting = greetingText(playerName)
     val openProfileDescription = stringResource(R.string.home_open_profile_a11y)
     val greetingStyle = ty.displayMedium.copy(fontWeight = FontWeight.Bold)
-    val greetingTwoLines = with(LocalDensity.current) { greetingStyle.lineHeight.toDp() * 2 }
+    val greetingTwoLines = with(LocalDensity.current) {greetingStyle.lineHeight.toDp() * 2}
     // Hidden until auth resolves so a signed-in user never sees the signed-out greeting first.
     val greetingAlpha by animateFloatAsState(
         targetValue = if (uiState.authResolved) 1f else 0f,
@@ -471,7 +479,11 @@ private fun HomeTopBar(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = max(HomeTopBarHeight, greetingTwoLines))
-            .padding(horizontal = spacing.xs),
+            .padding(horizontal = spacing.xs)
+            .clickable(
+                onClickLabel = openProfileDescription, role = Role.Button, onClick = onAvatarClick
+            ),
+
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -482,12 +494,12 @@ private fun HomeTopBar(
                 minLines = 2,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.graphicsLayer { alpha = greetingAlpha },
+                modifier = Modifier.graphicsLayer {alpha = greetingAlpha},
             )
         }
         Spacer(Modifier.width(spacing.sm))
-        
-        val avatarUrl = uiState.avatarUrl?.takeIf { it.isNotBlank() }
+
+        val avatarUrl = uiState.avatarUrl?.takeIf {it.isNotBlank()}
         val initials = playerName?.trim()?.firstOrNull()?.uppercase()
         Box(
             modifier = Modifier
@@ -499,8 +511,7 @@ private fun HomeTopBar(
                 )
                 .clip(CircleShape)
                 .border(BorderStroke(2.dp, mc.primaryAccent.copy(alpha = 0.5f)), CircleShape)
-                .clickable(onClickLabel = openProfileDescription, role = Role.Button, onClick = onAvatarClick)
-                .semantics { contentDescription = openProfileDescription },
+                .semantics {contentDescription = openProfileDescription},
             contentAlignment = Alignment.Center,
         ) {
             if (avatarUrl != null || initials != null) {
@@ -595,9 +606,18 @@ private fun greetingText(name: String?): String {
         localGreetingClock(System.currentTimeMillis(), java.util.TimeZone.getDefault())
     }
     if (name.isNullOrBlank()) {
-        return stringResource(resolveGreetingVariant(hour = 0, epochDay = epochDay, hasName = false))
+        return stringResource(
+            resolveGreetingVariant(
+                hour = 0,
+                epochDay = epochDay,
+                hasName = false
+            )
+        )
     }
-    return stringResource(resolveGreetingVariant(hour = hour, epochDay = epochDay, hasName = true), name)
+    return stringResource(
+        resolveGreetingVariant(hour = hour, epochDay = epochDay, hasName = true),
+        name
+    )
 }
 
 /**
@@ -627,15 +647,27 @@ fun AccountNudgeCard(
 
     Surface(color = mc.surface, shape = CardShape, modifier = modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(spacing.lg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(spacing.lg),
             verticalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(spacing.sm),
             ) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(22.dp))
-                Text(stringResource(R.string.home_nudge_title), style = ty.titleMedium, color = mc.textPrimary, modifier = Modifier.weight(1f))
+                Icon(
+                    Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = mc.primaryAccent,
+                    modifier = Modifier.size(22.dp)
+                )
+                Text(
+                    stringResource(R.string.home_nudge_title),
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
+                    modifier = Modifier.weight(1f)
+                )
             }
             Text(
                 text = nudge.message ?: stringResource(nudge.messageRes),
@@ -682,16 +714,22 @@ fun QuickStartCustomizeSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val selection = remember {
-        mutableStateListOf<QuickStartAction>().apply { addAll(selectedActions.take(4)) }
+        mutableStateListOf<QuickStartAction>().apply {addAll(selectedActions.take(4))}
     }
     val canSave = selection.size == 4
+
+    val orderedActions = remember(selection.toList(), allActions) {
+        val selectedSet = selection.toSet()
+        val unselected = allActions.filter {it !in selectedSet}
+        selection.toList() + unselected
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = mc.backgroundSecondary,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textDisabled.copy(alpha = 0.4f)) },
-        contentWindowInsets = { WindowInsets(0) },
+        dragHandle = {BottomSheetDefaults.DragHandle(color = mc.textDisabled.copy(alpha = 0.4f))},
+        contentWindowInsets = {WindowInsets(0)},
     ) {
         Column(
             modifier = Modifier
@@ -701,19 +739,23 @@ fun QuickStartCustomizeSheet(
                 .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
-            Text(text = stringResource(R.string.quick_start_sheet_title), style = ty.titleLarge, color = mc.textPrimary)
+            Text(
+                text = stringResource(R.string.quick_start_sheet_title),
+                style = ty.titleLarge,
+                color = mc.textPrimary
+            )
             Text(
                 text = stringResource(R.string.quick_start_sheet_subtitle, selection.size),
                 style = ty.bodySmall,
                 color = mc.textSecondary,
             )
 
-            allActions.chunked(2).forEach { rowActions ->
+            orderedActions.chunked(2).forEach {rowActions->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                 ) {
-                    rowActions.forEach { action ->
+                    rowActions.forEach {action->
                         val isSelected = action in selection
                         QuickStartCustomizationTile(
                             action = action,
@@ -730,9 +772,9 @@ fun QuickStartCustomizeSheet(
             }
 
             Spacer(Modifier.height(spacing.sm))
-            
+
             MagicCtaButton(
-                onClick = { onSave(selection.toList()) },
+                onClick = {onSave(selection.toList())},
                 text = stringResource(R.string.quick_start_sheet_save),
                 enabled = canSave,
                 modifier = Modifier.fillMaxWidth()
@@ -743,18 +785,16 @@ fun QuickStartCustomizeSheet(
 
 @Composable
 private fun QuickStartCustomizationTile(
-    action: QuickStartAction,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    action: QuickStartAction, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
 
     val backgroundColor by animateColorAsState(
-        targetValue = if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surfaceVariant.copy(alpha = 0.25f),
-        label = "custom_tile_bg"
+        targetValue = if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surfaceVariant.copy(
+            alpha = 0.25f
+        ), label = "custom_tile_bg"
     )
 
     val contentColor by animateColorAsState(
@@ -764,8 +804,7 @@ private fun QuickStartCustomizationTile(
 
     val borderStroke = if (selected) {
         BorderStroke(
-            1.5.dp,
-            Brush.horizontalGradient(listOf(mc.primaryAccent, mc.secondaryAccent))
+            1.5.dp, Brush.horizontalGradient(listOf(mc.primaryAccent, mc.secondaryAccent))
         )
     } else {
         BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f))
@@ -794,8 +833,7 @@ private fun QuickStartCustomizationTile(
                     .background(
                         if (selected) mc.primaryAccent.copy(alpha = 0.2f)
                         else mc.surfaceVariant.copy(alpha = 0.5f)
-                    ),
-                contentAlignment = Alignment.Center
+                    ), contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = action.icon,
@@ -807,29 +845,15 @@ private fun QuickStartCustomizationTile(
 
             Text(
                 text = action.label,
-                style = ty.labelLarge.copy(
+                style = ty.labelMedium.copy(
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                 ),
                 color = contentColor,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
 
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = mc.primaryAccent,
-                    modifier = Modifier.size(20.dp)
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(18.dp)
-                        .border(1.5.dp, mc.textDisabled.copy(alpha = 0.4f), CircleShape)
-                )
-            }
         }
     }
 }
@@ -840,10 +864,9 @@ private fun QuickStartCustomizationTile(
 
 /** Human label for a Quick Start action (used by the customization sheet). */
 private val QuickStartAction.label: String
-    @Composable
-    @ReadOnlyComposable
-    get() = when (this) {
+    @Composable @ReadOnlyComposable get() = when (this) {
         QuickStartAction.SCAN_CARD -> stringResource(R.string.quick_start_sheet_scan_card)
+        QuickStartAction.IMPORT_COLLECTION -> stringResource(R.string.quick_start_import_collection)
         QuickStartAction.CREATE_DECK -> stringResource(R.string.quick_start_sheet_new_deck)
         QuickStartAction.DRAFT_GUIDE -> stringResource(R.string.quick_start_sheet_draft_guide)
         QuickStartAction.SEARCH_CARD -> stringResource(R.string.quick_start_sheet_search_card)
@@ -861,6 +884,7 @@ private val QuickStartAction.label: String
 private val QuickStartAction.icon: androidx.compose.ui.graphics.vector.ImageVector
     get() = when (this) {
         QuickStartAction.SCAN_CARD -> Icons.Default.Camera
+        QuickStartAction.IMPORT_COLLECTION -> Icons.Default.ImportExport
         QuickStartAction.CREATE_DECK -> Icons.Default.AddCircle
         QuickStartAction.DRAFT_GUIDE -> Icons.Default.SportsEsports
         QuickStartAction.SEARCH_CARD -> Icons.Default.Search
@@ -871,5 +895,5 @@ private val QuickStartAction.icon: androidx.compose.ui.graphics.vector.ImageVect
         QuickStartAction.TRADES -> Icons.Default.SwapHoriz
         QuickStartAction.COMMUNITY_DECKS -> Icons.Default.Style
         QuickStartAction.SETTINGS -> Icons.Default.Settings
-        QuickStartAction.MULTI_ADD_CARD -> Icons.Default.CollectionsBookmark
+        QuickStartAction.MULTI_ADD_CARD -> Icons.Default.LibraryAdd
     }

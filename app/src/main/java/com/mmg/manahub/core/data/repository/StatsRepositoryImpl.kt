@@ -74,7 +74,8 @@ class StatsRepositoryImpl(
     ): Flow<CollectionStats> {
         val colorCode = when (colorFilter) {
             null -> null
-            MtgColor.COLORLESS -> "[]"   // colorless cards have color_identity stored as '[]'
+            MtgColor.COLORLESS -> "[]"
+            MtgColor.MULTICOLOR -> "M"
             else -> colorFilter.name.take(1) // W, U, B, R, G
         }
         val useEur = preferredCurrency == PreferredCurrency.EUR
@@ -383,8 +384,15 @@ class StatsRepositoryImpl(
         return counts
     }
 
-    private fun List<ColorCountProjection>.toColorMap(): Map<MtgColor, Int> =
-        CollectionColorAffinity.countByColor(map { it.colorIdentity to it.count })
+    private fun List<ColorCountProjection>.toColorMap(): Map<MtgColor, Int> {
+        val counts = CollectionColorAffinity.countByColor(map { it.colorIdentity to it.count }).toMutableMap()
+        val multicolorCount = sumOf { row ->
+            val colors = row.colorIdentity.filter { it in "WUBRG" }.toSet()
+            if (colors.size >= 2) row.count else 0
+        }
+        if (multicolorCount > 0) counts[MtgColor.MULTICOLOR] = multicolorCount
+        return counts
+    }
 
     private fun List<RarityCountProjection>.toRarityMap(): Map<Rarity, Int> =
         associate { row ->

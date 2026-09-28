@@ -174,6 +174,8 @@ fun FriendFolderTab(
                 actions.onApplyAdvancedSearch(query)
                 showAdvancedSearch = false
             },
+            onClear = actions.onApplyAdvancedSearch,
+            stateKey = "friend_folder",
             appliedQuery = uiState.sheetQuery,
         )
     }

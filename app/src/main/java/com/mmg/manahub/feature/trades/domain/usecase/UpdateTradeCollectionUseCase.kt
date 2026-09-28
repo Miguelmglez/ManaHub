@@ -2,15 +2,19 @@ package com.mmg.manahub.feature.trades.domain.usecase
 
 import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
 import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
+import com.mmg.manahub.core.data.local.entity.TradeOfferCleanupEntity
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.core.domain.repository.TradeCollectionLine
 import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.core.domain.repository.WishlistRepository
+import com.mmg.manahub.feature.trades.data.TradeWishlistCleanup
 import com.mmg.manahub.core.model.TradeItem
 import com.mmg.manahub.core.util.recordNonFatal
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -25,17 +29,19 @@ import kotlin.coroutines.cancellation.CancellationException
  * attributes (their refs belong to the other party). Only runs when a completion marker exists, and
  * removes it in the same transaction.
  *
- * Network follow-ups (remote open-for-trade removal, wishlist decrement) run only after the local
- * commit; their failures are reported but do not fail the result. The whole operation runs under
- * [NonCancellable] so leaving the screen can never split the local commit from those follow-ups.
+ * Remote offer removal and wishlist updates are queued within the local transaction, then retried
+ * independently of the apply gate. A remote failure leaves cleanup pending. The whole operation
+ * runs under [NonCancellable] so leaving the screen cannot interrupt the local commit.
  */
 class UpdateTradeCollectionUseCase(
     private val userCardRepository: UserCardRepository,
-    private val wishlistRepository: WishlistRepository,
+    private val wishlistCleanup: TradeWishlistCleanup,
     private val openForTradeRepository: OpenForTradeRepository,
     private val syncDao: TradeCollectionSyncDao,
     private val ioDispatcher: CoroutineDispatcher,
+    private val activeUserId: (suspend () -> String?)? = null,
 ) {
+    private val cleanupMutex = Mutex()
 
     /**
      * @param proposalId    ID of the completed trade proposal.
@@ -43,8 +49,9 @@ class UpdateTradeCollectionUseCase(
      * @param sentItems     Items the user traded away.
      * @param receivedItems Items the user received.
      * @param reverse       When `true`, undoes a previously applied sync (revoke flows).
-     * @return [Result.success] when applied or when there was nothing to do (already applied, or
-     *   nothing to reverse); [Result.failure] when the local write failed and nothing was written.
+     * @return [Result.success] when applied or already applied with no pending cleanup;
+     *   [Result.failure] when a local write or remote offer cleanup fails. A remote failure may
+     *   follow a successful local commit and remains retryable through the durable outbox.
      */
     suspend operator fun invoke(
         proposalId: String,
@@ -71,37 +78,57 @@ class UpdateTradeCollectionUseCase(
                     deductions = sentLines,
                     additions = receivedLines,
                     shouldApply = { syncDao.isSynced(proposalId, userId) == 0 },
-                    onApplied = { syncDao.markSynced(TradeCollectionSyncEntity(proposalId = proposalId, userId = userId)) },
+                    onApplied = {
+                        wishlistCleanup.stage(userId, receivedLines)
+                        syncDao.markSynced(TradeCollectionSyncEntity(proposalId = proposalId, userId = userId))
+                    },
+                    onOfferRemovals = { collectionIds ->
+                        syncDao.enqueueOfferCleanups(collectionIds.map { collectionId ->
+                            TradeOfferCleanupEntity(proposalId, userId, collectionId)
+                        })
+                    },
                 )
-            } ?: return@withContext Result.success(Unit)
-
-            if (!reverse) {
-                applied.remoteOfferRemovals.forEach { collectionId ->
-                    runCatchingNonCancellation { openForTradeRepository.removeByCollectionIdAndSync(collectionId).getOrThrow() }
-                        .onFailure { e -> recordNonFatal("trade_collection_remove_open_for_trade_failed", e) }
-                }
-                receivedLines.forEach { line ->
-                    runCatchingNonCancellation {
-                        wishlistRepository.decrementByAttributes(
-                            scryfallId = line.scryfallId,
-                            quantity = line.quantity,
-                            isFoil = line.isFoil,
-                            condition = line.condition,
-                            language = line.language,
-                        ).getOrThrow()
-                    }.onFailure { e -> recordNonFatal("trade_collection_wishlist_decrement_failed", e) }
-                }
             }
-            if (applied.unmatchedDeductionCount > 0) {
+
+            val cleanupResult = if (!reverse) retryPendingOfferCleanup(userId) else Result.success(Unit)
+            val wishlistCleanupResult = if (!reverse) wishlistCleanup.drain(userId) else Result.success(Unit)
+            if (applied != null && applied.unmatchedDeductionCount > 0) {
                 recordNonFatal("trade_collection_deduction_unmatched")
+            }
+            cleanupResult.getOrThrow()
+            wishlistCleanupResult.getOrThrow()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            recordSafeNonFatal("trade_collection_apply_failed", e)
+            Result.failure(e)
+        }
+    }
+
+    /** Retries committed offer deletions without reapplying collection changes. */
+    suspend fun retryPendingOfferCleanup(userId: String): Result<Unit> = withContext(ioDispatcher) {
+        try {
+            cleanupMutex.withLock {
+                activeUserId?.let { require(it() == userId) }
+                for (entry in syncDao.getPendingOfferCleanups(userId)) {
+                    activeUserId?.let { require(it() == userId) }
+                    openForTradeRepository.removeByCollectionIdAndSync(entry.collectionId).getOrThrow()
+                    activeUserId?.let { require(it() == userId) }
+                    syncDao.clearOfferCleanup(entry.proposalId, entry.userId, entry.collectionId)
+                }
             }
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            recordNonFatal("trade_collection_apply_failed", e)
+            recordSafeNonFatal("trade_collection_remove_open_for_trade_failed", e)
             Result.failure(e)
         }
+    }
+
+    suspend fun retryPendingWishlistCleanup(userId: String): Result<Unit> = withContext(ioDispatcher) {
+        wishlistCleanup.drain(userId)
     }
 
     private fun TradeItem.toLine(keepRef: Boolean) = TradeCollectionLine(
@@ -113,12 +140,4 @@ class UpdateTradeCollectionUseCase(
         userCardIdRef = if (keepRef) userCardIdRef?.takeIf { it.isNotBlank() } else null,
     )
 
-    private inline fun <T> runCatchingNonCancellation(block: () -> T): Result<T> =
-        try {
-            Result.success(block())
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            Result.failure(e)
-        }
 }

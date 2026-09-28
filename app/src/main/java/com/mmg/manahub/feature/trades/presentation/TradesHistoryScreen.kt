@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -62,6 +64,7 @@ private val FabClearance = 88.dp
 fun TradesHistoryScreen(
     onOpenThread: (proposalId: String, rootProposalId: String) -> Unit,
     onLoginClick: () -> Unit = {},
+    listState: LazyListState = rememberLazyListState(),
     viewModel: TradesHistoryViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -86,6 +89,7 @@ fun TradesHistoryScreen(
             onFilterSelected = viewModel::onFilterSelected,
             onItemClick = viewModel::onProposalClick,
             onLoginClick = onLoginClick,
+            listState = listState,
         )
 
         MagicToastHost(
@@ -102,6 +106,7 @@ private fun HistoryContent(
     onFilterSelected: (HistoryFilter) -> Unit,
     onItemClick: (TradeProposal) -> Unit,
     onLoginClick: () -> Unit,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val pullState = rememberPullRefreshState(
         isRefreshing = uiState.isRefreshing,
@@ -120,6 +125,7 @@ private fun HistoryContent(
         )
 
         LazyColumn(
+            state           = listState,
             modifier        = Modifier.fillMaxSize(),
             contentPadding  = PaddingValues(start = spacing.lg, top = spacing.sm, end = spacing.lg, bottom = FabClearance),
             verticalArrangement = Arrangement.spacedBy(spacing.sm),

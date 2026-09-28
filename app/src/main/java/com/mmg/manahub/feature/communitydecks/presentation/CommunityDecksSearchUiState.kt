@@ -235,14 +235,17 @@ fun CommunityDeckSortField.apiValue(direction: CommunityDeckSortDirection): Stri
  *   maps to a concrete Archidekt format id, and [CommunityAdvancedFilters.formats] always holds a
  *   real selection (defaulting to [COMMANDER]).
  */
-enum class CommunityDeckFormatFilter(val apiId: Int, val label: String) {
+enum class CommunityDeckFormatFilter(val apiId: Int?, val label: String) {
+    ALL(null, "All formats"),
+    COMMANDER(3, "Commander"),
     STANDARD(1, "Standard"),
-    PIONEER(15, "Pioneer"),
     MODERN(2, "Modern"),
-    LEGACY(4, "Legacy"),
-    VINTAGE(5, "Vintage"),
     PAUPER(6, "Pauper"),
-    COMMANDER(3, "Commander") ;
+    PIONEER(15, "Pioneer"),
+    LEGACY(4, "Legacy"),
+    VINTAGE(5, "Vintage");
+
+
 
 
     companion object {

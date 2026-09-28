@@ -7,26 +7,26 @@ import com.mmg.manahub.core.domain.repository.CardQueueRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.core.domain.search.AdvancedSearchCardMatcher
 import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.core.domain.usecase.queue.AddAllToCollectionResult
-import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
-import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.model.QueuedCard
-import com.mmg.manahub.core.model.CardAddOrigin
-import com.mmg.manahub.core.model.UserCardWithCard
-import com.mmg.manahub.core.model.AdvancedSearchQuery
-import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.core.domain.search.AdvancedSearchCardMatcher
 import com.mmg.manahub.core.domain.usecase.card.GetSpotlightFeedUseCase
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
+import com.mmg.manahub.core.domain.usecase.queue.AddAllToCollectionResult
+import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
+import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardAddOrigin
 import com.mmg.manahub.core.model.CollectionViewMode
+import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.QueuedCard
+import com.mmg.manahub.core.model.UserCardWithCard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -94,6 +94,8 @@ class AddCardViewModel(
     private val forceSearchTrigger = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     private var lastEffectiveQuery: String? = null
+    private var lastSearchOrigin = AddCardSearchOrigin.TEXT
+    private var searchGeneration = 0L
     private var currentSpotlightSetIndex: Int = 0
     private var hasMoreSpotlightSets: Boolean = true
 
@@ -129,6 +131,9 @@ class AddCardViewModel(
                     }
                     // A preloaded deck list is filtered locally; Scryfall is never queried meanwhile.
                     if (_uiState.value.isDeckMode) return@collectLatest
+                    val generation = ++searchGeneration
+                    lastEffectiveQuery = null
+                    _uiState.update { it.copy(isLoadingMore = false) }
 
                     val advancedString = active?.let { buildScryfallQuery(it) } ?: ""
                     val combinedQuery = when {
@@ -170,9 +175,20 @@ class AddCardViewModel(
                         combinedQuery
                     }
                     lastEffectiveQuery = effectiveQuery
+                    lastSearchOrigin = when {
+                        text.isNotBlank() && advancedString.isNotBlank() -> AddCardSearchOrigin.COMBINED
+                        advancedString.isNotBlank() -> AddCardSearchOrigin.ADVANCED
+                        else -> AddCardSearchOrigin.TEXT
+                    }
+                    val origin = lastSearchOrigin
 
                     when (val result = searchCards(effectiveQuery, page = 1)) {
+                        // A changed input can invalidate this request before the debounce emits again.
                         is DataResult.Success -> {
+                            if (searchGeneration != generation) return@collectLatest
+                            if (result.data.confirmedNoMatches404) {
+                                AddCardTelemetry.searchEmptyConfirmed(origin, effectiveQuery, 1)
+                            }
                             _uiState.update {
                                 it.copy(
                                     results = result.data.cards,
@@ -184,8 +200,10 @@ class AddCardViewModel(
                                 )
                             }
                         }
-                        is DataResult.Error -> _uiState.update {
-                            it.copy(error = result.message, isSearching = false)
+                        is DataResult.Error -> {
+                            if (searchGeneration != generation) return@collectLatest
+                            AddCardTelemetry.searchFailed(origin, effectiveQuery, 1, result.message)
+                            _uiState.update { it.copy(error = result.message, isSearching = false) }
                         }
                     }
                 }
@@ -211,49 +229,59 @@ class AddCardViewModel(
         if (!currentState.hasMore || currentState.isLoadingMore || currentState.isSearching) return
         
         val nextPage = currentState.currentPage + 1
+        val generation = searchGeneration
+        val origin = lastSearchOrigin
         _uiState.update { it.copy(isLoadingMore = true) }
         
         viewModelScope.launch {
-            when (val result = searchCards(query, nextPage)) {
-                is DataResult.Success -> _uiState.update {
-                    it.copy(
-                        results = it.results + result.data.cards,
-                        isLoadingMore = false,
-                        hasMore = result.data.hasMore,
-                        currentPage = nextPage
-                    )
+            val result = searchCards(query, nextPage)
+            if (lastEffectiveQuery != query || searchGeneration != generation) return@launch
+            when (result) {
+                is DataResult.Success -> {
+                    if (result.data.confirmedNoMatches404) {
+                        AddCardTelemetry.searchEmptyConfirmed(origin, query, nextPage)
+                    }
+                    _uiState.update {
+                        it.copy(
+                            results = it.results + result.data.cards,
+                            isLoadingMore = false,
+                            hasMore = result.data.hasMore,
+                            currentPage = nextPage
+                        )
+                    }
                 }
-                is DataResult.Error -> _uiState.update {
-                    it.copy(isLoadingMore = false, error = result.message)
+                is DataResult.Error -> {
+                    AddCardTelemetry.searchFailed(origin, query, nextPage, result.message)
+                    _uiState.update { it.copy(isLoadingMore = false, error = result.message) }
                 }
             }
         }
     }
 
     fun onQueryChange(query: String) {
+        invalidateSearch()
         _uiState.update { it.copy(query = query) }
         textQueryFlow.value = query
         applyDeckFilter()
     }
 
     fun onAdvancedQuerySearch(query: AdvancedSearchQuery) {
+        invalidateSearch()
         _uiState.update { it.copy(activeQuery = query) }
         activeQueryFlow.value = query
         
-        val nameCriterion = query.criteria.filterIsInstance<com.mmg.manahub.core.model.SearchCriterion.Name>().firstOrNull()
-        if (nameCriterion != null && nameCriterion.value.isNotBlank()) {
-            onQueryChange(nameCriterion.value)
-        }
         applyDeckFilter()
     }
 
     fun onClearFilters() {
+        invalidateSearch()
         _uiState.update { it.copy(activeQuery = null) }
         activeQueryFlow.value = null
         applyDeckFilter()
     }
 
     fun onClearAll() {
+        invalidateSearch()
         _uiState.update {
             it.copy(
                 query = "",
@@ -273,6 +301,7 @@ class AddCardViewModel(
     }
 
     fun onLanguageChange(code: String) {
+        invalidateSearch()
         viewModelScope.launch {
             val lang = when (code) {
                 "es"  -> com.mmg.manahub.core.model.CardLanguage.SPANISH
@@ -289,6 +318,12 @@ class AddCardViewModel(
             }
             userPreferences.setCardLanguage(lang)
         }
+    }
+
+    private fun invalidateSearch() {
+        searchGeneration++
+        lastEffectiveQuery = null
+        _uiState.update { it.copy(isLoadingMore = false, isSearching = false) }
     }
 
     fun onErrorDismissed() = _uiState.update { it.copy(error = null) }
@@ -349,11 +384,14 @@ class AddCardViewModel(
     }
 
     // An empty queue sheet has nothing to act on (its "Proceed" CTA is already gone).
-    private fun AddCardUiState.withQueue(cards: List<QueuedCard>) = copy(
-        queue = cards,
-        selectedScryfallIds = cards.selectedIds(),
-        showQueueSheet = showQueueSheet && cards.isNotEmpty(),
-    )
+    private fun AddCardUiState.withQueue(cards: List<QueuedCard>): AddCardUiState {
+        val effectiveCards = if (isListInverted) cards.reversed() else cards
+        return copy(
+            queue = effectiveCards,
+            selectedScryfallIds = cards.selectedIds(),
+            showQueueSheet = showQueueSheet && cards.isNotEmpty(),
+        )
+    }
 
     // The repository mutates synchronously; mirroring immediately keeps reads right after a
     // mutation consistent instead of waiting for the collector to be dispatched.
@@ -799,6 +837,18 @@ class AddCardViewModel(
             // Read once instead of the multi-mode collector, which may not have emitted yet.
             val owned = userCardRepository.observeCollection().first().ownedIdentityKeys()
             AddCardTelemetry.selectMissing(queueUnselected(candidates.filterNot { it.isOwnedIn(owned) }))
+        }
+    }
+
+    fun updateSorting() {
+        _uiState.update { state ->
+            val newInverted = !state.isListInverted
+            val rawCards = queueRepository.queue.value
+            val cardsToUse = if (newInverted) rawCards.reversed() else rawCards
+            state.copy(
+                isListInverted = newInverted,
+                queue = cardsToUse
+            )
         }
     }
 

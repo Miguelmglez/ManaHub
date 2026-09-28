@@ -281,9 +281,12 @@ private fun DictionaryRow(
             Spacer(Modifier.height(spacing.xs))
             if (row.isSystem) {
                 Text(
-                    text  = stringResource(R.string.tagdictionary_system_readonly),
+                    text  = stringResource(
+                        R.string.tagdictionary_system_category_readonly,
+                        row.category.displayLabel,
+                    ),
                     style = ty.labelSmall,
-                    color = mc.textDisabled,
+                    color = mc.textSecondary,
                 )
             } else if (patternCount > 0) {
                 Text(
@@ -306,7 +309,7 @@ private fun DictionaryRow(
         if (row.isSystem) {
             Icon(
                 imageVector = Icons.Default.Lock,
-                contentDescription = stringResource(R.string.tagdictionary_system_readonly),
+                contentDescription = null,
                 tint = mc.textDisabled,
             )
         } else {

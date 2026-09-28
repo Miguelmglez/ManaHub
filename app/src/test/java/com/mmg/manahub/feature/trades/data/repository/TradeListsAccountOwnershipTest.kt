@@ -65,14 +65,14 @@ class TradeListsAccountOwnershipTest {
     )
 
     @Test
-    fun `given a new account when wishlist migrates then foreign rows are evicted before reading what to push`() = runTest {
+    fun `given a new account when wishlist migrates then ambiguous rows are removed before reading what to push`() = runTest {
         coEvery { wishlistDao.getUnsynced("user-b") } returns listOf(guestWish("guest-1"))
         coEvery { wishlistRemote.batchAddWishlistEntries(any()) } returns Result.success(Unit)
 
         wishlistRepository.migrateLocalToRemote("user-b")
 
         coVerifyOrder {
-            wishlistDao.deleteForeignAccountRows("user-b")
+            wishlistDao.deleteAmbiguousRows()
             wishlistDao.getUnsynced("user-b")
             wishlistDao.markSynced(listOf("guest-1"), "user-b")
             wishlistDao.stampOwner(listOf("guest-1"), "user-b")
@@ -80,7 +80,7 @@ class TradeListsAccountOwnershipTest {
     }
 
     @Test
-    fun `given open-for-trade migrates then foreign rows are evicted first and migrated rows are claimed`() = runTest {
+    fun `given open-for-trade migrates then ambiguous rows are removed first and migrated rows are claimed`() = runTest {
         coEvery { offerDao.getUnsynced("user-b") } returns listOf(
             LocalOpenForTradeEntity(id = "offer-1", localCollectionId = "row-1", scryfallId = "card-1", ownerUserId = TradeListOwner.GUEST),
         )
@@ -89,7 +89,7 @@ class TradeListsAccountOwnershipTest {
         offerRepository.migrateLocalToRemote("user-b")
 
         coVerifyOrder {
-            offerDao.deleteForeignAccountRows("user-b")
+            offerDao.deleteAmbiguousRows()
             offerDao.getUnsynced("user-b")
             offerDao.stampOwner(listOf("offer-1"), "user-b")
         }
@@ -105,7 +105,7 @@ class TradeListsAccountOwnershipTest {
 
         wishlistRepository.syncFromRemote("user-b")
 
-        coVerify { wishlistDao.deleteForeignAccountRows("user-b") }
+        coVerify { wishlistDao.deleteAmbiguousRows() }
         assertEquals(listOf("user-b"), saved.captured.map { it.ownerUserId })
     }
 
@@ -119,7 +119,7 @@ class TradeListsAccountOwnershipTest {
 
         offerRepository.syncFromRemote("user-b")
 
-        coVerify { offerDao.deleteForeignAccountRows("user-b") }
+        coVerify { offerDao.deleteAmbiguousRows() }
         assertEquals(listOf("user-b"), saved.captured.map { it.ownerUserId })
     }
 
@@ -180,7 +180,7 @@ class TradeListsAccountOwnershipTest {
 
         assertTrue(wishlistResult.isFailure)
         assertTrue(offerResult.isFailure)
-        coVerify(exactly = 0) { wishlistDao.deleteForeignAccountRows(any()) }
-        coVerify(exactly = 0) { offerDao.deleteForeignAccountRows(any()) }
+        coVerify(exactly = 0) { wishlistDao.deleteAmbiguousRows() }
+        coVerify(exactly = 0) { offerDao.deleteAmbiguousRows() }
     }
 }

@@ -1,7 +1,6 @@
 package com.mmg.manahub.feature.trades.presentation
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,9 +38,13 @@ import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -56,6 +59,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.FullErrorState
@@ -63,6 +67,7 @@ import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.PullRefreshHeader
+import com.mmg.manahub.core.ui.components.SectionHeader
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.rememberPullRefreshState
 import com.mmg.manahub.core.ui.theme.CardShape
@@ -470,69 +475,73 @@ private fun ItemsSection(
     onCardClick: (String) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(bottom = MaterialTheme.spacing.xs)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(4.dp, 12.dp)
-                .background(mc.primaryAccent.copy(alpha = 0.4f), CircleShape)
-        )
-        Spacer(Modifier.width(MaterialTheme.spacing.sm))
-        Text(
-            text = label.uppercase(),
-            style = MaterialTheme.magicTypography.labelLarge.copy(fontWeight = FontWeight.Bold),
-            color = mc.textPrimary.copy(alpha = 0.8f),
-        )
-    }
-    if (reviewPlaceholder) {
-        Surface(
-            shape = ChipShape,
-            color = mc.secondaryAccent.copy(alpha = 0.1f),
-            border = BorderStroke(1.dp, mc.secondaryAccent.copy(alpha = 0.2f)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = MaterialTheme.spacing.xs)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null,
-                    tint = mc.secondaryAccent,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = stringResource(R.string.trades_review_collection_placeholder),
-                    style = MaterialTheme.magicTypography.labelMedium,
-                    color = mc.textPrimary,
+    var expanded by rememberSaveable { mutableStateOf(true) }
+
+    SectionHeader(
+        title = label.uppercase(),
+        expanded = expanded,
+        onToggle = { expanded = !expanded },
+        titleColor = mc.textPrimary,
+        trailing = {
+            val itemCount = items.filter { !it.isReviewCollectionPlaceholder }.size
+            if (itemCount > 0) {
+                CopyBadge(label = itemCount.toString())
+            }
+        },
+    )
+
+    AnimatedVisibility(visible = expanded) {
+        Column {
+            if (reviewPlaceholder) {
+                Surface(
+                    shape = ChipShape,
+                    color = mc.secondaryAccent.copy(alpha = 0.1f),
+                    border = BorderStroke(1.dp, mc.secondaryAccent.copy(alpha = 0.2f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = MaterialTheme.spacing.xs)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = mc.secondaryAccent,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.trades_review_collection_placeholder),
+                            style = MaterialTheme.magicTypography.labelMedium,
+                            color = mc.textPrimary,
+                        )
+                    }
+                }
+            }
+            val unknownCard = stringResource(R.string.trades_unknown_card)
+            items.filter { !it.isReviewCollectionPlaceholder }.forEach { item ->
+                CardListItem(
+                    name = item.cardName.ifBlank { unknownCard },
+                    imageUrl = item.imageUrl,
+                    priceUsd = item.priceUsd,
+                    priceEur = item.priceEur,
+                    scryfallId = item.cardId,
+                    onClick = { onCardClick(item.cardId) },
+                    quantityText = item.quantity?.let { stringResource(R.string.trades_quantity_multiplier, it) },
+                    hasFoil = item.isFoil == true,
+                    condition = item.condition?.takeIf { it.isNotBlank() },
+                    language = item.language?.takeIf { it.isNotBlank() },
+                    setCode = item.setCode,
+                    setName = item.setName,
+                    rarity = item.rarity,
+                    typeLine = item.typeLine,
+                    containerColor = mc.surfaceVariant.copy(alpha = 0.3f),
+                    shape = CardShape,
                 )
             }
         }
-    }
-    val unknownCard = stringResource(R.string.trades_unknown_card)
-    items.filter { !it.isReviewCollectionPlaceholder }.forEach { item ->
-        CardListItem(
-            name = item.cardName.ifBlank { unknownCard },
-            imageUrl = item.imageUrl,
-            priceUsd = null,
-            priceEur = null,
-            onClick = { onCardClick(item.cardId) },
-            quantityText = item.quantity?.let { stringResource(R.string.trades_quantity_multiplier, it) },
-            hasFoil = item.isFoil == true,
-            condition = item.condition?.takeIf { it.isNotBlank() },
-            language = item.language?.takeIf { it.isNotBlank() },
-            setCode = item.setCode,
-            setName = item.setName,
-            rarity = item.rarity,
-            typeLine = item.typeLine,
-            containerColor = mc.backgroundSecondary.copy(alpha = 0.5f),
-            shape = androidx.compose.ui.graphics.RectangleShape,
-        )
     }
 }
 

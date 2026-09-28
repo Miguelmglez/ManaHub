@@ -404,6 +404,8 @@ internal fun CommanderPickStepContent(
                 onApplyStructuredSearch(query)
                 showAdvancedSearch = false
             },
+            onClear = onApplyStructuredSearch,
+            stateKey = "wizard_commander",
             appliedQuery = uiState.commanderStructuredQuery,
             lockedCriteria = lockedCriteria.toSet(),
         )

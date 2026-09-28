@@ -10,12 +10,12 @@ import kotlin.test.assertTrue
 
 class SupabaseUploaderTest {
 
-    private fun row(oracleId: String) = buildCardStrategyTagsRow(
+    private fun row(oracleId: String, generatedAt: String = "2026-07-21T00:00:00Z") = buildCardStrategyTagsRow(
         oracleId = oracleId,
         tags = setOf("ramp"),
         tribes = emptySet(),
         sources = setOf("rule_engine"),
-        generatedAt = "2026-07-21T00:00:00Z",
+        generatedAt = generatedAt,
         pipelineVersion = 1,
     )
 
@@ -101,6 +101,57 @@ class SupabaseUploaderTest {
         assertEquals(1, summary.failedBatches)
         assertFalse(summary.allBatchesOk)
     }
+
+    @Test
+    fun `accepted upsert with missing read-back row fails verification`() {
+        val requests = mutableListOf<HttpRequest>()
+        val uploader = SupabaseUploader(
+            SupabaseUploadConfig("https://x.test", "key", verifyReadback = true),
+            send = { request ->
+                requests += request
+                fakeResponse(if (request.method() == "POST") 201 else 200)
+            },
+        )
+
+        val summary = uploader.uploadRows(sequenceOf(row("a")))
+
+        assertEquals(listOf("POST", "GET"), requests.map { it.method() })
+        assertEquals(1, summary.failedBatches)
+        assertFalse(summary.allBatchesOk)
+    }
+
+    @Test
+    fun `read-back accepts equivalent UTC timestamp representations`() {
+        val uploader = SupabaseUploader(
+            SupabaseUploadConfig("https://x.test", "key", verifyReadback = true),
+            send = { request ->
+                if (request.method() == "POST") fakeResponse(201)
+                else fakeResponse(200, readbackRow("2026-09-28 09:38:04.999041+00"))
+            },
+        )
+
+        val summary = uploader.uploadRows(sequenceOf(row("a", "2026-09-28T09:38:04.999041Z")))
+
+        assertTrue(summary.allBatchesOk)
+    }
+
+    @Test
+    fun `read-back rejects changed payload even when timestamps represent the same instant`() {
+        val uploader = SupabaseUploader(
+            SupabaseUploadConfig("https://x.test", "key", verifyReadback = true),
+            send = { request ->
+                if (request.method() == "POST") fakeResponse(201)
+                else fakeResponse(200, readbackRow("2026-09-28T09:38:04.999041+00:00", tag = "draw"))
+            },
+        )
+
+        val summary = uploader.uploadRows(sequenceOf(row("a", "2026-09-28T09:38:04.999041Z")))
+
+        assertEquals(1, summary.failedBatches)
+    }
+
+    private fun readbackRow(generatedAt: String, tag: String = "ramp") =
+        """[{"oracle_id":"a","payload":{"tags":["$tag"],"suggestions":[],"input_fingerprint":"","tribes":[],"themes":{},"archetypes":{},"sources":["rule_engine"],"archidekt_category":null},"pipeline_version":"1","generated_at":"$generatedAt"}]"""
 
     @Test
     fun `startPipelineRun parses the returned id from a representation response`() {

@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.core.util.recordNonFatal
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
@@ -165,6 +165,7 @@ class TradeNegotiationViewModel(
     // The first entry is covered by the session collector; later entries (back from the editor) refresh.
     private var hasEnteredScreen = false
     private var refreshJob: Job? = null
+    private var offerCleanupJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -189,7 +190,15 @@ class TradeNegotiationViewModel(
                             )
                         }
                         if (isAccountSwitch) autoApplyAttempted.clear()
-                        if (previousUserId.isBlank() || isAccountSwitch) startRefresh(userId, force = isAccountSwitch)
+                        if (previousUserId.isBlank() || isAccountSwitch) {
+                            offerCleanupJob?.cancel()
+                            offerCleanupJob = viewModelScope.launch(ioDispatcher) {
+                                updateTradeCollection.retryPendingOfferCleanup(userId)
+                            }
+                            startRefresh(userId, force = isAccountSwitch)
+                        }
+                    } else {
+                        offerCleanupJob?.cancel()
                     }
                 }
         }
@@ -206,7 +215,7 @@ class TradeNegotiationViewModel(
             getThread(rootProposalId)
                 .distinctUntilChanged()
                 .catch { e ->
-                    recordNonFatal("trade_thread_observe_failed", e)
+                    recordSafeNonFatal("trade_thread_observe_failed", e)
                     _uiState.update { s -> s.copy(isLoading = false, refreshFailed = true) }
                 }
                 .collect { thread ->
@@ -244,7 +253,7 @@ class TradeNegotiationViewModel(
                         Triple(userId, thread, pending.toSet())
                     }
                 }
-                .catch { e -> recordNonFatal("trade_pending_apply_observe_failed", e) }
+                .catch { e -> recordSafeNonFatal("trade_pending_apply_observe_failed", e) }
                 .collect { (userId, thread, pending) ->
                     _uiState.update { s -> s.copy(pendingApplyProposalIds = pending) }
                     resolvePendingApplies(userId, thread, pending)
@@ -261,7 +270,7 @@ class TradeNegotiationViewModel(
                         updateTradeCollection(proposal.id, userId, sentItemsOf(proposal, userId), receivedItemsOf(proposal, userId))
                             .onSuccess { _events.trySend(NegotiationEvent.CollectionSyncResult(success = true)) }
                             .onFailure { e ->
-                                recordNonFatal("trade_pending_apply_failed", e)
+                                recordSafeNonFatal("trade_pending_apply_failed", e)
                                 _events.trySend(NegotiationEvent.CollectionSyncResult(success = false))
                             }
                     }
@@ -345,7 +354,7 @@ class TradeNegotiationViewModel(
                         else -> {
                             FirebaseCrashlytics.getInstance().apply {
                                 log("trade_accept_failed")
-                                recordException(e)
+                                recordSafeNonFatal("trade_negotiation_remote_failed", e)
                             }
                             NegotiationError.Generic(e.toUserFacingMessage())
                         }
@@ -368,7 +377,7 @@ class TradeNegotiationViewModel(
                 .onFailure { e ->
                     FirebaseCrashlytics.getInstance().apply {
                         log("trade_decline_failed")
-                        recordException(e)
+                        recordSafeNonFatal("trade_negotiation_remote_failed", e)
                     }
                     _events.trySend(NegotiationEvent.ShowError(e.toUserFacingMessage()))
                 }
@@ -402,7 +411,7 @@ class TradeNegotiationViewModel(
                 .onFailure { e ->
                     FirebaseCrashlytics.getInstance().apply {
                         log("trade_cancel_failed")
-                        recordException(e)
+                        recordSafeNonFatal("trade_negotiation_remote_failed", e)
                     }
                     _events.trySend(NegotiationEvent.ShowError(e.toUserFacingMessage()))
                 }
@@ -457,7 +466,7 @@ class TradeNegotiationViewModel(
                         updateTradeCollection(proposalId, userId, sentItems, receivedItems, reverse = true)
                             .onSuccess { _events.trySend(NegotiationEvent.CollectionSyncResult(success = true)) }
                             .onFailure { e ->
-                                recordNonFatal("trade_revoke_collection_reverse_failed", e)
+                                recordSafeNonFatal("trade_revoke_collection_reverse_failed", e)
                                 _events.trySend(NegotiationEvent.CollectionSyncResult(success = false))
                             }
                     }
@@ -469,7 +478,7 @@ class TradeNegotiationViewModel(
                 .onFailure { e ->
                     FirebaseCrashlytics.getInstance().apply {
                         log("trade_revoke_failed")
-                        recordException(e)
+                        recordSafeNonFatal("trade_negotiation_remote_failed", e)
                     }
                     _events.trySend(NegotiationEvent.ShowError(e.toUserFacingMessage()))
                 }
@@ -541,7 +550,7 @@ class TradeNegotiationViewModel(
                         else -> {
                             FirebaseCrashlytics.getInstance().apply {
                                 log("trade_mark_completed_failed")
-                                recordException(e)
+                                recordSafeNonFatal("trade_negotiation_remote_failed", e)
                             }
                             NegotiationError.Generic(e.toUserFacingMessage())
                         }
@@ -564,7 +573,7 @@ class TradeNegotiationViewModel(
         receivedItems: List<TradeItem>,
     ) {
         refreshTradeThread(rootProposalId, userId)
-            .onFailure { e -> recordNonFatal("trade_mark_completed_refresh_failed", e) }
+            .onFailure { e -> recordSafeNonFatal("trade_mark_completed_refresh_failed", e) }
         val refreshed = getThread(rootProposalId).first().find { it.id == proposalId }
         if (refreshed?.status == TradeStatus.COMPLETED) {
             val loaded = refreshed.takeIf { it.itemsLoaded }
@@ -577,7 +586,7 @@ class TradeNegotiationViewModel(
             )
                 .onSuccess { _events.trySend(NegotiationEvent.CollectionSyncResult(success = true)) }
                 .onFailure { e ->
-                    recordNonFatal("trade_mark_completed_collection_update_failed", e)
+                    recordSafeNonFatal("trade_mark_completed_collection_update_failed", e)
                     _events.trySend(NegotiationEvent.CollectionSyncResult(success = false))
                 }
         } else {
@@ -589,7 +598,7 @@ class TradeNegotiationViewModel(
                 _events.trySend(NegotiationEvent.CollectionApplyDeferred)
             }.onFailure { e ->
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                recordNonFatal("trade_mark_completed_pending_apply_failed", e)
+                recordSafeNonFatal("trade_mark_completed_pending_apply_failed", e)
                 _events.trySend(NegotiationEvent.CollectionSyncResult(success = false))
             }
         }
@@ -616,7 +625,7 @@ class TradeNegotiationViewModel(
                     _events.trySend(NegotiationEvent.CollectionSyncResult(success = true))
                 }
                 .onFailure { e ->
-                    recordNonFatal("trade_undo_collection_changes_failed", e)
+                    recordSafeNonFatal("trade_undo_collection_changes_failed", e)
                     _events.trySend(NegotiationEvent.CollectionSyncResult(success = false))
                 }
             _uiState.update { it.copy(isSyncingCollection = false) }
@@ -682,7 +691,7 @@ class TradeNegotiationViewModel(
                     // §5.1 fix: previously showed `e.message` verbatim (raw server text /
                     // sentinel key leaking to the UI). Now recorded for diagnosis and
                     // surfaced as a semantic event the screen resolves to a fixed string.
-                    recordNonFatal("trade_collection_update_failed", e)
+                    recordSafeNonFatal("trade_collection_update_failed", e)
                     _events.trySend(NegotiationEvent.CollectionSyncResult(success = false))
                 }
             _uiState.update { it.copy(isSyncingCollection = false) }

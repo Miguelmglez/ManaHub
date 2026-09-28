@@ -135,17 +135,13 @@ interface LocalWishlistDao {
     @Query("DELETE FROM local_wishlists WHERE synced = 1 AND owner_user_id = :ownerUserId")
     suspend fun clearSynced(ownerUserId: String)
 
-    /**
-     * Removes rows that belong to an account other than [userId]: rows owned by someone else, and
-     * server-backed rows not proven to be [userId]'s (they re-download on the next sync). Only
-     * unsynced rows explicitly marked as guest survive for migration.
-     */
+    /** Removes ambiguous legacy rows while retaining verified rows for every account. */
     @Query("""
         DELETE FROM local_wishlists
-        WHERE owner_user_id IS NULL OR owner_user_id NOT IN (:userId, 'local_guest')
+        WHERE owner_user_id IS NULL
            OR (synced = 1 AND owner_user_id = 'local_guest')
     """)
-    suspend fun deleteForeignAccountRows(userId: String)
+    suspend fun deleteAmbiguousRows()
 
     /** Claims verified guest rows [ids] for [ownerUserId] after migration. */
     @Query("UPDATE local_wishlists SET owner_user_id = :ownerUserId WHERE id IN (:ids) AND owner_user_id = 'local_guest'")

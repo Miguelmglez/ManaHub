@@ -405,6 +405,7 @@ fun AppNavGraph(
                                             navController.navigate(Screen.GameSetup.baseRoute)
                                         }
                                     }
+                                    HomeAction.OpenImportCollection -> navController.navigate(Screen.ImportCards.route)
                                     HomeAction.ScanCard -> navController.navigate(Screen.CollectionScanner.route)
                                     HomeAction.SearchCard -> navController.navigate(Screen.CollectionAddCard.createRoute())
                                     HomeAction.CreateDeck -> navController.navigate(Screen.DeckStudio.createRoute(null))
@@ -614,6 +615,45 @@ fun AppNavGraph(
                             onNavigateToCommunityDecks = { cardName ->
                                 navController.navigate(Screen.CommunityDecksByCard.createRoute(cardName))
                             }
+                        )
+                    }
+                    composable(Screen.ImportCards.route){
+                            backStackEntry ->
+                        CollectionScreen(
+                            // G.1 fix: read the "tab" arg directly off THIS backStackEntry (always
+                            // reflects the current navigate() call, e.g. "decks" from the Draft
+                            // Simulator hand-off) rather than relying on CollectionViewModel's
+                            // SavedStateHandle-read-at-init (which freezes on the value seen the
+                            // FIRST time this destination's ViewModel was constructed — a restored
+                            // instance, per navigateTab's restoreState=true contract, keeps that
+                            // frozen value and never re-reads a fresh arg). See CollectionScreen's
+                            // initialTabArg LaunchedEffect for how this is applied.
+                            initialTabArg = backStackEntry.arguments?.getString("tab"),
+                            onCardClick = { id, key ->
+                                navController.navigate(Screen.CollectionCardDetail.createRoute(id, key))
+                            },
+                            onAddCardClick = { navController.navigate(Screen.CollectionAddCard.createRoute()) },
+                            onDeckClick = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
+                            onPlaytestClick = { id ->
+                                navController.navigate(Screen.PlaytestSetup.createRoute(id))
+                            },
+                            onNavigateToTradeProposal = { receiverId ->
+                                navController.navigate(Screen.CreateTradeProposal.createRoute(receiverId))
+                            },
+                            onNavigateToTradeThread = { proposalId, rootProposalId ->
+                                navController.navigate(
+                                    Screen.TradeNegotiationDetail.createRoute(proposalId, rootProposalId)
+                                )
+                            },
+                            onNavigateToAddFriends = {
+                                navController.navigate(Screen.FriendsList.route)
+                            },
+                            onBrowseCommunityDecks = {
+                                navController.navigate(Screen.CommunityDecks.route)
+                            },
+                            sharedTransitionScope = this@SharedTransitionLayout,
+                            animatedVisibilityScope = this@composable,
+                            openImport = true
                         )
                     }
 

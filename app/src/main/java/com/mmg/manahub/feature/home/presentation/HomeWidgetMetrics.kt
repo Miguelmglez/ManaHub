@@ -38,7 +38,6 @@ private val QuickActionIconSize = 38.dp
 private val LevelBadgeSize = 48.dp
 private val ProgressBarHeight = 6.dp
 private val StreakIconSize = 14.dp
-private val HeroIconBadgeSize = 64.dp
 private val HeaderRowMinHeight = 48.dp
 private val WinRateRingSize = 80.dp
 private val KpiBadgeSize = 40.dp
@@ -95,9 +94,19 @@ data class HomeWidgetMetrics(
     val gameStatsSlideHeight: Dp,
     val collectionSlideHeight: Dp,
     val tradesSlideHeight: Dp,
+    val quickActionTileHeight: Dp,
+    val greetingHeader: Dp,
+    val shellHeight: Dp,
 ) {
     /** The fixed body height of [type], or null when the widget sizes itself by its own frame. */
-    fun bodyHeight(type: HomeWidgetType): Dp? = bodyHeights[type]
+    fun bodyHeight(type: HomeWidgetType, quickActionsCount: Int = 4): Dp? {
+        if (type == HomeWidgetType.QUICK_ACTIONS) {
+            val rows = if (quickActionsCount in 1..2) 1 else if (quickActionsCount == 0) 1 else 2
+            val gap = if (rows > 1) 2.dp else 0.dp // sp.xxs
+            return shellHeight + quickActionTileHeight * rows + gap + 2.dp // SlotSlack
+        }
+        return bodyHeights[type]
+    }
 }
 
 /**
@@ -148,8 +157,10 @@ fun computeHomeWidgetMetrics(lh: HomeLineHeights, sp: Spacing): HomeWidgetMetric
         max(InboxBadgeSize, lh.titleMedium * 2 + lh.labelSmall),
     ) + SlotSlack
 
-    val heroCarousel = shell + HeaderRowMinHeight + sp.xxs + sp.md * 2 + sp.xl * 2 +
-        HeroIconBadgeSize + sp.md + lh.titleMedium + sp.xs + lh.bodySmall * 2 + SlotSlack
+    val greetingHeader = max(HeaderRowMinHeight, lh.displayMedium * 2)
+
+    val heroCarousel = shell + HeaderRowMinHeight + sp.xxs + sp.sm * 2 + 80.dp + sp.sm +
+        lh.titleMedium + sp.xs + lh.bodySmall * 2 + SlotSlack
 
     val quickActionTile = max(QuickActionTileMinHeight, sp.xs * 2 + QuickActionIconSize + sp.xs + lh.labelSmall)
     val questRow = sp.sm * 2 + maxOf(lh.bodyMedium, lh.labelMedium + sp.xxs + ProgressBarHeight, lh.labelSmall)
@@ -159,6 +170,7 @@ fun computeHomeWidgetMetrics(lh: HomeLineHeights, sp: Spacing): HomeWidgetMetric
     val singleCta = maxOf(lh.bodyMedium * 2, ctaButton, MinTouchTarget)
 
     val heights = mapOf(
+        HomeWidgetType.GREETING_HEADER to greetingHeader,
         HomeWidgetType.CONTEXT_HERO to heroCarousel,
         HomeWidgetType.QUICK_ACTIONS to shell + quickActionTile * 2 + sp.xxs + SlotSlack,
         HomeWidgetType.PROGRESSION_HUB to shell +
@@ -192,6 +204,9 @@ fun computeHomeWidgetMetrics(lh: HomeLineHeights, sp: Spacing): HomeWidgetMetric
         gameStatsSlideHeight = gameStatsSlide,
         collectionSlideHeight = collectionSlide,
         tradesSlideHeight = tradesSlide,
+        quickActionTileHeight = quickActionTile,
+        greetingHeader = greetingHeader,
+        shellHeight = shell,
     )
 }
 

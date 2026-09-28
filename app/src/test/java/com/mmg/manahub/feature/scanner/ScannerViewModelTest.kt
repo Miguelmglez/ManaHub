@@ -4,6 +4,7 @@ package com.mmg.manahub.feature.scanner
 import android.content.Context
 import android.graphics.PointF
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.queue.InMemoryCardQueueStore
 import com.mmg.manahub.core.data.queue.PersistentCardQueueRepository
@@ -27,15 +28,14 @@ import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.slot
 import io.mockk.mockk
-import androidx.lifecycle.SavedStateHandle
+import io.mockk.slot
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -1059,5 +1059,38 @@ class ScannerViewModelTest {
 
         coVerify(exactly = 0) { addScannedCardsToDeck(any(), any(), any()) }
         assertEquals(1, viewModel.uiState.value.scanSession.cards.size)
+    }
+
+    @Test
+    fun updateSorting_togglesInversionAndReversesCards() = runTest {
+        viewModel.onRecognitionResult(identified(similarity = 1.0f, card = defaultCard))
+        advanceUntilIdle()
+        val secondCard = TestFixtures.buildCard(scryfallId = "card-abc-002", name = "Counterspell", setCode = "lea")
+        viewModel.onRecognitionResult(identified(similarity = 1.0f, card = secondCard))
+        advanceUntilIdle()
+
+        val initialCards = viewModel.uiState.value.scanSession.cards
+        assertEquals(2, initialCards.size)
+        assertEquals("Lightning Bolt", initialCards[0].card.name)
+        assertEquals("Counterspell", initialCards[1].card.name)
+        assertFalse(viewModel.uiState.value.isListInverted)
+
+        viewModel.updateSorting()
+        advanceUntilIdle()
+
+        val invertedCards = viewModel.uiState.value.scanSession.cards
+        assertEquals(2, invertedCards.size)
+        assertEquals("Counterspell", invertedCards[0].card.name)
+        assertEquals("Lightning Bolt", invertedCards[1].card.name)
+        assertTrue(viewModel.uiState.value.isListInverted)
+
+        viewModel.updateSorting()
+        advanceUntilIdle()
+
+        val restoredCards = viewModel.uiState.value.scanSession.cards
+        assertEquals(2, restoredCards.size)
+        assertEquals("Lightning Bolt", restoredCards[0].card.name)
+        assertEquals("Counterspell", restoredCards[1].card.name)
+        assertFalse(viewModel.uiState.value.isListInverted)
     }
 }

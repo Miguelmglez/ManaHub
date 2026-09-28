@@ -38,7 +38,7 @@ data class AddCardUiState(
     val inFlightQueueIds: Set<String> = emptySet(),
     val queueToast: AddCardQueueToast? = null,
     val ownedCardIdentityKeys: Set<String> = emptySet(),
-    val isAutoDeleteOnAddEnabled: Boolean = false,
+    val isAutoDeleteOnAddEnabled: Boolean = true,
     val editingQueuedCard: QueuedCard? = null,
     val availablePrints: List<Card> = emptyList(),
     val isLoadingPrints: Boolean = false,
@@ -51,6 +51,7 @@ data class AddCardUiState(
     val deckCards: List<Card> = emptyList(),
     val isDeckLoading: Boolean = false,
     val deckLoadFailed: Boolean = false,
+    val isListInverted : Boolean = false
     )
 
 /** True while a preloaded deck list replaces the Scryfall search. */

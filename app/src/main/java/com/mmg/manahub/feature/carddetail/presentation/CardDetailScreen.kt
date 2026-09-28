@@ -122,6 +122,7 @@ import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.tagging.label
+import com.mmg.manahub.core.tagging.TagDictionary
 import com.mmg.manahub.core.ui.CardSharedBoundsTransform
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.AddCardSheet
@@ -480,7 +481,7 @@ private fun CardDetailLoadError(
     FullErrorState(
         message = when {
             rateLimitRetryAfterMs != null -> stringResource(R.string.error_rate_limited_message)
-            error == "SCRYFALL_404" -> stringResource(R.string.error_card_not_found)
+            error == "SCRYFALL_404" || error?.contains("404") == true -> stringResource(R.string.addcard_server_unavailable_subtitle)
             else -> stringResource(R.string.error_scryfall)
         },
         retryLabel = if (remainingSeconds > 0) {
@@ -2157,6 +2158,7 @@ private fun TagPickerSheet(
 
     // Built-in categories (excluding CUSTOM which is the fallback for raw custom tags)
     val builtInCategories = TagCategory.entries.filter { it != TagCategory.CUSTOM }
+    val catalogTags = TagDictionary.all().map { CardTag(it.key, it.category) }
 
     // User-created category keys that don't map to built-in categories
     val userCustomCategoryKeys = userDefinedTags
@@ -2266,7 +2268,9 @@ private fun TagPickerSheet(
             // ── Built-in categories ──────────────────────────────────────────
             builtInCategories.forEach { category ->
                 val canonical =
-                    CardTag.canonical.filter { it.category == category && it.key !in excludedBuiltInKeys }
+                    (CardTag.canonical + catalogTags)
+                        .distinctBy { it.key }
+                        .filter { it.category == category && it.key !in excludedBuiltInKeys }
                 val userDefined =
                     userDefinedTags.filter { it.categoryKey == category.name }
                 val items = canonical.map {

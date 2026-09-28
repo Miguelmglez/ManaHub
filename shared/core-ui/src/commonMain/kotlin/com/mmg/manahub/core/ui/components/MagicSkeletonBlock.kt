@@ -1,10 +1,5 @@
 package com.mmg.manahub.core.ui.components
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -19,14 +14,11 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 
-private const val SKELETON_MIN_ALPHA = 0.12f
-private const val SKELETON_MAX_ALPHA = 0.26f
 private const val SKELETON_STATIC_ALPHA = 0.18f
-private const val SKELETON_PULSE_MS = 900
 
 /**
- * The pulse shared by every skeleton block on one screen, so a board of placeholders runs a single
- * infinite transition instead of one per block.
+ * The pulse shared by every skeleton block on one screen, providing static fill alpha
+ * without running infinite transition loops.
  *
  * [alpha] must only be read from a draw-phase lambda: the pulse then invalidates drawing, never
  * composition or layout.
@@ -35,25 +27,17 @@ private const val SKELETON_PULSE_MS = 900
 class MagicSkeletonPulse internal constructor(
     private val animatedAlpha: State<Float>?,
 ) {
-    /** The current fill alpha (static when reduced motion is on). */
+    /** The current fill alpha. */
     val alpha: Float get() = animatedAlpha?.value ?: SKELETON_STATIC_ALPHA
 }
 
 /**
- * Creates the screen-level skeleton pulse. With [reducedMotion] the blocks render a static mid tone;
- * the platform decides the flag (the Android caller reads the system animator scale).
+ * Creates the screen-level skeleton pulse. Returns statically without infinite transitions
+ * to prevent continuous repainting/recomposition loops.
  */
 @Composable
-fun rememberMagicSkeletonPulse(reducedMotion: Boolean): MagicSkeletonPulse {
-    if (reducedMotion) return remember { MagicSkeletonPulse(animatedAlpha = null) }
-    val transition = rememberInfiniteTransition(label = "skeleton-pulse")
-    val alpha = transition.animateFloat(
-        initialValue = SKELETON_MIN_ALPHA,
-        targetValue = SKELETON_MAX_ALPHA,
-        animationSpec = infiniteRepeatable(tween(SKELETON_PULSE_MS), RepeatMode.Reverse),
-        label = "skeleton-alpha",
-    )
-    return remember(alpha) { MagicSkeletonPulse(animatedAlpha = alpha) }
+fun rememberMagicSkeletonPulse(reducedMotion: Boolean = false): MagicSkeletonPulse {
+    return remember { MagicSkeletonPulse(animatedAlpha = null) }
 }
 
 /**

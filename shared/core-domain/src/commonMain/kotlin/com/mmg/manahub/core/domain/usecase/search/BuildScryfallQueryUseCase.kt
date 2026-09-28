@@ -69,6 +69,14 @@ class BuildScryfallQueryUseCase {
                     parts.joinToString(",", prefix = "(", postfix = ")")
                 }
             }
+            is SearchCriterion.AnyOf -> {
+                val alternatives = criterion.alternatives.mapNotNull { alternative ->
+                    alternative.mapNotNull(::buildPart).takeIf { it.isNotEmpty() }
+                        ?.joinToString(" ", prefix = "(", postfix = ")")
+                }
+                alternatives.takeIf { it.isNotEmpty() }
+                    ?.joinToString(" OR ", prefix = "(", postfix = ")")
+            }
             is SearchCriterion.Colors -> buildColorPart("c", criterion.colors, criterion.mode)
             is SearchCriterion.ColorIdentity -> buildColorPart("id", criterion.colors, criterion.mode)
             is SearchCriterion.ManaCost ->
@@ -134,8 +142,11 @@ class BuildScryfallQueryUseCase {
                 parts.joinToString(" ")
             }
             // Collection-local filters have no Scryfall equivalent
-            is SearchCriterion.CollectionStatus,
-            is SearchCriterion.HasTag -> null
+            is SearchCriterion.CollectionStatus -> null
+            is SearchCriterion.HasTag -> criterion.keys
+                .mapNotNull { criterion.verifiedScryfallQueries[it]?.takeIf(String::isNotBlank) }
+                .takeIf { it.isNotEmpty() }
+                ?.joinToString(" OR ", prefix = "(", postfix = ")") { "($it)" }
             SearchCriterion.CommanderEligible -> "is:commander"
         }
     }
@@ -156,15 +167,21 @@ class BuildScryfallQueryUseCase {
      */
     private fun buildColorPart(prefix: String, colors: Set<String>, mode: ColorMatchMode): String? {
         if (colors.isEmpty()) return null
-        val nonColorless = colors.filterNot { it.equals(COLORLESS, ignoreCase = true) }
-        val wantsColorless = nonColorless.size != colors.size
+        val wantsMulticolor = colors.any { it.equals("M", ignoreCase = true) }
+        val nonColorless = colors.filterNot { it.equals(COLORLESS, ignoreCase = true) || it.equals("M", ignoreCase = true) }
+        val wantsColorless = colors.any { it.equals(COLORLESS, ignoreCase = true) }
         // Case-duplicate letters (e.g. {"W","w"}) must collapse to one — otherwise this renders
         // c>=ww / a duplicate OR-branch for what the local matcher treats as a single letter.
         val letters = nonColorless.map { it.lowercase() }.distinct()
-        return when (mode) {
+        if (wantsMulticolor && ((letters.isEmpty() && wantsColorless) ||
+                (letters.size == 1 && mode in setOf(ColorMatchMode.AT_MOST, ColorMatchMode.EXACTLY)))) {
+            return "$prefix>=2 -$prefix>=2"
+        }
+        val includeColorless = wantsColorless && !wantsMulticolor
+        val colorClause = if (letters.isEmpty() && !includeColorless) null else when (mode) {
             ColorMatchMode.ANY_OF -> {
                 val alternatives = letters.map { "$prefix${ColorMatchMode.AT_LEAST.colorsOperator}$it" } +
-                    if (wantsColorless) listOf("$prefix=c") else emptyList()
+                    if (includeColorless) listOf("$prefix=c") else emptyList()
                 if (alternatives.size == 1) alternatives.first()
                 else alternatives.joinToString(" or ", prefix = "(", postfix = ")")
             }
@@ -174,6 +191,7 @@ class BuildScryfallQueryUseCase {
                 if (letters.isEmpty()) "$prefix=c"
                 else "$prefix${mode.colorsOperator}${letters.joinToString("")}"
         }
+        return listOfNotNull(colorClause, if (wantsMulticolor) "$prefix>=2" else null).joinToString(" ")
     }
 
     /**

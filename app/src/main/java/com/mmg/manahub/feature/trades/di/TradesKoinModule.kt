@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.trades.di
 
 import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
 import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
 import com.mmg.manahub.core.data.remote.trades.OpenForTradeRemoteDataSource
@@ -27,6 +29,8 @@ import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradesUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RevokeAcceptanceUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.SyncTradeListsFromRemoteUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.UpdateTradeCollectionUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.TradePendingApplyCoordinator
+import com.mmg.manahub.feature.trades.data.TradeWishlistCleanup
 import com.mmg.manahub.feature.trades.presentation.TradeNegotiationViewModel
 import com.mmg.manahub.feature.trades.presentation.TradeProposalViewModel
 import com.mmg.manahub.feature.trades.presentation.TradesHistoryViewModel
@@ -108,6 +112,15 @@ fun tradesKoinModule(
     single { TradeSuggestionsRemoteDataSource(supabaseClient = get()) }
     single { TradesRemoteDataSource(supabaseClient = get()) }
     single { WishlistRemoteDataSource(supabaseClient = get()) }
+    single {
+        val authRepository = get<AuthRepository>()
+        TradeWishlistCleanup(
+            wishlistDao = get(),
+            syncDao = get(),
+            remote = get(),
+            activeUserId = { (authRepository.sessionState.value as? SessionState.Authenticated)?.user?.id },
+        )
+    }
 
     // ── Trades-only repositories (not shared with any other island). ──
     single<SharedListsRepository> { SharedListsRepositoryImpl(remote = get()) }
@@ -134,14 +147,19 @@ fun tradesKoinModule(
     factory { RefreshTradeThreadUseCase(get()) }
     factory { RefreshTradesUseCase(get()) }
     factory {
+        val authRepository = get<AuthRepository>()
         UpdateTradeCollectionUseCase(
             userCardRepository = get(),
-            wishlistRepository = get(),
+            wishlistCleanup = get(),
             openForTradeRepository = get(),
             syncDao = get(),
             ioDispatcher = get(named("io")),
+            activeUserId = {
+                (authRepository.sessionState.value as? SessionState.Authenticated)?.user?.id
+            },
         )
     }
+    single { TradePendingApplyCoordinator(get(), get(), get(), get()) }
 
     // ── ViewModels (one factory per trades ViewModel; nav args flow via the Koin SavedStateHandle). ──
     viewModel {

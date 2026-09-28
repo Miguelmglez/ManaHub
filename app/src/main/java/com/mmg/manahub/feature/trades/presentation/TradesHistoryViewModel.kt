@@ -11,7 +11,7 @@ import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
 import com.mmg.manahub.core.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradesUseCase
-import com.mmg.manahub.core.util.recordNonFatal
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -143,7 +143,7 @@ class TradesHistoryViewModel(
                 .map(::latestPerThread)
                 .flowOn(defaultDispatcher)
                 .catch { e ->
-                    recordNonFatal("trade_history_observe_failed", e)
+                    recordSafeNonFatal("trade_history_observe_failed", e)
                     _uiState.update { s -> s.copy(isLoading = false, refreshFailed = true) }
                 }
                 .collect { threads ->

@@ -62,6 +62,11 @@ class StatsDaoExpansionInstrumentedTest {
         setCode: String = "tst",
         releasedAt: String = "2020-01-01",
         artist: String? = null,
+        colors: String = "[]",
+        identity: String = "[]",
+        oracleId: String = "",
+        power: String? = null,
+        toughness: String? = null,
     ) {
         db.cardDao().upsert(
             CardEntity(
@@ -71,15 +76,15 @@ class StatsDaoExpansionInstrumentedTest {
                 lang = "en",
                 manaCost = null,
                 cmc = 0.0,
-                colors = "[]",
-                colorIdentity = "[]",
+                colors = colors,
+                colorIdentity = identity,
                 typeLine = "Creature",
                 printedTypeLine = null,
                 oracleText = null,
                 printedText = null,
                 keywords = keywords,
-                power = null,
-                toughness = null,
+                power = power,
+                toughness = toughness,
                 loyalty = null,
                 setCode = setCode,
                 setName = "Test Set",
@@ -100,6 +105,7 @@ class StatsDaoExpansionInstrumentedTest {
                 flavorText = null,
                 artist = artist,
                 scryfallUri = "https://scryfall.com/test",
+                oracleId = oracleId,
             )
         )
     }
@@ -121,6 +127,52 @@ class StatsDaoExpansionInstrumentedTest {
                 createdAt = createdAt,
             )
         )
+    }
+
+    @Test
+    fun colorAggregatesUsePrintedColorsAndMulticolorWithConcurrentSetFilter() = runTest {
+        insertCard("wu", priceUsd = 3.0, priceEur = 4.0, colors = "[\"W\",\"U\"]", identity = "[\"W\",\"U\"]", setCode = "one", artist = "Shared Artist", oracleId = "oracle-wu", legalityCommander = "legal", power = "2", toughness = "3")
+        insertCard("w", priceUsd = 2.0, colors = "[\"W\"]", identity = "[\"W\",\"U\"]", setCode = "one")
+        insertCard("ub", priceUsd = 5.0, colors = "[\"U\",\"B\"]", setCode = "two")
+        insertCard("land", priceUsd = 1.0, colors = "[]", identity = "[\"W\",\"U\"]", setCode = "one")
+        insertCollectionRow("wu-row", "wu", quantity = 2)
+        insertCollectionRow("w-row", "w", quantity = 3)
+        insertCollectionRow("ub-row", "ub", quantity = 4)
+        insertCollectionRow("land-row", "land", quantity = 5)
+
+        assertEquals(6, statsDao.observeTotals("M", null, null).first().totalCards)
+        assertEquals(2, statsDao.observeTotals("M", "one", null).first().totalCards)
+        assertEquals(6.0, statsDao.observeTotalValueUsd("M", "one", null).first(), 0.0001)
+        assertEquals(2, statsDao.observeCountByRarity("M", "one", null).first().single().count)
+        assertEquals("[\"W\",\"U\"]", statsDao.observeCountByColorIdentity("M", "one", null).first().single().colorIdentity)
+        assertEquals(5, statsDao.observeTotals("[]", "one", null).first().totalCards)
+        assertEquals(5, statsDao.observeTotals("W", "one", null).first().totalCards)
+        assertEquals(8.0, statsDao.observeTotalValueEur("M", "one", null).first(), 0.0001)
+        assertEquals(listOf("wu"), statsDao.observeMostValuableCards(10, false, "M", "one", null).first().map { it.scryfallId })
+        assertEquals(2, statsDao.observeCountByTypeLine("M", "one", null).first().single().count)
+        assertEquals(2, statsDao.observeManaCurve("M", "one", null).first().single().count)
+        assertEquals(2, statsDao.observeCountBySet("M", "one", null).first().single().count)
+        assertEquals(0, statsDao.observeTotalFoil("M", "one", null).first())
+        assertEquals(0, statsDao.observeTotalFullArt("M", "one", null).first())
+        assertEquals("Shared Artist", statsDao.observeTopArtist("M", "one", null).first()?.artist)
+        assertEquals(0.0, statsDao.observeAvgManaValue("M", "one", null).first() ?: -1.0, 0.0001)
+        assertEquals(2.0, statsDao.observeAvgPower("M", "one", null).first() ?: -1.0, 0.0001)
+        assertEquals(3.0, statsDao.observeAvgToughness("M", "one", null).first() ?: -1.0, 0.0001)
+        assertEquals("wu", statsDao.observeOldestCard("M", "one", null).first()?.scryfallId)
+        assertEquals("wu", statsDao.observeNewestCard("M", "one", null).first()?.scryfallId)
+        assertEquals("one", statsDao.observeTopSetByCount("M", "one", null).first()?.setCode)
+        assertEquals(6.0, statsDao.observeTopSetByValue("M", "one", false, null).first()?.totalValue ?: -1.0, 0.0001)
+        assertEquals(8.0, statsDao.observeTopSetByValue("M", "one", true, null).first()?.totalValue ?: -1.0, 0.0001)
+        assertEquals(1, statsDao.observeAllCollectionTags("M", "one", null).first().size)
+        assertEquals(1, statsDao.observeUniqueCardPrices("M", "one", null).first().size)
+        assertEquals(0.0, statsDao.observeTotalFoilValueUsd("M", "one", null).first(), 0.0001)
+        assertEquals(0.0, statsDao.observeTotalFoilValueEur("M", "one", null).first(), 0.0001)
+        assertEquals("wu", statsDao.observeMostDuplicatedCard("M", "one", null).first()?.scryfallId)
+        assertEquals(1, statsDao.observeFormatCoverage("M", "one", null).first().commanderCount)
+        assertEquals(1, statsDao.observeAllCollectionKeywords("M", "one", null).first().size)
+        assertEquals("wu", statsDao.observeMostVariantsCard("M", "one", null).first()?.scryfallId)
+        assertEquals(listOf("wu"), statsDao.observeCardsByArtist("Shared Artist", "M", "one", null, 10).first().map { it.scryfallId })
+        assertEquals(2, statsDao.observeCountByDecade("M", "one", null).first().single().count)
     }
 
     @Test

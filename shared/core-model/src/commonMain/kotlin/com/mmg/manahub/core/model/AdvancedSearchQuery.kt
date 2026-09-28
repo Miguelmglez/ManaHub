@@ -63,6 +63,9 @@ sealed class SearchCriterion {
     /** Scryfall "function" oracle-tag facet (see [CardFunctionOption]). */
     data class CardFunction(val functions: Set<String>, val matchAll: Boolean = false) : SearchCriterion()
 
+    /** Any complete alternative may match; criteria inside one alternative are combined with AND. */
+    data class AnyOf(val alternatives: List<List<SearchCriterion>>) : SearchCriterion()
+
     /**
      * A card's printed colors (Scryfall `c`). [ColorMatchMode.AT_LEAST] is the default because it
      * is what the Advanced Search color picker means by "these colors".
@@ -179,7 +182,10 @@ sealed class SearchCriterion {
     data class CollectionStatus(val source: CollectionSource) : SearchCriterion()
 
     /** Matches cards that have ANY of the given tag keys (in auto-tags OR user-tags). */
-    data class HasTag(val keys: List<String>) : SearchCriterion()
+    data class HasTag(
+        val keys: List<String>,
+        val verifiedScryfallQueries: Map<String, String> = emptyMap(),
+    ) : SearchCriterion()
 
     /**
      * Deck Wizard Commander v3 plan (Phase 3.4, D14): a card that can legally be a Commander

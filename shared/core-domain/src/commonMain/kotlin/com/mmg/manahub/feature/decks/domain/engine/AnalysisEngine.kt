@@ -873,7 +873,7 @@ object AnalysisEngine {
      * own "core-domain cannot reach TagDictionary.localize" fallback discipline). */
     private val AXIS_LABELS: Map<AxisKey, String> = mapOf(
         "LIFE" to "Life", "DEATH" to "Death", "TOKENS" to "Tokens", "COUNTERS" to "Counters",
-        "LANDFALL" to "Landfall", "GRAVEYARD" to "Graveyard", "ETB" to "ETB", "SPELLS" to "Spells",
+        "LANDFALL" to "Landfall", "GRAVEYARD" to "Graveyard", "GRAVEYARD_EXIT" to "Graveyard Exit", "ETB" to "ETB", "SPELLS" to "Spells",
         "ARTIFACTS" to "Artifacts", "ENCHANTMENTS" to "Enchantments", "ATTACHED" to "Equipment / Auras",
         "ATTACK" to "Attack", "PLANESWALKERS" to "Planeswalkers", "GROUP" to "Group Effects",
         "MILL_OPP" to "Mill (Opponent)", "ENGINE" to "Support", "LOCK" to "Stax Lock",

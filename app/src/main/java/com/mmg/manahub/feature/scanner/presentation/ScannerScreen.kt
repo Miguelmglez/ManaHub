@@ -22,6 +22,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,12 +37,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -53,7 +53,6 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FlashOff
 import androidx.compose.material.icons.rounded.FlashOn
 import androidx.compose.material.icons.rounded.Settings
@@ -82,7 +81,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -108,11 +106,14 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.PreferredCurrency
+import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardQueueSheet
 import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.EditQueuedCardSheet
+import com.mmg.manahub.core.ui.components.FoilBadge
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
+import com.mmg.manahub.core.ui.components.LanguageBadge
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicLoadingSize
@@ -347,6 +348,8 @@ fun ScannerScreen(
                 onToggleAutoDeleteOnAdd = viewModel::onToggleAutoDeleteOnAdd,
                 onIncrementQuantity = viewModel::onIncrementSessionCardQuantity,
                 onDecrementQuantity = viewModel::onDecrementSessionCardQuantity,
+                isListInverted = uiState.isListInverted,
+                updateSorting = viewModel::updateSorting
             )
             is ScannerTarget.Deck -> DeckScannerQueueSheet(
                 cards = uiState.scanSession.cards,
@@ -366,6 +369,8 @@ fun ScannerScreen(
                 onToggleAutoDeleteOnAdd = viewModel::onToggleAutoDeleteOnAdd,
                 onIncrementQuantity = viewModel::onIncrementSessionCardQuantity,
                 onDecrementQuantity = viewModel::onDecrementSessionCardQuantity,
+                isListInverted = uiState.isListInverted,
+                updateSorting = viewModel::updateSorting
             )
             ScannerTarget.Invalid -> Unit
         }
@@ -1236,34 +1241,30 @@ private fun DetectedCardOverlay(
     val ty = MaterialTheme.magicTypography
 
     Surface(
-        color = mc.background.copy(alpha = 0.85f),
+        color = mc.surface.copy(alpha = 0.92f),
         shape = RoundedCornerShape(16.dp),
-        modifier = Modifier
-            .fillMaxWidth()
+        tonalElevation = 4.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (card != null && isFoil) {
+                mc.goldMtg.copy(alpha = 0.45f)
+            } else if (card != null) {
+                mc.primaryAccent.copy(alpha = 0.25f)
+            } else {
+                mc.textPrimary.copy(alpha = 0.12f)
+            }
+        ),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onClick() }
-                .padding(12.dp),
+                .padding(14.dp),
             contentAlignment = Alignment.Center
         ) {
             if (card != null) {
-                IconButton(
-                    onClick = onRemove,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .minimumInteractiveComponentSize()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = stringResource(R.string.scanner_remove_detected_card),
-                        tint = mc.textSecondary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     // W2.11: purely informational — the card is added regardless. languageMismatch
                     // here means "no <selectedLanguage> printing exists, added the English print".
                     if (languageMismatch) {
@@ -1286,7 +1287,7 @@ private fun DetectedCardOverlay(
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
+                        verticalAlignment = Alignment.Top,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         // Card Art Thumbnail
@@ -1295,26 +1296,32 @@ private fun DetectedCardOverlay(
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(64.dp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .size(68.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(0.5.dp, mc.textPrimary.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
                         )
 
                         // Name and Set Info
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = card.name,
-                                style = ty.titleMedium,
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            CardName(
+                                name = card.name,
+                                style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = mc.textPrimary,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
                             )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 SetSymbol(
                                     setCode = card.setCode,
                                     rarity = CardRarity.fromString(card.rarity),
                                     size = 16.dp,
                                 )
-                                Spacer(Modifier.width(4.dp))
                                 Text(
                                     text = card.setName,
                                     style = ty.bodySmall,
@@ -1323,41 +1330,67 @@ private fun DetectedCardOverlay(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            Spacer(Modifier.height(2.dp))
                             Text(
                                 text = PriceFormatter.formatFromScryfall(
                                     if (isFoil) card.priceUsdFoil else card.priceUsd,
                                     if (isFoil) card.priceEurFoil else card.priceEur,
                                     preferredCurrency,
                                 ),
-                                style = ty.labelSmall.copy(letterSpacing = 0.sp),
-                                color = mc.primaryAccent
+                                style = ty.labelLarge.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp),
+                                color = if (isFoil) mc.goldMtg else mc.primaryAccent
+                            )
+                        }
+
+                        IconButton(
+                            onClick = onRemove,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(mc.textPrimary.copy(alpha = 0.08f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.scanner_remove_detected_card),
+                                tint = mc.textSecondary,
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
 
-                    // Attribute Pill (Normal, Set, Lang, Qty)
-                    Surface(
-                        color = mc.textPrimary.copy(alpha = 0.1f),
-                        shape = CircleShape,
-                        modifier = Modifier.fillMaxWidth().height(32.dp)
+                    // Attribute Badges Row (Set Symbol + Collector Number, Foil Badge, Language Badge)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
+                        Surface(
+                            color = mc.textPrimary.copy(alpha = 0.08f),
+                            shape = CircleShape,
                         ) {
-                            SetSymbol(
-                                setCode = card.setCode,
-                                rarity = CardRarity.fromString(card.rarity),
-                                size = 14.dp,
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                text = "#${card.collectorNumber}",
-                                style = ty.labelSmall,
-                                color = mc.textPrimary
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                SetSymbol(
+                                    setCode = card.setCode,
+                                    rarity = CardRarity.fromString(card.rarity),
+                                    size = 14.dp,
+                                )
+                                Text(
+                                    text = "#${card.collectorNumber}",
+                                    style = ty.labelSmall,
+                                    color = mc.textPrimary
+                                )
+                            }
                         }
+
+                        if (isFoil) {
+                            FoilBadge()
+                        }
+
+                        LanguageBadge(langCode = selectedLanguage)
                     }
                 }
             } else if (error != null) {
@@ -1373,7 +1406,11 @@ private fun DetectedCardOverlay(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     MagicLoadingSpinner(size = MagicLoadingSize.XSmall)
-                    Text(text = stringResource(R.string.scanner_searching_indicator), style = ty.bodySmall, color = mc.textPrimary)
+                    Text(
+                        text = stringResource(R.string.scanner_searching_indicator),
+                        style = ty.bodySmall,
+                        color = mc.textPrimary
+                    )
                 }
             } else {
                 Text(

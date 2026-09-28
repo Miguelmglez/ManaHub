@@ -388,6 +388,7 @@ class UserCardRepositoryImpl @Inject constructor(
         additions: List<TradeCollectionLine>,
         shouldApply: suspend () -> Boolean,
         onApplied: suspend () -> Unit,
+        onOfferRemovals: suspend (List<String>) -> Unit,
     ): TradeCollectionApplyResult? = withContext(ioDispatcher) {
         val now = System.currentTimeMillis()
         // Never withContext inside: it would leave Room's transaction thread.
@@ -428,6 +429,7 @@ class UserCardRepositoryImpl @Inject constructor(
                     now = now,
                 )
             }
+            onOfferRemovals(remoteOfferRemovals)
             onApplied()
             TradeCollectionApplyResult(
                 remoteOfferRemovals = remoteOfferRemovals,

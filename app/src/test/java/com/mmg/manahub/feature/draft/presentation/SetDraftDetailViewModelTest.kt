@@ -163,10 +163,29 @@ class SetDraftDetailViewModelTest {
         advanceUntilIdle()
         assertEquals(listOf("Bolt"), vm.uiState.value.filteredTiers.flatMap { t -> t.cards.map { it.name } })
 
-        vm.toggleTierListColorFilter("All")
+        vm.toggleTierListColorFilter("R")
         vm.onSearchQueryChanged("elf")
         advanceUntilIdle()
         assertEquals(listOf("Elf", "Elf"), vm.uiState.value.filteredTiers.flatMap { t -> t.cards.map { it.name } })
+    }
+
+    @Test
+    fun `multicolor tier filter combines with a letter and name within the selected set`() = runTest(testDispatcher) {
+        val base = tierList()
+        coEvery { repository.getSetTierList("tdm") } returns DataResult.Success(base.copy(
+            tiers = listOf(TierGroup("A", "Top", "", listOf(
+                tierCard("Azure Gold", "id-wu", listOf("W", "U")),
+                tierCard("Azure Mono", "id-w", listOf("W")),
+                tierCard("Azure Other", "id-ub", listOf("U", "B")),
+            )))
+        ))
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.toggleTierListColorFilter("M")
+        vm.toggleTierListColorFilter("W")
+        vm.onSearchQueryChanged("Azure")
+        advanceUntilIdle()
+        assertEquals(listOf("Azure Gold"), vm.uiState.value.filteredTiers.flatMap { tier -> tier.cards.map { it.name } })
     }
 
     private fun guide() = SetDraftGuide(

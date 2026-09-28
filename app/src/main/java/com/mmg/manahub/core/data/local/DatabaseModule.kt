@@ -170,6 +170,8 @@ object DatabaseModule {
                 // Trades audit H4/H8: trade_collection_sync.pending_apply and owner_user_id on
                 // local_wishlists / local_open_for_trade (all additive).
                 MIGRATION_55_56,
+                MIGRATION_56_57,
+                MIGRATION_57_58,
             )
             .build()
 

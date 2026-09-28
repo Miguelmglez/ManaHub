@@ -378,6 +378,18 @@ class OpenForTradeRepositoryImplTest {
         coVerify(exactly = 0) { dao.deleteByCollectionId(any(), any()) }
     }
 
+    @Test
+    fun `given trade apply already removed the local offer then remote removal still runs`() = runTest {
+        coEvery { dao.getByCollectionId("col-1", USER_ID) } returns null
+        coEvery { remote.removeByUserCardId("col-1") } returns Result.success(Unit)
+
+        val result = repository.removeByCollectionIdAndSync("col-1")
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 1) { remote.removeByUserCardId("col-1") }
+        coVerify(exactly = 1) { dao.deleteByCollectionId("col-1", USER_ID) }
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     //  GROUP 8 — syncFromRemote: eviction only after a complete keyset drain
     // ══════════════════════════════════════════════════════════════════════════

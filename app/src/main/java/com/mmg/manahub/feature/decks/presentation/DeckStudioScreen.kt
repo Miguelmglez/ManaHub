@@ -12,6 +12,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
@@ -24,7 +26,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,6 +36,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -45,16 +47,15 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,11 +65,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -87,12 +85,9 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
@@ -123,17 +118,16 @@ import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
-import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
-import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaHubBottomSheetSelector
 import com.mmg.manahub.core.ui.components.ManaTabItem
 import com.mmg.manahub.core.ui.components.ManaTabRow
+import com.mmg.manahub.core.ui.components.rememberFabVisibility
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.BottomSheetShape
@@ -155,9 +149,6 @@ import com.mmg.manahub.feature.decks.domain.usecase.SimilarDeckResult
 import com.mmg.manahub.feature.decks.presentation.components.AddBasicLandsRow
 import com.mmg.manahub.feature.decks.presentation.components.BasicLandsSheet
 import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
-import com.mmg.manahub.feature.decks.presentation.inspirations.BrowseInspirationsActions
-import com.mmg.manahub.feature.decks.presentation.inspirations.BrowseInspirationsSheet
-import com.mmg.manahub.feature.decks.presentation.inspirations.InspirationSelectionSource
 import com.mmg.manahub.feature.decks.presentation.components.CardSectionRow
 import com.mmg.manahub.feature.decks.presentation.components.CuratedStrategyPickerSheet
 import com.mmg.manahub.feature.decks.presentation.components.DeckAddCardsMethod
@@ -182,6 +173,9 @@ import com.mmg.manahub.feature.decks.presentation.components.TribeOption
 import com.mmg.manahub.feature.decks.presentation.components.WarningOverlay
 import com.mmg.manahub.feature.decks.presentation.components.groupCards
 import com.mmg.manahub.feature.decks.presentation.components.label
+import com.mmg.manahub.feature.decks.presentation.inspirations.BrowseInspirationsActions
+import com.mmg.manahub.feature.decks.presentation.inspirations.BrowseInspirationsSheet
+import com.mmg.manahub.feature.decks.presentation.inspirations.InspirationSelectionSource
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.koin.androidx.compose.koinViewModel
@@ -262,6 +256,9 @@ fun DeckStudioScreen(
     val focusManager = LocalFocusManager.current
     val toastState = rememberMagicToastState()
     val inspirationsToastState = rememberMagicToastState()
+
+    val buildListState = rememberLazyListState()
+    val isFabVisible = rememberFabVisibility(buildListState)
 
     // Deck Analysis Category Sections rework (W7): color identity + format + dominant tribe for
     // the Analysis tab's "Browse for <Category>" buttons (SectionSearchQuery.buildFor). Neither
@@ -582,9 +579,9 @@ fun DeckStudioScreen(
             floatingActionButton = {
                 // Adding cards is available only after the live deck has loaded.
                 AnimatedVisibility(
-                    visible = uiState.selectedTab == DeckStudioTab.BUILD && !uiState.isLoading && uiState.deck != null,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
+                    visible = uiState.selectedTab == DeckStudioTab.BUILD && !uiState.isLoading && uiState.deck != null && isFabVisible,
+                    enter = fadeIn() + scaleIn(),
+                    exit = fadeOut() + scaleOut(),
                 ) {
                     FloatingActionButton(
                         onClick = {
@@ -632,8 +629,8 @@ fun DeckStudioScreen(
                             add(
                                 ManaTabItem(
                                 label = stringResource(R.string.deck_studio_tab_suggestions).uppercase(),
-                                selected = uiState.selectedTab == DeckStudioTab.SUGGESTIONS,
-                                onClick = {viewModel.onSelectTab(DeckStudioTab.SUGGESTIONS)}))
+                                selected = uiState.selectedTab == DeckStudioTab.ANALYSIS,
+                                onClick = {viewModel.onSelectTab(DeckStudioTab.ANALYSIS)}))
                         }
                     }
                     if (!uiState.isLoading && tabs.size > 1) {
@@ -651,6 +648,7 @@ fun DeckStudioScreen(
                     ) {tab->
                         when (tab) {
                             DeckStudioTab.BUILD -> BuildTab(
+                                listState = buildListState,
                                 uiState = uiState,
                                 isCommanderFormat = isCommanderFormat,
                                 wizardAvailable = wizardAvailableForFormat,
@@ -699,7 +697,7 @@ fun DeckStudioScreen(
                                 onUnacknowledgeOverLimit = viewModel::unacknowledgeOverLimit,
                             )
 
-                            DeckStudioTab.SUGGESTIONS -> SuggestionsTab(
+                            DeckStudioTab.ANALYSIS -> AnalysisTab(
                                 uiState = uiState,
                                 onApplyCuratedStrategy = {strategy, tribe->
                                     viewModel.onApplyCuratedStrategy(strategy, tribe)
@@ -1126,6 +1124,8 @@ fun DeckStudioScreen(
             allCardsTabLabel = stringResource(R.string.deckdetail_tab_scryfall),
             onQueryChange = viewModel::searchCommander,
             onScryfallSearch = viewModel::searchCommander,
+            onAdvancedSearch = { viewModel.applyStructuredSearch(it) },
+            appliedAdvancedQuery = uiState.activeCollectionQuery,
             onAdd = {row->
                 focusManager.clearFocus()
                 viewModel.setCommander(row.card)
@@ -1240,6 +1240,7 @@ private fun BuildTab(
     preferredCurrency: PreferredCurrency,
     deckValueSummary: DeckValueSummary,
     playerName: String,
+    listState: LazyListState = rememberLazyListState(),
     onCardClick: (String) -> Unit,
     onDeckCardClick: (String) -> Unit,
     onReviewSurvey: (sessionId: Long) -> Unit,
@@ -1304,7 +1305,7 @@ private fun BuildTab(
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                state = rememberLazyListState(),
+                state = listState,
                 contentPadding = PaddingValues(bottom = FabClearance),
                 verticalArrangement = Arrangement.spacedBy(spacing.md),
             ) {
@@ -1999,7 +2000,7 @@ private fun DoctorStagedProgressContent(
 }
 
 /**
- * Edge-case QA fix (MEDIUM, 2026-09-06): [rememberSaveable] Saver for [SuggestionsTab]'s
+ * Edge-case QA fix (MEDIUM, 2026-09-06): [rememberSaveable] Saver for [AnalysisTab]'s
  * `collapsedCategorySections` state, which used to be a plain `remember` and did not survive the
  * real Navigation-Compose round-trip a `CardSectionRow` card tap triggers (see that state's own
  * KDoc). `SnapshotStateMap<String, Boolean>` has no default Bundle Saver, so this flattens each
@@ -2021,7 +2022,7 @@ private val CollapsedCategorySectionsSaver: Saver<SnapshotStateMap<String, Boole
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SuggestionsTab(
+private fun AnalysisTab(
     uiState: DeckStudioUiState,
     onApplyCuratedStrategy: (CuratedStrategy, String?) -> Unit,
     onAutoDetectArchetypePlan: () -> Unit,
@@ -2619,21 +2620,27 @@ private fun DeckStudioOptionsSheet(
             DeckStudioOptionRow(
                 icon = Icons.Default.Edit,
                 title = stringResource(R.string.deck_studio_edit_deck),
+                subtitle = "Change deck name or cover card",
+                accentColor = mc.primaryAccent,
                 onClick = { closeSheet(onEdit) },
             )
 
             if (showRebuildWithWizard) {
                 DeckStudioOptionRow(
-                    icon = Icons.Default.Refresh,
+                    icon = Icons.Default.AutoAwesome,
                     title = stringResource(R.string.deck_studio_rebuild_with_wizard),
+                    subtitle = "Regenerate cards using AI/Wizard",
+                    accentColor = mc.goldMtg,
                     onClick = { closeSheet(onRebuildWithWizard) },
                 )
             }
 
             if (showInspirations) {
                 DeckStudioOptionRow(
-                    icon = Icons.Default.AutoAwesome,
-                    title = stringResource(R.string.deck_studio_inspirations),
+                    icon = Icons.Default.Explore,
+                    title = stringResource(R.string.deck_studio_browse_inspirations),
+                    subtitle = stringResource(R.string.deck_studio_browse_inspirations_desc),
+                    accentColor = mc.secondaryAccent,
                     onClick = { closeSheet(onBrowseInspirations) },
                 )
             }
@@ -2641,13 +2648,17 @@ private fun DeckStudioOptionsSheet(
             DeckStudioOptionRow(
                 icon = Icons.Default.Share,
                 title = stringResource(R.string.deck_studio_share_deck),
+                subtitle = "Export deck list to text format",
+                accentColor = mc.primaryAccent,
                 enabled = shareEnabled,
                 onClick = { closeSheet(onShare) },
             )
 
             DeckStudioOptionRow(
-                icon = Icons.Default.CollectionsBookmark,
+                icon = Icons.Default.LibraryAdd,
                 title = stringResource(R.string.deckstudio_select_cards),
+                subtitle = "Batch select and manage cards",
+                accentColor = mc.primaryAccent,
                 enabled = shareEnabled,
                 onClick = { closeSheet(onSelectCards) },
             )
@@ -2655,7 +2666,9 @@ private fun DeckStudioOptionsSheet(
             DeckStudioOptionRow(
                 icon = Icons.Default.Delete,
                 title = stringResource(R.string.deckdetail_menu_delete),
-                enabled = true,
+                subtitle = "Permanently remove this deck",
+                accentColor = mc.lifeNegative,
+                isDestructive = true,
                 onClick = { closeSheet(onDeleteDeck) },
             )
         }
@@ -2666,8 +2679,10 @@ private fun DeckStudioOptionsSheet(
 private fun DeckStudioOptionRow(
     icon: ImageVector,
     title: String,
+    subtitle: String? = null,
     enabled: Boolean = true,
-    iconTint: Color? = null,
+    accentColor: Color? = null,
+    isDestructive: Boolean = false,
     textColor: Color? = null,
     onClick: () -> Unit,
 ) {
@@ -2675,32 +2690,76 @@ private fun DeckStudioOptionRow(
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
 
-    val effectiveIconTint = iconTint ?: if (enabled) mc.textSecondary else mc.textDisabled
-    val effectiveTextColor = textColor ?: if (enabled) mc.textPrimary else mc.textDisabled
+    val effectiveAccent = when {
+        !enabled -> mc.textDisabled
+        isDestructive -> mc.lifeNegative
+        accentColor != null -> accentColor
+        else -> mc.primaryAccent
+    }
+    val effectiveTextColor = when {
+        !enabled -> mc.textDisabled
+        textColor != null -> textColor
+        isDestructive -> mc.lifeNegative
+        else -> mc.textPrimary
+    }
 
     Surface(
         shape = CardShape,
-        color = mc.surface,
+        color = if (enabled) mc.surface else mc.surfaceVariant.copy(alpha = 0.25f),
+        border = BorderStroke(
+            0.5.dp,
+            if (enabled) effectiveAccent.copy(alpha = 0.2f) else mc.surfaceVariant.copy(alpha = 0.2f)
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.sm + spacing.xs),
+            modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = effectiveIconTint,
-                modifier = Modifier.size(24.dp),
-            )
-            Text(
-                text = title,
-                style = ty.bodyMedium,
-                color = effectiveTextColor,
-            )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(if (enabled) effectiveAccent.copy(alpha = 0.12f) else mc.surfaceVariant.copy(alpha = 0.3f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = effectiveAccent,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = title,
+                    style = ty.titleMedium,
+                    color = effectiveTextColor,
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = ty.bodySmall,
+                        color = if (enabled) mc.textSecondary else mc.textDisabled,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (enabled) {
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = mc.textSecondary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }

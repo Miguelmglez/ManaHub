@@ -16,8 +16,8 @@ import com.mmg.manahub.feature.communitydecks.domain.usecase.SearchCommunityDeck
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,8 +29,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.LocalDate
-import java.time.temporal.IsoFields
 
 /** Card-name search debounce window shared by the Commander and Card advanced-search pickers. */
 private const val CARD_PICKER_DEBOUNCE_MS = 400L
@@ -561,7 +559,7 @@ class CommunityDecksSearchViewModel(
             // cancelled, will never reach its own completion update to flip it back.
             _uiState.update { it.copy(isLoading = true, error = null, hasSearched = true, isLoadingMore = false) }
 
-            crashlytics.setCustomKey("community_search_format", filters.formats.apiId)
+            crashlytics.setCustomKey("community_search_format", filters.formats.apiId?:0)
             crashlytics.setCustomKey(
                 "community_search_sort",
                 "${state.selectedSortField.name}_${state.selectedSortDirection.name}",

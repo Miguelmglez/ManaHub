@@ -1390,7 +1390,8 @@ private fun TierFilterPanel(
             ManaColorPicker(
                 selectedColors = colorFilter,
                 onToggleColor = onToggleColor,
-                itemSize = 40.dp,
+                isMultiColorExclusive = false,
+                itemSize = 48.dp,
                 symbolSize = 26.dp,
             )
         }

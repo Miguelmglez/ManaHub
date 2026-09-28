@@ -6,6 +6,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
 import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
+import com.mmg.manahub.core.data.local.entity.TradeOfferCleanupEntity
+import com.mmg.manahub.core.data.local.entity.TradeWishlistCleanupEntity
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -58,4 +60,32 @@ interface TradeCollectionSyncDao {
      */
     @Query("DELETE FROM trade_collection_sync WHERE proposal_id = :proposalId AND user_id = :userId AND pending_apply = 0")
     suspend fun removeSyncRecord(proposalId: String, userId: String)
+
+    /** Queues remote deletions within the same transaction that applies the trade. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun enqueueOfferCleanups(entries: List<TradeOfferCleanupEntity>)
+
+    /** Returns every unconfirmed remote deletion for the current account. */
+    @Query("SELECT * FROM trade_offer_cleanup WHERE user_id = :userId ORDER BY proposal_id, collection_id")
+    suspend fun getPendingOfferCleanups(userId: String): List<TradeOfferCleanupEntity>
+
+    /** A confirmed remote delete is safe to remove even when the remote row was already absent. */
+    @Query("DELETE FROM trade_offer_cleanup WHERE proposal_id = :proposalId AND user_id = :userId AND collection_id = :collectionId")
+    suspend fun clearOfferCleanup(proposalId: String, userId: String, collectionId: String)
+
+    /** Stages the latest desired server quantity in the collection transaction. */
+    @Upsert
+    suspend fun upsertWishlistCleanup(entry: TradeWishlistCleanupEntity)
+
+    @Query("SELECT * FROM trade_wishlist_cleanup WHERE user_id = :userId ORDER BY wishlist_id")
+    suspend fun getPendingWishlistCleanups(userId: String): List<TradeWishlistCleanupEntity>
+
+    @Query("SELECT wishlist_id FROM trade_wishlist_cleanup WHERE user_id = :userId")
+    suspend fun getPendingWishlistIds(userId: String): List<String>
+
+    @Query("DELETE FROM trade_wishlist_cleanup WHERE user_id = :userId AND wishlist_id = :wishlistId AND target_quantity = :targetQuantity")
+    suspend fun clearWishlistCleanup(userId: String, wishlistId: String, targetQuantity: Int)
+
+    @Query("DELETE FROM trade_wishlist_cleanup WHERE user_id = :userId AND wishlist_id = :wishlistId")
+    suspend fun clearWishlistCleanupForEntry(userId: String, wishlistId: String)
 }

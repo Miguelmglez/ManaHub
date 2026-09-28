@@ -149,10 +149,8 @@ class OpenForTradeRepositoryImpl(
             // remote call, and the next syncFromRemote() would re-insert ("resurrect") the entry
             // the user just removed (trades audit §2.2, 2026-07-10).
             val owner = TradeListOwner.key(currentUserId())
-            if (dao.getByCollectionId(localCollectionId, owner) != null) {
-                remote.removeByUserCardId(localCollectionId).getOrThrow()
-                dao.deleteByCollectionId(localCollectionId, owner)
-            }
+            remote.removeByUserCardId(localCollectionId).getOrThrow()
+            dao.deleteByCollectionId(localCollectionId, owner)
         }
 
     override suspend fun removeLocal(id: String): Result<Unit> = runCatching {
@@ -170,13 +168,13 @@ class OpenForTradeRepositoryImpl(
 
     override suspend fun evictForeignAccountRows(userId: String): Result<Unit> = runCatching {
         require(currentUserId() == userId)
-        dao.deleteForeignAccountRows(userId)
+        dao.deleteAmbiguousRows()
     }
 
     override suspend fun migrateLocalToRemote(userId: String): Result<Int> = runCatching {
         require(currentUserId() == userId)
-        // A previous account's unsynced rows must never be pushed into this account.
-        dao.deleteForeignAccountRows(userId)
+        // Owner-scoped reads exclude another account's pending rows without deleting them.
+        dao.deleteAmbiguousRows()
         val unsynced = dao.getUnsynced(userId)
         if (unsynced.isEmpty()) return@runCatching 0
 
@@ -233,7 +231,7 @@ class OpenForTradeRepositoryImpl(
 
     override suspend fun syncFromRemote(userId: String): Result<Unit> = try {
         require(currentUserId() == userId)
-        dao.deleteForeignAccountRows(userId)
+        dao.deleteAmbiguousRows()
         val drain = remote.drainOpenForTrade(userId)
         require(currentUserId() == userId)
         val entities = drain.rows.map { dto ->

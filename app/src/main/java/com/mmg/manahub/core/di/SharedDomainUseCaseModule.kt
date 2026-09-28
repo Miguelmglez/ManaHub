@@ -216,5 +216,10 @@ object SharedDomainUseCaseModule {
         cardStrategyTagsRepository: CardStrategyTagsRepository,
         edhrecCardTagEnrichmentSource: EdhrecCardTagEnrichmentSourceContract,
     ): ResolveCardStrategyTagsUseCase =
-        ResolveCardStrategyTagsUseCase(computeCardTagsUseCase, cardStrategyTagsRepository, edhrecCardTagEnrichmentSource)
+        ResolveCardStrategyTagsUseCase(
+            computeCardTagsUseCase,
+            cardStrategyTagsRepository,
+            edhrecCardTagEnrichmentSource,
+            remoteMechanicsProvider = { com.mmg.manahub.core.tagging.TagDictionary.remoteCatalogEntries() },
+        )
 }

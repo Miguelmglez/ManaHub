@@ -12,11 +12,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -142,4 +151,64 @@ fun AvatarImage(avatarUrl: String?, initials: String, size: Int, modifier: Modif
             )
         }
     }
+}
+
+@Composable
+fun rememberFabVisibility(listState: LazyListState): Boolean {
+    var isFabVisible by remember { mutableStateOf(true) }
+    var previousIndex by remember { mutableIntStateOf(listState.firstVisibleItemIndex) }
+    var previousOffset by remember { mutableIntStateOf(listState.firstVisibleItemScrollOffset) }
+
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val canScrollFwd = listState.canScrollForward
+            val canScrollBwd = listState.canScrollBackward
+            val isScrollable = canScrollFwd || canScrollBwd
+            Triple(isScrollable, listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
+        }.collect { (isScrollable, currentIndex, currentOffset) ->
+            if (!isScrollable) {
+                isFabVisible = true
+            } else {
+                if (currentIndex > previousIndex || (currentIndex == previousIndex && currentOffset > previousOffset + 10)) {
+                    isFabVisible = false
+                } else if (currentIndex < previousIndex || (currentIndex == previousIndex && currentOffset < previousOffset - 10)) {
+                    isFabVisible = true
+                }
+            }
+            previousIndex = currentIndex
+            previousOffset = currentOffset
+        }
+    }
+
+    return isFabVisible
+}
+
+@Composable
+fun rememberFabVisibility(gridState: LazyGridState): Boolean {
+    var isFabVisible by remember { mutableStateOf(true) }
+    var previousIndex by remember { mutableIntStateOf(gridState.firstVisibleItemIndex) }
+    var previousOffset by remember { mutableIntStateOf(gridState.firstVisibleItemScrollOffset) }
+
+    LaunchedEffect(gridState) {
+        snapshotFlow {
+            val canScrollFwd = gridState.canScrollForward
+            val canScrollBwd = gridState.canScrollBackward
+            val isScrollable = canScrollFwd || canScrollBwd
+            Triple(isScrollable, gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
+        }.collect { (isScrollable, currentIndex, currentOffset) ->
+            if (!isScrollable) {
+                isFabVisible = true
+            } else {
+                if (currentIndex > previousIndex || (currentIndex == previousIndex && currentOffset > previousOffset + 10)) {
+                    isFabVisible = false
+                } else if (currentIndex < previousIndex || (currentIndex == previousIndex && currentOffset < previousOffset - 10)) {
+                    isFabVisible = true
+                }
+            }
+            previousIndex = currentIndex
+            previousOffset = currentOffset
+        }
+    }
+
+    return isFabVisible
 }

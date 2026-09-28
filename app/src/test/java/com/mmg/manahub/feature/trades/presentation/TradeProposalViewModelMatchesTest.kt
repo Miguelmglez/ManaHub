@@ -35,10 +35,12 @@ import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -63,6 +65,56 @@ import org.junit.Test
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TradeProposalViewModelMatchesTest {
+
+    @Test
+    fun `account switch clears retained editor data before new owner emissions`() = runTest {
+        val collections = MutableSharedFlow<List<UserCardWithCard>>()
+        val wishlists = MutableSharedFlow<List<WishlistEntry>>()
+        val offers = MutableSharedFlow<List<OpenForTradeEntry>>()
+        val friends = MutableSharedFlow<List<Friend>>()
+        every { userCardRepository.observeCollection() } returns collections
+        every { wishlistRepository.observeLocal() } returns wishlists
+        every { openForTradeRepository.observeLocal() } returns offers
+        every { friendRepository.observeFriends() } returns friends
+
+        val vm = createViewModel()
+        runCurrent()
+        collections.emit(listOf(buildUserCardWithCard(CARD_ID_LIGHTNING_BOLT)))
+        wishlists.emit(listOf(buildWishlistEntry(CARD_ID_COUNTERSPELL)))
+        offers.emit(listOf(buildOfferEntry(CARD_ID_DARK_RITUAL)))
+        friends.emit(listOf(buildFriend()))
+        advanceUntilIdle()
+        stubFriendWishlist(FRIEND_USER_ID, emptyList())
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+        vm.onFriendSelected(buildFriend())
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.collectionIds.contains(CARD_ID_LIGHTNING_BOLT))
+        assertTrue(vm.uiState.value.friends.isNotEmpty())
+
+        sessionFlow.value = SessionState.Authenticated(
+            AuthUser("user-b", "b@test.com", "B", "#B001", null, "email")
+        )
+        runCurrent()
+        val switched = vm.uiState.value
+        assertEquals("user-b", switched.currentUserId)
+        assertTrue(switched.collectionIds.isEmpty())
+        assertTrue(switched.friends.isEmpty())
+        assertNull(switched.selectedFriend)
+        assertTrue(switched.offerResults.isEmpty())
+        assertTrue(switched.wishlistResults.isEmpty())
+        assertTrue(switched.proposerMatches.isEmpty())
+        assertTrue(switched.receiverMatches.isEmpty())
+
+        sessionFlow.value = SessionState.Authenticated(
+            AuthUser(MY_USER_ID, "me@test.com", "Me", "#ME001", null, "email")
+        )
+        runCurrent()
+        assertEquals(MY_USER_ID, vm.uiState.value.currentUserId)
+        assertTrue(vm.uiState.value.collectionIds.isEmpty())
+        collections.emit(listOf(buildUserCardWithCard(CARD_ID_BIRDS_OF_PARADISE)))
+        advanceUntilIdle()
+        assertEquals(setOf(CARD_ID_BIRDS_OF_PARADISE), vm.uiState.value.collectionIds)
+    }
 
     // ── Test dispatcher ───────────────────────────────────────────────────────
 

@@ -11,13 +11,16 @@ sealed class TradeError : Exception() {
     object InitialAsymmetryNotAllowed : TradeError()
     object ReviewCollectionSameDirection : TradeError()
     object Unauthorized : TradeError()
+    object TradeNotFound : TradeError()
+    object RequestKeyReused : TradeError()
+    object InvalidCollectionReference : TradeError()
     data class Unknown(override val message: String?) : TradeError()
 }
 
 /**
  * Returns a user-readable message for a [Throwable].
- * Typed [TradeError] subclasses return a descriptive string; all other exceptions
- * fall back to the raw message (which may be null for truly unknown failures).
+ * Typed [TradeError] subclasses return a descriptive string; unknown server errors
+ * return null so identifiers and server text cannot reach the UI.
  */
 fun Throwable.toUserFacingMessage(): String? = when (this) {
     is TradeError.CardAlreadyLocked          -> "Some cards are already locked in another trade"
@@ -29,7 +32,10 @@ fun Throwable.toUserFacingMessage(): String? = when (this) {
     is TradeError.InitialAsymmetryNotAllowed -> "Both sides of the trade must include at least one item or a collection review"
     is TradeError.ReviewCollectionSameDirection -> "Collection review must go in opposite directions"
     is TradeError.Unauthorized               -> "You are not authorized to perform this action"
-    is TradeError.Unknown                    -> message
+    is TradeError.TradeNotFound               -> "This trade no longer exists. Please refresh."
+    is TradeError.RequestKeyReused            -> "This proposal changed while sending. Please try again."
+    is TradeError.InvalidCollectionReference -> "A selected collection card is no longer available. Please review the proposal."
+    is TradeError.Unknown                    -> null
     else                                     -> message
 }
 
@@ -52,6 +58,9 @@ fun parseTradeError(message: String?): TradeError {
         message.startsWith("INITIAL_ASYMMETRY") -> TradeError.InitialAsymmetryNotAllowed
         message.startsWith("REVIEW_COLLECTION_SAME_DIRECTION") -> TradeError.ReviewCollectionSameDirection
         message.startsWith("UNAUTHORIZED") -> TradeError.Unauthorized
+        message.startsWith("TRADE_NOT_FOUND") -> TradeError.TradeNotFound
+        message.startsWith("REQUEST_KEY_REUSED") -> TradeError.RequestKeyReused
+        message.startsWith("INVALID_COLLECTION_REFERENCE") -> TradeError.InvalidCollectionReference
         else -> TradeError.Unknown(message)
     }
 }

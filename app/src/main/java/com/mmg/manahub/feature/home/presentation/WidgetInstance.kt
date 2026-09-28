@@ -41,8 +41,8 @@ fun PersistedWidget.toInstanceOrNull(): WidgetInstance? {
  * DataStore-persisted token once the user next mutates the layout (add/remove/move), since every
  * mutation path re-persists from the already-expanded in-memory list.
  */
-fun List<PersistedWidget>.toInstancesWithMigration(): List<WidgetInstance> =
-    flatMap { persisted ->
+fun List<PersistedWidget>.toInstancesWithMigration(): List<WidgetInstance> {
+    val instances = flatMap { persisted ->
         if (persisted.persistedId == HomeWidgetType.LEGACY_SOCIAL_HUB_PERSISTED_ID) {
             listOf(
                 WidgetInstance(HomeWidgetType.FRIENDS, persisted.size),
@@ -52,3 +52,10 @@ fun List<PersistedWidget>.toInstancesWithMigration(): List<WidgetInstance> =
             listOfNotNull(persisted.toInstanceOrNull())
         }
     }.distinctBy { it.type.persistedId }
+
+    return if (instances.none { it.type == HomeWidgetType.GREETING_HEADER }) {
+        listOf(WidgetInstance(HomeWidgetType.GREETING_HEADER, WidgetSize.MEDIUM)) + instances
+    } else {
+        instances
+    }
+}

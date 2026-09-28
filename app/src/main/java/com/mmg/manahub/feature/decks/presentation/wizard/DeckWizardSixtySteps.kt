@@ -352,6 +352,8 @@ internal fun SeedPickStepContent(
                 onApplyStructuredSearch(query)
                 showAdvancedSearch = false
             },
+            onClear = onApplyStructuredSearch,
+            stateKey = "wizard_seed",
             appliedQuery = uiState.seedPickStructuredQuery,
             lockedCriteria = lockedCriteria.toSet(),
         )
