@@ -22,7 +22,7 @@ import com.mmg.manahub.core.model.DeckFormat
  * Deck Engine Unification (D3), formerly Wave 3 (Task 1) — the minimum RAW fit score
  * ([CardFit.score] / Motor B's `synergy`) a candidate must clear to be treated as a legitimate
  * placement/keep anywhere in the pipeline: the build-time Motor A/B/Scryfall-backstop loops
- * ([com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase]) require it to
+ * ([the deleted Motor A wizard build use case]) require it to
  * PLACE a card at all (D3: "gaps beat weak fills" — a deck that comes out short reports a
  * structured gap instead of a weak filler), and the Deck Wizard & Engine Rework plan's Workstream
  * 8 (Suggestions system) additionally uses it as:

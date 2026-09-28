@@ -66,7 +66,12 @@ class DeckViewModel(
             _uiState.update { it.copy(isImporting = true, importError = null) }
             try {
                 val parsed = com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper.parse(text)
-                val deckId = deckRepo.createDeck(name = "Imported Deck", description = "", format = "casual")
+                val deckId = deckRepo.createDeck(
+                    name = "Imported Deck",
+                    description = "",
+                    format = "casual",
+                    source = com.mmg.manahub.core.model.DeckCreationSource.IMPORT,
+                )
 
                 val mainboard = parsed.mainboard
                 val sideboard = parsed.sideboard

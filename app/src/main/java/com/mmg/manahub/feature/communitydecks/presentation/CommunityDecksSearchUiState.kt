@@ -71,7 +71,7 @@ data class CommunityDecksSearchUiState(
     val recentDecks: List<CommunityDeckSummary> = emptyList(),
     val updatedDecks: List<CommunityDeckSummary> = emptyList(),
     val primerDecks: List<CommunityDeckSummary> = emptyList(),
-    val selectedDiscoveryFormat: CommunityDeckFormatFilter = CommunityDeckFormatFilter.COMMANDER,
+    val selectedDiscoveryFormat: CommunityDeckFormatFilter? = null,
 
     // ── Search — advanced filters (Phase 2) ────────────────────────────────────────
     val advancedFilters: CommunityAdvancedFilters = CommunityAdvancedFilters(),
@@ -154,7 +154,7 @@ fun CommunityAdvancedFilters.toSearchFilters(
     // from a previous format that WAS Commander.
     commanderName = commander?.name?.takeIf { formats == CommunityDeckFormatFilter.COMMANDER },
     ownerUsername = ownerUsername.takeIf { it.isNotBlank() },
-    deckFormatId = formats.apiId,
+    deckFormatId = formats?.apiId,
     edhBracket = edhBracket.takeIf { formats == CommunityDeckFormatFilter.COMMANDER },
     colors = colors,
     size = deckSize.toIntOrNull(),
@@ -235,14 +235,17 @@ fun CommunityDeckSortField.apiValue(direction: CommunityDeckSortDirection): Stri
  *   maps to a concrete Archidekt format id, and [CommunityAdvancedFilters.formats] always holds a
  *   real selection (defaulting to [COMMANDER]).
  */
-enum class CommunityDeckFormatFilter(val apiId: Int, val label: String) {
+enum class CommunityDeckFormatFilter(val apiId: Int?, val label: String) {
+    ALL(null, "All formats"),
+    COMMANDER(3, "Commander"),
     STANDARD(1, "Standard"),
-    PIONEER(15, "Pioneer"),
     MODERN(2, "Modern"),
-    LEGACY(4, "Legacy"),
-    VINTAGE(5, "Vintage"),
     PAUPER(6, "Pauper"),
-    COMMANDER(3, "Commander") ;
+    PIONEER(15, "Pioneer"),
+    LEGACY(4, "Legacy"),
+    VINTAGE(5, "Vintage");
+
+
 
 
     companion object {

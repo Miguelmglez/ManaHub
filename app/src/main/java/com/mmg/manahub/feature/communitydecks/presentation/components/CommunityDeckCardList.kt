@@ -290,6 +290,7 @@ private fun LazyListScope.cardRows(
             priceEur = card.priceEur,
             onClick = { if (card.scryfallId.isNotBlank()) onCardClick(card.scryfallId) },
             quantityText = "×${card.quantity}",
+            manaCost = card.manaCost,
             setCode = card.setCode.takeIf { it.isNotBlank() },
             setName = card.setName.takeIf { it.isNotBlank() },
             rarity = card.rarity.takeIf { it.isNotBlank() },

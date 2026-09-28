@@ -1,5 +1,7 @@
 package com.mmg.manahub.core.data.remote
 
+// COMMENTS_REVIEWED: 2026-09-16
+
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.network.ScryfallCache
@@ -14,6 +16,7 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.PLAYABLE_SET_TYPES
 import com.mmg.manahub.core.model.SetType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 
 /**
@@ -152,6 +155,14 @@ class ScryfallRemoteDataSource(
             }
         }
 
+    /** Fetches and caches one uncached random card from Scryfall's complete catalog. */
+    suspend fun getRandomCard(query: String? = null): Result<Card> =
+        safeCall {
+            requestQueue.execute { api.getRandomCard(query) }
+                .toDomain()
+                .also { card -> cache.cards.put(card.scryfallId, card) }
+        }
+
     /**
      * Same shape as [searchCards], but also surfaces Scryfall's `has_more` flag via
      * [com.mmg.manahub.core.model.PaginatedCards] -- used by [query]-paged/paginating callers
@@ -287,6 +298,23 @@ class ScryfallRemoteDataSource(
         }
 
     /**
+     * One `/cards/collection` call over mixed [identifiers] (id, set + collector number, name + set,
+     * name). Found cards are returned as domain cards and cached; misses are echoed back.
+     */
+    suspend fun lookupCollection(
+        identifiers: List<CardIdentifierDto>,
+    ): Result<Pair<List<Card>, List<CardIdentifierDto>>> =
+        safeCall {
+            require(identifiers.size <= 75) { "Scryfall caps /cards/collection at 75 identifiers" }
+            val response = requestQueue.execute {
+                api.getCardCollection(CardCollectionRequestDto(identifiers))
+            }
+            val cards = response.data.toDomain()
+            cards.forEach { card -> cache.cards.put(card.scryfallId, card) }
+            cards to response.notFound
+        }
+
+    /**
      * Invalidates the in-memory [ScryfallCache.cards] entry for each of [scryfallIds] (Backend &
      * Performance Optimization plan, WS1+WS3 Part B item 7g). Call after writing fresh data for
      * these ids through a path that bypasses [cache] (e.g. [getCardCollection], used by price
@@ -378,5 +406,13 @@ class ScryfallRemoteDataSource(
         }
 
     private suspend fun <T> safeCall(block: suspend () -> T): Result<T> =
-        withContext(dispatcherProvider.io) { runCatching { block() } }
+        withContext(dispatcherProvider.io) {
+            try {
+                Result.success(block())
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Result.failure(error)
+            }
+        }
 }

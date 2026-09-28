@@ -72,6 +72,14 @@ class CardDetailViewModel(
     private val scryfallIdFlow = MutableStateFlow(initialScryfallId)
     private val scryfallId: String get() = scryfallIdFlow.value
 
+    // Bumped by onRetryLoad() so loadCard() re-runs for the SAME id (a StateFlow self-assignment would be a no-op).
+    private val reloadTrigger = MutableStateFlow(0)
+
+    // Original non-English id when the entry-only English redirect fired; restored if the English print fails to load.
+    private var englishRedirectSourceId: String? = null
+
+    private var tradeJob: Job? = null
+
     // The currently-loaded [Card], mirrored from every point [_uiState.card] is written. Used to
     // derive the oracle-wide identity (oracleId, name) that the Collection/Wishlist/Trade sections
     // now key off (Card Versions & Languages, Phase 1B) — distinct from [scryfallIdFlow], which is
@@ -132,7 +140,7 @@ class CardDetailViewModel(
 
     private fun loadCard() {
         viewModelScope.launch {
-            scryfallIdFlow.collectLatest { id ->
+            combine(scryfallIdFlow, reloadTrigger) { id, _ -> id }.collectLatest { id ->
                 // Entry-only English-first redirect (2026-07-23): a collection entry saved in a
                 // non-English language still shows its ENGLISH artwork in the list thumbnail the
                 // user tapped (Collection/Deck Studio images fall back to the English sibling —
@@ -154,6 +162,7 @@ class CardDetailViewModel(
                             ?.firstOrNull { it.lang == "en" }
                             ?.scryfallId
                         if (englishId != null && englishId != id) {
+                            englishRedirectSourceId = id
                             scryfallIdFlow.value = englishId
                             return@collectLatest
                         }
@@ -169,7 +178,8 @@ class CardDetailViewModel(
                         // redirect to an English printing (F-13 removed). printedName/printedText
                         // (with an oracle-English fallback when null) already handle localized
                         // display for foreign prints in CardDetailScreen.
-                        _uiState.update { it.copy(card = card, isLoading = false, isStale = result.isStale) }
+                        englishRedirectSourceId = null
+                        _uiState.update { it.copy(card = card, isLoading = false, isStale = result.isStale, error = null) }
                         loadedCardFlow.value = card
                         if (card.oracleId.isBlank()) {
                             // Edge-case audit A3 (2026-07-15): this printing's cached row predates
@@ -196,9 +206,7 @@ class CardDetailViewModel(
                         }
                     }
 
-                    is DataResult.Error -> _uiState.update {
-                        it.copy(error = result.message, isLoading = false)
-                    }
+                    is DataResult.Error -> onLoadFailed(id, result.message)
                 }
             }
         }
@@ -216,6 +224,38 @@ class CardDetailViewModel(
                     loadedCardFlow.value = card
                 }
         }
+    }
+
+    private suspend fun onLoadFailed(id: String, message: String) {
+        FirebaseCrashlytics.getInstance().log("card_detail_load_failed")
+        val redirectSource = englishRedirectSourceId
+        if (redirectSource != null) {
+            // The English sibling failed to load — show the print the user actually opened instead.
+            englishRedirectSourceId = null
+            scryfallIdFlow.value = redirectSource
+            return
+        }
+        val displayed = _uiState.value.card
+        if (displayed == null) {
+            _uiState.update { it.copy(error = message, isLoading = false) }
+            return
+        }
+        // A later print switch failed: keep the loaded print and re-key to it so writes target what is on screen.
+        _uiState.update { it.copy(isLoading = false) }
+        showError("Could not load this printing")
+        if (displayed.scryfallId != id) scryfallIdFlow.value = displayed.scryfallId
+    }
+
+    /** Re-runs the card load after an initial-load failure (full-screen error state). */
+    fun onRetryLoad() {
+        if (_uiState.value.isLoading) return
+        FirebaseCrashlytics.getInstance().log("card_detail_load_retry")
+        _uiState.update { it.copy(isLoading = true, error = null) }
+        reloadTrigger.update { it + 1 }
+    }
+
+    private suspend fun showError(message: String) {
+        _events.emit(CardDetailEvent.ShowToast(message, ToastSeverity.ERROR))
     }
 
     private fun observeUserCards() {
@@ -489,7 +529,8 @@ class CardDetailViewModel(
                 val previousLang = _uiState.value.card?.lang
                 _uiState.update { it.copy(showVariantSelector = false) }
                 viewModelScope.launch {
-                    val targetScryfallId = if (previousLang != null) {
+                    // Same language already: skip the language-prints round-trip (backend call budget).
+                    val targetScryfallId = if (previousLang != null && previousLang != card.lang) {
                         val result = cardRepo.getLanguagePrints(card.setCode, card.collectorNumber)
                         (result as? DataResult.Success)?.data
                             ?.firstOrNull { it.lang == previousLang }
@@ -556,7 +597,6 @@ class CardDetailViewModel(
                 quantity = quantity,
             )
             if (result is DataResult.Error) {
-                _uiState.update { it.copy(error = result.message) }
                 helper.logEvent("error_add_card_collection", mapOf("card_id" to targetScryfallId))
                 _events.emit(
                     CardDetailEvent.ShowToast(
@@ -598,7 +638,6 @@ class CardDetailViewModel(
             when {
                 result is DataResult.Error -> {
                     helper.logEvent("error_update_collection_entry", mapOf("entry_id" to entry.userCard.id))
-                    _uiState.update { it.copy(error = result.message) }
                     _events.emit(CardDetailEvent.ShowToast("Failed to update entry", ToastSeverity.ERROR))
                 }
                 result is DataResult.Success && result.data == UpdateEntryOutcome.ENTRY_NOT_FOUND -> {
@@ -642,7 +681,6 @@ class CardDetailViewModel(
                 }
                 .onFailure { e ->
                     helper.logEvent("error_add_card_wishlist", mapOf("card_id" to targetScryfallId))
-                    _uiState.update { it.copy(error = e.message) }
                     _events.emit(
                         CardDetailEvent.ShowToast(
                             "Could not add to wishlist: ${e.message}",
@@ -689,7 +727,6 @@ class CardDetailViewModel(
                 }
                 .onFailure { e ->
                     helper.logEvent("error_update_wishlist_entry", mapOf("entry_id" to entry.id))
-                    _uiState.update { it.copy(error = e.message) }
                     _events.emit(
                         CardDetailEvent.ShowToast(
                             "Failed to update entry: ${e.message}",
@@ -702,9 +739,10 @@ class CardDetailViewModel(
     }
 
     fun onConfirmTradeSelection(selections: Map<String, Int>) {
+        if (tradeJob?.isActive == true) return
         val userCards = _uiState.value.userCards
         val currentQty = _uiState.value.tradeQuantities
-        viewModelScope.launch {
+        tradeJob = viewModelScope.launch {
             var anyError = false
             var totalOffered = 0
             selections.forEach { (id, desiredQty) ->
@@ -737,21 +775,18 @@ class CardDetailViewModel(
                             language = uc.language,
                         )
                     }
-                    tradeResult.onFailure { e ->
-                        anyError = true
-                        _uiState.update { it.copy(error = e.message) }
-                    }
+                    tradeResult.onFailure { anyError = true }
                     totalOffered += desiredQty
                 } else {
                     // Remove the trade entry
                     openForTradeRepo.removeByCollectionId(uc.id)
-                        .onFailure { e ->
-                            anyError = true
-                            _uiState.update { it.copy(error = e.message) }
-                        }
+                        .onFailure { anyError = true }
                 }
             }
-            if (!anyError) {
+            if (anyError) {
+                FirebaseCrashlytics.getInstance().log("card_detail_trade_update_failed")
+                showError("Some trade offers could not be updated")
+            } else {
                 _events.emit(
                     CardDetailEvent.ShowToast(
                         if (totalOffered > 0) "$totalOffered ${if (totalOffered == 1) "copy" else "copies"} offered for trade"
@@ -764,27 +799,26 @@ class CardDetailViewModel(
     }
 
     fun onDeleteCard(userCardId: String) {
+        // Close the dialog up front: failures are reported by toast and a second tap can't re-delete.
+        _uiState.update { it.copy(cardToDelete = null) }
         viewModelScope.launch {
             runCatching { userCardRepo.deleteCard(userCardId) }
-                .onSuccess {
-                    helper.logEvent("delete_card", mapOf("card_id" to userCardId))
-                    _uiState.update { it.copy(cardToDelete = null) } }
-                .onFailure { e ->
+                .onSuccess { helper.logEvent("delete_card", mapOf("card_id" to userCardId)) }
+                .onFailure {
                     helper.logEvent("error_delete_card", mapOf("card_id" to userCardId))
-                    _uiState.update { it.copy(error = e.message) } }
+                    showError("Could not remove this copy")
+                }
         }
     }
 
     fun onDeleteWishlistEntry(id: String) {
+        _uiState.update { it.copy(wishlistEntryToDelete = null) }
         viewModelScope.launch {
             wishlistRepo.removeLocal(id)
-                .onSuccess {
-                    helper.logEvent("delete_wishlist_entry", mapOf("id" to id))
-                    _uiState.update { it.copy(wishlistEntryToDelete = null) }
-                }
-                .onFailure { e ->
+                .onSuccess { helper.logEvent("delete_wishlist_entry", mapOf("id" to id)) }
+                .onFailure {
                     helper.logEvent("error_delete_wishlist_entry", mapOf("id" to id))
-                    _uiState.update { it.copy(error = e.message) }
+                    showError("Could not remove this wishlist entry")
                 }
         }
     }
@@ -797,7 +831,10 @@ class CardDetailViewModel(
         _uiState.update { it.copy(card = it.card?.copy(tags = updated)) }
         viewModelScope.launch {
             runCatching { cardRepo.updateCardTags(scryfallId, updated) }
-                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+                .onFailure { _ ->
+                    _uiState.update { it.copy(card = it.card?.copy(tags = current)) }
+                    showError("Could not remove tag")
+                }
         }
     }
 
@@ -805,24 +842,21 @@ class CardDetailViewModel(
 
     fun onAddUserTag(tag: CardTag) {
         val current = _uiState.value.card?.userTags ?: return
-        if (tag in current) return
+        // Dedupe by key, not equality: one user-defined tag can arrive under different categories.
+        if (current.any { it.key == tag.key }) return
         val updated = current + tag
         // Optimistic update so the UI refreshes immediately
         _uiState.update { it.copy(card = it.card?.copy(userTags = updated)) }
         viewModelScope.launch {
             runCatching { cardRepo.updateUserTags(scryfallId, updated) }
                 .onSuccess {
-                    helper.logEvent("add_user_tag", mapOf("tag" to tag.label()))
+                    helper.logEvent("add_user_tag", mapOf("tag" to tag.analyticsLabel()))
                     _events.emit(CardDetailEvent.ShowToast("Tag '${tag.label()}' added")) }
-                .onFailure { e ->
+                .onFailure { _ ->
                     // Roll back on failure
-                    helper.logEvent("error_add_user_tag", mapOf("tag" to tag.label()))
-                    _uiState.update {
-                        it.copy(
-                            card = it.card?.copy(userTags = current),
-                            error = e.message
-                        )
-                    }
+                    helper.logEvent("error_add_user_tag", mapOf("tag" to tag.analyticsLabel()))
+                    _uiState.update { it.copy(card = it.card?.copy(userTags = current)) }
+                    showError("Could not add tag")
                 }
         }
     }
@@ -834,16 +868,12 @@ class CardDetailViewModel(
         viewModelScope.launch {
             runCatching { cardRepo.updateUserTags(scryfallId, updated) }
                 .onSuccess {
-                    helper.logEvent("remove_user_tag", mapOf("tag" to tag.label()))
+                    helper.logEvent("remove_user_tag", mapOf("tag" to tag.analyticsLabel()))
                 }
-                .onFailure { e ->
-                    helper.logEvent("error_remove_user_tag", mapOf("tag" to tag.label()))
-                    _uiState.update {
-                        it.copy(
-                            card = it.card?.copy(userTags = current),
-                            error = e.message
-                        )
-                    }
+                .onFailure { _ ->
+                    helper.logEvent("error_remove_user_tag", mapOf("tag" to tag.analyticsLabel()))
+                    _uiState.update { it.copy(card = it.card?.copy(userTags = current)) }
+                    showError("Could not remove tag")
                 }
         }
     }
@@ -856,21 +886,30 @@ class CardDetailViewModel(
             .replace(Regex("[^a-z0-9_]"), "")
             .take(50)
         if (key.isEmpty()) return
-        val newTag = CardTag(key, TagCategory.CUSTOM)
-        val updatedUserTags = ((_uiState.value.card?.userTags ?: emptyList()) + newTag).distinct()
+        // Same category the tag picker uses when re-applying this tag, so one key never yields two chips.
+        val category = TagCategory.entries.firstOrNull { it != TagCategory.CUSTOM && it.name == categoryKey }
+            ?: TagCategory.CUSTOM
+        val current = _uiState.value.card?.userTags ?: emptyList()
+        val updatedUserTags = if (current.any { it.key == key }) current else current + CardTag(key, category)
         // Optimistic update
         _uiState.update { it.copy(card = it.card?.copy(userTags = updatedUserTags)) }
         val userDefinedTag = UserDefinedTag(key = key, label = trimmed, categoryKey = categoryKey)
+        // Label and user-created category names are free text — analytics only get length / enum id.
+        val analyticsParams = mapOf(
+            "label_length" to trimmed.length,
+            "category" to if (category == TagCategory.CUSTOM) "custom" else category.name,
+        )
         viewModelScope.launch {
             runCatching {
                 userPrefs.saveUserDefinedTag(userDefinedTag)
                 cardRepo.updateUserTags(scryfallId, updatedUserTags)
             }.onSuccess {
-                helper.logEvent("save_custom_tag", mapOf("label" to label, "category" to categoryKey))
+                helper.logEvent("save_custom_tag", analyticsParams)
                 _events.emit(CardDetailEvent.ShowToast("'$trimmed' tag created and added"))
-            }.onFailure { e ->
-                helper.logEvent("error_save_custom_tag", mapOf("label" to label, "category" to categoryKey))
-                _uiState.update { it.copy(error = e.message) }
+            }.onFailure { _ ->
+                helper.logEvent("error_save_custom_tag", analyticsParams)
+                _uiState.update { it.copy(card = it.card?.copy(userTags = current)) }
+                showError("Could not create tag")
             }
         }
     }
@@ -881,7 +920,7 @@ class CardDetailViewModel(
         viewModelScope.launch {
             runCatching { userPrefs.deleteUserDefinedTag(key) }
                 .onSuccess {
-                    helper.logEvent("delete_custom_tag", mapOf("key" to key))
+                    helper.logEvent("delete_custom_tag", mapOf("key_length" to key.length))
                     _events.emit(
                         CardDetailEvent.ShowToast(
                             "Custom tag deleted",
@@ -889,9 +928,10 @@ class CardDetailViewModel(
                         )
                     )
                 }
-                .onFailure { e ->
-                    helper.logEvent("error_delete_custom_tag", mapOf("key" to key))
-                    _uiState.update { it.copy(error = e.message) } }
+                .onFailure {
+                    helper.logEvent("error_delete_custom_tag", mapOf("key_length" to key.length))
+                    showError("Could not delete tag")
+                }
         }
     }
 
@@ -902,11 +942,12 @@ class CardDetailViewModel(
             val existing = _uiState.value.userDefinedTags.find { it.key == key } ?: return@launch
             runCatching { userPrefs.saveUserDefinedTag(existing.copy(label = trimmed)) }
                 .onSuccess {
-                    helper.logEvent("update_custom_tag", mapOf("label" to newLabel, "key" to key))
+                    helper.logEvent("update_custom_tag", mapOf("label_length" to trimmed.length))
                     _events.emit(CardDetailEvent.ShowToast("Tag renamed to '$trimmed'")) }
-                .onFailure { e ->
-                    helper.logEvent("error_update_custom_tag", mapOf("label" to newLabel, "key" to key))
-                    _uiState.update { it.copy(error = e.message) } }
+                .onFailure {
+                    helper.logEvent("error_update_custom_tag", mapOf("label_length" to trimmed.length))
+                    showError("Could not rename tag")
+                }
         }
     }
 
@@ -916,11 +957,12 @@ class CardDetailViewModel(
         viewModelScope.launch {
             runCatching { cardRepo.confirmSuggestedTag(scryfallId, tag) }
                 .onSuccess {
-                    helper.logEvent("confirm_suggested_tag", mapOf("tag" to tag.label()))
+                    helper.logEvent("confirm_suggested_tag", mapOf("tag" to tag.analyticsLabel()))
                     _events.emit(CardDetailEvent.ShowToast("Tag '${tag.label()}' confirmed")) }
-                .onFailure { e ->
-                    helper.logEvent("error_confirm_suggested_tag", mapOf("tag" to tag.label()))
-                    _uiState.update { it.copy(error = e.message) } }
+                .onFailure {
+                    helper.logEvent("error_confirm_suggested_tag", mapOf("tag" to tag.analyticsLabel()))
+                    showError("Could not confirm tag")
+                }
         }
     }
 
@@ -928,11 +970,16 @@ class CardDetailViewModel(
         viewModelScope.launch {
             runCatching { cardRepo.dismissSuggestedTag(scryfallId, tag) }
                 .onSuccess {
-                    helper.logEvent("dismiss_suggested_tag", mapOf("tag" to tag.label()))
+                    helper.logEvent("dismiss_suggested_tag", mapOf("tag" to tag.analyticsLabel()))
                 }
-                .onFailure { e ->
-                    helper.logEvent("error_dismiss_suggested_tag", mapOf("tag" to tag.label()))
-                    _uiState.update { it.copy(error = e.message) } }
+                .onFailure {
+                    helper.logEvent("error_dismiss_suggested_tag", mapOf("tag" to tag.analyticsLabel()))
+                    showError("Could not dismiss tag")
+                }
         }
     }
+
+    // Custom tag keys are derived from user free text — only canonical tags are sent by name.
+    private fun CardTag.analyticsLabel(): String =
+        if (CardTag.canonical.any { it.key == key }) label() else "custom"
 }

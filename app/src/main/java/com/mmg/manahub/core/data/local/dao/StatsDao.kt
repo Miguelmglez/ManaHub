@@ -26,43 +26,47 @@ interface StatsDao {
     @Query("""
         SELECT COALESCE(SUM(uc.quantity), 0) AS totalCards, COUNT(DISTINCT uc.scryfall_id) AS uniqueCards
         FROM user_card_collection uc
-        INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
+        LEFT JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
-          AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
+          AND ((:colorFilter IS NULL AND :setFilter IS NULL)
+               OR (c.scryfall_id IS NOT NULL AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')))
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
     """)
     fun observeTotals(colorFilter: String?, setFilter: String?, userId: String?): Flow<TotalsProjection>
 
     @Query("""
         SELECT COALESCE(SUM(uc.quantity * CASE
-            WHEN uc.is_foil = 1 AND c.price_usd_foil IS NOT NULL THEN c.price_usd_foil
-            ELSE COALESCE(c.price_usd, 0) END), 0)
+            WHEN uc.is_foil = 1 AND c.price_usd_foil >= 0 THEN c.price_usd_foil
+            WHEN c.price_usd >= 0 THEN c.price_usd ELSE 0 END), 0)
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
     """)
     fun observeTotalValueUsd(colorFilter: String?, setFilter: String?, userId: String?): Flow<Double>
 
     @Query("""
         SELECT COALESCE(SUM(uc.quantity * CASE
-            WHEN uc.is_foil = 1 AND c.price_eur_foil IS NOT NULL THEN c.price_eur_foil
-            ELSE COALESCE(c.price_eur, 0) END), 0)
+            WHEN uc.is_foil = 1 AND c.price_eur_foil >= 0 THEN c.price_eur_foil
+            WHEN c.price_eur >= 0 THEN c.price_eur ELSE 0 END), 0)
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
     """)
     fun observeTotalValueEur(colorFilter: String?, setFilter: String?, userId: String?): Flow<Double>
@@ -70,7 +74,8 @@ interface StatsDao {
     @Query("""
         SELECT c.scryfall_id AS scryfallId, c.name AS name,
                c.image_art_crop AS imageArtCrop, c.image_normal AS imageNormal, uc.is_foil AS isFoil,
-               c.color_identity AS colorIdentity, c.set_code AS setCode,
+               SUM(uc.quantity) AS quantity,
+               c.colors AS colorIdentity, c.set_code AS setCode,
                c.set_name AS setName, c.rarity AS rarity,
                CASE WHEN uc.is_foil = 1 AND c.price_usd_foil IS NOT NULL
                     THEN c.price_usd_foil ELSE COALESCE(c.price_usd, 0) END AS priceUsd,
@@ -81,9 +86,11 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
+        GROUP BY c.scryfall_id, uc.is_foil
         ORDER BY
             CASE WHEN :useEur = 1 THEN priceEur ELSE priceUsd END DESC
         LIMIT :limit
@@ -91,16 +98,17 @@ interface StatsDao {
     fun observeMostValuableCards(limit: Int, useEur: Boolean, colorFilter: String?, setFilter: String?, userId: String?): Flow<List<CardValueProjection>>
 
     @Query("""
-        SELECT c.color_identity AS colorIdentity, SUM(uc.quantity) AS count
+        SELECT c.colors AS colorIdentity, SUM(uc.quantity) AS count
         FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
         WHERE uc.is_deleted = 0
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
-        GROUP BY c.color_identity
+        GROUP BY c.colors
     """)
     fun observeCountByColorIdentity(colorFilter: String?, setFilter: String?, userId: String?): Flow<List<ColorCountProjection>>
 
@@ -111,8 +119,9 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         GROUP BY c.rarity
     """)
@@ -125,8 +134,9 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         GROUP BY c.type_line
     """)
@@ -141,8 +151,9 @@ interface StatsDao {
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND c.type_line NOT LIKE '%Land%'
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         GROUP BY CASE WHEN CAST(c.cmc AS INTEGER) > 7 THEN 7 ELSE CAST(c.cmc AS INTEGER) END
         ORDER BY cmc ASC
@@ -156,8 +167,9 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         GROUP BY c.set_code ORDER BY count DESC
     """)
@@ -174,8 +186,9 @@ interface StatsDao {
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND uc.is_foil = 1
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
     """)
     fun observeTotalFoil(colorFilter: String?, setFilter: String?, userId: String?): Flow<Int>
@@ -189,8 +202,9 @@ interface StatsDao {
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (c.frame_effects LIKE '%fullart%' OR c.frame_effects LIKE '%borderless%' OR c.promo_types LIKE '%boosterfun%')
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
     """)
     fun observeTotalFullArt(colorFilter: String?, setFilter: String?, userId: String?): Flow<Int>
@@ -202,8 +216,9 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         GROUP BY artist ORDER BY count DESC LIMIT 1
     """)
@@ -217,8 +232,9 @@ interface StatsDao {
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND c.type_line NOT LIKE '%Land%'
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
     """)
     fun observeAvgManaValue(colorFilter: String?, setFilter: String?, userId: String?): Flow<Double?>
@@ -232,8 +248,9 @@ interface StatsDao {
           AND c.power IS NOT NULL AND c.power NOT LIKE '%*%' AND c.power NOT LIKE '%+%'
           AND c.power NOT IN ('X', '∞')
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
     """)
     fun observeAvgPower(colorFilter: String?, setFilter: String?, userId: String?): Flow<Double?>
@@ -247,16 +264,18 @@ interface StatsDao {
           AND c.toughness IS NOT NULL AND c.toughness NOT LIKE '%*%' AND c.toughness NOT LIKE '%+%'
           AND c.toughness NOT IN ('X', '∞')
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
     """)
     fun observeAvgToughness(colorFilter: String?, setFilter: String?, userId: String?): Flow<Double?>
 
     @Query("""
         SELECT c.scryfall_id AS scryfallId, c.name AS name,
-               c.image_art_crop AS imageArtCrop, uc.is_foil AS isFoil,
-               c.color_identity AS colorIdentity, c.set_code AS setCode,
+               c.image_art_crop AS imageArtCrop, c.image_normal AS imageNormal,
+               uc.is_foil AS isFoil, uc.quantity AS quantity,
+               c.colors AS colorIdentity, c.set_code AS setCode,
                c.set_name AS setName, c.rarity AS rarity,
                CASE WHEN uc.is_foil = 1 AND c.price_usd_foil IS NOT NULL
                     THEN c.price_usd_foil ELSE COALESCE(c.price_usd, 0) END AS priceUsd,
@@ -267,8 +286,9 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         ORDER BY c.released_at ASC LIMIT 1
     """)
@@ -276,8 +296,9 @@ interface StatsDao {
 
     @Query("""
         SELECT c.scryfall_id AS scryfallId, c.name AS name,
-               c.image_art_crop AS imageArtCrop, uc.is_foil AS isFoil,
-               c.color_identity AS colorIdentity, c.set_code AS setCode,
+               c.image_art_crop AS imageArtCrop, c.image_normal AS imageNormal,
+               uc.is_foil AS isFoil, uc.quantity AS quantity,
+               c.colors AS colorIdentity, c.set_code AS setCode,
                c.set_name AS setName, c.rarity AS rarity,
                CASE WHEN uc.is_foil = 1 AND c.price_usd_foil IS NOT NULL
                     THEN c.price_usd_foil ELSE COALESCE(c.price_usd, 0) END AS priceUsd,
@@ -288,8 +309,9 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         ORDER BY c.released_at DESC LIMIT 1
     """)
@@ -302,8 +324,9 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         GROUP BY c.set_code ORDER BY count DESC LIMIT 1
     """)
@@ -320,8 +343,9 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         GROUP BY c.set_code ORDER BY totalValue DESC LIMIT 1
     """)
@@ -334,8 +358,9 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         GROUP BY c.scryfall_id
     """)
@@ -368,8 +393,9 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
     """)
     fun observeUniqueCardPrices(colorFilter: String?, setFilter: String?, userId: String?): Flow<List<UniqueCardPriceProjection>>
@@ -383,8 +409,9 @@ interface StatsDao {
           AND uc.is_foil = 1
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
     """)
     fun observeTotalFoilValueUsd(colorFilter: String?, setFilter: String?, userId: String?): Flow<Double>
@@ -398,15 +425,16 @@ interface StatsDao {
           AND uc.is_foil = 1
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
     """)
     fun observeTotalFoilValueEur(colorFilter: String?, setFilter: String?, userId: String?): Flow<Double>
 
     @Query("""
         SELECT c.scryfall_id AS scryfallId, c.name AS name, c.image_art_crop AS imageArtCrop,
-               MAX(uc.is_foil) AS isFoil, c.color_identity AS colorIdentity, c.set_code AS setCode,
+               MAX(uc.is_foil) AS isFoil, c.colors AS colorIdentity, c.set_code AS setCode,
                c.set_name AS setName, c.rarity AS rarity,
                CASE WHEN MAX(uc.is_foil) = 1 AND c.price_usd_foil IS NOT NULL
                     THEN c.price_usd_foil ELSE COALESCE(c.price_usd, 0) END AS priceUsd,
@@ -418,8 +446,9 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         GROUP BY c.scryfall_id
         ORDER BY totalQuantity DESC
@@ -437,8 +466,9 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
     """)
     fun observeFormatCoverage(colorFilter: String?, setFilter: String?, userId: String?): Flow<FormatCoverageProjection>
@@ -450,8 +480,9 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         GROUP BY c.scryfall_id
     """)
@@ -481,7 +512,7 @@ interface StatsDao {
      */
     @Query("""
         SELECT c.scryfall_id AS scryfallId, c.name AS name, c.image_art_crop AS imageArtCrop,
-               uc.is_foil AS isFoil, c.color_identity AS colorIdentity, c.set_code AS setCode,
+               uc.is_foil AS isFoil, c.colors AS colorIdentity, c.set_code AS setCode,
                c.set_name AS setName, c.rarity AS rarity,
                CASE WHEN uc.is_foil = 1 AND c.price_usd_foil IS NOT NULL
                     THEN c.price_usd_foil ELSE COALESCE(c.price_usd, 0) END AS priceUsd,
@@ -495,8 +526,9 @@ interface StatsDao {
           AND c.oracle_id != ''
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         GROUP BY c.oracle_id
         ORDER BY variantCount DESC
@@ -512,7 +544,8 @@ interface StatsDao {
     @Query("""
         SELECT c.scryfall_id AS scryfallId, c.name AS name, c.image_art_crop AS imageArtCrop,
                c.image_normal AS imageNormal, MAX(uc.is_foil) AS isFoil,
-               c.color_identity AS colorIdentity, c.set_code AS setCode,
+               SUM(uc.quantity) AS quantity,
+               c.colors AS colorIdentity, c.set_code AS setCode,
                c.set_name AS setName, c.rarity AS rarity,
                CASE WHEN MAX(uc.is_foil) = 1 AND c.price_usd_foil IS NOT NULL
                     THEN c.price_usd_foil ELSE COALESCE(c.price_usd, 0) END AS priceUsd,
@@ -524,8 +557,9 @@ interface StatsDao {
           AND c.artist = :artist
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         GROUP BY c.scryfall_id
         ORDER BY c.name ASC
@@ -546,8 +580,9 @@ interface StatsDao {
           AND (c.stale_reason IS NULL OR c.stale_reason != 'pending_hydration')
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
           AND (:colorFilter IS NULL
-               OR (:colorFilter = '[]' AND c.color_identity = '[]')
-               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+               OR (:colorFilter = '[]' AND c.colors = '[]')
+               OR (:colorFilter = 'M' AND ((c.colors LIKE '%W%' AND c.colors LIKE '%U%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%W%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%B%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%U%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%R%') OR (c.colors LIKE '%B%' AND c.colors LIKE '%G%') OR (c.colors LIKE '%R%' AND c.colors LIKE '%G%')))
+               OR (:colorFilter != '[]' AND :colorFilter != 'M' AND c.colors LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
         GROUP BY decade
         ORDER BY decade ASC

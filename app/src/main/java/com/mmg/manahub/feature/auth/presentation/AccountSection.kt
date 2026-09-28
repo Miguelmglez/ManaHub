@@ -93,7 +93,9 @@ fun AccountSection(
     avatarUrl: String? = null,
 ) {
     when (sessionState) {
-        SessionState.Loading -> AccountSectionSkeleton(modifier = modifier)
+        SessionState.Loading -> {
+            AccountSectionSkeleton(modifier = modifier)
+        }
 
         SessionState.Unauthenticated -> {
             UnauthenticatedCard(
@@ -150,10 +152,11 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
     val shimmerAlpha by infiniteTransition.animateFloat(
         initialValue = 0.04f,
         targetValue = 0.14f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900),
-            repeatMode = RepeatMode.Reverse,
-        ),
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 900),
+                repeatMode = RepeatMode.Reverse,
+            ),
         label = "shimmer_alpha",
     )
 
@@ -161,48 +164,53 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
     val shimmerBase = mc.primaryAccent.copy(alpha = 0.08f)
 
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .border(
-                width = 1.dp,
-                color = mc.primaryAccent.copy(alpha = 0.15f),
-                shape = CardShape,
-            ),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = mc.primaryAccent.copy(alpha = 0.15f),
+                    shape = CardShape,
+                ),
         color = mc.surface,
         shape = CardShape,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(sp.lg),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(sp.lg),
         ) {
             // ── User Info placeholder ──────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(CircleShape)
-                        .background(shimmerColor)
+                    modifier =
+                        Modifier
+                            .size(72.dp)
+                            .clip(CircleShape)
+                            .background(shimmerColor),
                 )
                 Spacer(modifier = Modifier.width(sp.lg))
                 Column(modifier = Modifier.weight(1f)) {
                     Box(
-                        modifier = Modifier
-                            .width(120.dp)
-                            .height(20.dp)
-                            .clip(CardShape)
-                            .background(shimmerColor)
+                        modifier =
+                            Modifier
+                                .width(120.dp)
+                                .height(20.dp)
+                                .clip(CardShape)
+                                .background(shimmerColor),
                     )
                     Spacer(modifier = Modifier.height(sp.sm))
                     Box(
-                        modifier = Modifier
-                            .width(160.dp)
-                            .height(14.dp)
-                            .clip(CardShape)
-                            .background(shimmerColor)
+                        modifier =
+                            Modifier
+                                .width(160.dp)
+                                .height(14.dp)
+                                .clip(CardShape)
+                                .background(shimmerColor),
                     )
                 }
             }
@@ -217,19 +225,21 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
             ) {
                 // Primary button placeholder (weight(1f) mirrors Sign Out button)
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp)
-                        .clip(ButtonShape)
-                        .background(shimmerColor),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .clip(ButtonShape)
+                            .background(shimmerColor),
                 )
                 // Secondary button placeholder (fixed width mirrors Delete Account)
                 Box(
-                    modifier = Modifier
-                        .width(96.dp)
-                        .height(36.dp)
-                        .clip(ButtonShape)
-                        .background(shimmerBase),
+                    modifier =
+                        Modifier
+                            .width(96.dp)
+                            .height(36.dp)
+                            .clip(ButtonShape)
+                            .background(shimmerBase),
                 )
             }
         }
@@ -248,22 +258,23 @@ private fun UnauthenticatedCard(
     val ty = MaterialTheme.magicTypography
     val sp = MaterialTheme.spacing
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .border(
-                width = 1.dp,
-                color = mc.primaryAccent.copy(alpha = 0.3f),
-                shape = CardShape,
-            ),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = mc.primaryAccent.copy(alpha = 0.3f),
+                    shape = CardShape,
+                ),
         color = mc.surface,
         shape = CardShape,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = sp.lg, vertical = sp.lg),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = sp.lg, vertical = sp.lg),
         ) {
-
             // ── Header ─────────────────────────────────────────────────────────
             Text(
                 text = stringResource(R.string.auth_section_title),
@@ -352,9 +363,10 @@ private fun BenefitRow(
     val sp = MaterialTheme.spacing
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = sp.xs),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(vertical = sp.xs),
     ) {
         Icon(
             imageVector = icon,
@@ -385,10 +397,11 @@ private fun AuthenticatedCard(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    val nickname = displayName
-        ?: user.nickname
-        ?: user.email?.substringBefore('@')
-        ?: "Player"
+    val nickname =
+        displayName
+            ?: user.nickname
+            ?: user.email?.substringBefore('@')
+            ?: "Player"
     val avatarUrl = displayAvatarUrl ?: user.avatarUrl
     val gameTag = user.gameTag
 
@@ -403,13 +416,14 @@ private fun AuthenticatedCard(
     }
 
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .border(
-                width = 1.dp,
-                color = mc.primaryAccent.copy(alpha = 0.25f),
-                shape = CardShape,
-            ),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = mc.primaryAccent.copy(alpha = 0.25f),
+                    shape = CardShape,
+                ),
         color = mc.surface,
         shape = CardShape,
     ) {
@@ -420,44 +434,48 @@ private fun AuthenticatedCard(
             // flat surface, while staying entirely token-driven (works on all 12
             // palettes, including the light HallowedPrint theme).
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                mc.primaryAccent.copy(alpha = 0.16f),
-                                Color.Transparent,
-                            ),
-                        ),
-                    )
-                    .padding(16.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush =
+                                Brush.verticalGradient(
+                                    colors =
+                                        listOf(
+                                            mc.primaryAccent.copy(alpha = 0.16f),
+                                            Color.Transparent,
+                                        ),
+                                ),
+                        ).padding(16.dp),
             ) {
                 // ── User Info Section ──────────────────────────────────────────
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     // Avatar with a gradient accent ring
                     Box(
-                        modifier = Modifier
-                            .size(76.dp)
-                            .clip(CircleShape)
-                            .border(
-                                width = 2.dp,
-                                brush = Brush.linearGradient(listOf(mc.primaryAccent, mc.secondaryAccent)),
-                                shape = CircleShape,
-                            )
-                            .padding(3.dp)
-                            .clip(CircleShape)
-                            .background(mc.primaryAccent.copy(alpha = 0.1f)),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .size(76.dp)
+                                .clip(CircleShape)
+                                .border(
+                                    width = 2.dp,
+                                    brush = Brush.linearGradient(listOf(mc.primaryAccent, mc.secondaryAccent)),
+                                    shape = CircleShape,
+                                ).padding(3.dp)
+                                .clip(CircleShape)
+                                .background(mc.primaryAccent.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center,
                     ) {
                         if (avatarUrl != null) {
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(avatarUrl)
-                                    .crossfade(true)
-                                    .build(),
+                                model =
+                                    ImageRequest
+                                        .Builder(LocalContext.current)
+                                        .data(avatarUrl)
+                                        .crossfade(true)
+                                        .build(),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize().clip(CircleShape),
@@ -481,7 +499,7 @@ private fun AuthenticatedCard(
                                 style = ty.titleMedium,
                                 color = mc.textPrimary,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                         val email: String? = user.email
@@ -492,23 +510,22 @@ private fun AuthenticatedCard(
                                 style = ty.bodySmall,
                                 color = mc.textSecondary,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                         if (gameTag != null) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Box(
-                                modifier = Modifier
-                                    .border(
-                                        width = 1.dp,
-                                        color = mc.primaryAccent.copy(alpha = 0.4f),
-                                        shape = ChipShape,
-                                    )
-                                    .background(
-                                        color = mc.primaryAccent.copy(alpha = 0.12f),
-                                        shape = ChipShape,
-                                    )
-                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                                modifier =
+                                    Modifier
+                                        .border(
+                                            width = 1.dp,
+                                            color = mc.primaryAccent.copy(alpha = 0.4f),
+                                            shape = ChipShape,
+                                        ).background(
+                                            color = mc.primaryAccent.copy(alpha = 0.12f),
+                                            shape = ChipShape,
+                                        ).padding(horizontal = 8.dp, vertical = 3.dp),
                             ) {
                                 Text(
                                     text = gameTag,

@@ -4,12 +4,16 @@ import com.mmg.manahub.core.data.local.mapper.toDomainCard
 import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeWithCard
 import com.mmg.manahub.core.data.local.entity.LocalOpenForTradeEntity
+import com.mmg.manahub.core.data.local.TradeListOwner
 import com.mmg.manahub.core.data.remote.trades.OpenForTradeRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.OpenForTradeEntryDto
 import com.mmg.manahub.core.model.OpenForTradeEntry
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Instant
@@ -31,6 +35,9 @@ import java.util.UUID
 class OpenForTradeRepositoryImpl(
     private val dao: LocalOpenForTradeDao,
     private val remote: OpenForTradeRemoteDataSource,
+    // Signed-in account id, stamped on new rows so they never migrate into another account.
+    private val currentUserId: suspend () -> String? = { null },
+    private val sessionUserId: Flow<String?> = flowOf(null),
 ) : OpenForTradeRepository {
 
     // Serialises concurrent addLocal/addAndSync calls to prevent the TOCTOU race on the
@@ -41,7 +48,7 @@ class OpenForTradeRepositoryImpl(
     private val addMutex = Mutex()
 
     override fun observeLocal(): Flow<List<OpenForTradeEntry>> =
-        dao.observeAllWithCard().map { list ->
+        sessionUserId.flatMapLatest { dao.observeAllWithCard(TradeListOwner.key(it)) }.map { list ->
             // Group rows that share the same card + variant attributes (foil, condition,
             // language), summing their quantities. This mirrors the deduplication
             // logic in WishlistRepositoryImpl.addLocal() but works at read-time so that
@@ -73,7 +80,8 @@ class OpenForTradeRepositoryImpl(
     )
 
     override fun observeByScryfallId(scryfallId: String): Flow<List<OpenForTradeEntry>> =
-        dao.observeByScryfallId(scryfallId).map { list -> list.map { it.toDomain() } }
+        sessionUserId.flatMapLatest { dao.observeByScryfallId(scryfallId, TradeListOwner.key(it)) }
+            .map { list -> list.map { it.toDomain() } }
 
     // A9 (edge-case audit, 2026-07-15): unlike observeLocal() above, this does NOT de-duplicate
     // rows that share the same (scryfallId, isFoil, condition, language) tuple across different
@@ -84,9 +92,11 @@ class OpenForTradeRepositoryImpl(
     // expected and correct here. A future caller that renders these entries as a flat list should
     // first apply observeLocal()'s GroupKey dedup/sum convention (see [GroupKey] above).
     override fun observeVersionsByOracle(oracleId: String, name: String): Flow<List<OpenForTradeEntry>> =
-        dao.observeVersionsByOracle(oracleId, name).map { list -> list.map { it.toDomain() } }
+        sessionUserId.flatMapLatest { dao.observeVersionsByOracle(oracleId, name, TradeListOwner.key(it)) }
+            .map { list -> list.map { it.toDomain() } }
 
-    override fun observeUnsyncedCount(): Flow<Int> = dao.observeUnsyncedCount()
+    override fun observeUnsyncedCount(): Flow<Int> =
+        sessionUserId.flatMapLatest { dao.observeUnsyncedCount(TradeListOwner.key(it)) }
 
     override suspend fun addLocal(
         scryfallId: String,
@@ -97,7 +107,8 @@ class OpenForTradeRepositoryImpl(
         language: String,
     ): Result<Unit> = addMutex.withLock {
         runCatching {
-            val existing = dao.getByCollectionId(localCollectionId)
+            val owner = TradeListOwner.key(currentUserId())
+            val existing = dao.getByCollectionId(localCollectionId, owner)
             if (existing != null) {
                 // Update existing entry with new quantity and attributes
                 dao.upsert(
@@ -121,6 +132,7 @@ class OpenForTradeRepositoryImpl(
                         language = language,
                         synced = false,
                         createdAt = System.currentTimeMillis(),
+                        ownerUserId = owner,
                     )
                 )
             }
@@ -128,7 +140,7 @@ class OpenForTradeRepositoryImpl(
     }
 
     override suspend fun removeByCollectionId(localCollectionId: String): Result<Unit> =
-        runCatching { dao.deleteByCollectionId(localCollectionId) }
+        runCatching { dao.deleteByCollectionId(localCollectionId, TradeListOwner.key(currentUserId())) }
 
     override suspend fun removeByCollectionIdAndSync(localCollectionId: String): Result<Unit> =
         runCatching {
@@ -136,12 +148,13 @@ class OpenForTradeRepositoryImpl(
             // The old local-then-remote order could leave the server row alive after a failed
             // remote call, and the next syncFromRemote() would re-insert ("resurrect") the entry
             // the user just removed (trades audit §2.2, 2026-07-10).
+            val owner = TradeListOwner.key(currentUserId())
             remote.removeByUserCardId(localCollectionId).getOrThrow()
-            dao.deleteByCollectionId(localCollectionId)
+            dao.deleteByCollectionId(localCollectionId, owner)
         }
 
     override suspend fun removeLocal(id: String): Result<Unit> = runCatching {
-        dao.deleteById(id)
+        dao.deleteById(id, TradeListOwner.key(currentUserId()))
     }
 
     override suspend fun getRemote(userId: String): Result<List<OpenForTradeEntry>> =
@@ -153,15 +166,25 @@ class OpenForTradeRepositoryImpl(
     override suspend fun removeRemote(id: String): Result<Unit> =
         remote.removeOpenForTradeEntry(id)
 
+    override suspend fun evictForeignAccountRows(userId: String): Result<Unit> = runCatching {
+        require(currentUserId() == userId)
+        dao.deleteAmbiguousRows()
+    }
+
     override suspend fun migrateLocalToRemote(userId: String): Result<Int> = runCatching {
-        val unsynced = dao.getUnsynced()
+        require(currentUserId() == userId)
+        // Owner-scoped reads exclude another account's pending rows without deleting them.
+        dao.deleteAmbiguousRows()
+        val unsynced = dao.getUnsynced(userId)
         if (unsynced.isEmpty()) return@runCatching 0
 
         // local_collection_id maps 1:1 to user_card_collection.id in Supabase.
         // Entries remain in Room after sync (clearSynced removed) so that
         // observeLocal() continues to show them without re-downloading from remote.
         remote.batchAddOpenForTradeEntries(unsynced.map { it.localCollectionId }).getOrThrow()
-        dao.markSynced(unsynced.map { it.id })
+        require(currentUserId() == userId)
+        dao.markSynced(unsynced.map { it.id }, userId)
+        dao.stampOwner(unsynced.map { it.id }, userId)
         unsynced.size
     }
 
@@ -175,7 +198,8 @@ class OpenForTradeRepositoryImpl(
         userId: String,
     ): Result<Unit> = addMutex.withLock {
         runCatching {
-            val existing = dao.getByCollectionId(localCollectionId)
+            require(currentUserId() == userId)
+            val existing = dao.getByCollectionId(localCollectionId, userId)
             val entity: LocalOpenForTradeEntity = if (existing != null) {
                 existing.copy(
                     quantity = quantity,
@@ -195,18 +219,22 @@ class OpenForTradeRepositoryImpl(
                     language = language,
                     synced = false,
                     createdAt = System.currentTimeMillis(),
+                    ownerUserId = userId,
                 ).also { dao.upsert(it) }
             }
             // localCollectionId == user_card_collection.id in Supabase — no lookup needed.
             remote.batchAddOpenForTradeEntries(listOf(entity.localCollectionId)).getOrThrow()
-            dao.markSynced(listOf(entity.id))
+            require(currentUserId() == userId)
+            dao.markSynced(listOf(entity.id), userId)
         }
     }
 
-    override suspend fun syncFromRemote(userId: String): Result<Unit> = runCatching {
-        val dtos = remote.getOpenForTrade(userId).getOrThrow()
-        val remoteIds = dtos.map { it.id }.toSet()
-        val entities = dtos.map { dto ->
+    override suspend fun syncFromRemote(userId: String): Result<Unit> = try {
+        require(currentUserId() == userId)
+        dao.deleteAmbiguousRows()
+        val drain = remote.drainOpenForTrade(userId)
+        require(currentUserId() == userId)
+        val entities = drain.rows.map { dto ->
             LocalOpenForTradeEntity(
                 id = dto.id,
                 localCollectionId = dto.userCardId,
@@ -216,23 +244,27 @@ class OpenForTradeRepositoryImpl(
                 condition = dto.condition ?: "NM",
                 language = dto.language ?: "en",
                 synced = true,
-                // Project-wide fallback convention (trades audit §2.13, 2026-07-10): an
-                // unparseable createdAt falls back to epoch (0L), not "now" — deterministic,
-                // and it sorts a malformed timestamp to the bottom of a recency-DESC list
-                // instead of falsely surfacing it as newest. Mirrors WishlistRepositoryImpl
-                // and TradesRepositoryImpl.parseIso().
+                // An unparseable createdAt falls back to epoch so it sorts last, never as newest.
                 createdAt = runCatching { Instant.parse(dto.createdAt).toEpochMilliseconds() }
                     .getOrDefault(0L),
+                ownerUserId = userId,
             )
         }
-        dao.upsertAll(entities)
-        // Evict synced rows that the server no longer returns (e.g. post-trade orphans).
-        // Unsynced (locally-added, not yet pushed) rows are never touched.
-        if (remoteIds.isEmpty()) {
-            dao.clearSynced()
+        if (entities.isNotEmpty()) dao.upsertAll(entities)
+        val incomplete = drain.incompleteFailure()
+        if (incomplete != null) {
+            // Rows past the failed page were never seen, so nothing local may be evicted this pass.
+            Result.failure(incomplete)
         } else {
-            dao.deleteSyncedNotIn(remoteIds.toList())
+            // Evict synced rows the server no longer returns; unsynced local rows are never touched.
+            val remoteIds = entities.mapTo(HashSet()) { it.id }
+            dao.getSyncedIds(userId).filterNot { it in remoteIds }.chunked(EVICT_CHUNK_SIZE).forEach { dao.deleteSyncedByIds(it, userId) }
+            Result.success(Unit)
         }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 
     private fun LocalOpenForTradeEntity.toDomain() = OpenForTradeEntry(
@@ -262,4 +294,9 @@ class OpenForTradeRepositoryImpl(
         language = language ?: "en",
         createdAt = runCatching { Instant.parse(createdAt).toEpochMilliseconds() }.getOrDefault(0L),
     )
+
+    private companion object {
+        // Below API 29's 999 bind-variable limit per statement.
+        const val EVICT_CHUNK_SIZE = 500
+    }
 }

@@ -12,6 +12,7 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DetectionRule
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.model.TagDictionaryEntry
+import com.mmg.manahub.core.model.SuggestedTag
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -21,7 +22,7 @@ import kotlin.test.assertTrue
 /**
  * Coverage for [ResolveCardStrategyTagsUseCase] (Deck Engine Unification plan §8a addendum) —
  * STRICT FALLBACK semantics (superseded RUN 6's union): a precomputed [CardStrategyTagsResult
- * .Found] is used EXCLUSIVELY (zero on-device computation, zero suggested tags); a genuine miss
+ * .Found] is used EXCLUSIVELY (zero on-device computation, payload suggestions retained); a genuine miss
  * runs the on-device engine, attempts a bounded EDHREC theme-page shortlist verification, and
  * pushes the result back via [CardStrategyTagsRepository.submitStrategyTags].
  */
@@ -112,6 +113,7 @@ class ResolveCardStrategyTagsUseCaseTest {
         oracleId: String = "",
         oracleText: String? = "",
         name: String = "Test Card",
+        keywords: List<String> = emptyList(),
     ) = Card(
         scryfallId = "id-1",
         name = name,
@@ -124,7 +126,7 @@ class ResolveCardStrategyTagsUseCaseTest {
         printedTypeLine = null,
         oracleText = oracleText,
         printedText = null,
-        keywords = emptyList(),
+        keywords = keywords,
         power = null,
         toughness = null,
         loyalty = null,
@@ -172,6 +174,62 @@ class ResolveCardStrategyTagsUseCaseTest {
     // ── STRICT FALLBACK: precomputed hit ────────────────────────────────────
 
     @Test
+    fun `given a new reviewed Oracle mechanic on a Found row then only that rule is merged`() = runTest {
+        val repo = FakeRepository(CardStrategyTagsResult.Found(tags = listOf(CardTag.RAMP)))
+        val edhrec = FakeEdhrecEnrichment()
+        val mechanic = TagDictionaryEntry(
+            key = "empower_jace", category = TagCategory.KEYWORD,
+            labels = mapOf("en" to "Empower Jace"),
+            rules = listOf(DetectionRule(allOf = listOf("empower jace"), confidence = 0.95f)),
+        )
+        val useCase = ResolveCardStrategyTagsUseCase(computeCardTags, repo, edhrec) { listOf(mechanic) }
+        val card = testCard(
+            oracleId = "oracle-proteges-awakening", name = "Protege's Awakening",
+            oracleText = "Empower Jace 6. Surveil 2.", keywords = listOf("Surveil"),
+        )
+
+        val result = useCase(card, existingTagsJson = "[]")
+
+        assertTrue(result.confirmedTags.any { it.key == "empower_jace" && it.category == TagCategory.KEYWORD })
+        assertTrue(result.confirmedTags.any { it.key == "ramp" })
+        assertTrue(result.confirmedTags.none { it.key == "counters_source" })
+        assertEquals(0, repo.submitCallCount)
+        assertEquals(0, edhrec.callCount)
+    }
+
+    @Test
+    fun `given a new catalog keyword without Oracle rules then Found uses exact Scryfall keyword`() = runTest {
+        val repo = FakeRepository(CardStrategyTagsResult.Found(tags = emptyList()))
+        val mechanic = TagDictionaryEntry(
+            key = "new_mechanic", category = TagCategory.KEYWORD,
+            labels = mapOf("en" to "New Mechanic"), rules = emptyList(),
+        )
+        val useCase = ResolveCardStrategyTagsUseCase(computeCardTags, repo, FakeEdhrecEnrichment()) { listOf(mechanic) }
+
+        val matching = useCase(testCard(oracleId = "a", keywords = listOf("New Mechanic")), "[]")
+        val unrelated = useCase(testCard(oracleId = "b", keywords = listOf("New Mechanical")), "[]")
+
+        assertTrue(matching.confirmedTags.any { it.key == "new_mechanic" })
+        assertTrue(unrelated.confirmedTags.none { it.key == "new_mechanic" })
+    }
+
+    @Test
+    fun `given a catalog rule below auto threshold then Found retains it only as a suggestion`() = runTest {
+        val repo = FakeRepository(CardStrategyTagsResult.Found(tags = emptyList()))
+        val mechanic = TagDictionaryEntry(
+            key = "new_relation", category = TagCategory.STRATEGY,
+            labels = mapOf("en" to "New Relation"),
+            rules = listOf(DetectionRule(allOf = listOf("leaves your graveyard"), confidence = 0.75f)),
+        )
+        val useCase = ResolveCardStrategyTagsUseCase(computeCardTags, repo, FakeEdhrecEnrichment()) { listOf(mechanic) }
+
+        val result = useCase(testCard(oracleId = "a", oracleText = "Whenever a card leaves your graveyard, draw a card."), "[]")
+
+        assertTrue(result.confirmedTags.none { it.key == "new_relation" })
+        assertTrue(result.suggestedTags.any { it.tag.key == "new_relation" && it.confidence == 0.75f })
+    }
+
+    @Test
     fun `given the repository finds a precomputed row then it is used EXCLUSIVELY and no suggestions are produced`() = runTest {
         val repo = FakeRepository(CardStrategyTagsResult.Found(tags = listOf(CardTag.REMOVAL)))
         val edhrec = FakeEdhrecEnrichment()
@@ -199,6 +257,24 @@ class ResolveCardStrategyTagsUseCaseTest {
 
         assertTrue(CardTag.REMOVAL in result.confirmedTags)
         assertTrue(result.confirmedTags.any { it.key == "my_custom_tag" })
+    }
+
+    @Test
+    fun `remote suggestions remain unconfirmed and manual confirmation wins on the same key`() = runTest {
+        val graveyard = CardTag("graveyard_enabler", TagCategory.ROLE)
+        val death = CardTag("death_payoff", TagCategory.ROLE)
+        val repo = FakeRepository(CardStrategyTagsResult.Found(
+            tags = emptyList(),
+            suggestions = listOf(SuggestedTag(graveyard, 0.80f), SuggestedTag(death, 0.88f)),
+        ))
+        val useCase = ResolveCardStrategyTagsUseCase(computeCardTags, repo, FakeEdhrecEnrichment())
+
+        val result = useCase(testCard(oracleId = "oracle-suggestions"), """[{"k":"death_payoff","c":"ROLE"}]""")
+
+        assertTrue(result.confirmedTags.any { it.key == "death_payoff" })
+        assertEquals(listOf("graveyard_enabler"), result.suggestedTags.map { it.tag.key })
+        assertEquals(0.80f, result.suggestedTags.single().confidence)
+        assertEquals(0, repo.submitCallCount)
     }
 
     // ── STRICT FALLBACK: genuine miss (NotFound / Error) ────────────────────
@@ -265,6 +341,7 @@ class ResolveCardStrategyTagsUseCaseTest {
         assertTrue(result.suggestedTags.any { it.tag.key == "blink" })
         assertTrue(result.confirmedTags.none { it.key == "blink" })
         assertEquals(emptyMap(), repo.lastSubmission?.themes)
+        assertTrue(repo.lastSubmission?.suggestions?.any { it.tag.key == "blink" } == true)
     }
 
     @Test

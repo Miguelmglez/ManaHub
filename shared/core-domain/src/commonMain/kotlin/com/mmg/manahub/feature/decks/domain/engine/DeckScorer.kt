@@ -411,7 +411,7 @@ class DeckScorer(
         if (profile.colorIdentity.isEmpty()) {
             // Edge-case audit Fix 2: an EMPTY deck identity is ambiguous by format. For COMMANDER
             // and every 60-card constructed format (`DeckFormat.isSixtyCardConstructed`) it is a
-            // REAL, explicit "colorless required" constraint -- BuildDeckFromTemplateUseCase
+            // REAL, explicit "colorless required" constraint -- the deleted Motor A wizard build use case
             // .analyzeCollection's own D9 comment documents `colorIdentity.isEmpty()` as the
             // intentional Colorless wizard pick for exactly these formats, and this scorer must
             // gate the SAME way, never fall through to a universal pass (the old unconditional
@@ -419,7 +419,7 @@ class DeckScorer(
             // explicitly Colorless build). DRAFT (and any other non-constructed, non-Commander
             // format) has no identity concept at all -- `analyzeCollection`'s own `else -> true`
             // branch is the precedent -- so it keeps the permissive universal pass.
-            val identityIsMeaningful = profile.format == DeckFormat.COMMANDER || profile.format.isSixtyCardConstructed
+            val identityIsMeaningful = profile.format.isCommanderFormat || profile.format.isSixtyCardConstructed
             if (!identityIsMeaningful) return true to 1.0f
             return if (card.colorIdentity.isEmpty()) {
                 reasons += ScoreReason.Colorless
@@ -506,8 +506,8 @@ class DeckScorer(
                 }
         }
 
-        // ── Off-color identity (Commander only) ──────────────────────────────────
-        if (format == DeckFormat.COMMANDER && profile.colorIdentity.isNotEmpty()) {
+        // ── Off-color identity (Commander formats only) ──────────────────────────
+        if (format.isCommanderFormat && profile.colorIdentity.isNotEmpty()) {
             val allowed = profile.colorIdentity.map { it.symbol }.toSet()
             mainboard
                 .map { it.card }

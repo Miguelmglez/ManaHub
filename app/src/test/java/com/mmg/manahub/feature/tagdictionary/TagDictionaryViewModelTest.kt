@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.model.TagCategory
+import com.mmg.manahub.core.model.TagDictionaryEntry
 import com.mmg.manahub.core.tagging.TagDictionary
 import com.mmg.manahub.core.tagging.TagDictionaryRepository
 import com.mmg.manahub.core.tagging.TagOverride
@@ -31,6 +32,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import kotlin.math.abs
 
 /**
  * Unit tests for [TagDictionaryViewModel].
@@ -55,6 +57,7 @@ class TagDictionaryViewModelTest {
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
     private val dictionaryRepo = mockk<TagDictionaryRepository>(relaxed = true)
+    private val mechanicCatalog = mockk<com.mmg.manahub.core.tagging.CardMechanicCatalogRepository>(relaxed = true)
     private val prefs          = mockk<UserPreferencesDataStore>(relaxed = true)
 
     // Expose mutable flows so individual tests can control emitted values
@@ -62,7 +65,8 @@ class TagDictionaryViewModelTest {
     private val suggestThresholdFlow = MutableStateFlow(0.60f)
     private val overridesFlow        = MutableStateFlow<List<TagOverride>>(emptyList())
 
-    private lateinit var viewModel: TagDictionaryViewModel
+    private var onCachedCatalogLoad: () -> Unit = {}
+    private val viewModel: TagDictionaryViewModel by lazy(LazyThreadSafetyMode.NONE) { buildViewModel() }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -83,10 +87,13 @@ class TagDictionaryViewModelTest {
         every { prefs.tagSuggestThresholdFlow } returns suggestThresholdFlow
         every { dictionaryRepo.overridesFlow }  returns overridesFlow
         coEvery { dictionaryRepo.loadAndApply() } returns Unit
+        coEvery { mechanicCatalog.loadCached() } coAnswers { onCachedCatalogLoad() }
+        every { mechanicCatalog.entries } returns MutableStateFlow(emptyList())
 
         return TagDictionaryViewModel(
             dictionaryRepo = dictionaryRepo,
             prefs          = prefs,
+            mechanicCatalog = mechanicCatalog,
         )
     }
 
@@ -99,7 +106,6 @@ class TagDictionaryViewModelTest {
         mockkStatic(FirebaseCrashlytics::class)
         every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
 
-        viewModel = buildViewModel()
     }
 
     @After
@@ -109,11 +115,29 @@ class TagDictionaryViewModelTest {
         // The VM's overridesFlow collector mutates the real TagDictionary singleton — reset it
         // so test-to-test contamination never leaks a custom_ key into an unrelated test.
         TagDictionary.applyOverrides(emptyList())
+        TagDictionary.applyRemoteEntries(emptyList())
     }
 
     // ══════════════════════════════════════════════════════════════════════════
     //  GROUP 1 — setAutoThreshold
     // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `cached remote keyword appears as a read-only row with its catalog category`() = runTest {
+        onCachedCatalogLoad = {
+            TagDictionary.applyRemoteEntries(
+                listOf(TagDictionaryEntry("empower_jace", TagCategory.KEYWORD, mapOf("en" to "Empower Jace"), emptyList())),
+            )
+        }
+
+        val subject = viewModel
+        advanceUntilIdle()
+
+        val row = subject.state.value.rows.single { it.key == "empower_jace" }
+        assertEquals(TagCategory.KEYWORD, row.category)
+        assertEquals("Empower Jace", row.labelEn)
+        assertTrue(row.isSystem)
+    }
 
     @Test
     fun `given suggestThreshold 0_77 when setAutoThreshold 0_80 then saveTagSuggestThreshold is called with adjusted value`() = runTest {
@@ -194,7 +218,7 @@ class TagDictionaryViewModelTest {
         advanceUntilIdle()
 
         // Assert: coerced to 0.85
-        coVerify { prefs.saveTagSuggestThreshold(0.85f) }
+        coVerify { prefs.saveTagSuggestThreshold(match { abs(it - 0.85f) < 0.00001f }) }
     }
 
     @Test

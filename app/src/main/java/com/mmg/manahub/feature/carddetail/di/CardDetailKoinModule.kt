@@ -47,8 +47,6 @@ import org.koin.dsl.module
  *
  * `AddCardToCollectionUseCase` and `AddToWishlistUseCase` (KMP migration batch 2) are now natively
  * Koin-built in `SharedDomainKoinModule` — resolved below via `get()`, not registered here anymore.
- * (`AddToWishlistUseCase` is ALSO re-exposed to the still-Hilt, excluded `ScannerViewModel` via
- * `KoinToHiltBridgeModule's reverse bridge — same singleton instance either way.)
  *
  * `UpdateCollectionEntryUseCase` and `UpdateWishlistEntryUseCase` (Card Versions & Languages, Phase
  * 1A) are likewise natively Koin-built in `SharedDomainKoinModule` — resolved below via `get()`.

@@ -30,7 +30,7 @@ data class AddSuggestion(
      * How many copies to add (plan D3). For 60-card constructed formats this is up to
      * `4 − copies-already-in-deck` (a playset top-up); Commander/singleton formats keep it at 1.
      * Defaults to 1 so callers that do not compute multi-copy adds are unaffected. Consumed by the
-     * wizard build (`BuildDeckFromTemplateUseCase`) to write the right quantity per card; the
+     * wizard build (`the deleted Motor A wizard build use case`) to write the right quantity per card; the
      * retired `BudgetOptimizer` used to charge `suggestedCopies × price`. Always ≥1.
      */
     val suggestedCopies: Int = 1,

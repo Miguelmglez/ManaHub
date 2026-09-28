@@ -304,7 +304,7 @@ class SurveyViewModel(
      * draw sentinel (winnerId = -1) or an explicit "Draw" winner name.
      */
     private fun isDrawSession(winnerId: Int, winnerName: String): Boolean =
-        winnerId == -1 || winnerName.equals("Draw", ignoreCase = true)
+        winnerId == -1
 
     // ── Setters (Phase 3) ───────────────────────────────────────────────────────
 
@@ -440,6 +440,8 @@ class SurveyViewModel(
         viewModelScope.launch {
             withContext(ioDispatcher) {
                 gameSessionDao.updateSessionDeck(sessionId, deckId)
+                // Per-deck stats read player_sessions.deck_id, so the local seat needs it too
+                gameSessionDao.updateLocalSeatDeck(sessionId, deckId)
             }
             val deckCards = if (deckId != null) loadDeckCards(deckId) else emptyList()
             val hasSideboard = if (deckId != null) {

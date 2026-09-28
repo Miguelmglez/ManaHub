@@ -7,6 +7,7 @@ import com.mmg.manahub.core.model.CollectionSource
 import com.mmg.manahub.core.model.ColorMatchMode
 import com.mmg.manahub.core.model.ComparisonOperator
 import com.mmg.manahub.core.model.SearchCriterion
+import com.mmg.manahub.feature.decks.domain.engine.CommanderEligibility
 
 /**
  * Local, in-memory evaluator for an [AdvancedSearchQuery] against a single [Card] — the offline
@@ -29,6 +30,8 @@ object AdvancedSearchCardMatcher {
     /** Scryfall oracle text embeds parenthesized reminder text, a false-positive source for
      *  substring matching — stripped before every term check, as `StrategyAnalyzer` does. */
     private val reminderTextRegex = Regex("""\([^)]*\)""")
+
+    private val whitespaceRegex = Regex("""\s+""")
 
     /** True when [card] satisfies EVERY criterion of [query] (empty query matches everything). */
     fun matches(
@@ -67,7 +70,8 @@ object AdvancedSearchCardMatcher {
             card.oracleText?.contains(criterion.value, ignoreCase = true) == true
 
         is SearchCriterion.CardType -> {
-            val check: (String) -> Boolean = { type -> card.typeLine.contains(type, ignoreCase = true) }
+            val lines = paddedTypeLines(card)
+            val check: (String) -> Boolean = { type -> hasWholeType(lines, type) }
             // `exclude` renders as `-t:x` remotely, so it must negate locally too (Deck Analysis
             // curve sections are `mv=N -t:land`); the pre-extraction evaluator ignored the flag and
             // matched exactly the cards it was meant to drop.
@@ -87,6 +91,10 @@ object AdvancedSearchCardMatcher {
             }
             if (criterion.matchAll) criterion.functions.all(check)
             else criterion.functions.any(check)
+        }
+
+        is SearchCriterion.AnyOf -> criterion.alternatives.any { alternative ->
+            alternative.all { matchesCriterion(card, it, lenient, isWishlisted, isForTrade) }
         }
 
         is SearchCriterion.Colors -> matchesColorSet(card.colors, criterion.colors, criterion.mode)
@@ -133,6 +141,8 @@ object AdvancedSearchCardMatcher {
         is SearchCriterion.OracleTerms -> matchesOracleTerms(card, criterion, lenient)
 
         is SearchCriterion.ManaProduction -> matchesManaProduction(card, criterion, lenient)
+
+        SearchCriterion.CommanderEligible -> CommanderEligibility.isCommanderEligible(card)
 
         // Loyalty, Language, Artist and FlavorText have no locally cached field to evaluate, so
         // they are not a local constraint in either mode. Anything ADDED here silently matches
@@ -203,6 +213,32 @@ object AdvancedSearchCardMatcher {
         return criterion.minDistinctColors?.let { produced.toSet().size >= it } ?: true
     }
 
+    /**
+     * True when [type] appears as a whole token sequence in any of [paddedLines] — "Rat" must not
+     * match "Pirate". Same rule as the `search_friend_cards` RPC; multi-word types ("Time Lord")
+     * and hyphenated ones ("Assembly-Worker") match as written.
+     */
+    fun hasWholeType(paddedLines: List<String>, type: String): Boolean {
+        val needle = type.trim().lowercase()
+        if (needle.isEmpty()) return false
+        return paddedLines.any { it.contains(" $needle ") }
+    }
+
+    /** The card's type line plus each face's, normalized and space-padded for [hasWholeType]. */
+    fun paddedTypeLines(card: Card): List<String> =
+        (listOf(card.typeLine) + card.cardFaces.orEmpty().mapNotNull { it.typeLine })
+            .map(::normalizeTypeLine)
+            .distinct()
+
+    private fun normalizeTypeLine(typeLine: String): String {
+        val collapsed = typeLine.lowercase()
+            .replace("—", " ")
+            .replace("//", " ")
+            .replace(whitespaceRegex, " ")
+            .trim()
+        return " $collapsed "
+    }
+
     /** Lowercase -> strip parenthesized reminder text -> replace each face name with `~`. */
     private fun normalizedOracleText(card: Card): String {
         val raw = card.oracleText?.takeIf { it.isNotBlank() } ?: return ""
@@ -233,7 +269,10 @@ object AdvancedSearchCardMatcher {
         if (criterionColors.isEmpty()) return true
         val card = cardColors.map { it.uppercase() }.toSet()
         val wanted = criterionColors.map { it.uppercase() }.toSet()
-        val letters = wanted - COLORLESS
+        val letters = wanted - COLORLESS - "M"
+        val wantsMulticolor = "M" in wanted
+        if (wantsMulticolor && card.size < 2) return false
+        if (letters.isEmpty() && COLORLESS !in wanted) return true
         val wantsColorless = COLORLESS in wanted
         return when (mode) {
             // `(c>=w or c>=u)` / `(… or c=c)`

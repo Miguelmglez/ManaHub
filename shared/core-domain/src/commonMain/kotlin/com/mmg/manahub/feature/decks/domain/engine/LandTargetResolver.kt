@@ -6,7 +6,7 @@ import com.mmg.manahub.core.model.DeckFormat
 //  LandTargetResolver — Deck Wizard & Engine Rework plan, Workstream 6 ("One land
 //  engine").
 //
-//  Root cause (plan §0 F2): the wizard (BuildDeckFromTemplateUseCase.computeLandTarget,
+//  Root cause (plan §0 F2): the wizard (the deleted Motor A wizard build use case.computeLandTarget,
 //  now REMOVED) and Deck Studio (DeckStudioViewModel.calculateLandDeltas) used to
 //  compute "how many lands should this deck have" through two entirely different
 //  code paths — the wizard via an archetype-skeleton-or-dynamicLandIdeal split, Studio
@@ -18,7 +18,7 @@ import com.mmg.manahub.core.model.DeckFormat
 
 /**
  * The one authoritative "how many lands should this deck have" computation, shared by
- * [com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase] (the wizard) and
+ * [the deleted Motor A wizard build use case] (the wizard) and
  * [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel] (Studio's basic-land suggestion).
  *
  * A stateless object mirroring the sibling [ArchetypeSkeletonResolver]/[DeckSkeletons] objects in
@@ -49,13 +49,20 @@ object LandTargetResolver {
      *
      * @param archetypeSkeleton the resolved, color-modulated skeleton, or `null` for the
      *   GENERIC-with-no-themes "no skeleton" case (same convention as
-     *   `BuildDeckFromTemplateUseCase.resolveArchetypeSkeleton` /
+     *   `the deleted Motor A wizard build use case.resolveArchetypeSkeleton` /
      *   `DeckDoctorOrchestrator.resolveArchetypeSkeleton`).
      * @param profile a [DeckProfile] built from the mainboard whose land target is being decided
-     *   (nonland-only entries recommended — see call-site notes in `BuildDeckFromTemplateUseCase`/
+     *   (nonland-only entries recommended — see call-site notes in `the deleted Motor A wizard build use case`/
      *   `DeckStudioViewModel`); required for the 60-card branch ([ManaBaseAnalyzer.dynamicLandIdeal]
      *   reads its `roleCounts`/`avgCmc`/`nonLandCount`), ignored for Commander. `null` is safe (falls
      *   back to the skeleton/format default) for a caller that doesn't have a mainboard yet.
+     *
+     *   Deck Wizard 60-card wave (v6), plan §5 Phase 1.6: `BuildWizardDeckUseCase` calls this with
+     *   `profile = null` for every 60-card build (it has no mainboard yet during land-target
+     *   resolution, same as Commander) — the target then falls straight through to
+     *   [archetypeSkeleton]'s own `lands.ideal`, which already carries the resolved
+     *   [SixtyFormatProfile] shift ([ArchetypeSkeletonResolver.resolveWithColor]'s last layering
+     *   step). See `LandTargetResolverTest`'s own "wizard call shape" test.
      */
     fun resolve(
         format: DeckFormat,

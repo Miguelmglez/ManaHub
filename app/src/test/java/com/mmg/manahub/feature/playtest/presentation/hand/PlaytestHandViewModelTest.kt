@@ -1355,4 +1355,49 @@ class PlaytestHandViewModelTest {
             viewModel.uiState.value.customHandSelection["card-2"],
         )
     }
+
+    // ── Keep / bottom-N, init re-entry, build failures ───────────────────────
+
+    @Test
+    fun `given every hand card is forced and a start-count gap when onKeep then it enters PLAY without an unsatisfiable bottom-N step`() = runTest {
+        val slots = listOf(DeckSlot(scryfallId = "card-1", quantity = 7)) +
+            (2..19).map { DeckSlot(scryfallId = "card-$it", quantity = 1) }
+        stubDeckWithSlots(slots)
+        viewModel.initWithSetup(makeSetup(drawCount = 7, startCount = 5))
+        advanceUntilIdle()
+
+        viewModel.onSetCustomHandCount("card-1", 7)
+        viewModel.onConfirmCustomHandSheet()
+        viewModel.onKeep()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.showBottomNSelector)
+        assertEquals(PlaytestPhase.PLAY, state.phase)
+        assertEquals(7, state.battlefield!!.hand.size)
+    }
+
+    @Test
+    fun `given initWithSetup is called again before the first draw lands then the deck is built only once`() = runTest {
+        stubDeckWithCards(20)
+
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { cardDao.getByIds(any()) }
+        assertEquals(7, viewModel.uiState.value.snapshot!!.hand.size)
+    }
+
+    @Test
+    fun `given cardDao throws when initialized then the error state is shown instead of crashing`() = runTest {
+        stubDeckWithCards(20)
+        coEvery { cardDao.getByIds(any()) } throws IllegalStateException("database closed")
+
+        viewModel.initWithSetup(makeSetup())
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isLoading)
+        assertEquals("Failed to load deck cards", state.errorMessage)
+    }
 }

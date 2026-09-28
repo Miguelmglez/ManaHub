@@ -47,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -133,9 +134,9 @@ fun AccountManagementScreen(
     val toastState = rememberMagicToastState()
     var showShareSheet by remember { mutableStateOf(false) }
     var identityPendingUnlink by remember { mutableStateOf<AuthIdentity?>(null) }
-    var showSignOutDialog by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var showCancelEmailChangeDialog by remember { mutableStateOf(false) }
+    var showSignOutDialog by rememberSaveable { mutableStateOf(false) }
+    var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
+    var showCancelEmailChangeDialog by rememberSaveable { mutableStateOf(false) }
     // Local override for the "pending email change" note (Fix 2): cancelPendingEmailChange's RPC
     // returns void and does NOT push an updated AuthUser.newEmail through sessionState (GoTrue
     // does not proactively re-sync auth.users changes made outside its own updateUser flow into
@@ -154,7 +155,8 @@ fun AccountManagementScreen(
     // tap fires a concurrent duplicate call before the first one resolves. Cleared on every terminal
     // AuthUiState this screen's own actions can reach (Idle covers signOut(), which never transitions
     // through the branches below).
-    var pendingAction by remember { mutableStateOf<String?>(null) }
+    // Survives a font-scale/locale config change while a destructive request is still in flight
+    var pendingAction by rememberSaveable { mutableStateOf<String?>(null) }
     val isActionPending = pendingAction != null
 
     val copiedMessage = stringResource(R.string.account_mgmt_gametag_copied)

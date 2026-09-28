@@ -16,8 +16,8 @@ import com.mmg.manahub.feature.communitydecks.domain.usecase.SearchCommunityDeck
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,8 +29,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.LocalDate
-import java.time.temporal.IsoFields
 
 /** Card-name search debounce window shared by the Commander and Card advanced-search pickers. */
 private const val CARD_PICKER_DEBOUNCE_MS = 400L
@@ -116,6 +114,19 @@ class CommunityDecksSearchViewModel(
         }
 
         viewModelScope.launch {
+            userPreferences.homeCommunityDecksFormatFlow.collect { formatName ->
+                val format = formatName?.let { name ->
+                    CommunityDeckFormatFilter.entries.firstOrNull { it.name == name }
+                }
+                val formatChanged = _uiState.value.selectedDiscoveryFormat != format
+                _uiState.update { it.copy(selectedDiscoveryFormat = format) }
+                if (formatChanged && discoverLoaded && _uiState.value.discoverEnabled && !openedViaByCardDeepLink) {
+                    loadDiscover()
+                }
+            }
+        }
+
+        viewModelScope.launch {
             // `distinctUntilChanged()` runs BEFORE `filter` (bug fix) so a blank reset — e.g.
             // `onClearAdvancedFilters`'s `commanderQueryFlow.value = ""` — still advances
             // distinctUntilChanged's "last seen" baseline even though the blank value itself never
@@ -167,6 +178,13 @@ class CommunityDecksSearchViewModel(
     fun onSelectHubTab(tab: CommunityHubTab) {
         _uiState.update { it.copy(hubTab = tab) }
         if (tab == CommunityHubTab.DISCOVER && !discoverLoaded && _uiState.value.discoverEnabled) loadDiscover()
+    }
+
+    /** Retry for the "Discover unavailable" state — [onSelectHubTab] only loads once, so it can't serve as retry. */
+    fun retryDiscover() {
+        if (_uiState.value.isDiscoverLoading || !_uiState.value.discoverEnabled) return
+        crashlytics.log("community_discover_retry")
+        loadDiscover()
     }
 
     /**
@@ -229,14 +247,15 @@ class CommunityDecksSearchViewModel(
     /** One Discover section's decks; any failure (exception or [DataResult.Error]) degrades to empty. */
     private suspend fun fetchDecks(
         orderBy: String,
-        deckFormat: CommunityDeckFormatFilter = CommunityDeckFormatFilter.COMMANDER,
+        deckFormat: CommunityDeckFormatFilter? = null,
         primersOnly: Boolean = false,
     ): List<CommunityDeckSummary> = runCatching {
         val filters = CommunityAdvancedFilters(
-            formats = deckFormat,
+            formats = deckFormat ?: CommunityDeckFormatFilter.COMMANDER,
             primersOnly = primersOnly,
         ).toSearchFilters(deckName = null, orderBy = orderBy, page = 1, pageSize = DISCOVER_SECTION_SIZE)
-        (searchCommunityDecks(filters) as? DataResult.Success)?.data?.decks.orEmpty()
+        // Rows are keyed by archidektId, so a repeated deck would crash the LazyRow.
+        (searchCommunityDecks(filters) as? DataResult.Success)?.data?.decks.orEmpty().distinctBy { it.archidektId }
     }.getOrElse { emptyList() }
 
     /** Resolves trending card/commander names to full [Card]s in parallel; unresolved names are dropped. */
@@ -245,6 +264,8 @@ class CommunityDecksSearchViewModel(
             .map { name -> async { runCatching { cardRepository.getCardByExactName(name) }.getOrNull()?.getOrNull() } }
             .awaitAll()
             .filterNotNull()
+            // Two trending names can resolve to the same printing; tiles are keyed by scryfallId.
+            .distinctBy { it.scryfallId }
     }
 
 
@@ -343,14 +364,16 @@ class CommunityDecksSearchViewModel(
         if (switchingAwayFromCommander) commanderQueryFlow.value = ""
     }
 
-    fun onSelectDiscoveryFormat(format: CommunityDeckFormatFilter){
-        if (_uiState.value.selectedDiscoveryFormat == format){
+    fun onSelectDiscoveryFormat(format: CommunityDeckFormatFilter?) {
+        if (_uiState.value.selectedDiscoveryFormat == format) {
             return
         } else {
             _uiState.update { it.copy(selectedDiscoveryFormat = format) }
+            viewModelScope.launch {
+                userPreferences.saveHomeCommunityDecksFormat(format?.name)
+            }
             loadDiscover()
         }
-
     }
     // ── Advanced search filters (Phase 2) ───────────────────────────────────────────
     // NOTE (Advanced Search sheet rework, 2026-08-18): "Deck format" (`onSearchDeckFilterUpdated`)
@@ -436,8 +459,11 @@ class CommunityDecksSearchViewModel(
         }
         val results = (searchCards(query, page = 1) as? DataResult.Success)?.data?.cards.orEmpty()
         _uiState.update {
-            if (isCommander) it.copy(commanderResults = results, isCommanderSearching = false)
-            else it.copy(cardResults = results, isCardSearching = false)
+            // The field may have been cleared/edited while this request was in flight — drop stale results.
+            val currentQuery = if (isCommander) it.commanderQuery else it.cardQuery
+            val fresh = if (currentQuery == query) results else emptyList()
+            if (isCommander) it.copy(commanderResults = fresh, isCommanderSearching = false)
+            else it.copy(cardResults = fresh, isCardSearching = false)
         }
     }
 
@@ -533,7 +559,7 @@ class CommunityDecksSearchViewModel(
             // cancelled, will never reach its own completion update to flip it back.
             _uiState.update { it.copy(isLoading = true, error = null, hasSearched = true, isLoadingMore = false) }
 
-            crashlytics.setCustomKey("community_search_format", filters.formats.apiId)
+            crashlytics.setCustomKey("community_search_format", filters.formats.apiId?:0)
             crashlytics.setCustomKey(
                 "community_search_sort",
                 "${state.selectedSortField.name}_${state.selectedSortDirection.name}",
@@ -562,7 +588,7 @@ class CommunityDecksSearchViewModel(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            results = result.data.decks,
+                            results = result.data.decks.distinctBy { deck -> deck.archidektId },
                             totalCount = result.data.totalCount,
                             hasMore = result.data.hasMore,
                             error = null,
@@ -587,7 +613,9 @@ class CommunityDecksSearchViewModel(
      * old page could land after the new search's results and get appended onto them.
      */
     fun loadMore() {
-        if (_uiState.value.isLoadingMore || !_uiState.value.hasMore) return
+        val current = _uiState.value
+        // A fresh search in flight owns currentPage; paging now would append (or skip) a page of the new query.
+        if (current.isLoading || current.isLoadingMore || !current.hasMore) return
 
         val nextPage = currentPage + 1
 
@@ -609,7 +637,8 @@ class CommunityDecksSearchViewModel(
                     _uiState.update {
                         it.copy(
                             isLoadingMore = false,
-                            results = it.results + result.data.decks,
+                            // Archidekt pages can overlap when the sort order shifts; results are keyed by archidektId.
+                            results = (it.results + result.data.decks).distinctBy { deck -> deck.archidektId },
                             hasMore = result.data.hasMore,
                         )
                     }

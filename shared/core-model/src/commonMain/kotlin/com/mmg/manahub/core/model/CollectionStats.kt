@@ -72,6 +72,6 @@ data class CardValue(
     val imageNormal:   String? = null,
 )
 
-enum class MtgColor { W, U, B, R, G, COLORLESS }
+enum class MtgColor { W, U, B, R, G, COLORLESS, MULTICOLOR }
 enum class Rarity   { COMMON, UNCOMMON, RARE, MYTHIC, SPECIAL }
 enum class CardType { CREATURE, INSTANT, SORCERY, ENCHANTMENT, ARTIFACT, PLANESWALKER, LAND, BATTLE, OTHER }

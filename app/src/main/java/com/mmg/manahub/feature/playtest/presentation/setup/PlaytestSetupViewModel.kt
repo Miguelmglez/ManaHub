@@ -166,6 +166,8 @@ class PlaytestSetupViewModel(
                     val clampedDrawCount = current.drawCount.coerceIn(1, maxDrawCount)
                     current.copy(
                         isLoading             = false,
+                        // The deck flow can emit null transiently (e.g. mid-sync) before the deck arrives.
+                        errorMessage          = null,
                         deckName              = deckWithCards.deck.name,
                         deckFormat            = deckWithCards.deck.format,
                         drawCount             = clampedDrawCount,

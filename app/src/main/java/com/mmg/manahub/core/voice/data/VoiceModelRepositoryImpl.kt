@@ -46,15 +46,26 @@ class VoiceModelRepositoryImpl @Inject constructor(
     override fun modelDir(language: VoiceLanguage): File? =
         modelDirFor(language).takeIf { isModelValid(it) }
 
-    override suspend fun download(language: VoiceLanguage) = withContext(Dispatchers.IO) {
-        val current = _states.value[language]
-        if (current is VoiceModelState.Ready) return@withContext
-        if (current is VoiceModelState.Downloading) return@withContext
+    override suspend fun download(language: VoiceLanguage) {
+        // Claim the slot BEFORE the dispatcher hop: checking after it let a double tap start two
+        // downloads writing into the same temp zip and model directory.
+        val claimed = synchronized(downloadLock) {
+            val current = _states.value[language]
+            if (current is VoiceModelState.Ready || current is VoiceModelState.Downloading) {
+                false
+            } else {
+                updateState(language, VoiceModelState.Downloading(0f))
+                true
+            }
+        }
+        if (!claimed) return
+        downloadClaimed(language)
+    }
 
+    private suspend fun downloadClaimed(language: VoiceLanguage) = withContext(Dispatchers.IO) {
         // Upload es.zip and de.zip to Cloudflare R2 at voice/models/ before enabling these languages in production
         val url = "${baseUrl.trimEnd('/')}/voice/models/${language.modelFileName}"
         val modelDir = modelDirFor(language)
-        updateState(language, VoiceModelState.Downloading(0f))
 
         try {
             val request = Request.Builder().url(url).build()
@@ -72,13 +83,20 @@ class VoiceModelRepositoryImpl @Inject constructor(
             body.byteStream().use { input ->
                 FileOutputStream(tempZip).use { output ->
                     var bytesCopied = 0L
+                    // Emitting per 8 KiB chunk published thousands of states for a ~50 MB model;
+                    // 1% steps are all the progress bar can show
+                    var lastPublishedPercent = -1
                     val buffer = ByteArray(8 * 1024)
                     var bytes = input.read(buffer)
                     while (bytes >= 0) {
                         output.write(buffer, 0, bytes)
                         bytesCopied += bytes
                         if (totalBytes > 0) {
-                            updateState(language, VoiceModelState.Downloading(bytesCopied.toFloat() / totalBytes))
+                            val percent = (bytesCopied * 100 / totalBytes).toInt()
+                            if (percent != lastPublishedPercent) {
+                                lastPublishedPercent = percent
+                                updateState(language, VoiceModelState.Downloading(percent / 100f))
+                            }
                         }
                         bytes = input.read(buffer)
                     }
@@ -106,6 +124,9 @@ class VoiceModelRepositoryImpl @Inject constructor(
         updateState(language, VoiceModelState.NotDownloaded)
     }
 
+    /** Guards the NotDownloaded → Downloading transition against concurrent callers. */
+    private val downloadLock = Any()
+
     private fun modelDirFor(language: VoiceLanguage): File =
         File(context.filesDir, "voice-models/${language.modelDirName}")
 
@@ -116,6 +137,7 @@ class VoiceModelRepositoryImpl @Inject constructor(
 
     private fun unzip(zipFile: File, destDir: File) {
         destDir.mkdirs()
+        val destRoot = destDir.canonicalPath
         ZipInputStream(FileInputStream(zipFile)).use { zis ->
             var entry = zis.nextEntry
             while (entry != null) {
@@ -123,6 +145,10 @@ class VoiceModelRepositoryImpl @Inject constructor(
                 val entryName = entry.name.substringAfter("/")
                 if (entryName.isNotBlank()) {
                     val target = File(destDir, entryName)
+                    // Zip-slip: a crafted "../" entry would otherwise write outside the model dir
+                    require(target.canonicalPath.startsWith(destRoot + File.separator)) {
+                        "Blocked zip entry outside the model directory"
+                    }
                     if (entry.isDirectory) {
                         target.mkdirs()
                     } else {

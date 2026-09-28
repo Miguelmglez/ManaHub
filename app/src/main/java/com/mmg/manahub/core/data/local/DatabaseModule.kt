@@ -5,34 +5,34 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.mmg.manahub.core.data.cache.ManaSymbolStore
 import com.mmg.manahub.core.data.local.dao.CardDao
+import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
+import com.mmg.manahub.core.data.local.dao.ComboCacheDao
+import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
+import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
+import com.mmg.manahub.core.data.local.dao.CompetitiveLimitedRatingsCacheDao
+import com.mmg.manahub.core.data.local.dao.CompetitiveMetaCacheDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
+import com.mmg.manahub.core.data.local.dao.DraftSetDao
+import com.mmg.manahub.core.data.local.dao.FriendDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
+import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
+import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
 import com.mmg.manahub.core.data.local.dao.ManaSymbolDao
+import com.mmg.manahub.core.data.local.dao.NewsDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
+import com.mmg.manahub.core.data.local.dao.PuzzleDao
 import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
 import com.mmg.manahub.core.data.local.dao.TournamentDao
+import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
-import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
-import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
-import com.mmg.manahub.core.data.local.dao.ComboCacheDao
-import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
-import com.mmg.manahub.core.data.local.dao.PuzzleDao
-import com.mmg.manahub.core.data.local.dao.CompetitiveMetaCacheDao
-import com.mmg.manahub.core.data.local.dao.CompetitiveLimitedRatingsCacheDao
-import com.mmg.manahub.core.data.local.dao.DraftSetDao
-import com.mmg.manahub.core.data.local.dao.FriendDao
-import com.mmg.manahub.core.data.local.dao.NewsDao
-import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
-import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
-import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
-import com.mmg.manahub.core.data.cache.ManaSymbolStore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -69,7 +69,11 @@ object DatabaseModule {
             // Clearing all watermarks here ensures the next sync performs a full pull.
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
-                    runBlocking { syncPrefs.clearAllWatermarks() }
+                    runBlocking {
+                        syncPrefs.clearAllWatermarks()
+                        // Room's gamification tables are gone; their DataStore half (owner, cosmetics) must follow.
+                        clearGamificationPreferences(context)
+                    }
                 }
             })
             // All migrations from v25 onward are explicit and data-safe.
@@ -155,6 +159,19 @@ object DatabaseModule {
                 // RESTRICT FK on user_card_collection.scryfall_id -> cards.scryfall_id via the
                 // standard 12-step table recreation.
                 MIGRATION_52_53,
+                // v53 → v54 lives as a top-level `val` in Migration_53_54.kt (same reason).
+                // Deck Wizard Commander v3 plan, Phase 0 / E3: additive decks.posture_override
+                // column (the persisted posture pin, fixes F3).
+                MIGRATION_53_54,
+                // v54 → v55 lives as a top-level `val` in Migration_54_55.kt.
+                // Additive: draft_sets.setImageUrl column.
+                MIGRATION_54_55,
+                // v55 → v56 lives as a top-level `val` in Migration_55_56.kt (same reason).
+                // Trades audit H4/H8: trade_collection_sync.pending_apply and owner_user_id on
+                // local_wishlists / local_open_for_trade (all additive).
+                MIGRATION_55_56,
+                MIGRATION_56_57,
+                MIGRATION_57_58,
             )
             .build()
 

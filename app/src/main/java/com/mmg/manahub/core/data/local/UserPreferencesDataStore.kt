@@ -1,6 +1,8 @@
 package com.mmg.manahub.core.data.local
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
@@ -20,6 +22,8 @@ import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.ScoreWeightOverrides
 import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.model.UserPreferences
+import com.mmg.manahub.core.util.recordNonFatal
+import kotlinx.coroutines.CancellationException
 import com.mmg.manahub.core.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
@@ -30,10 +34,13 @@ import com.mmg.manahub.core.model.PersistedWidget
 import com.mmg.manahub.core.model.QuickStartAction
 import com.mmg.manahub.core.model.WidgetSize
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.transformLatest
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -61,10 +68,21 @@ private val KEY_PREFERRED_CURRENCY = stringPreferencesKey("preferred_currency")
 private val LAST_PRICE_REFRESH_KEY = longPreferencesKey("last_price_refresh")
 private val AVATAR_URL_KEY         = stringPreferencesKey("avatar_url")
 private val KEY_PLAYER_NAME = stringPreferencesKey("player_name")
+private val KEY_PROFILE_IDENTITY_OWNER = stringPreferencesKey("profile_identity_owner_user_id")
+private val KEY_PROFILE_IDENTITY_VERIFIED_GUEST = booleanPreferencesKey("profile_identity_verified_guest")
+
+internal fun shouldClearProfileIdentity(owner: String?, incomingUserId: String, verifiedGuest: Boolean): Boolean =
+    (owner != null && owner != incomingUserId) || (owner == null && !verifiedGuest)
 private val KEY_APP_THEME   = stringPreferencesKey("app_theme")
 private val KEY_TAG_AUTO_THRESHOLD    = floatPreferencesKey("tag_auto_threshold")
 private val KEY_TAG_SUGGEST_THRESHOLD = floatPreferencesKey("tag_suggest_threshold")
 private val KEY_TAG_OVERRIDES_JSON    = stringPreferencesKey("tag_dictionary_overrides")
+private val KEY_CARD_MECHANIC_CATALOG_JSON = stringPreferencesKey("card_mechanic_catalog")
+private val KEY_CARD_MECHANIC_REFRESH_OWNER = stringPreferencesKey("card_mechanic_refresh_owner")
+private val KEY_CARD_MECHANIC_REFRESH_SIGNATURE = stringPreferencesKey("card_mechanic_refresh_signature")
+private val KEY_CARD_MECHANIC_REFRESH_CURSOR = stringPreferencesKey("card_mechanic_refresh_cursor")
+private val KEY_CARD_MECHANIC_REFRESH_COMPLETE = booleanPreferencesKey("card_mechanic_refresh_complete")
+private val KEY_CARD_MECHANIC_REFRESH_CHECKPOINTS = stringPreferencesKey("card_mechanic_refresh_checkpoints")
 private val KEY_USER_DEFINED_TAGS     = stringPreferencesKey("user_defined_tags")
 private val KEY_COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mode")
 /** Persisted "Group by" selection for the Collection "Cards" tab. */
@@ -92,6 +110,7 @@ private val KEY_FIRST_STEPS_SKIPPED = stringPreferencesKey("home_first_steps_ski
 private val KEY_FIRST_STEPS_COMPLETION_SEEN = booleanPreferencesKey("home_first_steps_completion_seen")
 /** Persisted category selection for the Home COMMUNITY_DECKS widget (Home widget board overhaul, TASK 5b). */
 private val KEY_HOME_COMMUNITY_DECKS_CATEGORY = stringPreferencesKey("home_community_decks_category")
+private val KEY_HOME_COMMUNITY_DECKS_FORMAT = stringPreferencesKey("home_community_decks_format")
 
 // ── Password-recovery marker (password-recovery-hardening-plan-2026-08-18, §3.1) ──────────
 //
@@ -125,12 +144,7 @@ private val KEY_PUSH_NOTIFICATIONS_ENABLED = booleanPreferencesKey("push_notific
  * [com.mmg.manahub.core.model.DataResult.Error] only while this is explicitly turned off.
  */
 private val KEY_COMMUNITY_ENGINE_ENABLED = booleanPreferencesKey("community_engine_enabled")
-/**
- * Master gamification switch (XP, levels, achievements, quests). Default: DISABLED — the
- * gamification UI is hidden for this release (see docs/gamification-hidden-for-release.md).
- * The engine keeps recording progress silently while this is off, so re-enabling restores
- * the user's true state.
- */
+/** User opt-out for gamification (absent = opted in); the release gate lives in `FeatureFlags`. */
 private val KEY_GAMIFICATION_ENABLED = booleanPreferencesKey("gamification_enabled")
 /**
  * Master switch for the Competitive feature (Phase 4: MTG metagame rankings / 17lands ratings
@@ -145,8 +159,15 @@ private val KEY_COMPETITIVE_ENABLED = booleanPreferencesKey("competitive_enabled
  * competitive-specific persistence infra — a single plain string field, so it reuses this
  * general-purpose store rather than a dedicated abstraction. */
 private val KEY_COMPETITIVE_POSTAL_CODE = stringPreferencesKey("competitive_postal_code")
-/** One-shot flag: true once the Family-A achievement backfill has run (ADR-002 §4). Default: false. */
+/** Retired one-shot backfill guard; still removed on wipe so old installs do not keep it around. */
 private val KEY_GAMIFICATION_BACKFILL_DONE = booleanPreferencesKey("gamification_backfill_done")
+/** Account owning the local gamification store; absent = guest-owned (D3). */
+private val KEY_GAMIFICATION_OWNER_USER_ID = stringPreferencesKey("gamification_owner_user_id")
+private val KEY_GAMIFICATION_VERIFIED_GUEST = booleanPreferencesKey("gamification_verified_guest")
+/** Account the Room friends cache belongs to; absent means the cache holds no account's rows. */
+private val KEY_FRIENDS_CACHE_OWNER_USER_ID = stringPreferencesKey("friends_cache_owner_user_id")
+/** Prefixes of the per-user gamification sync watermarks written by `SyncPreferencesStore`. */
+private val GAMIFICATION_WATERMARK_PREFIXES = listOf("gam_sync_ms_", "gam_pushed_ledger_id_", "gam_cursor_")
 /** Per-install random id seeding deterministic quest generation for guests (ADR-002 §9). Not ANDROID_ID. */
 private val KEY_GAMIFICATION_DEVICE_ID = stringPreferencesKey("gamification_device_id")
 
@@ -167,6 +188,32 @@ private val KEY_EQUIPPED_RING_STYLE = stringPreferencesKey("gamification_equippe
 private val KEY_LAST_CELEBRATED_LEVEL = intPreferencesKey("gamification_last_celebrated_level")
 /** Sentinel meaning the level-up celebration baseline was never set (seed-without-celebrating). */
 private const val LAST_CELEBRATED_LEVEL_UNINITIALIZED = -1
+
+/**
+ * Removes every account-scoped gamification key from the shared `user_prefs` file. Also called
+ * by the Room destructive-migration callback, where no [UserPreferencesDataStore] exists yet.
+ */
+internal suspend fun clearGamificationPreferences(context: Context) {
+    context.userPrefsDataStore.edit { prefs ->
+        listOf(
+            KEY_EQUIPPED_TITLE,
+            KEY_EQUIPPED_BADGES,
+            KEY_EQUIPPED_AVATAR_FRAME,
+            KEY_EQUIPPED_RING_STYLE,
+            KEY_GAMIFICATION_OWNER_USER_ID,
+            KEY_GAMIFICATION_VERIFIED_GUEST,
+        ).forEach { prefs.remove(it) }
+        // Absent reads as the -1 sentinel, so the next observer seeds the baseline without a burst.
+        prefs.remove(KEY_LAST_CELEBRATED_LEVEL)
+        prefs.remove(KEY_GAMIFICATION_BACKFILL_DONE)
+        prefs.asMap().keys
+            .filter { key -> GAMIFICATION_WATERMARK_PREFIXES.any { key.name.startsWith(it) } }
+            .forEach { key ->
+                @Suppress("UNCHECKED_CAST")
+                prefs.remove(key as Preferences.Key<Any>)
+            }
+    }
+}
 
 // ── Deck Doctor: scoring-weight overrides (debug-only tuning) ─────────────────
 // Seven independent nullable Float overrides for the engine ScoreWeights. Absent key = use the
@@ -197,6 +244,14 @@ private val KEY_TRADE_LIST_PUBLIC  = booleanPreferencesKey("trade_list_public")
 private data class UdtRecord(val k: String, val l: String, val c: String)
 private val udtListType = object : TypeToken<List<UdtRecord>>() {}.type
 private val gson = Gson()
+private val mechanicCheckpointListType = object : TypeToken<List<CardMechanicRefreshCheckpoint>>() {}.type
+
+data class CardMechanicRefreshCheckpoint(
+    val ownerUserId: String = "",
+    val signature: String = "",
+    val cursor: String = "",
+    val complete: Boolean = false,
+)
 
 @Singleton
 class UserPreferencesDataStore @Inject constructor(
@@ -235,9 +290,8 @@ class UserPreferencesDataStore @Inject constructor(
 
     override suspend fun setAppLanguage(language: AppLanguage) {
         context.userPrefsDataStore.edit { it[KEY_APP_LANGUAGE] = language.code }
-        // Use commit() (blocking) instead of apply() so the write is guaranteed to
-        // be on disk before SettingsViewModel emits appLanguageChanged and the
-        // Activity restarts and reads the value in attachBaseContext.
+        // Legacy mirror kept only so an older install's stored value can still be read/cleared;
+        // MainActivity no longer honours it (the app is English-only).
         context.getSharedPreferences("user_prefs_lang_sync", Context.MODE_PRIVATE)
             .edit()
             .putString("app_language_sync", language.code)
@@ -393,9 +447,9 @@ class UserPreferencesDataStore @Inject constructor(
 
     // ── Avatar URL ────────────────────────────────────────────────────────────
 
-    val avatarUrlFlow: Flow<String?> = context.userPrefsDataStore.data
+    val avatarUrlFlow: Flow<String?> = safeData
         .map { it[AVATAR_URL_KEY] }
-        .catch { emit(null) }
+        .distinctUntilChanged()
 
     suspend fun saveAvatarUrl(url: String?) {
         context.userPrefsDataStore.edit { preferences ->
@@ -405,11 +459,27 @@ class UserPreferencesDataStore @Inject constructor(
                 preferences[AVATAR_URL_KEY] = url
         }
     }
-    val playerNameFlow: Flow<String> = context.userPrefsDataStore.data
-        .map { prefs -> prefs[KEY_PLAYER_NAME] ?: "Wizard" }
-        .catch { emit("Wizard") }
+    /**
+     * [DataStore.data] with read failures absorbed UPSTREAM of every `map`.
+     *
+     * `catch {}` placed after a `map` terminates the collector: one transient `IOException`
+     * (corrupt file, no disk space) permanently froze the screen observing it. Emitting empty
+     * preferences instead keeps the flow alive and falls back to defaults, and the failure is
+     * recorded rather than silently swallowed.
+     */
+    private val safeData: Flow<Preferences>
+        get() = context.userPrefsDataStore.data.catch { e ->
+            if (e is CancellationException) throw e
+            recordNonFatal("user_prefs_read_failed", e)
+            emit(emptyPreferences())
+        }
 
-    val themeFlow: Flow<AppTheme> = context.userPrefsDataStore.data
+    // distinctUntilChanged: any unrelated key write re-emits the whole DataStore (P-10).
+    val playerNameFlow: Flow<String> = safeData
+        .map { prefs -> prefs[KEY_PLAYER_NAME] ?: "Wizard" }
+        .distinctUntilChanged()
+
+    val themeFlow: Flow<AppTheme> = safeData
         .map { prefs ->
             when (prefs[KEY_APP_THEME]) {
                 "ARCANE_COSMOS"     -> AppTheme.ArcaneCosmos
@@ -437,13 +507,58 @@ class UserPreferencesDataStore @Inject constructor(
                 "PYROMANCER"        -> AppTheme.MedievalGrimoire
                 "HYDROMANCY"        -> AppTheme.GlacialEdge
 
-                else                -> AppTheme.ArcaneCosmos
+                else                -> AppTheme.Default
             }
         }
-        .catch { emit(AppTheme.ArcaneCosmos) }
 
     suspend fun savePlayerName(name: String) {
-        context.userPrefsDataStore.edit { it[KEY_PLAYER_NAME] = name }
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[KEY_PLAYER_NAME] = name
+        }
+    }
+
+    /** Marks identity explicitly created in a signed-out guest flow; owner absence alone is untrusted. */
+    suspend fun markProfileIdentityVerifiedGuest() {
+        context.userPrefsDataStore.edit { prefs ->
+            if (prefs[KEY_PROFILE_IDENTITY_OWNER] == null) {
+                prefs[KEY_PROFILE_IDENTITY_VERIFIED_GUEST] = true
+            }
+        }
+    }
+
+    suspend fun hasAccountProfileIdentity(): Boolean =
+        safeData.map { it[KEY_PROFILE_IDENTITY_OWNER] != null }.first()
+
+    /**
+     * Records [userId] as the account the cached nickname/avatar belong to. When a DIFFERENT account
+     * owned them, both are dropped first so the new account never inherits them (P-13). An ownerless
+     * legacy cache is untrusted; only an identity written as a verified guest survives first sign-in.
+     *
+     * @return true when a previous account's cached identity was dropped.
+     */
+    suspend fun claimProfileIdentity(userId: String): Boolean {
+        var wiped = false
+        context.userPrefsDataStore.edit { prefs ->
+            val owner = prefs[KEY_PROFILE_IDENTITY_OWNER]
+            if (shouldClearProfileIdentity(owner, userId, prefs[KEY_PROFILE_IDENTITY_VERIFIED_GUEST] == true)) {
+                prefs.remove(AVATAR_URL_KEY)
+                prefs.remove(KEY_PLAYER_NAME)
+                wiped = true
+            }
+            prefs[KEY_PROFILE_IDENTITY_OWNER] = userId
+            prefs.remove(KEY_PROFILE_IDENTITY_VERIFIED_GUEST)
+        }
+        return wiped
+    }
+
+    /** Drops the cached nickname, avatar and their owner (account deletion). */
+    suspend fun clearProfileIdentity() {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs.remove(AVATAR_URL_KEY)
+            prefs.remove(KEY_PLAYER_NAME)
+            prefs.remove(KEY_PROFILE_IDENTITY_OWNER)
+            prefs.remove(KEY_PROFILE_IDENTITY_VERIFIED_GUEST)
+        }
     }
 
     // ── Tag auto-tagger thresholds ────────────────────────────────────────────
@@ -473,6 +588,53 @@ class UserPreferencesDataStore @Inject constructor(
     suspend fun saveTagDictionaryOverrides(json: String) {
         context.userPrefsDataStore.edit { it[KEY_TAG_OVERRIDES_JSON] = json }
     }
+
+    val cardMechanicCatalogFlow: Flow<String> = context.userPrefsDataStore.data
+        .map { it[KEY_CARD_MECHANIC_CATALOG_JSON] ?: "[]" }
+
+    suspend fun saveCardMechanicCatalog(json: String) {
+        context.userPrefsDataStore.edit { it[KEY_CARD_MECHANIC_CATALOG_JSON] = json }
+    }
+
+    val cardMechanicRefreshCheckpointFlow: Flow<List<CardMechanicRefreshCheckpoint>> =
+        context.userPrefsDataStore.data.map { prefs ->
+            val legacy = CardMechanicRefreshCheckpoint(
+                ownerUserId = prefs[KEY_CARD_MECHANIC_REFRESH_OWNER].orEmpty(),
+                signature = prefs[KEY_CARD_MECHANIC_REFRESH_SIGNATURE].orEmpty(),
+                cursor = prefs[KEY_CARD_MECHANIC_REFRESH_CURSOR].orEmpty(),
+                complete = prefs[KEY_CARD_MECHANIC_REFRESH_COMPLETE] ?: false,
+            )
+            decodeMechanicCheckpoints(prefs[KEY_CARD_MECHANIC_REFRESH_CHECKPOINTS]).ifEmpty {
+                listOfNotNull(legacy.takeIf { it.ownerUserId.isNotBlank() && it.signature.isNotBlank() })
+            }
+        }
+
+    suspend fun saveCardMechanicRefreshCheckpoint(checkpoint: CardMechanicRefreshCheckpoint) {
+        context.userPrefsDataStore.edit { prefs ->
+            val saved = decodeMechanicCheckpoints(prefs[KEY_CARD_MECHANIC_REFRESH_CHECKPOINTS])
+            val legacy = CardMechanicRefreshCheckpoint(
+                ownerUserId = prefs[KEY_CARD_MECHANIC_REFRESH_OWNER].orEmpty(),
+                signature = prefs[KEY_CARD_MECHANIC_REFRESH_SIGNATURE].orEmpty(),
+                cursor = prefs[KEY_CARD_MECHANIC_REFRESH_CURSOR].orEmpty(),
+                complete = prefs[KEY_CARD_MECHANIC_REFRESH_COMPLETE] ?: false,
+            )
+            val previous = saved.ifEmpty {
+                listOfNotNull(legacy.takeIf { it.ownerUserId.isNotBlank() && it.signature.isNotBlank() })
+            }
+            prefs[KEY_CARD_MECHANIC_REFRESH_CHECKPOINTS] = gson.toJson(
+                previous.filterNot { it.ownerUserId == checkpoint.ownerUserId } + checkpoint,
+            )
+            prefs.remove(KEY_CARD_MECHANIC_REFRESH_OWNER)
+            prefs.remove(KEY_CARD_MECHANIC_REFRESH_SIGNATURE)
+            prefs.remove(KEY_CARD_MECHANIC_REFRESH_CURSOR)
+            prefs.remove(KEY_CARD_MECHANIC_REFRESH_COMPLETE)
+        }
+    }
+
+    private fun decodeMechanicCheckpoints(json: String?): List<CardMechanicRefreshCheckpoint> =
+        runCatching<List<CardMechanicRefreshCheckpoint>> {
+            gson.fromJson(json ?: "[]", mechanicCheckpointListType) ?: emptyList()
+        }.getOrDefault(emptyList())
 
     // ── User-defined tags ─────────────────────────────────────────────────────
 
@@ -635,15 +797,18 @@ class UserPreferencesDataStore @Inject constructor(
     }
 
     /**
-     * Master gamification switch. Default: false (OFF) because the gamification UI is hidden
-     * for this release (see docs/gamification-hidden-for-release.md). When false, all
-     * gamification UI (XP, levels, achievements, quests) is hidden — the engine keeps recording
-     * progress silently so re-enabling restores the user's true state (ADR-002 §"opt-out
-     * first-class"). To restore the feature, flip the default back to true / emit(true).
+     * The user's gamification opt-out. Default `true`: the release gate is
+     * `FeatureFlags.Gamification.ENABLED` + the remote kill switch, combined with this in
+     * `GamificationAvailability`, which every gate must consume instead of this raw pref.
      */
     val gamificationEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
-        .map { prefs -> prefs[KEY_GAMIFICATION_ENABLED] ?: false }
-        .catch { emit(false) }
+        .map { prefs -> prefs[KEY_GAMIFICATION_ENABLED] ?: true }
+        // Fail closed: an unreadable store must never switch the backend on.
+        .catch { e ->
+            if (e is CancellationException) throw e
+            recordNonFatal("gamification_pref_read_failed", e)
+            emit(false)
+        }
 
     /** Persists the master gamification switch. */
     suspend fun setGamificationEnabled(enabled: Boolean) {
@@ -660,9 +825,8 @@ class UserPreferencesDataStore @Inject constructor(
      * result while this is off, same pattern as `CommunityAggregateRepositoryImpl`. To enable,
      * flip the default to true / emit(true).
      */
-    val competitiveEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
+    val competitiveEnabledFlow: Flow<Boolean> = safeData
         .map { prefs -> prefs[KEY_COMPETITIVE_ENABLED] ?: false }
-        .catch { emit(false) }
 
     /** Persists the master Competitive feature switch. */
     suspend fun setCompetitiveEnabled(enabled: Boolean) {
@@ -679,22 +843,54 @@ class UserPreferencesDataStore @Inject constructor(
         context.userPrefsDataStore.edit { it[KEY_COMPETITIVE_POSTAL_CODE] = postalCode }
     }
 
-    /**
-     * One-shot guard for the Family-A achievement backfill (ADR-002 §4). Emits false until the
-     * backfill has run, then true forever — so retroactive unlocks are computed exactly once.
-     */
-    val gamificationBackfillDoneFlow: Flow<Boolean> = context.userPrefsDataStore.data
-        .map { prefs -> prefs[KEY_GAMIFICATION_BACKFILL_DONE] ?: false }
-        .catch { emit(false) }
+    /** Account that owns the local gamification store, or null for a guest-owned store (D3). */
+    suspend fun getGamificationOwnerUserId(): String? =
+        context.userPrefsDataStore.data.map { it[KEY_GAMIFICATION_OWNER_USER_ID] }.first()
 
-    /** Reads the backfill-done flag once (snapshot), for the app-start orchestrator. */
-    suspend fun isGamificationBackfillDone(): Boolean =
-        context.userPrefsDataStore.data.map { it[KEY_GAMIFICATION_BACKFILL_DONE] ?: false }.first()
+    val gamificationOwnerUserIdFlow: Flow<String?> = safeData
+        .map { it[KEY_GAMIFICATION_OWNER_USER_ID] }
+        .distinctUntilChanged()
 
-    /** Marks the Family-A achievement backfill as complete (never re-runs after this). */
-    suspend fun setGamificationBackfillDone() {
-        context.userPrefsDataStore.edit { it[KEY_GAMIFICATION_BACKFILL_DONE] = true }
+    val gamificationVerifiedGuestFlow: Flow<Boolean> = safeData
+        .map { it[KEY_GAMIFICATION_VERIFIED_GUEST] == true }
+        .distinctUntilChanged()
+
+    /** True only after an explicit signed-out lifecycle has quarantined legacy ownerless rows. */
+    suspend fun isGamificationVerifiedGuest(): Boolean =
+        context.userPrefsDataStore.data.map { it[KEY_GAMIFICATION_VERIFIED_GUEST] == true }.first()
+
+    suspend fun markGamificationVerifiedGuest() {
+        context.userPrefsDataStore.edit { it[KEY_GAMIFICATION_VERIFIED_GUEST] = true }
     }
+
+    /** The account whose rows the local friends cache holds, or null when it holds none. */
+    suspend fun getFriendsCacheOwnerUserId(): String? =
+        context.userPrefsDataStore.data.map { it[KEY_FRIENDS_CACHE_OWNER_USER_ID] }.first()
+
+    /** Records [userId] as the friends cache owner; null marks the cache as belonging to nobody. */
+    suspend fun setFriendsCacheOwnerUserId(userId: String?) {
+        context.userPrefsDataStore.edit { prefs ->
+            if (userId == null) prefs.remove(KEY_FRIENDS_CACHE_OWNER_USER_ID)
+            else prefs[KEY_FRIENDS_CACHE_OWNER_USER_ID] = userId
+        }
+    }
+
+    /** Persists [userId] as the owner of the local gamification store; null marks it guest-owned. */
+    suspend fun setGamificationOwnerUserId(userId: String?) {
+        context.userPrefsDataStore.edit { prefs ->
+            if (userId == null) prefs.remove(KEY_GAMIFICATION_OWNER_USER_ID)
+            else {
+                prefs[KEY_GAMIFICATION_OWNER_USER_ID] = userId
+                prefs.remove(KEY_GAMIFICATION_VERIFIED_GUEST)
+            }
+        }
+    }
+
+    /**
+     * Drops every account-scoped gamification preference (equipped cosmetics, celebration baseline,
+     * owner, sync watermarks). Keeps the user opt-out and the per-install device id.
+     */
+    suspend fun clearGamificationLocalState() = clearGamificationPreferences(context)
 
     /**
      * Returns a stable, per-install device id used to seed deterministic quest generation for guests
@@ -835,9 +1031,8 @@ class UserPreferencesDataStore @Inject constructor(
     // Defaults: collection, wishlist, and trade list are all public (true) by default.
     // These match the Supabase column defaults in the `user_profiles` table.
 
-    val collectionPublicFlow: Flow<Boolean> = context.userPrefsDataStore.data
+    val collectionPublicFlow: Flow<Boolean> = safeData
         .map { prefs -> prefs[KEY_COLLECTION_PUBLIC] ?: true }
-        .catch { emit(true) }
 
     val wishlistPublicFlow: Flow<Boolean> = context.userPrefsDataStore.data
         .map { prefs -> prefs[KEY_WISHLIST_PUBLIC] ?: true }
@@ -855,27 +1050,31 @@ class UserPreferencesDataStore @Inject constructor(
         context.userPrefsDataStore.edit { it[KEY_WISHLIST_PUBLIC] = value }
     }
 
+    /** Mirrors the server-side privacy columns after a profile load; a null flag leaves its key untouched. */
+    suspend fun savePrivacyFlags(collectionPublic: Boolean?, wishlistPublic: Boolean?, tradeListPublic: Boolean?) {
+        if (collectionPublic == null && wishlistPublic == null && tradeListPublic == null) return
+        context.userPrefsDataStore.edit { prefs ->
+            collectionPublic?.let { prefs[KEY_COLLECTION_PUBLIC] = it }
+            wishlistPublic?.let { prefs[KEY_WISHLIST_PUBLIC] = it }
+            tradeListPublic?.let { prefs[KEY_TRADE_LIST_PUBLIC] = it }
+        }
+    }
+
+    /** Drops the cached privacy flags so the next account starts from the server defaults. */
+    suspend fun clearPrivacyFlags() {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs.remove(KEY_COLLECTION_PUBLIC)
+            prefs.remove(KEY_WISHLIST_PUBLIC)
+            prefs.remove(KEY_TRADE_LIST_PUBLIC)
+        }
+    }
+
     suspend fun saveTradeListPublic(value: Boolean) {
         context.userPrefsDataStore.edit { it[KEY_TRADE_LIST_PUBLIC] = value }
     }
 
     suspend fun saveTheme(theme: AppTheme) {
-        context.userPrefsDataStore.edit { prefs ->
-            prefs[KEY_APP_THEME] = when (theme) {
-                AppTheme.NeonVoid         -> "NEON_VOID"
-                AppTheme.MedievalGrimoire -> "MEDIEVAL_GRIMOIRE"
-                AppTheme.ArcaneCosmos     -> "ARCANE_COSMOS"
-                AppTheme.ForestMurmur     -> "FOREST_MURMUR"
-                AppTheme.AncientOak       -> "ANCIENT_OAK"
-                AppTheme.HallowedPrint    -> "HALLOWED_PRINT"
-                AppTheme.AzureFlux        -> "AZURE_FLUX"
-                AppTheme.PlanarVeil       -> "PLANAR_VEIL"
-                AppTheme.VenomShade       -> "VENOM_SHADE"
-                AppTheme.GlacialEdge      -> "GLACIAL_EDGE"
-                AppTheme.DuskEmber        -> "DUSK_EMBER"
-                AppTheme.OnyxNoir         -> "ONYX_NOIR"
-            }
-        }
+        context.userPrefsDataStore.edit { prefs -> prefs[KEY_APP_THEME] = theme.persistKey }
     }
 
     // ── Home dashboard: Quick Start customization ──────────────────────────────
@@ -892,7 +1091,7 @@ class UserPreferencesDataStore @Inject constructor(
      * is padded with items from [QuickStartAction.defaults] (in defaults order, skipping
      * duplicates) so the grid always shows exactly 4 shortcuts. */
     fun observeQuickStartActions(): Flow<List<QuickStartAction>> =
-        context.userPrefsDataStore.data
+        safeData
             .map { prefs ->
                 val raw = prefs[KEY_QUICK_START_ORDER]
                 val parsed = raw
@@ -900,6 +1099,8 @@ class UserPreferencesDataStore @Inject constructor(
                     ?.map { it.trim() }
                     ?.filter { it.isNotEmpty() }
                     ?.mapNotNull { QuickStartAction.fromPersistedId(it) }
+                    // A corrupt/legacy string could repeat an id, which would also collide on the grid's stable key.
+                    ?.distinct()
                     ?: emptyList()
                 if (parsed.size >= 4) {
                     parsed
@@ -912,7 +1113,6 @@ class UserPreferencesDataStore @Inject constructor(
                     result
                 }
             }
-            .catch { emit(QuickStartAction.defaults) }
 
     /** Persists the chosen Quick Start actions as an ordered persistedId string. */
     suspend fun saveQuickStartActions(actions: List<QuickStartAction>) {
@@ -930,14 +1130,24 @@ class UserPreferencesDataStore @Inject constructor(
         }
     }
 
-    /** Emits true while the account nudge is still within its 48-hour cooldown. */
+    /**
+     * Emits true while the account nudge is still within its 48-hour cooldown, and flips to false
+     * by itself when the cooldown elapses (not only on the next preference write).
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun isNudgeCoolingDown(): Flow<Boolean> =
-        context.userPrefsDataStore.data
-            .map { prefs ->
-                val dismissedAt = prefs[KEY_ACCOUNT_NUDGE_DISMISSED_AT] ?: 0L
-                System.currentTimeMillis() - dismissedAt < ACCOUNT_NUDGE_COOLDOWN_MS
+        safeData
+            .map { prefs -> prefs[KEY_ACCOUNT_NUDGE_DISMISSED_AT] ?: 0L }
+            .distinctUntilChanged()
+            .transformLatest { dismissedAt ->
+                val remainingMs = ACCOUNT_NUDGE_COOLDOWN_MS - (System.currentTimeMillis() - dismissedAt)
+                if (remainingMs > 0) {
+                    emit(true)
+                    delay(remainingMs)
+                }
+                emit(false)
             }
-            .catch { emit(false) }
+            .distinctUntilChanged()
 
     // ── Home widget layout ────────────────────────────────────────────────────
     //
@@ -960,32 +1170,50 @@ class UserPreferencesDataStore @Inject constructor(
      *  this DataStore stays unaware of which default applies.
      */
     fun homeLayoutFlow(defaultLayout: List<PersistedWidget>): Flow<List<PersistedWidget>> =
-        context.userPrefsDataStore.data
-            .map { prefs ->
-                val raw = prefs[KEY_HOME_LAYOUT]
-                val parsed = raw
-                    ?.split(",")
-                    ?.mapNotNull { token -> decodeWidgetToken(token) }
-                    ?: emptyList()
-                // Deduplicate by persistedId: a corrupt stored string could produce two
-                // widgets with the same key, crashing the LazyVerticalGrid.
-                parsed.distinctBy { it.persistedId }.ifEmpty { defaultLayout.distinctBy { it.persistedId } }
-            }
-            .catch { emit(defaultLayout) }
+        safeData.map { prefs -> decodeHomeLayout(prefs[KEY_HOME_LAYOUT], defaultLayout) }
 
     /** Persists [layout] as an ordered "persistedId:SIZE_NAME" token string. */
     suspend fun saveHomeLayout(layout: List<PersistedWidget>) {
         context.userPrefsDataStore.edit { prefs ->
-            prefs[KEY_HOME_LAYOUT] = layout.joinToString(",") { widget ->
-                "${widget.persistedId}:${widget.size.name}"
-            }
+            prefs[KEY_HOME_LAYOUT] = encodeHomeLayout(layout)
         }
     }
 
+    /**
+     * Atomically rewrites the persisted layout from its CURRENT stored value: [transform] runs
+     * inside the DataStore edit on the decoded layout (or [defaultLayout] when nothing is stored),
+     * so two rapid mutations can never both start from the same stale snapshot and lose one.
+     */
+    suspend fun updateHomeLayout(
+        defaultLayout: List<PersistedWidget>,
+        transform: (List<PersistedWidget>) -> List<PersistedWidget>,
+    ) {
+        context.userPrefsDataStore.edit { prefs ->
+            val current = decodeHomeLayout(prefs[KEY_HOME_LAYOUT], defaultLayout)
+            val updated = transform(current).distinctBy { it.persistedId }
+            if (updated != current) prefs[KEY_HOME_LAYOUT] = encodeHomeLayout(updated)
+        }
+    }
+
+    private fun decodeHomeLayout(
+        raw: String?,
+        defaultLayout: List<PersistedWidget>,
+    ): List<PersistedWidget> {
+        val parsed = raw
+            ?.split(",")
+            ?.mapNotNull { token -> decodeWidgetToken(token) }
+            ?: emptyList()
+        // A corrupt stored string could produce two widgets with the same key, crashing the grid.
+        return parsed.distinctBy { it.persistedId }
+            .ifEmpty { defaultLayout.distinctBy { it.persistedId } }
+    }
+
+    private fun encodeHomeLayout(layout: List<PersistedWidget>): String =
+        layout.joinToString(",") { widget -> "${widget.persistedId}:${widget.size.name}" }
+
     /** Emits whether the customization coach-mark has already been shown. */
-    val homeCoachmarkSeenFlow: Flow<Boolean> = context.userPrefsDataStore.data
+    val homeCoachmarkSeenFlow: Flow<Boolean> = safeData
         .map { it[KEY_HOME_COACHMARK_SEEN] ?: false }
-        .catch { emit(false) }
 
     /** Marks the customization coach-mark as seen so it never shows again. */
     suspend fun markHomeCoachmarkSeen() {
@@ -996,9 +1224,8 @@ class UserPreferencesDataStore @Inject constructor(
      * Emits whether the First Steps "You're all set!" completion card has already been shown
      * once (Home widget board overhaul, TASK 3).
      */
-    val firstStepsCompletionSeenFlow: Flow<Boolean> = context.userPrefsDataStore.data
+    val firstStepsCompletionSeenFlow: Flow<Boolean> = safeData
         .map { it[KEY_FIRST_STEPS_COMPLETION_SEEN] ?: false }
-        .catch { emit(false) }
 
     /** Marks the First Steps completion card as seen so it stops occupying the hero slot. */
     suspend fun markFirstStepsCompletionSeen() {
@@ -1010,13 +1237,28 @@ class UserPreferencesDataStore @Inject constructor(
      * never chosen (the caller defaults to [com.mmg.manahub.feature.home.presentation
      * .HomeCommunityDeckCategory.POPULAR]).
      */
-    val homeCommunityDecksCategoryFlow: Flow<String?> = context.userPrefsDataStore.data
+    val homeCommunityDecksCategoryFlow: Flow<String?> = safeData
         .map { it[KEY_HOME_COMMUNITY_DECKS_CATEGORY] }
-        .catch { emit(null) }
 
     /** Persists [categoryId] (a [com.mmg.manahub.feature.home.presentation.HomeCommunityDeckCategory.persistedId]). */
     suspend fun saveHomeCommunityDecksCategory(categoryId: String) {
         context.userPrefsDataStore.edit { it[KEY_HOME_COMMUNITY_DECKS_CATEGORY] = categoryId }
+    }
+
+    /**
+     * Emits the persisted format filter of the Home COMMUNITY_DECKS widget as the enum name of
+     * `CommunityDeckFormatFilter`, or null when never chosen / cleared (= every format). The caller
+     * resolves unknown names to that same default.
+     */
+    val homeCommunityDecksFormatFlow: Flow<String?> = safeData
+        .map { it[KEY_HOME_COMMUNITY_DECKS_FORMAT] }
+
+    /** Persists [formatName] (a `CommunityDeckFormatFilter` enum name); null clears the filter. */
+    suspend fun saveHomeCommunityDecksFormat(formatName: String?) {
+        context.userPrefsDataStore.edit { prefs ->
+            if (formatName == null) prefs.remove(KEY_HOME_COMMUNITY_DECKS_FORMAT)
+            else prefs[KEY_HOME_COMMUNITY_DECKS_FORMAT] = formatName
+        }
     }
 
     /**
@@ -1044,7 +1286,7 @@ class UserPreferencesDataStore @Inject constructor(
      * carousel. An empty set means no steps have been skipped yet.
      */
     fun observeSkippedFirstSteps(): Flow<Set<String>> =
-        context.userPrefsDataStore.data
+        safeData
             .map { prefs ->
                 prefs[KEY_FIRST_STEPS_SKIPPED]
                     ?.split(",")
@@ -1052,7 +1294,6 @@ class UserPreferencesDataStore @Inject constructor(
                     ?.toSet()
                     ?: emptySet()
             }
-            .catch { emit(emptySet()) }
 
     /**
      * Persists [stepId] as skipped. Idempotent: adding an already-present id is a no-op.

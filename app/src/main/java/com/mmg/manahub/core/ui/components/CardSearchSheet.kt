@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -138,11 +140,10 @@ fun CardSearchSheet(
     initialAdvancedQuery: AdvancedSearchQuery? = null,
     /**
      * Structured-search sink: invoked once for a non-empty [initialAdvancedQuery], and again
-     * whenever the user presses SEARCH CARDS inside [AdvancedSearchSheet]. `null` (default) falls
-     * back to the legacy `onScryfallSearch(rawQuery)` route for callers with no structured
-     * handler (Trades), which writes the raw Scryfall string into the visible search bar.
+     * whenever the user presses SEARCH CARDS inside [AdvancedSearchSheet]. The structured
+     * criteria remain separate from the visible search text.
      */
-    onAdvancedSearch: ((AdvancedSearchQuery) -> Unit)? = null,
+    onAdvancedSearch: (AdvancedSearchQuery) -> Unit,
     /**
      * The structured query the caller currently has APPLIED (e.g. `DeckStudioUiState
      * .activeCollectionQuery`), forwarded to [AdvancedSearchSheet] so its shared ViewModel is
@@ -171,6 +172,10 @@ fun CardSearchSheet(
      */
     selectedTabIndex: Int? = null,
     onSelectedTabChange: (Int) -> Unit = {},
+    /** Extra lazy items after [offerResults] in the Offer tab, e.g. a paging footer. */
+    offerResultsFooter: (LazyListScope.() -> Unit)? = null,
+    /** Replaces the "no cards" text in the All Cards tab while the last search failed. */
+    scryfallErrorContent: (@Composable () -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -193,6 +198,7 @@ fun CardSearchSheet(
         onSelectedTabChange(tab)
     }
     var showAdvancedSearch by remember { mutableStateOf(false) }
+    var presetApplied by remember { mutableStateOf(false) }
 
     // Tab indices shift by one when the Wishlist tab (Trades feature) is present.
     val scryfallTabIndex = if (showWishlistTab) 2 else 1
@@ -204,7 +210,8 @@ fun CardSearchSheet(
     LaunchedEffect(initialAdvancedQuery) {
         if (initialAdvancedQuery != null && !initialAdvancedQuery.isEmpty()) {
             if (selectedTabIndex == null) setSelectedTab(scryfallTabIndex)
-            onAdvancedSearch?.invoke(initialAdvancedQuery)
+            onAdvancedSearch(initialAdvancedQuery)
+            presetApplied = true
         }
     }
     LaunchedEffect(initialCollectionTagKeys) {
@@ -247,17 +254,12 @@ fun CardSearchSheet(
             onDismiss = { showAdvancedSearch = false },
             onSearch = { advancedQuery, rawQuery ->
                 showAdvancedSearch = false
-                if (onAdvancedSearch != null) {
-                    // Structured route: the search bar stays clean and BOTH tabs honor the query,
-                    // so the user's current tab is left alone.
-                    onAdvancedSearch(advancedQuery)
-                } else {
-                    setSelectedTab(scryfallTabIndex)
-                    onScryfallSearch(rawQuery)
-                }
+                onAdvancedSearch(advancedQuery)
                 forceHideKeyboard()
             },
-            appliedQuery = appliedAdvancedQuery ?: initialAdvancedQuery,
+            onClear = onAdvancedSearch,
+            stateKey = "card_search_sheet",
+            appliedQuery = appliedAdvancedQuery ?: initialAdvancedQuery.takeUnless { presetApplied },
         )
     }
 
@@ -464,6 +466,7 @@ fun CardSearchSheet(
                                 )
                             }
                         }
+                        offerResultsFooter?.invoke(this)
 
                         if (addCardsResults.isNotEmpty()) {
                             if (offerResults.isNotEmpty()) {
@@ -512,12 +515,20 @@ fun CardSearchSheet(
                         selectedTab == collectionTabIndex -> isSearchingCards
                         else -> isSearchingScryfall
                     }
-                    if (!isSearching) {
-                        item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
+                    // Deck Wizard v4, W4.3 (G7): a search in flight used to render NOTHING here --
+                    // reading as "no results" (a lie) until the leading-icon spinner in the text
+                    // field, easy to miss, finished. Loading/empty/content are now each their own
+                    // distinguishable state in the results area itself.
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSearching) {
+                                MagicLoadingSpinner()
+                            } else if (selectedTab == scryfallTabIndex && scryfallErrorContent != null) {
+                                scryfallErrorContent()
+                            } else {
                                 Text(
                                     text = if (selectedTab == scryfallTabIndex && query.isBlank())
                                         stringResource(R.string.deckbuilder_add_cards_search_hint)

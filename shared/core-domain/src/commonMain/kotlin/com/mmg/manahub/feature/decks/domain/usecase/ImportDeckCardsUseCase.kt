@@ -6,6 +6,7 @@ import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CommunityDeck
 import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.DeckCreationSource
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
 import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
@@ -148,7 +149,9 @@ class ImportDeckCardsUseCase(
             is ImportSource.DeckstatsUrl -> parseDeckstatsUrlSource(source.url)
                 ?: return ImportOutcome.Error("Couldn't read this deckstats.net deck — check the URL or try again later.")
         }
-        return writeImport(parsed, targetDeckId, onProgress)
+        val creationSource =
+            if (source is ImportSource.FromCommunityDeck) DeckCreationSource.COMMUNITY else DeckCreationSource.IMPORT
+        return writeImport(parsed, targetDeckId, creationSource, onProgress)
     }
 
     // ── Per-source parsing → a common internal representation ──────────────────────
@@ -301,6 +304,7 @@ class ImportDeckCardsUseCase(
     private suspend fun writeImport(
         parsed: ParsedImport,
         targetDeckId: String?,
+        creationSource: DeckCreationSource,
         onProgress: (resolved: Int, total: Int) -> Unit,
     ): ImportOutcome {
         return try {
@@ -316,6 +320,7 @@ class ImportDeckCardsUseCase(
                     name = parsed.suggestedName ?: DEFAULT_DECK_NAME,
                     description = parsed.suggestedDescription ?: DEFAULT_DECK_DESCRIPTION,
                     format = parsed.suggestedFormat ?: "casual",
+                    source = creationSource,
                 )
             } catch (t: Throwable) {
                 crashReporter.log("deck_import_create_failed")
@@ -334,6 +339,8 @@ class ImportDeckCardsUseCase(
                     slots = resolution.resolvedCards.map { Triple(it.card.scryfallId, it.quantity, it.isSideboard) },
                 )
             } else {
+                // Importing into a still-empty draft makes it an imported deck (0 XP), not a built one.
+                if (resolution.resolvedCards.isNotEmpty()) deckRepository.tagDeckCreationSource(deckId, creationSource)
                 resolution.resolvedCards.forEach { resolved ->
                     deckRepository.addCardToDeck(
                         deckId = deckId,

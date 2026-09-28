@@ -325,4 +325,73 @@ class TournamentEngineTest {
         assertEquals(1, standings[0].position)
         assertEquals(2, standings[1].position)
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  StandingsCalculator — terminal tiebreakers (head-to-head, seed, shared first)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `Standings three-way cycle is ordered by seed and every leader is flagged shared first`() {
+        // A beats B, B beats C, C beats A: identical points/OMW/GW/OGW and 1 head-to-head win each,
+        // so only seed can separate them — the winner banner must show a tie, not a champion.
+        val a = player(1); val b = player(2); val c = player(3)
+        val matches = listOf(
+            finishedMatch(1, 1, 2, winnerId = 1),
+            finishedMatch(2, 2, 3, winnerId = 2),
+            finishedMatch(3, 3, 1, winnerId = 3),
+        )
+
+        val standings = StandingsCalculator.calculate(listOf(c, a, b), matches)   // deliberately unsorted input
+
+        assertEquals(listOf(1L, 2L, 3L), standings.map { it.player.id })
+        assertTrue("Every member of an unbreakable top tie must be shared first", standings.all { it.isSharedFirst })
+    }
+
+    @Test
+    fun `Standings input order does not change the result`() {
+        val a = player(1); val b = player(2); val c = player(3)
+        val matches = listOf(
+            finishedMatch(1, 1, 2, winnerId = 1),
+            finishedMatch(2, 2, 3, winnerId = 2),
+            finishedMatch(3, 3, 1, winnerId = 3),
+        )
+
+        val forward  = StandingsCalculator.calculate(listOf(a, b, c), matches).map { it.player.id }
+        val reversed = StandingsCalculator.calculate(listOf(c, b, a), matches).map { it.player.id }
+
+        assertEquals(forward, reversed)
+    }
+
+    @Test
+    fun `Standings head-to-head breaks a two-way tie before seed`() {
+        // Both beat the same outside opponent once and split nothing else, but B beat A directly:
+        // B must rank first despite the higher seed number.
+        val a = player(1); val b = player(2); val filler1 = player(3); val filler2 = player(4)
+        val matches = listOf(
+            finishedMatch(1, 1, 3, winnerId = 1),
+            finishedMatch(2, 2, 4, winnerId = 2),
+            finishedMatch(3, 3, 4, winnerId = 3),
+            finishedMatch(4, 4, 3, winnerId = 4, round = 2),
+            finishedMatch(5, 2, 1, winnerId = 2, round = 2),
+            finishedMatch(6, 1, 2, winnerId = 2, round = 3),
+        )
+
+        val standings = StandingsCalculator.calculate(listOf(a, b, filler1, filler2), matches)
+
+        val aPos = standings.indexOfFirst { it.player.id == 1L }
+        val bPos = standings.indexOfFirst { it.player.id == 2L }
+        assertTrue("B won both head-to-head matches, so B must outrank A", bPos < aPos)
+    }
+
+    @Test
+    fun `Standings single leader is never flagged shared first`() {
+        val a = player(1); val b = player(2)
+        val standings = StandingsCalculator.calculate(
+            listOf(a, b),
+            listOf(finishedMatch(1, 1, 2, winnerId = 1)),
+        )
+
+        assertEquals(1L, standings.first().player.id)
+        assertFalse(standings.any { it.isSharedFirst })
+    }
 }

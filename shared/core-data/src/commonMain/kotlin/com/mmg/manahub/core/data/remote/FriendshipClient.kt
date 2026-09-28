@@ -3,12 +3,15 @@ package com.mmg.manahub.core.data.remote
 import com.mmg.manahub.core.data.remote.dto.AcceptInviteRequestDto
 import com.mmg.manahub.core.data.remote.dto.AcceptInviteResultDto
 import com.mmg.manahub.core.data.remote.dto.FriendCardDto
+import com.mmg.manahub.core.data.remote.dto.FriendCardSearchRowDto
+import com.mmg.manahub.core.data.remote.dto.FriendListUnindexedCountRequestDto
 import com.mmg.manahub.core.data.remote.dto.FriendMatchHistoryDto
 import com.mmg.manahub.core.data.remote.dto.FriendStatsDto
 import com.mmg.manahub.core.data.remote.dto.FriendshipDto
 import com.mmg.manahub.core.data.remote.dto.GetFriendCollectionRequestDto
 import com.mmg.manahub.core.data.remote.dto.GetFriendMatchHistoryRequestDto
 import com.mmg.manahub.core.data.remote.dto.ReferralCodeDto
+import com.mmg.manahub.core.data.remote.dto.SearchFriendCardsRequestDto
 import com.mmg.manahub.core.data.remote.dto.SendFriendRequestDto
 import com.mmg.manahub.core.data.remote.dto.UpdateFriendshipStatusDto
 import com.mmg.manahub.core.data.remote.dto.UpsertCollectionStatsDto
@@ -16,6 +19,7 @@ import com.mmg.manahub.core.data.remote.dto.UserSearchResultDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
@@ -25,42 +29,61 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
+private const val FRIENDSHIP_COLUMNS = "id,user_id_1,user_id_2,status,created_at"
+
 class FriendshipClient(
     private val httpClient: HttpClient,
     private val baseUrl: String,
 ) {
+    /** One keyset page ordered by `id`; [afterId] is the last id of the previous page. */
     suspend fun getFriendships(
         statusFilter: String = "eq.ACCEPTED",
-        select: String = "id,user_id_1,user_id_2,status,created_at",
+        select: String = FRIENDSHIP_COLUMNS,
         or: String,
+        afterId: String? = null,
+        limit: Int? = null,
     ): List<FriendshipDto> =
         httpClient.get("${baseUrl}friendships") {
             parameter("status", statusFilter)
             parameter("select", select)
             parameter("or", or)
+            keysetPage(afterId, limit)
         }.body()
 
     suspend fun getPendingRequests(
         userId2Filter: String,
         statusFilter: String = "eq.PENDING",
-        select: String = "id,user_id_1,user_id_2,status,created_at",
+        select: String = FRIENDSHIP_COLUMNS,
+        afterId: String? = null,
+        limit: Int? = null,
     ): List<FriendshipDto> =
         httpClient.get("${baseUrl}friendships") {
             parameter("user_id_2", userId2Filter)
             parameter("status", statusFilter)
             parameter("select", select)
+            keysetPage(afterId, limit)
         }.body()
 
     suspend fun getOutgoingPendingRequests(
         userId1Filter: String,
         statusFilter: String = "eq.PENDING",
-        select: String = "id,user_id_1,user_id_2,status,created_at",
+        select: String = FRIENDSHIP_COLUMNS,
+        afterId: String? = null,
+        limit: Int? = null,
     ): List<FriendshipDto> =
         httpClient.get("${baseUrl}friendships") {
             parameter("user_id_1", userId1Filter)
             parameter("status", statusFilter)
             parameter("select", select)
+            keysetPage(afterId, limit)
         }.body()
+
+    private fun HttpRequestBuilder.keysetPage(afterId: String?, limit: Int?) {
+        if (limit == null) return
+        parameter("order", "id.asc")
+        parameter("limit", limit)
+        if (afterId != null) parameter("id", "gt.$afterId")
+    }
 
     suspend fun searchByGameTag(
         gameTagFilter: String,
@@ -82,24 +105,30 @@ class FriendshipClient(
         }
     }
 
+    /** PATCHes the matching rows and returns them; an empty list means no row was changed. */
     suspend fun updateFriendshipStatus(
         idFilter: String,
-        prefer: String = "return=minimal",
         body: UpdateFriendshipStatusDto,
-    ) {
+        select: String = FRIENDSHIP_COLUMNS,
+    ): List<FriendshipDto> =
         httpClient.patch("${baseUrl}friendships") {
             parameter("id", idFilter)
-            header("Prefer", prefer)
+            parameter("select", select)
+            header("Prefer", "return=representation")
             contentType(ContentType.Application.Json)
             setBody(body)
-        }
-    }
+        }.body()
 
-    suspend fun deleteFriendship(idFilter: String) {
+    /** DELETEs the matching rows and returns them; an empty list means nothing was deleted. */
+    suspend fun deleteFriendship(
+        idFilter: String,
+        select: String = FRIENDSHIP_COLUMNS,
+    ): List<FriendshipDto> =
         httpClient.delete("${baseUrl}friendships") {
             parameter("id", idFilter)
-        }
-    }
+            parameter("select", select)
+            header("Prefer", "return=representation")
+        }.body()
 
     suspend fun getProfilesByIds(
         idFilter: String,
@@ -124,6 +153,18 @@ class FriendshipClient(
 
     suspend fun getFriendCollection(body: GetFriendCollectionRequestDto): List<FriendCardDto> =
         httpClient.post("${baseUrl}rpc/get_friend_collection") {
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }.body()
+
+    suspend fun searchFriendCards(body: SearchFriendCardsRequestDto): List<FriendCardSearchRowDto> =
+        httpClient.post("${baseUrl}rpc/search_friend_cards") {
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }.body()
+
+    suspend fun friendListUnindexedCount(body: FriendListUnindexedCountRequestDto): Int =
+        httpClient.post("${baseUrl}rpc/friend_list_unindexed_count") {
             contentType(ContentType.Application.Json)
             setBody(body)
         }.body()

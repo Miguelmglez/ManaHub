@@ -76,7 +76,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -118,6 +117,7 @@ import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.PlayerEditSheet
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
+import com.mmg.manahub.core.ui.theme.swatchOutline
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -147,6 +147,7 @@ import kotlinx.coroutines.launch
  * @param onOnlineJoinGameStart Called after online session join succeeds (join path).
  * @param onNavigateToTournamentSetup Called when the user wants to create a local tournament.
  * @param onNavigateToTournamentDetail Called with a tournament ID to open an existing tournament.
+ * @param onNavigateToTournamentList Called to open the full tournament list.
  * @param prefilledJoinCode Optional 6-digit code arriving from a deep link to auto-open the join sheet.
  * @param onNavigateToTournament Legacy no-op callback kept for backward compatibility.
  * @param onNavigateToOnline Legacy no-op callback kept for backward compatibility.
@@ -161,6 +162,7 @@ fun GameSetupScreen(
     onOnlineJoinGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int, guestToken: String?) -> Unit,
     onNavigateToTournamentSetup: () -> Unit,
     onNavigateToTournamentDetail: (Long) -> Unit,
+    onNavigateToTournamentList: () -> Unit,
     prefilledJoinCode: String? = null,
     // Legacy callbacks kept for backward compatibility with any remaining call sites.
     onNavigateToTournament: () -> Unit = {},
@@ -179,6 +181,7 @@ fun GameSetupScreen(
         onOnlineJoinGameStart = onOnlineJoinGameStart,
         onNavigateToTournamentSetup = onNavigateToTournamentSetup,
         onNavigateToTournamentDetail = onNavigateToTournamentDetail,
+        onNavigateToTournamentList = onNavigateToTournamentList,
         prefilledJoinCode = prefilledJoinCode,
         onModeChange = viewModel::onModeChange,
         onPlayerCountChange = viewModel::onPlayerCountChange,
@@ -206,6 +209,7 @@ private fun GameSetupScreenContent(
     onOnlineJoinGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int, guestToken: String?) -> Unit,
     onNavigateToTournamentSetup: () -> Unit,
     onNavigateToTournamentDetail: (Long) -> Unit,
+    onNavigateToTournamentList: () -> Unit,
     prefilledJoinCode: String?,
     onModeChange: (GameMode) -> Unit,
     onPlayerCountChange: (Int) -> Unit,
@@ -427,7 +431,7 @@ private fun GameSetupScreenContent(
                     showTournamentsSheet = false
                     onNavigateToTournamentDetail(id)
                 },
-                onNavigateToTournamentList = { showTournamentsSheet = false; onNavigateToTournamentSetup() },
+                onNavigateToTournamentList = { showTournamentsSheet = false; onNavigateToTournamentList() },
                 onOnlineJoinGameStart = { sessionId, slotIndex, mode, playerCount, guestToken ->
                     showTournamentsSheet = false
                     onOnlineJoinGameStart(sessionId, slotIndex, mode, playerCount, guestToken)
@@ -594,7 +598,7 @@ private fun PlayerAvatarItem(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(4.dp)
-                            .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+                            .border(1.dp, mc.swatchOutline, CircleShape)
                     )
                 }
             }
@@ -644,7 +648,6 @@ private fun FriendsRoutingSheet(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val sheetState = rememberModalBottomSheetState(
-        confirmValueChange = { it != SheetValue.Hidden }
     )
 
     ModalBottomSheet(

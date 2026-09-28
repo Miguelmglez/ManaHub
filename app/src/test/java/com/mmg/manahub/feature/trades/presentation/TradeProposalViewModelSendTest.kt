@@ -41,6 +41,8 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -51,7 +53,7 @@ import org.junit.Test
  * Covers:
  *  - GROUP 1: onSendProposal — local validation sentinels (NOT_LOGGED_IN / NO_RECEIVER /
  *    SELF_TRADE / INITIAL_ASYMMETRY) map to the correct typed [ProposalEvent.ShowValidationError]
- *  - GROUP 2: onSaveDraft — the same local validation applies to the draft path
+ *  - GROUP 2: sending never creates a draft (autoSend is always true)
  *  - GROUP 3: onSendProposal — success branches (new proposal / edit / counter)
  *  - GROUP 4: onSendProposal — remote error mapping (typed [TradeError] vs untyped exception)
  *  - GROUP 5: §2.7 double-tap duplicate-proposal regression
@@ -121,6 +123,7 @@ class TradeProposalViewModelSendTest {
         editingProposalId: String? = null,
         parentProposalId: String? = null,
         rootProposalId: String? = null,
+        restoredState: SavedStateHandle? = null,
     ): TradeProposalViewModel {
         val args = buildMap<String, String> {
             if (receiverId.isNotBlank()) put("receiverId", receiverId)
@@ -129,7 +132,7 @@ class TradeProposalViewModelSendTest {
             rootProposalId?.let { put("rootProposalId", it) }
         }
         return TradeProposalViewModel(
-            savedStateHandle = SavedStateHandle(args),
+            savedStateHandle = restoredState ?: SavedStateHandle(args),
             authRepository = authRepository,
             tradesRepository = tradesRepository,
             createProposal = createProposal,
@@ -161,7 +164,7 @@ class TradeProposalViewModelSendTest {
             assertEquals(R.string.trades_error_not_logged_in, event.messageRes)
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -204,45 +207,27 @@ class TradeProposalViewModelSendTest {
             assertEquals(R.string.trades_error_initial_asymmetry, event.messageRes)
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), any(), any()) }
     }
 
     // =========================================================================
-    // GROUP 2: onSaveDraft — same local validation applies
+    // GROUP 2: drafts are never created (trades audit H5)
     // =========================================================================
 
     @Test
-    fun `given blank receiverId when onSaveDraft then NO_RECEIVER validation event is emitted`() = runTest {
-        sessionFlow.value = authenticated(MY_USER_ID)
-        val vm = createViewModel(receiverId = "")
-        advanceUntilIdle()
-
-        vm.events.test {
-            vm.onSaveDraft()
-            val event = awaitItem() as ProposalEvent.ShowValidationError
-            assertEquals(R.string.trades_error_no_receiver, event.messageRes)
-            cancelAndIgnoreRemainingEvents()
-        }
-        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), any()) }
-    }
-
-    @Test
-    fun `given both sides empty when onSaveDraft then INITIAL_ASYMMETRY validation event is emitted`() = runTest {
+    fun `given a new proposal when sent then it is always created with autoSend true`() = runTest {
         sessionFlow.value = authenticated(MY_USER_ID)
         val vm = createViewModel(receiverId = FRIEND_USER_ID)
         advanceUntilIdle()
+        vm.toggleReviewCollectionProposer(); vm.toggleReviewCollectionReceiver()
+        coEvery { createProposal(any(), any(), any(), any(), any(), any()) } returns Result.success("new-id")
 
-        vm.events.test {
-            vm.onSaveDraft()
-            val event = awaitItem() as ProposalEvent.ShowValidationError
-            assertEquals(R.string.trades_error_initial_asymmetry, event.messageRes)
-            cancelAndIgnoreRemainingEvents()
-        }
+        vm.onSendProposal()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { createProposal(any(), any(), any(), any(), true, any()) }
+        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), false, any()) }
     }
-
-    // =========================================================================
-    // GROUP 3: onSendProposal — success branches
-    // =========================================================================
 
     @Test
     fun `given a new proposal when onSendProposal succeeds then NavigateToThread carries the new proposal id`() = runTest {
@@ -251,7 +236,7 @@ class TradeProposalViewModelSendTest {
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer()
         vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(FRIEND_USER_ID, any(), true, true, true) } returns Result.success("new-proposal-id")
+        coEvery { createProposal(FRIEND_USER_ID, any(), true, true, true, any()) } returns Result.success("new-proposal-id")
 
         vm.events.test {
             vm.onSendProposal()
@@ -260,23 +245,6 @@ class TradeProposalViewModelSendTest {
             cancelAndIgnoreRemainingEvents()
         }
         assertFalse(vm.uiState.value.isSaving)
-    }
-
-    @Test
-    fun `given a draft when onSaveDraft succeeds then NavigateToThread carries the draft id and autoSend is false`() = runTest {
-        sessionFlow.value = authenticated(MY_USER_ID)
-        val vm = createViewModel(receiverId = FRIEND_USER_ID)
-        advanceUntilIdle()
-        vm.toggleReviewCollectionProposer()
-        vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(FRIEND_USER_ID, any(), true, true, false) } returns Result.success("draft-id")
-
-        vm.events.test {
-            vm.onSaveDraft()
-            advanceUntilIdle()
-            assertEquals(ProposalEvent.NavigateToThread("draft-id", "draft-id"), awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
     }
 
     @Test
@@ -295,7 +263,7 @@ class TradeProposalViewModelSendTest {
             cancelAndIgnoreRemainingEvents()
         }
         coVerify(exactly = 1) { editProposal("editing-id", any(), any(), any()) }
-        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { createProposal(any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -305,7 +273,7 @@ class TradeProposalViewModelSendTest {
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer()
         vm.toggleReviewCollectionReceiver()
-        coEvery { counterProposal("parent-id", any(), any()) } returns Result.success("counter-id")
+        coEvery { counterProposal("parent-id", any(), any(), any()) } returns Result.success("counter-id")
 
         vm.events.test {
             vm.onSendProposal()
@@ -322,7 +290,7 @@ class TradeProposalViewModelSendTest {
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer()
         vm.toggleReviewCollectionReceiver()
-        coEvery { counterProposal("parent-id", any(), any()) } returns Result.success("")
+        coEvery { counterProposal("parent-id", any(), any(), any()) } returns Result.success("")
 
         vm.events.test {
             vm.onSendProposal()
@@ -342,7 +310,7 @@ class TradeProposalViewModelSendTest {
         val vm = createViewModel(receiverId = FRIEND_USER_ID)
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer(); vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(any(), any(), any(), any(), any()) } returns Result.failure(TradeError.ProposalVersionMismatch)
+        coEvery { createProposal(any(), any(), any(), any(), any(), any()) } returns Result.failure(TradeError.ProposalVersionMismatch)
 
         vm.events.test {
             vm.onSendProposal()
@@ -360,7 +328,7 @@ class TradeProposalViewModelSendTest {
         val vm = createViewModel(receiverId = FRIEND_USER_ID)
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer(); vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(any(), any(), any(), any(), any()) } returns Result.failure(TradeError.InitialAsymmetryNotAllowed)
+        coEvery { createProposal(any(), any(), any(), any(), any(), any()) } returns Result.failure(TradeError.InitialAsymmetryNotAllowed)
 
         vm.events.test {
             vm.onSendProposal()
@@ -377,7 +345,7 @@ class TradeProposalViewModelSendTest {
         val vm = createViewModel(receiverId = FRIEND_USER_ID)
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer(); vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(any(), any(), any(), any(), any()) } returns Result.failure(TradeError.NotFriends)
+        coEvery { createProposal(any(), any(), any(), any(), any(), any()) } returns Result.failure(TradeError.NotFriends)
 
         vm.events.test {
             vm.onSendProposal()
@@ -394,7 +362,7 @@ class TradeProposalViewModelSendTest {
         val vm = createViewModel(receiverId = FRIEND_USER_ID)
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer(); vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(any(), any(), any(), any(), any()) } returns
+        coEvery { createProposal(any(), any(), any(), any(), any(), any()) } returns
             Result.failure(RuntimeException("raw_internal_server_sentinel"))
 
         vm.events.test {
@@ -416,43 +384,43 @@ class TradeProposalViewModelSendTest {
         val vm = createViewModel(receiverId = FRIEND_USER_ID)
         advanceUntilIdle()
         vm.toggleReviewCollectionProposer(); vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(any(), any(), any(), any(), any()) } returns Result.success("new-id")
+        coEvery { createProposal(any(), any(), any(), any(), any(), any()) } returns Result.success("new-id")
 
         vm.onSendProposal()
         vm.onSendProposal()
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { createProposal(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 1) { createProposal(any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
-    fun `given two rapid onSaveDraft calls then createProposal is invoked only once`() = runTest {
+    fun `given process recreation then composed review draft and request key survive retry`() = runTest {
         sessionFlow.value = authenticated(MY_USER_ID)
-        val vm = createViewModel(receiverId = FRIEND_USER_ID)
+        val savedState = SavedStateHandle(mapOf("receiverId" to FRIEND_USER_ID))
+        val first = createViewModel(receiverId = FRIEND_USER_ID, restoredState = savedState)
         advanceUntilIdle()
-        vm.toggleReviewCollectionProposer(); vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(any(), any(), any(), any(), false) } returns Result.success("draft-id")
+        first.toggleReviewCollectionProposer()
+        first.toggleReviewCollectionReceiver()
+        coEvery { createProposal(any(), any(), any(), any(), any(), any()) } returns Result.failure(TradeError.NotFriends)
 
-        vm.onSaveDraft()
-        vm.onSaveDraft()
+        first.onSendProposal()
         advanceUntilIdle()
+        val requestId = savedState.get<String>("proposalRequestId")
+        assertNotNull(requestId)
+        val restoredHandle = SavedStateHandle(mapOf(
+            "receiverId" to FRIEND_USER_ID,
+            "proposalDraft" to savedState.get<String>("proposalDraft"),
+            "proposalRequestId" to requestId,
+            "proposalRequestFingerprint" to savedState.get<String>("proposalRequestFingerprint"),
+        ))
+        val restored = createViewModel(receiverId = FRIEND_USER_ID, restoredState = restoredHandle)
+        advanceUntilIdle()
+        assertTrue(restored.uiState.value.includesReviewFromProposer)
+        assertTrue(restored.uiState.value.includesReviewFromReceiver)
 
-        coVerify(exactly = 1) { createProposal(any(), any(), any(), any(), false) }
+        restored.onSendProposal()
+        advanceUntilIdle()
+        coVerify(exactly = 2) { createProposal(any(), any(), any(), any(), any(), requestId) }
     }
 
-    @Test
-    fun `given a mixed rapid onSendProposal then onSaveDraft when the first is still in flight then only the first call executes`() = runTest {
-        sessionFlow.value = authenticated(MY_USER_ID)
-        val vm = createViewModel(receiverId = FRIEND_USER_ID)
-        advanceUntilIdle()
-        vm.toggleReviewCollectionProposer(); vm.toggleReviewCollectionReceiver()
-        coEvery { createProposal(any(), any(), any(), any(), any()) } returns Result.success("new-id")
-
-        // isSaving is one shared flag guarding BOTH entry points.
-        vm.onSendProposal()
-        vm.onSaveDraft()
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) { createProposal(any(), any(), any(), any(), any()) }
-    }
 }

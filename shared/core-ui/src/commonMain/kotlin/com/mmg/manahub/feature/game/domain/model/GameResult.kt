@@ -14,6 +14,10 @@ data class GameResult(
     val appUserWon:       Boolean = false,
     val appUserFinalLife: Int     = 0,
     val appUserName:      String  = "",
+    // Tournament context captured when the winner was resolved, so a later state reset cannot leak into the record
+    val tournamentId:        Long?      = null,
+    val tournamentMatchId:   Long?      = null,
+    val tournamentPlayerIds: List<Long> = emptyList(),
 )
 
 data class PlayerResult(

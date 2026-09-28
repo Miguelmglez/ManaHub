@@ -4,7 +4,6 @@ import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.remote.dto.WishlistEntryDto
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -21,30 +20,44 @@ class WishlistRemoteDataSource(
     private val supabaseClient: SupabaseClient,
     private val dispatcherProvider: DispatcherProvider = DispatcherProvider(),
 ) {
-    suspend fun getWishlist(userId: String): Result<List<WishlistEntryDto>> =
-        withContext(dispatcherProvider.io) {
-            runCatching {
-                supabaseClient.postgrest["wishlists"]
-                    .select { filter { eq("user_id", userId) } }
-                    .decodeList<WishlistEntryDto>()
-            }
+    /** Every row of [userId]'s list; fails unless the whole list was fetched. */
+    suspend fun getWishlist(userId: String): Result<List<WishlistEntryDto>> = drainWishlist(userId).toResult()
+
+    /**
+     * Every row of [userId]'s list, drained page by page in `(created_at, id)` order. A table
+     * query past `db-max-rows` is silently truncated, so only a complete drain may drive eviction.
+     */
+    suspend fun drainWishlist(userId: String): KeysetDrain<WishlistEntryDto> =
+        drainByCreatedAt(
+            id = { it.id },
+            createdAt = { it.createdAt },
+        ) { after, limit -> getWishlistPage(userId, after, limit) }
+
+    /** One `(created_at, id)` keyset page of [getWishlist]. */
+    suspend fun getWishlistPage(userId: String, after: CreatedAtCursor?, limit: Int): Result<List<WishlistEntryDto>> =
+        dispatcherProvider.remoteResult {
+            supabaseClient.postgrest["wishlists"]
+                .select {
+                    filter {
+                        eq("user_id", userId)
+                        if (after != null) afterCreatedAt(after)
+                    }
+                    createdAtPage(limit)
+                }
+                .decodeList<WishlistEntryDto>()
         }
 
     suspend fun addWishlistEntry(dto: WishlistEntryDto): Result<Unit> =
-        withContext(dispatcherProvider.io) {
-            runCatching {
-                supabaseClient.postgrest["wishlists"].insert(dto)
-                Unit
-            }
+        dispatcherProvider.remoteResult {
+            supabaseClient.postgrest["wishlists"].insert(dto)
+            Unit
         }
 
     suspend fun removeWishlistEntry(id: String): Result<Unit> =
-        withContext(dispatcherProvider.io) {
-            runCatching {
-                supabaseClient.postgrest["wishlists"]
-                    .delete { filter { eq("id", id) } }
-                Unit
-            }
+        dispatcherProvider.remoteResult {
+            supabaseClient.postgrest["wishlists"]
+                .delete { filter { eq("id", id) } }
+            Unit
         }
 
     /**
@@ -54,23 +67,19 @@ class WishlistRemoteDataSource(
      * the next [getWishlist] resurrect the stale server value (trades audit §2.3, 2026-07-10).
      */
     suspend fun updateWishlistQuantity(id: String, quantity: Int): Result<Unit> =
-        withContext(dispatcherProvider.io) {
-            runCatching {
-                supabaseClient.postgrest["wishlists"].update(
-                    buildJsonObject { put("quantity", quantity) }
-                ) { filter { eq("id", id) } }
-                Unit
-            }
+        dispatcherProvider.remoteResult {
+            supabaseClient.postgrest["wishlists"].update(
+                buildJsonObject { put("quantity", quantity) }
+            ) { filter { eq("id", id) } }
+            Unit
         }
 
     suspend fun batchAddWishlistEntries(dtos: List<WishlistEntryDto>): Result<Unit> =
-        withContext(dispatcherProvider.io) {
-            runCatching {
-                if (dtos.isEmpty()) return@runCatching
-                // upsert handles re-sync of entries whose local synced flag was reset,
-                // avoiding a duplicate-key error that would leave the banner stuck forever.
-                supabaseClient.postgrest["wishlists"].upsert(dtos)
-                Unit
-            }
+        dispatcherProvider.remoteResult {
+            if (dtos.isEmpty()) return@remoteResult Unit
+            // upsert handles re-sync of entries whose local synced flag was reset,
+            // avoiding a duplicate-key error that would leave the banner stuck forever.
+            supabaseClient.postgrest["wishlists"].upsert(dtos)
+            Unit
         }
 }

@@ -268,6 +268,75 @@ class CuratedStrategyCatalogTest {
         }
     }
 
+    // ── Deck Wizard Commander v3 Phase 0 / E1 (fixes F4): COMMANDER_CASUAL resolves like COMMANDER ──
+
+    @Test
+    fun `every entry available for COMMANDER is also available for COMMANDER_CASUAL`() {
+        CuratedStrategyCatalog.ALL.filter { it.availableIn(DeckFormat.COMMANDER) }.forEach { strategy ->
+            assertTrue(
+                strategy.availableIn(DeckFormat.COMMANDER_CASUAL),
+                "Entry '${strategy.id}' is available for COMMANDER but not COMMANDER_CASUAL",
+            )
+        }
+    }
+
+    @Test
+    fun `no entry is available for COMMANDER_CASUAL but not COMMANDER`() {
+        CuratedStrategyCatalog.ALL.filter { it.availableIn(DeckFormat.COMMANDER_CASUAL) }.forEach { strategy ->
+            assertTrue(
+                strategy.availableIn(DeckFormat.COMMANDER),
+                "Entry '${strategy.id}' is available for COMMANDER_CASUAL but not COMMANDER",
+            )
+        }
+    }
+
+    @Test
+    fun `nearestFor COMMANDER_CASUAL round-trips to the same entry as COMMANDER`() {
+        val commanderEntries = CuratedStrategyCatalog.ALL.filter { it.availableIn(DeckFormat.COMMANDER) }
+        assertTrue(commanderEntries.isNotEmpty())
+        commanderEntries.forEach { strategy ->
+            val archetype = strategy.archetypes.first()
+            val posture = strategy.postures.firstOrNull()
+            val viaCommander = CuratedStrategyCatalog.nearestFor(archetype, strategy.themes, DeckFormat.COMMANDER, posture)
+            val viaCasual = CuratedStrategyCatalog.nearestFor(archetype, strategy.themes, DeckFormat.COMMANDER_CASUAL, posture)
+            assertEquals(
+                assertNotNull(viaCommander, "nearestFor(..., COMMANDER) resolved null for '${strategy.id}'").id,
+                assertNotNull(viaCasual, "nearestFor(..., COMMANDER_CASUAL) resolved null for '${strategy.id}'").id,
+            )
+        }
+    }
+
+    // ── Deck Wizard Commander v3 Phase 0 / E3 (D4/D5): CuratedStrategy.toPin round-trip ──────────
+
+    @Test
+    fun `toPin round-trips every Commander catalog entry back onto itself via nearestFor`() {
+        val commanderEntries = CuratedStrategyCatalog.ALL.filter { it.availableIn(DeckFormat.COMMANDER) }
+        assertTrue(commanderEntries.isNotEmpty())
+        commanderEntries.forEach { strategy ->
+            val tribe = if (strategy.requiresTribe) "Elves" else null
+            val pin = strategy.toPin(tribe)
+            assertEquals(strategy.archetypes.first(), pin.archetype, "Entry '${strategy.id}' toPin.archetype mismatch")
+            assertEquals(strategy.postures.firstOrNull(), pin.posture, "Entry '${strategy.id}' toPin.posture mismatch")
+            assertEquals(strategy.themes, pin.themes, "Entry '${strategy.id}' toPin.themes mismatch")
+            assertEquals(tribe, pin.tribe, "Entry '${strategy.id}' toPin.tribe mismatch")
+
+            val resolved = CuratedStrategyCatalog.nearestFor(pin.archetype, pin.themes, DeckFormat.COMMANDER, pin.posture)
+            assertEquals(
+                strategy.id, assertNotNull(resolved, "toPin round-trip resolved null for '${strategy.id}'").id,
+                "toPin round-trip for '${strategy.id}' resolved a DIFFERENT entry",
+            )
+        }
+    }
+
+    @Test
+    fun `voltron toPin carries its posture, not just its archetype`() {
+        val voltron = assertNotNull(CuratedStrategyCatalog.byId("voltron"))
+        val pin = voltron.toPin()
+        assertEquals(ArchetypeId.AGGRO, pin.archetype)
+        assertEquals(PostureId.VOLTRON, pin.posture)
+        assertTrue(pin.themes.isEmpty())
+    }
+
     @Test
     fun `catalog is non-empty and every entry id is unique (exact count intentionally not pinned)`() {
         // The exact entry count is a moving target across this taxonomy migration (5 pure
@@ -276,5 +345,14 @@ class CuratedStrategyCatalogTest {
         // happens to be, not a real invariant. Uniqueness (checked above) and non-emptiness are
         // the actual structural guarantees this suite protects.
         assertTrue(CuratedStrategyCatalog.ALL.isNotEmpty())
+    }
+
+    // ── Deck Wizard 60-card wave (v6), plan §5 Phase 2.3 ────────────────────────────────────────
+
+    @Test
+    fun `prison is availableIn CASUAL but not STANDARD`() {
+        val prison = CuratedStrategyCatalog.ALL.first { it.id == "prison" }
+        assertTrue(prison.availableIn(DeckFormat.CASUAL), "prison.formats = COMMANDER_CASUAL = {COMMANDER, CASUAL} (confirmed in source)")
+        assertFalse(prison.availableIn(DeckFormat.STANDARD))
     }
 }

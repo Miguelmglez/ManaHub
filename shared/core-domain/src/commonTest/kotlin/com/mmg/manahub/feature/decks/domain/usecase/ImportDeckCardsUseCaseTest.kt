@@ -117,7 +117,7 @@ private class FakeDeckRepository(private var nextDeckId: String = "created-deck-
     override suspend fun replaceAllCards(deckId: String, slots: List<Triple<String, Int, Boolean>>) {
         replaceAllCardsCalls += deckId to slots
     }
-    override suspend fun updateArchetypeOverride(deckId: String, archetypeOverride: String?, themesOverride: List<String>) = Unit
+    override suspend fun updateArchetypeOverride(deckId: String, archetypeOverride: String?, themesOverride: List<String>, posture: String?) = Unit
     override suspend fun updateTribeOverride(deckId: String, tribeOverride: String?) = Unit
     override suspend fun updateStrategyLocked(deckId: String, locked: Boolean) = Unit
 }

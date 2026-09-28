@@ -2,6 +2,7 @@ package com.mmg.manahub.core.data.remote.dto
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Request/response DTOs for Commander Spellbook's `POST /find-my-combos` (Deck Engine
@@ -52,6 +53,16 @@ data class VariantDto(
     val description: String = "",
     val uses: List<CardInVariantDto> = emptyList(),
     val produces: List<FeatureProducedByVariantDto> = emptyList(),
+    // A JsonObject, not Map<String, Boolean>: one unexpected value type must not fail the whole page.
+    val legalities: JsonObject? = null,
+)
+
+/** `GET /variants/` page (DRF limit/offset paginator): `next` is null on the last page. */
+@Serializable
+data class VariantsPageDto(
+    val count: Int? = null,
+    val next: String? = null,
+    val results: List<VariantDto> = emptyList(),
 )
 
 @Serializable

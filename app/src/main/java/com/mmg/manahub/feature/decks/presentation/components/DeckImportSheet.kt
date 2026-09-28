@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,31 +26,40 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import kotlinx.coroutines.launch
 
 /**
- * Bottom sheet where the user can paste a Moxfield/Arena deck list to import.
+ * Bottom sheet where the user can paste a Moxfield/Arena list to import (decks and the Collection
+ * import reuse it).
  *
  * @param isLoading   True while cards are being resolved in the background.
  * @param error       Non-null if the last import finished with an error/warning message.
  * @param onImport    Called with the raw pasted text when the user confirms.
  * @param onDismiss   Called when the sheet is dismissed.
+ * @param loadingText Replaces the generic loading label (e.g. a "resolved X / N" progress line).
+ * @param onImportFromFile When set, shows an "Import from file" action; the file is parsed by the
+ *   caller, never loaded into the text field.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,18 +68,39 @@ fun DeckImportSheet(
     error: String?,
     onImport:  (text: String) -> Unit,
     onDismiss: () -> Unit,
+    title: String = stringResource(R.string.deck_import_title),
+    hint: String = stringResource(R.string.deck_import_hint),
+    placeholder: String = stringResource(R.string.deck_import_placeholder),
+    loadingText: String? = null,
+    onImportFromFile: (() -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     var pastedText by remember { mutableStateOf("") }
+    var isClosingProgrammatically by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { value ->
+            if (value == SheetValue.Hidden && !isClosingProgrammatically) {
+                false
+            } else {
+                true
+            }
+        },
+    )
+    val closeSheet: () -> Unit = {
+        scope.launch {
+            isClosingProgrammatically = true
+            sheetState.hide()
+            onDismiss()
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor   = mc.backgroundSecondary,
-        sheetState       = rememberModalBottomSheetState(
-            skipPartiallyExpanded = true,
-            confirmValueChange = { it != SheetValue.Hidden }
-        ),
+        sheetState       = sheetState,
         dragHandle = null,
     ) {
         Column(
@@ -86,7 +117,7 @@ fun DeckImportSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = onDismiss,
+                    onClick = closeSheet,
                     modifier = Modifier.offset(x = (-12).dp)
                 ) {
                     Icon(
@@ -95,15 +126,15 @@ fun DeckImportSheet(
                         tint = mc.textSecondary
                     )
                 }
+                Text(
+                    text  = title,
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
+                )
             }
-            Text(
-                text  = stringResource(R.string.deck_import_title),
-                style = ty.titleMedium,
-                color = mc.textPrimary,
-            )
 
             Text(
-                text  = stringResource(R.string.deck_import_hint),
+                text  = hint,
                 style = ty.bodySmall,
                 color = mc.textSecondary,
             )
@@ -113,7 +144,7 @@ fun DeckImportSheet(
                 onValueChange = { pastedText = it },
                 placeholder   = {
                     Text(
-                        text  = stringResource(R.string.deck_import_placeholder),
+                        text  = placeholder,
                         color = mc.textDisabled,
                         style = ty.bodySmall,
                     )
@@ -131,6 +162,18 @@ fun DeckImportSheet(
                 textStyle = ty.bodySmall,
                 maxLines  = 30,
             )
+
+            if (onImportFromFile != null) {
+                MagicCtaButton(
+                    onClick = onImportFromFile,
+                    enabled = !isLoading,
+                    text = stringResource(R.string.collection_import_from_file),
+                    style = MagicCtaStyle.Outlined,
+                    color = MagicCtaColor.Primary,
+                    icon = { Icon(Icons.Default.FileOpen, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             // Error / warning banner
             error?.let { msg ->
@@ -158,7 +201,7 @@ fun DeckImportSheet(
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        text  = stringResource(R.string.deck_import_loading),
+                        text  = loadingText ?: stringResource(R.string.deck_import_loading),
                         style = ty.bodySmall,
                         color = mc.textSecondary,
                     )
@@ -169,7 +212,7 @@ fun DeckImportSheet(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     OutlinedButton(
-                        onClick  = onDismiss,
+                        onClick  = closeSheet,
                         modifier = Modifier.weight(1f),
                         shape    = RoundedCornerShape(8.dp),
                     ) {

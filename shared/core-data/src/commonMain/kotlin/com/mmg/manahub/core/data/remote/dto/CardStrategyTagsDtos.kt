@@ -13,11 +13,15 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class CardStrategyTagsPayloadDto(
     val tags: List<String> = emptyList(),
+    val suggestions: List<CardStrategyTagSuggestionDto> = emptyList(),
     val tribes: List<String> = emptyList(),
     val themes: Map<String, Float> = emptyMap(),
     val archetypes: Map<String, Float> = emptyMap(),
     val sources: List<String> = emptyList(),
 )
+
+@Serializable
+data class CardStrategyTagSuggestionDto(val key: String, val confidence: Float)
 
 /** One row of the Supabase `card_strategy_tags` table (see `feedback_supabase_default_priv_table_grant`
  *  / `project_card_strategy_tags_pipeline` memory for the schema this mirrors). */

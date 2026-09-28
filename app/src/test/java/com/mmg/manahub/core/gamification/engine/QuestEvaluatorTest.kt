@@ -3,6 +3,7 @@ package com.mmg.manahub.core.gamification.engine
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.entity.QuestInstanceEntity
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.core.model.DeckCreationSource
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -38,7 +39,7 @@ class QuestEvaluatorTest {
     @Before
     fun setUp() {
         dao = mockk(relaxed = true)
-        evaluator = QuestEvaluator(dao, FixedClock(fixedInstant), TimeZone.UTC)
+        evaluator = QuestEvaluator(dao, FixedClock(fixedInstant), { TimeZone.UTC })
         coEvery { dao.getQuest(any()) } returns null
         coEvery { dao.upsertQuest(any()) } just Runs
     }
@@ -171,6 +172,22 @@ class QuestEvaluatorTest {
 
         assertEquals(3, deltas.single().newProgress) // 2 unique + 1 copy
         assertTrue(deltas.single().justCompleted)
+    }
+
+    @Test
+    fun `build deck quest advances for a built deck but not for an imported one`() = runTest {
+        coEvery { dao.getQuest("daily_build_deck:$dailyKey") } returns
+            dailyInstance("daily_build_deck", progress = 0, target = 1)
+
+        val imported = evaluator.process(
+            ProgressionEvent.DeckCreated("d-1", "casual", DeckCreationSource.IMPORT, fixedInstant)
+        )
+        val built = evaluator.process(
+            ProgressionEvent.DeckCreated("d-2", "casual", DeckCreationSource.BUILT, fixedInstant)
+        )
+
+        assertTrue(imported.isEmpty())
+        assertEquals(1, built.single().newProgress)
     }
 
     @Test

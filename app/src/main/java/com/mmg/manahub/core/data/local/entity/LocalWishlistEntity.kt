@@ -40,4 +40,8 @@ data class LocalWishlistEntity(
 
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),
+
+    // Null denotes ambiguous legacy ownership; new guest rows use an explicit owner key.
+    @ColumnInfo(name = "owner_user_id")
+    val ownerUserId: String? = null,
 )

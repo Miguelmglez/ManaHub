@@ -1,10 +1,35 @@
 package com.mmg.manahub.core.domain.repository
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckCardSource
+import com.mmg.manahub.core.model.DeckCreationSource
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DeckWithCards
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+
+/** One slot for [DeckRepository.replaceAllCardsWithSource] -- see that function's KDoc. */
+data class CardSlotWrite(
+    val scryfallId: String,
+    val quantity: Int,
+    val isSideboard: Boolean = false,
+    val source: DeckCardSource = DeckCardSource.USER,
+)
+
+data class DeckCardAddition(
+    val entryId: String,
+    val scryfallId: String,
+    val oracleId: String,
+    val quantity: Int,
+    val isSideboard: Boolean,
+)
+
+data class DeckCardAdditionResult(
+    val committedEntryIds: Set<String>,
+    val blockedCommanderEntryIds: Set<String>,
+    val committedCopies: Int,
+)
 
 /**
  * Contract for all deck persistence operations.
@@ -40,6 +65,24 @@ interface DeckRepository {
     suspend fun createDeck(name: String, description: String, format: String): String
 
     /**
+     * Creates a deck like [createDeck] and records [source] for its one-time `DeckCreated` progression
+     * event, which fires when the deck's first mainboard card is persisted (never for an empty draft).
+     * The default ignores [source]: implementations without progression just create the deck.
+     */
+    suspend fun createDeck(
+        name: String,
+        description: String,
+        format: String,
+        source: DeckCreationSource,
+    ): String = createDeck(name, description, format)
+
+    /**
+     * Re-tags a deck created in this session whose `DeckCreated` has not fired yet (it is still empty),
+     * e.g. a Studio draft that is about to be filled by an import or the wizard. No-op otherwise.
+     */
+    suspend fun tagDeckCreationSource(deckId: String, source: DeckCreationSource) {}
+
+    /**
      * Updates deck metadata. Bumps [Deck.updatedAt] so the sync engine picks up the change.
      */
     suspend fun updateDeck(deck: Deck)
@@ -64,6 +107,63 @@ interface DeckRepository {
         isSideboard: Boolean = false,
         source: DeckCardSource = DeckCardSource.USER,
     )
+
+    /**
+     * Merges scanner additions without replacing unrelated deck slots.
+     *
+     * Android overrides this with one Room transaction. The portable fallback keeps web
+     * implementations source-compatible until they provide an equivalent transactional store.
+     */
+    suspend fun mergeScannerCards(
+        deckId: String,
+        additions: List<DeckCardAddition>,
+    ): DeckCardAdditionResult {
+        val deck = observeDeckWithCards(deckId).first() ?: error("Deck not found")
+        val commanderId = deck.deck.commanderCardId
+        val blockedIds = additions.asSequence()
+            .filter { !it.isSideboard && it.scryfallId == commanderId }
+            .mapTo(linkedSetOf()) { it.entryId }
+        val permitted = additions.filterNot { it.entryId in blockedIds }
+        if (permitted.isNotEmpty()) {
+            val slots = LinkedHashMap<Pair<String, Boolean>, CardSlotWrite>()
+            deck.mainboard.forEach { slot ->
+                slots[slot.scryfallId to false] = CardSlotWrite(
+                    scryfallId = slot.scryfallId,
+                    quantity = slot.quantity,
+                    isSideboard = false,
+                    source = slot.source,
+                )
+            }
+            deck.sideboard.forEach { slot ->
+                slots[slot.scryfallId to true] = CardSlotWrite(
+                    scryfallId = slot.scryfallId,
+                    quantity = slot.quantity,
+                    isSideboard = true,
+                    source = slot.source,
+                )
+            }
+            permitted.groupBy { it.scryfallId to it.isSideboard }.forEach { (key, grouped) ->
+                val current = slots[key]
+                val added = grouped.sumOf { it.quantity.toLong() }
+                val quantity = (current?.quantity ?: 0).toLong() + added
+                check(quantity <= Int.MAX_VALUE) { "merged quantity exceeds Int range" }
+                slots[key] = CardSlotWrite(
+                    scryfallId = key.first,
+                    quantity = quantity.toInt(),
+                    isSideboard = key.second,
+                    source = current?.source ?: DeckCardSource.USER,
+                )
+            }
+            replaceAllCardsWithSource(deckId, slots.values.toList())
+        }
+        val committedCopies = permitted.sumOf { it.quantity.toLong() }
+        check(committedCopies <= Int.MAX_VALUE) { "committed copies exceed Int range" }
+        return DeckCardAdditionResult(
+            committedEntryIds = permitted.mapTo(linkedSetOf()) { it.entryId },
+            blockedCommanderEntryIds = blockedIds,
+            committedCopies = committedCopies.toInt(),
+        )
+    }
 
     /** Removes a card slot from the deck. */
     suspend fun removeCardFromDeck(deckId: String, scryfallId: String, isSideboard: Boolean)
@@ -106,16 +206,53 @@ interface DeckRepository {
     suspend fun replaceAllCards(deckId: String, slots: List<Triple<String, Int, Boolean>>)
 
     /**
+     * Deck Wizard Commander v3 plan (Phase 2.6, D12/D13): an ADDITIVE overload of [replaceAllCards]
+     * that also carries per-slot [DeckCardSource] provenance (engine-placed + commander = WIZARD,
+     * manual adds = USER) -- [replaceAllCards] itself has no source parameter and always writes
+     * [DeckCardSource.USER], so a straight delegation would silently lose provenance.
+     *
+     * DEFAULT implementation (best-effort, not a single Room transaction): [clearDeck] then
+     * [addCardToDeck] once per slot with its own [DeckCardSource]. This keeps the interface
+     * additive with ZERO changes required to any existing implementer (Android's Room-backed
+     * `DeckRepositoryImpl`, `WebDeckRepository`) — both automatically get a working implementation
+     * built from primitives they already have. A genuinely single-transaction Room override (the
+     * literal "ONE atomic write" the plan's D12 asks for) is deferred to the phase that wires this
+     * into the wizard VM (Phase 6): that is also when a cancelled build's "leave the draft
+     * untouched" guarantee actually matters end-to-end, and hardening it then avoids touching
+     * `androidMain`'s DAO twice. Callers on the Commander build path today (Phase 2's
+     * `BuildWizardDeckUseCase`) are not yet wired into any real wizard flow (Phase 3-6), so this
+     * default is exercised only by this phase's own tests until then.
+     *
+     * @param slots (scryfallId, quantity, isSideboard, source) — the sideboard flag exists for API
+     *        symmetry with [replaceAllCards]; the Commander build path always writes `false`
+     *        (Commander has no sideboard slot in this campaign's scope).
+     */
+    suspend fun replaceAllCardsWithSource(deckId: String, slots: List<CardSlotWrite>) {
+        clearDeck(deckId)
+        slots.forEach { slot ->
+            addCardToDeck(deckId, slot.scryfallId, slot.quantity, slot.isSideboard, slot.source)
+        }
+    }
+
+    /**
      * Pins (or clears) the deck's archetype/theme override (Deck Doctor Phase 1.5, D2).
      *
      * @param archetypeOverride a raw `ArchetypeId.name` string, or null to clear the macro pin
      *        (the engine goes back to inferring it every analysis).
      * @param themesOverride raw `ThemeId.name` strings (at most 2); empty clears the theme pin.
+     * @param posture Deck Wizard Commander v3 plan (E3, D5) -- a raw `PostureId.name` string, or
+     *        null to clear the posture pin. Appended LAST and defaulted so every existing 3-arg
+     *        call site keeps compiling unchanged; `null` ALSO clears any previously-set posture on
+     *        this write (same "null clears" convention as [archetypeOverride]/[themesOverride]
+     *        and the sibling `tribe` param on [com.mmg.manahub.feature.decks.domain.orchestrator
+     *        .DeckDoctorOrchestrator.setArchetypeOverride] -- correct for a non-postured strategy
+     *        pick or "Auto-detect", same as that precedent documents for tribe).
      */
     suspend fun updateArchetypeOverride(
         deckId: String,
         archetypeOverride: String?,
         themesOverride: List<String>,
+        posture: String? = null,
     )
 
     /**
@@ -127,8 +264,67 @@ interface DeckRepository {
     suspend fun updateTribeOverride(deckId: String, tribeOverride: String?)
 
     /**
+     * The whole strategy pin -- [updateArchetypeOverride] AND [updateTribeOverride] -- as ONE
+     * write, for callers that always decide both halves together (the Studio strategy picker).
+     * The default composes the two single writes; a backend with a transactional store overrides
+     * it so a failure can never leave the pin half-applied.
+     */
+    suspend fun updateStrategyPin(
+        deckId: String,
+        archetypeOverride: String?,
+        themesOverride: List<String>,
+        posture: String?,
+        tribeOverride: String?,
+    ) {
+        updateArchetypeOverride(deckId, archetypeOverride, themesOverride, posture)
+        updateTribeOverride(deckId, tribeOverride)
+    }
+
+    /**
      * Sets (or clears) the deck's [Deck.strategyLocked] flag (D4 hard no-cut guarantee). Bumps
      * [Deck.updatedAt].
      */
     suspend fun updateStrategyLocked(deckId: String, locked: Boolean)
+
+    /**
+     * Deck Wizard Commander v3 plan (Phase 8, JOB 2): the ONE atomic write for a wizard build's
+     * whole persist step -- card replacement + archetype/theme/posture pin + tribe pin + the
+     * strategy-locked flag. Before this, [com.mmg.manahub.feature.decks.domain.template
+     * .BuildWizardDeckUseCase.persist] issued 4 SEPARATE suspend calls
+     * ([replaceAllCardsWithSource] + [updateArchetypeOverride] + [updateTribeOverride] +
+     * [updateStrategyLocked]); a cancellation or failure between any two of them could leave a
+     * deck with NEW cards but a STALE pin (mitigated, not fixed, by a cancel-blocking guard in
+     * `DeckWizardViewModel` -- see that guard's own KDoc for why it stays as defense-in-depth).
+     *
+     * Deck Wizard 60-card wave (v6, plan §5 Phase 1.3): renamed from `persistCommanderBuild` --
+     * pure rename, every format now writes through this same entry point.
+     *
+     * DEFAULT implementation (best-effort, NOT one transaction): the same 4 calls this replaces,
+     * in the same order -- kept additive so `WebDeckRepository` compiles unchanged until it gets
+     * a real transactional web store. Android's `DeckRepositoryImpl` overrides this with a genuine
+     * single Room `@Transaction` ([com.mmg.manahub.core.data.local.dao.DeckDao.persistWizardBuild]).
+     */
+    suspend fun persistWizardBuild(
+        deckId: String,
+        slots: List<CardSlotWrite>,
+        archetypeOverride: String?,
+        themesOverride: List<String>,
+        posture: String?,
+        tribeOverride: String?,
+        strategyLocked: Boolean,
+        // Non-null only for a Commander build: written as commanderCardId + coverCardId in the same
+        // write, so a failed persist can never leave a commander set on a deck with zero cards.
+        commanderCardId: String? = null,
+    ) {
+        replaceAllCardsWithSource(deckId, slots)
+        updateArchetypeOverride(deckId, archetypeOverride, themesOverride, posture)
+        updateTribeOverride(deckId, tribeOverride)
+        updateStrategyLocked(deckId, strategyLocked)
+        if (commanderCardId != null) {
+            // Skipping the commander write silently would persist a Commander build with no commander.
+            val deck = observeDeckWithCards(deckId).first()?.deck
+                ?: throw IllegalStateException("persistWizardBuild: deck not found for the commander write")
+            updateDeck(deck.copy(commanderCardId = commanderCardId, coverCardId = commanderCardId))
+        }
+    }
 }

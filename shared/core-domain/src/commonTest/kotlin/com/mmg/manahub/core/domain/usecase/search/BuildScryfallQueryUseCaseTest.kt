@@ -18,6 +18,29 @@ class BuildScryfallQueryUseCaseTest {
     private val useCase = BuildScryfallQueryUseCase()
 
     @Test
+    fun `contradictory multicolor modes render a valid impossible search`() {
+        for (mode in listOf(ColorMatchMode.EXACTLY, ColorMatchMode.AT_MOST)) {
+            assertEquals("c>=2 -c>=2", useCase(AdvancedSearchQuery(listOf(SearchCriterion.Colors(setOf("M", "W"), mode)))))
+            assertEquals("id>=2 -id>=2", useCase(AdvancedSearchQuery(listOf(SearchCriterion.ColorIdentity(setOf("M", "C"), mode)))))
+        }
+        assertEquals("c>=2 -c>=2", useCase(AdvancedSearchQuery(listOf(SearchCriterion.Colors(setOf("M", "C"), ColorMatchMode.ANY_OF)))))
+        assertEquals("c>=w c>=2", useCase(AdvancedSearchQuery(listOf(SearchCriterion.Colors(setOf("M", "C", "W"), ColorMatchMode.AT_LEAST)))))
+    }
+
+    @Test
+    fun `multicolor is an additional count predicate for either field and every mode`() {
+        for (mode in ColorMatchMode.entries) {
+            val color = useCase(AdvancedSearchQuery(listOf(SearchCriterion.Colors(setOf("M", "W", "U"), mode))))
+            val identity = useCase(AdvancedSearchQuery(listOf(SearchCriterion.ColorIdentity(setOf("M", "W", "U"), mode))))
+            assertTrue("c>=2" in color)
+            assertTrue("id>=2" in identity)
+            assertTrue("m" !in color.substringBefore(" c>=2"))
+        }
+        assertEquals("c>=2", useCase(AdvancedSearchQuery(listOf(SearchCriterion.Colors(setOf("M"))))))
+        assertEquals("id>=2", useCase(AdvancedSearchQuery(listOf(SearchCriterion.ColorIdentity(setOf("M"))))))
+    }
+
+    @Test
     fun `given single function match-any when built then wraps in parens with no comma tail`() {
         val query = AdvancedSearchQuery(
             criteria = listOf(SearchCriterion.CardFunction(setOf("ramp"), matchAll = false))
@@ -169,5 +192,11 @@ class BuildScryfallQueryUseCaseTest {
         )
 
         assertEquals("", useCase(query))
+    }
+
+    @Test
+    fun `given CommanderEligible when built then renders is-commander`() {
+        val query = AdvancedSearchQuery(criteria = listOf(SearchCriterion.CommanderEligible))
+        assertEquals("is:commander", useCase(query))
     }
 }

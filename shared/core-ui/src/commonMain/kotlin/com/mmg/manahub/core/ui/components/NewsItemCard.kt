@@ -38,8 +38,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.core.model.news.NewsItem
+import com.mmg.manahub.core.ui.theme.CardCornerRadius
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.ExtraSmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.TimeAgoFormatter
 
 /**
@@ -49,6 +54,8 @@ import com.mmg.manahub.core.util.TimeAgoFormatter
  * @param placeholderPainter Optional painter used as placeholder, error, and fallback for the
  *   thumbnail [AsyncImage]. On Android callers typically pass `painterResource(R.drawable.mtg_card_back)`;
  *   on web (or when `null`) the image simply shows nothing while loading.
+ * @param titleMinLines minimum title lines; a row of equal-height cards passes the title's
+ *   `maxLines` (2) so short titles reserve the same space as long ones.
  */
 @Composable
 fun NewsItemCard(
@@ -59,6 +66,7 @@ fun NewsItemCard(
     placeholderPainter: Painter? = null,
     languageBadge: String? = null,
     showDescription: Boolean = true,
+    titleMinLines: Int = 1,
 ) {
     val mc = MaterialTheme.magicColors
     val interactionSource = remember { MutableInteractionSource() }
@@ -71,7 +79,7 @@ fun NewsItemCard(
             scaleX = scale
             scaleY = scale
         }
-        .clip(RoundedCornerShape(12.dp))
+        .clip(CardShape)
         .background(mc.surface)
         .clickable(
             interactionSource = interactionSource,
@@ -85,13 +93,15 @@ fun NewsItemCard(
             placeholderPainter = placeholderPainter,
             languageBadge = languageBadge,
             showDescription = showDescription,
-            modifier = containerModifier.padding(12.dp)
+            titleMinLines = titleMinLines,
+            modifier = containerModifier.padding(MaterialTheme.spacing.md)
         )
     } else {
         VerticalNewsLayout(
             item = item,
             placeholderPainter = placeholderPainter,
             languageBadge = languageBadge,
+            titleMinLines = titleMinLines,
             modifier = containerModifier
         )
     }
@@ -103,6 +113,7 @@ private fun HorizontalNewsLayout(
     placeholderPainter: Painter?,
     languageBadge: String?,
     showDescription: Boolean,
+    titleMinLines: Int,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -115,11 +126,12 @@ private fun HorizontalNewsLayout(
                 isVideo = item is NewsItem.Video,
                 duration = (item as? NewsItem.Video)?.duration,
                 placeholderPainter = placeholderPainter,
+                compact = true,
                 modifier = Modifier
                     .size(96.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(ChipShape)
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(MaterialTheme.spacing.md))
         }
 
         Column(modifier = Modifier.weight(1f)) {
@@ -132,6 +144,7 @@ private fun HorizontalNewsLayout(
                     style = mt.bodyLarge,
                     color = mc.textPrimary,
                     maxLines = 2,
+                    minLines = titleMinLines,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
@@ -165,6 +178,7 @@ private fun VerticalNewsLayout(
     item: NewsItem,
     placeholderPainter: Painter?,
     languageBadge: String?,
+    titleMinLines: Int,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -180,15 +194,16 @@ private fun VerticalNewsLayout(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                .clip(RoundedCornerShape(topStart = CardCornerRadius, topEnd = CardCornerRadius))
         )
 
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(MaterialTheme.spacing.md)) {
             Text(
                 text = item.title,
                 style = mt.bodyLarge,
                 color = mc.textPrimary,
                 maxLines = 2,
+                minLines = titleMinLines,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(6.dp))
@@ -210,6 +225,7 @@ private fun ThumbnailBox(
     placeholderPainter: Painter? = null,
     duration: String? = null,
     languageBadge: String? = null,
+    compact: Boolean = false,
 ) {
     val mt = MaterialTheme.magicTypography
     Box(modifier = modifier) {
@@ -227,22 +243,22 @@ private fun ThumbnailBox(
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .size(if (modifier.toString().contains("96.dp")) 32.dp else 48.dp)
+                    .size(if (compact) 32.dp else 48.dp)
                     .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.6f)),
+                    .background(VideoScrim.copy(alpha = 0.6f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = PlayArrowIcon,
                     contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(if (modifier.toString().contains("96.dp")) 20.dp else 28.dp),
+                    tint = VideoScrimContent,
+                    modifier = Modifier.size(if (compact) 20.dp else 28.dp),
                 )
             }
         }
 
         if (languageBadge != null) {
-            Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+            Box(modifier = Modifier.align(Alignment.TopEnd).padding(MaterialTheme.spacing.sm)) {
                 LanguageBadge(languageBadge)
             }
         }
@@ -252,14 +268,14 @@ private fun ThumbnailBox(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(6.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color.Black.copy(alpha = 0.8f))
+                    .clip(ExtraSmallCardShape)
+                    .background(VideoScrim.copy(alpha = 0.8f))
                     .padding(horizontal = 4.dp, vertical = 1.dp)
             ) {
                 Text(
                     text = duration,
                     style = mt.labelSmall,
-                    color = Color.White
+                    color = VideoScrimContent
                 )
             }
         }
@@ -277,7 +293,7 @@ private fun LanguageBadge(code: String) {
     } else {
         val mc = MaterialTheme.magicColors
         Surface(
-            shape = RoundedCornerShape(4.dp),
+            shape = ExtraSmallCardShape,
             color = mc.primaryAccent.copy(alpha = 0.15f),
         ) {
             Text(
@@ -289,6 +305,10 @@ private fun LanguageBadge(code: String) {
         }
     }
 }
+
+// Scrims sit on arbitrary thumbnail art, so they stay theme-independent on purpose (not tokens).
+private val VideoScrim = Color.Black
+private val VideoScrimContent = Color.White
 
 /** Layout orientation for [NewsItemCard]. */
 enum class NewsItemOrientation { HORIZONTAL, VERTICAL }

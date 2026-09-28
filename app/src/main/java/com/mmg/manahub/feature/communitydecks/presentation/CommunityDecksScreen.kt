@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.communitydecks.presentation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,9 +27,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -62,17 +61,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
-import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import com.mmg.manahub.R
-import org.jetbrains.compose.resources.painterResource
-import com.mmg.manahub.core.ui.Res
-import com.mmg.manahub.core.ui.mtg_card_back
+import com.mmg.manahub.core.data.network.RateLimitExhaustedException
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CommunityDeckSummary
 import com.mmg.manahub.core.model.DeckSummary
-import com.mmg.manahub.core.data.network.RateLimitExhaustedException
+import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
@@ -86,6 +82,7 @@ import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaHubBottomSheetSelector
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -93,6 +90,8 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.communitydecks.presentation.components.CommunityAdvancedSearchSheet
 import kotlinx.datetime.Instant
+import org.jetbrains.compose.resources.painterResource
+import org.koin.androidx.compose.koinViewModel
 
 /**
  * Community Decks Hub screen (Discover / Search).
@@ -181,7 +180,7 @@ fun CommunityDecksScreen(
                     when (uiState.hubTab) {
                         CommunityHubTab.DISCOVER -> CommunityDiscoverBody(
                             state = uiState,
-                            onRetry = { viewModel.onSelectHubTab(CommunityHubTab.DISCOVER) },
+                            onRetry = viewModel::retryDiscover,
                             onTrendingCommanderClick = viewModel::onTrendingCommanderClick,
                             onTrendingCardClick = viewModel::onTrendingCardClick,
                             onDeckClick = viewModel::onDeckClick,
@@ -561,7 +560,7 @@ private fun CommunityDeckResultsGrid(
         onTrendingCommanderClick: (Card) -> Unit,
         onTrendingCardClick: (Card) -> Unit,
         onDeckClick: (Int) -> Unit,
-        onDiscoveryFormatUpdate: (CommunityDeckFormatFilter) -> Unit,
+        onDiscoveryFormatUpdate: (CommunityDeckFormatFilter?) -> Unit,
         modifier: Modifier = Modifier,
     ) {
         val mc = MaterialTheme.magicColors
@@ -606,13 +605,18 @@ private fun CommunityDeckResultsGrid(
             verticalArrangement = Arrangement.spacedBy(spacing.lg),
         ) {
             item(key = "format_filter") {
+                val formatItems = CommunityDeckFormatFilter.entries
                 ManaHubBottomSheetSelector(
                     icon = Icons.Default.Layers,
-                    valueText =  stringResource(state.selectedDiscoveryFormat.displayResId),
-                    items = CommunityDeckFormatFilter.entries,
+                    valueText = state.selectedDiscoveryFormat?.let { stringResource(it.displayResId) }
+                        ?: stringResource(R.string.community_deck_filter_all_formats),
+                    items = formatItems,
                     selectedItem = state.selectedDiscoveryFormat,
-                    onSelect =  onDiscoveryFormatUpdate,
-                    itemLabel = { stringResource(it.displayResId) },
+                    onSelect = onDiscoveryFormatUpdate,
+                    itemLabel = { format ->
+                        if (format == null) stringResource(R.string.community_deck_filter_all_formats)
+                        else stringResource(format.displayResId)
+                    },
                     label = "Format:",
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -756,4 +760,5 @@ val CommunityDeckFormatFilter.displayResId get() = when (this) {
     CommunityDeckFormatFilter.STANDARD -> R.string.community_deck_format_standard
     CommunityDeckFormatFilter.PIONEER -> R.string.community_deck_format_pioneer
     CommunityDeckFormatFilter.VINTAGE -> R.string.community_deck_format_vintage
+    CommunityDeckFormatFilter.ALL -> R.string.community_deck_filter_all_formats
 }

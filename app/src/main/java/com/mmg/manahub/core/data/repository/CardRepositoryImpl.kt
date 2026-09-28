@@ -1,5 +1,7 @@
 package com.mmg.manahub.core.data.repository
 
+// COMMENTS_REVIEWED: 2026-09-16
+
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
@@ -8,7 +10,9 @@ import com.mmg.manahub.core.data.local.mapper.toSuggestedTagList
 import com.mmg.manahub.core.data.local.mapper.toSuggestedTagsJson
 import com.mmg.manahub.core.data.local.mapper.toTagList
 import com.mmg.manahub.core.data.local.mapper.toTagsJson
+import com.mmg.manahub.core.data.network.RateLimitExhaustedException
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.manahub.core.data.remote.dto.CardIdentifierDto
 import com.mmg.manahub.core.di.DefaultDispatcher
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.Card
@@ -16,12 +20,18 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.SuggestedTag
 import com.mmg.manahub.core.di.ApplicationScope
+import com.mmg.manahub.core.domain.repository.CardLookupIdentifier
+import com.mmg.manahub.core.domain.repository.CardLookupResult
 import com.mmg.manahub.core.domain.repository.CardPriceUpdate
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.card.ResolveCardStrategyTagsUseCase
 import com.mmg.manahub.core.util.recordSafeNonFatal
 import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -65,6 +75,19 @@ class CardRepositoryImpl @Inject constructor(
             }
         }
 
+    private suspend fun isConfirmedEmptySearch(error: Throwable?): Boolean {
+        if (error !is ClientRequestException || error.response.status != HttpStatusCode.NotFound) return false
+        val body = runCatching { Json.parseToJsonElement(error.response.bodyAsText()).jsonObject }.getOrNull()
+            ?: return false
+        val details = body["details"]?.jsonPrimitive?.content.orEmpty()
+        return body["object"]?.jsonPrimitive?.content == "error" &&
+            body["code"]?.jsonPrimitive?.content == "not_found" &&
+            body["status"]?.jsonPrimitive?.content == "404" &&
+            (details == "Your search returned no results." ||
+                details.startsWith("Your query didn’t match any cards.") ||
+                details.startsWith("Your query didn't match any cards."))
+    }
+
     override suspend fun searchCards(query: String, page: Int, bypassCache: Boolean): DataResult<List<Card>> =
         withContext(ioDispatcher) {
             val result = remote.searchCards(query, page, bypassCache)
@@ -82,9 +105,29 @@ class CardRepositoryImpl @Inject constructor(
                 DataResult.Success(cards)
             } else {
                 val exception = result.exceptionOrNull()
+                if (isConfirmedEmptySearch(exception)) {
+                    DataResult.Success(emptyList())
+                } else {
+                    DataResult.Error(exception?.message ?: "Unknown error")
+                }
+            }
+        }
+
+    override suspend fun getRandomCard(query: String?): DataResult<Card> =
+        withContext(ioDispatcher) {
+            val result = remote.getRandomCard(query)
+            if (result.isSuccess) {
+                val card = result.getOrThrow()
+                val (entity, existingTagsJson) = entityPreservingTags(card)
+                cardDao.upsert(entity)
+                scheduleTagResolution(card, existingTagsJson)
+                DataResult.Success(card)
+            } else {
+                val exception = result.exceptionOrNull()
                 if (exception is ClientRequestException && exception.response.status == HttpStatusCode.NotFound) {
                     DataResult.Error("SCRYFALL_404")
                 } else {
+                    exception?.let { recordSafeNonFatal("random_card_fetch_failed", it) }
                     DataResult.Error(exception?.message ?: "Unknown error")
                 }
             }
@@ -103,8 +146,8 @@ class CardRepositoryImpl @Inject constructor(
                 DataResult.Success(paginated)
             } else {
                 val exception = result.exceptionOrNull()
-                if (exception is ClientRequestException && exception.response.status == HttpStatusCode.NotFound) {
-                    DataResult.Error("SCRYFALL_404")
+                if (isConfirmedEmptySearch(exception)) {
+                    DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(emptyList(), false, 0, confirmedNoMatches404 = true))
                 } else {
                     DataResult.Error(exception?.message ?: "Unknown error")
                 }
@@ -338,7 +381,11 @@ class CardRepositoryImpl @Inject constructor(
 
     override suspend fun getCardsByIds(scryfallIds: List<String>): List<Card> = withContext(ioDispatcher) {
         if (scryfallIds.isEmpty()) return@withContext emptyList()
-        cardDao.getByIds(scryfallIds).map { it.toDomainCard() }
+        // SQLite binds at most 999 variables per statement on API <= 30; an unchunked IN (:ids)
+        // over a whole collection throws instead of returning rows.
+        scryfallIds.chunked(SQLITE_MAX_BIND_ARGS).flatMap { chunk ->
+            cardDao.getByIds(chunk).map { it.toDomainCard() }
+        }
     }
 
     override suspend fun getCardById(scryfallId: String): DataResult<Card> = withContext(ioDispatcher) {
@@ -478,8 +525,13 @@ class CardRepositoryImpl @Inject constructor(
     override suspend fun warmCacheForIds(scryfallIds: List<String>) = withContext(ioDispatcher) {
         if (scryfallIds.isEmpty()) return@withContext
 
-        // Single DB read for all IDs instead of N individual getById() calls.
-        val alreadyCached = cardDao.getByIds(scryfallIds).map { it.scryfallId }.toSet()
+        // One DB read per bind-limit chunk instead of N individual getById() calls.
+        // A sync placeholder row is not real card data: re-fetch it (the upsert's @Update hydrates it).
+        val alreadyCached = scryfallIds.chunked(SQLITE_MAX_BIND_ARGS)
+            .flatMap { cardDao.getByIds(it) }
+            .filterNot { it.staleReason == PENDING_HYDRATION_REASON }
+            .map { it.scryfallId }
+            .toSet()
         val missing = scryfallIds.filterNot { it in alreadyCached }
         if (missing.isEmpty()) return@withContext
 
@@ -499,6 +551,41 @@ class CardRepositoryImpl @Inject constructor(
             // Failures are intentionally swallowed — callers fall back to individual getCardById
         }
     }
+
+    override suspend fun lookupCardsByIdentifiers(
+        identifiers: List<CardLookupIdentifier>,
+    ): DataResult<CardLookupResult> = withContext(ioDispatcher) {
+        if (identifiers.isEmpty()) return@withContext DataResult.Success(CardLookupResult(emptyList(), emptyList()))
+        val result = remote.lookupCollection(identifiers.map { it.toDto() })
+        result.fold(
+            onSuccess = { (cards, notFound) ->
+                if (cards.isNotEmpty()) {
+                    val cachedMap = cardDao.getByIds(cards.map { it.scryfallId }).associateBy { it.scryfallId }
+                    cardDao.upsertAll(entitiesPreservingTagsBatch(cards, cachedMap))
+                    scheduleTagResolutionBatch(cards, cachedMap)
+                }
+                DataResult.Success(CardLookupResult(cards, notFound.map { it.toDomain() }))
+            },
+            onFailure = { e ->
+                if (e !is RateLimitExhaustedException) recordSafeNonFatal("card_identifier_lookup_failed", e)
+                DataResult.Error(e.message ?: "Unknown error")
+            },
+        )
+    }
+
+    private fun CardLookupIdentifier.toDto() = CardIdentifierDto(
+        id = scryfallId,
+        name = name,
+        set = setCode,
+        collectorNumber = collectorNumber,
+    )
+
+    private fun CardIdentifierDto.toDomain() = CardLookupIdentifier(
+        scryfallId = id,
+        name = name,
+        setCode = set,
+        collectorNumber = collectorNumber,
+    )
 
     override suspend fun evictStaleCache() =
         cardDao.evictStaleCache(System.currentTimeMillis() - CachePolicy.EVICT_MS)
@@ -547,3 +634,9 @@ class CardRepositoryImpl @Inject constructor(
         return "${e?.message ?: "Network error"} — $date"
     }
 }
+
+// Written by SyncManager.ensureCardsExist for a card Scryfall has not returned yet.
+private const val PENDING_HYDRATION_REASON = "pending_hydration"
+
+/** SQLITE_MAX_VARIABLE_NUMBER is 999 on API <= 30; stay under it for every `IN (:ids)` query. */
+private const val SQLITE_MAX_BIND_ARGS = 900

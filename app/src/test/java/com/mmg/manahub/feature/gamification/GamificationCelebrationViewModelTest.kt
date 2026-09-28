@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.gamification
 
+import com.mmg.manahub.util.testGamificationAvailability
 import app.cash.turbine.test
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.gamification.domain.model.AchievementCategory
@@ -60,7 +61,6 @@ class GamificationCelebrationViewModelTest {
         Dispatchers.setMain(testDispatcher)
         every { repository.observePendingCelebrations() } returns pendingFlow
         every { repository.observeProgression() } returns progressionFlow
-        every { dataStore.gamificationEnabledFlow } returns enabledFlow
         every { dataStore.lastCelebratedLevelFlow } returns lastCelebratedFlow
         // Default: baseline already initialised so the init{} seed is a no-op in most tests.
         coEvery { dataStore.getLastCelebratedLevel() } returns 1
@@ -87,7 +87,7 @@ class GamificationCelebrationViewModelTest {
         isSecret = false,
     )
 
-    private fun buildViewModel() = GamificationCelebrationViewModel(repository, dataStore)
+    private fun buildViewModel() = GamificationCelebrationViewModel(repository, dataStore, testGamificationAvailability(enabledFlow))
 
     private fun achievementId(item: GamificationCelebrationViewModel.CelebrationItem?): String? =
         (item as? GamificationCelebrationViewModel.CelebrationItem.Achievement)?.model?.id
@@ -229,6 +229,19 @@ class GamificationCelebrationViewModelTest {
 
         buildViewModel()
 
+        coVerify(exactly = 1) { dataStore.setLastCelebratedLevel(4) }
+    }
+
+    @Test
+    fun `given gamification unavailable when ViewModel inits then the baseline seed waits for availability`() = runTest {
+        enabledFlow.value = false
+        coEvery { dataStore.getLastCelebratedLevel() } returns -1
+        progressionFlow.value = progression(level = 4)
+
+        buildViewModel()
+        coVerify(exactly = 0) { dataStore.getLastCelebratedLevel() }
+
+        enabledFlow.value = true
         coVerify(exactly = 1) { dataStore.setLastCelebratedLevel(4) }
     }
 

@@ -56,6 +56,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.online.domain.model.ActiveSession
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
@@ -233,24 +236,13 @@ fun OnlineHostSheet(
                             onThemeSelected = viewModel::onThemeChanged,
                         )
 
-                        Button(
+                        MagicCtaButton(
                             onClick = viewModel::createSession,
+                            text = stringResource(R.string.lobby_create_button),
                             enabled = !uiState.isLoading,
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = mc.primaryAccent,
-                                contentColor = mc.background,
-                            ),
-                            shape = ButtonShape,
-                        ) {
-                            if (uiState.isLoading) {
-                                MagicLoadingSpinner(
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            } else {
-                                Text(text = stringResource(R.string.lobby_create_button), style = ty.labelLarge)
-                            }
-                        }
+                            isLoading = uiState.isLoading,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     } else {
                         // ── Waiting room view ──────────────────────────────────────
                         uiState.sessionCode?.let { code ->
@@ -305,24 +297,14 @@ fun OnlineHostSheet(
                         }
 
                         if (uiState.canStart) {
-                            Button(
+                            MagicCtaButton(
                                 onClick = { viewModel.startSession(onGameStart) },
+                                text = stringResource(R.string.lobby_start_button),
                                 enabled = !uiState.isLoading,
-                                modifier = Modifier.fillMaxWidth().height(48.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = mc.lifePositive,
-                                    contentColor = mc.background,
-                                ),
-                                shape = ButtonShape,
-                            ) {
-                                if (uiState.isLoading) {
-                                    MagicLoadingSpinner(
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                } else {
-                                    Text(text = stringResource(R.string.lobby_start_button), style = ty.labelLarge)
-                                }
-                            }
+                                isLoading = uiState.isLoading,
+                                color = MagicCtaColor.Success,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         } else {
                             Text(
                                 text = stringResource(R.string.lobby_waiting_players_msg),
@@ -334,18 +316,14 @@ fun OnlineHostSheet(
                         // Explicit close-room action — previously the only way out of a live
                         // session was the ✕ (which now routes through handleDismiss), with no
                         // affordance inside the waiting room itself (audit finding #6).
-                        OutlinedButton(
+                        MagicCtaButton(
                             onClick = handleDismiss,
+                            text = stringResource(R.string.lobby_action_close_room),
                             enabled = !uiState.isLoading,
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = mc.textSecondary,
-                            ),
-                            border = BorderStroke(1.dp, mc.surfaceVariant),
-                            shape = ButtonShape,
-                        ) {
-                            Text(text = stringResource(R.string.lobby_action_close_room), style = ty.labelLarge)
-                        }
+                            style = MagicCtaStyle.Outlined,
+                            color = MagicCtaColor.Neutral,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             }
@@ -407,7 +385,7 @@ private fun HostActiveSessionCard(
             ) {
                 Text(
                     text = session.code,
-                    style = ty.titleMedium.copy(fontFamily = FontFamily.Monospace, letterSpacing = 4.sp),
+                    style = ty.codeDisplay,
                     color = mc.primaryAccent,
                 )
                 Box(
@@ -425,30 +403,19 @@ private fun HostActiveSessionCard(
                 color = mc.textSecondary,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                Button(
+                MagicCtaButton(
                     onClick = onRejoin,
+                    text = stringResource(R.string.lobby_action_rejoin),
                     enabled = !isLoading,
-                    modifier = Modifier.weight(1f).height(48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = mc.primaryAccent,
-                        contentColor = mc.background,
-                    ),
-                    shape = ButtonShape,
-                ) {
-                    Text(text = stringResource(R.string.lobby_action_rejoin), style = ty.labelMedium)
-                }
-                Button(
+                    modifier = Modifier.weight(1f),
+                )
+                MagicCtaButton(
                     onClick = onAbandon,
+                    text = stringResource(R.string.lobby_action_abandon),
                     enabled = !isLoading,
-                    modifier = Modifier.weight(1f).height(48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = mc.secondaryAccent,
-                        contentColor = mc.background,
-                    ),
-                    shape = ButtonShape,
-                ) {
-                    Text(text = stringResource(R.string.lobby_action_abandon), style = ty.labelMedium)
-                }
+                    color = MagicCtaColor.Accent,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }

@@ -68,11 +68,10 @@ off suggestion use cases below). New engine, pure `commonMain`,
   workstreams of the same plan). **`SuggestCutsUseCase` itself SURVIVES undeleted** (kept alive
   only for `app/src/test/.../harness/HarnessDoctorPipeline.kt`'s unrelated Wizard Quality Campaign
   QA gate — see that file's KDoc — no production/DI consumer resolves it any more).
-  **`SuggestAddsFromCollectionUseCase`/`SuggestAddsFromCommunityUseCase` also SURVIVE** — Motor
-  A/B's own ranking logic is now DUAL-PURPOSE: `DeckDoctorOrchestrator` no longer calls them, but
-  `BuildDeckFromTemplateUseCase` (the Deck Wizard's build engine, `domain/template/`) independently
-  depends on both as its own fill-from-collection/community placement engine. Do not delete either
-  class without first checking `BuildDeckFromTemplateUseCase`'s own call sites.
+  **`SuggestAddsFromCollectionUseCase` SURVIVES** with one live caller (`HarnessDoctorPipeline`,
+  test harness); `SuggestAddsFromCommunityUseCase` and `CandidatePoolGenerator` were DELETED with the
+  Motor A wizard path in the 60-card wave (v6 Phase 7, 2026-09-17). Re-check `SuggestAddsFromCollectionUseCase`'s
+  callers before deleting it.
 - **"Decks like yours" (Motor B's OTHER half — `FindSimilarDecksUseCase`, "which real Archidekt
   decks look like this one") is UNCHANGED and SURVIVES**, re-homed as a top-level `LazyColumn` item
   gated only on `uiState.communityEngineEnabled && uiState.similarDecks.isNotEmpty()` — it was
@@ -122,18 +121,31 @@ off suggestion use cases below). New engine, pure `commonMain`,
     `contributions.sumOf { it.quantity }`** — role counts are `round(Σ quantity × confidence)`, so a
     partially-confident card contributes a fraction; `current` is what the SCORE uses, the
     `contributions` list (sorted confidence-descending) is what produced it. **Never reconcile one
-    from the other** — this is a documented-on-purpose mismatch, not a bug to "fix". Sections render
+    from the other** — the mismatch is real and permanent, but since Deck Wizard v4 (W0.3/E1) it is
+    purely INTERNAL: `CardSection.realCount` (`Σ contributions.quantity`, no rounding/weighting) is
+    the ONE number every UI consumer renders (wizard sections + Analysis tab sections); `current`
+    never reaches the screen any more, only the score. Sections render
     UNFILTERED, including 0/N gaps (the old `filter { it.current > 0 }` was deleted — a gap is exactly
     what the user needs to see; this also exposed and fixed a pre-existing bug where
     `tribe_members` had a band but no `RoleSpec`, so it was permanently absent from `roleCounts` on
     every TRIBAL skeleton — now wired via `ArchetypeRoleClassifier.tribeMemberCount`/
     `dominantTribeKey`).
-  - **SYNERGY sections** are the deck's top `profile.tagFingerprint` keys over the alignment
-    threshold (strategy + `tribe:` keys) plus a mandatory **"Off-plan"** section (`id = "offplan"`)
-    listing every non-aligned card that depresses the subscore — `offplan` never gets a Browse button
-    (nothing to search for). `subscore` math is UNCHANGED (still `density × 100`); the pillar's
-    sub-caption reads `"aligned N / M non-lands"` so the number stays explainable without granting
-    SYNERGY extra visual authority — it remains the weakest-calibrated pillar (KDoc warning kept).
+  - **SYNERGY sections — REWRITTEN by Deck Wizard v5 (D2/D3, ADR-009).** The pillar now renders
+    **Engines first**, then the deck's tribe ONCE, then `interaction`/`standalone`/`offplan`. The old
+    loose `fingerprint:<key>` list is GONE: a TRIBAL tag groups into the single `tribe:<x>` key space
+    (no more "Human" beside "Human (tribe)"), and a tag whose key is a `RoleKey` the skeleton already
+    bands is dropped from fingerprint grouping entirely (it would restate the richer `role:<key>`
+    section — this was duplicating a label on 45% of real builds, usually `card_draw`). An **engine**
+    is `PillarResult.synergyEngines`: per axis, the real producer and payoff card lists with REAL
+    counts (`Σ quantity`), both ideals, and a state of COMPLETE / MISSING_PAYOFFS / MISSING_PRODUCERS
+    — shown as soon as the axis has ≥1 card on each side, or one side ≥ half its ideal (flagged
+    incomplete). Each side is its own browsable section (`engine:<AXIS>:producers` / `:payoffs`).
+    `AxisState.health` stays INTERNAL to scoring — the old "% healthy" caption and the LIVE badge were
+    deleted as meaningless to players; never surface a health percentage again. MILL_OPP and LOCK are
+    excluded from Engines by design (payoff-optional: they would always read "missing payoffs").
+    `subscore` math is UNCHANGED and reads the graph, never these display sections — if a scoring path
+    ever reads a section, that is a bug. The pillar's sub-caption still reads `"aligned N / M
+    non-lands"`; it remains the weakest-calibrated pillar (KDoc warning kept).
   - **`SectionSearchQuery.kt` (new, `shared/core-domain/.../engine/`) owns ALL Scryfall query
     building — the engine itself stays 100% query-syntax-free.** `fragmentFor`/`buildFor`/
     `collectionTagKeysFor` per section id: direct `function:` oracle tags where one exists, a handful
@@ -183,10 +195,10 @@ off suggestion use cases below). New engine, pure `commonMain`,
     `nearestFor` call still uses the 2-arg, format-unfiltered overload while
     `CuratedStrategyPickerSheet` filters by format — a chip/sheet mismatch that can show a strategy
     chip the picker itself wouldn't offer for the deck's format. `SuggestCutsUseCase`/
-    `SuggestAddsFromCollectionUseCase`/`SuggestAddsFromCommunityUseCase` were NOT deleted despite the
-    original plan's intent, because live dependents (`BuildDeckFromTemplateUseCase`, and a Wizard
-    Quality Campaign QA harness for the first one) appeared after the plan was written — see the bullet
-    two above and the plan's decisions doc for the full reasoning; re-check both dependents before ever
+    `SuggestAddsFromCollectionUseCase` were NOT deleted despite the original plan's intent, because a
+    live dependent (`HarnessDoctorPipeline`, the wizard QA harness) appeared after the plan was written;
+    `SuggestAddsFromCommunityUseCase` went with the Motor A wizard path (v6 Phase 7) — see the bullet
+    two above and the plan's decisions doc for the full reasoning; re-check the dependent before ever
     revisiting that deletion.
   - → memory: `project_deck_analysis_category_sections`, `feedback_scryfall_function_tag_validation`,
     `feedback_tagdictionary_to_scryfall_translation`
@@ -279,26 +291,155 @@ off suggestion use cases below). New engine, pure `commonMain`,
   call budget / ADR-005 above) — per ADR-005 this pillar deliberately does NOT add a new on-demand
   refresh path to compensate. Sideboard role-coverage/matchup analysis remains FUTURE DEBT.
 
-**Deck Builder v2 wizard (`Screen.DeckWizard`) and Discoveries v2 (`DiscoverSynergiesV2UseCase`,
-identity-only clustering) are the SOLE "Build from seed" / "Browse inspirations" entry points** —
-gated by `DeckFeatureFlags.DECK_BUILDER_V2_ENABLED`/`DISCOVERIES_V2_ENABLED` (currently `true`).
-Their LEGACY siblings (`DECK_STUDIO_BUILD_FROM_SEED_ENABLED`/`DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED`,
-and the `SeedsContent`/`BuildDeckFromSeedsUseCase`/`DeckMagicEngine.discoverSynergies` content they
-gated) went through a hide-then-retire cycle: hidden 2026-07-17 when v2 landed, both entry points
-temporarily hidden end-to-end 2026-07-21 (all four flags briefly `false`), then the legacy code was
-DELETED OUTRIGHT (not just re-hidden) in the Deck Wizard & Engine Rework plan, Workstream 7.2
-(2026-07-28) after a parity audit confirmed the current wizard fully supersedes it — see
-`docs/plans/deck-wizard-rework-plan.md` §WS7 and `feature_deck_wizard_rework_ws7_retirement` memory.
-`docs/hidden-features/deck-studio-build-from-seed.md`/`-inspirations.md` were deleted alongside it;
-only `docs/hidden-features/deck-studio-suggestions.md` remains (still-real hide/show toggle, no
-legacy sibling to retire). → memory: `project_deck_builder_v2` (consolidated; per-run detail in
-`.claude/agent-memory/android-kotlin-architect/`), `project_deck_studio_temporary_hide_2026-07-21`
+### Deck Wizard (`Screen.DeckWizard`, `presentation/wizard/`)
+
+**The durable record is `docs/deck-wizard-state.md`** (architecture contract, D1-D26 decisions,
+engine defects, §7 what the 60-card wave closed and what stays open) — read it before touching any
+wizard code. `FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED` is `true` (Commander v3 2026-09-09; v4 Choice
+screen + harness v3 2026-09-15; v5 category vocabulary + placement quality 2026-09-15/16, ADR-009;
+**v6 60-card wave 2026-09-17, ADR-010 — every non-Draft format builds through ONE engine**). Only the
+must-know invariants live here:
+
+- **ONE engine, every format (v6 S1, ADR-010).** `BuildWizardDeckUseCase` (`shared/core-domain/.../
+  feature/decks/domain/template/`) builds `COMMANDER`/`COMMANDER_CASUAL` AND `CASUAL`/`STANDARD`/
+  `PIONEER`/`MODERN`/`LEGACY`/`VINTAGE`/`PAUPER` with a sealed `BuildAnchor` — `Commander(card)` or
+  `Sixty(identity, seeds)` — resolved by `WizardPlanResolver` into the SAME skeleton/axes/bands
+  `AnalysisEngine` resolves for that deck (`RoleKey`/`AxisKey`/`CardSection.id`/`CuratedStrategy.id`
+  vocabulary only; no wizard-only scoring, classification, legality or targets — if you feel the need
+  for a new wizard-only heuristic, stop). The legacy Motor A wizard path (`BuildDeckFromTemplateUseCase`,
+  `DeckTemplateResolver`, `MainboardTrimmer`, `CandidatePoolGenerator`, `DeckWizardSpec`, the
+  DIRECTION/IDENTITY/RESULT phases, `SuggestStrategiesForSeedsUseCase`, `RankOwnedCardsForProfileUseCase`)
+  is DELETED — do not resurrect it. `DRAFT` is the only unsupported format: the VM emits
+  `DeckWizardEvent.Exit` + a toast, never a silent fallback to Casual.
+  → memory: `project_deck_wizard_sixty_card_v6`, `project_deck_wizard_commander_v3_plan`
+- **Copies are an engine concept (v6 S2-S5).** `CopyPolicy.maxPlaceable(card, format, owned)` (basics
+  ∞, Commander-shaped 1, Vintage `restricted` 1, else `min(format.maxCopies, owned)`) is what the ENGINE
+  may place; `CopyPolicy.maxSeedCopies(card, format)` (legality only, never owned-clamped) is what the
+  USER may seed. Owned quantity is summed BY NAME across printings before the pool is deduped, and
+  `onAddSeed` keys its copy cap by name too (two printings of one card can never double the cap).
+  The placement loop, `finalize` and `refine` all work in COPY units (`fold` once per placed copy;
+  `tentativeByRole` holds one id per tentative copy; `finalize(draft, Map<RoleKey, List<String>>)` reads a
+  REPEATED id as that many copies — there is deliberately no `Map<String, Int>` overload, it clashes on
+  the JVM signature). Copy k ≥ 2 earns `PlacementScorer.CONSISTENCY_CREDIT × powerNormalized` (0.06,
+  Phase-6 swept — the 4-of target was unreachable at any value; see state doc §5/§7 before retuning).
+- **Seeds (v6 S3/S4/S19).** `DeckWizardUiState.seeds: List<WizardSeed(card, quantity)>`; seed cap =
+  `targetDeckSize − commander slot` in copies (60 / 99). Seeds may be unowned (kept, D7, shown with the
+  owned icon); the idle SEED_PICK grid is owned + legal cards, text/advanced search goes to Scryfall with
+  `AdvancedSearchSheet.lockedCriteria = SectionSearchQuery.legalityCriterion(format)` (Pauper ⇒
+  `f:pauper`). In the CARDS flow seeds DEFINE the identity — `colorIdentity` is REPLACED by the union
+  of the CURRENT seeds on every add/remove (never accumulated, Run 4a F3); in COLORS/STRATEGY flows a
+  seed outside the identity is rejected with the existing toast. Seeds past the non-land budget (or
+  lands past `landTarget`) shrink the OTHER side's fill — the deck never exceeds its size and seeds
+  are never dropped (Run 4a F5). `ManaColor.C` is UI-only state for the
+  exclusive Colorless chip — `DeckWizardUiState.engineIdentity` strips it; the engine sees `{}` and
+  fills basics with Wastes. Never let `C` reach `BuildAnchor`.
+- **`seedCards` hand-off (Browse inspirations).** `Screen.DeckWizard.createRoute(seedCards = [(id, qty)])`
+  lands on `WizardPhase.STRATEGY` in the CARDS flow; each pick goes through `onAddSeed` `qty` times
+  (same validation as a manual pick), Back returns to SEED_PICK; zero resolved seeds ⇒ SEED_PICK + toast.
+  The legacy name-based `seeds` arg is untouched.
+- **No format step (R13/R14); four step maps (v6 S20).** `Screen.DeckWizard.createRoute` requires
+  `format` and `deckId`. Commander: `COMMANDER_PICK → STRATEGY → PLAN_SECTIONS → REVIEW`; Cards:
+  `ENTRY → SEED_PICK → STRATEGY → PLAN_SECTIONS → REVIEW`; Colors: `ENTRY → COLOR_PICK → PLAN_SECTIONS →
+  REVIEW`; Strategy: `ENTRY → STRATEGY_PICK → PLAN_SECTIONS → REVIEW`; then `GENERATING → [CHOICE →
+  GENERATING] → Deck Studio` for every format (no Result screen — `WizardPhase.RESULT` does not exist).
+  The two Studio entry points stay mutually exclusive by render condition (R15) and are gated by
+  `isWizardAvailableForFormat` (= not Draft), not by `isCommanderFormat`; `createRoute`'s required
+  `replaceConfirmed` nav arg is re-checked against the deck's REAL card count right before persisting.
+- **Strategies for 60-card come ONLY from `CuratedStrategyCatalog.availableIn(format)`** ranked by
+  `RecommendWizardStrategiesUseCase(format, anchor, owned, …)` (Commander path byte-identical; Sixty
+  path = seeds' axis profiles + role confidences, seeds' `card_strategy_tags`,
+  `ColorStrategyAffinity.curatedFor(identity, format)` ×2 when seedless, owned support scaled by
+  `maxPlaceable`). `StrategyRecommendationList` is the one list composable for STRATEGY and
+  COLOR_PICK; STRATEGY_PICK lists the catalog with inline color combos (`emptySet()` renders a
+  "Colorless" chip). Custom for 60-card = generic SIXTY skeleton + `SixtyFormatProfile` + the seeds'
+  axes (D6 generalized).
+- **The Choice screen, not a Result screen (E11, v6 S6).** Ambiguity OR fallback ⇒ `WizardPhase.CHOICE`:
+  only unresolved sections, each capped at its remaining slots IN COPIES; rows are `CardRow` (60-card:
+  +/- stepper via `onChangeChoiceQuantity(role, id, ±1)`, Commander: selected toggle), one row per
+  DISTINCT id; the image tap opens `CardDetailSheet(readOnly = true)` inline — the wizard never
+  navigates to `CardDetailScreen` from Choice. `buildWithGroups()` + `finalize()`; **persistence happens
+  exactly ONCE** at `finalizeWizardDraft`; `onRetryGeneration` resumes the same `pendingFinalize`;
+  abandoning Choice writes nothing; `WizardPreferenceStore` records only genuinely chosen alternatives
+  after a successful persist.
+- **One legality predicate everywhere (R7/E9, v6 S11).** `DeckLegality.isLegalForFormat(card, format)`
+  is THE check — pool, seed add, Browse lock, Choice, `AnalysisEngine` P5, and `fillLandsV2` Stage A
+  (owned non-basics must be legal in the target format — Phase 6.2 found a Legacy dual landing in a
+  Standard build). `CASUAL`/`COMMANDER_CASUAL`/`DRAFT` are permissive. Vintage `restricted` stays
+  "legal"; only `CopyPolicy` reads `DeckLegality.isRestricted`.
+- **Basics are always available, ownership-exempt (R12).** `resolveBasicCard` only needs the basic's
+  `Card` OBJECT in `ownedCollection`; `DeckWizardViewModel.guaranteeBasicsAvailable(identity)` pre-warms
+  them (Wastes for `{}`) before the use case runs.
+- **Mana base sections (v6 S10).** `AnalysisEngine.evaluateManaBase` emits `produces:<X>` for EVERY
+  identity color even at count 0 and a `lands` section (band = `skeleton.lands`, first in MANA_BASE);
+  Studio inherits both; sections never feed the score (golden/calibration/corpus suites byte-identical).
+- **`CardSection.realCount` (`Σ contributions.quantity`) is what every UI consumer renders**; `current`
+  stays score-only.
+- **Persistence is ONE atomic write** — `BuildWizardDeckUseCase.persist(anchor, …)` →
+  `DeckRepository.persistWizardBuild` (single Room `@Transaction` via `DeckDao.persistWizardBuild`;
+  slots carry `quantity`; WIZARD source for engine-placed + commander, USER for seeds; a Commander
+  build's `commanderCardId`/`coverCardId` ride the SAME transaction via its `commanderCardId` param —
+  never a separate `updateDeck` before the cards, UX polish Run 4a F2). The 60-card path never writes
+  `commanderCardId` and never renames the deck (Studio owns the name); D12: always into
+  `launchedFromDeckId`. `finalize` merges land entries by scryfallId before persisting: a seeded basic
+  plus the same basic placed by the fill would otherwise collapse to ONE `deck_cards` row (PK
+  `deck_id, scryfall_id, is_sideboard`) and silently lose copies.
+- **Collection-only, D7** — no Scryfall backstop for ANY format, Casual included; seeds (owned or not)
+  are always kept. A thin collection legitimately declares gaps — never force-filled.
+- **Shared UI primitives (v6 S16).** `CardRow(onImageClick, addEnabled)` (commonMain) is the row for
+  seed queue / plan sections / review / choice; `CardDetailSheet(seedSelection, readOnly)`;
+  `DeckCardQueueSheet`/`DeckCardQueueItem` (`app/.../core/ui/components/`) is the generic card queue —
+  `DeckScannerQueueSheet` is a thin wrapper over it with the scanner's slots (`headerContent`,
+  `rowActions`, `footerContent`); the pre-existing `CardQueueSheet` is the Multi-Add/collection queue,
+  a different component.
+- **Never `.valueOf()` on a persisted enum string**; calibration is normative (fixtures are a
+  regression harness, never a training set); the golden/corpus/calibration/skeleton-differentiation
+  analysis suites must stay byte-identical across wizard-only changes.
+- **Telemetry** goes through the ViewModel (`FirebaseCrashlytics`/`CrashReporter`), never a
+  Composable directly; no card/deck names or other free text in any Crashlytics key or exception
+  message (`BuildWizardDeckUseCase`'s blocker telemetry logs format + colour-identity size, never
+  `commander.name`). ≤4 custom keys per logical operation.
+- **ONE category vocabulary (v5, ADR-009).** `CategoryVocabulary.cardTagKeysFor(roleKey)` is the only
+  answer to "which `CardTag` keys mean membership in this category", read by BOTH
+  `ArchetypeRoleClassifier.tagMatcher` (classification) and `SectionSearchQuery.collectionTagKeysFor`
+  (Browse's Collection filter), so a card the analysis attributes to a category is exactly what Browse
+  finds. Section Browse must never resolve its Collection filter through
+  `CardFunctionOption.collectionTagKeys` again — that second, wider vocabulary is what made "Counters
+  Payoff" list cards the analysis ignored. Widening a membership requires citing the `TagDictionary`
+  rules that prove two keys detect the same thing. KNOWN GAP: `RoleClassifier`'s private oracle-text
+  fallback for the 5 legacy roles is visible to the analysis but not to Browse (ADR-009 debt).
+- **The wizard never over-fills a role or plants an off-plan card (v5, S7/S8/D4).**
+  `PlacementScorer.marginalGain` charges an overflow cost for pushing any non-anti role past its
+  `max`, and the build loop hard-excludes an overflowing candidate while a non-overflowing one still
+  clears the floor. A bare type-line density producer (Instant/Sorcery/Artifact/Enchantment) only
+  earns axis gain when the plan targets that axis or a payoff is already placed — otherwise it would
+  form no edge and read off-plan. When on-plan candidates run out, the builder fills from Standalone
+  (own classified role) and only then off-plan, recording both in
+  `WizardBuildResult.fallbackStandaloneIds`/`fallbackOffPlanIds`. **Every fallback build MUST reach a
+  surface that shows those ids** — the Choice phase is entered on ambiguity OR fallback, never on
+  ambiguity alone (a v5 audit found the fallback flag silently vanishing on zero-ambiguity builds).
+  `refine` is a bounded local search (worst card out, best of a shortlist in, verified by full
+  re-analysis); it must never swap in a null-gain card without flagging it as off-plan.
+- **Quality over speed on generation** — a slower build is acceptable, a worse deck is not (the user's
+  own instruction). Record runtime percentiles; never trade deck quality for latency.
 
 **The SINGLE deck create + edit surface.** Both new decks AND existing decks route here: DeckList FAB +
 empty-state, Collection/Stats/Home/CardDetail deck-open, and Home → "Build deck" all navigate to
 `Screen.DeckStudio.createRoute(deckId?)` (null ⇒ fresh draft). The old `CreateDeckBottomSheet` + the
 `DeckViewModel.createDeck`/`showCreateDialog`/`createdDeckId` state are GONE — DeckStudio creates its own
 draft. Fuses manual editing + inline Deck Doctor suggestions + seed-build + Discoveries on ONE **live deck**.
+- **Browse inspirations (rework 2026-09-24, `docs/plans/browse-inspirations-rework-plan.md`).**
+  Offered only for 60-card formats on an EMPTY deck (`isBrowseInspirationsAvailable`). Strategies =
+  `DiscoverCollectionSynergiesUseCase` (commonMain `domain/inspirations/`): per-card
+  `SynergyGraph.cardAxisProfile` over the owned, format-legal pool + `SynergyEngineState.resolve`
+  (the D3 rule, now shared with `AnalysisEngine`); ids are the Analysis vocabulary
+  (`engine:<AXIS>:producers|payoffs`, `tribe:<x>`), so "Browse for X" reuses `SectionSearchQuery`/
+  `SectionMembership` untouched — a corpus parity test guards it. Combos = Spellbook `GET variants/`
+  for ONE pinned card (never the whole collection), pieces resolved from the collection then one
+  batched `lookupCardsByIdentifiers` per 75 names; combos with a resolved piece illegal in the format
+  or needing a command zone are hidden. ONE selection shared by both tabs, rules =
+  `InspirationSelection` (mirrors `onAddSeed`), wiped on dismiss; "Start building the deck" hands off
+  through the wizard's `seedCards` nav arg. `DiscoverSynergiesV2UseCase`/`FindCombosUseCase`/
+  `DiscoveryRow`/`ComboRow` are DELETED — do not resurrect the tag-cluster discoveries.
 - **Format + Import live INSIDE Studio:** `DeckFormatChipRow` (empty-state + `EditDeckSheet`) → `changeFormat`
   (writes through repo + `invalidateSuggestions()`). Import via `ImportDeckUseCase` (`domain/usecase/`,
   shared extraction — writes into the live draft, renames from a parsed header; `DeckViewModel.importDeck`
@@ -367,9 +508,9 @@ before. Deck Studio's Suggestions header carries a "Deck plan" chip/sheet (still
 source that REPLACED the since-retired `SuggestAddsWithBudgetUseCase` as `DeckDoctorOrchestrator`'s
 adds source. **`DeckDoctorOrchestrator` no longer has an adds source at all** — the whole
 Cuts/Adds suggestion engine was deleted end-to-end in the Deck Analysis Category Sections rework
-(W0, 2026-08-21); `SuggestAddsFromCollectionUseCase` survives only as `BuildDeckFromTemplateUseCase`
-(the Deck Wizard's build engine)'s own placement source — see the "Deck Studio" section above for
-the full W0 narrative. → memory: `project_archetype_engine`, `project_deck_doctor_phase2_motor_a`.
+(W0, 2026-08-21); `SuggestAddsFromCollectionUseCase` survives only for `HarnessDoctorPipeline` (its
+former production caller, the Motor A wizard build, was deleted in v6 Phase 7) — see the "Deck Studio"
+section above for the full W0 narrative. → memory: `project_archetype_engine`, `project_deck_doctor_phase2_motor_a`.
 Key invariants:
 - `DeckFormat.valueOf()` must NOT be used — use `DeckFormat.entries.firstOrNull { ... } ?: STANDARD`.
 - The wizard's `DeckWizardViewModel.onGenerate()` re-entrancy-guards a double-tap via a synchronous
@@ -394,8 +535,8 @@ Key invariants:
   — there is no more budget UI OR budget wiring anywhere in Deck Studio. `Card.colors`/
   `colorIdentity`/`producedMana` (D14) are persisted as compact WUBRG-subset strings (not JSON);
   Motor A's pip-intensity multiplier and unknown-color-identity fail-closed filter (Commander only,
-  still live inside `SuggestAddsFromCollectionUseCase` for `BuildDeckFromTemplateUseCase`'s sake)
-  consume them. → memory: `project_dormant_budget_pool` (retirement recorded),
+  still live inside `SuggestAddsFromCollectionUseCase` for the harness's sake) consume them; the
+  wizard itself now reads `producedMana` through `BuildWizardDeckUseCase`'s land fill. → memory: `project_dormant_budget_pool` (retirement recorded),
   `project_card_model_produced_mana`, `project_deck_doctor_phase2_motor_a`,
   `feedback_candidatepoolgenerator_no_longer_dormant`
 - **Phase 3** added a new Cloudflare Worker `cloudflare/manahub-community/` (TypeScript, Wrangler,
@@ -521,10 +662,10 @@ Key invariants:
   +DeckScorerTest green); `EvaluateDeckUseCase` passes the full mainboard. New `DeckWarning`s: `DeckTooSmall`,
   `TooManyCopies`, `SingletonViolation`, `OffColorIdentity` — quantity-aware, copy limit is **by card name**,
   basics exempt, CASUAL/DRAFT skip min-size. D3 multi-copy: `AddSuggestion.suggestedCopies` (≤`maxCopies −
-  owned-by-name`; Commander/Draft = 1) — consumed today by the wizard build
-  (`BuildDeckFromTemplateUseCase`) to write the right per-card quantity; the retired `BudgetOptimizer`
-  used to charge `copies × price` against it. D4: `CandidatePoolGenerator` edhrec-pre-sorts
-  ONLY for Commander; constructed pools rank by fit. When touching `DeckWarning`, add the new cases'
+  owned-by-name`; Commander/Draft = 1) — its wizard consumer (`BuildDeckFromTemplateUseCase`) was
+  deleted in v6 Phase 7; the wizard's copy rule is now `CopyPolicy` (owned summed by name, restricted
+  = 1); the retired `BudgetOptimizer` used to charge `copies × price` against it. D4:
+  `CandidatePoolGenerator` was deleted with the same path. When touching `DeckWarning`, add the new cases'
   `label()`+`key` in `DeckDoctorStrings` + `strings.xml`.
 - **Re-run the golden ORDERING invariants after ANY scoring-component change** — a re-tune of one component
   (curve) can unmask coupling in another (redundancy) by removing slack.

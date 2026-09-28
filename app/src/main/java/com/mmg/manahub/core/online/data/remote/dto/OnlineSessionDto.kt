@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
 data class OnlineSessionDto(
     @SerialName("id")                    val id: String,
     @SerialName("code")                  val code: String,
-    @SerialName("host_user_id")          val hostUserId: String,
+    @SerialName("host_user_id")          val hostUserId: String? = null,
     @SerialName("game_mode")             val gameMode: String,
     @SerialName("player_count")          val playerCount: Int,
     @SerialName("layout_key")            val layoutKey: String? = null,
@@ -28,7 +28,7 @@ data class OnlineSessionDto(
         gameMode          = gameMode,
         playerCount       = playerCount,
         layoutKey         = layoutKey,
-        status            = runCatching { OnlineSessionStatus.valueOf(status) }.getOrDefault(OnlineSessionStatus.ABANDONED),
+        status            = parseStatusOrUnknown(status, OnlineSessionStatus.entries, OnlineSessionStatus.UNKNOWN, "online_session_status_unknown"),
         tournamentId      = tournamentId,
         tournamentMatchId = tournamentMatchId,
         createdAt         = createdAt,

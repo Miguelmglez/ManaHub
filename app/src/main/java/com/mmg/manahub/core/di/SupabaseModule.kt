@@ -13,7 +13,7 @@ import dagger.hilt.components.SingletonComponent
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.auth
-import io.ktor.client.engine.android.Android
+import io.ktor.client.engine.okhttp.OkHttp
 import javax.inject.Singleton
 
 @Module
@@ -32,11 +32,12 @@ object SupabaseModule {
         // web target build an identical client. Android supplies only its platform-specific
         // pieces: the Keystore-backed session manager, the OkHttp Ktor engine, and the custom
         // "manahub" URI scheme used for the OAuth/deep-link redirect flow.
+        // Must be OkHttp: Ktor's Android engine has no WebSocketCapability, so Realtime never connects
         return createManaHubSupabaseClient(
             supabaseUrl = BuildConfig.SUPABASE_URL,
             supabaseKey = BuildConfig.SUPABASE_ANON_KEY,
             sessionManager = SecureSessionManager(context),
-            httpEngine = Android.create(),
+            httpEngine = OkHttp.create(),
             oauthScheme = "manahub",
             crashReporter = crashReporter,
         )

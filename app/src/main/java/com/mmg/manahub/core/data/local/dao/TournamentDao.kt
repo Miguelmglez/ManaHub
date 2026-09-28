@@ -44,10 +44,11 @@ abstract class TournamentDao {
     @Insert
     abstract suspend fun insertPlayers(players: List<TournamentPlayerEntity>): List<Long>
 
-    @Query("SELECT * FROM tournament_players WHERE tournamentId = :tournamentId")
+    // ORDER BY seed: standings and pairings must never depend on SQLite row order
+    @Query("SELECT * FROM tournament_players WHERE tournamentId = :tournamentId ORDER BY seed ASC")
     abstract suspend fun getPlayers(tournamentId: Long): List<TournamentPlayerEntity>
 
-    @Query("SELECT * FROM tournament_players WHERE tournamentId = :tournamentId")
+    @Query("SELECT * FROM tournament_players WHERE tournamentId = :tournamentId ORDER BY seed ASC")
     abstract fun observePlayers(tournamentId: Long): Flow<List<TournamentPlayerEntity>>
 
     /**

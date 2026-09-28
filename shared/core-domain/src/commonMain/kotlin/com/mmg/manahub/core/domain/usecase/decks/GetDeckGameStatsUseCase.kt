@@ -8,15 +8,16 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.feature.game.domain.model.DeckSessionSummary
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.delay
 
 /**
  * Aggregates per-deck game statistics into a single observable [Result].
  *
  * Combines four flows from [gameSessionRepository] / [cardRepository]:
- *  - Single-deck win/loss stats keyed by [playerName].
+ *  - Single-deck win/loss stats keyed by the local seat and deck id.
  *  - Top-scoring cards (up to [TOP_CARDS_LIMIT]) from survey answers.
  *  - Weakest cards (up to [WEAK_CARDS_LIMIT]) from survey answers.
  *  - The last [RECENT_SESSIONS_LIMIT] session summaries for the deck.
@@ -58,11 +59,11 @@ class GetDeckGameStatsUseCase(
 
     /**
      * Returns a cold [Flow] that emits a fresh [Result] whenever any of the
-     * underlying repository queries change for [deckId] or [playerName].
+     * underlying repository queries change for [deckId].
      */
-    operator fun invoke(deckId: String, playerName: String): Flow<Result> =
+    operator fun invoke(deckId: String): Flow<Result> =
         combine(
-            gameSessionRepository.observeSingleDeckStats(deckId, playerName),
+            gameSessionRepository.observeSingleDeckStats(deckId),
             gameSessionRepository.observeTopCardImpactsForDeck(deckId, TOP_CARDS_LIMIT),
             gameSessionRepository.observeWeakestCardImpactsForDeck(deckId, WEAK_CARDS_LIMIT),
             gameSessionRepository.observeSessionSummariesForDeck(deckId).map { it.take(RECENT_SESSIONS_LIMIT) },
@@ -106,5 +107,9 @@ class GetDeckGameStatsUseCase(
                 recentSessions = sessions,
             )
         }
-        .catch { emit(Result(totalGames = 0, wins = 0, winrate = 0f, avgDurationMs = 0L, topCards = emptyList(), weakestCards = emptyList(), recentSessions = emptyList())) }
+        .retryWhen { _, attempt ->
+            emit(Result(totalGames = 0, wins = 0, winrate = 0f, avgDurationMs = 0L, topCards = emptyList(), weakestCards = emptyList(), recentSessions = emptyList()))
+            delay((1_000L shl attempt.coerceAtMost(5).toInt()))
+            true
+        }
 }

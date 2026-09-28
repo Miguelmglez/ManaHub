@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
 import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.model.SearchCriterion
+import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -189,19 +191,25 @@ class SectionSearchQueryTest {
         )
     }
 
-    // ── fingerprint:<key> reuses the same translation as role:<key> ────────────────────────
+    // ── engine:<axis>:producers/payoffs (Deck Wizard Commander v5) ──────────────────────────
 
     @Test
-    fun fingerprintFragment_reusesRoleTranslation() {
-        assertEquals(
-            SectionSearchQuery.fragmentFor("role:sac_outlet", ctx()),
-            SectionSearchQuery.fragmentFor("fingerprint:sac_outlet", ctx()),
+    fun engineFragment_everyEngineAxis_yieldsNonNullBothSides() {
+        val context = ctx()
+        val axes = listOf(
+            "LIFE", "DEATH", "TOKENS", "COUNTERS", "LANDFALL", "GRAVEYARD", "ETB", "SPELLS",
+            "ARTIFACTS", "ENCHANTMENTS", "ATTACHED", "ATTACK", "PLANESWALKERS", "GROUP", "ENGINE", "GRAVEYARD_EXIT",
         )
+        val missing = axes.filter { axis ->
+            SectionSearchQuery.fragmentFor("engine:$axis:producers", context) == null ||
+                SectionSearchQuery.fragmentFor("engine:$axis:payoffs", context) == null
+        }
+        assertTrue(missing.isEmpty(), "engine axes with no fragment on one side: $missing")
     }
 
     @Test
-    fun fingerprintFragment_unknownKey_returnsNull() {
-        assertNull(SectionSearchQuery.fragmentFor("fingerprint:equipment_matters", ctx()))
+    fun engineFragment_unknownAxis_returnsNull() {
+        assertNull(SectionSearchQuery.fragmentFor("engine:NOT_AN_AXIS:producers", ctx()))
     }
 
     // ── Curve / mana-base / tribe / legality-pair / offplan structural ids ─────────────────
@@ -264,12 +272,15 @@ class SectionSearchQueryTest {
     }
 
     @Test
-    fun buildFor_commanderCasual_alsoGetsIdentityAndCommanderLegality() {
+    fun buildFor_commanderCasual_getsIdentityButNoLegalityClause() {
+        // Deck Wizard v4, W0.1 (G13/E9/R7): legality is ignored entirely for Casual formats, so
+        // Commander Casual keeps the identity bound but drops `legal:commander` -- the same rule
+        // isLegalForFormat now enforces at the predicate level.
         val context = ctx(colors = setOf(ManaColor.U), format = DeckFormat.COMMANDER_CASUAL)
         val built = SectionSearchQuery.buildFor("role:removal_spot", context)
         assertNotNull(built)
         assertTrue(built.contains("id<=U"))
-        assertTrue(built.contains("legal:commander"))
+        assertFalse(built.contains("legal:commander"), "Commander Casual must not filter by legality (R7), got: $built")
     }
 
     @Test
@@ -282,11 +293,30 @@ class SectionSearchQueryTest {
     }
 
     @Test
-    fun buildFor_colorlessOnlyIdentity_omitsIdClause() {
+    fun buildFor_colorlessOnlyIdentity_boundsToColorless() {
+        // N4: a colourless commander is a real constraint -- both tabs must list only colourless cards.
         val context = ctx(colors = setOf(ManaColor.C), format = DeckFormat.COMMANDER)
         val built = SectionSearchQuery.buildFor("role:removal_spot", context)
         assertNotNull(built)
-        assertFalse(built.contains("id<="), "a C-only identity must omit id<=, got: $built")
+        assertTrue(built.contains("id<=c"), "a C-only identity must bound to colourless, got: $built")
+        assertTrue(SectionSearchQuery.buildFor("role:removal_spot", ctx(colors = emptySet(), format = DeckFormat.COMMANDER))!!.contains("id<=c"))
+    }
+
+    @Test
+    fun toAdvancedQuery_commanderEmptyIdentity_addsColorlessIdentityCriterion() {
+        val context = ctx(colors = emptySet(), format = DeckFormat.COMMANDER)
+        val query = SectionSearchQuery.toAdvancedQuery("role:ramp", context)!!
+        val criterion = query.criteria.filterIsInstance<com.mmg.manahub.core.model.SearchCriterion.ColorIdentity>().single()
+        assertEquals(setOf("C"), criterion.colors)
+        assertEquals(com.mmg.manahub.core.model.ColorMatchMode.AT_MOST, criterion.mode)
+        // The shared renderer spells a C-only AT_MOST set as `id=c` -- the same colourless-only pool.
+        assertEquals("id=c", com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase()
+            .let { it(com.mmg.manahub.core.model.AdvancedSearchQuery(listOf(criterion))) })
+        val gate = SectionSearchQuery.localStructuralGate(context)
+        assertTrue(gate(card(id = "rock", name = "Rock", colorIdentity = emptyList())))
+        assertFalse(gate(card(id = "bolt", name = "Bolt", colorIdentity = listOf("R"))))
+        assertFalse(SectionSearchQuery.toAdvancedQuery("role:ramp", ctx(colors = emptySet(), format = DeckFormat.STANDARD))!!
+            .criteria.any { it is com.mmg.manahub.core.model.SearchCriterion.ColorIdentity })
     }
 
     // ── buildFor: legality composition ──────────────────────────────────────────────────────
@@ -327,47 +357,6 @@ class SectionSearchQueryTest {
         assertNotNull(produces)
         assertEquals(1, Regex("t:land").findAll(produces).count(), "produces: id must carry exactly one t:land, got: $produces")
         assertEquals(1, Regex("-t:land").findAll(mv).count(), "mv: id must carry exactly one -t:land, got: $mv")
-    }
-
-    // ── collectionTagKeysFor ─────────────────────────────────────────────────────────────────
-
-    @Test
-    fun collectionTagKeysFor_roleWithTagEquivalent_returnsTheKeyItself() {
-        assertEquals(setOf("sac_outlet"), SectionSearchQuery.collectionTagKeysFor("role:sac_outlet"))
-        assertEquals(setOf("mana_fix"), SectionSearchQuery.collectionTagKeysFor("role:mana_fix"))
-    }
-
-    @Test
-    fun collectionTagKeysFor_roleWithNoTagEquivalent_returnsEmpty() {
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("role:removal_spot"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("role:removal_mass"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("role:finisher"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("role:equipment_or_aura"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("role:tribe_members"))
-    }
-
-    @Test
-    fun collectionTagKeysFor_fingerprintDelegatesSameAsRole() {
-        assertEquals(
-            SectionSearchQuery.collectionTagKeysFor("role:token_generator"),
-            SectionSearchQuery.collectionTagKeysFor("fingerprint:token_generator"),
-        )
-    }
-
-    @Test
-    fun collectionTagKeysFor_manaRockAndDork_returnOwnKey() {
-        assertEquals(setOf("mana_rock"), SectionSearchQuery.collectionTagKeysFor("mana_rock"))
-        assertEquals(setOf("mana_dork"), SectionSearchQuery.collectionTagKeysFor("mana_dork"))
-    }
-
-    @Test
-    fun collectionTagKeysFor_structuralIds_returnEmpty() {
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("tribe:elf"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("produces:B"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("mv:3"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("legal"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("illegal"))
-        assertEquals(emptySet(), SectionSearchQuery.collectionTagKeysFor("offplan"))
     }
 
     // ── translate() as a standalone, directly-testable function ────────────────────────────
@@ -426,17 +415,41 @@ class SectionSearchQueryTest {
     }
 
     @Test
-    fun toAdvancedQuery_everyRoleKey_asFingerprint_yieldsNonDegenerateQuery() {
-        // fingerprint:<key> shares ROLE_CRITERIA with role:<key> for every key EXCEPT
-        // tribe_members (SYNERGY never emits a "fingerprint:tribe_members" section id -- that
-        // concept only exists under the PLAN_ROLES "role:" prefix, so it's excluded from the
-        // iterated set here rather than expecting ROLE_CRITERIA to carry a meaningless entry).
+    fun toAdvancedQuery_everyEngineAxis_yieldsNonDegenerateQueryBothSides() {
         val context = ctx()
-        val missing = (allArchetypeDataRoleKeys - "tribe_members").filter { key ->
-            val query = SectionSearchQuery.toAdvancedQuery("fingerprint:$key", context)
-            query == null || query.isEmpty()
+        val axes = listOf(
+            "LIFE", "DEATH", "TOKENS", "COUNTERS", "LANDFALL", "GRAVEYARD", "ETB", "SPELLS",
+            "ARTIFACTS", "ENCHANTMENTS", "ATTACHED", "ATTACK", "PLANESWALKERS", "GROUP", "ENGINE", "GRAVEYARD_EXIT",
+        )
+        val missing = axes.filter { axis ->
+            val producers = SectionSearchQuery.toAdvancedQuery("engine:$axis:producers", context)
+            val payoffs = SectionSearchQuery.toAdvancedQuery("engine:$axis:payoffs", context)
+            producers == null || producers.isEmpty() || payoffs == null || payoffs.isEmpty()
         }
-        assertTrue(missing.isEmpty(), "RoleKeys with no fingerprint toAdvancedQuery mapping: $missing")
+        assertTrue(missing.isEmpty(), "engine axes with no toAdvancedQuery mapping on one side: $missing")
+    }
+
+    @Test
+    fun toAdvancedQuery_engineRetainsMixedRoleAlternatives() {
+        val query = SectionSearchQuery.toAdvancedQuery("engine:ETB:producers", ctx())
+        assertNotNull(query)
+        val alternatives = query.criteria.filterIsInstance<SearchCriterion.AnyOf>().single().alternatives
+        assertTrue(alternatives.size > 1)
+        assertTrue(alternatives.any { group -> group.any { it is SearchCriterion.CardFunction } })
+        assertTrue(alternatives.any { group -> group.any { it !is SearchCriterion.CardFunction } })
+        val rendered = BuildScryfallQueryUseCase()(query)
+        assertTrue(rendered.contains(" OR "))
+    }
+
+    @Test
+    fun verifiedCatalogTagRendersOnlyVerifiedGlobalQueries() {
+        val criterion = SearchCriterion.HasTag(
+            keys = listOf("empower_jace", "manual_only"),
+            verifiedScryfallQueries = mapOf("empower_jace" to "oracle:\"Empower Jace\""),
+        )
+        val rendered = BuildScryfallQueryUseCase()(com.mmg.manahub.core.model.AdvancedSearchQuery(listOf(criterion)))
+        assertTrue(rendered.contains("oracle:\"Empower Jace\""))
+        assertFalse(rendered.contains("manual_only"))
     }
 
     @Test
@@ -589,4 +602,21 @@ class SectionSearchQueryTest {
         val query = SectionSearchQuery.toAdvancedQuery("role:ramp", context)!!
         assertFalse(query.criteria.any { it is com.mmg.manahub.core.model.SearchCriterion.Format })
     }
+
+    // ── Deck Wizard 60-card wave (v6), plan §5 Phase 3.2 -- the new "lands" section ─────────────
+
+    @Test
+    fun landsSection_fragmentIsPlainLandType() {
+        assertEquals("t:land", SectionSearchQuery.fragmentFor("lands", ctx()))
+    }
+
+    @Test
+    fun landsSection_criteriaIsCardType_land() {
+        val query = SectionSearchQuery.toAdvancedQuery("lands", ctx())
+        assertNotNull(query)
+        // Mirrors tribeCriteria's own shape: the FIRST criterion (category clause) is a single
+        // CardType(setOf("land")), no exclude flag -- NOT curveCriteria's exclude=true variant.
+        assertEquals(com.mmg.manahub.core.model.SearchCriterion.CardType(setOf("land")), query.criteria.first())
+    }
+
 }

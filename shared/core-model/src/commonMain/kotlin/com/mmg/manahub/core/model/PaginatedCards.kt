@@ -4,4 +4,5 @@ data class PaginatedCards(
     val cards: List<Card>,
     val hasMore: Boolean,
     val totalCards: Int,
+    val confirmedNoMatches404: Boolean = false,
 )

@@ -12,6 +12,7 @@ import com.mmg.manahub.core.nearby.domain.model.NearbyConnectionEvent
 import com.mmg.manahub.core.nearby.domain.model.NearbyGameMessage
 import com.mmg.manahub.core.nearby.domain.repository.NearbySessionRepository
 import com.mmg.manahub.core.online.domain.model.OnlineSessionStatus
+import com.mmg.manahub.core.online.data.remote.SupabaseRealtimeClient
 import com.mmg.manahub.core.online.domain.model.SessionEvent
 import com.mmg.manahub.core.online.domain.usecase.AdvancePhaseUseCase
 import com.mmg.manahub.core.online.domain.usecase.ConfirmDefeatUseCase
@@ -145,6 +146,11 @@ class GameViewModel(
 
     private val deltaJobs = mutableMapOf<Int, Job>()
 
+    /** Monotonic source for [CustomCounter.id]; a wall clock repeats on a fast double tap. */
+    private var customCounterSeq: Long = 0L
+
+    private fun nextCustomCounterId(): Long = ++customCounterSeq
+
     private var onlineSessionId: String? = null
     /**
      * Opaque identity token captured from the lobby (host/join) when this session's caller had no
@@ -203,8 +209,7 @@ class GameViewModel(
     // ── Life ──────────────────────────────────────────────────────────────────
 
     fun changeLife(playerId: Int, delta: Int) {
-        // Ignore life changes once a winner has been determined — the game is over.
-        if (_uiState.value.winner != null) return
+        if (!canMutate(playerId)) return
         _uiState.update { s ->
             s.copy(
                 players    = s.players.map { p ->
@@ -232,6 +237,7 @@ class GameViewModel(
     // ── Counters ──────────────────────────────────────────────────────────────
 
     fun changeCounter(playerId: Int, type: CounterType, delta: Int) {
+        if (!canMutate(playerId)) return
         _uiState.update { s ->
             s.copy(
                 players = s.players.map { p ->
@@ -271,7 +277,7 @@ class GameViewModel(
             s.copy(players = s.players.map { p ->
                 if (p.id != playerId) p else p.copy(
                     customCounters = p.customCounters + CustomCounter(
-                        id      = System.currentTimeMillis(),
+                        id      = nextCustomCounterId(),
                         name    = name.trim(),
                         value   = 0,
                         iconKey = iconKey,
@@ -306,6 +312,7 @@ class GameViewModel(
     // ── Commander damage ──────────────────────────────────────────────────────
 
     fun changeCommanderDamage(targetId: Int, sourceId: Int, delta: Int) {
+        if (!canMutate(targetId)) return
         _uiState.update { s ->
             s.copy(
                 players = s.players.map { p ->
@@ -332,18 +339,18 @@ class GameViewModel(
     // ── Phase tracker ─────────────────────────────────────────────────────────
 
     fun advancePhase() {
+        if (!canMutate()) return
         _uiState.update { s ->
             val phases    = GamePhase.entries
             val nextIndex = (phases.indexOf(s.currentPhase) + 1) % phases.size
             val nextPhase = phases[nextIndex]
             if (nextIndex == 0) {
                 // Phase wrapped — player's turn ends, advance to next player
-                val nextId      = nextActivePlayer(s)
-                val isNewRound  = nextId == s.players.firstOrNull { !it.defeated }?.id
+                val advance = nextTurnTarget(s)
                 s.copy(
                     currentPhase   = nextPhase,
-                    turnNumber     = if (isNewRound) s.turnNumber + 1 else s.turnNumber,
-                    activePlayerId = nextId,
+                    turnNumber     = if (advance.wrapped) s.turnNumber + 1 else s.turnNumber,
+                    activePlayerId = advance.nextId,
                 )
             } else {
                 s.copy(currentPhase = nextPhase)
@@ -365,15 +372,13 @@ class GameViewModel(
     }
 
     fun nextTurn() {
+        if (!canMutate()) return
         _uiState.update { s ->
-            val nextId     = nextActivePlayer(s)
-            val alive      = s.players.filter { !it.defeated }
-            // Turn number only increments when a full round completes (back to first alive player)
-            val isNewRound = nextId == alive.firstOrNull()?.id
+            val advance = nextTurnTarget(s)
             s.copy(
-                activePlayerId = nextId,
+                activePlayerId = advance.nextId,
                 currentPhase   = GamePhase.UNTAP,
-                turnNumber     = if (isNewRound) s.turnNumber + 1 else s.turnNumber,
+                turnNumber     = if (advance.wrapped) s.turnNumber + 1 else s.turnNumber,
                 hasPlayedLand  = emptySet(),
             )
         }
@@ -393,8 +398,10 @@ class GameViewModel(
     /** Marks the active player's land as played via a voice command. Idempotent: no-op if already played. */
     private fun onVoicePlayLand() {
         val state = _uiState.value
-        if (!state.gameSettings.voiceLandReminderEnabled) return
+        if (!state.gameSettings.voiceLandReminderEnabled || !canMutate()) return
         val activeId = state.activePlayerId
+        // Networked games: only the device owner's own seat may be toggled (and broadcast)
+        if ((onlineSessionId != null || isNearbySession) && activeId != mySlotIndex) return
         if (activeId in state.hasPlayedLand) return
         toggleLandPlayed(activeId)
         viewModelScope.launch { _voiceCommandEvents.emit(VoiceCommand.PlayLand) }
@@ -403,7 +410,7 @@ class GameViewModel(
     /** Advances to the next turn via a voice command. No-op unless the voice end-turn setting is enabled. */
     private fun onVoiceEndTurn() {
         val state = _uiState.value
-        if (!state.gameSettings.voiceEndTurnEnabled) return
+        if (!state.gameSettings.voiceEndTurnEnabled || !canMutate()) return
         nextTurn()
         viewModelScope.launch { _voiceCommandEvents.emit(VoiceCommand.EndTurn) }
     }
@@ -427,6 +434,7 @@ class GameViewModel(
 
     /** Toggles whether the given player has played a land this turn. */
     fun toggleLandPlayed(playerId: Int) {
+        if (!canMutate(playerId)) return
         _uiState.update { s ->
             s.copy(
                 hasPlayedLand = if (playerId in s.hasPlayedLand)
@@ -494,6 +502,7 @@ class GameViewModel(
 
     /** Player (or host) confirms the defeat. */
     fun confirmDefeat(playerId: Int) {
+        if (!canMutate(playerId)) return
         _uiState.update { s ->
             s.copy(players = s.players.map { p ->
                 if (p.id == playerId) p.copy(defeated = true, pendingDefeat = false, isSurviving = false) else p
@@ -580,7 +589,9 @@ class GameViewModel(
     fun reorderTurnOrder(orderedPlayerIds: List<Int>) {
         _uiState.update { s ->
             val playerMap = s.players.associateBy { it.id }
+            // Append anything the caller omitted: dropping a seat would delete a player mid-game
             val reordered = orderedPlayerIds.mapNotNull { playerMap[it] }
+                .plus(s.players.filter { it.id !in orderedPlayerIds })
             val newActiveId = if (s.turnNumber == 1)
                 reordered.firstOrNull()?.id ?: s.activePlayerId
             else
@@ -639,9 +650,11 @@ class GameViewModel(
     fun showEditName(playerId: Int?)     = _uiState.update { it.copy(editingNameForPlayerId = playerId) }
     fun showLayoutEditor(show: Boolean)  = _uiState.update { it.copy(showLayoutEditor = show) }
 
+    /** Rematch with the same seats as a local game: any networked or tournament context is dropped. */
     fun resetGame() {
         deltaJobs.values.forEach { it.cancel() }
         deltaJobs.clear()
+        resetSessionContext()
         _uiState.update { s ->
             val resetPlayers = s.players.map { p ->
                 p.copy(
@@ -652,21 +665,28 @@ class GameViewModel(
                     commanderDamage = emptyMap(),
                     customCounters  = emptyList(),
                     pendingDefeat   = false,
+                    isSurviving     = false,
                     defeated        = false
                 )
             }
             s.copy(
-                players        = resetPlayers,
-                activePlayerId = resetPlayers.firstOrNull()?.id ?: 0,
-                currentPhase   = GamePhase.UNTAP,
-                turnNumber     = 1,
-                winner         = null,
-                gameResult     = null,
-                gameStartTime  = System.currentTimeMillis(),
-                isGameRunning  = true,
-                hasPlayedLand  = emptySet(),
-                lifeDeltas     = emptyMap(),
-                phaseStops     = emptyList()
+                players                  = resetPlayers,
+                activePlayerId           = resetPlayers.firstOrNull()?.id ?: 0,
+                currentPhase             = GamePhase.UNTAP,
+                turnNumber               = 1,
+                winner                   = null,
+                gameResult               = null,
+                lastSessionId            = null,
+                gameStartTime            = System.currentTimeMillis(),
+                isGameRunning            = true,
+                isOnlineSession          = false,
+                isOnlineSessionAbandoned = false,
+                activeTournamentId       = null,
+                activeTournamentMatchId  = null,
+                tournamentPlayerIds      = emptyList(),
+                hasPlayedLand            = emptySet(),
+                lifeDeltas               = emptyMap(),
+                phaseStops               = emptyList()
             )
         }
         _toolsState.value = GlobalToolsState()
@@ -675,12 +695,51 @@ class GameViewModel(
     fun finishGame() {
         deltaJobs.values.forEach { it.cancel() }
         deltaJobs.clear()
+        resetSessionContext()
         _uiState.update { it.copy(
-            isGameRunning = false,
-            winner        = null,
-            gameResult    = null
+            isGameRunning            = false,
+            winner                   = null,
+            gameResult               = null,
+            isOnlineSession          = false,
+            isOnlineSessionAbandoned = false,
+            activeTournamentId       = null,
+            activeTournamentMatchId  = null,
+            tournamentPlayerIds      = emptyList(),
         ) }
         _toolsState.value = GlobalToolsState()
+    }
+
+    /**
+     * Tears down whatever networked session this ViewModel is bound to (jobs, Realtime/Nearby
+     * subscriptions, identity) so the next game starts from a clean slate. Pass [keepSessionId]
+     * when re-initialising the same online session, whose channel is re-bound by the caller.
+     */
+    private fun resetSessionContext(keepSessionId: String? = null) {
+        onlineObserveJob?.cancel();  onlineObserveJob = null
+        nearbyObserveJob?.cancel();  nearbyObserveJob = null
+        syncPollingJob?.cancel();    syncPollingJob = null
+        persistLifeJobs.values.forEach { it.cancel() }
+        persistLifeJobs.clear()
+        persistPhaseJob?.cancel();   persistPhaseJob = null
+
+        val sessionId = onlineSessionId
+        if (sessionId != null && sessionId != keepSessionId) {
+            if (isNearbySession) {
+                nearbyRepo.fullStateSyncProvider = null
+                nearbyRepo.disconnect()
+            } else {
+                val guestToken = onlineGuestToken
+                viewModelScope.launch {
+                    runCatching { observeSessionUseCase.disconnect(sessionId) }
+                    runCatching { leaveSessionUseCase(sessionId, guestToken) }
+                }
+            }
+        }
+        onlineSessionId  = null
+        onlineGuestToken = null
+        mySlotIndex      = -1
+        isNearbySession  = false
+        isNearbyHost     = false
     }
 
     // ── Online session ────────────────────────────────────────────────────────
@@ -724,10 +783,7 @@ class GameViewModel(
     ) {
         deltaJobs.values.forEach { it.cancel() }
         deltaJobs.clear()
-        persistLifeJobs.values.forEach { it.cancel() }
-        persistLifeJobs.clear()
-        persistPhaseJob?.cancel()
-        onlineObserveJob?.cancel()
+        resetSessionContext(keepSessionId = sessionId)
 
         this.onlineSessionId   = sessionId
         this.onlineGuestToken  = guestToken
@@ -785,6 +841,7 @@ class GameViewModel(
             observeSessionUseCase.getSnapshot(sessionId, onlineGuestToken).onSuccess { snapshot ->
                 val participantsBySlot = snapshot.participants.associateBy { it.slotIndex }
                 val playerStatesBySlot = snapshot.playerStates.associateBy { it.slotIndex }
+                val state = snapshot.sessionState
                 _uiState.update { s ->
                     s.copy(
                         players = s.players.map { p ->
@@ -802,11 +859,17 @@ class GameViewModel(
                                 defeated   = ps?.defeated   ?: p.defeated,
                             )
                         },
-                        currentPhase   = runCatching { GamePhase.valueOf(snapshot.sessionState.currentPhase) }.getOrDefault(GamePhase.UNTAP),
-                        activePlayerId = snapshot.sessionState.activePlayerSlot,
-                        turnNumber     = snapshot.sessionState.turnNumber,
+                        // Null while the session is still in the lobby: keep the local defaults
+                        currentPhase   = state?.let { st ->
+                            runCatching { GamePhase.valueOf(st.currentPhase) }.getOrDefault(s.currentPhase)
+                        } ?: s.currentPhase,
+                        activePlayerId = state?.activePlayerSlot ?: s.activePlayerId,
+                        turnNumber     = state?.turnNumber ?: s.turnNumber,
                     )
                 }
+                // The snapshot already accounts for every buffered delta; replaying them would
+                // regress life totals to their pre-snapshot values.
+                observeSessionUseCase.clearReplay(sessionId)
             }
             // 4. Collect events; wrap in runCatching so a WebSocket drop is logged and
             // does not silently cancel the job without any record.
@@ -822,6 +885,16 @@ class GameViewModel(
                 // Polling via startInGameSyncPolling continues as fallback.
             }
         }
+    }
+
+    /** Rebuilds the Realtime subscription after an SDK-level reset; polling covers the gap meanwhile. */
+    private fun reconnectOnlineSession() {
+        val sessionId = onlineSessionId ?: return
+        if (isNearbySession) return
+        val previousJob = onlineObserveJob
+        onlineObserveJob = null
+        previousJob?.cancel()
+        connectAndObserveOnlineSession(sessionId)
     }
 
     private fun handleOnlineEvent(event: SessionEvent) {
@@ -936,9 +1009,12 @@ class GameViewModel(
             is SessionEvent.ParticipantUpdated -> { /* presence handled in lobby */ }
             is SessionEvent.Error -> {
                 FirebaseCrashlytics.getInstance().apply {
-                    log("online_session_event_error: ${event.message}")
+                    log("online_session_event_error: type=${event::class.simpleName}")
                     setCustomKey("online_session_id", onlineSessionId ?: "")
                 }
+                // The SDK dropped our channel callbacks: rebuild the subscription, otherwise this
+                // game runs on the 3 s polling fallback alone for the rest of the session.
+                if (event.message == SupabaseRealtimeClient.REALTIME_RESET) reconnectOnlineSession()
             }
         }
     }
@@ -953,11 +1029,7 @@ class GameViewModel(
     ) {
         deltaJobs.values.forEach { it.cancel() }
         deltaJobs.clear()
-        persistLifeJobs.values.forEach { it.cancel() }
-        persistLifeJobs.clear()
-        persistPhaseJob?.cancel()
-        onlineObserveJob?.cancel()
-        nearbyObserveJob?.cancel()
+        resetSessionContext(keepSessionId = sessionId)
 
         this.onlineSessionId = sessionId
         this.mySlotIndex     = slotIndex
@@ -1184,8 +1256,10 @@ class GameViewModel(
                     // FINISHED: fall through — update defeated states so checkWinner() can
                     // trigger the result screen. Do NOT set isOnlineSessionAbandoned.
                     val playerStatesBySlot = snapshot.playerStates.associateBy { it.slotIndex }
+                    val state = snapshot.sessionState
                     _uiState.update { s ->
-                        val newTurn = snapshot.sessionState.activePlayerSlot != s.activePlayerId || snapshot.sessionState.turnNumber != s.turnNumber
+                        val newTurn = state != null &&
+                            (state.activePlayerSlot != s.activePlayerId || state.turnNumber != s.turnNumber)
                         s.copy(
                             players = s.players.map { p ->
                                 // Never overwrite the local player's optimistic state.
@@ -1199,11 +1273,11 @@ class GameViewModel(
                                     defeated   = ps.defeated,
                                 )
                             },
-                            currentPhase   = runCatching {
-                                GamePhase.valueOf(snapshot.sessionState.currentPhase)
-                            }.getOrDefault(s.currentPhase),
-                            activePlayerId = snapshot.sessionState.activePlayerSlot,
-                            turnNumber     = snapshot.sessionState.turnNumber,
+                            currentPhase   = state?.let { st ->
+                                runCatching { GamePhase.valueOf(st.currentPhase) }.getOrDefault(s.currentPhase)
+                            } ?: s.currentPhase,
+                            activePlayerId = state?.activePlayerSlot ?: s.activePlayerId,
+                            turnNumber     = state?.turnNumber ?: s.turnNumber,
                             hasPlayedLand  = if (newTurn) emptySet() else s.hasPlayedLand,
                         )
                     }
@@ -1232,13 +1306,18 @@ class GameViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        voiceCommandRecognizer.release()
+        // stop(), never release(): the recognizer is an app-wide singleton shared with other screens
+        voiceCommandRecognizer.stop()
         onlineObserveJob?.cancel()
         nearbyObserveJob?.cancel()
         persistLifeJobs.values.forEach { it.cancel() }
         persistPhaseJob?.cancel()
         syncPollingJob?.cancel()
-        val sessionId = onlineSessionId ?: return
+        val sessionId = onlineSessionId
+        if (sessionId == null) {
+            cleanupScope.cancel()
+            return
+        }
         if (isNearbySession) {
             nearbyRepo.disconnect()
         }
@@ -1299,15 +1378,12 @@ class GameViewModel(
                     totalCommanderDamageReceived = s.players
                         .filter { it.id != p.id }
                         .sumOf { it.commanderDamage[p.id] ?: 0 },
-                    eliminationReason = when {
-                        p.life <= 0    -> EliminationReason.LIFE
-                        p.poison >= 10 -> EliminationReason.POISON
-                        p.commanderDamage.values.any { it >= 21 }
-                                       -> EliminationReason.COMMANDER_DAMAGE
-                        else           -> null
-                    }
+                    eliminationReason = eliminationReasonFor(p, s.mode),
                 )
-            }
+            },
+            tournamentId        = s.activeTournamentId,
+            tournamentMatchId   = s.activeTournamentMatchId,
+            tournamentPlayerIds = s.tournamentPlayerIds,
         )
         _uiState.update { it.copy(winner = winner, gameResult = result, isGameRunning = false) }
 
@@ -1327,11 +1403,36 @@ class GameViewModel(
         ))
     }
 
-    private fun nextActivePlayer(s: GameUiState): Int {
-        val alive = s.players.filter { !it.defeated }
-        if (alive.isEmpty()) return s.activePlayerId
-        val idx = alive.indexOfFirst { it.id == s.activePlayerId }
-        return alive[(idx + 1) % alive.size].id
+    private data class TurnAdvance(val nextId: Int, val wrapped: Boolean)
+
+    /** Next non-defeated seat after the active one in table order; [TurnAdvance.wrapped] marks a completed round. */
+    private fun nextTurnTarget(s: GameUiState): TurnAdvance {
+        val players = s.players
+        if (players.isEmpty()) return TurnAdvance(s.activePlayerId, wrapped = false)
+        val start = players.indexOfFirst { it.id == s.activePlayerId }
+        for (step in 1..players.size) {
+            val idx = start + step
+            val candidate = players[idx % players.size]
+            if (!candidate.defeated) return TurnAdvance(candidate.id, wrapped = idx >= players.size)
+        }
+        return TurnAdvance(s.activePlayerId, wrapped = false)
+    }
+
+    /** False once a winner exists, or when [playerId] names a seat already out of the game. */
+    private fun canMutate(playerId: Int? = null): Boolean {
+        val s = _uiState.value
+        if (s.winner != null) return false
+        if (playerId == null) return true
+        return s.players.firstOrNull { it.id == playerId }?.defeated != true
+    }
+
+    private fun eliminationReasonFor(p: Player, mode: GameMode): EliminationReason? = when {
+        !p.defeated    -> null
+        p.life <= 0    -> EliminationReason.LIFE
+        p.poison >= 10 -> EliminationReason.POISON
+        mode == GameMode.COMMANDER && p.commanderDamage.values.any { it >= 21 }
+                       -> EliminationReason.COMMANDER_DAMAGE
+        else           -> EliminationReason.CONCEDE
     }
 
     // ── Tournament ────────────────────────────────────────────────────────────
@@ -1351,6 +1452,7 @@ class GameViewModel(
     ) {
         deltaJobs.values.forEach { it.cancel() }
         deltaJobs.clear()
+        resetSessionContext()
         val players = configs.mapIndexed { i, cfg ->
             Player(
                 id        = i,
@@ -1388,20 +1490,24 @@ class GameViewModel(
     }
 
     private fun recordTournamentResultIfNeeded(sessionId: Long, result: GameResult) {
-        val s = _uiState.value
-        val matchId = s.activeTournamentMatchId ?: return
+        // Read the snapshot captured at checkWinner time, never the live state: finishGame/initFrom*
+        // may have already replaced it by the time the Room insert completes.
+        val matchId = result.tournamentMatchId ?: return
+        val tournamentPlayerIds = result.tournamentPlayerIds
+        val players = result.allPlayers
+        val tournamentId = result.tournamentId
 
         // Guard: if tournament player id list does not cover every game player,
         // recording the result would silently map some players to wrong tournament
         // entries or drop them from life totals — abort instead of persisting garbage.
-        if (s.tournamentPlayerIds.size != s.players.size) {
+        if (tournamentPlayerIds.size != players.size) {
             FirebaseCrashlytics.getInstance().apply {
                 log("tournament_result_player_id_mismatch: matchId=$matchId")
-                setCustomKey("game_player_count", s.players.size)
-                setCustomKey("game_turn_count", s.turnNumber)
+                setCustomKey("game_player_count", players.size)
+                setCustomKey("game_turn_count", result.totalTurns)
                 recordException(IllegalStateException(
-                    "[GameViewModel] tournamentPlayerIds.size (${s.tournamentPlayerIds.size}) " +
-                    "!= players.size (${s.players.size}) for match $matchId"
+                    "[GameViewModel] tournamentPlayerIds.size (${tournamentPlayerIds.size}) " +
+                    "!= players.size (${players.size}) for match $matchId"
                 ))
             }
             return
@@ -1412,16 +1518,16 @@ class GameViewModel(
             // playerIds order (TournamentViewModel.buildPlayerConfigsForMatch builds configs in
             // playerIds order with id=index, and initFromTournamentMatch maps configs→players with
             // id=index). So players[i] ↔ tournamentPlayerIds[i] is a stable correspondence.
-            val winnerIndex = s.players.indexOfFirst { it.id == result.winner.id }
-            val winnerTournamentId = s.tournamentPlayerIds.getOrNull(winnerIndex)
+            val winnerIndex = players.indexOfFirst { it.id == result.winner.id }
+            val winnerTournamentId = tournamentPlayerIds.getOrNull(winnerIndex)
             if (winnerIndex < 0 || winnerTournamentId == null) {
                 // H3: a stuck tournament (match never finishes) was previously SILENT — the winner
                 // could not be mapped to a tournament participant, so we returned with no trace. Log a
                 // non-fatal so the stall is observable rather than mysterious.
                 FirebaseCrashlytics.getInstance().apply {
                     log("tournament_result_winner_unmapped: matchId=$matchId winnerIndex=$winnerIndex")
-                    setCustomKey("tournament_id", s.activeTournamentId ?: -1L)
-                    setCustomKey("game_player_count", s.players.size)
+                    setCustomKey("tournament_id", tournamentId ?: -1L)
+                    setCustomKey("game_player_count", players.size)
                     recordException(IllegalStateException(
                         "[GameViewModel] could not map game winner (id=${result.winner.id}, " +
                         "index=$winnerIndex) to a tournament participant for match $matchId"
@@ -1429,8 +1535,8 @@ class GameViewModel(
                 }
                 return@launch
             }
-            val lifeTotals = s.players.mapIndexedNotNull { i, p ->
-                val tid = s.tournamentPlayerIds.getOrNull(i) ?: return@mapIndexedNotNull null
+            val lifeTotals = players.mapIndexedNotNull { i, p ->
+                val tid = tournamentPlayerIds.getOrNull(i) ?: return@mapIndexedNotNull null
                 tid to p.life
             }.toMap()
             runCatching {
@@ -1443,7 +1549,7 @@ class GameViewModel(
             }.onFailure { e ->
                 FirebaseCrashlytics.getInstance().apply {
                     log("tournament_result_record_failed: matchId=$matchId")
-                    setCustomKey("tournament_id", s.activeTournamentId ?: -1L)
+                    setCustomKey("tournament_id", tournamentId ?: -1L)
                     recordException(e)
                 }
             }
@@ -1458,6 +1564,9 @@ class GameViewModel(
         selectedLayout: LayoutTemplate? = null,
         settings: GameSettings = GameSettings(),
     ) {
+        deltaJobs.values.forEach { it.cancel() }
+        deltaJobs.clear()
+        resetSessionContext()
         val players = configs.mapIndexed { i, config ->
             Player(
                 id        = i,
@@ -1472,15 +1581,16 @@ class GameViewModel(
         // mirrors the online/nearby swap so whichever config slot is flagged isAppUser doesn't end
         // up rendered sideways or upside-down for the person actually holding the device.
         val localSlotIndex = players.indexOfFirst { it.isAppUser }
-        _uiState.update { it.copy(
-            mode = mode,
-            players = players,
+        _uiState.value = GameUiState(
+            mode           = mode,
+            players        = players,
             activePlayerId = players.first().id,
-            activeLayout = layout,
+            activeLayout   = layout,
             gridAssignment = buildBottomSlotGridAssignment(layout, localSlotIndex),
-            isGameRunning = true,
-            gameSettings = settings,
-        ) }
+            gameStartTime  = System.currentTimeMillis(),
+            isGameRunning  = true,
+            gameSettings   = settings,
+        )
         _toolsState.value = GlobalToolsState()
 
         FirebaseCrashlytics.getInstance().apply {

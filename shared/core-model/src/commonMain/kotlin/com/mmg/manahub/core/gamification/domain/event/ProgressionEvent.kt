@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.gamification.domain.event
 
+import com.mmg.manahub.core.model.DeckCreationSource
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -112,10 +113,16 @@ sealed interface ProgressionEvent {
         override val isDeviceScoped: Boolean get() = true
     }
 
-    /** A new deck was created. */
+    /**
+     * A deck became real: its first mainboard card was persisted (an empty draft never emits).
+     *
+     * @param source how the deck was created; only [DeckCreationSource.isUserAuthored] sources earn XP
+     *   and advance the build-deck quest, while every source re-evaluates the DERIVED deck achievements.
+     */
     data class DeckCreated(
         val deckId: String,
         val format: String,
+        val source: DeckCreationSource,
         override val occurredAt: Instant,
     ) : ProgressionEvent {
         override val idempotencyKey: String get() = "deck_created:$deckId"
@@ -151,7 +158,12 @@ sealed interface ProgressionEvent {
         override val isDeviceScoped: Boolean get() = true
     }
 
-    /** A trade was completed (accepted by both parties). */
+    /**
+     * A trade the user takes part in was first observed COMPLETED (both parties marked it).
+     *
+     * @param tradeId the thread's root proposal id (the proposal's own id for a root), so a
+     *   counter-proposal chain grants once and both parties dedupe to the same key.
+     */
     data class TradeCompleted(
         val tradeId: String,
         override val occurredAt: Instant,
@@ -161,13 +173,32 @@ sealed interface ProgressionEvent {
         override val isDeviceScoped: Boolean get() = false
     }
 
-    /** A friend request was accepted. */
+    /**
+     * A friendship with another user became ACCEPTED.
+     *
+     * @param friendId the OTHER user's id (never the friendship row id), so removing and re-adding
+     *   the same person replays the same key instead of granting again.
+     */
     data class FriendAdded(
         val friendId: String,
         override val occurredAt: Instant,
     ) : ProgressionEvent {
         override val idempotencyKey: String get() = "friend:$friendId"
-        // Server-side friend/user id — globally stable per user; NOT device-scoped.
+        // Server-side user id — globally stable per user; NOT device-scoped.
+        override val isDeviceScoped: Boolean get() = false
+    }
+
+    /**
+     * The collection changed in bulk without a rewarded add (an import commit, a sync pull).
+     *
+     * Grants ZERO XP, writes no ledger row and advances no quest: it only re-evaluates the DERIVED
+     * collection achievements so they do not lag until the next scan or manual add.
+     */
+    data class CollectionChanged(
+        override val occurredAt: Instant,
+    ) : ProgressionEvent {
+        override val idempotencyKey: String get() = "collection_changed:${occurredAt.toEpochMilliseconds()}"
+        // Never reaches the ledger — scoping is irrelevant; false by convention.
         override val isDeviceScoped: Boolean get() = false
     }
 

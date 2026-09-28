@@ -2,6 +2,8 @@ package com.mmg.manahub.tools.tagpipeline.pipeline
 
 import com.mmg.manahub.tools.tagpipeline.io.readJsonl
 import com.mmg.manahub.tools.tagpipeline.model.CardStrategyTagsRow
+import com.mmg.manahub.tools.tagpipeline.io.PIPELINE_JSON
+import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -23,6 +25,32 @@ import java.nio.file.Path
  */
 object SinceWatermark {
 
+    fun loadCompleteManifest(path: Path, minimumRows: Int = 30_000): SinceFilter {
+        val rows = Files.newBufferedReader(path).use { reader ->
+            reader.lineSequence().filter { it.isNotBlank() }.map { line ->
+                PIPELINE_JSON.decodeFromString(CardStrategyTagsRow.serializer(), line)
+            }.toList()
+        }
+        require(rows.size >= minimumRows) {
+            "--since requires a complete manifest ($minimumRows or more rows); got ${rows.size}"
+        }
+        require(rows.all { it.oracleId.isNotBlank() && it.inputFingerprint.isNotBlank() }) {
+            "--since manifest contains rows without oracle_id or input_fingerprint"
+        }
+        require(rows.map { it.oracleId }.toSet().size == rows.size) {
+            "--since manifest contains duplicate oracle_id values"
+        }
+        return SinceFilter(
+            manifest = rows.associate { it.oracleId to it.pipelineVersion },
+            fingerprints = rows.associate { it.oracleId to it.inputFingerprint },
+            requireFingerprint = true,
+        )
+    }
+
+    fun loadFingerprints(previousOutputPath: Path): Map<String, String> =
+        readJsonl(previousOutputPath, CardStrategyTagsRow.serializer(), gzip = false)
+            .associate { it.oracleId to it.inputFingerprint }
+
     /** Loads a previous run's JSONL output into `oracle_id -> pipeline_version`. Never throws — a
      *  missing/corrupt manifest degrades to "process everything" (same "fail open, never abort the
      *  whole run" posture as the EDHREC/Oracle-Tags fetches). */
@@ -39,8 +67,16 @@ object SinceWatermark {
 
     /** True when [oracleId] should be (re)processed this run: absent from [manifest], or last
      *  processed at an OLDER pipeline version than [currentPipelineVersion]. */
-    fun shouldReprocess(oracleId: String, currentPipelineVersion: Int, manifest: Map<String, Int>): Boolean {
+    fun shouldReprocess(
+        oracleId: String,
+        currentPipelineVersion: Int,
+        manifest: Map<String, Int>,
+        fingerprint: String = "",
+        fingerprints: Map<String, String> = emptyMap(),
+        requireFingerprint: Boolean = false,
+    ): Boolean {
         val lastProcessedVersion = manifest[oracleId] ?: return true
-        return lastProcessedVersion < currentPipelineVersion
+        if (lastProcessedVersion < currentPipelineVersion) return true
+        return requireFingerprint && fingerprints[oracleId] != fingerprint
     }
 }

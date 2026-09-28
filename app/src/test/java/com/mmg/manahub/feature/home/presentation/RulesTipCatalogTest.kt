@@ -148,4 +148,37 @@ class RulesTipCatalogTest {
         val b = shuffledFor(2L)
         assertFalse(a == b)
     }
+
+    // ── Single-tip widget (roll + fixed height) ────────────────────────────────
+
+    @Test
+    fun `roll never returns the current tip and stays in bounds`() {
+        val size = RULES_TIPS_DAILY_ORDER.size
+        val random = Random(42)
+        repeat(500) {
+            val current = random.nextInt(size)
+            val next = rollRulesTipIndex(current, random)
+            assertTrue(next in 0 until size)
+            assertTrue(next != current)
+        }
+    }
+
+    @Test
+    fun `roll reaches every other tip`() {
+        val size = RULES_TIPS_DAILY_ORDER.size
+        val random = Random(7)
+        val seen = (0 until size * 40).map { rollRulesTipIndex(0, random) }.toSet()
+        assertEquals((1 until size).toSet(), seen)
+    }
+
+    @Test
+    fun `every tip body stays short enough for the fixed-height card`() {
+        // The card is sized by the tallest body in the catalog, so one outlier would pad every tip.
+        val tooLong = MTG_TIPS_CATALOG.filter { it.body.length > MAX_TIP_BODY_CHARS }.map { it.title }
+        assertTrue("Tips over $MAX_TIP_BODY_CHARS chars: $tooLong", tooLong.isEmpty())
+    }
+
+    private companion object {
+        const val MAX_TIP_BODY_CHARS = 280
+    }
 }

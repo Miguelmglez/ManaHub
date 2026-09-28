@@ -162,6 +162,48 @@ class ImportDeckUseCaseTest {
         coVerify(exactly = 1) { deckRepository.addCardToDeck(DECK_ID, sol.scryfallId, 1, false) }
     }
 
+    @Test
+    fun `given an uppercase X quantity multiplier when invoke then the line is imported`() = runTest {
+        coEvery { cardRepository.searchCardByName("Lightning Bolt") } returns DataResult.Success(bolt)
+
+        val result = useCase(DECK_ID, "4X Lightning Bolt")
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 1) { deckRepository.addCardToDeck(DECK_ID, bolt.scryfallId, 4, false) }
+    }
+
+    @Test
+    fun `given an etched marker when invoke then the line is imported instead of skipped`() = runTest {
+        // The line format accepts *E* as well as *F*; such lines used to fall through unmatched.
+        coEvery { cardRepository.searchCardByName("Sol Ring") } returns DataResult.Success(sol)
+
+        val result = useCase(DECK_ID, "1 Sol Ring (VMA) 4 *E*\n2 Sol Ring *e*")
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 1) { deckRepository.addCardToDeck(DECK_ID, sol.scryfallId, 1, false) }
+        coVerify(exactly = 1) { deckRepository.addCardToDeck(DECK_ID, sol.scryfallId, 2, false) }
+    }
+
+    @Test
+    fun `given a quantity with no name when invoke then nothing is written`() = runTest {
+        val result = useCase(DECK_ID, "4    \n4")
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 0) { deckRepository.addCardToDeck(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { cardRepository.searchCardByName(any()) }
+    }
+
+    @Test
+    fun `given a line padded with whitespace when invoke then the name is trimmed before lookup`() = runTest {
+        coEvery { cardRepository.searchCardByName("Negate") } returns DataResult.Success(negate)
+
+        val result = useCase(DECK_ID, "   2 Negate   ")
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 1) { cardRepository.searchCardByName("Negate") }
+        coVerify(exactly = 1) { deckRepository.addCardToDeck(DECK_ID, negate.scryfallId, 2, false) }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     //  Group 3 — Sideboard section
     // ─────────────────────────────────────────────────────────────────────────

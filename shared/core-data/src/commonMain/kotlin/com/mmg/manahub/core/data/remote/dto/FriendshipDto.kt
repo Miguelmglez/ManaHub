@@ -106,3 +106,56 @@ data class FriendMatchHistoryDto(
     @SerialName("total_games") val totalGames: Int,
     @SerialName("last_played_at") val lastPlayedAt: String? = null,
 )
+
+@Serializable
+data class SearchFriendCardsRequestDto(
+    @SerialName("p_friend_user_id") val pFriendUserId: String,
+    @SerialName("p_list") val pList: String,
+    @SerialName("p_name") val pName: String? = null,
+    @SerialName("p_name_exact") val pNameExact: Boolean = false,
+    @SerialName("p_oracle_text") val pOracleText: String? = null,
+    @SerialName("p_types_all") val pTypesAll: List<String>? = null,
+    @SerialName("p_types_any") val pTypesAny: List<String>? = null,
+    @SerialName("p_types_exclude") val pTypesExclude: List<String>? = null,
+    @SerialName("p_colors") val pColors: List<String>? = null,
+    @SerialName("p_colors_mode") val pColorsMode: String = "at_least",
+    @SerialName("p_identity") val pIdentity: List<String>? = null,
+    @SerialName("p_identity_mode") val pIdentityMode: String = "at_most",
+    @SerialName("p_mv_min") val pMvMin: Int? = null,
+    @SerialName("p_mv_max") val pMvMax: Int? = null,
+    @SerialName("p_power_min") val pPowerMin: Int? = null,
+    @SerialName("p_power_max") val pPowerMax: Int? = null,
+    @SerialName("p_toughness_min") val pToughnessMin: Int? = null,
+    @SerialName("p_toughness_max") val pToughnessMax: Int? = null,
+    @SerialName("p_rarities") val pRarities: List<String>? = null,
+    @SerialName("p_set_codes") val pSetCodes: List<String>? = null,
+    @SerialName("p_formats") val pFormats: List<String>? = null,
+    @SerialName("p_format_legal") val pFormatLegal: Boolean = true,
+    @SerialName("p_languages") val pLanguages: List<String>? = null,
+    @SerialName("p_limit") val pLimit: Int = 50,
+    @SerialName("p_after_sort_key") val pAfterSortKey: String? = null,
+    @SerialName("p_after_row_id") val pAfterRowId: String? = null,
+)
+
+@Serializable
+data class FriendCardSearchRowDto(
+    @SerialName("source_list") val sourceList: String,
+    @SerialName("row_id") val rowId: String,
+    @SerialName("scryfall_id") val scryfallId: String,
+    @SerialName("quantity") val quantity: Int,
+    @SerialName("is_foil") val isFoil: Boolean,
+    @SerialName("condition") val condition: String? = null,
+    @SerialName("language") val language: String? = null,
+    @SerialName("card_name") val cardName: String? = null,
+    @SerialName("set_code") val setCode: String? = null,
+    @SerialName("rarity") val rarity: String? = null,
+    @SerialName("sort_key") val sortKey: String,
+    @SerialName("has_more") val hasMore: Boolean = false,
+    @SerialName("unindexed_count") val unindexedCount: Int = 0,
+)
+
+@Serializable
+data class FriendListUnindexedCountRequestDto(
+    @SerialName("p_friend_user_id") val pFriendUserId: String,
+    @SerialName("p_list") val pList: String,
+)

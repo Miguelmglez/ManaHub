@@ -15,12 +15,28 @@ interface WishlistRepository {
     fun observeVersionsByOracle(oracleId: String, name: String): Flow<List<WishlistEntry>>
     fun observeUnsyncedCount(): Flow<Int>
     suspend fun addLocal(entry: WishlistEntry): Result<Unit>
+
+    /**
+     * [addLocal] for every entry as ONE local write; rows stay unsynced until the next push.
+     *
+     * Abstract on purpose: the obvious `entries.forEach { addLocal(it) }` default is neither atomic
+     * nor guarded by the implementation's add mutex, so a new implementor must make that choice
+     * explicitly instead of inheriting the unsafe version.
+     */
+    suspend fun addAllLocal(entries: List<WishlistEntry>): Result<Unit>
     suspend fun removeLocal(id: String): Result<Unit>
     suspend fun updateQuantityLocal(id: String, quantity: Int): Result<Unit>
     suspend fun getRemote(userId: String): Result<List<WishlistEntry>>
     suspend fun addRemote(entry: WishlistEntry): Result<Unit>
     suspend fun removeRemote(id: String): Result<Unit>
     suspend fun migrateLocalToRemote(userId: String): Result<Int>
+
+    /**
+     * Removes local rows that belong to an account other than [userId] (a previous account's rows
+     * after an account switch), keeping guest rows so they migrate to [userId]. Call before any
+     * migrate/sync for [userId].
+     */
+    suspend fun evictForeignAccountRows(userId: String): Result<Unit> = Result.success(Unit)
 
     /**
      * Inserts or increments a [WishlistEntry] in the local Room store and immediately

@@ -32,6 +32,7 @@ Identify cards by pointing the camera at the card name. Uses on-device ML Kit OC
 - Auto-pause after add to prevent double-scanning; flash toggle
 - Debounced two-stage lookup (full-text → exact-name fallback)
 - Confirm sheet with foil, condition, language, and quantity
+- Scanned cards land in a persistent queue shared with Add Card's "Select multiple" mode
 
 ### 📁 Collection Manager
 Search and manage your entire collection with real-time Scryfall data.
@@ -40,8 +41,11 @@ Search and manage your entire collection with real-time Scryfall data.
 - Filter by rarity, mana value, format legality, price, oracle text, and trade status
 - Grid and list views; card detail with double-faced support and art crop
 - Edit quantity, condition, language, and foil per copy
+- "Select multiple" in Add Card: tap cards across searches (or browse a deck's cards from Deck Studio or a Community deck, with "Select all" / "Select missing"), then add them all to the collection or wishlist
 - Wishlist mode (a card can live in both collection and wishlist)
 - Batch price refresh via the Scryfall collection endpoint; stale-cache indicator
+- Import a collection from a pasted Moxfield / MTG Arena list or a Moxfield / ManaBox CSV file, reviewed in its own queue before anything is written
+- Export what the Cards tab currently shows (collection, wishlist or for-trade, with search and filters applied) as text, Moxfield CSV or ManaBox CSV, saved to the device or shared as a file
 
 ### 🏷 Automatic Card Tagging
 Cards are tagged automatically as they enter your collection, via English oracle-text analysis.
@@ -58,10 +62,22 @@ Build and manage decks backed by your collection and real-time Scryfall data.
 - Import / export in Moxfield / MTGO text format
 - Format validation (Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Commander, Casual)
 - Card detail with double-faced support; quick add/remove from search or your collection
-- **Deck creation wizard**: guided multi-step builder (Commander & Casual) that matches your
-  collection against community deck templates (EDHREC/Archidekt data), with staged generation
-  progress, per-category fill report, and community picks grouped by role (Removal, Ramp, …)
-  clearly separated from cards you own
+- **Deck creation wizard**: guided multi-step builder for every non-Draft format — Commander,
+  Commander Casual, Casual, Standard, Pioneer, Modern, Legacy, Vintage and Pauper — built by the SAME
+  scoring/analysis engine that grades the deck afterward. Commander decks start from a commander;
+  60-card decks start from your cards, your colors (colorless included) or a strategy, with the seed
+  search locked to the format's legality. Pick a curated strategy (or go Custom), fill remaining plan
+  sections — mana base included — from your collection. The engine adds up to four copies of a card
+  but never more than you own; genuine close calls it can't break on its own surface as a short
+  Choice screen (only the real questions, with a one-tap "let the wizard decide" for any of them);
+  every other card is placed automatically with a transparent gap report (no silent placeholder
+  cards). It never over-fills a role past its plan, never picks a card that doesn't serve the plan
+  while a fitting one remains, and when your collection genuinely runs out it says so instead of
+  padding the deck quietly. The finished deck opens straight in Deck Studio.
+- **Deck analysis**: every category the engine classifies can be browsed, in your collection and on
+  Scryfall, from the same button — and both find the same cards. Synergies are shown as engines,
+  pairing the cards that produce a resource with the cards that pay it off (life, tokens, counters,
+  graveyard…), each explained in a sentence and flagged when one half is missing.
 - **Collection discoveries**: synergy clusters detected in your own collection (strategies and
   tribes), each with a one-tap "Build this" handoff into the wizard
 
@@ -113,7 +129,7 @@ Coming soon.
 | Architecture | MVVM + Clean Architecture, KMP-oriented (`:shared:core-*` commonMain + `:app` Android) |
 | Dependency Injection | Koin (new/migrated code) + Hilt (legacy, being phased out) |
 | Database | Room (exported schemas, DB v40) — Android-only (no wasm target); repo interfaces are shared |
-| Networking | Ktor (commonMain, js/wasm-ready) + kotlinx.serialization; a small Retrofit remnant remains only for `DraftModule` (Cloudflare/YouTube manual JSON) |
+| Networking | Ktor (commonMain, js/wasm-ready) + kotlinx.serialization; Draft content is delivered from Cloudflare/R2 through a versioned sets manifest |
 | Backend (BaaS) | Supabase (auth + postgrest + realtime + edge functions) via Ktor client |
 | Image loading | Coil + SVG decoder |
 | Camera / OCR | CameraX + ML Kit Text Recognition (on-device) |
@@ -130,7 +146,7 @@ Coming soon.
 
 SDK: `minSdk = 29` (Android 10) · `targetSdk = 36` (Android 16) · `compileSdk = 37`. JDK 17.
 
-Release builds use R8 (minification + resource shrinking) with a custom `proguard-rules.pro`. Sensitive values (`YOUTUBE_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_CLIENT_ID`, `CLOUDFLARE_WORKER_URL`, `COMMUNITY_WORKER_URL`) are injected via `BuildConfig` from `local.properties` (git-ignored) or CI environment variables.
+Release builds use R8 (minification + resource shrinking) with a custom `proguard-rules.pro`. Sensitive values (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_CLIENT_ID`, `CLOUDFLARE_WORKER_URL`, `COMMUNITY_WORKER_URL`) are injected via `BuildConfig` from `local.properties` (git-ignored) or CI environment variables.
 
 ## Architecture
 
@@ -182,7 +198,6 @@ Supabase-backed implementation of the same interfaces when that phase starts.
 
 - **Supabase** — auth (email/password + Google), Postgres, Realtime, Edge Functions, and the push outbox. Backend SQL/migrations/RPCs/Edge Functions live under `supabase/`.
 - **Scryfall API** — all card data, prices, images, set info. Rate-limited (≤10 req/s) via a request queue; queries are allowlist-sanitised; data cached in Room.
-- **YouTube Data API v3** — news videos. The key is injected via BuildConfig; if absent, the feature is gracefully disabled.
 - **ML Kit (Google)** — on-device OCR. No camera frames or OCR results leave the device.
 - **Firebase** — Analytics + Crashlytics (telemetry) and FCM (push delivery). `google-services.json` is git-ignored and never committed.
 
@@ -198,7 +213,6 @@ If you create an account, only email, nickname, Game Tag, auth provider, and the
 - `HttpLoggingInterceptor` is BODY level in debug only; NONE in release
 - Room and DataStore excluded from Google Drive auto-backup (`backup_rules.xml`, `data_extraction_rules.xml`)
 - Release builds use R8 minification + resource shrinking with a custom `proguard-rules.pro`
-- YouTube API key injected via an OkHttp interceptor — not visible in Retrofit signatures or Logcat
 - Scryfall queries sanitised with an allowlist before being appended to API URLs
 - Camera frames never leave the device (on-device ML Kit)
 - User session encrypted on disk (Android Keystore AES-GCM via `SecureSessionManager`)
@@ -224,7 +238,6 @@ Required keys are marked with `*`:
 SUPABASE_URL=...            # *
 SUPABASE_ANON_KEY=...       # *
 GOOGLE_CLIENT_ID=...        # *
-YOUTUBE_API_KEY=...         # optional — News videos disabled if absent
 CLOUDFLARE_WORKER_URL=...   # optional — has a default
 COMMUNITY_WORKER_URL=...    # optional — has a placeholder default, `manahub-community` Worker not yet deployed
 

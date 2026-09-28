@@ -4,6 +4,7 @@ import com.mmg.manahub.core.data.remote.dto.SetsIndexResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import io.ktor.client.statement.bodyAsText
 
 /**
@@ -35,17 +36,23 @@ class CloudflareContentClient(
      * Fetches the raw JSON for a set's draft guide.
      *
      * @param setCode Lowercase set code (e.g. "eoe").
+     * @param contentVersion Published content version used to bypass stale HTTP cache entries.
      */
-    suspend fun getSetGuide(setCode: String): String =
-        httpClient.get("${baseUrl}draft/${setCode}/guide.json").bodyAsText()
+    suspend fun getSetGuide(setCode: String, contentVersion: String? = null): String =
+        httpClient.get("${baseUrl}draft/${setCode}/guide.json") {
+            contentVersion?.let { parameter("v", it) }
+        }.bodyAsText()
 
     /**
      * Fetches the raw JSON for a set's tier list.
      *
      * @param setCode Lowercase set code (e.g. "eoe").
+     * @param contentVersion Published content version used to bypass stale HTTP cache entries.
      */
-    suspend fun getSetTierList(setCode: String): String =
-        httpClient.get("${baseUrl}draft/${setCode}/tier-list.json").bodyAsText()
+    suspend fun getSetTierList(setCode: String, contentVersion: String? = null): String =
+        httpClient.get("${baseUrl}draft/${setCode}/tier-list.json") {
+            contentVersion?.let { parameter("v", it) }
+        }.bodyAsText()
 
     /**
      * Fetches the raw booster.json describing the set's pack structure.

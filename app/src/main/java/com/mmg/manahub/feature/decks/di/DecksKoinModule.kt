@@ -1,15 +1,20 @@
 package com.mmg.manahub.feature.decks.di
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.mmg.manahub.BuildConfig
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.common.DataStoreKeyValueStore
+import com.mmg.manahub.core.common.KeyValueStore
+import com.mmg.manahub.core.data.local.userPrefsDataStore
 import com.mmg.manahub.core.data.remote.DeckstatsClient
 import com.mmg.manahub.core.data.remote.DeckstatsFetcherImpl
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.EdhrecPowerResolver
+import com.mmg.manahub.feature.decks.domain.engine.KeyValueWizardPreferenceStore
 import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
 import com.mmg.manahub.feature.decks.domain.engine.PowerResolver
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
-import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
+import com.mmg.manahub.feature.decks.domain.engine.WizardPreferenceStore
+import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.DeckstatsFetcher
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCaseV2
@@ -18,17 +23,11 @@ import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckCardsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckArchetypeUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.DeriveCommanderStrategiesUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.RankOwnedCardsForProfileUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.RecommendWizardStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.SuggestStrategiesForSeedsUseCase
-import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
+import com.mmg.manahub.feature.decks.domain.template.BuildWizardDeckUseCase
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
-import com.mmg.manahub.feature.decks.domain.template.DeckTemplateResolver
-import com.mmg.manahub.feature.decks.domain.template.DiscoverSynergiesV2UseCase
-import com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase
+import com.mmg.manahub.feature.decks.domain.inspirations.DiscoverCollectionSynergiesUseCase
 import com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckViewModel
@@ -36,7 +35,6 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -61,7 +59,7 @@ import java.util.concurrent.TimeUnit
  *
  * ## The Deck Doctor scoring engine is now natively Koin-built (the Hilt `DeckDoctorModule` was DELETED)
  * Every class in the engine graph ([DeckScorer], [RoleClassifier], [ManaBaseAnalyzer], [EdhrecPowerResolver],
- * [CandidatePoolGenerator], [InferDeckIdentityUseCase] and the six
+ * [InferDeckIdentityUseCase] and the six
  * deck use cases) already lived in `:shared:core-domain` `commonMain` with NO `@Inject`/`@Singleton`
  * annotations (an earlier KMP-migration slice stripped them). The ONLY class that still had `@Inject`
  * was [com.mmg.manahub.feature.draft.data.engine.ScoringDraftDeckBuilder] (the still-Hilt Draft
@@ -97,13 +95,6 @@ fun decksKoinModule(): Module = module {
             manaBaseAnalyzer = get(),
         )
     }
-    // ── Candidate pool helpers. ──
-    // `BudgetOptimizer` was DELETED in WS7.3 (D-H, budget feature not coming back) alongside
-    // `SuggestAddsWithBudgetUseCase`. `CandidatePoolGenerator` SURVIVES -- it has a live caller
-    // (the wizard's Scryfall backstop, WS4) beyond the now-deleted dormant pipeline; see
-    // `feedback_candidatepoolgenerator_no_longer_dormant` memory.
-    single { CandidatePoolGenerator(cardRepository = get()) }
-
     // ── Deck use cases. ──
     single { InferDeckIdentityUseCase() }
     // Deck Doctor Community/Archetype plan, Phase 1.4: the archetype/theme classifier. Stateless
@@ -125,6 +116,22 @@ fun decksKoinModule(): Module = module {
             crashReporter = get(),
         )
     }
+    // Deck Wizard Commander v3 plan (Phase 0 / E4, D2): the ONE shared analysis entry point --
+    // built from the same EvaluateDeckUseCase/InferDeckIdentityUseCase/CrashReporter singletons
+    // above, consumed by DeckDoctorOrchestrator today and by the Commander builder in a later phase.
+    single { DeckAnalysisPipeline(evaluateDeckUseCase = get(), inferDeckIdentityUseCase = get(), crashReporter = get()) }
+    // Deck Wizard Commander v3 plan (Phase 2/6); generalized to every format by the Deck Wizard
+    // 60-card wave (v6, plan §5 Phase 5.4) -- the ONE build engine for every anchor now, consuming
+    // the SAME DeckAnalysisPipeline singleton above. Bound under BuildWizardDeckUseCase (not the
+    // kept BuildWizardDeckUseCase typealias) so DeckWizardViewModel's own `buildWizardDeckUseCase`
+    // param type resolves correctly -- see feedback_koin_single_concrete_type_mismatch.
+    single { BuildWizardDeckUseCase(deckAnalysisPipeline = get(), crashReporter = get()) }
+    // Deck Wizard v4, W7 Task B (E8) -- shares the app's own "user_prefs" DataStore file (never a
+    // second preferences file) via the SAME internal accessor UserPreferencesDataStore uses. Bound
+    // to the interface type (feedback_koin_single_concrete_type_mismatch): every consumer's
+    // constructor param is typed as KeyValueStore/WizardPreferenceStore, never the concrete class.
+    single<KeyValueStore> { DataStoreKeyValueStore(get<android.content.Context>().userPrefsDataStore) }
+    single<WizardPreferenceStore> { KeyValueWizardPreferenceStore(get()) }
     single { SuggestAddsUseCase(deckScorer = get()) }
     // Deck Analysis Category Sections rework (W0, D3): the old Deck Doctor "Cuts" suggestion tab
     // was deleted, so NOTHING in production resolves `SuggestCutsUseCase` via Koin any more --
@@ -132,16 +139,13 @@ fun decksKoinModule(): Module = module {
     // undeleted (not Koin-wired) because `app/src/test/.../harness/HarnessDoctorPipeline.kt`
     // directly constructs it (bypassing Koin) for the separate Wizard Quality Campaign's
     // "coherence-cuts-v2" ZERO-TOLERANCE QA gate -- deleting the class would have broken that
-    // unrelated harness. `SuggestAddsFromCollectionUseCase`/`SuggestAddsFromCommunityUseCase`
-    // SURVIVE (and stay Koin-registered) below for a similar but PRODUCTION reason: they are now
-    // ALSO the Deck Wizard's own fill-from-collection/community placement engine
-    // (`BuildDeckFromTemplateUseCase`, registered further down), not just Suggestions-tab-only as
-    // their original (Phase 2/4) KDoc implied.
-    single { SuggestAddsFromCollectionUseCase(deckScorer = get(), manaBaseAnalyzer = get()) }
-    // `CommunityAggregateRepository` (communityAggregateKoinModule) and `CommunityDecksRepository`
-    // (communityDecksKoinModule) are resolved via `get()` — both modules load in the same
-    // ManaHubApp `modules(...)` call, so declaration order does not matter to Koin.
-    single { SuggestAddsFromCommunityUseCase(cardRepository = get()) }
+    // unrelated harness. `SuggestAddsFromCollectionUseCase` SURVIVES the same way (also
+    // constructed directly by `HarnessDoctorPipeline.kt`, bypassing Koin) -- its own `single { }`
+    // registration is deliberately NOT re-added here either (Deck Wizard 60-card wave v6, plan §5
+    // Phase 7.1): its only production consumer, `the deleted Motor A wizard build use case`, was deleted along
+    // with the rest of the Motor A wizard path. `SuggestAddsFromCommunityUseCase` had no surviving
+    // caller at all once that same use case was deleted, so it (and its Koin binding) were deleted
+    // outright, not just un-registered.
     single { FindSimilarDecksUseCase(communityDecksRepository = get()) }
 
     // Deck Doctor Community/Archetype plan, Phase 6: the deckstats.net import-by-URL adapter
@@ -158,52 +162,21 @@ fun decksKoinModule(): Module = module {
     single { ImportDeckCardsUseCase(deckRepository = get(), cardRepository = get(), crashReporter = get(), deckstatsFetcher = get()) }
     single { ImportDeckUseCase(importDeckCardsUseCase = get()) }
 
-    // Deck Builder v2 (docs/plans/deck-builder-v2-plan.md), Phase 1/2. Flag-gated OFF
-    // (DeckFeatureFlags.DECK_BUILDER_V2_ENABLED) -- registered natively in Koin now so the wizard
-    // (Phase 3, not yet built) can resolve them with no further DI work. `CommunityAggregateRepository`
-    // is resolved via `get()` from `communityAggregateKoinModule` (same cross-module pattern as
-    // SuggestAddsFromCommunityUseCase above).
-    single { DeckTemplateResolver(communityAggregateRepository = get(), crashReporter = get()) }
     single { CollectionProfileUseCase() }
-    // Deck Engine Unification plan (§5 Phase 3) — the wizard's own use cases for the two NEW entry
-    // flows: Flow A's "suggested strategies from seeds" ranking and Flow B/C's "suggested seeds from
-    // a picked profile" ranking. Both pure/dependency-free (no defaults needed here since Koin
-    // always supplies a real instance; see each class's own KDoc).
-    single { SuggestStrategiesForSeedsUseCase() }
-    single { RankOwnedCardsForProfileUseCase() }
-    // Deck Wizard & Engine Rework plan, Workstream 2.2 — the STRATEGY step's pure candidate
-    // union/ranking. Pure/dependency-free, same registration convention as the two above.
-    single { DeriveCommanderStrategiesUseCase() }
-    // Deck Engine Unification plan (D1, live-wired in §5 Phase 3.5): build = the Doctor's own Motor A
-    // loop, so BuildDeckFromTemplateUseCase shares the SAME SuggestAddsFromCollectionUseCase
-    // singleton DeckDoctorOrchestrator uses. Motor B (community) is NOW wired live -- the wizard's
-    // Review step gained a per-build "also use community trends" toggle
-    // (DeckWizardSpec.useCommunityData) that ANDs with this global flag at build time
-    // (BuildDeckFromTemplateUseCase.fetchCommunityOwnedCandidates checks BOTH), mirroring
-    // DeckStudioViewModel's own `isCommunityEngineEnabled = { userPreferences
-    // .communityEngineEnabledFlow.first() }` pattern exactly.
-    single {
-        BuildDeckFromTemplateUseCase(
-            deckTemplateResolver = get(),
-            deckScorer = get(),
-            cardRepository = get(),
-            suggestAddsFromCollectionUseCase = get(),
-            manaBaseAnalyzer = get(),
-            crashReporter = get(),
-            communityAggregateRepository = get(),
-            suggestAddsFromCommunityUseCase = get(),
-            isCommunityEngineEnabled = { get<UserPreferencesDataStore>().communityEngineEnabledFlow.first() },
-            // Deck Wizard & Engine Rework plan, Workstream 4.1 (F4 fix): the Scryfall backstop fill
-            // phase, gated at runtime on DeckWizardSpec.includeOutsideCollection -- shares the SAME
-            // CandidatePoolGenerator singleton registered above (no longer purely dormant, see that
-            // class's KDoc).
-            candidatePoolGenerator = get(),
-        )
-    }
-    // Deck Builder v2, Phase 5 (docs/plans/deck-builder-v2-plan.md §3.5) -- Discoveries v2. Flag
-    // -gated OFF by default until DeckFeatureFlags.DISCOVERIES_V2_ENABLED flips (this batch flips
-    // it to true -- see that flag's KDoc).
-    single { DiscoverSynergiesV2UseCase(deckScorer = get()) }
+    // Deck Wizard Commander v3 plan, Phase 4.1; generalized to every 60-card anchor by the Deck
+    // Wizard 60-card wave (v6, plan §5 Phase 5.4) — the STRATEGY/COLOR_PICK/STRATEGY_PICK ranking
+    // use case, still pure/dependency-free. Bound under RecommendWizardStrategiesUseCase (not the
+    // deleted RecommendCommanderStrategiesUseCase typealias, Phase 7.1) so DeckWizardViewModel's
+    // own `recommendCommanderStrategiesUseCase` param type resolves correctly -- see
+    // feedback_koin_single_concrete_type_mismatch. Replaces the retired DeriveCommanderStrategiesUseCase.
+    single { RecommendWizardStrategiesUseCase() }
+    // Deck Wizard 60-card wave (v6, plan §5 Phase 7.1): `DeckTemplateResolver`,
+    // `SuggestStrategiesForSeedsUseCase`, `RankOwnedCardsForProfileUseCase`, and
+    // `the deleted Motor A wizard build use case` (the legacy Motor A wizard build engine, Casual's own build
+    // path until this phase) were deleted along with their Koin bindings here -- every format now
+    // builds through the single `BuildWizardDeckUseCase` registered above.
+    // Browse inspirations (Deck Studio, 60-card empty decks): the collection-wide Synergy discovery.
+    single { DiscoverCollectionSynergiesUseCase() }
 
     // ── ViewModels (the Decks island) ──────────────────────────────────────────────
     // DeckViewModel: backs the deck list.
@@ -229,40 +202,49 @@ fun decksKoinModule(): Module = module {
             savedStateHandle = get(),
             findSimilarDecksUseCase = get(),
             importDeckCardsUseCase = get(),
-            discoverSynergiesV2UseCase = get(),
-            findCombosUseCase = get(),
-            // Deck Wizard & Engine Rework plan, Workstream 6 -- unifies calculateLandDeltas onto the
-            // SAME LandTargetResolver the wizard uses at build time (see DeckStudioViewModel's KDoc
-            // on resolveStudioLandTarget).
-            deckScorer = get(),
+            discoverCollectionSynergiesUseCase = get(),
+            findCombosWithCardUseCase = get(),
             manaBaseAnalyzer = get(),
             // Suggestions Tab UI Polish plan (W11 bug-fix pass, 2026-08-25) -- already a `single`
             // in SharedDomainKoinModule (shared with AdvancedSearchViewModel/AddCardViewModel).
             buildScryfallQueryUseCase = get(),
+            calculateDeckValueSummaryUseCase = get(),
+            // Deck Wizard UX polish plan, Run 1 §1.6 -- the SAME DeckAnalysisPipeline singleton
+            // declared above (also resolved by DeckDoctorOrchestrator/BuildWizardDeckUseCase), for
+            // scoreStrategyMatches()'s per-strategy "match %" preview. Never a second instance.
+            deckAnalysisPipeline = get(),
         )
     }
 
-    // DeckWizardViewModel: Deck Builder v2 wizard (docs/plans/deck-builder-v2-plan.md §3.4). Always
-    // creates its own fresh draft (no `deckId` nav arg, unlike DeckStudioViewModel) -- the optional
-    // strategyHint/themeHint/colors args are the Discoveries v2 "Build this" hand-off (D11).
+    // DeckWizardViewModel: Deck Builder v2 wizard (docs/plans/deck-builder-v2-plan.md §3.4), every
+    // format since the Deck Wizard 60-card wave (v6, plan §5 Phase 5.4). A Commander build creates
+    // its own fresh draft; a 60-card build always writes into the `deckId` nav arg (R13/S14) -- the
+    // optional strategyHint/themeHint/colors args are the Discoveries v2 "Build this" hand-off (D11).
     viewModel {
         DeckWizardViewModel(
             deckRepository = get(),
             userCardRepository = get(),
             collectionProfileUseCase = get(),
-            buildDeckFromTemplateUseCase = get(),
             searchCardsUseCase = get(),
             communityAggregateRepository = get(),
             crashReporter = get(),
             appContext = get(),
             savedStateHandle = get(),
-            suggestStrategiesForSeedsUseCase = get(),
-            rankOwnedCardsForProfileUseCase = get(),
-            userPreferences = get(),
             // Deck Wizard & Engine Rework plan, Workstream 2 -- STRATEGY step's source 1 +
             // derivation ranking.
             cardStrategyTagsRepository = get(),
-            deriveCommanderStrategiesUseCase = get(),
+            recommendCommanderStrategiesUseCase = get(),
+            // Deck Wizard Commander v3 plan, Phase 5 (D2) -- the SAME shared DeckAnalysisPipeline
+            // singleton DeckDoctorOrchestrator/the harness already resolve, never a second instance.
+            deckAnalysisPipeline = get(),
+            // Deck Wizard Commander v3 plan, Phase 6; generalized to every format by the 60-card
+            // wave -- onGenerate's ONE build path now.
+            buildWizardDeckUseCase = get(),
+            // Deck Wizard v4, W0.2 -- pre-warms real basic-land Card objects before a build.
+            cardRepository = get(),
+            // Deck Wizard v4, W7 Task B (E4/E8) -- biases placement toward previously-chosen Choice
+            // picks and records freshly-made ones.
+            wizardPreferenceStore = get(),
         )
     }
 }

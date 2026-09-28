@@ -31,10 +31,12 @@ import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.user.UserInfo
+import io.github.jan.supabase.auth.user.UserSession
 import io.github.jan.supabase.exceptions.RestException
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ResponseException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
@@ -83,6 +85,8 @@ class AuthRepositoryImpl(
     private val supabaseOkHttpClient: OkHttpClient,
     private val applicationScope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher,
+    // Drops account-scoped local stores (gamification) after a confirmed server-side deletion.
+    private val onAccountDeleted: suspend () -> Unit = {},
 ) : AuthRepository {
 
     private val profileRefreshSignal = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -95,6 +99,14 @@ class AuthRepositoryImpl(
      * restart should reset the baseline.
      */
     private var knownIdentityProviders: Set<String>? = null
+
+    /**
+     * Last [SessionState.Authenticated] emitted by [sessionState] (enriched when enrichment landed).
+     * Carried through [SessionStatus.RefreshFailure] so a transient network/5xx refresh failure is
+     * never reported as a sign-out; cleared only when a real [SessionState.Unauthenticated] lands.
+     */
+    @Volatile
+    private var lastAuthenticated: SessionState.Authenticated? = null
 
     /**
      * Session state flow enriched with `user_profiles` data.
@@ -114,7 +126,7 @@ class AuthRepositoryImpl(
         supabaseAuth.sessionStatus,
         profileRefreshSignal.onStart { emit(Unit) }
     ) { status, _ -> status }
-        .map { status -> status.toSessionState() }
+        .map { status -> resolveSessionState(status) }
         // [linkGoogleIdentityNative] only returns the OAuth authorization URL — the actual link
         // completes asynchronously via MainActivity's `supabaseClient.handleDeeplinks(intent)`,
         // which updates the SDK session and makes `sessionStatus` re-emit with the newly-linked
@@ -124,11 +136,15 @@ class AuthRepositoryImpl(
         .flatMapLatest { state ->
             if (state !is SessionState.Authenticated) {
                 flowOf(state)
+            } else if (state === lastAuthenticated) {
+                // Carried through a refresh failure: already enriched, and the network is down anyway.
+                flowOf(state)
             } else if (state.user.isAnonymous) {
                 // Anonymous users have no user_profiles row — skip profile fetch and upsert.
                 flowOf(state)
             } else {
                 flow {
+                    claimCachedIdentity(state.user.id)
                     // Fast emit: only emit immediately when the nickname is already known from
                     // in-memory session metadata (i.e. email/password users whose nickname is
                     // embedded in the token). For Google users the in-memory metadata may reflect
@@ -158,7 +174,9 @@ class AuthRepositoryImpl(
                                 profileCompleted = profile.profileCompleted,
                                 hasPassword = hasPassword,
                             )
-                            syncToDataStore(enrichedUser)
+                            // The fetched row is authoritative: a null avatar is a removal (P-12).
+                            syncToDataStore(enrichedUser, avatarAuthoritative = true)
+                            syncPrivacyFlagsToDataStore(profile)
                             emit(SessionState.Authenticated(enrichedUser))
                         } else {
                             // No profile row yet (e.g. email-confirmed user whose profile row
@@ -176,6 +194,13 @@ class AuthRepositoryImpl(
                         }
                     }
                 }
+            }
+        }
+        .onEach { state ->
+            when (state) {
+                is SessionState.Authenticated -> lastAuthenticated = state
+                SessionState.Unauthenticated -> lastAuthenticated = null
+                else -> Unit
             }
         }
         .stateIn(
@@ -309,7 +334,7 @@ class AuthRepositoryImpl(
                 //
                 // LOCAL scope avoids a network call with a short-lived token. The auth.users
                 // row is harmless until profile_completed = true (RLS policies block access).
-                runCatching { supabaseAuth.signOut(SignOutScope.LOCAL) }
+                signOutLocally(SignOutScope.LOCAL)
                 return@runCatching AuthResult.Error(
                     AuthError.NoProfileFound(email = userInfo.email)
                 )
@@ -690,7 +715,7 @@ class AuthRepositoryImpl(
                 // preserving the clear-before-sign-out ordering documented above.
                 withContext(NonCancellable) {
                     runCatching { userPreferencesDataStore.clearPendingRecoveryMarker() }
-                    runCatching { supabaseAuth.signOut(SignOutScope.GLOBAL) }
+                    signOutLocally(SignOutScope.GLOBAL)
                 }
                 AuthResult.Success(Unit)
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
@@ -726,7 +751,7 @@ class AuthRepositoryImpl(
             // or an Activity recreation) must not be able to interrupt this cleanup partway through.
             withContext(NonCancellable) {
                 runCatching { userPreferencesDataStore.clearPendingRecoveryMarker() }
-                runCatching { supabaseAuth.signOut(SignOutScope.LOCAL) }
+                signOutLocally(SignOutScope.LOCAL)
             }
             AuthResult.Success(Unit)
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
@@ -767,16 +792,55 @@ class AuthRepositoryImpl(
             // potentially throw before clearing local state, and leave the session
             // alive — causing the background sync worker to keep hitting Supabase
             // with an invalid token until the JWT TTL expires.
-            runCatching { supabaseAuth.signOut(SignOutScope.LOCAL) }
+            signOutLocally(SignOutScope.LOCAL)
+            try {
+                onAccountDeleted()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The account is already gone server-side; a local cleanup failure must not report failure.
+                recordNonFatal("auth_delete_account_local_cleanup_failed", e)
+            }
             AuthResult.Success(Unit)
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
     }
 
     override suspend fun signOut(): AuthResult<Unit> = withContext(ioDispatcher) {
         runCatching {
+            val hadAuthenticatedSession = supabaseAuth.currentUserOrNull() != null
             supabaseAuth.signOut()
+            if (hadAuthenticatedSession || userPreferencesDataStore.hasAccountProfileIdentity()) {
+                userPreferencesDataStore.clearProfileIdentity()
+            }
+            clearLocalPrivacyFlags()
             AuthResult.Success(Unit)
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+    }
+
+    /** Best-effort sign-out that also drops the account-scoped local caches (privacy flags). */
+    private suspend fun signOutLocally(scope: SignOutScope) {
+        val hadAuthenticatedSession = supabaseAuth.currentUserOrNull() != null
+        runCatching { supabaseAuth.signOut(scope) }
+        if (hadAuthenticatedSession || userPreferencesDataStore.hasAccountProfileIdentity()) {
+            runCatching { userPreferencesDataStore.clearProfileIdentity() }
+                .onFailure { e -> if (e is CancellationException) throw e }
+        }
+        clearLocalPrivacyFlags()
+    }
+
+    private suspend fun clearLocalPrivacyFlags() {
+        runCatching { userPreferencesDataStore.clearPrivacyFlags() }
+    }
+
+    /** Mirrors the user's own `user_profiles` privacy columns locally so Settings shows the server truth. */
+    private suspend fun syncPrivacyFlagsToDataStore(profile: UserProfileDto) {
+        runCatching {
+            userPreferencesDataStore.savePrivacyFlags(
+                collectionPublic = profile.collectionPublic,
+                wishlistPublic = profile.wishlistPublic,
+                tradeListPublic = profile.tradeListPublic,
+            )
+        }
     }
 
     override suspend fun getCurrentUser(): AuthUser? =
@@ -801,19 +865,33 @@ class AuthRepositoryImpl(
      * This ensures [ProfileViewModel.uiState.playerName] and [avatarUrl] are updated
      * from the server data without requiring the user to manually refresh.
      */
-    private suspend fun syncToDataStore(user: AuthUser) {
+    private suspend fun syncToDataStore(user: AuthUser, avatarAuthoritative: Boolean = false) {
         try {
-            // Only update DataStore if the server actually has values. 
-            // This prevents overwriting a valid local nickname/avatar with null 
-            // during the very first authenticated emit (before profile enrichment).
+            userPreferencesDataStore.claimProfileIdentity(user.id)
+            // A null nickname never overwrites the local one (first authenticated emit, before
+            // enrichment). A null avatar is written only when [user] comes from a fetched profile
+            // row, where null means "removed"; elsewhere it means "not known".
             user.nickname?.takeIf { it.isNotBlank() }?.let {
                 userPreferencesDataStore.savePlayerName(it)
             }
-            user.avatarUrl?.let {
-                userPreferencesDataStore.saveAvatarUrl(it)
+            if (user.avatarUrl != null || avatarAuthoritative) {
+                userPreferencesDataStore.saveAvatarUrl(user.avatarUrl)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             // Non-fatal: DataStore write failures must not surface to the user.
+        }
+    }
+
+    /** Drops a different account's cached nickname/avatar before this account's values sync in. */
+    private suspend fun claimCachedIdentity(userId: String) {
+        try {
+            userPreferencesDataStore.claimProfileIdentity(userId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            recordNonFatal("auth_cached_identity_claim_failed", e)
         }
     }
 
@@ -1058,7 +1136,7 @@ class AuthRepositoryImpl(
                         // surface a distinct result so the caller can tell the user their password
                         // WAS set — this must never read as a generic failure.
                         recordNonFatal("account_mgmt_set_password_session_revoked")
-                        runCatching { supabaseAuth.signOut(SignOutScope.LOCAL) }
+                        signOutLocally(SignOutScope.LOCAL)
                         AuthResult.Error(AuthError.PasswordUpdatedSessionRevoked)
                     }
                 } else {
@@ -1163,10 +1241,10 @@ class AuthRepositoryImpl(
      * claim on the session's JWT access token, not on [UserInfo] itself (verified via `auth-kt`
      * sources — `UserInfo` has no `isAnonymous`/`is_anonymous` field anywhere, nested or not), so
      * this mapper genuinely cannot answer it from a bare `UserInfo`. That default is correct for
-     * every call site of this function EXCEPT [toSessionState] (the sole path whose result feeds
+     * every call site of this function EXCEPT [toAuthenticatedState] (the sole path whose result feeds
      * [AuthRepository.sessionState], which is where every consumer reads `.isAnonymous` from) —
      * every other call site is an email/Google sign-in or profile-update flow that a guest session
-     * can never reach. [toSessionState] corrects the field via `.copy(isAnonymous = ...)` using
+     * can never reach. [toAuthenticatedState] corrects the field via `.copy(isAnonymous = ...)` using
      * [decodeIsAnonymousClaim] against the session's access token, which DOES carry the claim.
      *
      * Internal to allow overriding in unit tests (MockK has trouble with UserInfo extension properties).
@@ -1346,8 +1424,31 @@ class AuthRepositoryImpl(
         private const val SET_PASSWORD_VERIFY_TIMEOUT_MS = 3_000L
     }
 
-    private fun SessionStatus.toSessionState(): SessionState = when (this) {
-        is SessionStatus.Authenticated -> session.user
+    /**
+     * Maps an SDK [SessionStatus] to the domain [SessionState].
+     *
+     * [SessionStatus.RefreshFailure] is a network/5xx failure while the stored session is kept (a
+     * revoked token clears the session and emits [SessionStatus.NotAuthenticated] instead), so it
+     * keeps the user signed in: the last emitted [SessionState.Authenticated], else the persisted
+     * session (cold start with an expired token while offline), else [SessionState.Unauthenticated].
+     */
+    private suspend fun resolveSessionState(status: SessionStatus): SessionState = when (status) {
+        is SessionStatus.Authenticated ->
+            status.session.toAuthenticatedState() ?: SessionState.Unauthenticated
+
+        is SessionStatus.NotAuthenticated -> SessionState.Unauthenticated
+        is SessionStatus.Initializing -> SessionState.Loading
+        is SessionStatus.RefreshFailure -> lastAuthenticated
+            ?: runCatching { supabaseAuth.sessionManager.loadSession() }
+                .onFailure { if (it is CancellationException) throw it }
+                .getOrNull()
+                ?.toAuthenticatedState()
+            ?: SessionState.Unauthenticated
+    }
+
+    private fun UserSession.toAuthenticatedState(): SessionState.Authenticated? {
+        val session = this
+        return session.user
             ?.let { mapUserInfoToAuthUser(it) }
             // The JWT access token — not UserInfo — is where GoTrue's top-level `is_anonymous`
             // claim and the `amr` (Authentication Methods Reference) claim actually live. This is
@@ -1365,10 +1466,5 @@ class AuthRepositoryImpl(
                 sessionId = decodeSessionIdClaim(session.accessToken),
             )
             ?.let { SessionState.Authenticated(it) }
-            ?: SessionState.Unauthenticated
-
-        is SessionStatus.NotAuthenticated -> SessionState.Unauthenticated
-        is SessionStatus.Initializing -> SessionState.Loading
-        is SessionStatus.RefreshFailure -> SessionState.Unauthenticated
     }
 }

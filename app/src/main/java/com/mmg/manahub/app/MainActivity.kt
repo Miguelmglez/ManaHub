@@ -7,24 +7,28 @@ import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Rational
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.google.android.play.core.install.model.AppUpdateType
-import com.google.android.play.core.install.model.UpdateAvailability
 import com.mmg.manahub.app.navigation.AppNavGraph
+import com.mmg.manahub.app.update.AppUpdateController
+import com.mmg.manahub.core.domain.update.AppUpdateState
+import com.mmg.manahub.core.ui.components.ForceUpdateScreen
 import com.mmg.manahub.core.common.decodeSessionIdClaim
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
@@ -44,10 +48,12 @@ import io.github.jan.supabase.auth.SignOutScope
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.handleDeeplinks
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.util.Locale
 import javax.inject.Inject
+import org.koin.android.ext.android.inject
 
 /**
  * Bound on the blocking pending-recovery-marker write in [MainActivity.handleSupabaseAuthDeepLink]
@@ -56,6 +62,9 @@ import javax.inject.Inject
  * `onCreate`/`onNewIntent`, so it must have SOME bound rather than none.
  */
 private const val MARKER_WRITE_TIMEOUT_MS = 2_000L
+
+private const val UPDATE_PROMPT_DELAY_MS = 2_000L
+private const val UPDATE_PROMPT_DURATION_MS = 10_000L
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -96,6 +105,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var supabaseClient: SupabaseClient
+
+    // Koin-owned app singleton; Koin is started in ManaHubApp.onCreate before any Activity exists.
+    private val appUpdateController: AppUpdateController by inject()
 
     /**
      * Guards against a malicious app injecting a forged manahub://auth intent.
@@ -410,12 +422,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun attachBaseContext(newBase: Context) {
-        val langCode = newBase
-            .getSharedPreferences("user_prefs_lang_sync", Context.MODE_PRIVATE)
-            .getString("app_language_sync", "en")
-            ?: "en"
-
-        val locale = Locale(langCode)
+        // English-only app: a legacy es/de value in user_prefs_lang_sync must never be honoured
+        val locale = Locale(APP_LOCALE)
         Locale.setDefault(locale)
 
         val config = Configuration(newBase.resources.configuration)
@@ -453,36 +461,52 @@ class MainActivity : ComponentActivity() {
         // Cold-start from a notification tap: buffered until AppNavGraph registers its navigator.
         handlePushDeeplink(intent)
 
-        val appUpdateManager = AppUpdateManagerFactory.create(this)
-        val appUpdateInfoTask = appUpdateManager.appUpdateInfo
+        appUpdateController.bind(this)
 
         setContent {
             val updateToastState = rememberMagicToastState()
+            val updateState by appUpdateController.state.collectAsStateWithLifecycle()
+            var optionalUpdatePromptShown by rememberSaveable { mutableStateOf(false) }
 
-            androidx.compose.runtime.LaunchedEffect(Unit) {
-                appUpdateInfoTask.addOnSuccessListener { appUpdateInfo ->
-                    if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                        && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
-                    ) {
+            LaunchedEffect(updateState) {
+                when (val current = updateState) {
+                    is AppUpdateState.Available -> {
+                        if (!current.inAppFlowAvailable || optionalUpdatePromptShown) return@LaunchedEffect
+                        // Toast events are not replayed, so wait until the host collects past launch.
+                        delay(UPDATE_PROMPT_DELAY_MS)
+                        optionalUpdatePromptShown = true
                         updateToastState.show(
-                            message = "New app update available. Tap to update.",
+                            message = "A new version of ManaHub is available. Tap to update.",
                             type = MagicToastType.INFO,
-                            durationMs = 10000,
-                            onClick = {
-                                appUpdateManager.startUpdateFlowForResult(
-                                    appUpdateInfo,
-                                    AppUpdateType.FLEXIBLE,
-                                    this@MainActivity,
-                                    500
-                                )
-                            }
+                            durationMs = UPDATE_PROMPT_DURATION_MS,
+                            onClick = appUpdateController::requestUpdate,
                         )
+                    }
+                    AppUpdateState.Downloaded -> {
+                        delay(UPDATE_PROMPT_DELAY_MS)
+                        updateToastState.show(
+                            message = "Update ready. Tap to restart and install.",
+                            type = MagicToastType.SUCCESS,
+                            durationMs = UPDATE_PROMPT_DURATION_MS,
+                            onClick = appUpdateController::completeUpdate,
+                        )
+                    }
+                    else -> Unit
+                }
+            }
+
+            val forcedUpdate = updateState as? AppUpdateState.Forced
+            if (forcedUpdate != null) {
+                LaunchedEffect(forcedUpdate.minSupportedVersionCode) {
+                    FirebaseCrashlytics.getInstance().apply {
+                        setCustomKey("remote_min_version_code", forcedUpdate.minSupportedVersionCode)
+                        log("force_update_shown")
                     }
                 }
             }
 
             val theme by userPreferencesDataStore.themeFlow
-                .collectAsStateWithLifecycle(initialValue = AppTheme.NeonVoid)
+                .collectAsStateWithLifecycle(initialValue = AppTheme.Default)
 
             val userPrefs by userPreferencesRepository.preferencesFlow
                 .collectAsStateWithLifecycle(initialValue = null)
@@ -492,7 +516,14 @@ class MainActivity : ComponentActivity() {
                     LocalPreferredCurrency provides (userPrefs?.preferredCurrency ?: com.mmg.manahub.core.model.PreferredCurrency.USD),
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        AppNavGraph(isInPiP = isInPiP)
+                        // Hidden from accessibility while blocked so TalkBack cannot reach the app.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .then(if (forcedUpdate != null) Modifier.clearAndSetSemantics { } else Modifier),
+                        ) {
+                            AppNavGraph(isInPiP = isInPiP)
+                        }
                         // Global achievement-unlock celebration overlay (ADR-002, Phase 1). Hosted
                         // here so a celebration plays above any screen; suppressed when the master
                         // gamification toggle is off (handled inside the host's ViewModel).
@@ -503,19 +534,22 @@ class MainActivity : ComponentActivity() {
                                 .align(Alignment.BottomCenter)
                                 .navigationBarsPadding(),
                         )
+                        if (forcedUpdate != null) {
+                            BackHandler(enabled = true) { }
+                            ForceUpdateScreen(
+                                message = forcedUpdate.message,
+                                onUpdateClick = appUpdateController::requestUpdate,
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 500) {
-            if (resultCode != RESULT_OK) {
-                // Update failed or cancelled
-            }
-        }
+    private companion object {
+        /** The app ships English-only (CLAUDE.md language rules); no locale picker exists. */
+        const val APP_LOCALE = "en"
     }
+
 }

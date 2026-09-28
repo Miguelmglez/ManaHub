@@ -18,14 +18,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.distinctUntilChangedBy
-import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  UI state
@@ -96,60 +95,56 @@ class TradesViewModel(
 
     init {
         observeSession()
-        observeWishlist()
-        observeOpenForTrade()
-        observeFriends()
     }
 
     // ── Session observation ───────────────────────────────────────────────────
 
     private fun observeSession() {
-        authRepo.sessionState
-            .onEach { state -> _uiState.update { it.copy(isLoggedIn = state is SessionState.Authenticated) } }
-            .catch { /* session errors are non-fatal for this screen */ }
-            .launchIn(viewModelScope)
-
-        // Trigger a full remote sync only on a genuine sign-in transition (first auth, or a
-        // switch to a different account). `distinctUntilChangedBy { user.id }` gates out token
-        // refreshes, which re-emit `Authenticated` with the SAME user id and would otherwise
-        // re-trigger a full remote sync on every emission (trades audit §2.14, 2026-07-10).
-        authRepo.sessionState
-            .filterIsInstance<SessionState.Authenticated>()
-            .distinctUntilChangedBy { it.user.id }
-            .onEach { state ->
-                syncTradeListsFromRemote(state.user.id)
-                    .onFailure { _events.trySend(TradesEvent.SyncFailed) }
-            }
-            .catch { /* failures are already surfaced via onFailure above; guard collector crash */ }
-            .launchIn(viewModelScope)
-    }
-
-    // ── Observation ───────────────────────────────────────────────────────────
-
-    private fun observeWishlist() {
         viewModelScope.launch {
-            getLocalWishlist()
+            authRepo.sessionState
+                .map { (it as? SessionState.Authenticated)?.user?.id }
                 .distinctUntilChanged()
-                .catch { e -> _events.trySend(TradesEvent.ShowMessage(e.toUserFacingMessage())) }
-                .collect { entries -> _uiState.update { it.copy(wishlist = entries) } }
-        }
-    }
-
-    private fun observeOpenForTrade() {
-        viewModelScope.launch {
-            getLocalOpenForTrade()
-                .distinctUntilChanged()
-                .catch { e -> _events.trySend(TradesEvent.ShowMessage(e.toUserFacingMessage())) }
-                .collect { entries -> _uiState.update { it.copy(openForTrade = entries) } }
-        }
-    }
-
-    private fun observeFriends() {
-        viewModelScope.launch {
-            getFriends()
-                .distinctUntilChanged()
-                .catch { /* friends are optional; silently ignore */ }
-                .collect { friends -> _uiState.update { it.copy(friends = friends) } }
+                .collectLatest { ownerId ->
+                    _uiState.update { it.copy(
+                        wishlist = emptyList(), openForTrade = emptyList(), friends = emptyList(),
+                        isLoggedIn = ownerId != null,
+                    ) }
+                    coroutineScope {
+                        launch {
+                            getLocalWishlist().distinctUntilChanged()
+                                .catch { e -> _events.trySend(TradesEvent.ShowMessage(e.toUserFacingMessage())) }
+                                .collect { entries ->
+                                    if ((authRepo.sessionState.value as? SessionState.Authenticated)?.user?.id == ownerId) {
+                                        _uiState.update { it.copy(wishlist = entries) }
+                                    }
+                                }
+                        }
+                        launch {
+                            getLocalOpenForTrade().distinctUntilChanged()
+                                .catch { e -> _events.trySend(TradesEvent.ShowMessage(e.toUserFacingMessage())) }
+                                .collect { entries ->
+                                    if ((authRepo.sessionState.value as? SessionState.Authenticated)?.user?.id == ownerId) {
+                                        _uiState.update { it.copy(openForTrade = entries) }
+                                    }
+                                }
+                        }
+                        if (ownerId != null) {
+                            launch {
+                                getFriends().distinctUntilChanged()
+                                    .catch { /* friends are optional; silently ignore */ }
+                                    .collect { friends ->
+                                        if ((authRepo.sessionState.value as? SessionState.Authenticated)?.user?.id == ownerId) {
+                                            _uiState.update { it.copy(friends = friends) }
+                                        }
+                                    }
+                            }
+                            launch {
+                                syncTradeListsFromRemote(ownerId)
+                                    .onFailure { _events.trySend(TradesEvent.SyncFailed) }
+                            }
+                        }
+                    }
+                }
         }
     }
 

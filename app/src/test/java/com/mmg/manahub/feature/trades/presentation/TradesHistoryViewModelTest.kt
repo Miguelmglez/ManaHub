@@ -74,13 +74,15 @@ class TradesHistoryViewModelTest {
         id: String,
         status: TradeStatus,
         updatedAt: Long = 1_000L,
+        rootProposalId: String = id,
+        createdAt: Long = 1_000L,
     ) = TradeProposal(
         id = id,
         status = status,
         proposerId = USER_A,
         receiverId = USER_B,
         parentProposalId = null,
-        rootProposalId = id,
+        rootProposalId = rootProposalId,
         proposalVersion = 1,
         includesReviewCollectionFromProposer = false,
         includesReviewCollectionFromReceiver = false,
@@ -88,7 +90,7 @@ class TradesHistoryViewModelTest {
         receiverMarkedCompletedAt = null,
         cancellationReason = null,
         items = emptyList(),
-        createdAt = 1_000L,
+        createdAt = createdAt,
         updatedAt = updatedAt,
     )
 
@@ -113,6 +115,7 @@ class TradesHistoryViewModelTest {
         tradesRepository = tradesRepository,
         refreshTrades = refreshTrades,
         ioDispatcher = testDispatcher,
+        defaultDispatcher = testDispatcher,
     )
 
     // =========================================================================
@@ -229,7 +232,7 @@ class TradesHistoryViewModelTest {
     }
 
     @Test
-    fun `given proposals of every status when filter is DECLINED then DECLINED CANCELLED REVOKED and COUNTERED are all returned`() = runTest {
+    fun `given proposals of every status when filter is DECLINED then DECLINED CANCELLED and REVOKED are returned but not COUNTERED`() = runTest {
         allProposalsFlow.value = listOf(
             buildProposal("p1", TradeStatus.DECLINED),
             buildProposal("p2", TradeStatus.CANCELLED),
@@ -244,7 +247,7 @@ class TradesHistoryViewModelTest {
         advanceUntilIdle()
         vm.onFilterSelected(HistoryFilter.DECLINED)
 
-        assertEquals(setOf("p1", "p2", "p3", "p4"), vm.uiState.value.filtered.map { it.id }.toSet())
+        assertEquals(setOf("p1", "p2", "p3"), vm.uiState.value.filtered.map { it.id }.toSet())
     }
 
     @Test
@@ -314,5 +317,59 @@ class TradesHistoryViewModelTest {
         verify(exactly = 0) { tradesRepository.clearCache() }
         coVerify(exactly = 1) { refreshTrades(USER_A) }
         assertEquals(USER_A, vm.uiState.value.currentUserId)
+    }
+
+    // =========================================================================
+    // Thread grouping, first-load state, single-flight refresh
+    // =========================================================================
+
+    @Test
+    fun `given a counter-offer chain then history shows only the latest proposal of the thread`() = runTest {
+        allProposalsFlow.value = listOf(
+            buildProposal("root", TradeStatus.COUNTERED, updatedAt = 2_000L, createdAt = 1_000L),
+            buildProposal("counter", TradeStatus.PROPOSED, updatedAt = 2_000L, rootProposalId = "root", createdAt = 2_000L),
+            buildProposal("other", TradeStatus.COMPLETED, updatedAt = 1_500L),
+        )
+        sessionFlow.value = authenticated(USER_A)
+        coEvery { refreshTrades(any()) } returns Result.success(Unit)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        assertEquals(listOf("counter", "other"), vm.uiState.value.filtered.map { it.id })
+        vm.onFilterSelected(HistoryFilter.DECLINED)
+        assertTrue(vm.uiState.value.filtered.isEmpty())
+    }
+
+    @Test
+    fun `given an empty cache then history stays loading until the first refresh ends`() = runTest {
+        sessionFlow.value = authenticated(USER_A)
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        coEvery { refreshTrades(USER_A) } coAnswers { gate.await(); Result.failure(RuntimeException("offline")) }
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.isLoading)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isLoading)
+        assertTrue(vm.uiState.value.refreshFailed)
+    }
+
+    @Test
+    fun `given two refresh calls while one is in flight then the repository is called once`() = runTest {
+        sessionFlow.value = authenticated(USER_A)
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        coEvery { refreshTrades(USER_A) } coAnswers { gate.await(); Result.success(Unit) }
+
+        val vm = createViewModel()
+        vm.refresh()
+        vm.refresh()
+        advanceUntilIdle()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { refreshTrades(USER_A) }
     }
 }

@@ -19,4 +19,16 @@ interface PushTokenRepository {
 
     /** Re-registers the current device token with a new [locale] after a language change. */
     suspend fun updateLocale(locale: String)
+
+    /**
+     * Registers THIS device's current token (resolved internally). Used when the user re-enables
+     * push notifications, so the backend starts targeting the device again (ADR-005).
+     */
+    suspend fun registerCurrentDevice()
+
+    /**
+     * Removes THIS device's current token so the backend stops sending to it at all — the master
+     * switch must gate the backend work, not just the notification display (ADR-005).
+     */
+    suspend fun unregisterCurrentDevice()
 }

@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.orchestrator
+// COMMENTS_REVIEWED: 2026-09-16
 
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.repository.DeckRepository
@@ -10,25 +11,27 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.ScoreWeightOverrides
-import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
-import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
 import com.mmg.manahub.feature.decks.domain.engine.PillarId
+import com.mmg.manahub.feature.decks.domain.engine.PostureId
 import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.toAnalysisWeights
 import com.mmg.manahub.feature.decks.domain.engine.toScoreWeights
 import com.mmg.manahub.feature.decks.domain.engine.withUnresolvedFinding
+import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.FindSimilarDecksUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SimilarDeckResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -92,9 +95,9 @@ data class DeckDoctorState(
      * Reset to empty at the start of every [loadAnalysis]. */
     val completedStages: List<DoctorAnalysisStage> = emptyList(),
     /**
-     * Deck Engine Unification plan (D4): mirrors `Deck.strategyLocked`. The host UI hides the
-     * "Deck plan" archetype/theme editor while true. Flip off via [unlockStrategy] (an explicit,
-     * confirmed user action).
+     * Mirrors `Deck.strategyLocked` (still persisted/synced from a wizard build). Deck Wizard UX
+     * polish plan, Run 1 §1.4 removed the UI gate + explicit unlock action this field used to drive
+     * — nothing reads it any more, kept only because the persisted flag itself stays.
      */
     val strategyLocked: Boolean = false,
 
@@ -174,6 +177,11 @@ class DeckDoctorOrchestrator(
     private val isCommunityEngineEnabled: suspend () -> Boolean = { false },
 ) {
 
+    /** Deck Wizard Commander v3 plan (E4, D2): the ONE shared analysis entry point — see its own
+     * class KDoc. Built from this orchestrator's own constructor deps so no existing call site
+     * needs a new positional/named argument. */
+    private val deckAnalysisPipeline = DeckAnalysisPipeline(evaluateDeckUseCase, inferDeckIdentityUseCase, crashReporter)
+
     private val _state = MutableStateFlow(DeckDoctorState())
     val state: StateFlow<DeckDoctorState> = _state.asStateFlow()
 
@@ -193,6 +201,18 @@ class DeckDoctorOrchestrator(
     /** The in-flight Motor B ("Decks like yours") fetch job — cancelled before every new launch,
      * so only the LATEST fetch can ever survive to update [state]. */
     private var communityJob: Job? = null
+
+    /** In-flight debounced [recomputeIncremental] job -- cancelled before every relaunch so rapid taps coalesce into one evaluation. */
+    private var recomputeJob: Job? = null
+
+    /** True from the moment a mutation is applied to [analysisCache] until [performRecompute] publishes Health for it -- lets a host that cancelled the pending recompute run it immediately on return, see [recomputeNowIfDirty]. */
+    private var recomputeDirty: Boolean = false
+
+    /** Bumped on every [recomputeIncremental] mutation (and reset at [loadAnalysis]/[invalidate]) --
+     * [performRecompute] snapshots this at launch and re-checks it before publishing, so a job left
+     * running past its own cancel() (cooperative cancellation is not guaranteed mid-evaluate) can
+     * never overwrite a NEWER mutation's result or clear [recomputeDirty] out from under it. */
+    private var mutationGeneration: Int = 0
 
     /**
      * Workstream 8.4 -- bumped once per [loadAnalysis] call, BEFORE its coroutine is launched.
@@ -231,6 +251,9 @@ class DeckDoctorOrchestrator(
          * is picked up without a full [loadAnalysis]. */
         var archetypeOverride: String?,
         var themesOverride: List<String>,
+        /** Deck Wizard Commander v3 plan (E3, D5): raw `Deck.postureOverride`, same "re-read on
+         * incremental recompute" convention as [archetypeOverride]/[themesOverride] above. */
+        var postureOverride: String?,
         val commanderTags: List<CardTag>,
         // ── Deck Engine Unification (D4) ────────────────────────────────────────
         /** Mirrors `Deck.strategyLocked` -- re-read on every full [loadAnalysis] (an unlock is
@@ -246,6 +269,9 @@ class DeckDoctorOrchestrator(
     fun loadAnalysis(deckId: String) {
         analysisCache = null
         analysisJob?.cancel()
+        recomputeJob?.cancel()
+        recomputeDirty = false
+        mutationGeneration++
         // Workstream 8.4 -- this pass's own identity, captured BEFORE launch so every stage-emitting
         // sub-job it spawns ([recomputeCommunityInternal]) can tell whether it is still the CURRENT
         // pass by the time it actually gets to update [DeckDoctorState.stage].
@@ -292,26 +318,29 @@ class DeckDoctorOrchestrator(
             val archetypeOverride = deckWithCards.deck.archetypeOverride
             val themesOverride = deckWithCards.deck.themesOverride
             val tribeOverride = deckWithCards.deck.tribeOverride
+            val postureOverride = deckWithCards.deck.postureOverride
             val strategyLocked = deckWithCards.deck.strategyLocked
 
-            val seedCards = inferenceSeeds(commanderCard, mainboardEntries)
-            val inferredSeedTags = inferDeckIdentityUseCase(seedCards).seedTags
-            val seedTags = (inferredSeedTags + pinSeedTags(archetypeOverride, themesOverride, tribeOverride)).distinct()
             val weightOverrides = weightsProvider()
             val weights = weightOverrides.toScoreWeights()
             // Wave 2 / B3: P5's SideboardOversized check needs the sideboard count; the mainboard
             // resolution above never touches deckWithCards.sideboard.
             val sideboardCount = deckWithCards.sideboard.sumOf { it.quantity }
 
-            val health = evaluateDeckUseCase(
+            // Deck Wizard Commander v3 plan (E4, D2): seed inference + pin fold + evaluate now live
+            // in the ONE shared DeckAnalysisPipeline (also used by the wizard and the harness) --
+            // see that class's KDoc for why this replaced the inline sequence that used to be here.
+            // seedTags is resolved once here (not inside analyze) because AnalysisCache.seedTags
+            // caches it verbatim for every later recomputeIncremental call this session.
+            val seedTags = deckAnalysisPipeline.resolveSeedTags(mainboardEntries, commanderCard, archetypeOverride, themesOverride, tribeOverride)
+            val health = deckAnalysisPipeline.analyze(
                 mainboard = mainboardEntries,
                 format = format,
-                commanderIdentity = commanderIdentity,
-                seedTags = seedTags,
-                weights = weights,
+                commander = commanderCard,
                 archetypeOverride = archetypeOverride,
                 themesOverride = themesOverride,
-                commanderTags = commanderTags,
+                tribeOverride = tribeOverride,
+                weights = weights,
                 // Deck Analysis Engine v2 Phase 2 -- same DataStore-backed debug-tuning mechanism,
                 // extended (not duplicated) to also carry the 5 pillar weights. Deck Analysis Engine
                 // v3 (spec §8): passed RAW (not pre-mapped) since the macro-dependent base weights
@@ -319,6 +348,8 @@ class DeckDoctorOrchestrator(
                 // method's own KDoc for [scoreWeightOverrides].
                 scoreWeightOverrides = weightOverrides,
                 sideboardCount = sideboardCount,
+                precomputedSeedTags = seedTags,
+                postureOverride = postureOverride,
             )
 
             val collectionCards = collection.map { it.card }
@@ -345,6 +376,7 @@ class DeckDoctorOrchestrator(
                 sideboardCount = sideboardCount,
                 archetypeOverride = archetypeOverride,
                 themesOverride = themesOverride,
+                postureOverride = postureOverride,
                 commanderTags = commanderTags,
                 strategyLocked = strategyLocked,
             )
@@ -447,7 +479,7 @@ class DeckDoctorOrchestrator(
                 runCatching {
                     similarUseCase(
                         seedQuery = seed,
-                        deckFormat = if (context.format == DeckFormat.COMMANDER) ArchidektFormat.COMMANDER.apiId else SIXTY_ARCHIDEKT_FORMAT_ID,
+                        deckFormat = if (context.format.isCommanderFormat) ArchidektFormat.COMMANDER.apiId else SIXTY_ARCHIDEKT_FORMAT_ID,
                         userColorIdentity = health.profile.colorIdentity.map { it.symbol }.toSet(),
                     )
                 }.getOrNull()
@@ -490,27 +522,52 @@ class DeckDoctorOrchestrator(
      */
     private fun recomputeIncremental() {
         val context = analysisCache ?: return
-        scope.launch {
-            val mainboard = context.workingMainboard
-            val weightOverrides = weightsProvider()
-            val weights = weightOverrides.toScoreWeights()
-            val health = evaluateDeckUseCase(
-                mainboard = mainboard,
-                format = context.format,
-                commanderIdentity = context.commanderIdentity,
-                seedTags = context.seedTags,
-                weights = weights,
-                archetypeOverride = context.archetypeOverride,
-                themesOverride = context.themesOverride,
-                commanderTags = context.commanderTags,
-                // Deck Analysis Engine v3 (spec §8) -- raw overrides, see the sibling call site above.
-                scoreWeightOverrides = weightOverrides,
-                sideboardCount = context.sideboardCount,
-            )
-            _state.update {
-                it.copy(health = withUnresolvedWarning(health, context.unresolvedCount))
-            }
+        recomputeDirty = true
+        val generation = ++mutationGeneration
+        // Coalesce rapid taps into one recompute -- cancel-and-relaunch keeps only the last call.
+        recomputeJob?.cancel()
+        recomputeJob = scope.launch {
+            delay(RECOMPUTE_DEBOUNCE_MS)
+            performRecompute(context, generation)
         }
+    }
+
+    /** Evaluates [context] and publishes Health, clearing [recomputeDirty] -- shared by the debounced [recomputeIncremental] and the immediate [recomputeNowIfDirty]. [generation] is the [mutationGeneration] snapshot at launch time; a mismatch on completion means a newer mutation landed while this evaluation was in flight, so its result is stale and must not publish or clear the dirty flag a newer generation still owns. */
+    private suspend fun performRecompute(context: AnalysisCache, generation: Int) {
+        val mainboard = context.workingMainboard
+        val weightOverrides = weightsProvider()
+        val weights = weightOverrides.toScoreWeights()
+        val health = evaluateDeckUseCase(
+            mainboard = mainboard,
+            format = context.format,
+            commanderIdentity = context.commanderIdentity,
+            seedTags = context.seedTags,
+            weights = weights,
+            archetypeOverride = context.archetypeOverride,
+            themesOverride = context.themesOverride,
+            postureOverride = context.postureOverride,
+            commanderTags = context.commanderTags,
+            // Deck Analysis Engine v3 (spec §8) -- raw overrides, see the sibling call site above.
+            scoreWeightOverrides = weightOverrides,
+            sideboardCount = context.sideboardCount,
+        )
+        if (generation != mutationGeneration) {
+            crashReporter.log("deck_studio_incremental_recompute_stale_discarded")
+            return
+        }
+        _state.update {
+            it.copy(health = withUnresolvedWarning(health, context.unresolvedCount))
+        }
+        recomputeDirty = false
+    }
+
+    /** Runs a mutation that was left pending by [cancelPendingRecompute] immediately, with no debounce delay -- a no-op when nothing is dirty. */
+    fun recomputeNowIfDirty() {
+        if (!recomputeDirty) return
+        val context = analysisCache ?: return
+        val generation = mutationGeneration
+        recomputeJob?.cancel()
+        recomputeJob = scope.launch { performRecompute(context, generation) }
     }
 
     /**
@@ -551,6 +608,14 @@ class DeckDoctorOrchestrator(
         return true
     }
 
+    /** Drops the entire [scryfallId] slot regardless of quantity (distinct from [onCutCard]'s one-copy decrement); returns false if [analysisCache] isn't primed. */
+    fun onRemoveCardCompletely(scryfallId: String): Boolean {
+        val context = analysisCache ?: return false
+        context.workingMainboard = context.workingMainboard.filterNot { it.card.scryfallId == scryfallId }
+        recomputeIncremental()
+        return true
+    }
+
     /**
      * The working-mainboard quantity for [scryfallId] if [analysisCache] is primed, else `null`
      * (the host falls back to its own live-deck quantity source). Lets the host compute the
@@ -576,9 +641,17 @@ class DeckDoctorOrchestrator(
         if (_state.value.isLoaded) {
             analysisJob?.cancel()
             communityJob?.cancel()
+            recomputeJob?.cancel()
+            recomputeDirty = false
+            mutationGeneration++
             analysisCache = null
             _state.update { it.copy(isLoaded = false, stage = null, completedStages = emptyList()) }
         }
+    }
+
+    /** Cancels an in-flight debounced [recomputeIncremental] without touching [analysisCache] -- the mutation stays dirty, see [recomputeNowIfDirty]. */
+    fun cancelPendingRecompute() {
+        recomputeJob?.cancel()
     }
 
     /**
@@ -600,82 +673,15 @@ class DeckDoctorOrchestrator(
         }
     }
 
-    /**
-     * Picks the inference seed cards: the commander (when present) plus the deck's highest-weight
-     * identity cards (most STRATEGY / ARCHETYPE / TRIBAL tags), capped so one off-theme card can't
-     * skew the seed.
-     */
-    private fun inferenceSeeds(commander: Card?, mainboard: List<DeckEntry>): List<Card> {
-        val ranked = mainboard
-            .map { it.card }
-            .filter { it.scryfallId != commander?.scryfallId }
-            .map { card -> card to identityTagCount(card) }
-            .filter { it.second > 0 }
-            .sortedByDescending { it.second }
-            .take(MAX_SEED_CARDS)
-            .map { it.first }
-        return (listOfNotNull(commander) + ranked).distinctBy { it.scryfallId }
-    }
-
-    private fun identityTagCount(card: Card): Int =
-        (card.tags + card.userTags).count { it.category in IDENTITY_CATEGORIES }
-
-    /**
-     * Wizard Quality Campaign Wave 4 (Task 1): folds a deck's PERSISTED `archetypeOverride`/
-     * `themesOverride` pin into the seed-tag basis via the SAME [DeckIdentitySeedTags] table
-     * [com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase.recomputeProfile]
-     * uses at build time -- without this, a deck built with an explicit Direction hint (e.g. the
-     * wizard's GRAVEYARD strategy) scored its own placed cards against a richer basis DURING the
-     * build than the Doctor scores them against AFTERWARD (inference-only), so a card that legitimately
-     * cleared the wizard's category-fill floor could fall below the Doctor's cut floor purely from
-     * the missing explicit signal -- see `project_wizard_quality_campaign_wave3` memory's bucket-(ii)
-     * root cause and [DeckIdentitySeedTags]'s class KDoc.
-     *
-     * [archetypeOverride]/[themesOverride] are persisted as raw enum-name STRINGS
-     * ([com.mmg.manahub.core.model.Deck.archetypeOverride]/`themesOverride`) -- mapped back
-     * defensively via `entries.firstOrNull`; an unknown/stale name (e.g. a renamed enum entry)
-     * resolves to "no pin contribution" for that piece, never a guess or a crash. A deck with no
-     * override (both null/empty -- the common case) contributes an empty list here, so
-     * [loadAnalysis]'s `seedTags` is BYTE-IDENTICAL to before this change for every unpinned/GENERIC
-     * deck.
-     *
-     * A stale/unresolvable override string is now ALSO reported as a non-fatal (never silently
-     * swallowed): the persisted string was written by this same app and should always resolve, so a
-     * miss means enum drift (a renamed/removed [ArchetypeId]/[ThemeId] entry without a data
-     * migration) -- an actionable bug, not an expected runtime state, and exactly the class of
-     * silent-degradation this campaign exists to catch early.
-     */
-    private fun pinSeedTags(archetypeOverride: String?, themesOverride: List<String>, tribeOverride: String? = null): List<CardTag> {
-        val archetype = archetypeOverride?.let { name -> ArchetypeId.entries.firstOrNull { it.name == name } }
-        val themes = themesOverride.mapNotNull { name -> ThemeId.entries.firstOrNull { it.name == name } }
-        val archetypeStale = archetypeOverride != null && archetype == null
-        val themesLostCount = themesOverride.size - themes.size
-        if (archetypeStale || themesLostCount > 0) {
-            crashReporter.log("deck_doctor_pin_seed_tags_unresolved")
-            crashReporter.setCustomKey("deck_doctor_pin_archetype_stale", archetypeStale.toString())
-            crashReporter.setCustomKey("deck_doctor_pin_themes_lost_count", themesLostCount.toString())
-            crashReporter.recordException(
-                RuntimeException(
-                    "[DeckDoctorOrchestrator] deck_doctor_pin_seed_tags_unresolved: " +
-                        "archetypeOverride=$archetypeOverride themesOverride=$themesOverride"
-                )
-            )
-        }
-        // Deck Engine Unification (D2): tribeOverride is a SEPARATE pin column (never folded into
-        // themesOverride's JSON list -- see Deck.tribeOverride's KDoc), so it never participates in
-        // the stale-pin detection above (a blank/absent tribe is simply "no tribe pin", not a data
-        // hazard the way an unresolvable ArchetypeId/ThemeId name is).
-        if (archetype == null && themes.isEmpty() && tribeOverride.isNullOrBlank()) return emptyList()
-        // Deck Analysis Engine v3: ArchetypeId.GENERIC no longer exists -- forArchetype now takes a
-        // nullable archetype directly (null = no macro pin), no fallback coercion needed.
-        return DeckIdentitySeedTags.forArchetype(archetype, themes, tribeOverride)
-    }
+    // Deck Wizard Commander v3 plan (E4, D2): the former inferenceSeeds/identityTagCount/
+    // pinSeedTags private helpers moved to DeckAnalysisPipeline (see deckAnalysisPipeline's KDoc
+    // above and loadAnalysis's call site) — this orchestrator no longer needs its own copies.
 
     // ── Archetype override (Phase 1.7 Studio UI entry point) ───────────────────────
 
     /**
      * Pins (or, when [archetypeId]/[themes] are both null/empty, clears) the deck's archetype/theme
-     * override — writes through [DeckRepository.updateArchetypeOverride] then re-runs a FULL
+     * override — writes through [DeckRepository.updateStrategyPin] (ONE write, tribe included) then re-runs a FULL
      * [loadAnalysis] (a macro/theme change reshapes the whole resolved skeleton, so an incremental
      * recompute is not enough — mirrors [changeFormat]'s "cheap enough to just reload" precedent).
      *
@@ -683,33 +689,39 @@ class DeckDoctorOrchestrator(
      * @param themes at most 2 (the caller — the Studio bottom sheet — already enforces this cap);
      *        empty clears the theme pin.
      * @param tribe Deck Analysis Engine v2 Phase 3 -- the curated strategy picker's tribe sub-pick
-     *        (only meaningful when a [ThemeId.TRIBAL]-requiring strategy is applied), written through
-     *        the SEPARATE [DeckRepository.updateTribeOverride] column (mirrors the wizard's own
-     *        `updateArchetypeOverride` + `updateTribeOverride` pair, see [DeckWizardViewModel]).
+     *        (only meaningful when a [ThemeId.TRIBAL]-requiring strategy is applied), written on the
+     *        SAME [DeckRepository.updateStrategyPin] call as the archetype/theme/posture pin.
      *        Defaults to `null` so every pre-Phase-3 call site (the legacy `ArchetypePlanSheet`,
      *        which has no tribe UI, and existing tests) keeps clearing/leaving the tribe pin exactly
      *        as before -- `null` here always clears the tribe column, which is also the CORRECT
      *        behavior for a non-tribal strategy pick or "Auto-detect" ([clearArchetypeOverride]).
+     * @param posture Deck Wizard Commander v3 plan (E3, D5, fixes F3) -- a raw `PostureId.name`,
+     *        written on the same [DeckRepository.updateStrategyPin] call (posture travels WITH the
+     *        archetype/theme pin it describes, via [CuratedStrategy.toPin]). Defaults to `null`, same "null clears,
+     *        also correct for a non-postured pick or Auto-detect" convention as [tribe].
      */
     fun setArchetypeOverride(
         deckId: String,
         archetypeId: ArchetypeId?,
         themes: List<ThemeId>,
         tribe: String? = null,
+        posture: PostureId? = null,
     ) {
         scope.launch {
             runCatching {
-                deckRepository.updateArchetypeOverride(
+                deckRepository.updateStrategyPin(
                     deckId = deckId,
                     archetypeOverride = archetypeId?.name,
                     themesOverride = themes.take(2).map { it.name },
+                    posture = posture?.name,
+                    tribeOverride = tribe,
                 )
-                deckRepository.updateTribeOverride(deckId, tribe)
             }.onFailure {
+                if (it is CancellationException) throw it
                 crashReporter.log("deck_studio_archetype_override_failed")
                 crashReporter.recordException(RuntimeException("[DeckDoctorOrchestrator] deck_studio_archetype_override_failed", it))
-                return@launch
             }
+            // Reload even after a failed write so the chip shows what is actually persisted.
             loadAnalysis(deckId)
         }
     }
@@ -717,25 +729,6 @@ class DeckDoctorOrchestrator(
     /** "Auto-detect" — clears both the macro and theme pin and re-infers from scratch. */
     fun clearArchetypeOverride(deckId: String) {
         setArchetypeOverride(deckId, archetypeId = null, themes = emptyList())
-    }
-
-    /**
-     * Deck Engine Unification plan (D4): the deck's own explicit "Unlock strategy" action —
-     * flips `Deck.strategyLocked` off (releasing the gate on the host UI's "Deck plan" editor) then
-     * re-runs a full [loadAnalysis] (mirrors [setArchetypeOverride]'s "cheap enough to just reload"
-     * precedent).
-     */
-    fun unlockStrategy(deckId: String) {
-        scope.launch {
-            runCatching {
-                deckRepository.updateStrategyLocked(deckId, false)
-            }.onFailure {
-                crashReporter.log("deck_studio_unlock_strategy_failed")
-                crashReporter.recordException(RuntimeException("[DeckDoctorOrchestrator] deck_studio_unlock_strategy_failed", it))
-                return@launch
-            }
-            loadAnalysis(deckId)
-        }
     }
 
     /** Appends a [DeckWarning.UnresolvedCards] (legacy) / [Finding.UnresolvedCards] (Deck Analysis
@@ -761,11 +754,8 @@ class DeckDoctorOrchestrator(
     }
 
     private companion object {
-        /** Identity tag categories used to rank inference seed cards (mirrors the scorer's set). */
-        val IDENTITY_CATEGORIES = setOf(TagCategory.STRATEGY, TagCategory.ARCHETYPE, TagCategory.TRIBAL)
-
-        /** Cap on auto-selected identity seed cards (plus the commander) so one card can't skew the seed. */
-        const val MAX_SEED_CARDS = 8
+        /** Debounce window for [recomputeIncremental] -- coalesces a rapid tap burst into one evaluation pass. */
+        const val RECOMPUTE_DEBOUNCE_MS = 200L
 
         /** Signature-card count for the 60-card canonical aggregate key (Phase 3.2 precedent: 2-3). */
         const val SIGNATURE_CARD_COUNT = 3

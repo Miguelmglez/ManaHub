@@ -6,6 +6,10 @@ import javax.inject.Inject
 class AbandonMyActiveSessionUseCase @Inject constructor(
     private val repository: OnlineSessionRepository,
 ) {
-    suspend operator fun invoke(sessionId: String, guestToken: String? = null): Result<Unit> =
+    suspend operator fun invoke(sessionId: String, guestToken: String? = null): Result<Unit> = try {
         repository.abandonMyActiveSession(sessionId, guestToken)
+    } finally {
+        // Mirrors LeaveSessionUseCase: the RPC first, the local channel released either way
+        repository.disconnectRealtime(sessionId)
+    }
 }

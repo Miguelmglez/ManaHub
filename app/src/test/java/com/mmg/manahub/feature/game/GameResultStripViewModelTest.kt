@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.game
 
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.util.testGamificationAvailability
 import com.mmg.manahub.core.gamification.domain.GamificationEngine
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.domain.model.ProcessedOutcome
@@ -40,7 +40,6 @@ class GameResultStripViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
 
     private val engine = mockk<GamificationEngine>()
-    private val dataStore = mockk<UserPreferencesDataStore>(relaxed = true)
 
     private val outcomes = MutableSharedFlow<ProcessedOutcome>(
         replay = 8,
@@ -53,7 +52,6 @@ class GameResultStripViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         every { engine.outcomes } returns outcomes
-        every { dataStore.gamificationEnabledFlow } returns enabledFlow
     }
 
     @After
@@ -79,7 +77,7 @@ class GameResultStripViewModelTest {
         leveledUp = true,
     )
 
-    private fun buildViewModel() = GameResultStripViewModel(engine, dataStore)
+    private fun buildViewModel() = GameResultStripViewModel(engine, testGamificationAvailability(enabledFlow))
 
     @Test
     fun `given matching session outcome when observed then exposes that outcome`() = runTest {
@@ -128,6 +126,40 @@ class GameResultStripViewModelTest {
         advanceUntilIdle()
 
         assertNull(vm.outcome.value)
+    }
+
+    @Test
+    fun `given a second game in the same entry when observed then the previous outcome is replaced`() = runTest {
+        // The strip VM outlives one game inside a back-stack entry; a new id must not keep showing
+        // the previous game's XP.
+        val vm = buildViewModel()
+        vm.observe(sessionId = 42L)
+        advanceUntilIdle()
+        outcomes.emit(ProcessedOutcome(gameFinished(42L), outcome(50)))
+        advanceUntilIdle()
+        assertEquals(50, vm.outcome.value?.xpGranted)
+
+        vm.observe(sessionId = 43L)
+        advanceUntilIdle()
+        assertNull("A new session must clear the stale outcome", vm.outcome.value)
+
+        outcomes.emit(ProcessedOutcome(gameFinished(43L), outcome(11)))
+        advanceUntilIdle()
+        assertEquals(11, vm.outcome.value?.xpGranted)
+    }
+
+    @Test
+    fun `given the same sessionId observed twice then the collector is not restarted`() = runTest {
+        val vm = buildViewModel()
+        vm.observe(sessionId = 42L)
+        advanceUntilIdle()
+        outcomes.emit(ProcessedOutcome(gameFinished(42L), outcome(50)))
+        advanceUntilIdle()
+
+        vm.observe(sessionId = 42L)
+        advanceUntilIdle()
+
+        assertEquals(50, vm.outcome.value?.xpGranted)
     }
 
     @Test

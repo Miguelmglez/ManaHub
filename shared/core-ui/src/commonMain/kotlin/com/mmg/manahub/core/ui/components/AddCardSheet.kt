@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.ui.components
+// COMMENTS_REVIEWED: 2026-09-17
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -44,7 +45,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -56,6 +56,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,6 +80,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.CardConstants
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -120,6 +122,10 @@ fun AddCardSheet(
      */
     cardImagePlaceholder: Painter? = null,
     extraContent: (@Composable () -> Unit)? = null,
+    /** Upper bound for the quantity stepper (e.g. the copies actually offered). */
+    maxQty: Int = 99,
+    /** When true, foil/condition/language are shown read-only (the card is a concrete copy). */
+    variantLocked: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -128,7 +134,8 @@ fun AddCardSheet(
     var isFoil by remember { mutableStateOf(initialFoil) }
     var condition by remember { mutableStateOf(initialCondition) }
     var language by remember { mutableStateOf(initialLanguage) }
-    var qty by remember { mutableIntStateOf(initialQty) }
+    val qtyCap = maxQty.coerceAtLeast(1)
+    var qty by remember { mutableIntStateOf(initialQty.coerceIn(1, qtyCap)) }
 
     var showConditionSheet by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
@@ -139,10 +146,14 @@ fun AddCardSheet(
     // part of handling onConfirm, so the composable is torn down before it could matter.
     var confirmed by remember { mutableStateOf(false) }
 
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden }
-    )
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    fun requestDismiss() {
+        scope.launch {
+            sheetState.hide()
+            onDismiss()
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -170,7 +181,7 @@ fun AddCardSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
-                        onClick = onDismiss,
+                        onClick = ::requestDismiss,
                         modifier = Modifier.offset(x = (-12).dp)
                     ) {
                         Icon(
@@ -305,6 +316,7 @@ fun AddCardSheet(
                         value = condition,
                         icon = null, // Could add icon here if needed
                         modifier = Modifier.weight(1.2f),
+                        enabled = !variantLocked,
                         onClick = { showConditionSheet = true }
                     )
 
@@ -314,6 +326,7 @@ fun AddCardSheet(
                         value = CardConstants.getFlag(language),
                         icon = null,
                         modifier = Modifier.weight(1f),
+                        enabled = !variantLocked,
                         onClick = { showLanguageSheet = true }
                     )
 
@@ -326,6 +339,7 @@ fun AddCardSheet(
                             1.dp,
                             if (isFoil) mc.primaryAccent.copy(alpha = 0.6f) else mc.surfaceVariant
                         ),
+                        enabled = !variantLocked,
                         onClick = { isFoil = !isFoil }
                     ) {
                         Column(
@@ -341,6 +355,7 @@ fun AddCardSheet(
                             Switch(
                                 checked = isFoil,
                                 onCheckedChange = { isFoil = it },
+                                enabled = !variantLocked,
                                 modifier = Modifier.size(width = 32.dp, height = 24.dp).scale(0.75f),
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = mc.background,
@@ -394,14 +409,15 @@ fun AddCardSheet(
                         )
 
                         IconButton(
-                            onClick = { if (qty < 99) qty++ },
+                            onClick = { if (qty < qtyCap) qty++ },
+                            enabled = qty < qtyCap,
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
                                 Icons.Default.Add,
                                 contentDescription = "Add",
                                 modifier = Modifier.size(20.dp),
-                                tint = if (qty < 99) mc.primaryAccent else mc.textDisabled
+                                tint = if (qty < qtyCap) mc.primaryAccent else mc.textDisabled
                             )
                         }
                     }
@@ -457,7 +473,7 @@ fun AddCardSheet(
                 )
 
                 MagicCtaButton(
-                    onClick = onDismiss,
+                    onClick = ::requestDismiss,
                     text = "Cancel",
                     style = MagicCtaStyle.Ghost,
                     modifier = Modifier.fillMaxWidth(),
@@ -475,6 +491,7 @@ private fun SelectorCard(
     value: String,
     icon: @Composable (() -> Unit)?,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -486,6 +503,7 @@ private fun SelectorCard(
         color = mc.surface,
         shape = CardShape,
         border = BorderStroke(1.dp, mc.surfaceVariant),
+        enabled = enabled,
         onClick = onClick
     ) {
         Column(

@@ -6,7 +6,7 @@ import javax.inject.Inject
 class AdvancePhaseUseCase @Inject constructor(
     private val repository: OnlineSessionRepository,
 ) {
-    suspend fun broadcast(sessionId: String, newPhase: String, activePlayerSlot: Int, turnNumber: Int) =
+    suspend fun broadcast(sessionId: String, newPhase: String, activePlayerSlot: Int, turnNumber: Int): Boolean =
         repository.broadcastPhaseChange(sessionId, newPhase, activePlayerSlot, turnNumber)
 
     suspend fun persist(sessionId: String, guestToken: String? = null): Result<Unit> =

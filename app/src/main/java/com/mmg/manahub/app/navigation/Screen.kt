@@ -1,4 +1,5 @@
 package com.mmg.manahub.app.navigation
+// COMMENTS_REVIEWED: 2026-09-16
 
 import android.net.Uri
 
@@ -19,10 +20,38 @@ sealed class Screen(val route: String) {
         /** Builds a route that opens the collection with a specific tab selected. */
         fun routeWithTab(tab: String) = "collection?tab=$tab"
     }
-    object CollectionAddCard  : Screen("collection/add")
-    object CollectionMassiveAddCard  : Screen("collection/massiveAddCard")
+    /**
+     * AddCard search. Optional query args: `multi` opens "Select multiple" mode; `source` +
+     * `sourceId` preload a deck's cards as the browse list (and force multi mode).
+     */
+    object CollectionAddCard  : Screen("collection/add?multi={multi}&source={source}&sourceId={sourceId}") {
+        const val baseRoute = "collection/add"
+
+        /** Deck sources AddCard can preload; [value] is the raw `source` nav argument. */
+        enum class Source(val value: String) { DECK("deck"), COMMUNITY("community") }
+
+        /** Builds the route; the defaults open the plain search. */
+        fun createRoute(multi: Boolean = false, source: Source? = null, sourceId: String? = null): String {
+            val params = buildList {
+                if (multi) add("multi=true")
+                if (source != null && !sourceId.isNullOrBlank()) {
+                    add("source=${source.value}")
+                    add("sourceId=${Uri.encode(sourceId)}")
+                }
+            }
+            return if (params.isEmpty()) baseRoute else "$baseRoute?${params.joinToString("&")}"
+        }
+    }
 
     object CollectionScanner  : Screen("collection/scanner")
+
+    object ImportCards  : Screen("collection/import")
+    object DeckScanner : Screen("deck/{deckId}/scanner") {
+        fun createRoute(deckId: String): String {
+            require(deckId.isNotBlank()) { "deckId must not be blank" }
+            return "deck/${Uri.encode(deckId)}/scanner"
+        }
+    }
     object CollectionCardDetail : Screen("collection/detail/{scryfallId}?sharedTransitionKey={sharedTransitionKey}") {
         fun createRoute(scryfallId: String, sharedTransitionKey: String? = null) =
             "collection/detail/${Uri.encode(scryfallId)}" + (sharedTransitionKey?.let { "?sharedTransitionKey=${Uri.encode(it)}" } ?: "")
@@ -84,8 +113,13 @@ sealed class Screen(val route: String) {
      * `tribe:<subtype>` key, [colors] a concatenated
      * [com.mmg.manahub.feature.decks.domain.engine.ManaColor] symbol string (e.g. "WU"). All blank
      * by default (a plain "Build from seed" entry point passes none).
+     *
+     * Deck Wizard v4 (R13): [format]/[deckId] are REQUIRED, not optional — the wizard always builds
+     * INTO an existing Deck Studio draft, never creates a fresh one of its own anymore.
      */
-    object DeckWizard : Screen("deck/wizard?archetype={archetype}&theme={theme}&tribe={tribe}&colors={colors}&seeds={seeds}") {
+    object DeckWizard : Screen(
+        "deck/wizard?archetype={archetype}&theme={theme}&tribe={tribe}&colors={colors}&seeds={seeds}&seedCards={seedCards}&format={format}&deckId={deckId}&replaceConfirmed={replaceConfirmed}"
+    ) {
         const val baseRoute = "deck/wizard"
 
         /**
@@ -96,21 +130,48 @@ sealed class Screen(val route: String) {
          *   init for the matching `split("|")`. When present, forces the wizard's Flow A
          *   (cards-first) entry, mirroring how [archetype]/[theme]/[tribe]/[colors] force Flow
          *   B/C's picks.
+         * @param format Deck Wizard v4 (R13) — a raw [com.mmg.manahub.core.model.DeckFormat] enum
+         *   name, REQUIRED. The wizard never has its own format step; the format always comes from
+         *   the deck being built/edited, chosen at creation in `DeckListScreen`'s
+         *   `DeckCreationSheet`. Making this non-nullable here is deliberate: a wizard route without
+         *   a format must fail to compile, not fail at runtime.
+         * @param deckId Deck Wizard Commander v3 plan (Phase 6, D12) — the id of the draft the
+         *   wizard was launched FROM, REQUIRED for the same reason as [format] (every wizard launch
+         *   targets an existing draft created by Deck Studio). The wizard's atomic write targets
+         *   this deck (never creates a new one) and, on finish, pops back to the Studio destination
+         *   that launched it instead of creating a second Studio back-stack entry.
+         * @param replaceConfirmed Deck Wizard v4 (R15) — REQUIRED, no default: every caller must
+         *   explicitly decide whether the user already confirmed replacing [deckId]'s existing
+         *   cards. `false` is only safe when [deckId] is empty; [DeckWizardViewModel] re-checks the
+         *   deck's card count at persist time and refuses an unconfirmed write into a non-empty
+         *   deck regardless of which entry point reached this route.
          */
         fun createRoute(
+            format: String,
+            deckId: String,
             archetype: String? = null,
             theme: String? = null,
             tribe: String? = null,
             colors: String? = null,
             seeds: List<String>? = null,
+            // Exact picks (scryfallId + copies) from Browse inspirations; lands directly on the STRATEGY step.
+            seedCards: List<Pair<String, Int>>? = null,
+            replaceConfirmed: Boolean,
         ): String {
-            val params = mutableListOf<String>()
+            val params = mutableListOf(
+                "format=${Uri.encode(format)}",
+                "deckId=${Uri.encode(deckId)}",
+                "replaceConfirmed=$replaceConfirmed",
+            )
             if (!archetype.isNullOrEmpty()) params += "archetype=${Uri.encode(archetype)}"
             if (!theme.isNullOrEmpty()) params += "theme=${Uri.encode(theme)}"
             if (!tribe.isNullOrEmpty()) params += "tribe=${Uri.encode(tribe)}"
             if (!colors.isNullOrEmpty()) params += "colors=${Uri.encode(colors)}"
             if (!seeds.isNullOrEmpty()) params += "seeds=${Uri.encode(seeds.joinToString("|"))}"
-            return if (params.isEmpty()) baseRoute else "$baseRoute?${params.joinToString("&")}"
+            if (!seedCards.isNullOrEmpty()) {
+                params += "seedCards=${Uri.encode(seedCards.joinToString("|") { (id, quantity) -> "$id:$quantity" })}"
+            }
+            return "$baseRoute?${params.joinToString("&")}"
         }
     }
     // Screen.DeckImprovement (the standalone Deck Doctor screen) was RETIRED in Phase 0.5 of
@@ -321,13 +382,15 @@ sealed class Screen(val route: String) {
 
     // ── Trade proposal flow ───────────────────────────────────────────────────
     object CreateTradeProposal : Screen(
-        "trades/proposal/create/{receiverId}?parentProposalId={parentProposalId}&editingProposalId={editingProposalId}&rootProposalId={rootProposalId}"
+        "trades/proposal/create?receiverId={receiverId}&parentProposalId={parentProposalId}&editingProposalId={editingProposalId}&rootProposalId={rootProposalId}"
     ) {
-        fun createRoute(receiverId: String) = "trades/proposal/create/$receiverId"
+        /** A new proposal; a null [receiverId] opens the editor with no counterparty picked. */
+        fun createRoute(receiverId: String?) =
+            if (receiverId.isNullOrBlank()) "trades/proposal/create" else "trades/proposal/create?receiverId=${Uri.encode(receiverId)}"
         fun createCounterRoute(receiverId: String, parentProposalId: String, rootProposalId: String) =
-            "trades/proposal/create/${Uri.encode(receiverId)}?parentProposalId=${Uri.encode(parentProposalId)}&rootProposalId=${Uri.encode(rootProposalId)}"
+            "trades/proposal/create?receiverId=${Uri.encode(receiverId)}&parentProposalId=${Uri.encode(parentProposalId)}&rootProposalId=${Uri.encode(rootProposalId)}"
         fun createEditRoute(receiverId: String, editingProposalId: String, rootProposalId: String) =
-            "trades/proposal/create/${Uri.encode(receiverId)}?editingProposalId=${Uri.encode(editingProposalId)}&rootProposalId=${Uri.encode(rootProposalId)}"
+            "trades/proposal/create?receiverId=${Uri.encode(receiverId)}&editingProposalId=${Uri.encode(editingProposalId)}&rootProposalId=${Uri.encode(rootProposalId)}"
     }
 
     object TradeNegotiationDetail : Screen("trades/proposal/{proposalId}/thread/{rootProposalId}") {

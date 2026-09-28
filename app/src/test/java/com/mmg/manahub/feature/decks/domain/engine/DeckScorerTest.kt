@@ -374,7 +374,7 @@ class DeckScorerTest {
 
     @Test
     fun `given empty deck color identity for DRAFT when fit then any card is still permitted -- no identity concept`() {
-        // DRAFT has no color-identity concept at all (mirrors BuildDeckFromTemplateUseCase
+        // DRAFT has no color-identity concept at all (mirrors the deleted Motor A wizard build use case
         // .analyzeCollection's own `else -> true` branch for non-constructed, non-Commander
         // formats) -- this is the one case where an empty identity legitimately means "no
         // restriction", and Fix 2 must not touch it.

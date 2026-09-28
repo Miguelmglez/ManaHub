@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -68,7 +69,7 @@ fun InlineErrorState(
                 color = if (enabled) mc.primaryAccent else mc.textDisabled,
                 modifier = Modifier
                     .padding(start = 8.dp)
-                    .clickable(enabled = enabled, onClick = onRetry),
+                    .clickable(enabled = enabled, onClickLabel = retryLabel, role = Role.Button, onClick = onRetry),
             )
         }
     }

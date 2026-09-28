@@ -103,6 +103,10 @@ object ArchetypeRoleClassifier {
         // tagMatcher, so a tag-less card is not silently undercounted.
         "recursion" to "Recursion",
         "evasion" to "Evasion",
+        "pseudo_evasion" to "Combat Pressure",
+        "graveyard_exit_source" to "Graveyard Exit Source",
+        "leave_graveyard_payoff" to "Graveyard Exit Payoff",
+        "proliferate_source" to "Proliferate",
         // ── Deck Analysis Engine v3, Phase 1 (spec §5.1) -- reused pre-existing tag entries ──
         // (anthem/untapper/spell_copy/equipment already had a real TagDictionary DetectionRule
         // from earlier work; they were simply never wired into this classifier's vocabulary).
@@ -156,6 +160,7 @@ object ArchetypeRoleClassifier {
         "mill_self" to setOf("GRAVEYARD"),
         "discard_outlet" to setOf("GRAVEYARD"),
         "graveyard_enabler" to setOf("GRAVEYARD"),
+        "graveyard_exit_source" to setOf("GRAVEYARD_EXIT"),
         "blink_effect" to setOf("ETB"),
         "clone_theft_effect" to setOf("ETB"),
         "spell_copy" to setOf("SPELLS"),
@@ -164,6 +169,7 @@ object ArchetypeRoleClassifier {
         "equipment" to setOf("ATTACHED"),
         "haste_source" to setOf("ATTACK"),
         "evasion" to setOf("ATTACK"),
+        "pseudo_evasion" to setOf("ATTACK"),
         "threat_early" to setOf("ATTACK"),
         "planeswalker" to setOf("PLANESWALKERS"),
         "group_effect" to setOf("GROUP"),
@@ -186,10 +192,12 @@ object ArchetypeRoleClassifier {
         "lifegain_payoff" to setOf("LIFE", "GROUP"),
         "death_payoff" to setOf("DEATH", "TOKENS", "GROUP"),
         "counters_payoff" to setOf("COUNTERS", "TOKENS"),
+        "proliferate_source" to setOf("PLANESWALKERS"),
         "landfall_payoff" to setOf("LANDFALL"),
         "reanimation" to setOf("GRAVEYARD"),
         "self_mill_payoff" to setOf("GRAVEYARD"),
         "recursion" to setOf("GRAVEYARD"),
+        "leave_graveyard_payoff" to setOf("GRAVEYARD_EXIT"),
         "etb_payoff" to setOf("ETB"),
         "spell_payoff" to setOf("SPELLS"),
         // "counterspell" deliberately NOT mapped to SPELLS (Deck Analysis Engine v3 spec §5.2
@@ -207,8 +215,8 @@ object ArchetypeRoleClassifier {
         "enchantment_payoff" to setOf("ENCHANTMENTS"),
         "combat_payoff" to setOf("ATTACHED", "ATTACK", "TOKENS"),
         "evasion" to setOf("ATTACHED"),
+        "pseudo_evasion" to setOf("ATTACHED"),
         "tribe_payoff" to setOf("TRIBE"),
-        "counters_source" to setOf("PLANESWALKERS"),
     )
 
     private val AXIS_AMPLIFIES: Map<RoleKey, Set<AxisKey>> = mapOf(
@@ -216,9 +224,14 @@ object ArchetypeRoleClassifier {
         "recursion" to setOf("DEATH"),
         "cost_reducer" to setOf("SPELLS", "ARTIFACTS"),
         "protection" to setOf("ATTACHED", "PLANESWALKERS"),
+        "proliferate_source" to setOf("COUNTERS"),
     )
 
     private fun axisSetFor(map: Map<RoleKey, Set<AxisKey>>, key: RoleKey): Set<AxisKey> = map[key].orEmpty()
+
+    // SYNERGY "Engines" UI (v5): the inverse of AXIS_PRODUCES/AXIS_CONSUMES, one axis -> its role set.
+    fun producerRoleKeysForAxis(axis: AxisKey): Set<RoleKey> = AXIS_PRODUCES.filterValues { axis in it }.keys
+    fun payoffRoleKeysForAxis(axis: AxisKey): Set<RoleKey> = AXIS_CONSUMES.filterValues { axis in it }.keys
 
     /**
      * Every [RoleSpec] this classifier evaluates BEYOND [LEGACY_ROLE_MAP] (the 5 legacy-backed
@@ -303,11 +316,12 @@ object ArchetypeRoleClassifier {
 
     // ── Matcher builders ─────────────────────────────────────────────────────────
 
-    /** A card matches [key] (any `TagCategory.ROLE` tag with that key) at D11-gated confidence. */
+    // Matches against CategoryVocabulary's full membership set, not the bare key (see ADR-009).
     private fun tagMatcher(key: RoleKey): (Card) -> Float = matcher@{ card ->
-        val confirmed = (card.tags + card.userTags).any { it.key == key }
+        val membership = CategoryVocabulary.cardTagKeysFor(key)
+        val confirmed = (card.tags + card.userTags).any { it.key in membership }
         if (confirmed) return@matcher 1f
-        val suggested = card.suggestedTags.filter { it.tag.key == key && it.confidence >= SUGGESTED_TAG_FLOOR }
+        val suggested = card.suggestedTags.filter { it.tag.key in membership && it.confidence >= SUGGESTED_TAG_FLOOR }
         suggested.maxOfOrNull { it.confidence } ?: 0f
     }
 

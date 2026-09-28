@@ -46,7 +46,7 @@ class QuestReconcilerTest {
         claimUseCase = mockk()
         reconciler = QuestReconciler(
             dao, stableIdProvider, claimUseCase,
-            FixedClock(fixedInstant), TimeZone.UTC,
+            FixedClock(fixedInstant), { TimeZone.UTC },
         )
         coEvery { stableIdProvider.stableId() } returns "device-A"
         coEvery { dao.getStaleQuests(any()) } returns emptyList()

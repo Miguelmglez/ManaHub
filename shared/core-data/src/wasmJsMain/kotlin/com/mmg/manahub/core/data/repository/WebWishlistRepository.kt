@@ -106,6 +106,19 @@ class WebWishlistRepository(
         }
     }
 
+    // One pass under the same mutex as addLocal: the cache update must not interleave with a
+    // concurrent single add, which would drop one of the two writes.
+    override suspend fun addAllLocal(entries: List<WishlistEntry>): Result<Unit> = addMutex.withLock {
+        runCatching {
+            entriesCache.update { current ->
+                current + entries.associate { entry ->
+                    val stored = entry.copy(id = entry.id.ifBlank { Uuid.random().toString() })
+                    stored.id to stored
+                }
+            }
+        }
+    }
+
     override suspend fun removeLocal(id: String): Result<Unit> = runCatching {
         remote.removeWishlistEntry(id)
         entriesCache.update { it - id }

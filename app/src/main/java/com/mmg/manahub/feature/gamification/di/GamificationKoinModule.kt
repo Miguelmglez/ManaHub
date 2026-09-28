@@ -29,6 +29,7 @@ fun gamificationKoinModule(): Module = module {
         GamificationCelebrationViewModel(
             repository = get(),
             userPreferencesDataStore = get(),
+            gamificationAvailability = get(),
         )
     }
 }

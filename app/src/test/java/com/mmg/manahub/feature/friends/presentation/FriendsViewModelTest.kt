@@ -1,15 +1,16 @@
 package com.mmg.manahub.feature.friends.presentation
 
-import app.cash.turbine.test
-import com.mmg.manahub.core.ui.components.MagicToastType
-import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.core.util.CardConstants
+import com.mmg.manahub.core.common.CrashReporter
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
-import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.core.model.Friend
-import com.mmg.manahub.core.model.OutgoingFriendRequest
 import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.FriendRequest
+import com.mmg.manahub.core.model.FriendRequestException
+import com.mmg.manahub.core.model.FriendshipGoneException
+import com.mmg.manahub.core.model.OutgoingFriendRequest
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.friends.domain.usecase.SearchUserByGameTagUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SendFriendRequestUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
@@ -17,12 +18,13 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -34,94 +36,50 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/**
- * Unit tests for [FriendsViewModel] — Phase 1 (friends-v2).
- *
- * Strategy:
- * - [FriendRepository] and [AuthRepository] are mocked with MockK.
- * - [SearchUserByGameTagUseCase] and [SendFriendRequestUseCase] are mocked.
- * - [UnconfinedTestDispatcher] is used so coroutines complete eagerly without
- *   needing [advanceUntilIdle] in most cases.
- * - [AuthRepository.sessionState] is backed by a [MutableStateFlow] so we can
- *   drive authentication state transitions per test.
- *
- * Key invariants:
- * - The user types the game tag WITHOUT the "#" prefix (e.g. "A1B2C3", 6 chars).
- *   The ViewModel internally prepends "#" before calling [SearchUserByGameTagUseCase].
- * - [GAME_TAG_LENGTH] = 7 (with "#"); the user input must be exactly 6 chars.
- * - [triggerSearch] validates query.length != (GAME_TAG_LENGTH - 1), i.e. != 6.
- * - [onSearchQueryChange] must NOT trigger a search automatically.
- * - [UiState.toastType] defaults to [MagicToastType.ERROR]; success paths emit [MagicToastType.SUCCESS].
- * - [clearToast] resets both [UiState.toastMessage] to null and [UiState.toastType] to ERROR.
- */
 @OptIn(ExperimentalCoroutinesApi::class)
 class FriendsViewModelTest {
 
-    // ── Test dispatcher ───────────────────────────────────────────────────────
-
     private val testDispatcher = UnconfinedTestDispatcher()
 
-    // ── Mocks ─────────────────────────────────────────────────────────────────
-
-    private val friendRepo         = mockk<FriendRepository>(relaxed = true)
-    private val authRepo           = mockk<AuthRepository>()
-    private val searchUseCase      = mockk<SearchUserByGameTagUseCase>()
+    private val friendRepo = mockk<FriendRepository>(relaxed = true)
+    private val authRepo = mockk<AuthRepository>()
+    private val searchUseCase = mockk<SearchUserByGameTagUseCase>()
     private val sendRequestUseCase = mockk<SendFriendRequestUseCase>()
-    private val analyticsHelper    = mockk<AnalyticsHelper>(relaxed = true)
+    private val analyticsHelper = mockk<AnalyticsHelper>(relaxed = true)
     private val shareInviteUseCase = mockk<ShareInviteUseCase>()
+    private val crashReporter = mockk<CrashReporter>(relaxed = true)
 
-    // Controls sessionState emissions
-    private val sessionStateFlow = MutableStateFlow<SessionState>(SessionState.Unauthenticated)
+    private val sessionState = MutableStateFlow<SessionState>(SessionState.Unauthenticated)
+    private val friends = MutableStateFlow<List<Friend>>(emptyList())
+    private val incoming = MutableStateFlow<List<FriendRequest>>(emptyList())
+    private val outgoing = MutableStateFlow<List<OutgoingFriendRequest>>(emptyList())
 
-    // ── Fixtures ──────────────────────────────────────────────────────────────
-
-    private val dummyAuthUser = AuthUser(
-        id        = "user-uuid-001",
-        email     = "test@example.com",
-        nickname  = "TestUser",
-        gameTag   = "#A1B2C3",
-        avatarUrl = null,
-        provider  = "email",
+    private val me = AuthUser(
+        id = "user-me", email = "me@example.com", nickname = "Me", gameTag = "#A1B2C3",
+        avatarUrl = null, provider = "email",
     )
-
-    private val dummyFriend = Friend(
-        id        = "friendship-001",
-        userId    = "user-uuid-002",
-        nickname  = "Gandalf",
-        gameTag   = "#XYZ1234",
-        avatarUrl = null,
-    )
-
-    // ── SUT ───────────────────────────────────────────────────────────────────
+    private val stranger = Friend(id = "", userId = "user-stranger", nickname = "Gandalf", gameTag = "#XYZ123", avatarUrl = null)
 
     private lateinit var viewModel: FriendsViewModel
-
-    // ── Setup / Teardown ─────────────────────────────────────────────────────
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-
-        every { authRepo.sessionState } returns sessionStateFlow
-
-        // Default stubs for FriendRepository flows — return empty lists so the ViewModel
-        // does not crash on init.
-        every { friendRepo.observeFriends() }           returns flowOf(emptyList())
-        every { friendRepo.observePendingRequests() }   returns flowOf(emptyList())
-        every { friendRepo.observeOutgoingRequests() }  returns flowOf(emptyList())
-
-        // Default stub: all refresh operations succeed silently.
-        coEvery { friendRepo.refreshFriends(any()) }          returns Result.success(Unit)
-        coEvery { friendRepo.refreshRequests(any()) }         returns Result.success(Unit)
+        every { authRepo.sessionState } returns sessionState
+        every { friendRepo.observeFriends() } returns friends
+        every { friendRepo.observePendingRequests() } returns incoming
+        every { friendRepo.observeOutgoingRequests() } returns outgoing
+        coEvery { friendRepo.refreshAll(any()) } returns Result.success(Unit)
         coEvery { friendRepo.refreshOutgoingRequests(any()) } returns Result.success(Unit)
-
+        coEvery { friendRepo.refreshRequests(any()) } returns Result.success(Unit)
         viewModel = FriendsViewModel(
-            friendRepo         = friendRepo,
-            authRepo           = authRepo,
-            searchUseCase      = searchUseCase,
+            friendRepo = friendRepo,
+            authRepo = authRepo,
+            searchUseCase = searchUseCase,
             sendRequestUseCase = sendRequestUseCase,
-            analyticsHelper    = analyticsHelper,
+            analyticsHelper = analyticsHelper,
             shareInviteUseCase = shareInviteUseCase,
+            crashReporter = crashReporter,
         )
     }
 
@@ -130,496 +88,351 @@ class FriendsViewModelTest {
         Dispatchers.resetMain()
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 1 — onSearchQueryChange (must NOT auto-trigger search)
-    // ══════════════════════════════════════════════════════════════════════════
+    private fun signIn() {
+        sessionState.value = SessionState.Authenticated(me)
+    }
+
+    // ── Refresh ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `given onSearchQueryChange called when query is valid length then search does NOT trigger automatically`() = runTest {
-        // The user types the tag WITHOUT the "#" prefix. Exactly 6 chars is valid (GAME_TAG_LENGTH - 1).
-        // onSearchQueryChange must only update state — triggerSearch() is required to call the backend.
-        val userInput = "A1B2C3" // 6 chars, no "#" prefix — the new valid format
+    fun `signing in refreshes the three lists once through refreshAll`() = runTest {
+        signIn()
 
-        viewModel.onSearchQueryChange(userInput)
-        advanceUntilIdle()
-
-        // searchUseCase must never be invoked by onSearchQueryChange
-        coVerify(exactly = 0) { searchUseCase(any()) }
-        assertEquals(userInput, viewModel.uiState.value.searchQuery)
+        coVerify(exactly = 1) { friendRepo.refreshAll("user-me") }
+        coVerify(exactly = 0) { friendRepo.refreshFriends(any()) }
+        assertTrue(viewModel.uiState.value.hasRefreshed)
+        assertFalse(viewModel.uiState.value.isRefreshing)
     }
 
     @Test
-    fun `given onSearchQueryChange called then searchResult is cleared and searchPerformed resets to false`() = runTest {
-        // Any pending search result from a previous triggerSearch must be cleared when the
-        // user modifies the query text.
-        viewModel.onSearchQueryChange("A1B2C3")
-        advanceUntilIdle()
+    fun `a same-user session re-emission does not refresh again`() = runTest {
+        signIn()
+        sessionState.value = SessionState.Authenticated(me.copy(nickname = "Renamed"))
 
-        val state = viewModel.uiState.value
-        assertNull(state.searchResult)
-        assertFalse(state.searchPerformed)
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 2 — triggerSearch length validation
-    //
-    //  GAME_TAG_LENGTH = 7 (full tag with "#").
-    //  User input = tag without "#" → valid length = GAME_TAG_LENGTH - 1 = 6.
-    //  The ViewModel prepends "#" before calling the use case.
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given query shorter than 6 chars when triggerSearch then no backend call is made`() = runTest {
-        // After trimming, a 5-char input is != 6, so the ViewModel must reject it client-side.
-        val shortInput = "ABC12" // 5 chars — too short
-
-        viewModel.onSearchQueryChange(shortInput)
-        viewModel.triggerSearch()
-        advanceUntilIdle()
-
-        coVerify(exactly = 0) { searchUseCase(any()) }
-        // searchPerformed is set to true so the UI can show a validation message
-        assertTrue(viewModel.uiState.value.searchPerformed)
-        assertNull(viewModel.uiState.value.searchResult)
+        coVerify(exactly = 1) { friendRepo.refreshAll("user-me") }
     }
 
     @Test
-    fun `given query longer than 6 chars when triggerSearch then no backend call is made`() = runTest {
-        // A 7-char input (which equals the old full-tag format with "#") must now be rejected
-        // because the user should NOT type the "#" prefix themselves.
-        val longInput = "#A1B2C3" // 7 chars — one char too many for user input
-
-        viewModel.onSearchQueryChange(longInput)
-        viewModel.triggerSearch()
-        advanceUntilIdle()
-
-        coVerify(exactly = 0) { searchUseCase(any()) }
-        assertTrue(viewModel.uiState.value.searchPerformed)
-        assertNull(viewModel.uiState.value.searchResult)
-    }
-
-    @Test
-    fun `given query exactly 6 chars when triggerSearch then searchUseCase is called with hash-prefixed tag`() = runTest {
-        // Exactly 6 characters is the only valid user-input length (GAME_TAG_LENGTH - 1).
-        // The ViewModel must prepend "#" so the use case receives "#A1B2C3".
-        val userInput     = "A1B2C3"               // what the user types (6 chars)
-        val expectedArg   = "#$userInput"           // what the ViewModel passes to the use case
-        assertEquals(CardConstants.GAME_TAG_LENGTH - 1, userInput.length)
-
-        coEvery { searchUseCase(expectedArg) } returns Result.success(null)
-
-        viewModel.onSearchQueryChange(userInput)
-        viewModel.triggerSearch()
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) { searchUseCase(expectedArg) }
-    }
-
-    @Test
-    fun `given query with surrounding whitespace and correct trimmed length when triggerSearch then searchUseCase is called with trimmed hash-prefixed tag`() = runTest {
-        // triggerSearch trims the query before checking length — leading/trailing spaces must
-        // not disqualify an otherwise valid 6-char game tag.
-        val userInput   = "A1B2C3"
-        val expectedArg = "#$userInput"
-        assertEquals(CardConstants.GAME_TAG_LENGTH - 1, userInput.length)
-
-        coEvery { searchUseCase(expectedArg) } returns Result.success(null)
-
-        viewModel.onSearchQueryChange("  $userInput  ")
-        viewModel.triggerSearch()
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) { searchUseCase(expectedArg) }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 3 — triggerSearch result handling
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given valid query and search returns result when triggerSearch then searchResult is populated`() = runTest {
-        val userInput   = "A1B2C3"
-        val expectedArg = "#$userInput"
-        coEvery { searchUseCase(expectedArg) } returns Result.success(dummyFriend)
-
-        viewModel.onSearchQueryChange(userInput)
-        viewModel.triggerSearch()
-        advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertEquals(dummyFriend, state.searchResult)
-        assertTrue(state.searchPerformed)
-        assertFalse(state.isSearching)
-    }
-
-    @Test
-    fun `given valid query and search returns null when triggerSearch then searchResult is null and searchPerformed is true`() = runTest {
-        // null result means no user was found with that game tag
-        val userInput   = "A1B2C3"
-        val expectedArg = "#$userInput"
-        coEvery { searchUseCase(expectedArg) } returns Result.success(null)
-
-        viewModel.onSearchQueryChange(userInput)
-        viewModel.triggerSearch()
-        advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertNull(state.searchResult)
-        assertTrue(state.searchPerformed)
-        assertFalse(state.isSearching)
-    }
-
-    @Test
-    fun `given valid query and search fails when triggerSearch then searchResult is null and searchPerformed is true`() = runTest {
-        // Network failures must not crash the ViewModel — searchResult stays null and
-        // the UI should interpret searchPerformed=true + searchResult=null as "not found".
-        val userInput   = "A1B2C3"
-        val expectedArg = "#$userInput"
-        coEvery { searchUseCase(expectedArg) } returns Result.failure(Exception("Network error"))
-
-        viewModel.onSearchQueryChange(userInput)
-        viewModel.triggerSearch()
-        advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertNull(state.searchResult)
-        assertTrue(state.searchPerformed)
-        assertFalse(state.isSearching)
-    }
-
-    @Test
-    fun `given triggerSearch in progress when called then isSearching becomes false after completion`() = runTest {
-        val userInput   = "A1B2C3"
-        val expectedArg = "#$userInput"
-
-        viewModel.uiState.test {
-            awaitItem() // initial state
-
-            coEvery { searchUseCase(expectedArg) } returns Result.success(dummyFriend)
-            viewModel.onSearchQueryChange(userInput)
-            // onSearchQueryChange emits a new state (query updated, result/performed cleared)
-            awaitItem()
-
-            viewModel.triggerSearch()
-            // UnconfinedTestDispatcher completes the coroutine eagerly, so isSearching=true
-            // and the final state are both emitted; we only care the final state is correct.
-            cancelAndIgnoreRemainingEvents()
+    fun `switching accounts cancels the first account refresh`() = runTest {
+        val firstStarted = CompletableDeferred<Unit>()
+        val firstCancelled = CompletableDeferred<Unit>()
+        coEvery { friendRepo.refreshAll("user-me") } coAnswers {
+            firstStarted.complete(Unit)
+            try {
+                CompletableDeferred<Result<Unit>>().await()
+            } finally {
+                firstCancelled.complete(Unit)
+            }
         }
+        coEvery { friendRepo.refreshAll("user-other") } returns Result.success(Unit)
 
-        // After completion, isSearching must be false
-        assertFalse(viewModel.uiState.value.isSearching)
+        signIn()
+        firstStarted.await()
+        sessionState.value = SessionState.Authenticated(me.copy(id = "user-other"))
+        firstCancelled.await()
+
+        coVerify(exactly = 1) { friendRepo.refreshAll("user-other") }
+        assertEquals("user-other", viewModel.uiState.value.currentUserId)
+        assertFalse(viewModel.uiState.value.refreshFailed)
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 4 — authentication state integration
-    // ══════════════════════════════════════════════════════════════════════════
-
     @Test
-    fun `given unauthenticated session when init then isLoggedIn is false`() = runTest {
-        // sessionStateFlow starts as Unauthenticated in setUp()
+    fun `signing out clears cached friendship rows before repository flows update`() = runTest {
+        signIn()
+        friends.value = listOf(Friend("fs-a", "user-a", "A", "#AAAAAA", null))
+        incoming.value = listOf(FriendRequest("fs-b", "user-b", "B", "#BBBBBB", null))
+        outgoing.value = listOf(OutgoingFriendRequest("fs-c", "user-c", "C", "#CCCCCC", null))
+        assertEquals(1, viewModel.uiState.value.friends.size)
+        assertEquals(1, viewModel.uiState.value.pendingRequests.size)
+        assertEquals(1, viewModel.uiState.value.outgoingRequests.size)
+
+        sessionState.value = SessionState.Unauthenticated
+
         assertFalse(viewModel.uiState.value.isLoggedIn)
-    }
-
-    @Test
-    fun `given session transitions to Authenticated when observed then isLoggedIn becomes true`() = runTest {
-        viewModel.uiState.test {
-            awaitItem() // initial Unauthenticated state
-
-            sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser)
-            val updatedState = awaitItem()
-            assertTrue(updatedState.isLoggedIn)
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `given authenticated session when init then loadData is called via refreshFriends and refreshRequests`() = runTest {
-        // Simulate being already authenticated at ViewModel construction time
-        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser)
-
-        val vm = FriendsViewModel(
-            friendRepo         = friendRepo,
-            authRepo           = authRepo,
-            searchUseCase      = searchUseCase,
-            sendRequestUseCase = sendRequestUseCase,
-            analyticsHelper    = analyticsHelper,
-            shareInviteUseCase = shareInviteUseCase,
-        )
-        advanceUntilIdle()
-
-        coVerify(atLeast = 1) { friendRepo.refreshFriends(dummyAuthUser.id) }
-        coVerify(atLeast = 1) { friendRepo.refreshRequests(dummyAuthUser.id) }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 5 — empty query edge cases
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given empty query when triggerSearch then no backend call is made`() = runTest {
-        viewModel.onSearchQueryChange("")
-        viewModel.triggerSearch()
-        advanceUntilIdle()
-
-        coVerify(exactly = 0) { searchUseCase(any()) }
-        assertTrue(viewModel.uiState.value.searchPerformed)
-    }
-
-    @Test
-    fun `given blank whitespace query when triggerSearch then no backend call is made`() = runTest {
-        // After trim() a whitespace-only string becomes empty, length 0 != 6
-        viewModel.onSearchQueryChange("       ")
-        viewModel.triggerSearch()
-        advanceUntilIdle()
-
-        coVerify(exactly = 0) { searchUseCase(any()) }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 6 — Toast types (toastType field in UiState)
-    //
-    //  Default: MagicToastType.ERROR
-    //  Success paths → MagicToastType.SUCCESS
-    //  Failure paths → MagicToastType.ERROR
-    //  clearToast()  → toastMessage = null, toastType = ERROR
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given sendFriendRequest succeeds then toastMessage is set and toastType is SUCCESS`() = runTest {
-        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser)
-        advanceUntilIdle()
-
-        coEvery { sendRequestUseCase(any(), any()) } returns Result.success(Unit)
-
-        viewModel.sendFriendRequest(
-            toUserId  = "user-uuid-002",
-            errorMsg  = "Could not send request",
-            sentMsg   = "Friend request sent!",
-        )
-        advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertEquals("Friend request sent!", state.toastMessage)
-        assertEquals(MagicToastType.SUCCESS, state.toastType)
-    }
-
-    @Test
-    fun `given sendFriendRequest fails then toastMessage is set and toastType is ERROR`() = runTest {
-        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser)
-        advanceUntilIdle()
-
-        coEvery { sendRequestUseCase(any(), any()) } returns Result.failure(Exception("Network error"))
-
-        viewModel.sendFriendRequest(
-            toUserId  = "user-uuid-002",
-            errorMsg  = "Could not send request",
-            sentMsg   = "Friend request sent!",
-        )
-        advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertEquals("Could not send request", state.toastMessage)
-        assertEquals(MagicToastType.ERROR, state.toastType)
-    }
-
-    @Test
-    fun `given acceptRequest succeeds then toastMessage is set and toastType is SUCCESS`() = runTest {
-        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser)
-        advanceUntilIdle()
-
-        coEvery { friendRepo.acceptRequest(any(), any()) } returns Result.success(Unit)
-
-        viewModel.acceptRequest(
-            requestId  = "req-id-001",
-            errorMsg   = "Could not accept",
-            successMsg = "Friend request accepted!",
-        )
-        advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertEquals("Friend request accepted!", state.toastMessage)
-        assertEquals(MagicToastType.SUCCESS, state.toastType)
-    }
-
-    @Test
-    fun `given acceptRequest fails then toastMessage is set and toastType is ERROR`() = runTest {
-        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser)
-        advanceUntilIdle()
-
-        coEvery { friendRepo.acceptRequest(any(), any()) } returns Result.failure(Exception("Server error"))
-
-        viewModel.acceptRequest(
-            requestId  = "req-id-001",
-            errorMsg   = "Could not accept",
-            successMsg = "Friend request accepted!",
-        )
-        advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertEquals("Could not accept", state.toastMessage)
-        assertEquals(MagicToastType.ERROR, state.toastType)
-    }
-
-    @Test
-    fun `given rejectRequest succeeds then toastMessage is set and toastType is SUCCESS`() = runTest {
-        coEvery { friendRepo.rejectRequest(any()) } returns Result.success(Unit)
-
-        viewModel.rejectRequest(
-            requestId  = "req-id-002",
-            errorMsg   = "Could not reject",
-            successMsg = "Request declined.",
-        )
-        advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertEquals("Request declined.", state.toastMessage)
-        assertEquals(MagicToastType.SUCCESS, state.toastType)
-    }
-
-    @Test
-    fun `given rejectRequest fails then toastMessage is set and toastType is ERROR`() = runTest {
-        coEvery { friendRepo.rejectRequest(any()) } returns Result.failure(Exception("Server error"))
-
-        viewModel.rejectRequest(
-            requestId  = "req-id-002",
-            errorMsg   = "Could not reject",
-            successMsg = "Request declined.",
-        )
-        advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertEquals("Could not reject", state.toastMessage)
-        assertEquals(MagicToastType.ERROR, state.toastType)
-    }
-
-    @Test
-    fun `given clearToast called then toastMessage is null and toastType resets to ERROR`() = runTest {
-        // Manually put a SUCCESS toast into the state, then verify clearToast wipes both fields.
-        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser)
-        advanceUntilIdle()
-
-        coEvery { sendRequestUseCase(any(), any()) } returns Result.success(Unit)
-        viewModel.sendFriendRequest(
-            toUserId  = "user-uuid-002",
-            errorMsg  = "Error",
-            sentMsg   = "Sent!",
-        )
-        advanceUntilIdle()
-
-        // Pre-condition: toast is showing
-        assertEquals(MagicToastType.SUCCESS, viewModel.uiState.value.toastType)
-
-        viewModel.clearToast()
-
-        val state = viewModel.uiState.value
-        assertNull(state.toastMessage)
-        assertEquals(MagicToastType.ERROR, state.toastType)
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 7 — Outgoing requests (cancelOutgoingRequest + UiState field)
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given observeOutgoingRequests emits list when ViewModel initializes then outgoingRequests in UiState updates`() = runTest {
-        val outgoing = listOf(
-            OutgoingFriendRequest(
-                id          = "id1",
-                toUserId    = "uid2",
-                toNickname  = "Wizard",
-                toGameTag   = "#B2C3D4",
-                toAvatarUrl = null,
-            )
-        )
-        every { friendRepo.observeOutgoingRequests() } returns flowOf(outgoing)
-
-        // Construct a fresh ViewModel to pick up the overridden flow stub
-        val vm = FriendsViewModel(
-            friendRepo         = friendRepo,
-            authRepo           = authRepo,
-            searchUseCase      = searchUseCase,
-            sendRequestUseCase = sendRequestUseCase,
-            analyticsHelper    = analyticsHelper,
-            shareInviteUseCase = shareInviteUseCase,
-        )
-        advanceUntilIdle()
-
-        assertEquals(outgoing, vm.uiState.value.outgoingRequests)
-    }
-
-    @Test
-    fun `given observeOutgoingRequests emits empty list then outgoingRequests in UiState is empty`() = runTest {
-        // The default setUp already stubs observeOutgoingRequests() with emptyList(), so the
-        // default viewModel is sufficient for this assertion.
-        advanceUntilIdle()
-
+        assertTrue(viewModel.uiState.value.friends.isEmpty())
+        assertTrue(viewModel.uiState.value.pendingRequests.isEmpty())
         assertTrue(viewModel.uiState.value.outgoingRequests.isEmpty())
     }
 
     @Test
-    fun `given cancelOutgoingRequest succeeds then toastMessage is successMsg and toastType is SUCCESS`() = runTest {
-        coEvery { friendRepo.cancelOutgoingRequest("req-id") } returns Result.success(Unit)
+    fun `switching accounts clears prior friendship rows before new refresh completes`() = runTest {
+        signIn()
+        friends.value = listOf(Friend("fs-a", "user-a", "A", "#AAAAAA", null))
+        assertEquals(1, viewModel.uiState.value.friends.size)
+        coEvery { friendRepo.refreshAll("user-other") } coAnswers {
+            CompletableDeferred<Result<Unit>>().await()
+        }
 
-        viewModel.cancelOutgoingRequest(
-            friendshipId = "req-id",
-            errorMsg     = "Could not cancel",
-            successMsg   = "Request cancelled.",
-        )
-        advanceUntilIdle()
+        sessionState.value = SessionState.Authenticated(me.copy(id = "user-other"))
 
-        val state = viewModel.uiState.value
-        assertEquals("Request cancelled.", state.toastMessage)
-        assertEquals(MagicToastType.SUCCESS, state.toastType)
+        assertEquals("user-other", viewModel.uiState.value.currentUserId)
+        assertTrue(viewModel.uiState.value.friends.isEmpty())
     }
 
     @Test
-    fun `given cancelOutgoingRequest fails then toastMessage is errorMsg and toastType is ERROR`() = runTest {
-        coEvery { friendRepo.cancelOutgoingRequest("req-id") } returns Result.failure(Exception("Network error"))
+    fun `a failed refresh keeps the cache and offers a retry`() = runTest {
+        coEvery { friendRepo.refreshAll(any()) } returns Result.failure(IllegalStateException("offline"))
+        signIn()
 
-        viewModel.cancelOutgoingRequest(
-            friendshipId = "req-id",
-            errorMsg     = "Could not cancel",
-            successMsg   = "Request cancelled.",
-        )
-        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.refreshFailed)
+        assertTrue(viewModel.uiState.value.hasRefreshed)
 
-        val state = viewModel.uiState.value
-        assertEquals("Could not cancel", state.toastMessage)
-        assertEquals(MagicToastType.ERROR, state.toastType)
+        coEvery { friendRepo.refreshAll(any()) } returns Result.success(Unit)
+        viewModel.retryRefresh()
+
+        coVerify(exactly = 2) { friendRepo.refreshAll("user-me") }
+        assertFalse(viewModel.uiState.value.refreshFailed)
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 8 — refreshOutgoingRequests integration with loadData
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── F-02: section-scoped keys ─────────────────────────────────────────────
 
     @Test
-    fun `given authenticated session when ViewModel initializes then refreshOutgoingRequests is called with the current user id`() = runTest {
-        // refreshOutgoingRequests must be part of loadData so that the outgoing-request cache
-        // is warmed up every time the user lands on the Friends screen while authenticated.
-        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser)
+    fun `the same friendship id in three lists yields unique row keys`() = runTest {
+        signIn()
+        friends.value = listOf(Friend("fs-Y", "user-a", "A", "#AAAAAA", null))
+        incoming.value = listOf(FriendRequest("fs-Y", "user-a", "A", "#AAAAAA", null))
+        outgoing.value = listOf(OutgoingFriendRequest("fs-Y", "user-a", "A", "#AAAAAA", null))
 
-        val vm = FriendsViewModel(
-            friendRepo         = friendRepo,
-            authRepo           = authRepo,
-            searchUseCase      = searchUseCase,
-            sendRequestUseCase = sendRequestUseCase,
-            analyticsHelper    = analyticsHelper,
-            shareInviteUseCase = shareInviteUseCase,
-        )
-        advanceUntilIdle()
+        val keys = FriendsListKeys.rowKeys(viewModel.uiState.value)
 
-        coVerify(atLeast = 1) { friendRepo.refreshOutgoingRequests(dummyAuthUser.id) }
+        assertEquals(3, keys.size)
+        assertEquals(keys.size, keys.toSet().size)
+    }
+
+    // ── F-12: game-tag input ─────────────────────────────────────────────────
+
+    @Test
+    fun `a pasted lowercase tag with a hash is normalized before searching`() = runTest {
+        signIn()
+        coEvery { searchUseCase("#A1B2C3") } returns Result.success(stranger)
+        viewModel.onSearchQueryChange("  #a1b2c3 ")
+
+        viewModel.triggerSearch()
+
+        coVerify(exactly = 1) { searchUseCase("#A1B2C3") }
+        assertEquals(GameTagSearchStatus.FOUND, viewModel.uiState.value.searchStatus)
     }
 
     @Test
-    fun `given session transitions to Authenticated after init then refreshOutgoingRequests is called`() = runTest {
-        // The session starts as Unauthenticated; loadData (and therefore refreshOutgoingRequests)
-        // must fire when the session later becomes Authenticated.
-        advanceUntilIdle() // let the ViewModel observe the initial Unauthenticated state
+    fun `a malformed tag never reaches the backend`() = runTest {
+        signIn()
+        viewModel.onSearchQueryChange("AB-12")
 
-        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser)
-        advanceUntilIdle()
+        viewModel.triggerSearch()
 
-        coVerify(atLeast = 1) { friendRepo.refreshOutgoingRequests(dummyAuthUser.id) }
+        coVerify(exactly = 0) { searchUseCase(any()) }
+        assertEquals(GameTagSearchStatus.INVALID_INPUT, viewModel.uiState.value.searchStatus)
+    }
+
+    @Test
+    fun `a search failure is not reported as no player found`() = runTest {
+        signIn()
+        coEvery { searchUseCase(any()) } returns Result.failure(IllegalStateException("offline"))
+        viewModel.onSearchQueryChange("A1B2C3")
+
+        viewModel.triggerSearch()
+
+        assertEquals(GameTagSearchStatus.FAILED, viewModel.uiState.value.searchStatus)
+        assertNull(viewModel.uiState.value.searchResult)
+    }
+
+    @Test
+    fun `an unknown tag reads as not found`() = runTest {
+        signIn()
+        coEvery { searchUseCase(any()) } returns Result.success(null)
+        viewModel.onSearchQueryChange("A1B2C3")
+
+        viewModel.triggerSearch()
+
+        assertEquals(GameTagSearchStatus.NOT_FOUND, viewModel.uiState.value.searchStatus)
+    }
+
+    @Test
+    fun `a late result for query A never replaces query B or becomes sendable`() = runTest {
+        signIn()
+        val firstResult = CompletableDeferred<Result<Friend?>>()
+        coEvery { searchUseCase("#A1B2C3") } coAnswers { withContext(NonCancellable) { firstResult.await() } }
+        val secondFriend = stranger.copy(userId = "user-second")
+        coEvery { searchUseCase("#D4E5F6") } returns Result.success(secondFriend)
+        coEvery { sendRequestUseCase("user-me", "user-second") } returns Result.success(Unit)
+
+        viewModel.onSearchQueryChange("A1B2C3")
+        viewModel.triggerSearch()
+        viewModel.onSearchQueryChange("D4E5F6")
+        viewModel.triggerSearch()
+        firstResult.complete(Result.success(stranger))
+
+        assertEquals("D4E5F6", viewModel.uiState.value.searchQuery)
+        assertEquals(secondFriend, viewModel.uiState.value.searchResult)
+        viewModel.sendFriendRequest()
+        coVerify(exactly = 0) { sendRequestUseCase("user-me", stranger.userId) }
+    }
+
+    // ── F-07: search result relation ─────────────────────────────────────────
+
+    private fun searchFor(result: Friend) {
+        coEvery { searchUseCase(any()) } returns Result.success(result)
+        viewModel.onSearchQueryChange("A1B2C3")
+        viewModel.triggerSearch()
+    }
+
+    @Test
+    fun `the search result relation follows the cached lists`() = runTest {
+        signIn()
+        searchFor(stranger)
+        assertEquals(SearchResultRelation.NONE, viewModel.uiState.value.searchRelation)
+
+        outgoing.value = listOf(OutgoingFriendRequest("fs-1", stranger.userId, "G", "#XYZ123", null))
+        assertEquals(SearchResultRelation.OUTGOING_PENDING, viewModel.uiState.value.searchRelation)
+
+        outgoing.value = emptyList()
+        incoming.value = listOf(FriendRequest("fs-2", stranger.userId, "G", "#XYZ123", null))
+        assertEquals(SearchResultRelation.INCOMING_PENDING, viewModel.uiState.value.searchRelation)
+        assertEquals("fs-2", viewModel.uiState.value.searchResultIncomingRequest?.id)
+
+        friends.value = listOf(Friend("fs-3", stranger.userId, "G", "#XYZ123", null))
+        assertEquals(SearchResultRelation.FRIEND, viewModel.uiState.value.searchRelation)
+    }
+
+    @Test
+    fun `searching your own tag is recognized as self and cannot be sent`() = runTest {
+        signIn()
+        searchFor(stranger.copy(userId = "user-me"))
+
+        assertEquals(SearchResultRelation.SELF, viewModel.uiState.value.searchRelation)
+        viewModel.sendFriendRequest()
+        coVerify(exactly = 0) { sendRequestUseCase(any(), any()) }
+    }
+
+    @Test
+    fun `a request to an existing friend is ignored`() = runTest {
+        signIn()
+        friends.value = listOf(Friend("fs-3", stranger.userId, "G", "#XYZ123", null))
+        searchFor(stranger)
+
+        viewModel.sendFriendRequest()
+
+        coVerify(exactly = 0) { sendRequestUseCase(any(), any()) }
+    }
+
+    @Test
+    fun `a sent request clears the search and refreshes outgoing requests`() = runTest {
+        signIn()
+        searchFor(stranger)
+        coEvery { sendRequestUseCase("user-me", stranger.userId) } returns Result.success(Unit)
+
+        viewModel.sendFriendRequest()
+
+        assertEquals(FriendsMessage.REQUEST_SENT, viewModel.uiState.value.message)
+        assertNull(viewModel.uiState.value.searchResult)
+        coVerify(exactly = 1) { friendRepo.refreshOutgoingRequests("user-me") }
+    }
+
+    @Test
+    fun `a duplicate pair (409) maps to the already-linked message and re-syncs the lists`() = runTest {
+        signIn()
+        searchFor(stranger)
+        coEvery { sendRequestUseCase(any(), any()) } returns Result.failure(FriendRequestException.AlreadyLinked())
+
+        viewModel.sendFriendRequest()
+
+        assertEquals(FriendsMessage.SEND_ALREADY_LINKED, viewModel.uiState.value.message)
+        assertFalse(viewModel.uiState.value.isSendingRequest)
+        coVerify(exactly = 2) { friendRepo.refreshAll("user-me") }
+    }
+
+    @Test
+    fun `a self-check violation maps to its own message`() = runTest {
+        signIn()
+        searchFor(stranger)
+        coEvery { sendRequestUseCase(any(), any()) } returns Result.failure(FriendRequestException.SelfRequest())
+
+        viewModel.sendFriendRequest()
+
+        assertEquals(FriendsMessage.SEND_SELF, viewModel.uiState.value.message)
+    }
+
+    @Test
+    fun `an unknown send failure keeps the generic message`() = runTest {
+        signIn()
+        searchFor(stranger)
+        coEvery { sendRequestUseCase(any(), any()) } returns Result.failure(RuntimeException("boom"))
+
+        viewModel.sendFriendRequest()
+
+        assertEquals(FriendsMessage.SEND_FAILED, viewModel.uiState.value.message)
+    }
+
+    // ── F-09: per-row in-flight guard ────────────────────────────────────────
+
+    @Test
+    fun `a second tap on a row in flight is ignored and the row is released afterwards`() = runTest {
+        signIn()
+        val gate = CompletableDeferred<Result<Unit>>()
+        coEvery { friendRepo.acceptRequest("fs-1", "user-me") } coAnswers { gate.await() }
+
+        viewModel.acceptRequest("fs-1")
+        viewModel.acceptRequest("fs-1")
+        viewModel.rejectRequest("fs-1")
+
+        assertEquals(setOf("fs-1"), viewModel.uiState.value.inFlightRequestIds)
+        coVerify(exactly = 1) { friendRepo.acceptRequest("fs-1", "user-me") }
+        coVerify(exactly = 0) { friendRepo.rejectRequest(any()) }
+
+        gate.complete(Result.success(Unit))
+
+        assertTrue(viewModel.uiState.value.inFlightRequestIds.isEmpty())
+        assertEquals(FriendsMessage.REQUEST_ACCEPTED, viewModel.uiState.value.message)
+    }
+
+    @Test
+    fun `a request that is gone server-side reports it and refreshes the incoming list`() = runTest {
+        signIn()
+        coEvery { friendRepo.rejectRequest("fs-1") } returns Result.failure(FriendshipGoneException())
+
+        viewModel.rejectRequest("fs-1")
+
+        assertEquals(FriendsMessage.REQUEST_GONE, viewModel.uiState.value.message)
+        coVerify(exactly = 1) { friendRepo.refreshRequests("user-me") }
+    }
+
+    @Test
+    fun `a failed accept releases the row and shows an error`() = runTest {
+        signIn()
+        coEvery { friendRepo.acceptRequest(any(), any()) } returns Result.failure(RuntimeException("boom"))
+
+        viewModel.acceptRequest("fs-1")
+
+        assertTrue(viewModel.uiState.value.inFlightRequestIds.isEmpty())
+        assertEquals(FriendsMessage.ACCEPT_FAILED, viewModel.uiState.value.message)
+        assertTrue(viewModel.uiState.value.message!!.isError)
+    }
+
+    @Test
+    fun `clearMessage drops the shown message`() = runTest {
+        signIn()
+        coEvery { friendRepo.cancelOutgoingRequest("fs-1") } returns Result.success(Unit)
+        viewModel.cancelOutgoingRequest("fs-1")
+        assertEquals(FriendsMessage.REQUEST_CANCELLED, viewModel.uiState.value.message)
+
+        viewModel.clearMessage()
+
+        assertNull(viewModel.uiState.value.message)
+    }
+
+    @Test
+    fun `row actions do nothing while signed out`() = runTest {
+        viewModel.acceptRequest("fs-1")
+
+        coVerify(exactly = 0) { friendRepo.acceptRequest(any(), any()) }
+        assertFalse(viewModel.uiState.value.isLoggedIn)
+    }
+
+    @Test
+    fun `normalizeGameTag accepts only six letters or digits`() {
+        assertEquals("A1B2C3", FriendsViewModel.normalizeGameTag("#a1b2c3"))
+        assertNull(FriendsViewModel.normalizeGameTag("A1B2C"))
+        assertNull(FriendsViewModel.normalizeGameTag("A1B2C3D"))
+        assertNull(FriendsViewModel.normalizeGameTag("A1_2C3"))
     }
 }

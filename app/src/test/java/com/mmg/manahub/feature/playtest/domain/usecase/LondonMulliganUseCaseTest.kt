@@ -199,4 +199,31 @@ class LondonMulliganUseCaseTest {
         // Library: [LIB, C] — C is appended at the bottom.
         assertEquals("C", finalLibrary.last().scryfallId)
     }
+
+    // ── Group: applyBottomN input sanitising ─────────────────────────────────
+
+    @Test
+    fun `given a repeated index when applyBottomN then the card is bottomed once and total count is conserved`() {
+        val hand    = (1..7).map { makeCard("h$it") }
+        val library = (1..10).map { makeCard("l$it") }
+
+        val (finalHand, finalLibrary) = useCase.applyBottomN(hand, library, cardsToBottom = listOf(2, 2))
+
+        assertEquals(6, finalHand.size)
+        assertEquals(11, finalLibrary.size)
+        assertEquals(17, finalHand.size + finalLibrary.size)
+        assertEquals("h3", finalLibrary.last().scryfallId)
+    }
+
+    @Test
+    fun `given an out-of-range index when applyBottomN then it is ignored instead of throwing`() {
+        val hand    = (1..3).map { makeCard("h$it") }
+        val library = (1..5).map { makeCard("l$it") }
+
+        val (finalHand, finalLibrary) = useCase.applyBottomN(hand, library, cardsToBottom = listOf(0, 7, -1))
+
+        assertEquals(listOf("h2", "h3"), finalHand.map { it.scryfallId })
+        assertEquals(6, finalLibrary.size)
+        assertEquals("h1", finalLibrary.last().scryfallId)
+    }
 }

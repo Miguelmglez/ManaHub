@@ -9,12 +9,12 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.VideogameAsset
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.mmg.manahub.R
 
@@ -124,8 +124,8 @@ val ALL_FIRST_STEPS: List<FirstStepItem> = listOf(
         id = STEP_FIRST_PLAYTEST_DECK,
         titleRes = R.string.first_step_playtest_deck_title,
         subtitleRes = R.string.first_step_playtest_deck_subtitle,
-        icon = StepIcon.Vector(Icons.Default.PlayArrow),
-        action = HomeAction.PlaytestRecentDeck,
+        icon = StepIcon.Vector(Icons.Default.VideogameAsset),
+        action = HomeAction.OpenDecks,
     ),
     // DATA-DRIVEN: hidden once the user is authenticated (non-anonymous).
     FirstStepItem(

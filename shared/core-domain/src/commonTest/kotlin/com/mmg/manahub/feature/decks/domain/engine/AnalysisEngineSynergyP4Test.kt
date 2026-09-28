@@ -53,18 +53,17 @@ class AnalysisEngineSynergyP4Test {
         return analysis.pillars.first { it.id == PillarId.SYNERGY }
     }
 
-    // ── Pre-existing, UNCHANGED behavior: per-key fingerprint sections ─────────────────────────
+    // ── Deck Wizard Commander v5 (D2): the old loose fingerprint:<key> sections are gone ────────
 
     @Test
-    fun cardAlignedOnTwoFingerprintKeys_appearsInBothSections() {
+    fun cardAlignedOnlyToLooseFingerprintKeys_emitsNoFingerprintSection() {
         val synergy = synergyOf(mainboard())
 
-        val tokensSection = synergy.sections.firstOrNull { it.id == "fingerprint:tokens" }
-        val sacrificeSection = synergy.sections.firstOrNull { it.id == "fingerprint:sacrifice" }
-        assertTrue(tokensSection != null, "expected a fingerprint:tokens section: ${synergy.sections.map { it.id }}")
-        assertTrue(sacrificeSection != null, "expected a fingerprint:sacrifice section: ${synergy.sections.map { it.id }}")
-        assertTrue(tokensSection.contributions.any { it.scryfallId == "dual-card" }, "dual-card must appear under tokens")
-        assertTrue(sacrificeSection.contributions.any { it.scryfallId == "dual-card" }, "dual-card must appear under sacrifice")
+        assertTrue(synergy.sections.none { it.id.startsWith("fingerprint:") }, "no fingerprint:* section: ${synergy.sections.map { it.id }}")
+        // dual-card has no ROLE/edge signal in this 2-card fixture, so with its old sections
+        // removed it now falls through to the residual offplan classification.
+        val offplanSection = synergy.sections.first { it.id == "offplan" }
+        assertTrue(offplanSection.contributions.any { it.scryfallId == "dual-card" })
     }
 
     @Test
@@ -73,10 +72,13 @@ class AnalysisEngineSynergyP4Test {
 
         val offplanSection = synergy.sections.first { it.id == "offplan" }
         assertTrue(offplanSection.contributions.any { it.scryfallId == "offplan-card" })
-        val otherSections = synergy.sections.filterNot { it.id == "offplan" }
+        // A card can still legitimately count toward a structural engine axis (e.g. a bare
+        // Instant toward the SPELLS producer side) -- offplan is a role/edge classification, not
+        // exclusivity across every section (a card can appear in more than one section by design).
+        val otherSections = synergy.sections.filterNot { it.id == "offplan" || it.id.startsWith("engine:") }
         assertFalse(
             otherSections.any { section -> section.contributions.any { it.scryfallId == "offplan-card" } },
-            "offplan-card must not appear in any other section",
+            "offplan-card must not appear in any non-engine section",
         )
     }
 
@@ -177,6 +179,45 @@ class AnalysisEngineSynergyP4Test {
         assertEquals(3, finding.producerCopies)
         assertEquals(1, finding.producerIdeal)
         assertEquals("Tokens", finding.axisLabel)
+    }
+
+    // ── Deck Wizard v5, X4 (H8/S6) — one tribe key space, no fingerprint:<tribe> duplicate ──────
+
+    /** A manual TRIBAL CardTag ("goblin") on a card that is NOT itself a Goblin creature and names
+     * no Goblin payoff in its oracle text -- [TribeDeriver.tribeKeys] derives nothing for it, so the
+     * ONLY signal is the manual tag. Before the fix this produced its own `fingerprint:goblin`
+     * section; after, it must fold into `tribe:goblin` (the same key space a structurally-derived
+     * tribe uses) so a future Goblin creature in the SAME deck lands in the same section, not a
+     * second, differently-spelled one. */
+    private fun manualTribalTagCard() = card(id = "anthem-card", name = "Goblin Anthem", typeLine = "Enchantment", tags = listOf(CardTag("goblin", TagCategory.TRIBAL)))
+
+    private fun goblinCreatureCard(id: String) = card(id = id, name = id, typeLine = "Creature — Goblin", cmc = 1.0, power = "1", toughness = "1")
+
+    @Test
+    fun manualTribalCardTag_neverProducesItsOwnFingerprintSection() {
+        // 8 copies clears TRIBE_ABS_THRESHOLD on the manual tag's own bare key (DeckScorer.fingerprint
+        // still aggregates TRIBAL tags under their bare key -- see AnalysisEngine.evaluateSynergy's
+        // own KDoc on this point), so the alignment check has real signal to work with.
+        val mainboard = (1..8).map { i -> entry(manualTribalTagCard().copy(scryfallId = "anthem-$i")) }
+        val synergy = synergyOf(mainboard)
+
+        assertTrue(synergy.sections.none { it.id.startsWith("fingerprint:goblin") }, "no fingerprint:goblin* section: ${synergy.sections.map { it.id }}")
+    }
+
+    @Test
+    fun manualTribalCardTag_andStructuralTribe_shareOneSection() {
+        // Both sides clear their own alignment threshold independently (8 copies each -- see
+        // DeckScorer.TRIBE_ABS_THRESHOLD/the bare-key normalization this test's KDoc explains) so
+        // this proves the FOLD, not just that one side happens to win the normalization race.
+        val mainboard = (1..8).map { i -> entry(manualTribalTagCard().copy(scryfallId = "anthem-$i")) } +
+            (1..8).map { i -> entry(goblinCreatureCard("goblin-$i")) }
+        val synergy = synergyOf(mainboard)
+
+        val tribeSections = synergy.sections.filter { it.id == "tribe:goblin" }
+        assertEquals(1, tribeSections.size, "expected exactly one tribe:goblin section: ${synergy.sections.map { it.id }}")
+        assertTrue(synergy.sections.none { it.id.startsWith("fingerprint:goblin") })
+        val ids = tribeSections.first().contributions.map { it.scryfallId }.toSet()
+        assertTrue(ids.contains("anthem-1") && ids.contains("goblin-1"), "both the manual-tag and structural cards must land in the SAME section: $ids")
     }
 
     // ── bandRatioScoreF (spec §7 task 2) — pure shape test, independent of the full pipeline ────

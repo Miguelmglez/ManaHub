@@ -387,7 +387,7 @@ fun BattlefieldContent(
 
                 if (currentZone != PlayZone.LANDS && currentZone != PlayZone.PERMANENTS) {
                     MagicCtaButton(
-                        text = if (isLand) "Play as Land" else "Play",
+                        text = if (isLand) stringResource(R.string.playtest_battle_action_play_land) else stringResource(R.string.playtest_battle_action_play),
                         onClick = {
                             android.util.Log.d("Battlefield", "Play button clicked for instanceId=${playCard.instanceId}")
                             pendingMove = PendingMove(playCard.instanceId, if (isLand) PlayZone.LANDS else PlayZone.PERMANENTS)
@@ -404,7 +404,7 @@ fun BattlefieldContent(
                 ) {
                     if (currentZone != PlayZone.GRAVEYARD) {
                         MagicCtaButton(
-                            text = "Graveyard",
+                            text = stringResource(R.string.playtest_battle_graveyard_label),
                             onClick = {
                                 pendingMove = PendingMove(playCard.instanceId, PlayZone.GRAVEYARD)
                                 isDismissingInspection = true
@@ -416,7 +416,7 @@ fun BattlefieldContent(
 
                     if (currentZone != PlayZone.EXILE) {
                         MagicCtaButton(
-                            text = "Exile",
+                            text = stringResource(R.string.playtest_battle_exile_label),
                             onClick = {
                                 pendingMove = PendingMove(playCard.instanceId, PlayZone.EXILE)
                                 isDismissingInspection = true
@@ -429,7 +429,7 @@ fun BattlefieldContent(
 
                 if (currentZone != PlayZone.HAND) {
                     MagicCtaButton(
-                        text = "Return to Hand",
+                        text = stringResource(R.string.playtest_battle_action_return_to_hand),
                         onClick = {
                             android.util.Log.d("Battlefield", "Hand button clicked for instanceId=${playCard.instanceId}")
                             pendingMove = PendingMove(playCard.instanceId, PlayZone.HAND)
@@ -833,7 +833,7 @@ private fun GraveyardPile(
             }
         }
         Text(
-            text = "Graveyard",
+            text = stringResource(R.string.playtest_battle_graveyard_label),
             style = ty.labelSmall,
             color = mc.textPrimary,
             modifier = Modifier.padding(top = sp.xxs),
@@ -886,7 +886,7 @@ private fun ExilePile(
             }
         }
         Text(
-            text = "Exile",
+            text = stringResource(R.string.playtest_battle_exile_label),
             style = ty.labelSmall,
             color = mc.textPrimary,
             modifier = Modifier.padding(top = sp.xxs),

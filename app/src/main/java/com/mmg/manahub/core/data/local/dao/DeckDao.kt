@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.data.local.dao
+// COMMENTS_REVIEWED: 2026-09-08
 
 import androidx.room.ColumnInfo
 import androidx.room.Dao
@@ -27,6 +28,25 @@ data class DeckSummaryRow(
     @ColumnInfo(name = "imageArtCrop") val imageArtCrop: String?,
 )
 
+data class ScannerDeckCardAddition(
+    val entryId: String,
+    val scryfallId: String,
+    val oracleId: String,
+    val quantity: Int,
+    val isSideboard: Boolean,
+)
+
+data class ScannerDeckCardMergeResult(
+    val committedEntryIds: Set<String>,
+    val blockedCommanderEntryIds: Set<String>,
+    val committedCopies: Int,
+)
+
+data class CardOracleIdentityRow(
+    @ColumnInfo(name = "scryfall_id") val scryfallId: String,
+    @ColumnInfo(name = "oracle_id") val oracleId: String,
+)
+
 @Dao
 interface DeckDao {
 
@@ -48,6 +68,67 @@ interface DeckDao {
 
     @Query("DELETE FROM deck_cards WHERE deck_id = :deckId AND scryfall_id = :scryfallId AND is_sideboard = :isSideboard")
     fun removeDeckCard(deckId: String, scryfallId: String, isSideboard: Boolean)
+
+    @Query("SELECT scryfall_id, oracle_id FROM cards WHERE scryfall_id IN (:scryfallIds)")
+    fun getCardOracleIdentities(scryfallIds: List<String>): List<CardOracleIdentityRow>
+
+    /** Merges scanner additions and validates commander identity in one Room transaction. */
+    @Transaction
+    fun mergeScannerCards(
+        deckId: String,
+        additions: List<ScannerDeckCardAddition>,
+        updatedAt: Long = System.currentTimeMillis(),
+    ): ScannerDeckCardMergeResult {
+        val deck = getDeckById(deckId) ?: error("Deck not found")
+        val ids = buildList {
+            addAll(additions.map { it.scryfallId })
+            deck.commanderCardId?.let(::add)
+        }.distinct()
+        val oracleIds = ids
+            .chunked(500)
+            .flatMap(::getCardOracleIdentities)
+            .associate { it.scryfallId to it.oracleId }
+        val commanderId = deck.commanderCardId
+        val commanderOracleId = commanderId?.let(oracleIds::get).orEmpty()
+        val blocked = linkedSetOf<String>()
+        val permitted = additions.filter { addition ->
+            val additionOracleId = oracleIds[addition.scryfallId]
+                .orEmpty()
+                .ifBlank { addition.oracleId }
+            val isCommander = !addition.isSideboard && (
+                addition.scryfallId == commanderId ||
+                    commanderOracleId.isNotBlank() && additionOracleId == commanderOracleId
+                )
+            if (isCommander) blocked += addition.entryId
+            !isCommander
+        }
+
+        val currentSlots = getDeckCards(deckId).associateBy { it.scryfallId to it.isSideboard }
+        val mergedRows = permitted.groupBy { it.scryfallId to it.isSideboard }.map { (key, grouped) ->
+            val current = currentSlots[key]
+            val added = grouped.sumOf { it.quantity.toLong() }
+            val mergedQuantity = (current?.quantity ?: 0).toLong() + added
+            check(mergedQuantity <= Int.MAX_VALUE) { "merged quantity exceeds Int range" }
+            DeckCardEntity(
+                deckId = deckId,
+                scryfallId = key.first,
+                quantity = mergedQuantity.toInt(),
+                isSideboard = key.second,
+                source = current?.source ?: "USER",
+            )
+        }
+        if (mergedRows.isNotEmpty()) {
+            upsertDeckCards(mergedRows)
+            touchDeckUpdatedAt(deckId, updatedAt)
+        }
+        val committedCopies = permitted.sumOf { it.quantity.toLong() }
+        check(committedCopies <= Int.MAX_VALUE) { "committed copies exceed Int range" }
+        return ScannerDeckCardMergeResult(
+            committedEntryIds = permitted.mapTo(linkedSetOf()) { it.entryId },
+            blockedCommanderEntryIds = blocked,
+            committedCopies = committedCopies.toInt(),
+        )
+    }
 
     /**
      * Atomically moves [quantity] copies of a card between the mainboard and the
@@ -146,6 +227,7 @@ interface DeckDao {
         UPDATE decks SET
             archetype_override = :archetypeOverride,
             themes_override = :themesOverrideJson,
+            posture_override = :postureOverride,
             updated_at = :updatedAt
         WHERE id = :deckId
     """)
@@ -153,6 +235,7 @@ interface DeckDao {
         deckId: String,
         archetypeOverride: String?,
         themesOverrideJson: String?,
+        postureOverride: String? = null,
         updatedAt: Long = System.currentTimeMillis(),
     )
 
@@ -169,6 +252,28 @@ interface DeckDao {
     """)
     suspend fun updateTribeOverride(
         deckId: String,
+        tribeOverride: String?,
+        updatedAt: Long = System.currentTimeMillis(),
+    )
+
+    /**
+     * The whole strategy pin (archetype/themes/posture + tribe) in ONE statement -- a Studio
+     * strategy pick can never leave a half-applied pin the way two sequential updates could.
+     */
+    @Query("""
+        UPDATE decks SET
+            archetype_override = :archetypeOverride,
+            themes_override = :themesOverrideJson,
+            posture_override = :postureOverride,
+            tribe_override = :tribeOverride,
+            updated_at = :updatedAt
+        WHERE id = :deckId
+    """)
+    suspend fun updateStrategyPin(
+        deckId: String,
+        archetypeOverride: String?,
+        themesOverrideJson: String?,
+        postureOverride: String?,
         tribeOverride: String?,
         updatedAt: Long = System.currentTimeMillis(),
     )
@@ -233,6 +338,71 @@ interface DeckDao {
         if (cards.isNotEmpty()) upsertDeckCards(cards)
     }
 
+    /**
+     * Deck Wizard Commander v3 plan (Phase 6, D12): atomically replaces all card slots for a deck
+     * with per-slot provenance ([DeckCardEntity.source]) AND bumps `updated_at` in the SAME SQLite
+     * transaction as the clear+insert. Unlike [DeckRepository.replaceAllCardsWithSource]'s commonMain
+     * default (clearDeck then addCardToDeck per slot -- NOT atomic, still the portable fallback for
+     * `WebDeckRepository`), a mid-list write failure here (e.g. a FK violation on `deck_id`) rolls
+     * BOTH the clear and every prior insert back, leaving the draft in its pre-call state -- the real
+     * D12 cancellation-safety guarantee. See [DeckDaoReplaceAllCardsWithSourceTransactionTest] for
+     * the instrumented Room proof.
+     */
+    @Transaction
+    fun replaceAllCardsWithSource(deckId: String, cards: List<DeckCardEntity>, updatedAt: Long = System.currentTimeMillis()) {
+        clearDeckCards(deckId)
+        if (cards.isNotEmpty()) upsertDeckCards(cards)
+        touchDeckUpdatedAt(deckId, updatedAt)
+    }
+
+    // No-op (0 rows affected) if the deck does not exist -- callers that already validated the
+    // deckId (every production call site) never hit that branch.
+    @Query("UPDATE decks SET updated_at = :updatedAt WHERE id = :deckId")
+    fun touchDeckUpdatedAt(deckId: String, updatedAt: Long)
+
+    /**
+     * Deck Wizard Commander v3 plan (Phase 8, JOB 2): ONE Room transaction spanning the entire
+     * wizard-build persist -- card replacement + archetype/theme/posture pin + tribe pin +
+     * strategy-locked flag, previously 4 separate suspend repository calls (see
+     * [com.mmg.manahub.core.domain.repository.DeckRepository.persistWizardBuild]'s KDoc for the
+     * data-corruption gap this closes). A `suspend` default method annotated `@Transaction` runs
+     * every call inside it -- blocking [clearDeckCards]/[upsertDeckCards] AND the other `suspend`
+     * DAO methods below -- on Room's single transaction thread, so a failure/cancellation partway
+     * through rolls EVERYTHING back, leaving the deck exactly as it was before this call.
+     *
+     * Deck Wizard 60-card wave (v6, plan §5 Phase 1.3): renamed from `persistCommanderBuild` --
+     * pure rename, every format now writes through this same entry point.
+     */
+    @Transaction
+    suspend fun persistWizardBuild(
+        deckId: String,
+        cards: List<DeckCardEntity>,
+        archetypeOverride: String?,
+        themesOverrideJson: String?,
+        postureOverride: String?,
+        tribeOverride: String?,
+        strategyLocked: Boolean,
+        commanderCardId: String? = null,
+        updatedAt: Long = System.currentTimeMillis(),
+    ) {
+        clearDeckCards(deckId)
+        if (cards.isNotEmpty()) upsertDeckCards(cards)
+        updateArchetypeOverride(deckId, archetypeOverride, themesOverrideJson, postureOverride, updatedAt)
+        updateTribeOverride(deckId, tribeOverride, updatedAt)
+        updateStrategyLocked(deckId, strategyLocked, updatedAt)
+        // Same transaction as the cards: a Commander build never leaves a commander on an empty deck.
+        if (commanderCardId != null) updateCommanderAndCover(deckId, commanderCardId, updatedAt)
+    }
+
+    @Query("""
+        UPDATE decks SET
+            commander_card_id = :commanderCardId,
+            cover_card_id = :commanderCardId,
+            updated_at = :updatedAt
+        WHERE id = :deckId
+    """)
+    suspend fun updateCommanderAndCover(deckId: String, commanderCardId: String, updatedAt: Long)
+
     // ── Stats / other features ─────────────────────────────────────────────────
 
     @Query("""
@@ -256,8 +426,8 @@ interface DeckDao {
     """)
     fun observeDeckSummaryRows(): Flow<List<DeckSummaryRow>>
 
-    @Query("SELECT COUNT(*) FROM decks WHERE is_deleted = 0")
-    fun observeDeckCount(): Flow<Int>
+    @Query("SELECT COUNT(*) FROM decks WHERE is_deleted = 0 AND (user_id = :userId OR user_id IS NULL)")
+    fun observeDeckCount(userId: String?): Flow<Int>
 
     @Query("""
         SELECT d.* FROM decks d

@@ -1,5 +1,7 @@
 package com.mmg.manahub.core.data.repository
 
+// COMMENTS_REVIEWED: 2026-09-16
+
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
@@ -11,6 +13,13 @@ import com.mmg.manahub.core.domain.usecase.card.ResolveCardStrategyTagsUseCase
 import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.util.TestFixtures
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.request.get
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -96,6 +105,51 @@ class CardRepositoryImplTest {
     @After
     fun tearDown() {
         unmockkStatic(FirebaseCrashlytics::class)
+    }
+
+    @Test
+    fun search404IsEmptyOnlyForConfirmedNoMatchesResponse() = runTest {
+        val noMatchDetails = listOf(
+            "Your search returned no results.",
+            "Your query didn’t match any cards. Adjust your search terms or refer to the syntax guide at https://scryfall.com/docs/reference",
+        )
+        for (details in noMatchDetails) {
+            val failure = searchFailure("""{"object":"error","code":"not_found","status":404,"details":"$details"}""")
+            coEvery { remote.searchCardsPaginated("query", 1, false) } returns Result.failure(failure)
+            val result = repository.searchCardsPaginated("query", 1)
+            assertTrue(result is DataResult.Success)
+            val success = result as DataResult.Success
+            assertTrue(success.data.cards.isEmpty())
+            assertEquals(false, success.data.hasMore)
+            assertTrue(success.data.confirmedNoMatches404)
+        }
+    }
+
+    @Test
+    fun unrelatedSearch404AndSyntaxFailureRemainErrors() = runTest {
+        val failures = listOf(
+            """{"object":"error","code":"not_found","status":404,"details":"Resource unavailable"}""",
+            """{"object":"error","code":"bad_request","status":404,"details":"Your query didn’t match any cards."}""",
+            """{"object":"error","code":"not_found","status":404,"details":"Your query has invalid syntax."}""",
+        )
+        for (body in failures) {
+            coEvery { remote.searchCardsPaginated("query", 1, false) } returns Result.failure(searchFailure(body))
+            assertTrue(repository.searchCardsPaginated("query", 1) is DataResult.Error)
+        }
+        val syntax = """{"object":"error","code":"bad_request","status":400,"details":"Invalid search syntax"}"""
+        coEvery { remote.searchCardsPaginated("query", 1, false) } returns Result.failure(searchFailure(syntax, HttpStatusCode.BadRequest))
+        assertTrue(repository.searchCardsPaginated("query", 1) is DataResult.Error)
+    }
+
+    private suspend fun searchFailure(body: String, status: HttpStatusCode = HttpStatusCode.NotFound): Throwable {
+        val client = HttpClient(MockEngine {
+            respond(body, status, headersOf(HttpHeaders.ContentType, "application/json"))
+        }) { expectSuccess = true }
+        return try {
+            runCatching { client.get("https://api.scryfall.com/cards/search?q=query") }.exceptionOrNull()!!
+        } finally {
+            client.close()
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -204,6 +258,19 @@ class CardRepositoryImplTest {
             "userTags must be preserved from existing entity",
             capturedEntity.captured.userTags.isNotBlank() && capturedEntity.captured.userTags != "[]"
         )
+    }
+
+    @Test
+    fun `given a pending-hydration placeholder when warmCacheForIds then it is re-fetched and real rows are skipped`() = runTest {
+        val real = TestFixtures.buildFreshCardEntity("real-1")
+        val placeholder = TestFixtures.buildFreshCardEntity("ph-1").copy(isStale = true, staleReason = "pending_hydration")
+        coEvery { cardDao.getByIds(any()) } returns listOf(real, placeholder)
+        coEvery { remote.getCardsBatch(listOf("ph-1")) } returns Result.success(listOf(TestFixtures.buildCard("ph-1")))
+
+        repository.warmCacheForIds(listOf("real-1", "ph-1"))
+
+        coVerify(exactly = 1) { remote.getCardsBatch(listOf("ph-1")) }
+        coVerify(exactly = 1) { cardDao.upsertAll(match { entities -> entities.single().scryfallId == "ph-1" }) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -335,6 +402,36 @@ class CardRepositoryImplTest {
         val result = repository.getCardById("id-001")
 
         assertTrue(result is DataResult.Success)
+    }
+
+    @Test
+    fun `given an existing card row when getRandomCard succeeds then cached tags are preserved and the card is upserted`() = runTest {
+        val existing = TestFixtures.buildCardEntity(scryfallId = "random-1").copy(
+            tags = "[{\"k\":\"RAMP\"}]",
+            userTags = "[{\"k\":\"my_tag\",\"c\":\"CUSTOM\"}]",
+            suggestedTags = "[{\"k\":\"DRAW\",\"c\":\"AUTO\"}]",
+        )
+        coEvery { cardDao.getById("random-1") } returns existing
+        coEvery { remote.getRandomCard("lang:en") } returns Result.success(TestFixtures.buildCard("random-1"))
+        val captured = slot<CardEntity>()
+        coEvery { cardDao.upsert(capture(captured)) } returns Unit
+
+        val result = repository.getRandomCard("lang:en")
+
+        assertTrue(result is DataResult.Success)
+        assertEquals(existing.tags, captured.captured.tags)
+        assertEquals(existing.userTags, captured.captured.userTags)
+        assertEquals(existing.suggestedTags, captured.captured.suggestedTags)
+        coVerify(exactly = 1) { cardDao.upsert(any()) }
+        coVerify(exactly = 1) { remote.getRandomCard("lang:en") }
+        coVerify(exactly = 1) {
+            resolveCardStrategyTags(
+                match { it.scryfallId == "random-1" },
+                existing.tags,
+                any(),
+                any(),
+            )
+        }
     }
 
     @Test

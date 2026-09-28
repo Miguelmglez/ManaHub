@@ -1,12 +1,11 @@
 package com.mmg.manahub.feature.decks.presentation.components
+// COMMENTS_REVIEWED: 2026-09-21
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,13 +15,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
@@ -50,6 +47,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicSelectionItem
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
@@ -61,6 +61,7 @@ import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedStrategyInfo
 import com.mmg.manahub.feature.decks.domain.engine.availableIn
+import com.mmg.manahub.feature.decks.domain.usecase.ArchetypeResolution
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Deck Analysis Engine v2 Phase 3 (plan §3.4 item 1) — the curated-strategy picker that
@@ -68,25 +69,34 @@ import com.mmg.manahub.feature.decks.domain.engine.availableIn
 //  strategies", plan §3.2).
 //
 //  Naming note (deviation, documented): this file's `CuratedStrategyPickerSheet` is
-//  DELIBERATELY NOT named `StrategyPickerSheet` — that name is already taken by an UNRELATED,
-//  already-live component (`StrategyPickerSheet.kt`, Deck Wizard & Engine Rework plan WS1.2's
-//  shared 3-axis archetype/theme/tribe picker, still mounted by `DeckWizardCommanderSteps
-//  .StrategyStepContent`). The two pickers solve different problems (this one: pick ONE curated,
-//  pre-validated strategy from a flat list; that one: freely compose archetype + up to 2 themes +
-//  tribe from a restricted candidate set) and must stay separate composables — reusing the name
-//  here would either collide at the same package/file scope or silently shadow the wizard's own
-//  picker. [TribeOption] (declared in `StrategyPickerSheet.kt`) IS reused as-is below: it is a
-//  plain, picker-agnostic (key, label) shape, not specific to that file's 3-axis flow.
+//  DELIBERATELY NOT named `StrategyPickerSheet` — that name belonged to an unrelated 3-axis
+//  archetype/theme/tribe picker (Deck Wizard & Engine Rework plan WS1.2) that was deleted in the
+//  Deck Wizard Commander v3 plan's Phase 8 cleanup after confirming zero remaining callers (0
+//  production call sites; only its own @Preview referenced it). [TribeOption] used to live in
+//  that now-deleted file; it moved here since this is its only surviving consumer group
+//  (`DeckStudioScreen.kt`, `DeckWizardCommanderSteps.kt` also use it) — a plain, picker-agnostic
+//  (key, label) shape, not specific to any one picker's flow.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/** A tribe candidate for a strategy/plan picker's tribe sub-selection — `key` is a raw
+ * `tribe:<subtype>` string, `label` its display name. Picker-agnostic (key, label) shape shared
+ * by [CuratedStrategyPickerSheet] and the wizard's commander-tribe picker. */
+data class TribeOption(val key: String, val label: String)
+
 /**
- * The Studio "Analysis" tab header chip (plan §3.4 item 2): "Plan: <Strategy> (detected|manual)".
- * Tapping opens [CuratedStrategyPickerSheet]. Reads the v2 [ResolvedStrategyInfo] directly
- * (unlike the retired `ArchetypePlanChip`, which read the legacy `ArchetypeResolution`).
+ * The Studio "Analysis" tab header chip — always tappable (Deck Wizard UX polish plan, Run 1 §1.4
+ * removed the strategy-lock gate and the MANUAL/AUTO badge; the icon alone still distinguishes a
+ * manual pin from an auto-detected one). Tapping opens [CuratedStrategyPickerSheet]. Reads the v2
+ * [ResolvedStrategyInfo] for the matched CURATED strategy name; [archetypeResolution] (Run 1 §1.6)
+ * folds in the raw inferred signal (macro/hybrid label + posture) as a second line, replacing the
+ * separate "Archetype signal" card this chip used to sit above. NEVER renders confidence/margin
+ * text — [ArchetypeResolution.confidence] is 1.0 on every pinned deck, so a margin figure is pure
+ * noise, not information.
  */
 @Composable
 fun StrategyPlanChip(
     strategy: ResolvedStrategyInfo,
+    archetypeResolution: ArchetypeResolution?,
     onClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -142,18 +152,19 @@ fun StrategyPlanChip(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = if (strategy.isManualOverride) mc.goldMtg.copy(alpha = 0.15f) else mc.lifePositive.copy(alpha = 0.15f),
-                ) {
-                    Text(
-                        text = (if (strategy.isManualOverride) "MANUAL" else "AUTO").uppercase(),
-                        style = ty.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = if (strategy.isManualOverride) mc.goldMtg else mc.lifePositive,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+                    if (archetypeResolution != null) {
+                        val detectedLabel = archetypeResolution.planLabel()
+                        val detectedText = archetypeResolution.posture?.let { posture ->
+                            stringResource(R.string.deck_studio_strategy_detected_with_posture_format, detectedLabel, posture.displayName)
+                        } ?: stringResource(R.string.deck_studio_strategy_detected_format, detectedLabel)
+                        Text(
+                            text = detectedText,
+                            style = ty.labelSmall,
+                            color = mc.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
@@ -222,6 +233,14 @@ fun StrategyPlanHint(onClick: () -> Unit) {
  *        that one is a CURATED-catalog id only (`null` for a non-curated archetype match), while
  *        this is the resolved [com.mmg.manahub.feature.decks.domain.engine.ResolvedStrategyInfo
  *        .displayName] the caller already has in scope, curated or not.
+ * @param strategyMatchScores Deck Wizard UX polish plan, Run 1 §1.6: `CuratedStrategy.id` ->
+ *        `DeckAnalysisPipeline`-computed total score (0-100) for pinning THIS deck to that
+ *        strategy, populated incrementally by the caller's `scoreStrategyMatches()` as each entry
+ *        resolves. A row with no entry here is either still being scored ([isScoringStrategyMatches]
+ *        true — renders a loading spinner) or will never be scored (a `requiresTribe` entry on a
+ *        deck with no dominant tribe — renders nothing, never a fake 0%). The Auto-detect row never
+ *        reads this map.
+ * @param isScoringStrategyMatches whether a `scoreStrategyMatches()` pass is still in flight.
  */
 @Composable
 fun CuratedStrategyPickerSheet(
@@ -233,6 +252,8 @@ fun CuratedStrategyPickerSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     currentStrategyName: String? = null,
+    strategyMatchScores: Map<String, Int> = emptyMap(),
+    isScoringStrategyMatches: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -248,8 +269,16 @@ fun CuratedStrategyPickerSheet(
                 (query.isBlank() || entry.displayName.contains(query, ignoreCase = true) || entry.description.contains(query, ignoreCase = true))
         }
     }
-    val corePlans = filtered.filter { it.themes.isEmpty() }
-    val themedPresets = filtered.filter { it.themes.isNotEmpty() }
+    // Sorted by match % descending within each group ONLY once the scoring pass has finished --
+    // sorting while scores stream in reorders rows under the user's finger. Until then the catalog
+    // order stands (stable sort, every key -1); an entry that never scores stays at the end after.
+    val sortScores = if (isScoringStrategyMatches) emptyMap() else strategyMatchScores
+    val corePlans = remember(filtered, sortScores) {
+        filtered.filter { it.themes.isEmpty() }.sortedByDescending { sortScores[it.id] ?: -1 }
+    }
+    val themedPresets = remember(filtered, sortScores) {
+        filtered.filter { it.themes.isNotEmpty() }.sortedByDescending { sortScores[it.id] ?: -1 }
+    }
 
     Column(modifier.fillMaxSize().padding(horizontal = spacing.lg, vertical = spacing.md)) {
         Row(
@@ -359,6 +388,7 @@ fun CuratedStrategyPickerSheet(
                             description = entry.description,
                             isSelected = entry.id == selectedStrategyId,
                             accentColor = mc.primaryAccent,
+                            trailing = strategyMatchTrailing(entry.id, strategyMatchScores, isScoringStrategyMatches),
                             onClick = {
                                 if (entry.requiresTribe) tribePending = entry
                                 else { onApply(entry, null); onDismiss() }
@@ -376,6 +406,7 @@ fun CuratedStrategyPickerSheet(
                             description = entry.description,
                             isSelected = entry.id == selectedStrategyId,
                             accentColor = mc.primaryAccent,
+                            trailing = strategyMatchTrailing(entry.id, strategyMatchScores, isScoringStrategyMatches),
                             onClick = {
                                 if (entry.requiresTribe) tribePending = entry
                                 else { onApply(entry, null); onDismiss() }
@@ -397,6 +428,30 @@ fun CuratedStrategyPickerSheet(
     }
 }
 
+/** Run 1 §1.6 — the row-end match-percentage slot: a bold "NN%" once scored, an
+ * [MagicLoadingSpinner] placeholder while [isScoring] is still true and this row hasn't resolved
+ * yet, or `null` (renders nothing) once scoring has finished and this entry was never scored (a
+ * `requiresTribe` entry on a deck with no dominant tribe — never a fake 0%). */
+private fun strategyMatchTrailing(
+    strategyId: String,
+    scores: Map<String, Int>,
+    isScoring: Boolean,
+): (@Composable () -> Unit)? {
+    val score = scores[strategyId]
+    return when {
+        score != null -> ({
+            Text(
+                text = stringResource(R.string.deck_curated_strategy_picker_match_format, score),
+                style = MaterialTheme.magicTypography.labelLarge,
+                color = MaterialTheme.magicColors.primaryAccent,
+                fontWeight = FontWeight.Bold,
+            )
+        })
+        isScoring -> ({ com.mmg.manahub.core.ui.components.MagicLoadingSpinner(size = com.mmg.manahub.core.ui.components.MagicLoadingSize.XSmall) })
+        else -> null
+    }
+}
+
 @Composable
 private fun PickerSectionHeader(title: String) {
     Text(
@@ -407,13 +462,13 @@ private fun PickerSectionHeader(title: String) {
     )
 }
 
-// AutoDetectRow and CuratedStrategyRow were replaced by MagicSelectionItem
-
 /** The inline "now pick a tribe for <Strategy>" step shown after tapping a `requiresTribe`
- * strategy (plan §3.4 item 1's "tribe sub-picker shown when the selected entry has
- * `requiresTribe=true`") — replaces the flat list until a tribe is chosen or the user backs out. */
+ * strategy -- replaces the flat list until a tribe is chosen or the user backs out. One
+ * [MagicSelectionItem] per tribe in a plain [Column] (every caller already scrolls), with a
+ * full-width outlined "Back to strategies" CTA last. Internal (not `private`) because the wizard's
+ * STRATEGY/COLOR_PICK/STRATEGY_PICK steps reuse it verbatim. */
 @Composable
-private fun TribePickerSection(
+internal fun TribePickerSection(
     strategy: CuratedStrategy,
     availableTribes: List<TribeOption>,
     onSelectTribe: (String) -> Unit,
@@ -436,35 +491,22 @@ private fun TribePickerSection(
                 color = mc.textSecondary,
             )
         } else {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                verticalArrangement = Arrangement.spacedBy(spacing.sm),
-            ) {
-                availableTribes.forEach { option ->
-                    Surface(
-                        onClick = { onSelectTribe(option.key) },
-                        shape = ChipShape,
-                        color = mc.surface,
-                        border = BorderStroke(1.dp, mc.surfaceVariant),
-                    ) {
-                        Row(
-                            modifier = Modifier.heightIn(min = 48.dp).wrapContentHeight(Alignment.CenterVertically).padding(horizontal = spacing.sm),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(option.label, style = ty.labelMedium, color = mc.textPrimary)
-                        }
-                    }
-                }
+            availableTribes.forEach { option ->
+                MagicSelectionItem(
+                    title = option.label,
+                    isSelected = false,
+                    accentColor = mc.primaryAccent,
+                    onClick = { onSelectTribe(option.key) },
+                )
             }
         }
-        Text(
+        MagicCtaButton(
+            onClick = onCancel,
             text = stringResource(R.string.deck_curated_strategy_picker_tribe_cancel),
-            style = ty.labelLarge,
-            color = mc.textSecondary,
-            modifier = Modifier
-                .sizeIn(minHeight = 48.dp)
-                .clickable(onClick = onCancel)
-                .padding(vertical = spacing.xs),
+            style = MagicCtaStyle.Outlined,
+            color = MagicCtaColor.Neutral,
+            icon = { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp)) },
+            modifier = Modifier.fillMaxWidth().padding(top = spacing.md),
         )
     }
 }

@@ -41,6 +41,9 @@ enum class AchievementResolver {
     /** Number of the five WUBRG colors that have at least 20 owned cards (0..5). */
     COLORS_WITH_20_PLUS,
 
+    /** Number of the five WUBRG colors that have at least one owned card (0..5). */
+    COLORS_WITH_ANY,
+
     /** Count of owned mythic-rarity printings. */
     MYTHIC_CARDS,
 
@@ -89,6 +92,9 @@ enum class AchievementResolver {
      * the durable `puzzle_results` table with zero double-count risk.
      */
     PUZZLES_SOLVED,
+
+    /** Accepted friends in the local friends cache (server truth; remove + re-add never double-counts). */
+    FRIENDS_COUNT,
 }
 
 /**
@@ -124,6 +130,7 @@ data class AchievementTier(
  * @param resolver for DERIVED defs, the Room aggregate to query; null for COUNTER defs.
  * @param isSecret hidden/masked as "???" until unlocked (Chunk B renders the mask).
  * @param unlocks RESERVED for Phase 3 (cosmetics). Always empty in Phase 1.
+ * @param availability whether the def can currently be earned; unavailable defs are hidden and skipped.
  */
 data class AchievementDef(
     val id: String,
@@ -137,6 +144,7 @@ data class AchievementDef(
     val resolver: AchievementResolver? = null,
     val isSecret: Boolean = false,
     val unlocks: List<UnlockableId> = emptyList(),
+    val availability: CatalogAvailability = CatalogAvailability.ALWAYS,
 ) {
     init {
         require(tiers.isNotEmpty()) { "Achievement '$id' must declare at least one tier" }
@@ -148,6 +156,9 @@ data class AchievementDef(
             "DERIVED achievement '$id' must declare a resolver"
         }
     }
+
+    /** True when this def may be shown, evaluated and backfilled. */
+    val isAvailable: Boolean get() = availability.isAvailable
 
     /** The final (highest) threshold — the value at which the achievement is fully maxed. */
     val maxThreshold: Int get() = tiers.last().threshold

@@ -5,7 +5,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 /**
  * Reports a non-fatal exception to Crashlytics, stripping the original
  * message to avoid leaking user-controlled data (card names, player names).
- * The exception type and stack trace are preserved for diagnosis.
+ * The exception type and stack trace are preserved for diagnosis without retaining the cause.
  *
  * Use this for exceptions from external sources or user input where the
  * original message might contain sensitive data.
@@ -16,7 +16,8 @@ fun recordSafeNonFatal(tag: String, e: Throwable) {
     // background thread during stack trace trimming (secondary crash).
     if (e is OutOfMemoryError) return
 
-    val sanitized = RuntimeException("[$tag] ${e::class.simpleName}", e)
+    val sanitized = RuntimeException("[$tag] ${e::class.simpleName}")
+    sanitized.stackTrace = e.stackTrace
     FirebaseCrashlytics.getInstance().recordException(sanitized)
 }
 

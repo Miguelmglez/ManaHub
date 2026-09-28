@@ -6,6 +6,6 @@ import javax.inject.Inject
 class ToggleLandPlayedUseCase @Inject constructor(
     private val repository: OnlineSessionRepository,
 ) {
-    suspend fun broadcast(sessionId: String, slotIndex: Int, played: Boolean) =
+    suspend fun broadcast(sessionId: String, slotIndex: Int, played: Boolean): Boolean =
         repository.broadcastLandToggled(sessionId, slotIndex, played)
 }

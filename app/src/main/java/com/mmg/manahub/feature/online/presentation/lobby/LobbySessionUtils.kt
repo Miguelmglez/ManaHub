@@ -22,6 +22,17 @@ internal fun OnlineSessionStatus.isTerminal(): Boolean =
     this == OnlineSessionStatus.FINISHED || this == OnlineSessionStatus.ABANDONED
 
 /**
+ * Returns [this] with an [ParticipantStatus.UNKNOWN] status replaced by the status this
+ * participant already had in [current], so a server value this build cannot parse never
+ * overwrites a known state.
+ */
+internal fun OnlineParticipant.keepingKnownStatusFrom(current: List<OnlineParticipant>): OnlineParticipant {
+    if (status != ParticipantStatus.UNKNOWN) return this
+    val previous = current.firstOrNull { it.id == id }?.status ?: return this
+    return copy(status = previous)
+}
+
+/**
  * Merges a freshly-fetched participant [snapshot] into the [current] list by id.
  *
  * The snapshot wins for participants present in it (updated ready-state, theme, etc.).
@@ -40,7 +51,9 @@ internal fun mergeParticipantsById(
     snapshot: List<OnlineParticipant>,
     missingStreak: Map<String, Int> = emptyMap(),
 ): Pair<List<OnlineParticipant>, Map<String, Int>> {
-    val active = snapshot.filter { it.status != ParticipantStatus.LEFT }
+    val active = snapshot
+        .map { it.keepingKnownStatusFrom(current) }
+        .filter { it.status != ParticipantStatus.LEFT }
     val snapshotIds = active.map { it.id }.toSet()
     val realtimeOnly = current.filter { it.id !in snapshotIds }
 

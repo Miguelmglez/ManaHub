@@ -1,7 +1,9 @@
 package com.mmg.manahub.feature.decks.domain.engine
+// COMMENTS_REVIEWED: 2026-09-16
 
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -218,7 +220,14 @@ object AnalysisEngine {
         val p1 = evaluateManaBase(mainboard, archetypeFormat, colorIdentity, skeleton, roleCounts, landCount, avgMv, profile, manaBaseAnalyzer, attribution)
         val p2 = evaluateCurve(avgMv, nonLand, nonLandCount, skeleton, roleCounts, themes)
         val p3 = evaluatePlanRoles(skeleton, roleCounts, attribution)
-        val p4 = evaluateSynergy(mainboard, nonLand, nonLandCount, profile, archetype, themes, synergyGraph, archetypeFormat)
+        // `ramp`/[ArchetypeData.MANA_FIX_KEY] get an UNCONDITIONAL role:<key> section from P1
+        // ([evaluateManaBase]'s rampSection/manaFixSection) regardless of whether this deck's own
+        // skeleton targets them -- always excluded from SYNERGY's fingerprint grouping too, not
+        // just when present in roleTargets.
+        val p4 = evaluateSynergy(
+            mainboard, nonLand, nonLandCount, profile, archetype, themes, synergyGraph, archetypeFormat,
+            skeleton.roleTargets.keys + setOf("ramp", ArchetypeData.MANA_FIX_KEY),
+        )
         val p5 = evaluateLegality(mainboard, format, colorIdentity, sideboardCount)
 
         val analysis = compose(listOf(p1, p2, p3, p4, p5), strategyInfo, weights)
@@ -304,16 +313,33 @@ object AnalysisEngine {
         val shown = sortFindings(findings)
 
         // Category Sections rework (W1) -- per-color land breakdown + the mana-related role
-        // buckets. "produces:X" is skipped entirely when the deck's lands produce no copies of
-        // that color (plan wording: "one per color the deck's lands ACTUALLY produce") -- unlike
-        // PLAN_ROLES, this is not a gap table, so an empty color is simply omitted rather than
-        // shown at 0. role:ramp/role:mana_fix mirror PLAN_ROLES' section shape (id/band/
-        // contributions) but live here since P1 owns mana_fix and P3 explicitly excludes it.
+        // buckets. Deck Wizard 60-card wave (v6), plan §5 Phase 3.1: an IDENTITY color is now a
+        // GAP-TABLE entry -- always emitted, even at current=0 (min=ideal=the SAME Karsten need
+        // ColorSourceShortage already computed above, max=null), so the wizard's own Browse-for-X
+        // CTA has a real section to attach to before the user has added a single source of that
+        // color. Colors OUTSIDE the identity keep the pre-v6 "only when actually produced" rule
+        // unchanged (an off-identity dual still shows its extra color, informational only, no
+        // band). Colorless is special-cased separately: no Karsten source concept exists for {C}
+        // pips (any land pays them), so `produces:C` shows ONLY once the deck actually has a {C}
+        // pip, with no band either way. role:ramp/role:mana_fix mirror PLAN_ROLES' section shape
+        // (id/band/contributions) but live here since P1 owns mana_fix and P3 explicitly excludes it.
+        val identityColors = colorIdentity.filter { it != ManaColor.C }.toSet()
+        // ManaBaseAnalyzer.pipDistribution/requiredByColor never populate ManaColor.C -- "{C}" is
+        // colourless GENERIC demand, not a colour any Karsten source table fixes (coloredPipsIn's
+        // own KDoc: "Generic/colourless/X/S -> empty") -- so colourless needs its own direct
+        // mana-cost scan for "does this deck have a real {C} pip at all", never the shared report.
+        val hasColorlessPip = mainboard.any { entry -> entry.card.manaCost?.contains("{C}") == true }
         val producesSections = ManaColor.entries.mapNotNull { color ->
             val symbol = color.symbol.first()
             val producing = mainboard.filter { BasicLandCalculator.isLand(it.card) && it.card.producedMana.contains(symbol) }
             val count = producing.sumOf { it.quantity }
-            if (count == 0) return@mapNotNull null
+            val inIdentity = color in identityColors
+            when {
+                color == ManaColor.C -> if (!hasColorlessPip) return@mapNotNull null
+                !inIdentity && count == 0 -> return@mapNotNull null
+                else -> Unit
+            }
+            val need = (manaReport.requiredByColor[color] ?: 0).takeIf { inIdentity }
             // Suggestions Tab UI Polish plan (W6, D-b): label is now a plain color name, not a raw
             // "{W}"-style token baked into the string -- the UI renders the real mana symbol
             // itself (SectionHeader's `icon` slot via a ManaSymbolImage wrapper), the way
@@ -323,9 +349,24 @@ object AnalysisEngine {
                 id = "produces:${color.symbol}",
                 label = color.displayName,
                 current = count,
+                min = need,
+                ideal = need,
                 contributions = producing.toContributions(),
             )
         }
+        // Deck Wizard 60-card wave (v6), plan §5 Phase 3.2: a dedicated, browsable "lands" section
+        // (the SAME id/band/contributions shape every other category uses) -- emitted FIRST in
+        // this pillar. `landCount` is the same authoritative count `landScore`/`karstenTarget`
+        // above already use; `skeleton.lands` is the SAME band the build engine itself targets.
+        val landsSection = CardSection(
+            id = "lands",
+            label = "Lands",
+            current = landCount,
+            min = skeleton.lands.min,
+            ideal = skeleton.lands.ideal,
+            max = skeleton.lands.max,
+            contributions = mainboard.filter { BasicLandCalculator.isLand(it.card) }.toContributions(),
+        )
         val rampBand = skeleton.roleTargets["ramp"]
         val rampSection = CardSection(
             id = "role:ramp",
@@ -355,7 +396,7 @@ object AnalysisEngine {
             current = manaDorkEntries.sumOf { it.quantity },
             contributions = manaDorkEntries.toContributions(),
         )
-        val sections = producesSections + rampSection + manaFixSection + manaRockSection + manaDorkSection
+        val sections = listOf(landsSection) + producesSections + rampSection + manaFixSection + manaRockSection + manaDorkSection
 
         return PillarResult(id = PillarId.MANA_BASE, subscore = subscore, findings = shown, sections = sections)
     }
@@ -480,7 +521,13 @@ object AnalysisEngine {
             val contributions = attribution[key].orEmpty().collapsed()
 
             coverage += RoleCoverageEntry(roleKey = key, label = label, current = have, min = band.min, ideal = band.ideal, max = band.max, isAntiRole = isAnti)
-            sections += CardSection(id = "role:$key", label = label, current = have, min = band.min, ideal = band.ideal, max = band.max, isAntiRole = isAnti, contributions = contributions)
+            // "ramp" already gets its own role:ramp section from the MANA_BASE pillar above
+            // (rampSection) -- PLAN_ROLES must not re-emit a second, identically-labeled one (S6:
+            // no duplicate categories). Coverage/score/findings below are UNCHANGED for "ramp" --
+            // only this duplicate DISPLAY section is skipped.
+            if (key != "ramp") {
+                sections += CardSection(id = "role:$key", label = label, current = have, min = band.min, ideal = band.ideal, max = band.max, isAntiRole = isAnti, contributions = contributions)
+            }
 
             val weight = band.ideal.coerceAtLeast(1)
             if (isAnti) {
@@ -558,13 +605,18 @@ object AnalysisEngine {
      * `"dominant axis"` (the `consistency` term) reuses [InferDeckArchetypeUseCase]'s own Phase-3a
      * definition (`graph.axes.maxByOrNull { it.health }`) rather than inventing a second one.
      *
-     * ## Sections: what changed and what deliberately did NOT
-     * The pre-existing per-key `fingerprint:<key>`/`tribe:<x>` DISPLAY sections (grouped by
-     * [profile]'s CardTag-fingerprint alignment, [SYNERGY_ALIGNMENT_THRESHOLD]) are UNCHANGED —
-     * nothing in spec §7 asks to remove that view, and it answers a genuinely different question
-     * ("which named strategy does this card pull toward") than the graph-based subscore now does.
-     * ONLY the old catch-all `"offplan"` bucket (cards the tag-fingerprint check does not align to
-     * ANY key) is rebuilt as a real 3-way split, spec §7:
+     * ## Sections: "Engines first" (Deck Wizard Commander v5, D2/D3)
+     * Display order: (1) [SynergyEngine] producer/payoff pairs, one per axis clearing
+     * [SynergyEngineState]'s visibility rule ([PillarResult.synergyEngines], mirrored here as
+     * `engine:<axis>:producers`/`engine:<axis>:payoffs` [CardSection]s); (2) the deck's own
+     * dominant tribe, once (`tribe:<x>`); (3) interaction/standalone/off-plan. The old loose
+     * `fingerprint:<key>` list (one section per [profile]'s CardTag-fingerprint-aligned STRATEGY
+     * key) is REMOVED — a card that used to land there with no engine role and no dominant-tribe
+     * membership now falls through into the residual interaction/standalone/off-plan classification
+     * below, exactly as an unaligned card always has. This is a DISPLAY-only change: alignment
+     * against [SYNERGY_ALIGNMENT_THRESHOLD] still only decides section membership, never [subscore]
+     * (unchanged formula above, reads only [graph]).
+     * The catch-all `"offplan"` bucket is a real 3-way split, spec §7:
      *  - **`"interaction"`**: the card carries [INTERACTION_ROLES] — legitimate, not off-plan.
      *    A Swords to Plowshares must never read as off-plan (checked FIRST, unconditionally).
      *  - **`"standalone"`**: NOT interaction, but has a real reason to be in the deck: either it
@@ -587,6 +639,7 @@ object AnalysisEngine {
         themes: List<ThemeId>,
         graph: DeckSynergyGraph,
         format: ArchetypeFormat,
+        roleKeys: Set<RoleKey>,
     ): PillarResult {
         // ── The graph-based signal every metric below and the offplan 3-way split share ────────
         val edgeCardIds = buildSet { graph.edges.forEach { add(it.fromCardId); add(it.toCardId) } }
@@ -664,27 +717,70 @@ object AnalysisEngine {
         val subscore = if (notApplicable) 0 else (100 * bandRatioScoreF(raw, band.ideal, band.max)).roundToInt().coerceIn(0, 100)
         val shown = sortFindings(conflictFindings)
 
-        // ── Sections: unchanged tag-fingerprint groups + the new offplan 3-way split ────────────
+        // ── Engines (v5, D2/D3): one producer -> payoff pair per axis clearing the visibility
+        // rule -- payoff-optional axes (MILL_OPP, LOCK, see SynergyGraph.payoffPolicyFor) have no
+        // real payoff role at all ("the producers ARE the win condition"), so they are excluded
+        // from this pairing rather than permanently reading as "missing payoffs" on a well-built
+        // stax/mill deck. The deck's own dominant TRIBE axis is excluded too -- it gets its own
+        // section below, once, not folded into the generic engine list.
+        val dominantTribeAxis = graph.axes.map { it.axis }.firstOrNull { it.startsWith("TRIBE:") }
+        val axisIdeals = SynergyGraph.axisIdeals(format, nonLandCount, dominantTribeAxis)
+        val engines = graph.axes
+            .filter { it.axis != "MILL_OPP" && it.axis != "LOCK" && it.axis != dominantTribeAxis }
+            .mapNotNull { axisState ->
+                val breakdown = graph.axisBreakdown[axisState.axis] ?: return@mapNotNull null
+                val producerCopies = breakdown.producers.sumOf { it.quantity }
+                val payoffCopies = breakdown.payoffs.sumOf { it.quantity }
+                val payoffIdeal = axisIdeals[axisState.axis]?.payoffIdeal ?: return@mapNotNull null
+                val state = SynergyEngineState.resolve(producerCopies, payoffCopies, axisState.producerIdeal, payoffIdeal)
+                    ?: return@mapNotNull null
+                SynergyEngine(
+                    axis = axisState.axis,
+                    label = axisLabel(axisState.axis),
+                    producers = breakdown.producers,
+                    payoffs = breakdown.payoffs,
+                    producerIdeal = axisState.producerIdeal,
+                    payoffIdeal = payoffIdeal,
+                    state = state,
+                )
+            }
+        val engineSections = engines.flatMap { engine ->
+            listOf(
+                CardSection(id = "engine:${engine.axis}:producers", label = "${engine.label} producers", current = engine.producers.sumOf { it.quantity }, contributions = engine.producers),
+                CardSection(id = "engine:${engine.axis}:payoffs", label = "${engine.label} payoffs", current = engine.payoffs.sumOf { it.quantity }, contributions = engine.payoffs),
+            )
+        }
+
+        // ── The deck's own tribe, once (D2) + the interaction/standalone/off-plan residual ──────
+        // A card whose ONLY alignment used to be a loose STRATEGY fingerprint key (e.g. "lifegain")
+        // now falls through to this residual classification instead of getting its own removed
+        // section -- its information already surfaced above via the matching engine, if it has one.
+        val dominantTribeKey = dominantTribeAxis?.let { TribeDeriver.TRIBE_PREFIX + it.removePrefix("TRIBE:") }
         data class AlignedEntry(val entry: DeckEntry, val alignedKeys: Set<String>)
         val alignedEntries = nonLand.map { entry ->
-            val keys = ((entry.card.tags + entry.card.userTags).map { it.key } + TribeDeriver.tribeKeys(entry.card)).toSet()
-            val alignedKeys = keys.filter { (profile.tagFingerprint[it] ?: 0f) >= SYNERGY_ALIGNMENT_THRESHOLD }.toSet()
+            val tagKeyPairs = (entry.card.tags + entry.card.userTags)
+                .filterNot { it.key in roleKeys }
+                .map { tag ->
+                    val groupKey = if (tag.category == TagCategory.TRIBAL) TribeDeriver.TRIBE_PREFIX + tag.key else tag.key
+                    tag.key to groupKey
+                }
+            val tribeKeyPairs = TribeDeriver.tribeKeys(entry.card).map { it to it }
+            val alignedKeys = (tagKeyPairs + tribeKeyPairs)
+                .filter { (lookupKey, _) -> (profile.tagFingerprint[lookupKey] ?: 0f) >= SYNERGY_ALIGNMENT_THRESHOLD }
+                .map { (_, groupKey) -> groupKey }
+                .toSet()
             AlignedEntry(entry, alignedKeys)
         }
-        val byKey = linkedMapOf<String, MutableList<DeckEntry>>()
+        val tribeEntries = mutableListOf<DeckEntry>()
         val residual = mutableListOf<DeckEntry>()
         alignedEntries.forEach { (entry, alignedKeys) ->
-            if (alignedKeys.isEmpty()) residual += entry else alignedKeys.forEach { key -> byKey.getOrPut(key) { mutableListOf() } += entry }
+            if (dominantTribeKey != null && dominantTribeKey in alignedKeys) tribeEntries += entry else residual += entry
         }
-        val fingerprintSections = byKey.map { (key, entries) ->
-            val isTribe = key.startsWith(TribeDeriver.TRIBE_PREFIX)
-            CardSection(
-                id = if (isTribe) key else "fingerprint:$key",
-                label = if (isTribe) synergyTribeLabel(key) else synergyStrategyLabel(key),
-                current = entries.sumOf { it.quantity },
-                contributions = entries.toContributions(),
-            )
-        }.sortedByDescending { it.current }
+        val tribeSections = if (dominantTribeKey != null && tribeEntries.isNotEmpty()) {
+            listOf(CardSection(id = dominantTribeKey, label = synergyTribeLabel(dominantTribeKey), current = tribeEntries.sumOf { it.quantity }, contributions = tribeEntries.toContributions()))
+        } else {
+            emptyList()
+        }
 
         val interaction = mutableListOf<DeckEntry>()
         val standalone = mutableListOf<DeckEntry>()
@@ -705,7 +801,7 @@ object AnalysisEngine {
             id = PillarId.SYNERGY,
             subscore = subscore,
             findings = shown,
-            sections = fingerprintSections + listOf(
+            sections = engineSections + tribeSections + listOf(
                 offplanSplitSection("interaction", "Interaction", interaction),
                 offplanSplitSection("standalone", "Standalone", standalone),
                 offplanSplitSection("offplan", "Off-plan", offplan),
@@ -713,6 +809,7 @@ object AnalysisEngine {
             alignedNonLandCopies = alignedCopies,
             totalNonLandCopies = nonLandCount,
             notApplicable = notApplicable,
+            synergyEngines = engines,
         )
     }
 
@@ -776,14 +873,14 @@ object AnalysisEngine {
      * own "core-domain cannot reach TagDictionary.localize" fallback discipline). */
     private val AXIS_LABELS: Map<AxisKey, String> = mapOf(
         "LIFE" to "Life", "DEATH" to "Death", "TOKENS" to "Tokens", "COUNTERS" to "Counters",
-        "LANDFALL" to "Landfall", "GRAVEYARD" to "Graveyard", "ETB" to "ETB", "SPELLS" to "Spells",
+        "LANDFALL" to "Landfall", "GRAVEYARD" to "Graveyard", "GRAVEYARD_EXIT" to "Graveyard Exit", "ETB" to "ETB", "SPELLS" to "Spells",
         "ARTIFACTS" to "Artifacts", "ENCHANTMENTS" to "Enchantments", "ATTACHED" to "Equipment / Auras",
         "ATTACK" to "Attack", "PLANESWALKERS" to "Planeswalkers", "GROUP" to "Group Effects",
-        "MILL_OPP" to "Mill (Opponent)", "ENGINE" to "Engine", "LOCK" to "Stax Lock",
+        "MILL_OPP" to "Mill (Opponent)", "ENGINE" to "Support", "LOCK" to "Stax Lock",
     )
 
     private fun axisLabel(axis: AxisKey): String = when {
-        axis.startsWith("TRIBE:") -> "${axis.removePrefix("TRIBE:").replaceFirstChar { it.uppercase() }} (tribe)"
+        axis.startsWith("TRIBE:") -> tribeSuffixLabel(axis.removePrefix("TRIBE:"))
         else -> AXIS_LABELS[axis] ?: axis.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
     }
 
@@ -799,9 +896,11 @@ object AnalysisEngine {
      */
     private fun synergyStrategyLabel(key: String): String = key.replace('_', ' ').replaceFirstChar { it.uppercase() }
 
-    /** `"tribe:elf"` -> `"Elf (tribe)"` (plan's exact W2 spec for tribe-key sections). */
-    private fun synergyTribeLabel(tribeKey: String): String =
-        "${tribeKey.removePrefix(TribeDeriver.TRIBE_PREFIX).replaceFirstChar { it.uppercase() }} (tribe)"
+    /** `"tribe:elf"` -> `"Elf (Tribe)"` (the ONE tribe-label spelling, mirrored by the presentation
+     * layer's `deck_analysis_axis_tribe_format` string -- H8/S6, no second core-domain spelling). */
+    private fun synergyTribeLabel(tribeKey: String): String = tribeSuffixLabel(tribeKey.removePrefix(TribeDeriver.TRIBE_PREFIX))
+
+    private fun tribeSuffixLabel(subtype: String): String = "${subtype.replaceFirstChar { it.uppercase() }} (Tribe)"
 
     // ── P5 — Legality & construction ────────────────────────────────────────────────────────
 
@@ -857,7 +956,7 @@ object AnalysisEngine {
         }
 
         mainboard.map { it.card }.distinctBy { it.scryfallId }
-            .filterNot { isLegal(it, format) }
+            .filterNot { isLegalForFormat(it, format) }
             .forEach { findings += Finding.IllegalCard(it.name) }
 
         // Wave 2 / B3: 60-card constructed only (DeckFormat.isSixtyCardConstructed — Standard,
@@ -881,7 +980,7 @@ object AnalysisEngine {
         // Category Sections rework (W1) -- legal/illegal split, grouped by scryfallId so a card
         // that (abnormally) appears as more than one DeckEntry still counts its full quantity once.
         // Always shown, even at 0 -- "Illegal 0" is itself useful confirmation.
-        val entriesByLegality = mainboard.groupBy { isLegal(it.card, format) }
+        val entriesByLegality = mainboard.groupBy { isLegalForFormat(it.card, format) }
         fun legalitySection(legal: Boolean, id: String, label: String): CardSection {
             val entries = entriesByLegality[legal].orEmpty()
             return CardSection(
@@ -897,24 +996,6 @@ object AnalysisEngine {
         )
 
         return PillarResult(id = PillarId.LEGALITY, subscore = subscore, findings = shown, sections = sections)
-    }
-
-    /** Mirrors [DeckScorer]'s private `isLegal` verbatim ("restricted" counts as legal; CASUAL/
-     * DRAFT are permissive). */
-    private fun isLegal(card: Card, format: DeckFormat): Boolean {
-        fun ok(s: String) = s.equals("legal", true) || s.equals("restricted", true)
-        return when (format) {
-            DeckFormat.STANDARD -> ok(card.legalityStandard)
-            DeckFormat.PIONEER -> ok(card.legalityPioneer)
-            DeckFormat.MODERN -> ok(card.legalityModern)
-            DeckFormat.LEGACY -> ok(card.legalityLegacy)
-            DeckFormat.VINTAGE -> ok(card.legalityVintage)
-            DeckFormat.PAUPER -> ok(card.legalityPauper)
-            DeckFormat.COMMANDER -> ok(card.legalityCommander)
-            DeckFormat.COMMANDER_CASUAL -> true
-            DeckFormat.CASUAL -> true
-            DeckFormat.DRAFT -> true
-        }
     }
 
     // ── Composition ─────────────────────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.usecase
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
@@ -123,6 +124,59 @@ class EvaluateDeckUseCaseTest {
         assertEquals(1, explore.size)
         assertEquals("deck_doctor", explore.single().featureKey)
         collector.cancel()
+    }
+
+    @Test
+    fun `emitProgression false suppresses the FeatureExplored event`() = runTest(dispatcher) {
+        val emitted = mutableListOf<ProgressionEvent>()
+        val collector = backgroundScope.launch { eventBus.events.collect { emitted.add(it) } }
+        runCurrent()
+
+        useCase(listOf(entry(card(id = "c1"))), DeckFormat.COMMANDER, emitProgression = false)
+        runCurrent()
+
+        assertTrue(emitted.filterIsInstance<ProgressionEvent.FeatureExplored>().isEmpty())
+        collector.cancel()
+    }
+
+    // ── Deck Wizard Commander v3 plan (Phase 0 / E3, fixes F3) ──────────────────────────────
+
+    @Test
+    fun `pinning archetype and posture resolves both onto ArchetypeResolution`() = runTest(dispatcher) {
+        val mainboard = (1..20).map { entry(card(id = "spell-$it")) } + (1..37).map { entry(landCard(id = "land-$it")) }
+
+        val result = useCase(
+            mainboard, DeckFormat.COMMANDER,
+            archetypeOverride = "AGGRO", themesOverride = emptyList(), postureOverride = "VOLTRON",
+        )
+
+        assertEquals(com.mmg.manahub.feature.decks.domain.engine.ArchetypeId.AGGRO, result.archetypeResolution.macro)
+        assertEquals(com.mmg.manahub.feature.decks.domain.engine.PostureId.VOLTRON, result.archetypeResolution.posture)
+        assertTrue(result.archetypeResolution.isManualOverride)
+    }
+
+    @Test
+    fun `pinning voltron resolves the curated strategy chip to voltron`() = runTest(dispatcher) {
+        val mainboard = (1..20).map { entry(card(id = "spell-$it")) } + (1..37).map { entry(landCard(id = "land-$it")) }
+
+        val result = useCase(
+            mainboard, DeckFormat.COMMANDER,
+            archetypeOverride = "AGGRO", themesOverride = emptyList(), postureOverride = "VOLTRON",
+        )
+
+        assertEquals("voltron", result.analysis?.strategy?.curatedStrategyId)
+    }
+
+    @Test
+    fun `an unrecognized posture override resolves to no posture, never a crash`() = runTest(dispatcher) {
+        val mainboard = (1..20).map { entry(card(id = "spell-$it")) } + (1..37).map { entry(landCard(id = "land-$it")) }
+
+        val result = useCase(
+            mainboard, DeckFormat.COMMANDER,
+            archetypeOverride = "AGGRO", themesOverride = emptyList(), postureOverride = "STALE_ENUM_NAME",
+        )
+
+        assertNull(result.archetypeResolution.posture)
     }
 
     // ── Deck Analysis Engine v2 Wave 2 (A2) ─────────────────────────────────────────────────

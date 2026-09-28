@@ -4,7 +4,12 @@ import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
+import com.mmg.manahub.core.domain.repository.AddOutcome
+import com.mmg.manahub.core.domain.usecase.collection.CardCommit
+import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.core.model.CardAddOrigin
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -253,5 +258,90 @@ class AddCardToCollectionUseCaseTest {
 
         assertTrue(result is DataResult.Success)
         coVerify(exactly = 1) { cardRepository.getCardBySetAndNumber("lea", "7") }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 5 — Progression events (restore plan D9, G-09/G-10)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun stubAdd(id: String, outcome: AddOutcome) {
+        coEvery { cardRepository.getCardById(id) } returns DataResult.Success(TestFixtures.buildCard(id))
+        coEvery {
+            userCardRepository.addOrIncrement(id, any(), any(), any(), any(), any(), any())
+        } returns outcome
+    }
+
+    private fun emitted(): List<ProgressionEvent> {
+        val events = mutableListOf<ProgressionEvent>()
+        coVerify(atLeast = 0) { progressionEventBus.emit(capture(events)) }
+        return events
+    }
+
+    @Test
+    fun `given a new row of 3 copies when a manual add runs then the first copy counts only as unique`() = runTest {
+        stubAdd("id-new", AddOutcome.CREATED_NEW)
+
+        useCase(scryfallId = "id-new", quantity = 3)
+
+        val event = emitted().single() as ProgressionEvent.CardsAdded
+        assertEquals(1, event.addedUnique)
+        assertEquals(2, event.addedCopies)
+    }
+
+    @Test
+    fun `given an existing row when a manual add of 2 runs then both count as extra copies`() = runTest {
+        stubAdd("id-old", AddOutcome.INCREMENTED_EXISTING)
+
+        useCase(scryfallId = "id-old", quantity = 2)
+
+        val event = emitted().single() as ProgressionEvent.CardsAdded
+        assertEquals(0, event.addedUnique)
+        assertEquals(2, event.addedCopies)
+    }
+
+    @Test
+    fun `given a mixed queue batch when committed then scans and manual adds emit one event each`() = runTest {
+        stubAdd("scan-1", AddOutcome.CREATED_NEW)
+        stubAdd("manual-new", AddOutcome.CREATED_NEW)
+        stubAdd("manual-old", AddOutcome.INCREMENTED_EXISTING)
+        val committer = CommitScannedCardsUseCase(useCase, progressionEventBus)
+
+        val result = committer(
+            listOf(
+                CardCommit("scan-1", false, "NM", "en", quantity = 2, origin = CardAddOrigin.SCANNED),
+                CardCommit("manual-new", false, "NM", "en", quantity = 2, origin = CardAddOrigin.MANUAL),
+                CardCommit("manual-old", false, "NM", "en", quantity = 1, origin = CardAddOrigin.MANUAL),
+            )
+        )
+
+        assertEquals(5, result.committedCopies)
+        val events = emitted()
+        assertEquals(2, events.size)
+        assertEquals(2, (events.single { it is ProgressionEvent.CardScanned } as ProgressionEvent.CardScanned).count)
+        val added = events.single { it is ProgressionEvent.CardsAdded } as ProgressionEvent.CardsAdded
+        assertEquals(1, added.addedUnique)
+        assertEquals(2, added.addedCopies)
+    }
+
+    @Test
+    fun `given a manual-only queue batch when committed then no scan event is emitted`() = runTest {
+        stubAdd("manual-1", AddOutcome.CREATED_NEW)
+        val committer = CommitScannedCardsUseCase(useCase, progressionEventBus)
+
+        committer(listOf(CardCommit("manual-1", false, "NM", "en", quantity = 1, origin = CardAddOrigin.MANUAL)))
+
+        val events = emitted()
+        assertTrue(events.none { it is ProgressionEvent.CardScanned })
+        assertEquals(1, (events.single() as ProgressionEvent.CardsAdded).addedUnique)
+    }
+
+    @Test
+    fun `given a scanned-only batch whose writes all fail when committed then nothing is emitted`() = runTest {
+        coEvery { cardRepository.getCardById("bad") } returns DataResult.Error("offline")
+        val committer = CommitScannedCardsUseCase(useCase, progressionEventBus)
+
+        committer(listOf(CardCommit("bad", false, "NM", "en", quantity = 1, origin = CardAddOrigin.SCANNED)))
+
+        assertTrue(emitted().isEmpty())
     }
 }

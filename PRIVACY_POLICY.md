@@ -1,6 +1,6 @@
 # Privacy Policy — ManaHub
 
-**Last updated: April 17, 2026**
+**Last updated: September 22, 2026**
 
 This Privacy Policy describes how ManaHub ("the App", "we", "us") collects, uses, and protects information when you use the ManaHub Android application. Please read it carefully.
 
@@ -57,15 +57,17 @@ All of the following is stored **only on your device** and is never transmitted 
 | Card metadata cache (oracle text, image URLs, prices from Scryfall) | Display and tagging | Room database (local) |
 | Player name, avatar URL, preferred currency, app language, card language | Personalisation | DataStore Preferences (local) |
 | Tag dictionary overrides and user-defined tags | Custom tagging | DataStore Preferences (local) |
-| App theme, auto-refresh toggle, tag thresholds | Settings | DataStore Preferences (local) |
+| App theme, notification and privacy preferences, tag thresholds | Settings | DataStore Preferences (local) |
 
 ### 3.3 Data we do NOT collect
 
 - Location data
 - Contacts or social graph data
 - Browsing history outside the App
-- Analytics or behavioural tracking data
-- Crash reports (no Crashlytics, Firebase Analytics, or Sentry are integrated)
+- Advertising identifiers or cross-app tracking data
+
+Crash reports and anonymous usage analytics **are** collected through Firebase — see section 6.7 for
+exactly what is sent and how it is minimised.
 
 ---
 
@@ -126,12 +128,13 @@ Using Google Sign-In is optional. You may instead create an account with an emai
 
 **Scryfall Privacy Policy:** [https://scryfall.com/docs/privacy](https://scryfall.com/docs/privacy)
 
-### 6.4 YouTube Data API v3 (Draft Guide feature)
+### 6.4 YouTube (News feature)
 
-**What it does:** Fetches Magic: The Gathering draft guide videos for a given set.
+**What it does:** The News feed lists recent videos from MTG YouTube channels (via public YouTube channel RSS feeds) and plays them in-app using the embedded YouTube player.
 
-**What is sent:** MTG set names as search query parameters. No personal information is transmitted.
+**What is sent:** Fetching channel feeds sends standard HTTPS requests with no personal information. When you play a video, the embedded player loads directly from YouTube, which may receive your IP address, device/browser information, and cookies, and may record playback activity under YouTube's own policies. ManaHub does not receive or store this data.
 
+**YouTube Terms of Service:** [https://www.youtube.com/t/terms](https://www.youtube.com/t/terms)
 **Google's Privacy Policy:** [https://policies.google.com/privacy](https://policies.google.com/privacy)
 
 ### 6.5 Send Feedback Feature
@@ -141,6 +144,20 @@ Tapping "Send Feedback" opens your device's email app with a pre-filled message 
 ### 6.6 RSS and Atom News Feeds
 
 Standard HTTPS GET requests to publicly available MTG news feed URLs. No personal information is transmitted.
+
+### 6.7 Firebase Crashlytics and Firebase Analytics
+
+**What they do:** Firebase Crashlytics collects crash reports and non-fatal error reports so we can fix
+bugs. Firebase Analytics collects anonymous, aggregated usage events (for example, which screens are
+opened and which features are used) so we can understand how the App is used.
+
+**What is sent:** Device model, operating system version, App version, a Firebase-generated
+installation identifier, crash stack traces, and event names with non-identifying parameters. We do
+not send your email address, nickname, card names, search text, or any other personal or free-text
+content in these reports. Where an error involves user-supplied data, the report is stripped to its
+length or category before it is sent.
+
+**Firebase Privacy Policy:** [https://firebase.google.com/support/privacy](https://firebase.google.com/support/privacy)
 
 ---
 

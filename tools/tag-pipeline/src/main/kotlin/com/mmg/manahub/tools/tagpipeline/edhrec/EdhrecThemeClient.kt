@@ -8,6 +8,8 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 /**
  * Fetches + caches EDHREC theme/tag pages (plan D6). **Every fetch is treated as fallible**: EDHREC
@@ -37,7 +39,7 @@ class EdhrecThemeClient(
      *  error, non-200, unparsable body) rather than throwing — callers should treat `null` as "skip
      *  this theme this run," never as a reason to abort. */
     fun fetchThemePageOrNull(slug: String): EdhrecThemePageDto? {
-        val cacheFile = "edhrec-tag-$slug.json"
+        val cacheFile = "edhrec-tag-$slug-${LocalDate.now(ZoneOffset.UTC)}.json"
         val cached = cache.readText(cacheFile)
         if (cached != null) {
             return runCatching { PIPELINE_JSON.decodeFromString(EdhrecThemePageDto.serializer(), cached) }

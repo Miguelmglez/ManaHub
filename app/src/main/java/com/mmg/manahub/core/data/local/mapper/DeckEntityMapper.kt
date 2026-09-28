@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.data.local.mapper
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -44,6 +45,7 @@ fun DeckEntity.toDomainDeck(): Deck = Deck(
     themesOverride = decodeThemesOverride(themesOverride),
     tribeOverride = tribeOverride,
     strategyLocked = strategyLocked,
+    postureOverride = postureOverride,
 )
 
 fun DeckWithCardsEntity.toDomainDeckWithCards(): DeckWithCards = DeckWithCards(
@@ -73,4 +75,5 @@ fun Deck.toEntity(): DeckEntity = DeckEntity(
     themesOverride = encodeThemesOverride(themesOverride),
     tribeOverride = tribeOverride,
     strategyLocked = strategyLocked,
+    postureOverride = postureOverride,
 )

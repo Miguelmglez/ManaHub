@@ -59,28 +59,23 @@ android {
 
         buildConfigField(
             "String",
-            "YOUTUBE_API_KEY",
-            "\"${localProperties.getProperty("YOUTUBE_API_KEY", "")}\""
-        )
-        buildConfigField(
-            "String",
             "SUPABASE_URL",
-            "\"${requiredProperty("SUPABASE_URL")}\""
+            "\"${requiredProperty("SUPABASE_URL")}\"",
         )
         buildConfigField(
             "String",
             "SUPABASE_ANON_KEY",
-            "\"${requiredProperty("SUPABASE_ANON_KEY")}\""
+            "\"${requiredProperty("SUPABASE_ANON_KEY")}\"",
         )
         buildConfigField(
             "String",
             "GOOGLE_CLIENT_ID",
-            "\"${requiredProperty("GOOGLE_CLIENT_ID")}\""
+            "\"${requiredProperty("GOOGLE_CLIENT_ID")}\"",
         )
         buildConfigField(
             "String",
             "CLOUDFLARE_WORKER_URL",
-            "\"${localProperties.getProperty("CLOUDFLARE_WORKER_URL", "https://manahub-draft-api.miguel-mglez.workers.dev/")}\""
+            "\"${localProperties.getProperty("CLOUDFLARE_WORKER_URL", "https://manahub-draft-api.miguel-mglez.workers.dev/")}\"",
         )
         buildConfigField(
             "String",
@@ -90,7 +85,7 @@ android {
             // required — CommunityAggregateApi builds request URLs via "${baseUrl}v1/..." string
             // concatenation (see its KDoc: "must end with `/`"), matching the CLOUDFLARE_WORKER_URL
             // convention above.
-            "\"${localProperties.getProperty("COMMUNITY_WORKER_URL", "https://manahub-community.miguel-mglez.workers.dev/")}\""
+            "\"${localProperties.getProperty("COMMUNITY_WORKER_URL", "https://manahub-community.miguel-mglez.workers.dev/")}\"",
         )
         buildConfigField(
             "String",
@@ -102,7 +97,7 @@ android {
             // compiles now and the real subdomain only needs a `local.properties` override (or this
             // default updated) once deployed. Trailing slash required — CompetitiveApi builds
             // request URLs via "${baseUrl}meta/..." / "${baseUrl}limited/..." string concatenation.
-            "\"${localProperties.getProperty("COMPETITIVE_WORKER_URL", "https://manahub-competitive.miguel-mglez.workers.dev/")}\""
+            "\"${localProperties.getProperty("COMPETITIVE_WORKER_URL", "https://manahub-competitive.miguel-mglez.workers.dev/")}\"",
         )
 
         ndk {
@@ -168,7 +163,7 @@ android {
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
             signingConfig = signingConfigs.getByName("release")
         }
@@ -204,7 +199,7 @@ android {
             // KMP migration — Phase 3: Manually link CMP resources from :shared:core-ui
             // until the android-kmp-library + CMP resource merging is stabilized.
             assets.srcDirs(
-                file("build/generated/cmp-assets")
+                file("build/generated/cmp-assets"),
             )
         }
         getByName("androidTest") {
@@ -225,8 +220,6 @@ android {
         }
     }
 }
-
-
 
 dependencies {
     // KMP migration — Phase 0, Spike A: shared pure-Kotlin domain models (CollectionViewMode, GroupingMode).
@@ -263,16 +256,13 @@ dependencies {
     // Firebase
     implementation(libs.firebase.crashlytics)
     implementation(libs.splashscreen)
-    implementation(libs.foundation)
-    implementation(libs.material3)
+    implementation(compose.foundation)
+    implementation(compose.material3)
     // tv.material removed — no usages found in the codebase (verified 2026-06-10)
     implementation(libs.emojis)
-    val composeBom = platform(libs.compose.bom)
-    implementation(composeBom)
-    implementation(libs.compose.ui)
-    implementation(libs.compose.material3)
-    implementation(libs.compose.tooling.preview)
-    debugImplementation(libs.compose.tooling)
+    implementation(compose.ui)
+    implementation(compose.preview)
+    debugImplementation(compose.uiTooling)
 
     implementation(libs.navigation.compose)
     implementation(libs.lifecycle.viewmodel)
@@ -297,7 +287,7 @@ dependencies {
     ksp(libs.room.compiler)
 
     implementation(libs.retrofit)
-    implementation(libs.retrofit.gson)  // Kept for DraftModule (Cloudflare/YouTube manual JSON parsing)
+    implementation(libs.retrofit.gson) // Kept for DraftModule (Cloudflare/YouTube manual JSON parsing)
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.datetime)
@@ -317,6 +307,7 @@ dependencies {
     testImplementation(libs.coroutines.test)
     testImplementation(libs.arch.core.testing)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.ktor.client.mock)
     // work-testing — Backend & Performance Optimization plan, WS7 Part 2 (2026-07-29): TestListenableWorkerBuilder
     // lets a plain JVM unit test build a real CoroutineWorker instance (own WorkerParameters) and call
     // doWork() in isolation, pinning the gamification gate / PriceRefreshWorker / CardBackfillWorker
@@ -340,7 +331,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
 
     implementation(libs.accompanist.permissions)
-    implementation(libs.material.icons.extended)
+    implementation(compose.materialIconsExtended)
     implementation(libs.compose.googlefonts)
     implementation(libs.datastore.preferences)
     implementation(libs.paging.runtime)
@@ -355,6 +346,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.messaging)
+    // Remote Config: kill switches + force-update policy (version from firebase-bom).
+    implementation(libs.firebase.config)
     implementation(libs.youtube.player)
 
     // Nearby Connections — peer-to-peer in-person game state sync

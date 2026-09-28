@@ -33,7 +33,7 @@ fun card(
     rarity: String = "rare",
     /** D14 -- WUBRG-subset production string (e.g. "WU" for a dual land). Deck Wizard & Engine
      * Rework plan WS9.4 -- lets fixture lands exercise [ArchetypeRoleClassifier]'s
-     * `manaFixMatcher`/[BuildDeckFromTemplateUseCase]'s fixing-land filter without needing every
+     * `manaFixMatcher`/[the deleted Motor A wizard build use case]'s fixing-land filter without needing every
      * existing call site to opt in (defaults to "" -- no production, matching [Card]'s own default). */
     producedMana: String = "",
     /** Deck Analysis Engine v2 Phase 2 -- per-format legality overrides for the P5

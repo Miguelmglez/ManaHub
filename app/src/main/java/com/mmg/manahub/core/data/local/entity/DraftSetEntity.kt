@@ -24,5 +24,6 @@ data class DraftSetEntity(
     val guideVersion: String,
     val tierListVersion: String,
     val boosterVersion: String? = null,
+    val setImageUrl: String? = null,
     val cachedAt: Long = System.currentTimeMillis(),
 )

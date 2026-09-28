@@ -12,6 +12,10 @@ import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.domain.repository.AddOutcome
+import com.mmg.manahub.core.domain.repository.CollectionAddRequest
+import com.mmg.manahub.core.domain.repository.CollectionDecrementResult
+import com.mmg.manahub.core.domain.repository.TradeCollectionApplyResult
+import com.mmg.manahub.core.domain.repository.TradeCollectionLine
 import com.mmg.manahub.core.domain.repository.UpdateEntryOutcome
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.auth.SessionState
@@ -179,8 +183,52 @@ class UserCardRepositoryImpl @Inject constructor(
         userId: String?,
         quantity: Int,
     ): AddOutcome = withContext(ioDispatcher) {
-        val now = System.currentTimeMillis()
+        addOrIncrementRow(
+            scryfallId = scryfallId,
+            isFoil = isFoil,
+            condition = condition,
+            language = language,
+            isForTrade = isForTrade,
+            resolvedUserId = userId ?: authRepository.getCurrentUser()?.id,
+            quantity = quantity,
+            now = System.currentTimeMillis(),
+        )
+    }
+
+    override suspend fun addOrIncrementBatch(
+        entries: List<CollectionAddRequest>,
+        userId: String?,
+    ): List<AddOutcome> = withContext(ioDispatcher) {
+        if (entries.isEmpty()) return@withContext emptyList()
         val resolvedUserId = userId ?: authRepository.getCurrentUser()?.id
+        val now = System.currentTimeMillis()
+        // Never withContext inside: it would leave Room's transaction thread.
+        database.withTransaction {
+            entries.map { entry ->
+                addOrIncrementRow(
+                    scryfallId = entry.scryfallId,
+                    isFoil = entry.isFoil,
+                    condition = entry.condition,
+                    language = entry.language,
+                    isForTrade = false,
+                    resolvedUserId = resolvedUserId,
+                    quantity = entry.quantity,
+                    now = now,
+                )
+            }
+        }
+    }
+
+    private suspend fun addOrIncrementRow(
+        scryfallId: String,
+        isFoil: Boolean,
+        condition: String,
+        language: String,
+        isForTrade: Boolean,
+        resolvedUserId: String?,
+        quantity: Int,
+        now: Long,
+    ): AddOutcome {
         val normalizedCondition = condition.uppercase().trim()
         val normalizedLanguage = language.lowercase().trim()
 
@@ -197,7 +245,7 @@ class UserCardRepositoryImpl @Inject constructor(
             )
         }
 
-        when {
+        return when {
             existing == null -> {
                 userCardCollectionDao.upsert(
                     UserCardCollectionEntity(
@@ -240,7 +288,10 @@ class UserCardRepositoryImpl @Inject constructor(
             else -> {
                 userCardCollectionDao.upsert(
                     existing.copy(
-                        quantity   = existing.quantity + quantity,
+                        // Summed as Long first: an Int overflow here would write a NEGATIVE owned
+                        // quantity, which every consumer reads as real ownership data.
+                        quantity   = (existing.quantity.toLong() + quantity)
+                            .coerceIn(0L, Int.MAX_VALUE.toLong()).toInt(),
                         isForTrade = isForTrade || existing.isForTrade,
                         updatedAt  = now,
                     )
@@ -304,6 +355,162 @@ class UserCardRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun decrementById(
+        id: String,
+        quantity: Int,
+        expectedScryfallId: String,
+        isFoil: Boolean,
+        condition: String,
+        language: String,
+        userId: String,
+    ): CollectionDecrementResult = withContext(ioDispatcher) {
+        val result = database.withTransaction {
+            decrementRow(
+                refId = id,
+                scryfallId = expectedScryfallId,
+                isFoil = isFoil,
+                condition = condition,
+                language = language,
+                quantity = quantity,
+                userId = userId,
+                now = System.currentTimeMillis(),
+            )
+        }
+        if (result.usedAttributeFallback) {
+            recordSafeNonFatal("trade_ref_mismatch", IllegalStateException("collection ref did not match the traded variant"))
+        }
+        result
+    }
+
+    override suspend fun applyTradeCollectionChanges(
+        userId: String,
+        deductions: List<TradeCollectionLine>,
+        additions: List<TradeCollectionLine>,
+        shouldApply: suspend () -> Boolean,
+        onApplied: suspend () -> Unit,
+        onOfferRemovals: suspend (List<String>) -> Unit,
+    ): TradeCollectionApplyResult? = withContext(ioDispatcher) {
+        val now = System.currentTimeMillis()
+        // Never withContext inside: it would leave Room's transaction thread.
+        val result = database.withTransaction {
+            if (!shouldApply()) return@withTransaction null
+            val remoteOfferRemovals = mutableListOf<String>()
+            var refFallbacks = 0
+            var unmatched = 0
+            deductions.forEach { line ->
+                val decrement = decrementRow(
+                    refId = line.userCardIdRef,
+                    scryfallId = line.scryfallId,
+                    isFoil = line.isFoil,
+                    condition = line.condition,
+                    language = line.language,
+                    quantity = line.quantity,
+                    userId = userId,
+                    now = now,
+                )
+                if (decrement.usedAttributeFallback) refFallbacks++
+                val rowId = decrement.rowId
+                if (rowId == null) {
+                    unmatched++
+                } else {
+                    trimOpenForTradeOffer(rowId, userId, decrement.remainingQuantity ?: 0)
+                        ?.let { remoteOfferRemovals += it }
+                }
+            }
+            additions.forEach { line ->
+                addOrIncrementRow(
+                    scryfallId = line.scryfallId,
+                    isFoil = line.isFoil,
+                    condition = line.condition,
+                    language = line.language,
+                    isForTrade = false,
+                    resolvedUserId = userId,
+                    quantity = line.quantity,
+                    now = now,
+                )
+            }
+            onOfferRemovals(remoteOfferRemovals)
+            onApplied()
+            TradeCollectionApplyResult(
+                remoteOfferRemovals = remoteOfferRemovals,
+                refFallbackCount = refFallbacks,
+                unmatchedDeductionCount = unmatched,
+            )
+        }
+        if (result != null && result.refFallbackCount > 0) {
+            recordSafeNonFatal("trade_ref_mismatch", IllegalStateException("collection ref did not match the traded variant"))
+        }
+        result
+    }
+
+    /**
+     * Subtracts [quantity] from the row [refId] points at, or — when that row is gone, owned by
+     * someone else or holds a different variant — from the live row with the attribute tuple.
+     * Must run inside a `database.withTransaction` block.
+     */
+    private fun decrementRow(
+        refId: String?,
+        scryfallId: String,
+        isFoil: Boolean,
+        condition: String,
+        language: String,
+        quantity: Int,
+        userId: String,
+        now: Long,
+    ): CollectionDecrementResult {
+        val normalizedCondition = condition.uppercase().trim()
+        val normalizedLanguage = language.lowercase().trim()
+        val byRef = refId?.takeIf { it.isNotBlank() }?.let { userCardCollectionDao.getById(it) }
+        val refMatches = byRef != null &&
+            !byRef.isDeleted &&
+            byRef.scryfallId == scryfallId &&
+            byRef.isFoil == isFoil &&
+            byRef.condition.equals(normalizedCondition, ignoreCase = true) &&
+            byRef.language.equals(normalizedLanguage, ignoreCase = true) &&
+            byRef.userId == userId
+        val target = if (refMatches) {
+            byRef
+        } else {
+            userCardCollectionDao.getByCompositeKey(
+                userId, scryfallId, isFoil, normalizedCondition, normalizedLanguage,
+            )?.takeIf { !it.isDeleted }
+        }
+        val usedFallback = !refId.isNullOrBlank() && !refMatches
+        if (target == null) return CollectionDecrementResult(null, null, usedFallback)
+
+        val remaining = (target.quantity.toLong() - quantity).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+        if (remaining == 0) {
+            userCardCollectionDao.softDelete(target.id, now)
+        } else {
+            userCardCollectionDao.upsert(target.copy(quantity = remaining, updatedAt = now))
+        }
+        return CollectionDecrementResult(target.id, remaining, usedFallback)
+    }
+
+    /**
+     * Keeps the open-for-trade offer of [rowId] within the [remaining] copies: deleted at zero,
+     * trimmed otherwise. Must run inside a `database.withTransaction` block.
+     *
+     * @return [rowId]'s collection id when a SYNCED offer was deleted and still has to be removed
+     *   remotely; null otherwise.
+     */
+    private suspend fun trimOpenForTradeOffer(
+        rowId: String,
+        userId: String,
+        remaining: Int,
+    ): String? {
+        val offer = localOpenForTradeDao.getByCollectionId(rowId, userId) ?: return null
+        if (remaining == 0) {
+            localOpenForTradeDao.deleteById(offer.id, userId)
+            return offer.localCollectionId.takeIf { offer.synced }
+        }
+        // The remote offer is one row per collection row, so trimming the local count needs no push.
+        if (offer.quantity > remaining) {
+            localOpenForTradeDao.upsert(offer.copy(quantity = remaining))
+        }
+        return null
+    }
+
     override suspend fun updateEntryWithMerge(
         entryId: String,
         newScryfallId: String,
@@ -343,6 +550,7 @@ class UserCardRepositoryImpl @Inject constructor(
             val normalizedCondition = condition.uppercase().trim()
             val normalizedLanguage = language.lowercase().trim()
             val resolvedUserId = userId ?: edited.userId
+            val offerOwnerId = com.mmg.manahub.core.data.local.TradeListOwner.key(resolvedUserId)
 
             val survivorCandidate = if (!resolvedUserId.isNullOrBlank()) {
                 userCardCollectionDao.getByCompositeKey(
@@ -363,6 +571,7 @@ class UserCardRepositoryImpl @Inject constructor(
                     userCardCollectionDao.softDelete(entryId, now)
                     repointOpenForTradeOffer(
                         fromCollectionId = entryId,
+                        ownerUserId = offerOwnerId,
                         toCollectionId = survivorCandidate.id,
                         toScryfallId = newScryfallId,
                         isFoil = isFoil,
@@ -382,6 +591,7 @@ class UserCardRepositoryImpl @Inject constructor(
                     userCardCollectionDao.softDelete(entryId, now)
                     repointOpenForTradeOffer(
                         fromCollectionId = entryId,
+                        ownerUserId = offerOwnerId,
                         toCollectionId = survivorCandidate.id,
                         toScryfallId = newScryfallId,
                         isFoil = isFoil,
@@ -403,7 +613,7 @@ class UserCardRepositoryImpl @Inject constructor(
                             updatedAt = now,
                         )
                     )
-                    val offer = localOpenForTradeDao.getByCollectionId(entryId)
+                    val offer = localOpenForTradeDao.getByCollectionId(entryId, offerOwnerId)
                     if (offer != null) {
                         localOpenForTradeDao.upsert(
                             offer.copy(
@@ -437,6 +647,7 @@ class UserCardRepositoryImpl @Inject constructor(
      */
     private suspend fun repointOpenForTradeOffer(
         fromCollectionId: String,
+        ownerUserId: String,
         toCollectionId: String,
         toScryfallId: String,
         isFoil: Boolean,
@@ -444,8 +655,8 @@ class UserCardRepositoryImpl @Inject constructor(
         language: String,
         quantityCap: Int,
     ) {
-        val fromOffer = localOpenForTradeDao.getByCollectionId(fromCollectionId) ?: return
-        val toOffer = localOpenForTradeDao.getByCollectionId(toCollectionId)
+        val fromOffer = localOpenForTradeDao.getByCollectionId(fromCollectionId, ownerUserId) ?: return
+        val toOffer = localOpenForTradeDao.getByCollectionId(toCollectionId, ownerUserId)
         if (toOffer != null) {
             val cappedQuantity = (toOffer.quantity + fromOffer.quantity).coerceAtMost(quantityCap)
             localOpenForTradeDao.upsert(
@@ -457,7 +668,7 @@ class UserCardRepositoryImpl @Inject constructor(
                     synced = false,
                 )
             )
-            localOpenForTradeDao.deleteByCollectionId(fromCollectionId)
+            localOpenForTradeDao.deleteByCollectionId(fromCollectionId, ownerUserId)
         } else {
             localOpenForTradeDao.upsert(
                 fromOffer.copy(

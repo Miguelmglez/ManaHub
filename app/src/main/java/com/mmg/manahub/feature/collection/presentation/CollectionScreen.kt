@@ -1,10 +1,9 @@
 package com.mmg.manahub.feature.collection.presentation
 
-import com.mmg.manahub.feature.collection.presentation.components.CollectionMergeConflictSheet
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -12,7 +11,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,22 +26,21 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CloudDownload
@@ -48,14 +48,12 @@ import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -66,10 +64,10 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,12 +76,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
@@ -91,44 +85,46 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.compose.foundation.layout.height
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.currentStateAsState
 import com.mmg.manahub.R
+import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.model.CollectionCardGroup
-import com.mmg.manahub.core.model.CollectionSource
 import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionSection
+import com.mmg.manahub.core.model.CollectionSource
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.sync.SyncState
-import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.ui.components.CardGridItem
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.HexGridBackground
-import com.mmg.manahub.core.ui.components.ManaTabItem
-import com.mmg.manahub.core.ui.components.ManaTabRow
-import com.mmg.manahub.core.ui.components.MagicCtaButton
-import com.mmg.manahub.core.ui.components.MagicCtaColor
-import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicActiveFiltersBar
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastState
 import com.mmg.manahub.core.ui.components.MagicToastType
-import com.mmg.manahub.core.ui.components.ManaHubBottomSheetSelector
-import com.mmg.manahub.core.ui.components.ManaHubSelector
+import com.mmg.manahub.core.ui.components.ManaTabItem
+import com.mmg.manahub.core.ui.components.ManaTabRow
 import com.mmg.manahub.core.ui.components.StaleWarningBanner
+import com.mmg.manahub.core.ui.components.rememberFabVisibility
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchViewModel
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
-import com.mmg.manahub.core.ui.theme.spacing
-import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.collection.presentation.components.CollectionMergeConflictSheet
+import com.mmg.manahub.feature.collection.presentation.importexport.CollectionExportHost
+import com.mmg.manahub.feature.collection.presentation.importexport.CollectionImportHost
+import com.mmg.manahub.feature.collection.presentation.importexport.CollectionImportViewModel
+import com.mmg.manahub.feature.collection.presentation.importexport.CollectionTransferActionsSheet
 import com.mmg.manahub.feature.decks.presentation.DeckListScreen
 import com.mmg.manahub.feature.trades.presentation.TradesScreen
+import org.koin.androidx.compose.koinViewModel
 import java.util.Locale
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -139,12 +135,15 @@ fun CollectionScreen(
     onDeckClick:              (deckId: String) -> Unit,
     onPlaytestClick:          (deckId: String) -> Unit = {},
     onBrowseCommunityDecks:   () -> Unit = {},
-    onNavigateToTradeProposal: (receiverId: String) -> Unit = {},
+    onNavigateToTradeProposal: (receiverId: String?) -> Unit = {},
     onNavigateToTradeThread:   (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
+    onNavigateToAddFriends:    () -> Unit = {},
     viewModel:                CollectionViewModel = koinViewModel(),
     advancedSearchViewModel:  AdvancedSearchViewModel = koinViewModel(),
+    importViewModel:          CollectionImportViewModel = koinViewModel(),
     sharedTransitionScope:    SharedTransitionScope? = null,
     animatedVisibilityScope:  AnimatedVisibilityScope? = null,
+    openImport: Boolean = false,
     /**
      * The route's raw `tab` query arg ("decks"/"trades"/"cards"/null), read fresh off the current
      * [androidx.navigation.NavBackStackEntry] by the caller (see `AppNavGraph`'s Collection
@@ -161,7 +160,13 @@ fun CollectionScreen(
     initialTabArg:            String? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val importState by importViewModel.uiState.collectAsStateWithLifecycle()
     var showAdvancedSearch by remember { mutableStateOf(false) }
+    var showTransferActions by remember { mutableStateOf(false) }
+    val toastState = rememberMagicToastState()
+    // Sheets render in their own window above the NavHost: unmount them while navigating away.
+    val isResumed = LocalLifecycleOwner.current.lifecycle
+        .currentStateAsState().value.isAtLeast(Lifecycle.State.RESUMED)
 
     LaunchedEffect(initialTabArg) {
         val forcedTab = when (initialTabArg?.lowercase()) {
@@ -172,9 +177,16 @@ fun CollectionScreen(
         }
         if (forcedTab != null) viewModel.onTabSelected(forcedTab)
     }
+    LaunchedEffect(openImport) {
+        if (openImport) {
+            importViewModel.onImportRequested()
+        }
+    }
 
     CollectionContent(
         uiState               = uiState,
+        toastState            = toastState,
+        onOverflowClick       = { showTransferActions = true },
         onCardClick           = onCardClick,
         onAddCardClick        = onAddCardClick,
         onDeckClick           = { id ->
@@ -197,10 +209,48 @@ fun CollectionScreen(
         onSnackbarDismissed        = viewModel::onSnackbarDismissed,
         onNavigateToTradeProposal  = onNavigateToTradeProposal,
         onNavigateToTradeThread    = onNavigateToTradeThread,
+        onNavigateToAddFriends     = onNavigateToAddFriends,
         gridState                  = viewModel.gridState,
         listState                  = viewModel.listState,
         sharedTransitionScope      = sharedTransitionScope,
         animatedVisibilityScope    = animatedVisibilityScope,
+    )
+
+    if (showTransferActions && isResumed) {
+        CollectionTransferActionsSheet(
+            canExport = uiState.canExport,
+            onExport = {
+                showTransferActions = false
+                viewModel.onExportRequested()
+            },
+            onImport = {
+                showTransferActions = false
+                importViewModel.onImportRequested()
+            },
+            onDismiss = { showTransferActions = false },
+        )
+    }
+
+    CollectionImportHost(
+        state = importState,
+        viewModel = importViewModel,
+        isResumed = isResumed,
+        toastState = toastState,
+        onCardClick = { entry -> onCardClick(entry.card.scryfallId, null) },
+    )
+
+    CollectionExportHost(
+        state = uiState.export,
+        isResumed = isResumed,
+        toastState = toastState,
+        fileName = viewModel::exportFileName,
+        onFormatSelected = viewModel::onExportFormatSelected,
+        onSaveTo = viewModel::onExportSave,
+        onShare = viewModel::onExportShare,
+        onShareLaunched = viewModel::onExportShareLaunched,
+        onShareFailed = viewModel::onExportShareFailed,
+        onMessageShown = viewModel::onExportMessageShown,
+        onDismiss = viewModel::onExportSheetDismissed,
     )
 
     if (showAdvancedSearch) {
@@ -214,6 +264,8 @@ fun CollectionScreen(
             },
             // The sheet's ViewModel outlives any single open, so it must be re-seeded from what
             // is actually filtering the collection right now.
+            onClear = viewModel::applyAdvancedFilters,
+            stateKey = "collection",
             appliedQuery = uiState.activeQuery,
             collectionSortOrder = uiState.sortOrder,
             collectionSortDirection = uiState.sortDirection,
@@ -241,6 +293,8 @@ fun CollectionScreen(
 @Composable
 private fun CollectionContent(
     uiState:              CollectionUiState,
+    toastState:           MagicToastState,
+    onOverflowClick:      () -> Unit,
     onCardClick:          (String, String?) -> Unit,
     onAddCardClick:       () -> Unit,
     onDeckClick:          (String) -> Unit,
@@ -255,15 +309,15 @@ private fun CollectionContent(
     onTabSelected:        (CollectionTab) -> Unit,
     onSyncDismissed:      () -> Unit,
     onSnackbarDismissed:  () -> Unit,
-    onNavigateToTradeProposal: (String) -> Unit = {},
+    onNavigateToTradeProposal: (String?) -> Unit = {},
     onNavigateToTradeThread:   (String, String) -> Unit = { _, _ -> },
+    onNavigateToAddFriends:    () -> Unit = {},
     gridState:            LazyGridState,
     listState:            LazyListState,
     sharedTransitionScope:    SharedTransitionScope? = null,
     animatedVisibilityScope:  AnimatedVisibilityScope? = null,
 ) {
     val mc = MaterialTheme.magicColors
-    val toastState = rememberMagicToastState()
     val syncErrorMsg       = stringResource(R.string.collection_sync_error)
     val migrationMsgFmt    = stringResource(R.string.trades_migration_synced_n_cards)
 
@@ -285,6 +339,8 @@ private fun CollectionContent(
         onSnackbarDismissed()
     }
 
+    val activeFabVisible = if (uiState.viewMode == CollectionViewMode.GRID) rememberFabVisibility(gridState) else rememberFabVisibility(listState)
+
     Box(modifier = Modifier.fillMaxSize().background(mc.background)) {
         HexGridBackground(modifier = Modifier.fillMaxSize(), color = mc.primaryAccent.copy(alpha = 0.05f))
 
@@ -292,10 +348,17 @@ private fun CollectionContent(
             containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets(0),
             topBar = {
-                CollectionTopBar()
+                CollectionTopBar(
+                    showOverflow = uiState.selectedTab == CollectionTab.CARDS,
+                    onOverflowClick = onOverflowClick,
+                )
             },
             floatingActionButton = {
-                if (uiState.selectedTab == CollectionTab.CARDS) {
+                AnimatedVisibility(
+                    visible = uiState.selectedTab == CollectionTab.CARDS && activeFabVisible,
+                    enter   = fadeIn() + scaleIn(),
+                    exit    = fadeOut() + scaleOut(),
+                ) {
                     FloatingActionButton(
                         onClick        = onAddCardClick,
                         containerColor = mc.primaryAccent,
@@ -371,6 +434,7 @@ private fun CollectionContent(
                         onCardClick           = { onCardClick(it, null) },
                         onNavigateToProposal  = onNavigateToTradeProposal,
                         onNavigateToThread    = onNavigateToTradeThread,
+                        onNavigateToAddFriends = onNavigateToAddFriends,
                     )
                 }
             }
@@ -570,25 +634,12 @@ private fun CardsTabContent(
 
             // Active filters indicator
             AnimatedVisibility(visible = filterCount > 0) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        stringResource(R.string.collection_active_filters, filterCount),
-                        style = MaterialTheme.magicTypography.bodySmall,
-                        color = mc.primaryAccent,
-                    )
-                    MagicCtaButton(
-                        onClick = onClearFilters,
-                        text = stringResource(R.string.collection_clear_filters),
-                        style = MagicCtaStyle.Ghost,
-                        color = MagicCtaColor.Error,
-                    )
-                }
+                MagicActiveFiltersBar(
+                    text = stringResource(R.string.collection_active_filters, filterCount),
+                    clearLabel = stringResource(R.string.collection_clear_filters),
+                    onClear = onClearFilters,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
             }
 
             // Same honesty rule as the empty state: a rendered list that silently drops uncached
@@ -656,7 +707,10 @@ private fun CardsTabContent(
 }
 
 @Composable
-private fun CollectionTopBar() {
+private fun CollectionTopBar(
+    showOverflow: Boolean,
+    onOverflowClick: () -> Unit,
+) {
     val mc = MaterialTheme.magicColors
 
     Surface(
@@ -678,6 +732,15 @@ private fun CollectionTopBar() {
                 color    = mc.textPrimary,
                 modifier = Modifier.weight(1f)
             )
+            if (showOverflow) {
+                IconButton(onClick = onOverflowClick) {
+                    Icon(
+                        imageVector = Icons.Default.ImportExport,
+                        contentDescription = stringResource(R.string.action_more_options),
+                        tint = mc.textSecondary,
+                    )
+                }
+            }
         }
     }
 }

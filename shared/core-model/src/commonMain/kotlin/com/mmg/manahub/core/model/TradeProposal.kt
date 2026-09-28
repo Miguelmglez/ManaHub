@@ -19,4 +19,9 @@ data class TradeProposal(
     val items: List<TradeItem>,
     val createdAt: Long,
     val updatedAt: Long,
+    /**
+     * False while [items] was never fetched or its last fetch failed: an empty [items] then means
+     * "unknown", not "no cards", and must not drive collection changes or an edit.
+     */
+    val itemsLoaded: Boolean = true,
 )

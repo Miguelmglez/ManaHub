@@ -27,7 +27,7 @@ import kotlinx.datetime.toLocalDateTime
 class QuestEvaluator(
     private val dao: GamificationDao,
     private val clock: Clock,
-    private val timeZone: TimeZone,
+    private val timeZoneProvider: () -> TimeZone,
 ) {
 
     /**
@@ -37,10 +37,11 @@ class QuestEvaluator(
      */
     suspend fun process(event: ProgressionEvent): List<QuestProgressDelta> {
         val templates = QuestCatalog.templatesByEventType[event::class] ?: return emptyList()
-        val today = clock.now().toLocalDateTime(timeZone).date
+        val today = clock.now().toLocalDateTime(timeZoneProvider()).date
 
         val deltas = mutableListOf<QuestProgressDelta>()
         for (template in templates) {
+            if (!template.isAvailable) continue
             val periodKey = periodKeyFor(template, today)
             val instanceId = "${template.id}:$periodKey"
 

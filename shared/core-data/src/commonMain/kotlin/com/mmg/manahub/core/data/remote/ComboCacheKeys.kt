@@ -22,6 +22,11 @@ object ComboCacheKeys {
         return "combo:${fnv1a64Hex(canonical)}"
     }
 
+    /** Key for one page of the "combos that include this card" lookup; its own prefix keeps it
+     * disjoint from [cacheKey]'s whole-list entries in the shared cache table. */
+    fun cardCacheKey(cardName: String, page: Int): String =
+        "combo-card:${fnv1a64Hex("${cardName.lowercase().trim()}|$page")}"
+
     /** FNV-1a 64-bit, rendered as a fixed-width lowercase hex string. */
     private fun fnv1a64Hex(input: String): String {
         var hash = -3750763034362895579L // FNV offset basis (0xcbf29ce484222325)

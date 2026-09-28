@@ -1,8 +1,10 @@
 package com.mmg.manahub.feature.decks.presentation
+// COMMENTS_REVIEWED: 2026-09-16
 
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.mmg.manahub.app.navigation.Screen
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
@@ -17,6 +19,7 @@ import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DeckSlot
 import com.mmg.manahub.core.model.DeckWithCards
+import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.ScoreWeightOverrides
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.model.UserCardWithCard
@@ -29,13 +32,16 @@ import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
-import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
+import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.LandTargetResolver
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
+import com.mmg.manahub.feature.decks.domain.engine.availableIn
 import com.mmg.manahub.feature.decks.domain.engine.card
 import com.mmg.manahub.feature.decks.domain.engine.fixedPower
+import com.mmg.manahub.feature.decks.domain.usecase.DeckAnalysisPipeline
+import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
@@ -49,6 +55,7 @@ import io.mockk.mockkStatic
 import io.mockk.just
 import io.mockk.Runs
 import io.mockk.slot
+import io.mockk.spyk
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,6 +64,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -79,7 +87,7 @@ import org.junit.Test
  * - Deck Analysis Category Sections rework (W0, D3/D5): the old Motor A add-pipeline / budget /
  *   cut-suggestion tests (Phase 2) were DELETED end-to-end here, along with
  *   `suggestCutsUseCase`/`suggestAddsFromCollectionUseCase` (`SuggestAddsFromCollectionUseCase`
- *   itself survives as a class -- it is still used by `BuildDeckFromTemplateUseCase`, the Deck
+ *   itself survives as a class -- it is still used by `the deleted Motor A wizard build use case`, the Deck
  *   Wizard's own build engine -- only `DeckDoctorOrchestrator`'s/`DeckStudioViewModel`'s USE of it
  *   is gone).
  * - [FirebaseCrashlytics] is always static-mocked because [logFailure] is called outside
@@ -101,17 +109,15 @@ class DeckStudioViewModelTest {
     private val suggestTagsUseCase = mockk<SuggestTagsUseCase>(relaxed = true)
     private val wishlistRepository = mockk<WishlistRepository>()
     private val userPreferences = mockk<UserPreferencesDataStore>()
+    private val preferredCurrency = MutableStateFlow(PreferredCurrency.EUR)
     private val crashReporter = mockk<CrashReporter>(relaxed = true)
     private val appContext = mockk<Context>()
-    // Deck Engine Unification plan D7 (Phase 4.3) — Combos tab.
-    private val findCombosUseCase = mockk<com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase>()
-    // Deck Engine Unification plan D7 (4.1/4.2) — Strategies tab search.
-    private val discoverSynergiesV2UseCase = mockk<com.mmg.manahub.feature.decks.domain.template.DiscoverSynergiesV2UseCase>()
 
     // ── Real engine + use cases (deterministic fixed PowerResolver) ───────────
     private val scorer = DeckScorer(RoleClassifier(), fixedPower(normalized = 0.6f))
     private val eventBus = ProgressionEventBus()
-    private val evaluateDeckUseCase = EvaluateDeckUseCase(scorer, eventBus, dispatcher)
+    // spyk (not a plain instance) so the debounce-coalescing tests below can coVerify the exact call count.
+    private val evaluateDeckUseCase = spyk(EvaluateDeckUseCase(scorer, eventBus, dispatcher))
     private val inferDeckIdentityUseCase = InferDeckIdentityUseCase()
 
     // ── Group C / C2: per-deck game stats use case (relaxed; deckStatsFlow is lazy) ──
@@ -136,6 +142,8 @@ class DeckStudioViewModelTest {
         every { userPreferences.observeScoreWeightOverrides() } returns flowOf(ScoreWeightOverrides.NONE)
         // playerNameFlow is referenced at VM construction time (stateIn property initializer).
         every { userPreferences.playerNameFlow } returns flowOf("")
+        preferredCurrency.value = PreferredCurrency.EUR
+        every { userPreferences.preferredCurrencyFlow } returns preferredCurrency
         // Deck Doctor Community/Archetype plan, Phase 4/5: communityEngineEnabledFlow is collected
         // in init (mirrors playerNameFlow's own construction-time collection) — default OFF so
         // these pre-existing tests keep "Decks like yours" (Motor B) unpopulated.
@@ -152,9 +160,6 @@ class DeckStudioViewModelTest {
         // batch-resolve-specific tests below override getCardsByIds to return real cards.
         coEvery { cardRepository.warmCacheForIds(any()) } just Runs
         coEvery { cardRepository.getCardsByIds(any()) } returns emptyList()
-        // Inspirations (Phase 4): init loadDiscoveries() calls discoverSynergiesV2UseCase when
-        // wired (createVm()'s default is null -> loadDiscoveries takes its null-degrade branch,
-        // no stub needed).
     }
 
     @After
@@ -194,16 +199,17 @@ class DeckStudioViewModelTest {
         tags = listOf(CardTag.TRIBAL, CardTag.MANA_DORK),
     )
 
-    /** A second REMOVAL-tagged card with a distinct name -- Group 7c uses it to prove
-     * [DeckStudioViewModel.onAddCardsQueryChange] ANDs a typed name onto an active tag filter
-     * instead of dropping it (edge-case QA fix, 2026-09-06). */
+    /** A second MANA_DORK-tagged card with a distinct name -- Group 7c uses it to prove
+     * [DeckStudioViewModel.onAddCardsQueryChange] ANDs a typed name onto an active section
+     * predicate instead of dropping it (edge-case QA fix, 2026-09-06; repurposed onto a real
+     * `mana_dork` section id, Deck Wizard UX polish plan, Run 1 §1.2). */
     private val beastWithinCard = card(
         id = "beast-within-1",
-        name = "Beast Within",
-        typeLine = "Instant",
+        name = "Birds of Paradise",
+        typeLine = "Creature — Bird",
         colorIdentity = listOf("G"),
         colors = listOf("G"),
-        tags = listOf(CardTag.REMOVAL),
+        tags = listOf(CardTag.MANA_DORK),
     )
 
     private fun deckWithCards(
@@ -250,7 +256,10 @@ class DeckStudioViewModelTest {
     )
 
     /** Creates the ViewModel with real use-case instances (Phase 1 & most Phase 2 tests). */
-    private fun createVm(deckId: String? = null): DeckStudioViewModel =
+    private fun createVm(
+        deckId: String? = null,
+        savedStateHandle: SavedStateHandle? = null,
+    ): DeckStudioViewModel =
         DeckStudioViewModel(
             deckRepository = deckRepository,
             cardRepository = cardRepository,
@@ -265,15 +274,18 @@ class DeckStudioViewModelTest {
             userPreferences = userPreferences,
             crashReporter = crashReporter,
             appContext = appContext,
-            savedStateHandle = SavedStateHandle(
+            savedStateHandle = savedStateHandle ?: SavedStateHandle(
                 if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
             ),
         )
 
-    /** Creates the ViewModel with a mocked [findCombosUseCase] wired (Deck Engine Unification plan
-     * D7, Phase 4.3 Combos-tab tests) — every other new Phase-4-and-earlier dependency stays at its
-     * nullable default (`discoverSynergiesV2UseCase = null` -> legacy `discoveries` path). */
-    private fun createVmWithFindCombos(deckId: String? = null): DeckStudioViewModel =
+    /** Deck Wizard UX polish plan, Run 1 §1.6 -- the ONE `createVm*` helper wiring a real
+     * [DeckAnalysisPipeline] mock, so [DeckStudioViewModel.scoreStrategyMatches] actually runs
+     * (every other helper leaves it at its nullable default, a no-op). */
+    private fun createVmWithAnalysisPipeline(
+        pipeline: DeckAnalysisPipeline,
+        deckId: String? = null,
+    ): DeckStudioViewModel =
         DeckStudioViewModel(
             deckRepository = deckRepository,
             cardRepository = cardRepository,
@@ -291,63 +303,187 @@ class DeckStudioViewModelTest {
             savedStateHandle = SavedStateHandle(
                 if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
             ),
-            findCombosUseCase = findCombosUseCase,
+            deckAnalysisPipeline = pipeline,
         )
 
-    /** Creates the ViewModel with BOTH [discoverSynergiesV2UseCase] and [findCombosUseCase] mocked
-     * (the full v2 synergy browser -- Strategies search + Combos tab, Deck Engine Unification
-     * plan D7 Phase 4). */
-    private fun createVmWithInspirationsV2(deckId: String? = null): DeckStudioViewModel =
-        DeckStudioViewModel(
-            deckRepository = deckRepository,
-            cardRepository = cardRepository,
-            userCardRepository = userCardRepository,
-            searchCardsUseCase = searchCardsUseCase,
-            suggestTagsUseCase = suggestTagsUseCase,
-            evaluateDeckUseCase = evaluateDeckUseCase,
-            inferDeckIdentityUseCase = inferDeckIdentityUseCase,
-            getDeckGameStatsUseCase = getDeckGameStatsUseCase,
-            importDeckUseCase = importDeckUseCase,
-            wishlistRepository = wishlistRepository,
-            userPreferences = userPreferences,
-            crashReporter = crashReporter,
-            appContext = appContext,
-            savedStateHandle = SavedStateHandle(
-                if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
-            ),
-            discoverSynergiesV2UseCase = discoverSynergiesV2UseCase,
-            findCombosUseCase = findCombosUseCase,
-        )
+    @Test
+    fun `fresh draft id is persisted in saved state after creation`() = runTest(dispatcher) {
+        val savedStateHandle = SavedStateHandle()
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
 
-    /**
-     * Creates the ViewModel with the REAL [scorer] wired as [DeckStudioViewModel]'s `deckScorer`
-     * (every other `createVm*` helper leaves it at its nullable default, which routes
-     * `calculateLandDeltas` through the pre-WS6 format-only fallback and never exercises
-     * [DeckStudioViewModel.resolveStudioLandTarget] at all). Edge-case QA fix (MEDIUM,
-     * 2026-09-06) parity test below needs this to actually reach the
-     * [com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver.resolveWithColor]
-     * call site being fixed.
-     */
-    private fun createVmWithScorer(deckId: String? = null): DeckStudioViewModel =
-        DeckStudioViewModel(
-            deckRepository = deckRepository,
-            cardRepository = cardRepository,
-            userCardRepository = userCardRepository,
-            searchCardsUseCase = searchCardsUseCase,
-            suggestTagsUseCase = suggestTagsUseCase,
-            evaluateDeckUseCase = evaluateDeckUseCase,
-            inferDeckIdentityUseCase = inferDeckIdentityUseCase,
-            getDeckGameStatsUseCase = getDeckGameStatsUseCase,
-            importDeckUseCase = importDeckUseCase,
-            wishlistRepository = wishlistRepository,
-            userPreferences = userPreferences,
-            crashReporter = crashReporter,
-            appContext = appContext,
-            savedStateHandle = SavedStateHandle(
-                if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
-            ),
-            deckScorer = scorer,
+        createVm(savedStateHandle = savedStateHandle)
+        advanceUntilIdle()
+
+        assertEquals(DECK_ID, savedStateHandle.get<String>("deckId"))
+        assertEquals(true, savedStateHandle.get<Boolean>("deckStudioCreatedFreshDraft"))
+    }
+
+    @Test
+    fun `missing observed deck leaves loading and exposes no deck`() = runTest(dispatcher) {
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(null)
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+        val vm = createVm(deckId = DECK_ID)
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.isLoading)
+        assertNull(vm.uiState.value.deck)
+    }
+
+    @Test
+    fun `deck scanner route rejects a blank deck id`() {
+        val failure = runCatching { Screen.DeckScanner.createRoute(" ") }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+    }
+
+    @Test
+    fun `deck value summary includes commander separates boards and applies quantity`() =
+        runTest(dispatcher) {
+            val pricedCommander = commander.copy(priceEur = 10.0, priceUsd = 12.0)
+            val pricedMain = elfCard.copy(priceEur = 2.0, priceUsd = 3.0)
+            val pricedSideboard = removalCard.copy(priceEur = 4.0, priceUsd = 5.0)
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+                DeckWithCards(
+                    deck = Deck(
+                        id = DECK_ID,
+                        name = "Elves",
+                        format = "commander",
+                        commanderCardId = pricedCommander.scryfallId,
+                    ),
+                    mainboard = listOf(
+                        DeckSlot(pricedCommander.scryfallId, 1),
+                        DeckSlot(pricedMain.scryfallId, 3),
+                    ),
+                    sideboard = listOf(DeckSlot(pricedSideboard.scryfallId, 2)),
+                ),
+            )
+            coEvery { cardRepository.getCardById(pricedCommander.scryfallId) } returns DataResult.Success(pricedCommander)
+            coEvery { cardRepository.getCardById(pricedMain.scryfallId) } returns DataResult.Success(pricedMain)
+            coEvery { cardRepository.getCardById(pricedSideboard.scryfallId) } returns DataResult.Success(pricedSideboard)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+            val vm = createVm()
+            advanceUntilIdle()
+
+            val summary = vm.uiState.value.deckValueSummary
+            assertEquals(16.0, summary.mainboard.knownTotal, 0.001)
+            assertEquals(4, summary.mainboard.knownCopies)
+            assertEquals(0, summary.mainboard.missingPriceCopies)
+            assertEquals(8.0, summary.sideboard.knownTotal, 0.001)
+            assertEquals(2, summary.sideboard.knownCopies)
+            assertEquals(0, summary.sideboard.missingPriceCopies)
+        }
+
+    @Test
+    fun `deck value summary counts unknown prices and treats zero price as known`() =
+        runTest(dispatcher) {
+            val zeroPricedCard = elfCard.copy(priceEur = 0.0, priceUsd = 0.0)
+            val unknownPricedCard = removalCard.copy(priceEur = null, priceUsd = null)
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+                deckWithCards(
+                    slots = listOf(
+                        DeckSlot(zeroPricedCard.scryfallId, 2),
+                        DeckSlot(unknownPricedCard.scryfallId, 3),
+                        DeckSlot("unresolved-card", 4),
+                    ),
+                ),
+            )
+            coEvery { cardRepository.getCardById(zeroPricedCard.scryfallId) } returns DataResult.Success(zeroPricedCard)
+            coEvery { cardRepository.getCardById(unknownPricedCard.scryfallId) } returns DataResult.Success(unknownPricedCard)
+            coEvery { cardRepository.getCardById("unresolved-card") } returns DataResult.Error("missing")
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+            val vm = createVm()
+            advanceUntilIdle()
+
+            val mainboard = vm.uiState.value.deckValueSummary.mainboard
+            assertEquals(0.0, mainboard.knownTotal, 0.001)
+            assertEquals(2, mainboard.knownCopies)
+            assertEquals(7, mainboard.missingPriceCopies)
+            assertFalse(mainboard.isEmpty)
+        }
+
+    @Test
+    fun `changing preferred currency updates state and deck value summary`() = runTest(dispatcher) {
+        val pricedCard = elfCard.copy(priceEur = 2.0, priceUsd = 7.0)
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+            deckWithCards(slots = listOf(DeckSlot(pricedCard.scryfallId, 2))),
         )
+        coEvery { cardRepository.getCardById(pricedCard.scryfallId) } returns DataResult.Success(pricedCard)
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+        val vm = createVm()
+        advanceUntilIdle()
+        assertEquals(PreferredCurrency.EUR, vm.uiState.value.preferredCurrency)
+        assertEquals(4.0, vm.uiState.value.deckValueSummary.mainboard.knownTotal, 0.001)
+
+        preferredCurrency.value = PreferredCurrency.USD
+        advanceUntilIdle()
+
+        assertEquals(PreferredCurrency.USD, vm.uiState.value.preferredCurrency)
+        assertEquals(14.0, vm.uiState.value.deckValueSummary.mainboard.knownTotal, 0.001)
+    }
+
+    @Test
+    fun `reactive deck emission updates deck and board value summary`() = runTest(dispatcher) {
+        val observedDeck = MutableStateFlow<DeckWithCards?>(
+            deckWithCards(slots = listOf(DeckSlot(elfCard.scryfallId, 1))),
+        )
+        val pricedElf = elfCard.copy(priceEur = 2.0, priceUsd = 3.0)
+        val pricedRemoval = removalCard.copy(priceEur = 5.0, priceUsd = 7.0)
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns observedDeck
+        coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(pricedElf)
+        coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns DataResult.Success(pricedRemoval)
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+        val vm = createVm()
+        advanceUntilIdle()
+        assertEquals(DEFAULT_DECK_NAME, vm.uiState.value.deck?.name)
+        assertEquals(2.0, vm.uiState.value.deckValueSummary.mainboard.knownTotal, 0.001)
+
+        observedDeck.value = deckWithCards(
+            slots = listOf(DeckSlot(removalCard.scryfallId, 2)),
+            deckName = "Updated deck",
+        )
+        advanceUntilIdle()
+
+        assertEquals("Updated deck", vm.uiState.value.deck?.name)
+        assertEquals(10.0, vm.uiState.value.deckValueSummary.mainboard.knownTotal, 0.001)
+        assertEquals(2, vm.uiState.value.deckValueSummary.mainboard.knownCopies)
+    }
+
+    @Test
+    fun `deck value summary reports empty and partial boards independently`() = runTest(dispatcher) {
+        val partiallyPricedCard = elfCard.copy(priceEur = 2.0, priceUsd = null)
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+            DeckWithCards(
+                deck = Deck(id = DECK_ID, name = DEFAULT_DECK_NAME, format = "casual"),
+                mainboard = listOf(
+                    DeckSlot(partiallyPricedCard.scryfallId, 2),
+                    DeckSlot(removalCard.scryfallId, 1),
+                ),
+                sideboard = emptyList(),
+            ),
+        )
+        coEvery { cardRepository.getCardById(partiallyPricedCard.scryfallId) } returns
+            DataResult.Success(partiallyPricedCard)
+        coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns
+            DataResult.Success(removalCard.copy(priceEur = null, priceUsd = null))
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+        val vm = createVm()
+        advanceUntilIdle()
+
+        val summary = vm.uiState.value.deckValueSummary
+        assertEquals(4.0, summary.mainboard.knownTotal, 0.001)
+        assertEquals(2, summary.mainboard.knownCopies)
+        assertEquals(1, summary.mainboard.missingPriceCopies)
+        assertTrue(summary.sideboard.isEmpty)
+        assertEquals(0.0, summary.sideboard.knownTotal, 0.001)
+        assertEquals(0, summary.sideboard.missingPriceCopies)
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Group 1 — Init: draft creation vs. existing deck
@@ -1482,19 +1618,22 @@ class DeckStudioViewModelTest {
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `searchCollectionByTags returns only cards whose tags plus userTags intersect the given keys`() =
+    fun `searchCollectionByTags resolves a SectionMembership predicate from the section id and unions tags plus userTags`() =
         runTest(dispatcher) {
-            // Arrange — elfCard carries TRIBAL/MANA_DORK, removalCard carries REMOVAL (built-in
-            // tags); a third card carries its match ONLY via userTags to prove the union
-            // (`card.tags + card.userTags`) is honored, not just `tags`.
+            // Arrange — Deck Wizard UX polish plan, Run 1 §1.2: the set passed to
+            // searchCollectionByTags now carries the raw `CardSection.id` itself (never real
+            // CardTag keys) -- "mana_dork" resolves to SectionMembership's own
+            // card.hasTagKey("mana_dork") predicate, which reads `tags + userTags`. elfCard
+            // carries the built-in MANA_DORK tag; a third card carries its match ONLY via
+            // userTags to prove the union is honored, not just `tags`. removalCard has neither.
             val userTaggedCard = card(
                 id = "user-tagged-1",
-                name = "Homebrew Sac Outlet",
-                typeLine = "Artifact",
+                name = "Homebrew Mana Dork",
+                typeLine = "Creature — Elf",
                 colorIdentity = emptyList(),
                 colors = emptyList(),
                 tags = emptyList(),
-                userTags = listOf(CardTag.SACRIFICE),
+                userTags = listOf(CardTag.MANA_DORK),
             )
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(
@@ -1506,15 +1645,15 @@ class DeckStudioViewModelTest {
             val vm = createVm()
             advanceUntilIdle()
 
-            // Act — request only REMOVAL + SACRIFICE, excluding elfCard's TRIBAL/MANA_DORK keys.
-            vm.searchCollectionByTags(setOf(CardTag.REMOVAL.key, CardTag.SACRIFICE.key))
+            // Act — "mana_dork" is a real CardSection.id (AnalysisEngine's own manaDorkSection).
+            vm.searchCollectionByTags(setOf("mana_dork"))
 
             // Assert
             val resultIds = vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet()
-            assertEquals(setOf(removalCard.scryfallId, userTaggedCard.scryfallId), resultIds)
+            assertEquals(setOf(elfCard.scryfallId, userTaggedCard.scryfallId), resultIds)
             assertTrue(
-                "elfCard has none of the requested keys and must be excluded",
-                elfCard.scryfallId !in resultIds
+                "removalCard has no mana_dork tag on either tags or userTags and must be excluded",
+                removalCard.scryfallId !in resultIds
             )
         }
 
@@ -1522,8 +1661,8 @@ class DeckStudioViewModelTest {
     fun `searchCollectionByTags with an empty key set falls back to the full collection`() =
         runTest(dispatcher) {
             // Arrange — documented no-op behavior (see the function's KDoc): an empty key set
-            // (e.g. a curve/mana/legality section with no CardTag equivalent) degrades to
-            // showCollectionCards() rather than clearing addCardsResults to empty.
+            // (e.g. a curve/mana/legality section with no card-level membership predicate)
+            // degrades to showCollectionCards() rather than clearing addCardsResults to empty.
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(
                 listOf(userCardWith(elfCard), userCardWith(removalCard))
@@ -1549,11 +1688,11 @@ class DeckStudioViewModelTest {
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `onAddCardsQueryChange after searchCollectionByTags keeps ANDing the active tag filter`() =
+    fun `onAddCardsQueryChange after searchCollectionByTags keeps ANDing the active section predicate`() =
         runTest(dispatcher) {
-            // Arrange — elfCard (TRIBAL/MANA_DORK) must never surface once REMOVAL is the active
-            // tag filter; removalCard and beastWithinCard both carry REMOVAL but only one matches
-            // a subsequent typed name.
+            // Arrange — removalCard (no mana_dork tag) must never surface once "mana_dork" is the
+            // active section predicate; elfCard and beastWithinCard both carry MANA_DORK but only
+            // one matches a subsequent typed name.
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(
                 listOf(userCardWith(elfCard), userCardWith(removalCard), userCardWith(beastWithinCard))
@@ -1564,38 +1703,39 @@ class DeckStudioViewModelTest {
             val vm = createVm()
             advanceUntilIdle()
 
-            // Act 1 — Analysis tab "Browse for X" opens the Collection tab pre-filtered by REMOVAL.
-            vm.searchCollectionByTags(setOf(CardTag.REMOVAL.key))
+            // Act 1 — Analysis tab "Browse for X" opens the Collection tab pre-filtered by the
+            // "mana_dork" section predicate.
+            vm.searchCollectionByTags(setOf("mana_dork"))
             var resultIds = vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet()
             assertEquals(
-                "the tag filter alone must already exclude the non-REMOVAL elfCard",
-                setOf(removalCard.scryfallId, beastWithinCard.scryfallId),
+                "the section predicate alone must already exclude the non-mana_dork removalCard",
+                setOf(elfCard.scryfallId, beastWithinCard.scryfallId),
                 resultIds,
             )
 
-            // Act 2 — the user types on top of the active tag filter (the pre-fix bug: this used
-            // to drop the tag constraint and filter the WHOLE collection by name alone).
-            vm.onAddCardsQueryChange("Beast")
+            // Act 2 — the user types on top of the active section predicate (the pre-fix bug: this
+            // used to drop the tag constraint and filter the WHOLE collection by name alone).
+            vm.onAddCardsQueryChange("Birds")
             resultIds = vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet()
             assertEquals(
-                "typing must AND the name substring onto the still-active REMOVAL tag filter",
+                "typing must AND the name substring onto the still-active mana_dork predicate",
                 setOf(beastWithinCard.scryfallId),
                 resultIds,
             )
 
-            // Act 3 — clearing the search field must preserve the tag filter, not reset to the
-            // full collection.
+            // Act 3 — clearing the search field must preserve the section predicate, not reset to
+            // the full collection.
             vm.onAddCardsQueryChange("")
             resultIds = vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet()
             assertEquals(
-                "a blank query must keep the active tag filter, not fall back to the full collection",
-                setOf(removalCard.scryfallId, beastWithinCard.scryfallId),
+                "a blank query must keep the active section predicate, not fall back to the full collection",
+                setOf(elfCard.scryfallId, beastWithinCard.scryfallId),
                 resultIds,
             )
         }
 
     @Test
-    fun `clearActiveStructuredSearchFragment also clears the active collection tag filter`() =
+    fun `clearActiveStructuredSearchFragment also clears the active section predicate`() =
         runTest(dispatcher) {
             // Arrange
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
@@ -1607,7 +1747,7 @@ class DeckStudioViewModelTest {
             }
             val vm = createVm()
             advanceUntilIdle()
-            vm.searchCollectionByTags(setOf(CardTag.REMOVAL.key))
+            vm.searchCollectionByTags(setOf("mana_dork"))
 
             // Act — mirrors the FAB / onReplaceCard entry points resetting a stale preset.
             vm.clearActiveStructuredSearchFragment()
@@ -1660,18 +1800,14 @@ class DeckStudioViewModelTest {
         }
 
     @Test
-    fun `collectionCardsMatching ANDs the structured query, the tag filter and the typed name`() =
+    fun `searchCollectionByTags' section predicate REPLACES a previously active structured query, never unions with it`() =
         runTest(dispatcher) {
-            // Arrange — one card fails each of the three constraints in turn, so only a card
-            // satisfying all three may survive.
-            val untaggedInstant = card(
-                id = "beast-trick-1",
-                name = "Beast Trick",
-                typeLine = "Instant",
-                colorIdentity = listOf("G"),
-                colors = listOf("G"),
-            )
-            val all = listOf(elfCard, removalCard, beastWithinCard, untaggedInstant)
+            // Deck Wizard UX polish plan, Run 1 §1.2: a section-driven browse's Collection tab is
+            // `predicate && name filter` ONLY -- it must never stay ANDed/ORed with whatever
+            // activeCollectionQuery a PRIOR generic Advanced Search left behind. removalCard is an
+            // Instant (matches the earlier structured query) but has no mana_dork tag; elfCard is
+            // the reverse -- proving the predicate takes over completely rather than combining.
+            val all = listOf(elfCard, removalCard, beastWithinCard)
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(all.map { userCardWith(it) })
             coEvery { cardRepository.getCardById(any()) } answers {
@@ -1682,16 +1818,47 @@ class DeckStudioViewModelTest {
             val vm = createVm()
             advanceUntilIdle()
 
-            // Act — structured query drops elfCard (a Creature), the tag filter drops
-            // untaggedInstant, the typed name drops removalCard ("Naturalize").
+            // Act 1 — a generic Advanced Search structured query filters the Collection tab to
+            // every Instant (removalCard only, here).
             vm.applyStructuredSearch(AdvancedSearchQuery(criteria = listOf(SearchCriterion.CardType(setOf("Instant")))))
             advanceUntilIdle()
-            vm.searchCollectionByTags(setOf(CardTag.REMOVAL.key))
-            vm.onAddCardsQueryChange("Beast")
-
-            // Assert
             assertEquals(
-                setOf(beastWithinCard.scryfallId),
+                "sanity check: the structured query alone must match removalCard (an Instant)",
+                setOf(removalCard.scryfallId),
+                vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet(),
+            )
+
+            // Act 2 — a section browse now starts on TOP of that same sheet session.
+            vm.searchCollectionByTags(setOf("mana_dork"))
+
+            // Assert — the predicate REPLACES the structured query outright: elfCard/beastWithinCard
+            // (mana_dork, not Instants) now match; removalCard (an Instant, not mana_dork) drops out.
+            assertEquals(
+                setOf(elfCard.scryfallId, beastWithinCard.scryfallId),
+                vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet(),
+            )
+        }
+
+    @Test
+    fun `collectionCardsMatching keeps the section predicate as the sole gate when no structured query is active`() =
+        runTest(dispatcher) {
+            // Deck Wizard UX polish plan, Run 1 §1.2: a bare section-predicate filter (no
+            // accompanying applyStructuredSearch) must NOT degrade to "matches everything" just
+            // because StructuredCardSearch.matches(card, null) trivially returns true.
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
+            every { userCardRepository.observeCollection() } returns flowOf(
+                listOf(userCardWith(elfCard), userCardWith(removalCard))
+            )
+            coEvery { cardRepository.getCardById(any()) } answers {
+                DataResult.Success(listOf(elfCard, removalCard).first { it.scryfallId == firstArg() })
+            }
+            val vm = createVm()
+            advanceUntilIdle()
+
+            vm.searchCollectionByTags(setOf("mana_dork"))
+
+            assertEquals(
+                setOf(elfCard.scryfallId),
                 vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet(),
             )
         }
@@ -1948,9 +2115,90 @@ class DeckStudioViewModelTest {
             )
         }
 
+    /** W7 Task C (R11) -- mirrors [createVm] but ALSO seeds [DECK_STUDIO_SELECT_BUILD_TAB_KEY] on
+     * the SavedStateHandle, exactly as [com.mmg.manahub.app.navigation.AppNavGraph]'s wizard
+     * pop-back path does before popping back to an existing Studio entry. */
+    private fun createVmSelectingBuildTab(deckId: String): DeckStudioViewModel =
+        DeckStudioViewModel(
+            deckRepository = deckRepository,
+            cardRepository = cardRepository,
+            userCardRepository = userCardRepository,
+            searchCardsUseCase = searchCardsUseCase,
+            suggestTagsUseCase = suggestTagsUseCase,
+            evaluateDeckUseCase = evaluateDeckUseCase,
+            inferDeckIdentityUseCase = inferDeckIdentityUseCase,
+            getDeckGameStatsUseCase = getDeckGameStatsUseCase,
+            importDeckUseCase = importDeckUseCase,
+            wishlistRepository = wishlistRepository,
+            userPreferences = userPreferences,
+            crashReporter = crashReporter,
+            appContext = appContext,
+            savedStateHandle = SavedStateHandle(mapOf("deckId" to deckId, DECK_STUDIO_SELECT_BUILD_TAB_KEY to true)),
+        )
+
     // ─────────────────────────────────────────────────────────────────────────
     //  Group 8 — Tab selection + lazy Suggestions loading
     // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `a fresh navigation (no deckId) already defaults to the BUILD tab -- no signal needed`() =
+        runTest(dispatcher) {
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(null)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            val vm = createVm()
+            advanceUntilIdle()
+
+            assertEquals(DeckStudioTab.BUILD, vm.uiState.value.selectedTab)
+        }
+
+    @Test
+    fun `W7 fix 1 -- the pop-back signal forces BUILD when written onto an ALREADY-CONSTRUCTED instance's handle`() =
+        runTest(dispatcher) {
+            // Reproduces the real pop-back path: AppNavGraph writes the key onto the PREVIOUS
+            // back-stack entry's SavedStateHandle -- which belongs to an already-initialised
+            // DeckStudioViewModel, not a fresh one. A one-shot `init` read (the original, broken
+            // implementation) would miss this entirely because init never runs again.
+            stubResolvableDeck()
+            val handle = SavedStateHandle(mapOf("deckId" to DECK_ID))
+            val vm = DeckStudioViewModel(
+                deckRepository = deckRepository,
+                cardRepository = cardRepository,
+                userCardRepository = userCardRepository,
+                searchCardsUseCase = searchCardsUseCase,
+                suggestTagsUseCase = suggestTagsUseCase,
+                evaluateDeckUseCase = evaluateDeckUseCase,
+                inferDeckIdentityUseCase = inferDeckIdentityUseCase,
+                getDeckGameStatsUseCase = getDeckGameStatsUseCase,
+                importDeckUseCase = importDeckUseCase,
+                wishlistRepository = wishlistRepository,
+                userPreferences = userPreferences,
+                crashReporter = crashReporter,
+                appContext = appContext,
+                savedStateHandle = handle,
+            )
+            advanceUntilIdle()
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
+            advanceUntilIdle()
+            assertEquals(DeckStudioTab.ANALYSIS, vm.uiState.value.selectedTab)
+
+            // Simulate AppNavGraph's pop-back write onto this SAME instance's handle.
+            handle[DECK_STUDIO_SELECT_BUILD_TAB_KEY] = true
+            advanceUntilIdle()
+
+            assertEquals(DeckStudioTab.BUILD, vm.uiState.value.selectedTab)
+        }
+
+    @Test
+    fun `W7 Task C -- the pop-back-to-existing-entry signal forces the BUILD tab on init`() =
+        runTest(dispatcher) {
+            // Keeps the fresh-construction case green too (the key can also arrive via the
+            // constructor's initial SavedStateHandle map, e.g. after process death).
+            stubResolvableDeck()
+            val vm = createVmSelectingBuildTab(DECK_ID)
+            advanceUntilIdle()
+
+            assertEquals(DeckStudioTab.BUILD, vm.uiState.value.selectedTab)
+        }
 
     @Test
     fun `onSelectTab BUILD updates selectedTab without triggering analysis`() =
@@ -1980,7 +2228,7 @@ class DeckStudioViewModelTest {
             assertFalse("suggestionsLoaded must be false before tab select", vm.uiState.value.suggestionsLoaded)
 
             // Act
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
 
             // Assert — lazy first analysis completed.
@@ -1996,7 +2244,7 @@ class DeckStudioViewModelTest {
             stubResolvableDeck()
             val vm = createVm()
             advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
             val healthAfterFirst = vm.uiState.value.health
 
@@ -2005,7 +2253,7 @@ class DeckStudioViewModelTest {
             coEvery { cardRepository.searchWithRawQuery(any()) } returns emptyList()
 
             // Act — select SUGGESTIONS again (suggestionsLoaded = true already).
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
 
             // Assert — health unchanged (no re-analysis), no second loadAnalysis kicked off.
@@ -2015,13 +2263,15 @@ class DeckStudioViewModelTest {
     @Test
     fun `manual edit on BUILD tab invalidates suggestions requiring re-analysis on next SUGGESTIONS open`() =
         runTest(dispatcher) {
-            // Arrange — open SUGGESTIONS first to set suggestionsLoaded=true.
+            // Arrange — go back to BUILD; a SUGGESTIONS-tab mutation recomputes in place instead of invalidating.
             stubResolvableDeck()
             val vm = createVm()
             advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
             assertTrue(vm.uiState.value.suggestionsLoaded)
+            vm.onSelectTab(DeckStudioTab.BUILD)
+            advanceUntilIdle()
 
             // Act — manual mutation on BUILD tab must invalidate.
             vm.addCardToDeck(removalCard.scryfallId)
@@ -2038,13 +2288,15 @@ class DeckStudioViewModelTest {
 
     @Test
     fun `removeCard on BUILD tab invalidates suggestions`() = runTest(dispatcher) {
-        // Arrange — prime the suggestions.
+        // Arrange — prime suggestions, then go back to BUILD (a SUGGESTIONS-tab removeCard recomputes in place instead).
         stubResolvableDeck()
         val vm = createVm()
         advanceUntilIdle()
-        vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+        vm.onSelectTab(DeckStudioTab.ANALYSIS)
         advanceUntilIdle()
         assertTrue(vm.uiState.value.suggestionsLoaded)
+        vm.onSelectTab(DeckStudioTab.BUILD)
+        advanceUntilIdle()
 
         // Act
         vm.removeCard(removalCard.scryfallId)
@@ -2072,7 +2324,7 @@ class DeckStudioViewModelTest {
         coEvery { cardRepository.searchWithRawQuery(any()) } returns emptyList()
         val vm = createVm()
         advanceUntilIdle()
-        vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+        vm.onSelectTab(DeckStudioTab.ANALYSIS)
         advanceUntilIdle()
         assertTrue(vm.uiState.value.suggestionsLoaded)
 
@@ -2101,7 +2353,7 @@ class DeckStudioViewModelTest {
         coEvery { cardRepository.searchWithRawQuery(any()) } returns emptyList()
         val vm = createVm()
         advanceUntilIdle()
-        vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+        vm.onSelectTab(DeckStudioTab.ANALYSIS)
         advanceUntilIdle()
         assertTrue(vm.uiState.value.suggestionsLoaded)
 
@@ -2112,6 +2364,193 @@ class DeckStudioViewModelTest {
         // Assert
         assertFalse("setCommander must invalidate suggestions", vm.uiState.value.suggestionsLoaded)
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Group 13b — live refresh: a mainboard add/remove recomputes Health in place while on Analysis.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `addCardToDeck while on SUGGESTIONS recomputes health in place without a tab switch`() =
+        runTest(dispatcher) {
+            // Arrange
+            stubResolvableDeck()
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
+            advanceUntilIdle()
+            assertTrue(vm.uiState.value.suggestionsLoaded)
+            val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
+
+            // Act — a Browse-sheet add while Analysis is showing.
+            vm.addCardToDeck(elfCard.scryfallId)
+            advanceUntilIdle()
+
+            // Assert — recomputed in place: still loaded, still on the SAME tab, new count visible.
+            assertTrue("must stay loaded -- an incremental recompute, not an invalidate",
+                vm.uiState.value.suggestionsLoaded)
+            assertEquals(DeckStudioTab.ANALYSIS, vm.uiState.value.selectedTab)
+            assertEquals(
+                "the added copy must be reflected in the SAME health snapshot",
+                initialNonLandCount + 1,
+                vm.uiState.value.health!!.profile.nonLandCount,
+            )
+        }
+
+    @Test
+    fun `removeCardFromDeck while on SUGGESTIONS recomputes health in place`() = runTest(dispatcher) {
+        // Arrange — bump elfCard to 2 copies first so the removal decrements rather than deletes.
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+            commanderDeckWithCards(
+                slots = listOf(
+                    DeckSlot(commander.scryfallId, 1),
+                    DeckSlot(removalCard.scryfallId, 1),
+                    DeckSlot(elfCard.scryfallId, 2),
+                )
+            )
+        )
+        coEvery { cardRepository.getCardById(commander.scryfallId) } returns DataResult.Success(commander)
+        coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns DataResult.Success(removalCard)
+        coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+        every { wishlistRepository.observeLocal() } returns flowOf(emptyList())
+        coEvery { cardRepository.searchWithRawQuery(any()) } returns emptyList()
+        val vm = createVm()
+        advanceUntilIdle()
+        vm.onSelectTab(DeckStudioTab.ANALYSIS)
+        advanceUntilIdle()
+        val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
+
+        // Act
+        vm.removeCardFromDeck(elfCard.scryfallId)
+        advanceUntilIdle()
+
+        // Assert
+        assertTrue(vm.uiState.value.suggestionsLoaded)
+        assertEquals(DeckStudioTab.ANALYSIS, vm.uiState.value.selectedTab)
+        assertEquals(initialNonLandCount - 1, vm.uiState.value.health!!.profile.nonLandCount)
+    }
+
+    @Test
+    fun `three rapid adds while on SUGGESTIONS coalesce into exactly one recompute`() =
+        runTest(dispatcher) {
+            // Arrange
+            stubResolvableDeck()
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
+            advanceUntilIdle()
+            val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
+            // 1 call already spent on the full loadAnalysis pass above.
+            coVerify(exactly = 1) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+
+            // Act — taps faster than the 200ms debounce window; each write+cache-mutation runs, but the recompute itself never fires early.
+            vm.addCardToDeck(elfCard.scryfallId)
+            advanceTimeBy(50)
+            vm.addCardToDeck(elfCard.scryfallId)
+            advanceTimeBy(50)
+            vm.addCardToDeck(elfCard.scryfallId)
+            advanceUntilIdle()
+
+            // Assert — all 3 mutations landed but only ONE additional evaluation pass ran (debounce coalesces the recompute, never drops a mutation).
+            assertEquals(initialNonLandCount + 3, vm.uiState.value.health!!.profile.nonLandCount)
+            coVerify(exactly = 2) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `switching tabs mid-recompute cancels cleanly -- no crash, no stale health leak`() =
+        runTest(dispatcher) {
+            // Arrange
+            stubResolvableDeck()
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
+            advanceUntilIdle()
+            val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
+
+            // Act — start a mutation, then leave the tab before the 200ms debounce elapses.
+            vm.addCardToDeck(elfCard.scryfallId)
+            advanceTimeBy(50)
+            vm.onSelectTab(DeckStudioTab.BUILD)
+            advanceUntilIdle()
+
+            // Assert — reaching here without a crash is itself part of the point; health must also stay unchanged.
+            assertEquals(DeckStudioTab.BUILD, vm.uiState.value.selectedTab)
+            assertEquals(
+                "a cancelled recompute must never publish an update",
+                initialNonLandCount,
+                vm.uiState.value.health!!.profile.nonLandCount,
+            )
+        }
+
+    @Test
+    fun `switching tabs mid-recompute then returning to SUGGESTIONS recomputes exactly once and reflects the add`() =
+        runTest(dispatcher) {
+            // Arrange
+            stubResolvableDeck()
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
+            advanceUntilIdle()
+            val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
+            coVerify(exactly = 1) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+
+            // Act — mutate, leave before the debounce fires (health stays stale, per the test above), then return.
+            vm.addCardToDeck(elfCard.scryfallId)
+            advanceTimeBy(50)
+            vm.onSelectTab(DeckStudioTab.BUILD)
+            advanceUntilIdle()
+            assertEquals(initialNonLandCount, vm.uiState.value.health!!.profile.nonLandCount)
+
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
+            advanceUntilIdle()
+
+            // Assert — the return itself triggers the ONE deferred evaluation and now shows the add.
+            assertEquals(initialNonLandCount + 1, vm.uiState.value.health!!.profile.nonLandCount)
+            coVerify(exactly = 2) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `a mutation whose write completes after the tab switch still updates health, and returning triggers no extra recompute`() =
+        runTest(dispatcher) {
+            // Arrange
+            stubResolvableDeck()
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
+            advanceUntilIdle()
+            val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
+            coVerify(exactly = 1) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+
+            // Act — start the mutation, then switch tabs before its launched coroutine has even run.
+            vm.addCardToDeck(elfCard.scryfallId)
+            vm.onSelectTab(DeckStudioTab.BUILD)
+            advanceUntilIdle()
+
+            // Assert — the write + its debounced recompute complete off-tab, health already current.
+            assertEquals(DeckStudioTab.BUILD, vm.uiState.value.selectedTab)
+            assertEquals(initialNonLandCount + 1, vm.uiState.value.health!!.profile.nonLandCount)
+            coVerify(exactly = 2) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+
+            // Act — return to SUGGESTIONS; nothing is dirty, so no further evaluation runs.
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
+            advanceUntilIdle()
+
+            coVerify(exactly = 2) {
+                evaluateDeckUseCase.invoke(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+        }
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Group 14 — isEmptyDeck property
@@ -2183,7 +2622,7 @@ class DeckStudioViewModelTest {
     }
 
     @Test
-    fun `updateDeckName with empty or blank string is a no-op`() = runTest(dispatcher) {
+    fun `updateDeckMetadata with blank name and null cover is a no-op`() = runTest(dispatcher) {
         // Arrange
         every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
             deckWithCards(deckName = "My Deck")
@@ -2193,15 +2632,38 @@ class DeckStudioViewModelTest {
         advanceUntilIdle()
 
         // Act
-        vm.updateDeckName("   ")
+        vm.updateDeckMetadata("   ", null)
         advanceUntilIdle()
 
-        // Assert — no repository call for a blank name.
+        // Assert — no repository call when both fields resolve to "keep current".
         coVerify(exactly = 0) { deckRepository.updateDeck(any()) }
     }
 
     @Test
-    fun `updateDeckName with valid name calls updateDeck`() = runTest(dispatcher) {
+    fun `updateDeckMetadata with a valid name and cover writes both fields in ONE updateDeck call`() = runTest(dispatcher) {
+        // Arrange — Edit-Deck-sheet rename race regression (Deck Wizard UX polish plan, Run 1 §1.3):
+        // the old back-to-back updateDeckName/setCoverCard calls each read-then-wrote the whole deck,
+        // so the second write silently reverted the first's name change. A single updateDeckMetadata
+        // call must carry BOTH fields in the SAME deck.copy/updateDeck call.
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+            deckWithCards(deckName = "My Deck")
+        )
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+        val vm = createVm()
+        advanceUntilIdle()
+
+        // Act
+        vm.updateDeckMetadata("Dragon Stompy", "cover-card-1")
+        advanceUntilIdle()
+
+        // Assert — exactly one write, carrying both the new name AND the new cover.
+        coVerify(exactly = 1) {
+            deckRepository.updateDeck(match { it.name == "Dragon Stompy" && it.coverCardId == "cover-card-1" })
+        }
+    }
+
+    @Test
+    fun `updateDeckMetadata with blank name keeps the current name but still applies the cover`() = runTest(dispatcher) {
         // Arrange
         every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
             deckWithCards(deckName = "My Deck")
@@ -2211,11 +2673,11 @@ class DeckStudioViewModelTest {
         advanceUntilIdle()
 
         // Act
-        vm.updateDeckName("Dragon Stompy")
+        vm.updateDeckMetadata("   ", "cover-card-2")
         advanceUntilIdle()
 
         // Assert
-        coVerify { deckRepository.updateDeck(match { it.name == "Dragon Stompy" }) }
+        coVerify { deckRepository.updateDeck(match { it.name == "My Deck" && it.coverCardId == "cover-card-2" }) }
     }
 
     @Test
@@ -2235,222 +2697,215 @@ class DeckStudioViewModelTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Group 16 — loadDiscoveries on init (Phase 4). Groups 16-20's original seed-build
-    //  (openSeedSheet/closeSeedSheet, addSeed/removeSeed, onSeedQueryChange, generateFromSeeds,
-    //  startFromDiscovery) and the legacy discoverSynergies-specific tests were REMOVED in the
-    //  Deck Wizard & Engine Rework plan, WS7.2 (2026-07-28) along with the production code they
-    //  exercised (`SeedsContent`/`BuildDeckFromSeedsUseCase`/`DeckMagicEngine.discoverSynergies`).
-    //  See Group 21b below for the surviving v2 synergy-browser coverage.
+    //  Group 16 — Browse inspirations (60-card empty decks): collection synergies, owned-card
+    //  pins, per-card combos and the shared selection handed to the wizard.
     // ─────────────────────────────────────────────────────────────────────────
 
-    @Test
-    fun `given any init outcome when VM initialises then isLoadingDiscoveries is false after completion`() =
-        runTest(dispatcher) {
-            // Arrange — test the success path (isLoadingDiscoveries transitions to false). No
-            // discoverSynergiesV2UseCase wired (createVm() defaults it to null), so loadDiscoveries
-            // takes its null-degrade branch -- isLoadingDiscoveries still flips false.
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
+    private val findCombosWithCardUseCase = mockk<com.mmg.manahub.feature.decks.domain.inspirations.FindCombosWithCardUseCase>()
 
-            // Act
-            val vm = createVm()
-            advanceUntilIdle()
+    private fun roleTag(key: String) = CardTag(key, com.mmg.manahub.core.model.TagCategory.ROLE)
 
-            // Assert — loading flag is cleared regardless of success/failure.
-            assertFalse("isLoadingDiscoveries must be false after loadDiscoveries completes",
-                vm.uiState.value.isLoadingDiscoveries)
-        }
+    private val outletCard = card(id = "outlet-1", name = "Carrion Feeder", typeLine = "Creature", tags = listOf(roleTag("sac_outlet")))
+    private val payoffCard = card(id = "payoff-1", name = "Blood Artist", typeLine = "Creature", tags = listOf(roleTag("death_payoff")))
+    private val healerCard = card(id = "healer-1", name = "Soul Warden", typeLine = "Creature", tags = listOf(roleTag("lifegain_source")))
+    private val lifePayoffCard = card(id = "lifepay-1", name = "Ajani's Pridemate", typeLine = "Creature", tags = listOf(roleTag("lifegain_payoff")))
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Group 21b — Synergy browser: Strategies search + Combos tab
-    //  (Deck Engine Unification plan D7, Phase 4)
-    // ─────────────────────────────────────────────────────────────────────────
+    private fun ownedCopies(card: Card, quantity: Int = 1) = UserCardWithCard(
+        userCard = UserCard(id = "uc-${card.scryfallId}", scryfallId = card.scryfallId, quantity = quantity),
+        card = card,
+    )
 
-    private fun discoveryV2(label: String, tag: CardTag, memberName: String) =
-        com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2(
-            key = com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.Strategy(tag),
-            label = label,
-            memberCount = 8,
-            dominantColors = emptySet(),
-            members = listOf(card(id = "id-$memberName", name = memberName, tags = listOf(tag))),
-            archetype = null,
-            theme = null,
-            tribe = null,
+    private fun combo(id: String, vararg names: String) =
+        com.mmg.manahub.feature.decks.domain.model.CardCombo(id, names.toList(), "desc", listOf("Infinite mana"), false, emptyMap())
+
+    private fun createVmWithInspirations(
+        format: String = "casual",
+        collection: List<UserCardWithCard> = listOf(ownedCopies(outletCard), ownedCopies(payoffCard), ownedCopies(healerCard), ownedCopies(lifePayoffCard)),
+    ): DeckStudioViewModel {
+        every { userCardRepository.observeCollection() } returns flowOf(collection)
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+            DeckWithCards(deck = Deck(id = DECK_ID, name = DEFAULT_DECK_NAME, format = format), mainboard = emptyList(), sideboard = emptyList()),
         )
+        return DeckStudioViewModel(
+            deckRepository = deckRepository,
+            cardRepository = cardRepository,
+            userCardRepository = userCardRepository,
+            searchCardsUseCase = searchCardsUseCase,
+            suggestTagsUseCase = suggestTagsUseCase,
+            evaluateDeckUseCase = evaluateDeckUseCase,
+            inferDeckIdentityUseCase = inferDeckIdentityUseCase,
+            getDeckGameStatsUseCase = getDeckGameStatsUseCase,
+            importDeckUseCase = importDeckUseCase,
+            wishlistRepository = wishlistRepository,
+            userPreferences = userPreferences,
+            crashReporter = crashReporter,
+            appContext = appContext,
+            savedStateHandle = SavedStateHandle(mapOf("deckId" to DECK_ID)),
+            discoverCollectionSynergiesUseCase = com.mmg.manahub.feature.decks.domain.inspirations.DiscoverCollectionSynergiesUseCase(dispatcher),
+            findCombosWithCardUseCase = findCombosWithCardUseCase,
+        )
+    }
 
     @Test
-    fun `given discoveriesV2 loaded when VM initialises then filteredDiscoveriesV2 starts equal to the full list`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            val ramp = discoveryV2("Ramp", CardTag.RAMP, "Sol Ring")
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns listOf(ramp)
+    fun `opening inspirations computes every collection engine in the Synergy vocabulary`() = runTest(dispatcher) {
+        val vm = createVmWithInspirations()
+        advanceUntilIdle()
 
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
+        vm.openInspirations()
+        advanceUntilIdle()
 
-            assertEquals(listOf(ramp), vm.uiState.value.discoveriesV2)
-            assertEquals(listOf(ramp), vm.uiState.value.filteredDiscoveriesV2)
-        }
-
-    @Test
-    fun `given two discoveries when search query matches one label then filteredDiscoveriesV2 narrows to it`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            val ramp = discoveryV2("Ramp", CardTag.RAMP, "Sol Ring")
-            val tokens = discoveryV2("Tokens", CardTag.TOKENS, "Anointed Procession")
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns listOf(ramp, tokens)
-
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
-
-            vm.onDiscoverySearchQueryChange("ramp")
-
-            assertEquals(listOf(ramp), vm.uiState.value.filteredDiscoveriesV2)
-            // The full, unfiltered list is untouched -- only the derived view narrows.
-            assertEquals(2, vm.uiState.value.discoveriesV2.size)
-        }
+        val state = vm.uiState.value.inspirations
+        assertTrue(state.isOpen)
+        assertFalse(state.isLoadingSynergies)
+        val axes = state.synergies!!.engines.map { it.axis }
+        assertTrue("DEATH" in axes)
+        assertTrue("LIFE" in axes)
+    }
 
     @Test
-    fun `given a search-by-card pick when it matches only one discovery then filteredDiscoveriesV2 narrows to it`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            val ramp = discoveryV2("Ramp", CardTag.RAMP, "Sol Ring")
-            val tokens = discoveryV2("Tokens", CardTag.TOKENS, "Anointed Procession")
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns listOf(ramp, tokens)
+    fun `the owned-card search lists only legal cards and a pin narrows the synergies`() = runTest(dispatcher) {
+        val banned = card(id = "banned-1", name = "Carrion Banned", typeLine = "Creature", legalityModern = "banned")
+        val vm = createVmWithInspirations(
+            format = "modern",
+            collection = listOf(ownedCopies(outletCard), ownedCopies(payoffCard), ownedCopies(healerCard), ownedCopies(lifePayoffCard), ownedCopies(banned)),
+        )
+        advanceUntilIdle()
+        vm.openInspirations()
+        advanceUntilIdle()
 
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
+        vm.onInspirationsQueryChange(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.STRATEGIES, "carrion")
+        assertEquals(listOf("Carrion Feeder"), vm.uiState.value.inspirations.strategiesPicker.results.map { it.name })
 
-            vm.onToggleDiscoverySearchCard("Sol Ring")
-            assertEquals(listOf(ramp), vm.uiState.value.filteredDiscoveriesV2)
-
-            // Toggling the SAME card again clears the pick back to the unfiltered list.
-            vm.onToggleDiscoverySearchCard("Sol Ring")
-            assertEquals(listOf(ramp, tokens), vm.uiState.value.filteredDiscoveriesV2)
-        }
-
-    @Test
-    fun `onClearDiscoverySearch resets both search inputs and filteredDiscoveriesV2`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            val ramp = discoveryV2("Ramp", CardTag.RAMP, "Sol Ring")
-            val tokens = discoveryV2("Tokens", CardTag.TOKENS, "Anointed Procession")
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns listOf(ramp, tokens)
-
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
-            vm.onDiscoverySearchQueryChange("ramp")
-            vm.onToggleDiscoverySearchCard("Sol Ring")
-
-            vm.onClearDiscoverySearch()
-
-            assertEquals("", vm.uiState.value.discoverySearchQuery)
-            assertTrue(vm.uiState.value.discoverySelectedCardNames.isEmpty())
-            assertEquals(listOf(ramp, tokens), vm.uiState.value.filteredDiscoveriesV2)
-        }
+        vm.onPinInspirationsCard(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.STRATEGIES, outletCard)
+        val state = vm.uiState.value.inspirations
+        assertEquals("", state.strategiesPicker.query)
+        assertEquals(outletCard, state.strategiesPicker.pinned)
+        assertTrue(state.visibleSynergies!!.engines.all { it.contains("Carrion Feeder") })
+        assertTrue(state.visibleSynergies!!.engines.none { it.axis == "LIFE" })
+        assertTrue("a pin only filters, it never selects", state.selection.isEmpty())
+    }
 
     @Test
-    fun `given the Combos tab has never been selected when VM initialises then loadCombos is never called`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns emptyList()
+    fun `the selection applies the wizard copy cap by name`() = runTest(dispatcher) {
+        every { appContext.getString(any(), *anyVararg()) } returns "capped"
+        val vm = createVmWithInspirations()
+        advanceUntilIdle()
+        vm.openInspirations()
 
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
+        repeat(5) { vm.addToInspirationSelection(outletCard, com.mmg.manahub.feature.decks.presentation.inspirations.InspirationSelectionSource.THUMBNAIL) }
 
-            assertNull("combos must not be fetched just from opening Inspirations", vm.uiState.value.comboResult)
-            coVerify(exactly = 0) { findCombosUseCase(any(), any()) }
-        }
-
-    @Test
-    fun `given selecting the Combos tab for the first time then loadCombos fetches and populates comboResult`() =
-        runTest(dispatcher) {
-            val userCardWithCard = userCardWith(elfCard)
-            every { userCardRepository.observeCollection() } returns flowOf(listOf(userCardWithCard))
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns emptyList()
-            val expected = DataResult.Success(
-                com.mmg.manahub.feature.decks.domain.model.ComboResult(complete = emptyList(), almostThere = emptyList())
-            )
-            coEvery { findCombosUseCase(any(), any()) } returns expected
-
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
-
-            vm.onSelectInspirationsTab(InspirationsTab.COMBOS)
-            advanceUntilIdle()
-
-            assertEquals(InspirationsTab.COMBOS, vm.uiState.value.inspirationsTab)
-            assertEquals(expected.data, vm.uiState.value.comboResult)
-            assertFalse(vm.uiState.value.isLoadingCombos)
-            assertTrue(vm.uiState.value.combosLoaded)
-            coVerify(exactly = 1) { findCombosUseCase(any(), any()) }
-        }
+        assertEquals(4, vm.uiState.value.inspirations.quantityOf(outletCard))
+        vm.decrementInspirationSelection(outletCard)
+        assertEquals(3, vm.uiState.value.inspirations.quantityOf(outletCard))
+    }
 
     @Test
-    fun `given the Combos tab already loaded when reselected then loadCombos is not called again`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns emptyList()
-            coEvery { findCombosUseCase(any(), any()) } returns DataResult.Success(
-                com.mmg.manahub.feature.decks.domain.model.ComboResult(complete = emptyList(), almostThere = emptyList())
-            )
+    fun `closing the sheet wipes the selection pins and searches but keeps the synergies`() = runTest(dispatcher) {
+        val vm = createVmWithInspirations()
+        advanceUntilIdle()
+        vm.openInspirations()
+        advanceUntilIdle()
+        vm.addToInspirationSelection(payoffCard, com.mmg.manahub.feature.decks.presentation.inspirations.InspirationSelectionSource.BROWSE)
+        vm.onPinInspirationsCard(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.STRATEGIES, outletCard)
 
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
-            vm.onSelectInspirationsTab(InspirationsTab.COMBOS)
-            advanceUntilIdle()
-            vm.onSelectInspirationsTab(InspirationsTab.STRATEGIES)
-            vm.onSelectInspirationsTab(InspirationsTab.COMBOS)
-            advanceUntilIdle()
+        vm.closeInspirations()
 
-            coVerify(exactly = 1) { findCombosUseCase(any(), any()) }
-        }
+        val state = vm.uiState.value.inspirations
+        assertFalse(state.isOpen)
+        assertTrue(state.selection.isEmpty())
+        assertNull(state.strategiesPicker.pinned)
+        assertNotNull(state.synergies)
+    }
 
     @Test
-    fun `given findCombosUseCase throws when the Combos tab is selected then comboResult degrades to EMPTY, never crashes`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            coEvery { discoverSynergiesV2UseCase(any(), any()) } returns emptyList()
-            coEvery { findCombosUseCase(any(), any()) } throws RuntimeException("Spellbook down")
+    fun `combos are never fetched until a card is pinned in the Combos tab`() = runTest(dispatcher) {
+        val vm = createVmWithInspirations()
+        advanceUntilIdle()
+        vm.openInspirations()
+        vm.onSelectInspirationsTab(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.COMBOS)
+        vm.onInspirationsQueryChange(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.COMBOS, "blood")
+        advanceUntilIdle()
 
-            val vm = createVmWithInspirationsV2()
-            advanceUntilIdle()
-            vm.onSelectInspirationsTab(InspirationsTab.COMBOS)
-            advanceUntilIdle()
-
-            assertEquals(
-                com.mmg.manahub.feature.decks.domain.model.ComboResult.EMPTY,
-                vm.uiState.value.comboResult,
-            )
-            assertTrue(vm.uiState.value.combosLoaded)
-            assertFalse(vm.uiState.value.isLoadingCombos)
-        }
+        coVerify(exactly = 0) { findCombosWithCardUseCase(any(), any(), any()) }
+        assertEquals(listOf("Blood Artist"), vm.uiState.value.inspirations.combosPicker.results.map { it.name })
+    }
 
     @Test
-    fun `given findCombosUseCase is null when the Combos tab is selected then comboResult degrades to EMPTY without a crash`() =
-        runTest(dispatcher) {
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
+    fun `pinning a card fetches its combos and resolves unowned pieces in one batched lookup`() = runTest(dispatcher) {
+        val missingPiece = card(id = "zulaport-1", name = "Zulaport Cutthroat", typeLine = "Creature")
+        coEvery { findCombosWithCardUseCase("Blood Artist", DeckFormat.CASUAL, 0) } returns DataResult.Success(
+            com.mmg.manahub.feature.decks.domain.model.CardComboPage(
+                combos = listOf(combo("owned", "Blood Artist", "Carrion Feeder"), combo("near", "Blood Artist", "Zulaport Cutthroat")),
+                totalCount = 2,
+                hasMore = false,
+            ),
+        )
+        coEvery { cardRepository.lookupCardsByIdentifiers(any()) } returns DataResult.Success(
+            com.mmg.manahub.core.domain.repository.CardLookupResult(cards = listOf(missingPiece), notFound = emptyList()),
+        )
+        val vm = createVmWithInspirations()
+        advanceUntilIdle()
+        vm.openInspirations()
 
-            val vm = createVm() // findCombosUseCase defaults to null here
-            advanceUntilIdle()
-            vm.onSelectInspirationsTab(InspirationsTab.COMBOS)
-            advanceUntilIdle()
+        vm.onPinInspirationsCard(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.COMBOS, payoffCard)
+        advanceUntilIdle()
 
-            assertEquals(
-                com.mmg.manahub.feature.decks.domain.model.ComboResult.EMPTY,
-                vm.uiState.value.comboResult,
-            )
-            assertTrue(vm.uiState.value.combosLoaded)
+        val state = vm.uiState.value.inspirations
+        assertEquals(listOf("owned", "near"), state.combos.map { it.combo.id })
+        assertEquals(emptyList<String>(), state.combos.first().missingCardNames)
+        assertEquals(listOf("Zulaport Cutthroat"), state.combos.last().missingCardNames)
+        assertEquals(missingPiece, state.comboCard("zulaport cutthroat"))
+        coVerify(exactly = 1) {
+            cardRepository.lookupCardsByIdentifiers(listOf(com.mmg.manahub.core.domain.repository.CardLookupIdentifier(name = "Zulaport Cutthroat")))
         }
+    }
+
+    @Test
+    fun `a combo with a piece illegal in the deck format is hidden`() = runTest(dispatcher) {
+        val bannedPiece = card(id = "banned-2", name = "Banned Piece", typeLine = "Creature", legalityModern = "banned")
+        coEvery { findCombosWithCardUseCase(any(), DeckFormat.MODERN, 0) } returns DataResult.Success(
+            com.mmg.manahub.feature.decks.domain.model.CardComboPage(
+                combos = listOf(combo("legal", "Blood Artist", "Carrion Feeder"), combo("illegal", "Blood Artist", "Banned Piece")),
+                totalCount = 2,
+                hasMore = false,
+            ),
+        )
+        coEvery { cardRepository.lookupCardsByIdentifiers(any()) } returns DataResult.Success(
+            com.mmg.manahub.core.domain.repository.CardLookupResult(cards = listOf(bannedPiece), notFound = emptyList()),
+        )
+        val vm = createVmWithInspirations(format = "modern")
+        advanceUntilIdle()
+        vm.openInspirations()
+
+        vm.onPinInspirationsCard(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.COMBOS, payoffCard)
+        advanceUntilIdle()
+
+        assertEquals(listOf("legal"), vm.uiState.value.inspirations.combos.map { it.combo.id })
+    }
+
+    @Test
+    fun `adding combos to the selection never bumps a shared piece and the seeds carry exact copies`() = runTest(dispatcher) {
+        coEvery { findCombosWithCardUseCase(any(), any(), 0) } returns DataResult.Success(
+            com.mmg.manahub.feature.decks.domain.model.CardComboPage(
+                combos = listOf(combo("a", "Blood Artist", "Carrion Feeder"), combo("b", "Blood Artist", "Soul Warden")),
+                totalCount = 2,
+                hasMore = false,
+            ),
+        )
+        val vm = createVmWithInspirations()
+        advanceUntilIdle()
+        vm.openInspirations()
+        vm.onPinInspirationsCard(com.mmg.manahub.feature.decks.presentation.inspirations.InspirationsTab.COMBOS, payoffCard)
+        advanceUntilIdle()
+        repeat(3) { vm.addToInspirationSelection(payoffCard, com.mmg.manahub.feature.decks.presentation.inspirations.InspirationSelectionSource.PINNED) }
+
+        vm.uiState.value.inspirations.combos.forEach(vm::addComboToInspirationSelection)
+        val seeds = vm.consumeInspirationSeedCards()
+
+        assertEquals(mapOf("payoff-1" to 3, "outlet-1" to 1, "healer-1" to 1), seeds.toMap())
+        assertTrue(vm.uiState.value.inspirations.selection.isEmpty())
+        assertFalse(vm.uiState.value.inspirations.isOpen)
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Group 22 — changeFormat (Group B / B1)
@@ -2529,7 +2984,7 @@ class DeckStudioViewModelTest {
             stubResolvableDeck()
             val vm = createVm()
             advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
             assertTrue("suggestionsLoaded must be true before format change",
                 vm.uiState.value.suggestionsLoaded)
@@ -2754,7 +3209,7 @@ class DeckStudioViewModelTest {
                 savedStateHandle = SavedStateHandle(emptyMap()),
             )
             advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
             assertTrue("suggestionsLoaded must be true before import", vm.uiState.value.suggestionsLoaded)
 
@@ -3229,7 +3684,7 @@ class DeckStudioViewModelTest {
         stubResolvableDeck()
         val vm = createVm()
         advanceUntilIdle()
-        vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+        vm.onSelectTab(DeckStudioTab.ANALYSIS)
         advanceUntilIdle()
         assertTrue("suggestionsLoaded must be true before applyLandSuggestions",
             vm.uiState.value.suggestionsLoaded)
@@ -3278,7 +3733,7 @@ class DeckStudioViewModelTest {
             coEvery { cardRepository.getCardById(vinSpell.scryfallId) } returns DataResult.Success(vinSpell)
             every { userCardRepository.observeCollection() } returns flowOf(emptyList())
 
-            val vm = createVmWithScorer()
+            val vm = createVm()
             advanceUntilIdle()
 
             // Act — the Build tab's own suggested total (sum of positive per-color deltas; see
@@ -3309,21 +3764,323 @@ class DeckStudioViewModelTest {
                 fixedSkeleton.lands.ideal,
             )
 
-            val profile = scorer.profile(
-                mainboard = listOf(
-                    DeckEntry(card = vinCreature, quantity = 4, isOwned = true, isSideboard = false),
-                    DeckEntry(card = vinSpell, quantity = 4, isOwned = true, isSideboard = false),
-                ),
-                format = DeckFormat.VINTAGE,
-                colorIdentity = colorIdentity,
-                seedTags = emptyList(),
-            )
+            // Deck Wizard UX polish plan, Run 1 §1.1: resolveStudioLandTarget always calls
+            // LandTargetResolver.resolve with profile = null (intentionally bypassing
+            // dynamicLandIdeal), so the expected value here must match that, not a real profile.
             val expectedTarget = LandTargetResolver.resolve(
                 format = DeckFormat.VINTAGE,
                 archetypeSkeleton = fixedSkeleton,
-                profile = profile,
+                profile = null,
             )
 
             assertEquals(expectedTarget, buildTabTarget)
+        }
+
+    // Deck Wizard UX polish plan, Run 2 (Run 1 carry-over): a REAL colourless 60-card mainboard
+    // (no commander) must plan Wastes exactly like the wizard did at build time -- the old
+    // `identity.isEmpty() && commanderIdentity == null` gate skipped planning for it and turned the
+    // wizard's own Wastes fill into "remove N Wastes" deltas on reopen.
+    @Test
+    fun `a colourless 60-card mainboard plans Wastes -- the wizard's own Wastes fill reads back as zero deltas`() =
+        runTest(dispatcher) {
+            val golem = card(
+                id = "golem-1", name = "Colourless Golem", typeLine = "Artifact Creature — Golem",
+                colorIdentity = emptyList(), colors = emptyList(), manaCost = "{3}",
+            )
+            val wastes = card(
+                id = "wastes-1", name = "Wastes", typeLine = "Basic Land",
+                colorIdentity = emptyList(), colors = emptyList(),
+            )
+            coEvery { cardRepository.getCardById(golem.scryfallId) } returns DataResult.Success(golem)
+            coEvery { cardRepository.getCardById(wastes.scryfallId) } returns DataResult.Success(wastes)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            fun deck(wastesCount: Int) = DeckWithCards(
+                deck = Deck(id = DECK_ID, name = "Golems", format = "standard"),
+                mainboard = listOfNotNull(
+                    DeckSlot(golem.scryfallId, 24),
+                    DeckSlot(wastes.scryfallId, wastesCount).takeIf { wastesCount > 0 },
+                ),
+                sideboard = emptyList(),
+            )
+
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deck(wastesCount = 0))
+            val withoutWastes = createVm()
+            advanceUntilIdle()
+            val deltas = withoutWastes.uiState.value.landDeltas
+            assertEquals("only a Wastes delta may be planned for a colourless mainboard", listOf("Wastes"), deltas.map { it.landName })
+            val wastesTarget = deltas.single().delta
+            assertTrue("a colourless mainboard must get a positive Wastes suggestion, got $wastesTarget", wastesTarget > 0)
+
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deck(wastesCount = wastesTarget))
+            val withWastes = createVm()
+            advanceUntilIdle()
+            assertEquals(emptyList<LandDelta>(), withWastes.uiState.value.landDeltas)
+        }
+
+    @Test
+    fun `a spell-less deck with no commander yields no land deltas at all, never remove-every-basic`() =
+        runTest(dispatcher) {
+            val forest = card(
+                id = "forest-1", name = "Forest", typeLine = "Basic Land — Forest",
+                colorIdentity = listOf("G"), colors = emptyList(), tags = emptyList(),
+            )
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+                DeckWithCards(
+                    deck = Deck(id = DECK_ID, name = "Lands only", format = "standard"),
+                    mainboard = listOf(DeckSlot(forest.scryfallId, 20)),
+                    sideboard = emptyList(),
+                )
+            )
+            coEvery { cardRepository.getCardById(forest.scryfallId) } returns DataResult.Success(forest)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+            val vm = createVm()
+            advanceUntilIdle()
+
+            assertEquals(emptyList<LandDelta>(), vm.uiState.value.landDeltas)
+        }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  GROUP — Deck Wizard UX polish plan, Run 1 §1.6: scoreStrategyMatches
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun fakeHealth(score: Int): DeckHealth =
+        DeckHealth(evaluation = mockk(relaxed = true), profile = mockk(relaxed = true), analysis = mockk { every { totalScore } returns score })
+
+    @Test
+    fun `scoreStrategyMatches publishes a score for every availableIn entry`() =
+        runTest(dispatcher) {
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+                DeckWithCards(deck = Deck(id = DECK_ID, name = "Test", format = "casual"), mainboard = listOf(DeckSlot(elfCard.scryfallId, 1)), sideboard = emptyList())
+            )
+            coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            val pipeline = mockk<DeckAnalysisPipeline>()
+            coEvery {
+                pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            } returns fakeHealth(77)
+
+            val vm = createVmWithAnalysisPipeline(pipeline)
+            advanceUntilIdle()
+
+            vm.scoreStrategyMatches()
+            advanceUntilIdle()
+
+            // elfCard's typeLine ("Creature — Elf Druid") gives it a real subtype, so
+            // ArchetypeRoleClassifier.dominantTribeKey resolves a dominant tribe -- every
+            // requiresTribe entry (e.g. "tribal") gets scored too, not left unscored.
+            val expectedIds = CuratedStrategyCatalog.ALL
+                .filter { it.availableIn(DeckFormat.CASUAL) }
+                .map { it.id }
+                .toSet()
+            val state = vm.uiState.value
+            assertEquals(expectedIds, state.strategyMatchScores.keys)
+            assertTrue("every published score must be the pipeline's own value", state.strategyMatchScores.values.all { it == 77 })
+            assertFalse("scoring must report done once every entry has resolved", state.isScoringStrategyMatches)
+            coVerify(exactly = expectedIds.size) {
+                pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `scoreStrategyMatches with an unchanged deck snapshot skips recompute entirely`() = runTest(dispatcher) {
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+            DeckWithCards(deck = Deck(id = DECK_ID, name = "Test", format = "casual"), mainboard = listOf(DeckSlot(elfCard.scryfallId, 1)), sideboard = emptyList())
+        )
+        coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+        val pipeline = mockk<DeckAnalysisPipeline>()
+        coEvery {
+            pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns fakeHealth(50)
+
+        val vm = createVmWithAnalysisPipeline(pipeline)
+        advanceUntilIdle()
+
+        vm.scoreStrategyMatches()
+        advanceUntilIdle()
+        val firstPassCount = CuratedStrategyCatalog.ALL.count { it.availableIn(DeckFormat.CASUAL) }
+
+        // Act -- reopening the sheet on the SAME deck must not re-invoke the pipeline at all.
+        vm.scoreStrategyMatches()
+        advanceUntilIdle()
+
+        coVerify(exactly = firstPassCount) {
+            pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        }
+    }
+
+    @Test
+    fun `scoreStrategyMatches recomputes after a deck mutation invalidates the cached snapshot`() = runTest(dispatcher) {
+        val deckFlow = MutableStateFlow(
+            DeckWithCards(deck = Deck(id = DECK_ID, name = "Test", format = "casual"), mainboard = listOf(DeckSlot(elfCard.scryfallId, 1)), sideboard = emptyList())
+        )
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns deckFlow
+        coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
+        coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns DataResult.Success(removalCard)
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+        val pipeline = mockk<DeckAnalysisPipeline>()
+        coEvery {
+            pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns fakeHealth(60)
+
+        val vm = createVmWithAnalysisPipeline(pipeline)
+        advanceUntilIdle()
+
+        vm.scoreStrategyMatches()
+        advanceUntilIdle()
+        val firstPassCount = CuratedStrategyCatalog.ALL.count { it.availableIn(DeckFormat.CASUAL) }
+
+        // Act -- a real deck mutation (a second card added) must invalidate the cached snapshot.
+        deckFlow.value = deckFlow.value.copy(
+            mainboard = listOf(DeckSlot(elfCard.scryfallId, 1), DeckSlot(removalCard.scryfallId, 1)),
+        )
+        advanceUntilIdle()
+        vm.scoreStrategyMatches()
+        advanceUntilIdle()
+
+        coVerify(exactly = firstPassCount * 2) {
+            pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        }
+    }
+
+    @Test
+    fun `scoreStrategyMatches leaves a requiresTribe entry unscored when the deck has no dominant tribe`() =
+        runTest(dispatcher) {
+            // removalCard (Instant, no creature subtype) carries no tribal signal at all.
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+                DeckWithCards(deck = Deck(id = DECK_ID, name = "Test", format = "casual"), mainboard = listOf(DeckSlot(removalCard.scryfallId, 1)), sideboard = emptyList())
+            )
+            coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns DataResult.Success(removalCard)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            val pipeline = mockk<DeckAnalysisPipeline>()
+            coEvery {
+                pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            } returns fakeHealth(42)
+
+            val vm = createVmWithAnalysisPipeline(pipeline)
+            advanceUntilIdle()
+
+            vm.scoreStrategyMatches()
+            advanceUntilIdle()
+
+            val tribalId = CuratedStrategyCatalog.ALL.first { it.requiresTribe }.id
+            assertTrue(
+                "a requiresTribe entry must never be scored (not even a fake 0%) when no dominant tribe exists",
+                tribalId !in vm.uiState.value.strategyMatchScores,
+            )
+        }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  GROUP — Deck Wizard UX polish plan, Run 4a: F4 (Browse identity/legality gate) + F7
+    //  (strategy scoring cancellation)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `F4 -- searchCollectionByTags on a Commander deck excludes off-identity and Commander-illegal cards even when the section predicate matches`() =
+        runTest(dispatcher) {
+            val blackDork = card(id = "dork-b", name = "Black Dork", typeLine = "Creature — Elf", colorIdentity = listOf("B"), colors = listOf("B"), tags = listOf(CardTag.MANA_DORK))
+            val bannedGreenDork = card(id = "dork-banned", name = "Banned Green Dork", typeLine = "Creature — Elf", colorIdentity = listOf("G"), colors = listOf("G"), tags = listOf(CardTag.MANA_DORK), legalityCommander = "banned")
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(commanderDeckWithCards(listOf(DeckSlot(elfCard.scryfallId, 1))))
+            every { userCardRepository.observeCollection() } returns flowOf(
+                listOf(userCardWith(elfCard), userCardWith(blackDork), userCardWith(bannedGreenDork))
+            )
+            coEvery { cardRepository.getCardById(any()) } answers {
+                DataResult.Success(listOf(elfCard, commander, blackDork, bannedGreenDork).first { it.scryfallId == firstArg() })
+            }
+            val vm = createVm()
+            advanceUntilIdle()
+
+            vm.searchCollectionByTags(setOf("mana_dork"))
+
+            assertEquals(setOf(elfCard.scryfallId), vm.uiState.value.addCardsResults.map { it.card.scryfallId }.toSet())
+        }
+
+    @Test
+    fun `F7 -- a superseded scoring pass records no non-fatals and leaves the new pass's spinner on until it ends`() =
+        runTest(dispatcher) {
+            val deckFlow = MutableStateFlow(
+                DeckWithCards(deck = Deck(id = DECK_ID, name = "Test", format = "casual"), mainboard = listOf(DeckSlot(elfCard.scryfallId, 1)), sideboard = emptyList())
+            )
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns deckFlow
+            coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
+            coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns DataResult.Success(removalCard)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val pipeline = mockk<DeckAnalysisPipeline>()
+            coEvery {
+                pipeline.analyze(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            } coAnswers {
+                gate.await()
+                fakeHealth(42)
+            }
+            val vm = createVmWithAnalysisPipeline(pipeline)
+            advanceUntilIdle()
+
+            vm.scoreStrategyMatches()
+            runCurrent() // first pass is suspended inside its first analyze()
+
+            deckFlow.value = deckFlow.value.copy(mainboard = listOf(DeckSlot(elfCard.scryfallId, 1), DeckSlot(removalCard.scryfallId, 1)))
+            advanceUntilIdle()
+            vm.scoreStrategyMatches() // snapshot changed -> cancels the first pass mid-loop
+            runCurrent()
+
+            assertTrue("the cancelled pass must not clear the new pass's spinner", vm.uiState.value.isScoringStrategyMatches)
+            io.mockk.verify(exactly = 0) { crashReporter.recordException(any()) }
+
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertFalse(vm.uiState.value.isScoringStrategyMatches)
+            io.mockk.verify(exactly = 0) { crashReporter.recordException(any()) }
+            assertEquals(
+                CuratedStrategyCatalog.ALL.filter { it.availableIn(DeckFormat.CASUAL) }.map { it.id }.toSet(),
+                vm.uiState.value.strategyMatchScores.keys,
+            )
+        }
+
+    @Test
+    fun `F16 -- applyStructuredSearch keeps the typed name filter and re-issues the search with it`() =
+        runTest(dispatcher) {
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            val queries = mutableListOf<String>()
+            coEvery { searchCardsUseCase(capture(queries)) } returns
+                DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false, totalCards = 1))
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.searchScryfallDirect("elf")
+            advanceUntilIdle()
+
+            // The sheet's preset LaunchedEffect re-fires (derived context changed / remount).
+            vm.applyStructuredSearch(AdvancedSearchQuery(criteria = listOf(SearchCriterion.CardType(setOf("Creature")))))
+            advanceUntilIdle()
+
+            assertEquals("elf", vm.uiState.value.addCardsQuery)
+            assertEquals("elf (t:Creature)", queries.last())
+        }
+
+    @Test
+    fun `F17 -- a strategy pick is ONE repository write carrying the tribe, never a second tribe write`() =
+        runTest(dispatcher) {
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            // The pick reloads the analysis afterwards; give that reload what it observes.
+            every { wishlistRepository.observeLocal() } returns flowOf(emptyList())
+            coEvery { cardRepository.searchWithRawQuery(any()) } returns emptyList()
+            val vm = createVm()
+            advanceUntilIdle()
+
+            vm.onSetArchetypeOverride(
+                archetypeId = com.mmg.manahub.feature.decks.domain.engine.ArchetypeId.AGGRO,
+                themes = listOf(com.mmg.manahub.feature.decks.domain.engine.ThemeId.TRIBAL),
+                tribe = "tribe:elf",
+            )
+            advanceUntilIdle()
+
+            io.mockk.coVerify(exactly = 1) {
+                deckRepository.updateStrategyPin(DECK_ID, "AGGRO", listOf("TRIBAL"), null, "tribe:elf")
+            }
+            io.mockk.coVerify(exactly = 0) { deckRepository.updateTribeOverride(any(), any()) }
+            io.mockk.coVerify(exactly = 0) { deckRepository.updateArchetypeOverride(any(), any(), any(), any()) }
         }
 }

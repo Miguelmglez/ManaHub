@@ -54,6 +54,14 @@ class PushTokenRepositoryImpl @Inject constructor(
         }.onFailure { Log.w(TAG, "updateLocale failed", it) }
     }
 
+    override suspend fun registerCurrentDevice() {
+        register(FirebaseMessaging.getInstance().token.await())
+    }
+
+    override suspend fun unregisterCurrentDevice() {
+        unregister(FirebaseMessaging.getInstance().token.await())
+    }
+
     private companion object {
         const val TAG = "PushTokenRepository"
     }

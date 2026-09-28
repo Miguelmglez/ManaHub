@@ -1,5 +1,8 @@
 package com.mmg.manahub.feature.tournament.presentation
 
+import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.util.recordNonFatal
+import kotlinx.coroutines.CancellationException
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -38,7 +41,7 @@ class TournamentSetupViewModel(
             )
         },
         val isCreating: Boolean  = false,
-        val error:      String?  = null,
+        val error:      TournamentSetupError? = null,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -93,13 +96,16 @@ class TournamentSetupViewModel(
 
     fun updatePlayerName(index: Int, name: String) {
         val list = _uiState.value.players.toMutableList()
-        list[index] = list[index].copy(name = name.take(MAX_PLAYER_NAME_LENGTH))
+        // A keyboard commit can land after the row was removed
+        val current = list.getOrNull(index) ?: return
+        list[index] = current.copy(name = name.take(MAX_PLAYER_NAME_LENGTH))
         _uiState.update { it.copy(players = list) }
     }
 
     fun updatePlayerTheme(index: Int, theme: PlayerThemeColors) {
         val list = _uiState.value.players.toMutableList()
-        list[index] = list[index].copy(theme = theme)
+        val current = list.getOrNull(index) ?: return
+        list[index] = current.copy(theme = theme)
         _uiState.update { it.copy(players = list) }
     }
 
@@ -107,7 +113,7 @@ class TournamentSetupViewModel(
         val state = _uiState.value
         if (state.isCreating) return
         if (state.name.isBlank()) {
-            _uiState.update { it.copy(error = "Tournament name cannot be empty") }
+            _uiState.update { it.copy(error = TournamentSetupError.NAME_REQUIRED) }
             return
         }
         // Odd player counts are allowed for Swiss and Single Elimination — the engine assigns byes.
@@ -120,19 +126,26 @@ class TournamentSetupViewModel(
             }
             runCatching {
                 repository.createTournament(
-                    name              = state.name,
+                    name              = state.name.trim(),
                     format            = state.format,
                     structure         = state.structure,
                     players           = players,
-                    matchesPerPairing = state.matchesPerPairing,
+                    // Only round robin repeats a pairing; the other engines pair each round themselves
+                    matchesPerPairing = if (state.structure == "ROUND_ROBIN") state.matchesPerPairing else 1,
                     isRandomPairings  = state.isRandomPairings,
                 )
             }.onSuccess { id ->
                 _uiState.update { it.copy(isCreating = false) }
                 _navigationEvent.send(id)
             }.onFailure { e ->
-                _uiState.update { it.copy(isCreating = false, error = e.message ?: "Failed to create tournament") }
+                if (e is CancellationException) throw e
+                _uiState.update { it.copy(isCreating = false, error = TournamentSetupError.CREATE_FAILED) }
+                FirebaseCrashlytics.getInstance().log("tournament_create_failed: structure=${state.structure}")
+                recordNonFatal("tournament_create_failed", e)
             }
         }
     }
 }
+
+/** Setup failures the screen resolves to strings (the ViewModel stays Context-free). */
+enum class TournamentSetupError { NAME_REQUIRED, CREATE_FAILED }

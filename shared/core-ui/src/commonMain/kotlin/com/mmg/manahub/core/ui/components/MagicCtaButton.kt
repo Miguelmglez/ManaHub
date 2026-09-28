@@ -8,13 +8,14 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -33,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.scale
@@ -58,6 +58,11 @@ enum class MagicCtaStyle {
     Filled,
     Outlined,
     Ghost
+}
+
+enum class MagicCtaSize {
+    Normal,
+    Compact
 }
 
 enum class MagicCtaColor {
@@ -94,9 +99,10 @@ fun MagicCtaButton(
     isLoading: Boolean = false,
     style: MagicCtaStyle = MagicCtaStyle.Filled,
     color: MagicCtaColor = MagicCtaColor.Primary,
+    size: MagicCtaSize = MagicCtaSize.Normal,
     tintIcon: Boolean = true,
     icon: (@Composable () -> Unit)? = null,
-    contentPadding: androidx.compose.foundation.layout.PaddingValues? = null,
+    contentPadding: PaddingValues? = null,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
 ) {
     val mc = MaterialTheme.magicColors
@@ -109,9 +115,9 @@ fun MagicCtaButton(
     val gradientColors = when (color) {
         MagicCtaColor.Primary -> listOf(mc.primaryAccent, mc.secondaryAccent)
         MagicCtaColor.Accent -> listOf(mc.secondaryAccent, mc.primaryAccent)
-        MagicCtaColor.Error -> listOf(mc.lifeNegative, mc.primaryAccent)
+        MagicCtaColor.Error -> listOf(mc.lifeNegative, mc.lifeNegative)
         MagicCtaColor.Gold -> listOf(mc.goldMtg, mc.secondaryAccent)
-        MagicCtaColor.Success -> listOf(mc.lifePositive, mc.primaryAccent)
+        MagicCtaColor.Success -> listOf(mc.lifePositive, mc.lifePositive)
         MagicCtaColor.Warning -> listOf(mc.lifeNegative, mc.goldMtg)
         MagicCtaColor.Info -> listOf(mc.manaU, mc.secondaryAccent)
         MagicCtaColor.Neutral -> listOf(mc.textSecondary, mc.textDisabled)
@@ -140,10 +146,16 @@ fun MagicCtaButton(
 
     val baseModifier = modifier.scale(scale)
 
-    val finalPadding = contentPadding ?: androidx.compose.foundation.layout.PaddingValues(
-        horizontal = if (text == null) spacing.md else spacing.xl,
-        vertical = spacing.md
-    )
+    val finalPadding = contentPadding ?: when (size) {
+        MagicCtaSize.Normal -> PaddingValues(
+            horizontal = if (text == null) spacing.md else spacing.xl,
+            vertical = spacing.md
+        )
+        MagicCtaSize.Compact -> PaddingValues(
+            horizontal = if (text == null) spacing.sm else spacing.md,
+            vertical = spacing.xs
+        )
+    }
 
     when (style) {
         MagicCtaStyle.Filled -> {
@@ -170,7 +182,7 @@ fun MagicCtaButton(
                     .padding(finalPadding),
                 contentAlignment = Alignment.Center
             ) {
-                CenteredButtonContent(text, isLoading, icon, if (enabled && !isLoading) contentColor else disabledContent, null, tintIcon)
+                CenteredButtonContent(text, isLoading, icon, if (enabled && !isLoading) contentColor else disabledContent, null, tintIcon, size)
             }
         }
         MagicCtaStyle.Outlined -> {
@@ -192,7 +204,7 @@ fun MagicCtaButton(
                     .padding(finalPadding),
                 contentAlignment = Alignment.Center
             ) {
-                CenteredButtonContent(text, isLoading, icon, if (enabled && !isLoading) baseColor else disabledContent, if (enabled && !isLoading) gradientBrush else null, tintIcon)
+                CenteredButtonContent(text, isLoading, icon, if (enabled && !isLoading) baseColor else disabledContent, if (enabled && !isLoading) gradientBrush else null, tintIcon, size)
             }
         }
         MagicCtaStyle.Ghost -> {
@@ -209,7 +221,7 @@ fun MagicCtaButton(
                     .padding(finalPadding),
                 contentAlignment = Alignment.Center
             ) {
-                CenteredButtonContent(text, isLoading, icon, if (enabled && !isLoading) baseColor else disabledContent, if (enabled && !isLoading) gradientBrush else null, tintIcon)
+                CenteredButtonContent(text, isLoading, icon, if (enabled && !isLoading) baseColor else disabledContent, if (enabled && !isLoading) gradientBrush else null, tintIcon, size)
             }
         }
     }
@@ -222,12 +234,18 @@ private fun CenteredButtonContent(
     icon: (@Composable () -> Unit)?,
     tintColor: Color,
     gradientBrush: Brush?,
-    tintIcon: Boolean = true
+    tintIcon: Boolean = true,
+    size: MagicCtaSize = MagicCtaSize.Normal
 ) {
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     val showIcon = isLoading || icon != null
     val hasText = !text.isNullOrBlank()
+
+    val iconBoxSize = if (size == MagicCtaSize.Compact) 16.dp else 24.dp
+    val indicatorSize = if (size == MagicCtaSize.Compact) 14.dp else 18.dp
+    val strokeWidth = if (size == MagicCtaSize.Compact) 2.dp else 2.5.dp
+    val spacerWidth = if (size == MagicCtaSize.Compact) spacing.xs else spacing.sm
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -242,15 +260,15 @@ private fun CenteredButtonContent(
             exit = fadeOut() + shrinkHorizontally()
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(24.dp)) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(iconBoxSize)) {
                     AnimatedContent(
                         targetState = isLoading,
                         label = "cta_icon_transition"
                     ) { loading ->
                         if (loading) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.5.dp,
+                                modifier = Modifier.size(indicatorSize),
+                                strokeWidth = strokeWidth,
                                 color = tintColor
                             )
                         } else icon?.let {
@@ -263,49 +281,34 @@ private fun CenteredButtonContent(
                     }
                 }
                 if (hasText) {
-                    Spacer(Modifier.width(spacing.sm))
+                    Spacer(Modifier.width(spacerWidth))
                 }
             }
         }
         
-        // Center: Text perfectly aligned thanks to identical left/right constraints
+        // Center: Text
         if (text != null) {
             Box(
                 contentAlignment = Alignment.Center
             ) {
                 val textModifier = if (gradientBrush != null) Modifier.gradientTint(gradientBrush) else Modifier
-                AutoResizeText(
-                    text = text.uppercase(),
-                    style = ty.labelLarge.copy(
+                val textStyle = if (size == MagicCtaSize.Compact) {
+                    ty.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+                } else {
+                    ty.labelLarge.copy(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.5.sp
-                    ),
+                    )
+                }
+                AutoResizeText(
+                    text = text.uppercase(),
+                    style = textStyle,
                     color = tintColor,
                     modifier = textModifier
                 )
-            }
-        }
-        
-        // Right side: Invisible clone to balance the left side
-        if (hasText) {
-            AnimatedVisibility(
-                visible = showIcon,
-                enter = fadeIn() + expandHorizontally(),
-                exit = fadeOut() + shrinkHorizontally(),
-                modifier = Modifier.alpha(0f)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(Modifier.width(spacing.sm))
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(24.dp)) {
-                        if (isLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.5.dp, color = tintColor)
-                        } else if (icon != null) {
-                            CompositionLocalProvider(LocalContentColor provides tintColor) {
-                                icon()
-                            }
-                        }
-                    }
-                }
             }
         }
     }

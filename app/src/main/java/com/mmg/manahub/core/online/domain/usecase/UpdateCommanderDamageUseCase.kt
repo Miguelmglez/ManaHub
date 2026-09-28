@@ -6,7 +6,7 @@ import javax.inject.Inject
 class UpdateCommanderDamageUseCase @Inject constructor(
     private val repository: OnlineSessionRepository,
 ) {
-    suspend fun broadcast(sessionId: String, targetSlot: Int, sourceSlot: Int, newDamage: Int) =
+    suspend fun broadcast(sessionId: String, targetSlot: Int, sourceSlot: Int, newDamage: Int): Boolean =
         repository.broadcastCommanderDamage(sessionId, targetSlot, sourceSlot, newDamage)
 
     suspend operator fun invoke(

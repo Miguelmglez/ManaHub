@@ -7,6 +7,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 
 class SinceWatermarkTest {
 
@@ -66,5 +67,28 @@ class SinceWatermarkTest {
         val corrupt = dir.resolve("corrupt.jsonl")
         Files.writeString(corrupt, "{ this is not valid json at all")
         assertEquals(emptyMap(), SinceWatermark.loadManifest(corrupt))
+    }
+
+    @Test
+    fun `complete manifest requires fingerprints and compares changed card content`() {
+        val path = Files.createTempFile("complete-watermark", ".jsonl")
+        writeJsonl(path, com.mmg.manahub.tools.tagpipeline.model.CardStrategyTagsRow.serializer(), sequenceOf(
+            buildCardStrategyTagsRow(
+                oracleId = "oracle-1", tags = emptySet(), tribes = emptySet(),
+                sources = setOf("rule_engine"), generatedAt = "2026-09-27T00:00:00Z",
+                pipelineVersion = 2, inputFingerprint = "old-hash",
+            ),
+        ))
+
+        val manifest = SinceWatermark.loadCompleteManifest(path, minimumRows = 1)
+        assertFalse(SinceWatermark.shouldReprocess("oracle-1", 2, manifest.manifest, "old-hash", manifest.fingerprints, true))
+        assertTrue(SinceWatermark.shouldReprocess("oracle-1", 2, manifest.manifest, "new-hash", manifest.fingerprints, true))
+    }
+
+    @Test
+    fun `delta sized manifest is rejected before publication`() {
+        val path = Files.createTempFile("incomplete-watermark", ".jsonl")
+        Files.writeString(path, "")
+        assertFailsWith<IllegalArgumentException> { SinceWatermark.loadCompleteManifest(path, minimumRows = 1) }
     }
 }

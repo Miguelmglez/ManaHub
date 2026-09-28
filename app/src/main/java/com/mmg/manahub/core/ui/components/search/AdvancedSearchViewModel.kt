@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.ui.components.search
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
@@ -31,6 +32,7 @@ class AdvancedSearchViewModel(
     private val scryfallDataSource: ScryfallRemoteDataSource,
     private val buildQuery: BuildScryfallQueryUseCase,
     private val userPreferencesDataStore: UserPreferencesDataStore,
+    private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
 
     data class UiState(
@@ -86,6 +88,7 @@ class AdvancedSearchViewModel(
         // the sheet with a clear (X) action -- see the Oracle text / Mana production sections.
         val oracleTerms: SearchCriterion.OracleTerms? = null,
         val manaProduction: SearchCriterion.ManaProduction? = null,
+        val sectionAlternatives: SearchCriterion.AnyOf? = null,
         val orderBy: SearchOrder = SearchOrder.NAME,
         val orderDirection: SearchDirection = SearchDirection.ASC,
         val builtQuery: String = "",
@@ -98,6 +101,15 @@ class AdvancedSearchViewModel(
         /** Which of the user's lists results come from — mutually exclusive, never intersecting. */
         val collectionSource: CollectionSource = CollectionSource.COLLECTION,
         val filterTags: Set<String> = emptySet(),
+        val filterTagQueries: Map<String, String> = emptyMap(),
+        /**
+         * Deck Wizard Commander v3 plan (Phase 3.2/3.4, D14): criteria the CALLER wants
+         * non-removable for this open (e.g. [SearchCriterion.CommanderEligible]). Seeded once per
+         * open via [setLockedCriteria], rendered read-only in the sheet, and force-merged into
+         * every [rebuildQuery] result — see [mergeLocked] — so no toggle/clear can drop them.
+         * Survives both [clearAll] and [seedFrom], which otherwise rebuild [UiState] from scratch.
+         */
+        val lockedCriteria: List<SearchCriterion> = emptyList(),
     ) {
         val hasAnyCollectionFilter: Boolean
             get() = collectionSource != CollectionSource.COLLECTION || filterTags.isNotEmpty()
@@ -105,6 +117,20 @@ class AdvancedSearchViewModel(
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    private val _sectionExpansion = MutableStateFlow(savedStateHandle.get<Map<String, Boolean>>("section_expansion") ?: emptyMap())
+    val sectionExpansion: StateFlow<Map<String, Boolean>> = _sectionExpansion.asStateFlow()
+
+    fun setSectionExpanded(key: String, expanded: Boolean) {
+        val updated = _sectionExpansion.value + (key to expanded)
+        _sectionExpansion.value = updated
+        savedStateHandle["section_expansion"] = updated
+    }
+
+    fun clearSectionAlternatives() {
+        _uiState.update { it.copy(sectionAlternatives = null) }
+        updateBuiltQuery()
+    }
 
     init {
         viewModelScope.launch {
@@ -153,13 +179,36 @@ class AdvancedSearchViewModel(
             criteria.add(SearchCriterion.Format(s.selectedFormat, s.formatLegal))
         s.oracleTerms?.let { criteria.add(it) }
         s.manaProduction?.let { criteria.add(it) }
+        s.sectionAlternatives?.let { criteria.add(it) }
         // COLLECTION is the implicit default, so it contributes no criterion (and no filter badge).
         if (s.collectionSource != CollectionSource.COLLECTION)
             criteria.add(SearchCriterion.CollectionStatus(s.collectionSource))
         if (s.filterTags.isNotEmpty())
-            criteria.add(SearchCriterion.HasTag(s.filterTags.toList()))
+            criteria.add(SearchCriterion.HasTag(s.filterTags.toList(), s.filterTagQueries.filterKeys { it in s.filterTags }))
 
-        return AdvancedSearchQuery(criteria, s.orderBy, s.orderDirection)
+        return AdvancedSearchQuery(mergeLocked(criteria, s.lockedCriteria), s.orderBy, s.orderDirection)
+    }
+
+    /**
+     * Forces every entry of [locked] into [criteria], REPLACING any existing criterion of the same
+     * subtype rather than merely appending. This is what makes a lock structural instead of a UI
+     * suggestion: the merge happens on the way OUT of the sheet (here), not by disabling whatever
+     * picker would otherwise back that criterion — e.g. a locked [SearchCriterion.Format] always
+     * wins over the Format picker's own [UiState.selectedFormat], even though that picker has no
+     * knowledge a lock exists.
+     */
+    private fun mergeLocked(criteria: List<SearchCriterion>, locked: List<SearchCriterion>): List<SearchCriterion> {
+        if (locked.isEmpty()) return criteria
+        val withoutLockedTypes = criteria.filterNot { c -> locked.any { it::class == c::class } }
+        return withoutLockedTypes + locked
+    }
+
+    /** Deck Wizard Commander v3 plan (Phase 3.2/3.4, D14): seeds the criteria this open should
+     * treat as locked — call ONCE per sheet open, before [seedFrom] (mirrors that function's own
+     * "once per open" contract). An empty list is a real, valid value (most callers have no lock). */
+    fun setLockedCriteria(criteria: List<SearchCriterion>) {
+        _uiState.update { it.copy(lockedCriteria = criteria) }
+        updateBuiltQuery()
     }
 
     private fun updateBuiltQuery() {
@@ -311,10 +360,17 @@ class AdvancedSearchViewModel(
         updateBuiltQuery()
     }
 
-    fun toggleFilterTag(key: String) {
+    fun toggleFilterTag(key: String, verifiedScryfallQuery: String? = null) {
         val current = _uiState.value.filterTags.toMutableSet()
-        if (current.contains(key)) current.remove(key) else current.add(key)
-        _uiState.update { it.copy(filterTags = current) }
+        val queries = _uiState.value.filterTagQueries.toMutableMap()
+        if (current.contains(key)) {
+            current.remove(key)
+            queries.remove(key)
+        } else {
+            current.add(key)
+            if (verifiedScryfallQuery != null) queries[key] = verifiedScryfallQuery
+        }
+        _uiState.update { it.copy(filterTags = current, filterTagQueries = queries) }
         updateBuiltQuery()
     }
 
@@ -325,9 +381,12 @@ class AdvancedSearchViewModel(
         updateBuiltQuery()
     }
 
-    /** [priceCurrency] is a user preference, not a search criterion, so it survives a clear. */
+    /** [priceCurrency] is a user preference, not a search criterion, so it survives a clear —
+     * [lockedCriteria][UiState.lockedCriteria] too (D14: a lock must survive Clear All, since
+     * clearing the form is exactly the case a removable "lock" would otherwise defeat). */
     fun clearAll() {
-        _uiState.value = UiState(priceCurrency = _uiState.value.priceCurrency)
+        val locked = _uiState.value.lockedCriteria
+        _uiState.value = UiState(priceCurrency = _uiState.value.priceCurrency, lockedCriteria = locked)
         updateBuiltQuery()
     }
 
@@ -352,7 +411,7 @@ class AdvancedSearchViewModel(
      */
     fun seedFrom(query: AdvancedSearchQuery) {
         val previous = _uiState.value
-        var next = UiState(priceCurrency = previous.priceCurrency)
+        var next = UiState(priceCurrency = previous.priceCurrency, lockedCriteria = previous.lockedCriteria)
         query.criteria.forEach { criterion ->
             next = when (criterion) {
                 is SearchCriterion.Name -> next.copy(nameValue = criterion.value, nameExact = criterion.exact)
@@ -366,6 +425,7 @@ class AdvancedSearchViewModel(
                     cardFunction = criterion.functions,
                     cardFunctionMatchAll = criterion.matchAll,
                 )
+                is SearchCriterion.AnyOf -> next.copy(sectionAlternatives = criterion)
                 is SearchCriterion.Colors -> next.copy(
                     selectedColors = criterion.colors,
                     colorMode = criterion.mode,
@@ -395,7 +455,15 @@ class AdvancedSearchViewModel(
                 is SearchCriterion.ManaProduction -> next.copy(manaProduction = criterion)
                 is SearchCriterion.OracleTerms -> next.copy(oracleTerms = criterion)
                 is SearchCriterion.CollectionStatus -> next.copy(collectionSource = criterion.source)
-                is SearchCriterion.HasTag -> next.copy(filterTags = criterion.keys.toSet())
+                is SearchCriterion.HasTag -> next.copy(
+                    filterTags = criterion.keys.toSet(),
+                    filterTagQueries = criterion.verifiedScryfallQueries,
+                )
+                // Deck Wizard Commander v3 plan (Phase 3.4, D14): no backing UiState field --
+                // CommanderEligible is only ever seeded via a caller's `lockedCriteria`, not this
+                // sheet's own toggleable filters, so it is a no-op here (same convention as Loyalty/
+                // Language/Artist/FlavorText above).
+                SearchCriterion.CommanderEligible -> next
             }
         }
         // Edge-case QA fix (LOW, 2026-09-06): seedFrom used to only walk query.criteria, silently

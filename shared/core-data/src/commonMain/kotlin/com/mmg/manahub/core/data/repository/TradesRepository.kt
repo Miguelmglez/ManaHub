@@ -38,6 +38,15 @@ interface TradesRepository {
         includesReviewFromReceiver: Boolean,
         autoSend: Boolean,
     ): Result<String>
+    /** Sends a stable request key so a retried create returns its first proposal. */
+    suspend fun createProposalWithRequestId(
+        receiverId: String,
+        items: List<TradeItemRequestDto>,
+        includesReviewFromProposer: Boolean,
+        includesReviewFromReceiver: Boolean,
+        autoSend: Boolean,
+        clientRequestId: String,
+    ): Result<String> = createProposal(receiverId, items, includesReviewFromProposer, includesReviewFromReceiver, autoSend)
     suspend fun editProposal(
         proposalId: String,
         expectedVersion: Int,
@@ -52,6 +61,13 @@ interface TradesRepository {
         items: List<TradeItemRequestDto>,
         reviewFlags: ReviewFlags,
     ): Result<String>
+    /** Sends a stable request key so a retried counter returns its first proposal. */
+    suspend fun counterProposalWithRequestId(
+        parentProposalId: String,
+        items: List<TradeItemRequestDto>,
+        reviewFlags: ReviewFlags,
+        clientRequestId: String,
+    ): Result<String> = counterProposal(parentProposalId, items, reviewFlags)
     suspend fun acceptProposal(proposalId: String): Result<Unit>
     suspend fun revokeAcceptance(proposalId: String): Result<Unit>
     suspend fun markCompleted(proposalId: String): Result<Unit>

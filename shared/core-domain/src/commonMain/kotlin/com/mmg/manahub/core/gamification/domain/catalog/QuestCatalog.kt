@@ -70,7 +70,8 @@ object QuestCatalog {
             weightClass = QuestWeightClass.ACCESSIBLE, target = 1, xpReward = XpConfig.dailyQuestClaim,
             title = "Tinkerer", description = "Create or save a deck.",
             emoji = "🛠️", reactsTo = setOf(DECK_CREATED, DECK_SAVED),
-            advance = { 1 },
+            // Imported/community/draft decks are not "built" by the user.
+            advance = { e -> if (e is ProgressionEvent.DeckCreated && !e.source.isUserAuthored) 0 else 1 },
         ),
         QuestTemplate(
             id = "daily_explore_deck_doctor", period = QuestPeriod.DAILY,

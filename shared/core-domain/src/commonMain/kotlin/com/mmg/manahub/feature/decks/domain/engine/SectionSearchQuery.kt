@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.decks.domain.engine
+// COMMENTS_REVIEWED: 2026-09-10
 
 import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.ColorMatchMode
 import com.mmg.manahub.core.model.ComparisonOperator
 import com.mmg.manahub.core.model.DeckFormat
@@ -102,11 +104,14 @@ object SectionSearchQuery {
         sectionId == "illegal" -> null
         sectionId == "mana_rock" -> "function:mana-rock"
         sectionId == "mana_dork" -> "function:mana-dork"
+        // Deck Wizard 60-card wave (v6), plan §5 Phase 3.2: the new "lands" section -- plain land
+        // type, no color/production filter (that is what "produces:X" is already for).
+        sectionId == "lands" -> "t:land"
         sectionId.startsWith("produces:") ->
             "t:land produces:${sectionId.removePrefix("produces:")}"
         sectionId.startsWith("mv:") -> curveFragment(sectionId.removePrefix("mv:"))
         sectionId.startsWith("role:") -> roleFragment(sectionId.removePrefix("role:"), context)
-        sectionId.startsWith("fingerprint:") -> ROLE_ORACLE_FRAGMENTS[sectionId.removePrefix("fingerprint:")]
+        sectionId.startsWith("engine:") -> engineFragment(sectionId)
         sectionId.startsWith(TribeDeriver.TRIBE_PREFIX) -> tribeFragment(sectionId)
         else -> null
     }
@@ -158,6 +163,24 @@ object SectionSearchQuery {
     }
 
     /**
+     * Local mirror of [toAdvancedQuery]'s identity + legality half for a section-predicate
+     * Collection browse ([SectionMembership.predicate] is category-only): the SAME
+     * [isLegalForFormat] the add path applies, plus identity containment. [enforceIdentity]
+     * defaults to the Commander-family rule [identityCriterion] encodes; a caller whose identity
+     * is user-picked (a 60-card Colors/Strategy flow) opts in, a Cards flow (seeds define the
+     * identity) opts out.
+     */
+    fun localStructuralGate(
+        context: SectionQueryContext,
+        enforceIdentity: Boolean = ArchetypeFormat.of(context.format) == ArchetypeFormat.COMMANDER,
+    ): (Card) -> Boolean {
+        val identitySymbols = context.colorIdentity.map { it.symbol }.toSet()
+        return { card ->
+            isLegalForFormat(card, context.format) && (!enforceIdentity || identitySymbols.containsAll(card.colorIdentity))
+        }
+    }
+
+    /**
      * [SearchCriterion] mirror of [identityClause] — `null`/non-null under the EXACT same
      * conditions, same WUBRG-ordered color set, and now the same explicit operator: the clause
      * builds `id<=`, so the criterion carries [ColorMatchMode.AT_MOST].
@@ -169,7 +192,8 @@ object SectionSearchQuery {
     private fun identityCriterion(context: SectionQueryContext): SearchCriterion? {
         if (ArchetypeFormat.of(context.format) != ArchetypeFormat.COMMANDER) return null
         val colored = WUBRG_ORDER.filter { it in context.colorIdentity }
-        if (colored.isEmpty()) return null
+        // The renderer emits a C-only AT_MOST set as `id=c` -- the same colourless-only pool as `id<=c`.
+        if (colored.isEmpty()) return SearchCriterion.ColorIdentity(colors = setOf("C"), mode = ColorMatchMode.AT_MOST)
         return SearchCriterion.ColorIdentity(
             colors = colored.map { it.symbol }.toSet(),
             mode = ColorMatchMode.AT_MOST,
@@ -177,9 +201,13 @@ object SectionSearchQuery {
     }
 
     /** [SearchCriterion] mirror of [legalityClause] — same format→Scryfall-format-name mapping,
-     * `null` for the same 2 formats. [SearchCriterion.Format]'s `f:<x>` rendering is a confirmed
-     * live alias of `legal:<x>` (both return identical result sets on Scryfall). */
-    private fun legalityCriterion(format: DeckFormat): SearchCriterion? {
+     * same null cases. [SearchCriterion.Format]'s `f:<x>` rendering is a confirmed live alias of
+     * `legal:<x>` (both return identical result sets on Scryfall). Promoted from `private` to
+     * `public` (Deck Wizard 60-card wave v6, plan §5 Phase 5.2) — `internal` would not be visible
+     * across the `:shared:core-domain` -> `:app` module boundary; SEED_PICK's own
+     * `seedLockedCriteria` (`app/.../DeckWizardSixtySteps.kt`) reuses this ONE format→Scryfall
+     * legality mapping rather than a second, wizard-local copy. */
+    fun legalityCriterion(format: DeckFormat): SearchCriterion? {
         val scryfallFormat = when (format) {
             DeckFormat.STANDARD -> "standard"
             DeckFormat.PIONEER -> "pioneer"
@@ -187,8 +215,8 @@ object SectionSearchQuery {
             DeckFormat.LEGACY -> "legacy"
             DeckFormat.VINTAGE -> "vintage"
             DeckFormat.PAUPER -> "pauper"
-            DeckFormat.COMMANDER, DeckFormat.COMMANDER_CASUAL -> "commander"
-            DeckFormat.CASUAL, DeckFormat.DRAFT -> null
+            DeckFormat.COMMANDER -> "commander"
+            DeckFormat.COMMANDER_CASUAL, DeckFormat.CASUAL, DeckFormat.DRAFT -> null
         } ?: return null
         return SearchCriterion.Format(format = listOf(scryfallFormat), legal = true)
     }
@@ -203,12 +231,14 @@ object SectionSearchQuery {
         sectionId == "illegal" -> null
         sectionId == "mana_rock" -> listOf(SearchCriterion.CardFunction(setOf("mana-rock")))
         sectionId == "mana_dork" -> listOf(SearchCriterion.CardFunction(setOf("mana-dork")))
+        // Mirrors tribeCriteria's own shape (a single CardType criterion, no exclude flag).
+        sectionId == "lands" -> listOf(SearchCriterion.CardType(setOf("land")))
         sectionId.startsWith("produces:") -> listOf(
             SearchCriterion.ManaProduction(colors = setOf(sectionId.removePrefix("produces:")), requireLand = true),
         )
         sectionId.startsWith("mv:") -> curveCriteria(sectionId.removePrefix("mv:"))
         sectionId.startsWith("role:") -> roleCriteria(sectionId.removePrefix("role:"), context)
-        sectionId.startsWith("fingerprint:") -> ROLE_CRITERIA[sectionId.removePrefix("fingerprint:")]
+        sectionId.startsWith("engine:") -> engineCriteria(sectionId)
         sectionId.startsWith(TribeDeriver.TRIBE_PREFIX) -> tribeCriteria(sectionId)
         else -> null
     }
@@ -262,33 +292,61 @@ object SectionSearchQuery {
         return SearchCriterion.OracleTerms(anyOfGroups = listOf(terms))
     }
 
-    /**
-     * Local collection filter: the [com.mmg.manahub.core.model.CardTag] keys equivalent to this
-     * section, for pre-filtering `CardSearchSheet`'s Collection tab.
-     *
-     * `role:*`/`fingerprint:*` ids: per D6 the [RoleKey] vocabulary and the tagging engine's
-     * [com.mmg.manahub.core.model.CardTag] vocabulary are largely the SAME string keys -- BUT the
-     * task brief explicitly asked to verify this, not trust it. All 37 [RoleKey]s referenced from
-     * `ArchetypeData`'s bands were spot-checked against `TagDictionary.kt`'s current entries; 5 do
-     * NOT have a matching `CardTag` key: `removal_spot` / `removal_mass` (only a generic
-     * `"removal"` tag exists, which would incorrectly conflate spot removal with board wipes),
-     * `finisher` (no such tag at all), `equipment_or_aura` (only `"equipment"` and
-     * `"equipment_matters"` exist, neither an exact match), and `tribe_members` (tribe membership
-     * is a runtime [TribeDeriver.subtypeKeys] structural fact, not a static tag). Those 5 return
-     * `emptySet()` rather than guessing a near-miss key. [NO_COLLECTION_TAG_EQUIVALENT] is that
-     * exception list.
-     *
-     * `tribe:*` ids also return `emptySet()`: a `tribe:elf` fingerprint key is a runtime-derived
-     * label ([TribeDeriver.tribeKeys]), never a literal [com.mmg.manahub.core.model.CardTag] on
-     * any card -- the local equivalent is the same structural subtype predicate the curve/mana/
-     * legality/offplan ids already fall back to (per the plan's own instruction for those).
-     */
-    fun collectionTagKeysFor(sectionId: String): Set<String> = when {
-        sectionId.startsWith("role:") -> tagKeyOrEmpty(sectionId.removePrefix("role:"))
-        sectionId.startsWith("fingerprint:") -> tagKeyOrEmpty(sectionId.removePrefix("fingerprint:"))
-        sectionId == "mana_rock" -> setOf("mana_rock")
-        sectionId == "mana_dork" -> setOf("mana_dork")
-        else -> emptySet() // tribe:*, produces:*, mv:*, legal, illegal, offplan, interaction, standalone -- structural, not tag-keyed
+    // ── Engines (Deck Wizard Commander v5, D2/D3) — "engine:<axis>:producers"/"engine:<axis>:payoffs".
+    // Union of the axis's producer/payoff RoleKeys (ArchetypeRoleClassifier.AXIS_PRODUCES/
+    // AXIS_CONSUMES inverse), except ENGINE itself (its two sides are hardcoded in SynergyGraph.
+    // buildCardProfile, not in those tables) and SPELLS/ARTIFACTS/ENCHANTMENTS' producer side
+    // (a raw type-line density signal, not a role -- see SynergyGraph.structuralProducerAxes).
+
+    private val ENGINE_PRODUCER_ROLE_OVERRIDES: Map<AxisKey, Set<RoleKey>> = mapOf("ENGINE" to setOf("counterspell", "protection"))
+    private val ENGINE_PAYOFF_ROLE_OVERRIDES: Map<AxisKey, Set<RoleKey>> = mapOf(
+        "ENGINE" to setOf("finisher"),
+        "PLANESWALKERS" to setOf("protection", "proliferate_source"),
+    )
+    private val ENGINE_PRODUCER_TYPE_FRAGMENT: Map<AxisKey, String> = mapOf(
+        "SPELLS" to "(t:instant or t:sorcery)",
+        "ARTIFACTS" to "t:artifact",
+        "ENCHANTMENTS" to "t:enchantment",
+    )
+    private val ENGINE_PRODUCER_TYPE_CRITERIA: Map<AxisKey, SearchCriterion> = mapOf(
+        "SPELLS" to SearchCriterion.CardType(setOf("instant", "sorcery"), matchAll = false),
+        "ARTIFACTS" to SearchCriterion.CardType(setOf("artifact")),
+        "ENCHANTMENTS" to SearchCriterion.CardType(setOf("enchantment")),
+    )
+
+    private fun engineRoleKeys(axis: AxisKey, isProducerSide: Boolean): Set<RoleKey> =
+        if (isProducerSide) ENGINE_PRODUCER_ROLE_OVERRIDES[axis] ?: ArchetypeRoleClassifier.producerRoleKeysForAxis(axis)
+        else ENGINE_PAYOFF_ROLE_OVERRIDES[axis] ?: ArchetypeRoleClassifier.payoffRoleKeysForAxis(axis)
+
+    private fun orJoinFragments(fragments: List<String>): String? = when (fragments.size) {
+        0 -> null
+        1 -> fragments[0]
+        else -> "(" + fragments.joinToString(" or ") { if (it.contains(' ')) "($it)" else it } + ")"
+    }
+
+    private fun engineFragment(sectionId: String): String? {
+        val (axis, side) = parseEngineSectionId(sectionId) ?: return null
+        val isProducerSide = side == "producers"
+        if (isProducerSide) ENGINE_PRODUCER_TYPE_FRAGMENT[axis]?.let { return it }
+        val roles = engineRoleKeys(axis, isProducerSide)
+        return orJoinFragments(roles.mapNotNull { ROLE_ORACLE_FRAGMENTS[it] })
+    }
+
+    /** Retains every role alternative, including mixed function, Oracle and structural rules. */
+    private fun engineCriteria(sectionId: String): List<SearchCriterion>? {
+        val (axis, side) = parseEngineSectionId(sectionId) ?: return null
+        val isProducerSide = side == "producers"
+        if (isProducerSide) ENGINE_PRODUCER_TYPE_CRITERIA[axis]?.let { return listOf(it) }
+        val roles = engineRoleKeys(axis, isProducerSide)
+        val alternatives = roles.mapNotNull { ROLE_CRITERIA[it] }
+        return alternatives.takeIf { it.isNotEmpty() }?.let { listOf(SearchCriterion.AnyOf(it)) }
+    }
+
+    private fun parseEngineSectionId(sectionId: String): Pair<AxisKey, String>? {
+        val body = sectionId.removePrefix("engine:")
+        val separatorIndex = body.lastIndexOf(':')
+        if (separatorIndex <= 0) return null
+        return body.substring(0, separatorIndex) to body.substring(separatorIndex + 1)
     }
 
     // ── Identity / legality composition ─────────────────────────────────────────────────────
@@ -299,25 +357,19 @@ object SectionSearchQuery {
     /**
      * `id<=WUBG` for Commander-family formats (COMMANDER + COMMANDER_CASUAL, via
      * [ArchetypeFormat.of] -- the same distinction [AnalysisEngine] already uses), omitted for
-     * 60-card/Draft formats whose legal pool is not identity-bounded. Colorless-only identity
-     * (`{C}` with no WUBRG colors, or a genuinely colorless deck) omits the clause entirely --
-     * `id<=C` is never useful ("colorless or less" adds no filtering `id<=` doesn't already do by
-     * being empty).
+     * 60-card/Draft formats whose legal pool is not identity-bounded. An EMPTY Commander identity
+     * (a colourless commander) is a real constraint -- `id<=c` -- so the All-cards tab lists the
+     * same colourless-only pool [localStructuralGate] admits.
      */
     private fun identityClause(context: SectionQueryContext): String? {
         if (ArchetypeFormat.of(context.format) != ArchetypeFormat.COMMANDER) return null
         val colored = WUBRG_ORDER.filter { it in context.colorIdentity }
-        if (colored.isEmpty()) return null
+        if (colored.isEmpty()) return "id<=c"
         return "id<=" + colored.joinToString("") { it.symbol }
     }
 
-    /**
-     * `legal:<format>` for every format with a live Scryfall legality list. [DeckFormat
-     * .COMMANDER_CASUAL] maps to the SAME `legal:commander` pool as [DeckFormat.COMMANDER] --
-     * "Casual" here is this app's own relaxed deck-BUILDING rules (no format legality difference
-     * from Scryfall's point of view). [DeckFormat.CASUAL]/[DeckFormat.DRAFT] have no Scryfall
-     * legality list to filter by and are omitted, per the plan.
-     */
+    /** `legal:<format>` for every format [isLegalForFormat] enforces (R7: Commander only among the
+     * Commander-family formats; every other permissive format is omitted here too). */
     private fun legalityClause(format: DeckFormat): String? = when (format) {
         DeckFormat.STANDARD -> "legal:standard"
         DeckFormat.PIONEER -> "legal:pioneer"
@@ -325,8 +377,8 @@ object SectionSearchQuery {
         DeckFormat.LEGACY -> "legal:legacy"
         DeckFormat.VINTAGE -> "legal:vintage"
         DeckFormat.PAUPER -> "legal:pauper"
-        DeckFormat.COMMANDER, DeckFormat.COMMANDER_CASUAL -> "legal:commander"
-        DeckFormat.CASUAL, DeckFormat.DRAFT -> null
+        DeckFormat.COMMANDER -> "legal:commander"
+        DeckFormat.COMMANDER_CASUAL, DeckFormat.CASUAL, DeckFormat.DRAFT -> null
     }
 
     // ── Curve ────────────────────────────────────────────────────────────────────────────────
@@ -353,16 +405,6 @@ object SectionSearchQuery {
         if (key == "tribe_members") context.dominantTribe?.let { "t:$it" }
         else ROLE_ORACLE_FRAGMENTS[key]
 
-    private fun tagKeyOrEmpty(key: RoleKey): Set<String> =
-        if (key in NO_COLLECTION_TAG_EQUIVALENT) emptySet() else setOf(key)
-
-    /** Role keys spot-checked against `TagDictionary.kt` with NO matching `CardTag` key (see
-     * [collectionTagKeysFor] KDoc). All 37 [RoleKey]s referenced by [ArchetypeData]'s bands were
-     * checked; these 5 are the only misses. */
-    private val NO_COLLECTION_TAG_EQUIVALENT: Set<RoleKey> = setOf(
-        "removal_spot", "removal_mass", "finisher", "equipment_or_aura", "tribe_members",
-    )
-
     // ── Plan roles -- direct oracle tag (W3 table 1, 20 rows) ───────────────────────────────
 
     private val DIRECT_ORACLE_TAGS: Map<RoleKey, String> = mapOf(
@@ -387,6 +429,9 @@ object SectionSearchQuery {
         "blink_effect" to "function:blink",
         "group_effect" to "function:group-hug",
         "stax_piece" to "function:tax",
+        // Deck Wizard v4, W4.2 (G6): 5 RoleKeys ArchetypeData grew after this table was written had
+        // no fragment mapping at all -- no "Browse" button, the exact defect the user hit on Anthem.
+        "anthem" to "function:anthem",
     )
 
     // ── Plan roles -- structural, constant (W3 table 2, minus tribe_members which needs
@@ -399,6 +444,8 @@ object SectionSearchQuery {
         "finisher" to "t:creature mv>=5 pow>=4",
         "planeswalker" to "t:planeswalker",
         "vehicle" to "t:vehicle",
+        // W4.2 (G6): pure type-line fact, same shape as planeswalker/vehicle above.
+        "equipment" to "t:equipment",
     )
 
     // ── Plan roles -- translated from TagDictionary DetectionRules (W3 table 3, 10 rows) ──────
@@ -458,14 +505,66 @@ object SectionSearchQuery {
             "creatures you control of the chosen type", "other creatures you control of the chosen type",
             "that share a creature type with", "choose a creature type",
         ))),
+        // Deck Wizard v4, W4.2 (G6): 3 more RoleKeys with no function: tag, added to ArchetypeData
+        // after the W3 table was written -- verified no equivalent exists in CardFunctionOption.
+        // TagDictionary.kt:744-746
+        "treasure_source" to listOf(DetectionRule(anyOf = listOf(
+            "treasure token", "gold token", "powerstone token",
+        ))),
+        // TagDictionary.kt:766-770
+        "mill_opponent" to listOf(DetectionRule(anyOf = listOf(
+            "target player mills", "each opponent mills", "that player mills",
+        ))),
+        // TagDictionary.kt:771-777 -- disambiguated from mill_opponent by excluding its phrasing.
+        "mill_self" to listOf(DetectionRule(
+            allOf = listOf("mill"),
+            noneOf = listOf("target player", "each opponent", "that player", "target opponent"),
+        )),
+        // Deck Wizard Commander v5 (Engines): 3 more Phase-1 producer/payoff roles with no function:
+        // tag, needed for engine:LIFE/COUNTERS/ATTACHED Browse -- TagDictionary.kt:734-738/739-743.
+        "lifegain_source" to listOf(
+            DetectionRule(allOf = listOf("gain", "life"), noneOf = listOf("gain control")),
+            DetectionRule(allOf = listOf("gains", "life")),
+            DetectionRule(allOf = listOf("lifelink")),
+        ),
+        "counters_source" to listOf(
+            DetectionRule(allOf = listOf("put a +1/+1 counter")),
+            DetectionRule(allOf = listOf("proliferate")),
+            DetectionRule(anyOf = listOf("adapt", "evolve", "outlast")),
+        ),
+        // TagDictionary.kt:780-785.
+        "combat_payoff" to listOf(DetectionRule(anyOf = listOf(
+            "whenever a creature you control attacks", "whenever one or more creatures you control attack",
+            "deals combat damage to a player",
+        ))),
+        // TagDictionary.kt:747-751 -- needed for engine:LANDFALL:producers Browse.
+        "extra_land_drop" to listOf(
+            DetectionRule(allOf = listOf("play an additional land")),
+            DetectionRule(allOf = listOf("put", "land", "onto the battlefield"), typeLineNoneOf = listOf("basic")),
+        ),
+        // TagDictionary.kt:760-765 -- needed for engine:ATTACK:producers Browse.
+        "haste_source" to listOf(DetectionRule(anyOf = listOf(
+            "creatures you control have haste", "other creatures you control have haste", "gains haste", "gain haste",
+        ))),
+        "graveyard_exit_source" to listOf(DetectionRule(anyOf = listOf(
+            "return target card from your graveyard", "return a card from your graveyard",
+            "from your graveyard to your hand", "from your graveyard to the battlefield", "harmonize",
+        ))),
+        "leave_graveyard_payoff" to listOf(DetectionRule(allOf = listOf("leave your graveyard"))),
+        "pseudo_evasion" to listOf(DetectionRule(anyOf = listOf(
+            "trample", "deathtouch", "first strike", "double strike",
+        ))),
+        "proliferate_source" to listOf(DetectionRule(allOf = listOf("proliferate"))),
     )
 
     private val DICTIONARY_TRANSLATED_FRAGMENTS: Map<RoleKey, String> =
         DICTIONARY_TRANSLATED_RULES.mapValues { (_, rules) -> translate(rules) }
 
-    /** Merged lookup for every constant (context-free) role fragment: 20 direct + 6 structural
-     * (excluding `tribe_members`, handled separately) + 10 dictionary-translated = 36 entries,
-     * covering every [RoleKey] [ArchetypeData] references except `tribe_members`. Shared by both
+    /** Merged lookup for every constant (context-free) role fragment: 21 direct + 7 structural
+     * (excluding `tribe_members`, handled separately) + 13 dictionary-translated = 41 entries,
+     * covering every [RoleKey] [ArchetypeData] references except `tribe_members` (W4.2, G6: added
+     * `anthem`/`equipment`/`treasure_source`/`mill_opponent`/`mill_self`, the 5 keys that grew onto
+     * `ArchetypeData` after this table was first written and had no fragment at all). Shared by both
      * `role:<key>` and `fingerprint:<key>` ids (plan: "same TagDictionary translation as the
      * roles, reuse your translator"). Widened `private` -> `internal` (W11) so
      * `SectionSearchQueryTest`'s full-coverage test can enumerate `.keys` as the single
@@ -558,6 +657,7 @@ object SectionSearchQuery {
         )
         put("planeswalker", listOf(SearchCriterion.CardType(setOf("planeswalker"))))
         put("vehicle", listOf(SearchCriterion.CardType(setOf("vehicle"))))
+        put("equipment", listOf(SearchCriterion.CardType(setOf("equipment"))))
         // Re-verified real tags (see this property's own KDoc above).
         put("sac_outlet", listOf(SearchCriterion.CardFunction(setOf("sacrifice-outlet"))))
         put("clone_theft_effect", listOf(SearchCriterion.CardFunction(setOf("theft"))))

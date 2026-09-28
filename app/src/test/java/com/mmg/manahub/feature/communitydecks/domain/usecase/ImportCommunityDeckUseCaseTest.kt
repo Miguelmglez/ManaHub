@@ -117,7 +117,7 @@ class ImportCommunityDeckUseCaseTest {
 
     @Before
     fun setUp() {
-        coEvery { deckRepository.createDeck(any(), any(), any()) } returns testDeckId
+        coEvery { deckRepository.createDeck(any(), any(), any(), any()) } returns testDeckId
 
         useCase = ImportCommunityDeckUseCase(
             deckRepository = deckRepository,
@@ -164,6 +164,7 @@ class ImportCommunityDeckUseCaseTest {
                 name = "Test Deck",
                 description = "A test deck",
                 format = "modern",
+                source = com.mmg.manahub.core.model.DeckCreationSource.COMMUNITY,
             )
         }
     }
@@ -299,7 +300,7 @@ class ImportCommunityDeckUseCaseTest {
         useCase(deck)
 
         // Assert
-        coVerify(exactly = 1) { deckRepository.createDeck(any(), any(), any()) }
+        coVerify(exactly = 1) { deckRepository.createDeck(any(), any(), any(), any()) }
         coVerify(exactly = 1) { deckRepository.updateDeckAttribution(any(), any(), any(), any(), any()) }
     }
 
@@ -474,7 +475,7 @@ class ImportCommunityDeckUseCaseTest {
         // resolution phase itself would throw an unrelated MockK "no answer found" exception before
         // this test's actual scenario (createDeck failing) is ever reached.
         coEvery { cardRepository.searchCardByName(any()) } returns DataResult.Error("Not found")
-        coEvery { deckRepository.createDeck(any(), any(), any()) } throws
+        coEvery { deckRepository.createDeck(any(), any(), any(), any()) } throws
             RuntimeException("DB full")
 
         val deck = buildCommunityDeck()
@@ -511,7 +512,7 @@ class ImportCommunityDeckUseCaseTest {
         // Arrange — see the "createDeck throws" test above for why every card must resolve/fail
         // cleanly here (resolution now runs before deck creation).
         coEvery { cardRepository.searchCardByName(any()) } returns DataResult.Error("Not found")
-        coEvery { deckRepository.createDeck(any(), any(), any()) } throws RuntimeException()
+        coEvery { deckRepository.createDeck(any(), any(), any(), any()) } throws RuntimeException()
 
         val deck = buildCommunityDeck()
 

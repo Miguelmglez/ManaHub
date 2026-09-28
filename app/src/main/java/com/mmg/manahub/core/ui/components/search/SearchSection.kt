@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -20,7 +19,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.core.ui.components.SectionHeader
+import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
+import com.mmg.manahub.core.ui.theme.spacing
 
 /**
  * A collapsible Advanced Search filter section: title/icon header + collapsible body. The header
@@ -33,36 +34,43 @@ fun SearchSection(
     title: String,
     icon: ImageVector? = null,
     collapsedByDefault: Boolean = false,
+    expandedState: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
     titleColor: Color = MaterialTheme.magicColors.goldMtg,
     iconColor: Color = titleColor,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(!collapsedByDefault) }
+    var localExpanded by remember { mutableStateOf(!collapsedByDefault) }
+    val expanded = expandedState ?: localExpanded
     val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = CardShape,
         color = mc.surface,
         border = BorderStroke(0.5.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
-        shadowElevation = if (expanded) 1.dp else 0.dp
+        shadowElevation = 0.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(
                 title = title,
                 expanded = expanded,
-                onToggle = { expanded = !expanded },
+                onToggle = {
+                    if (onExpandedChange != null) onExpandedChange(!expanded)
+                    else localExpanded = !expanded
+                },
                 icon = icon,
                 titleColor = titleColor,
                 iconColor = iconColor,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                modifier = Modifier.padding(horizontal = spacing.sm)
             )
             AnimatedVisibility(visible = expanded) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                        .padding(start = spacing.lg, end = spacing.lg, bottom = spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(spacing.md),
                     content = content,
                 )
             }

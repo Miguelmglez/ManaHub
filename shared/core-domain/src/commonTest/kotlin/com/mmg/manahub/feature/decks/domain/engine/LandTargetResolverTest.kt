@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 /**
  * Deck Wizard & Engine Rework plan, Workstream 6 ("One land engine") — [LandTargetResolver] is the
  * single shared "how many lands should this deck have" computation now called by BOTH
- * `BuildDeckFromTemplateUseCase` (the wizard, at build time) and `DeckStudioViewModel`
+ * `the deleted Motor A wizard build use case` (the wizard, at build time) and `DeckStudioViewModel`
  * (`calculateLandDeltas`, Studio's basic-land suggestion). This suite pins down the behavioral
  * split it consolidates: Commander/other non-60-card formats use the resolved archetype skeleton's
  * own land ideal (falling back to the generic per-format default); 60-card constructed formats use
@@ -136,6 +136,25 @@ class LandTargetResolverTest {
             manaBaseAnalyzer = analyzer,
         )
         assertEquals(genericIdeal, result)
+    }
+
+    @Test
+    fun `wizard call shape -- profile null with a 60-card skeleton returns exactly skeleton lands ideal`() {
+        val skeleton = ArchetypeSkeletonResolver.resolveWithColor(
+            format = ArchetypeFormat.SIXTY,
+            archetype = null,
+            posture = null,
+            themes = emptyList(),
+            identity = setOf(ManaColor.R),
+            deckFormat = DeckFormat.MODERN,
+        )
+        val result = LandTargetResolver.resolve(
+            format = DeckFormat.MODERN,
+            archetypeSkeleton = skeleton,
+            profile = null,
+            manaBaseAnalyzer = analyzer,
+        )
+        assertEquals(skeleton.lands.ideal, result)
     }
 
     // ── band() ───────────────────────────────────────────────────────────────────

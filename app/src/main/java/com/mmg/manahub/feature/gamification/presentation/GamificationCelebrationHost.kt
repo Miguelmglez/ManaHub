@@ -29,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
@@ -48,6 +47,7 @@ import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.overlayScrimSoft
 import com.mmg.manahub.core.ui.theme.spacing
 import org.koin.androidx.compose.koinViewModel
 import kotlin.math.cos
@@ -149,7 +149,7 @@ private fun LevelUpOverlay(
         modifier = Modifier
             .fillMaxSize()
             .zIndex(Float.MAX_VALUE)
-            .background(Color.Black.copy(alpha = 0.72f))
+            .background(mc.overlayScrimSoft)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -283,7 +283,7 @@ private fun CelebrationOverlay(
         modifier = Modifier
             .fillMaxSize()
             .zIndex(Float.MAX_VALUE)
-            .background(Color.Black.copy(alpha = 0.72f))
+            .background(mc.overlayScrimSoft)
             // Tap anywhere to skip/dismiss. No ripple — the whole scrim is the target.
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },

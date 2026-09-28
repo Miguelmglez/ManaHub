@@ -26,9 +26,12 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -991,5 +994,89 @@ class CommunityDecksSearchViewModelTest {
         advanceUntilIdle()
 
         coVerify { searchUseCase(match { it.deckTagName == "Aggro" }) }
+    }
+
+    // ── Discover retry, pagination integrity, stale picker results ───────────
+
+    @Test
+    fun `given discover is unavailable when retryDiscover and the sources recover then sections are populated`() = runTest {
+        coEvery { communityAggregateRepository.getTrending() } returns DataResult.Error("boom")
+        coEvery { searchUseCase(any()) } returns DataResult.Error("boom")
+        val vm = enableDiscoverAndCreate()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.discoverUnavailable)
+
+        coEvery { searchUseCase(any()) } returns DataResult.Success(testSearchResult)
+        vm.retryDiscover()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertFalse(state.discoverUnavailable)
+        assertTrue(state.popularDecks.isNotEmpty())
+    }
+
+    @Test
+    fun `given the next page repeats a deck when loadMore then results stay unique by archidektId`() = runTest {
+        val page1Result = buildSearchResult(totalCount = 3, hasMore = true)
+        val page2Result = buildSearchResult(
+            totalCount = 3,
+            hasMore = false,
+            decks = listOf(testSummary, testSummary.copy(archidektId = 200, name = "Second Deck")),
+        )
+        coEvery { searchUseCase(match { it.page == 1 }) } returns DataResult.Success(page1Result)
+        coEvery { searchUseCase(match { it.page == 2 }) } returns DataResult.Success(page2Result)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onQueryChange("Sol Ring")
+        vm.search()
+        advanceUntilIdle()
+        vm.loadMore()
+        advanceUntilIdle()
+
+        assertEquals(listOf(100, 200), vm.uiState.value.results.map { it.archidektId })
+    }
+
+    @Test
+    fun `given a fresh search is in flight when loadMore then no next page is requested`() = runTest {
+        coEvery { searchUseCase(match { it.deckName == "Sol Ring" }) } returns
+            DataResult.Success(buildSearchResult(totalCount = 10, hasMore = true))
+        coEvery { searchUseCase(match { it.deckName == "Counterspell" }) } coAnswers {
+            delay(1_000)
+            DataResult.Success(buildSearchResult(totalCount = 10, hasMore = true))
+        }
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onQueryChange("Sol Ring")
+        vm.search()
+        advanceUntilIdle()
+
+        vm.onQueryChange("Counterspell")
+        vm.search()
+        runCurrent()
+        vm.loadMore()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { searchUseCase(match { it.page == 2 }) }
+        assertEquals(1, vm.uiState.value.results.size)
+    }
+
+    @Test
+    fun `given the commander query is cleared while its search is in flight then the stale results are dropped`() = runTest {
+        val atraxa = fakeCard("Atraxa, Praetors' Voice")
+        coEvery { searchCards("Atr", 1) } coAnswers {
+            delay(1_000)
+            DataResult.Success(PaginatedCards(cards = listOf(atraxa), hasMore = false, totalCards = 1))
+        }
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.onCommanderQueryChange("Atr")
+        advanceTimeBy(500)
+        vm.onCommanderQueryChange("")
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.commanderResults.isEmpty())
+        assertFalse(vm.uiState.value.isCommanderSearching)
     }
 }

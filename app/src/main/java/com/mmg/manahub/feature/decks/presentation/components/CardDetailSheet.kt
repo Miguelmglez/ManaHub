@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.components
+// COMMENTS_REVIEWED: 2026-09-17
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -68,6 +69,8 @@ import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.MagicColors
+import com.mmg.manahub.core.ui.theme.MagicTypography
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -81,11 +84,14 @@ import org.jetbrains.compose.resources.painterResource
  * (image flip + tags + +/-/delete + commander actions) instead of navigating away.
  * Stateless: every state field is a parameter and every action is a callback.
  *
- * The action area branches on three cases:
+ * The action area branches on four cases:
  *  1. [isCommanderSelectionContext] — the "Choose Commander" search flow (golden CTA /
  *     status badge), no +/- counter.
  *  2. [isCommander] (outside the selection flow) — the current commander, status badge only.
- *  3. A regular deck card — the +/- quantity counter plus the remove-all button.
+ *  3. [seedSelection] non-null (Deck Wizard "Start from cards" seed pick, v6 P4) — an "Add to
+ *     deck" CTA at quantity 0, else the same +/- stepper Case 4 uses plus an owned/in-deck caption.
+ *  4. A regular deck card — the +/- quantity counter plus the remove-all button, both hidden when
+ *     [readOnly].
  *
  * @param deckCard the slot backing every callback (identity/quantity/onAdd/onRemove/onDelete/
  *   onChooseAsCommander ALWAYS operate on `deckCard.card`'s original scryfallId — never the
@@ -107,6 +113,11 @@ import org.jetbrains.compose.resources.painterResource
  * @param onChooseAsCommander assign the resolved [Card] as commander.
  * @param onRemoveCommander clear the current commander.
  * @param onDismiss close the sheet.
+ * @param seedSelection non-null puts the sheet in Deck Wizard seed-pick mode (case 3) instead of
+ *   the regular deck-card mode (case 4) — ignored when [isCommander] or
+ *   [isCommanderSelectionContext] is true.
+ * @param readOnly hides case 4's +/- stepper and remove-all button (a card viewed, not edited);
+ *   wins over [seedSelection] too — case 3 then renders its caption only, no CTA/stepper.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -123,6 +134,8 @@ internal fun CardDetailSheet(
     onChooseAsCommander: (Card) -> Unit,
     onRemoveCommander: () -> Unit,
     onDismiss: () -> Unit,
+    seedSelection: SeedSelectionUi? = null,
+    readOnly: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -136,8 +149,6 @@ internal fun CardDetailSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) {
         it != SheetValue.Hidden
     }
-
-    var showBackFace by remember { mutableStateOf(value = false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -182,96 +193,7 @@ internal fun CardDetailSheet(
 
             if (visualCard != null) {
                 item {
-                    val hasBackFace = !visualCard.imageBackNormal.isNullOrBlank()
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(spacing.sm),
-                    ) {
-                        val rotation by animateFloatAsState(
-                            targetValue = if (showBackFace) -180f else 0f,
-                            animationSpec = tween(durationMillis = 500),
-                            label = "CardFlip",
-                        )
-
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth(0.8f)
-                                .aspectRatio(0.716f)
-                                .clip(CardShape),
-                            shape = CardShape,
-                            shadowElevation = 8.dp,
-                            tonalElevation = 4.dp,
-                            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f))
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer {
-                                        rotationY = rotation
-                                        cameraDistance = 12f * density
-                                    }
-                                    .then(
-                                        if (hasBackFace) Modifier.clickable {
-                                            showBackFace = !showBackFace
-                                        } else Modifier
-                                    ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(visualCard.imageNormal ?: visualCard.imageArtCrop)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = visualCard.name,
-                                    placeholder = painterResource(Res.drawable.mtg_card_back),
-                                    error = painterResource(Res.drawable.mtg_card_back),
-                                    fallback = painterResource(Res.drawable.mtg_card_back),
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .graphicsLayer { alpha = if (rotation >= -90f) 1f else 0f },
-                                )
-                                if (hasBackFace) {
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current)
-                                            .data(visualCard.imageBackNormal)
-                                            .crossfade(true)
-                                            .build(),
-                                        contentDescription = visualCard.name,
-                                        placeholder = painterResource(Res.drawable.mtg_card_back),
-                                        error = painterResource(Res.drawable.mtg_card_back),
-                                        fallback = painterResource(Res.drawable.mtg_card_back),
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .graphicsLayer {
-                                                rotationY = 180f
-                                                alpha = if (rotation < -90f) 1f else 0f
-                                            },
-                                    )
-                                }
-                            }
-                        }
-
-                        if (hasBackFace) {
-                            Surface(
-                                shape = ChipShape,
-                                color = mc.primaryAccent.copy(alpha = 0.1f),
-                                modifier = Modifier.padding(top = spacing.xs)
-                            ) {
-                                Text(
-                                    text = stringResource(if (showBackFace) R.string.carddetail_flip_see_front else R.string.carddetail_flip_see_back),
-                                    style = ty.labelSmall,
-                                    color = mc.primaryAccent,
-                                    modifier = Modifier.padding(
-                                        horizontal = spacing.md,
-                                        vertical = spacing.xxs
-                                    )
-                                )
-                            }
-                        }
-                    }
+                    CardFlipPortrait(card = visualCard)
                 }
 
                 item {
@@ -300,16 +222,7 @@ internal fun CardDetailSheet(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth(0.8f)
-                                .aspectRatio(0.716f)
-                                .clip(CardShape),
-                            shape = CardShape,
-                            shadowElevation = 8.dp,
-                            tonalElevation = 4.dp,
-                            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f))
-                        ) {
+                        CardPortraitFrame(mc = mc) {
                             Image(
                                 painter = painterResource(Res.drawable.mtg_card_back),
                                 contentDescription = null,
@@ -372,7 +285,42 @@ internal fun CardDetailSheet(
                         }
                     }
 
-                    // Case 3: regular deck card — +/- quantity counter.
+                    // Case 3: Deck Wizard seed pick — CTA at 0, else the stepper + an owned/in-deck caption.
+                    // readOnly wins over seedSelection (review-only card view, e.g. Studio Analysis): caption only, no controls.
+                    seedSelection != null -> {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.sm),
+                            verticalArrangement = Arrangement.spacedBy(spacing.sm),
+                        ) {
+                            when {
+                                readOnly -> SeedSelectionCaption(seedSelection, ty, mc)
+                                seedSelection.quantity <= 0 -> {
+                                    MagicCtaButton(
+                                        onClick = seedSelection.onAdd,
+                                        text = stringResource(R.string.deck_wizard_add_to_deck),
+                                        style = MagicCtaStyle.Filled,
+                                        color = MagicCtaColor.Primary,
+                                        icon = {
+                                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
+                                else -> {
+                                    SeedSelectionCaption(seedSelection, ty, mc)
+                                    QuantityStepperRow(
+                                        quantity = seedSelection.quantity,
+                                        onRemove = seedSelection.onRemove,
+                                        removeEnabled = true,
+                                        onAdd = seedSelection.onAdd,
+                                        addEnabled = seedSelection.quantity < seedSelection.maxQuantity,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Case 4: regular deck card — +/- quantity counter, hidden when readOnly.
                     else -> {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.sm),
@@ -392,56 +340,14 @@ internal fun CardDetailSheet(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-                            
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(spacing.xs)
-                            ) {
-                                MagicCtaButton(
-                                    onClick = onRemove,
-                                    enabled = deckCard.quantity > 0,
-                                    style = MagicCtaStyle.Outlined,
-                                    color = MagicCtaColor.Primary,
-                                    icon = {
-                                        Icon(
-                                            Icons.Default.Remove,
-                                            contentDescription = stringResource(R.string.action_remove),
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    },
-                                    contentPadding = PaddingValues(spacing.sm),
-                                    modifier = Modifier.size(48.dp)
-                                )
 
-                                Surface(
-                                    shape = ChipShape,
-                                    color = mc.surfaceVariant.copy(alpha = 0.3f),
-                                    border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
-                                    modifier = Modifier.height(48.dp).width(56.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = deckCard.quantity.toString(),
-                                            style = ty.titleLarge,
-                                            color = mc.textPrimary,
-                                            fontWeight = FontWeight.ExtraBold,
-                                        )
-                                    }
-                                }
-
-                                MagicCtaButton(
-                                    onClick = onAdd,
-                                    style = MagicCtaStyle.Filled,
-                                    color = MagicCtaColor.Primary,
-                                    icon = {
-                                        Icon(
-                                            Icons.Default.Add,
-                                            contentDescription = stringResource(R.string.action_add),
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    },
-                                    contentPadding = PaddingValues(spacing.sm),
-                                    modifier = Modifier.size(48.dp)
+                            if (!readOnly) {
+                                QuantityStepperRow(
+                                    quantity = deckCard.quantity,
+                                    onRemove = onRemove,
+                                    removeEnabled = deckCard.quantity > 0,
+                                    onAdd = onAdd,
+                                    addEnabled = true,
                                 )
                             }
                         }
@@ -449,8 +355,8 @@ internal fun CardDetailSheet(
                 }
             }
 
-            // Delete / remove-all — hidden in pure commander-selection context.
-            if (!isCommanderSelectionContext) {
+            // Delete / remove-all — hidden in commander-selection context, seed-pick mode, and readOnly.
+            if (!isCommanderSelectionContext && seedSelection == null && !readOnly) {
                 item {
                     MagicCtaButton(
                         onClick = onDelete,
@@ -469,6 +375,218 @@ internal fun CardDetailSheet(
                             .padding(horizontal = spacing.lg, vertical = spacing.sm)
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * A resolved seed for [CardDetailSheet]'s seed-selection mode (Deck Wizard "Start from cards",
+ * v6 P4) — 60-card seed picking, never used in a commander context.
+ */
+internal data class SeedSelectionUi(
+    val quantity: Int,
+    val maxQuantity: Int,
+    val isOwned: Boolean,
+    val ownedQuantity: Int,
+    val onAdd: () -> Unit,
+    val onRemove: () -> Unit,
+)
+
+/** The "In deck: N · owned/not owned" caption, shared by the interactive and [readOnly] seed-selection renders. */
+@Composable
+private fun SeedSelectionCaption(seedSelection: SeedSelectionUi, ty: MagicTypography, mc: MagicColors) {
+    Text(
+        text = stringResource(R.string.deck_wizard_seed_in_deck, seedSelection.quantity) +
+            " · " +
+            if (seedSelection.isOwned) {
+                stringResource(R.string.deck_wizard_seed_owned, seedSelection.ownedQuantity)
+            } else {
+                stringResource(R.string.deck_wizard_seed_not_owned)
+            },
+        style = ty.labelMedium,
+        color = mc.textSecondary,
+    )
+}
+
+/** The +/- quantity stepper shared by [CardDetailSheet]'s regular and seed-selection action areas. */
+@Composable
+private fun QuantityStepperRow(
+    quantity: Int,
+    onRemove: () -> Unit,
+    removeEnabled: Boolean,
+    onAdd: () -> Unit,
+    addEnabled: Boolean,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+    ) {
+        MagicCtaButton(
+            onClick = onRemove,
+            enabled = removeEnabled,
+            style = MagicCtaStyle.Outlined,
+            color = MagicCtaColor.Primary,
+            icon = {
+                Icon(
+                    Icons.Default.Remove,
+                    contentDescription = stringResource(R.string.action_remove),
+                    modifier = Modifier.size(20.dp)
+                )
+            },
+            contentPadding = PaddingValues(spacing.sm),
+            modifier = Modifier.size(48.dp)
+        )
+
+        Surface(
+            shape = ChipShape,
+            color = mc.surfaceVariant.copy(alpha = 0.3f),
+            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
+            modifier = Modifier.height(48.dp).width(56.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = quantity.toString(),
+                    style = ty.titleLarge,
+                    color = mc.textPrimary,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+            }
+        }
+
+        MagicCtaButton(
+            onClick = onAdd,
+            enabled = addEnabled,
+            style = MagicCtaStyle.Filled,
+            color = MagicCtaColor.Primary,
+            icon = {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = stringResource(R.string.action_add),
+                    modifier = Modifier.size(20.dp)
+                )
+            },
+            contentPadding = PaddingValues(spacing.sm),
+            modifier = Modifier.size(48.dp)
+        )
+    }
+}
+
+/**
+ * The card-portrait frame (aspect ratio, shape, elevation, border) shared by [CardFlipPortrait]'s
+ * real image and [CardDetailSheet]'s loading placeholder -- hoisted (Deck Wizard Commander v4 plan,
+ * Run 2 W2 review, P2.1) so the two can't silently drift apart on a future tweak.
+ */
+@Composable
+private fun CardPortraitFrame(mc: MagicColors, content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth(0.8f)
+            .aspectRatio(0.716f)
+            .clip(CardShape),
+        shape = CardShape,
+        shadowElevation = 8.dp,
+        tonalElevation = 4.dp,
+        border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
+        content = content,
+    )
+}
+
+/**
+ * The large card image + DFC flip block, extracted from [CardDetailSheet] (Deck Wizard Commander v4
+ * plan, W2.3/G3) so the wizard's own selected-commander view can render the SAME composition
+ * without reaching into this file's private internals. Takes just the [Card] to render -- no
+ * sheet/dismiss/action-area coupling.
+ */
+@Composable
+internal fun CardFlipPortrait(card: Card, modifier: Modifier = Modifier) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    val hasBackFace = !card.imageBackNormal.isNullOrBlank()
+    var showBackFace by remember { mutableStateOf(value = false) }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(spacing.sm),
+    ) {
+        val rotation by animateFloatAsState(
+            targetValue = if (showBackFace) -180f else 0f,
+            animationSpec = tween(durationMillis = 500),
+            label = "CardFlip",
+        )
+
+        CardPortraitFrame(mc = mc) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        rotationY = rotation
+                        cameraDistance = 12f * density
+                    }
+                    .then(
+                        if (hasBackFace) Modifier.clickable {
+                            showBackFace = !showBackFace
+                        } else Modifier
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(card.imageNormal ?: card.imageArtCrop)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = card.name,
+                    placeholder = painterResource(Res.drawable.mtg_card_back),
+                    error = painterResource(Res.drawable.mtg_card_back),
+                    fallback = painterResource(Res.drawable.mtg_card_back),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = if (rotation >= -90f) 1f else 0f },
+                )
+                if (hasBackFace) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(card.imageBackNormal)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = card.name,
+                        placeholder = painterResource(Res.drawable.mtg_card_back),
+                        error = painterResource(Res.drawable.mtg_card_back),
+                        fallback = painterResource(Res.drawable.mtg_card_back),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                rotationY = 180f
+                                alpha = if (rotation < -90f) 1f else 0f
+                            },
+                    )
+                }
+            }
+        }
+
+        if (hasBackFace) {
+            Surface(
+                onClick = { showBackFace = !showBackFace },
+                shape = ChipShape,
+                color = mc.primaryAccent.copy(alpha = 0.1f),
+                modifier = Modifier.padding(top = spacing.xs)
+            ) {
+                Text(
+                    text = stringResource(if (showBackFace) R.string.carddetail_flip_see_front else R.string.carddetail_flip_see_back),
+                    style = ty.labelSmall,
+                    color = mc.primaryAccent,
+                    modifier = Modifier.padding(
+                        horizontal = spacing.md,
+                        vertical = spacing.xxs
+                    )
+                )
             }
         }
     }
@@ -509,5 +627,6 @@ private fun CommanderStatusBadge() {
     }
 }
 
-/** Height of the golden "Choose as commander" CTA button. */
-private val CommanderCtaHeight = 52.dp
+/** Height of the golden "Choose as commander" CTA button -- 48dp, the app's touch-target minimum
+ * and on the 8dp spacing grid (Deck Wizard Commander v4 plan, Run 2 W2 review, P2.3: was 52dp). */
+private val CommanderCtaHeight = 48.dp

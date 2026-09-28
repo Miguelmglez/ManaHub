@@ -42,7 +42,8 @@ class UserProfileClient(
      */
     suspend fun fetchProfile(
         idFilter: String,
-        select: String = "id,nickname,game_tag,avatar_url,provider,profile_completed",
+        select: String = "id,nickname,game_tag,avatar_url,provider,profile_completed," +
+            "collection_public,wishlist_public,trade_list_public",
     ): List<UserProfileDto> =
         httpClient.get("${baseUrl}user_profiles") {
             parameter("id", idFilter)

@@ -67,8 +67,16 @@ class CommunityDecksRepositoryImpl(
                 // 2. Fetch from network (rate-limited + retried by the queue).
                 val dto = requestQueue.execute { api.getDeckById(archidektId) }
 
-                // Cache the response for offline re-render / stale fallback.
-                cache.insert(dto)
+                // Cache the response for offline re-render / stale fallback — best-effort: a failed write
+                // (e.g. disk full) must not turn a successful fetch into an error.
+                try {
+                    cache.insert(dto)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    crashReporter.log("community_deck_cache_write_failed")
+                    crashReporter.recordException(e)
+                }
 
                 DataResult.Success(dto.toDomain())
             } catch (e: ResponseException) {

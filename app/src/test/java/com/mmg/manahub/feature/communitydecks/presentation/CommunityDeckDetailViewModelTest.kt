@@ -635,4 +635,52 @@ class CommunityDeckDetailViewModelTest {
         val state = vm.uiState.value as CommunityDeckDetailUiState.Content
         assertEquals(setOf("Sol Ring"), state.ownedCardIdentityKeys)
     }
+
+    @Test
+    fun `given a pending-hydration placeholder in the collection then it does not count as owned`() = runTest {
+        coEvery { getCommunityDeck(testDeckId) } returns DataResult.Success(buildCommunityDeck())
+        val owned = com.mmg.manahub.core.model.UserCardWithCard(
+            userCard = com.mmg.manahub.core.model.UserCard(id = "uc-1", scryfallId = "sf-sol-ring"),
+            card = buildOwnedCard(scryfallId = "sf-sol-ring", name = "Sol Ring"),
+        )
+        val placeholder = com.mmg.manahub.core.model.UserCardWithCard(
+            userCard = com.mmg.manahub.core.model.UserCard(id = "uc-2", scryfallId = "sf-tower"),
+            card = buildOwnedCard(scryfallId = "sf-tower", name = "Command Tower")
+                .copy(staleReason = "pending_hydration"),
+        )
+        every { userCardRepository.observeCollection() } returns flowOf(listOf(owned, placeholder))
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as CommunityDeckDetailUiState.Content
+        assertEquals(setOf("Sol Ring"), state.ownedCardIdentityKeys)
+    }
+
+    @Test
+    fun `given the import use case throws when importDeck then an error result is shown and importing clears`() = runTest {
+        coEvery { getCommunityDeck(testDeckId) } returns DataResult.Success(buildCommunityDeck())
+        coEvery { importCommunityDeck(any(), any()) } throws IllegalStateException("boom")
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.events.test {
+            vm.importDeck()
+            advanceUntilIdle()
+            val event = awaitItem() as CommunityDeckDetailEvent.ShowImportResult
+            assertTrue(event.isError)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertFalse((vm.uiState.value as CommunityDeckDetailUiState.Content).isImporting)
+    }
+
+    @Test
+    fun `given an invalid archidektId when created then Error is shown without a network call`() = runTest {
+        val vm = createViewModel(savedStateHandle = buildSavedStateHandle(id = 0))
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value is CommunityDeckDetailUiState.Error)
+        coVerify(exactly = 0) { getCommunityDeck(any()) }
+    }
 }

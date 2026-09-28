@@ -7,6 +7,9 @@ import com.mmg.manahub.core.data.local.entity.DeckEntity
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.core.model.DeckCreationSource
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -35,6 +38,7 @@ import org.junit.Test
  *  - GROUP 4: addCardToDeck — card entity construction, deck updatedAt bump
  *  - GROUP 5: removeCardFromDeck — DAO delegation, deck updatedAt bump
  *  - GROUP 6: clearDeck   — DAO delegation, deck updatedAt bump
+ *  - GROUP 6b: replaceAllCardsWithSource — single-transaction DAO delegation (D12 atomicity)
  *  - GROUP 7: observeAllDeckSummaries — groupBy, cardCount, colorIdentity, sorting
  *  - GROUP 8: moveCardQuantity — provenance merge on a board-move (edge-case audit Fix 3)
  */
@@ -157,6 +161,98 @@ class DeckRepositoryImplTest {
         repository.createDeck("New Deck", "", "casual")
 
         assertFalse(captured.captured.isDeleted)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 1b — DeckCreated emission on the first mainboard card (restore plan D8)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /** Makes the DAO answer as if [cards] were persisted for whatever deck id is asked. */
+    private fun persistedCards(vararg cards: DeckCardEntity) {
+        every { deckDao.getDeckCards(any()) } returns cards.toList()
+        every { deckDao.getDeckById(any()) } answers { buildDeckEntity(id = firstArg(), format = "commander") }
+    }
+
+    private fun card(deckId: String, isSideboard: Boolean = false) =
+        DeckCardEntity(deckId = deckId, scryfallId = "c-1", quantity = 1, isSideboard = isSideboard)
+
+    @Test
+    fun `given a blank deck when it is only created then DeckCreated is never emitted`() = runTest {
+        repository.createDeck("Draft", "", "casual")
+
+        coVerify(exactly = 0) { progressionEventBus.emit(any()) }
+    }
+
+    @Test
+    fun `given a new deck when its first mainboard card lands then DeckCreated is emitted once with its source`() = runTest {
+        val id = repository.createDeck("Draft", "", "casual")
+        persistedCards(card(id))
+
+        repository.addCardToDeck(id, "c-1")
+        repository.addCardToDeck(id, "c-2")
+
+        coVerify(exactly = 1) {
+            progressionEventBus.emit(match {
+                it is ProgressionEvent.DeckCreated && it.deckId == id && it.source == DeckCreationSource.BUILT &&
+                    it.format == "commander"
+            })
+        }
+    }
+
+    @Test
+    fun `given a new deck when only a sideboard card lands then DeckCreated is not emitted`() = runTest {
+        val id = repository.createDeck("Draft", "", "casual")
+        persistedCards(card(id, isSideboard = true))
+
+        repository.addCardToDeck(id, "c-1", isSideboard = true)
+
+        coVerify(exactly = 0) { progressionEventBus.emit(any()) }
+    }
+
+    @Test
+    fun `given an imported deck when its cards are replaced then DeckCreated carries IMPORT`() = runTest {
+        val id = repository.createDeck("Imported", "", "casual", DeckCreationSource.IMPORT)
+        persistedCards(card(id))
+
+        repository.replaceAllCards(id, listOf(Triple("c-1", 1, false)))
+
+        coVerify(exactly = 1) {
+            progressionEventBus.emit(match { it is ProgressionEvent.DeckCreated && it.source == DeckCreationSource.IMPORT })
+        }
+    }
+
+    @Test
+    fun `given an empty Studio draft re-tagged by an import then DeckCreated carries the new source`() = runTest {
+        val id = repository.createDeck("Draft", "", "casual")
+        repository.tagDeckCreationSource(id, DeckCreationSource.IMPORT)
+        persistedCards(card(id))
+
+        repository.addCardToDeck(id, "c-1")
+
+        coVerify(exactly = 1) {
+            progressionEventBus.emit(match { it is ProgressionEvent.DeckCreated && it.source == DeckCreationSource.IMPORT })
+        }
+    }
+
+    @Test
+    fun `given a deck not created this session when a card lands then nothing is emitted`() = runTest {
+        persistedCards(card(DECK_ID))
+
+        repository.tagDeckCreationSource(DECK_ID, DeckCreationSource.WIZARD)
+        repository.addCardToDeck(DECK_ID, "c-1")
+
+        coVerify(exactly = 0) { progressionEventBus.emit(any()) }
+    }
+
+    @Test
+    fun `given a discarded empty draft then a later card write emits nothing`() = runTest {
+        val id = repository.createDeck("Draft", "", "casual")
+        repository.deleteDeck(id)
+        persistedCards(card(id))
+
+        repository.addCardToDeck(id, "c-1")
+
+        coVerify(exactly = 0) { progressionEventBus.emit(any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -309,6 +405,41 @@ class DeckRepositoryImplTest {
         repository.clearDeck(DECK_ID)
 
         assertTrue("updatedAt must be bumped", captured.captured.updatedAt > 100L)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 6b — replaceAllCardsWithSource (Deck Wizard Commander v3, D12 atomicity)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given slots when replaceAllCardsWithSource then deckDao single-transaction method is called exactly once`() = runTest {
+        val entitiesSlot = slot<List<DeckCardEntity>>()
+        every { deckDao.replaceAllCardsWithSource(DECK_ID, capture(entitiesSlot), any()) } returns Unit
+
+        repository.replaceAllCardsWithSource(
+            DECK_ID,
+            listOf(
+                com.mmg.manahub.core.domain.repository.CardSlotWrite("wizard-card-1", 1, source = DeckCardSource.WIZARD),
+                com.mmg.manahub.core.domain.repository.CardSlotWrite("user-card-1", 1, source = DeckCardSource.USER),
+            ),
+        )
+
+        verify(exactly = 1) { deckDao.replaceAllCardsWithSource(DECK_ID, any(), any()) }
+        assertEquals(setOf("wizard-card-1", "user-card-1"), entitiesSlot.captured.map { it.scryfallId }.toSet())
+        assertEquals("WIZARD", entitiesSlot.captured.first { it.scryfallId == "wizard-card-1" }.source)
+    }
+
+    @Test
+    fun `given slots when replaceAllCardsWithSource then the old non-atomic clearDeck plus addCardToDeck composition is never used`() = runTest {
+        every { deckDao.replaceAllCardsWithSource(any(), any(), any()) } returns Unit
+
+        repository.replaceAllCardsWithSource(
+            DECK_ID,
+            listOf(com.mmg.manahub.core.domain.repository.CardSlotWrite("card-1", 1)),
+        )
+
+        verify(exactly = 0) { deckDao.clearDeckCards(any()) }
+        verify(exactly = 0) { deckDao.upsertDeckCard(any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════

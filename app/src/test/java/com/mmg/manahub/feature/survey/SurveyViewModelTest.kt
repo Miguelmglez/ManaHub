@@ -316,6 +316,29 @@ class SurveyViewModelTest {
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
+    @Test
+    fun `setDeckForSession writes the deck onto the session AND the local seat`() = runTest(dispatcher) {
+        // Per-deck stats GROUP BY player_sessions.deck_id, so writing only game_sessions.deckId
+        // left every per-deck query empty (ADR-001).
+        every { deckRepository.observeDeckWithCards(any()) } returns flowOf(null)
+        val vm = buildVm()
+
+        vm.setDeckForSession("deck-uuid-1")
+
+        coVerify(exactly = 1) { gameSessionDao.updateSessionDeck(sessionId, "deck-uuid-1") }
+        coVerify(exactly = 1) { gameSessionDao.updateLocalSeatDeck(sessionId, "deck-uuid-1") }
+    }
+
+    @Test
+    fun `setDeckForSession with a null deck clears both rows`() = runTest(dispatcher) {
+        val vm = buildVm()
+
+        vm.setDeckForSession(null)
+
+        coVerify(exactly = 1) { gameSessionDao.updateSessionDeck(sessionId, null) }
+        coVerify(exactly = 1) { gameSessionDao.updateLocalSeatDeck(sessionId, null) }
+    }
+
     private fun buildVm() = SurveyViewModel(
         surveyAnswerDao = surveyAnswerDao,
         surveyCardImpactDao = surveyCardImpactDao,

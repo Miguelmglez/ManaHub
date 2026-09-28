@@ -1,14 +1,26 @@
 package com.mmg.manahub.feature.scanner
+// COMMENTS_REVIEWED: 2026-09-16
 
 import android.content.Context
 import android.graphics.PointF
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.data.queue.InMemoryCardQueueStore
+import com.mmg.manahub.core.data.queue.PersistentCardQueueRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.CommitScanResult
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
+import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
+import com.mmg.manahub.core.model.QueuedCard
+import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.feature.decks.domain.usecase.AddScannedCardsToDeckResult
+import com.mmg.manahub.feature.decks.domain.usecase.AddScannedCardsToDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.DeckBoard
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
+import com.mmg.manahub.feature.scanner.presentation.ScannerTarget
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel
 import com.mmg.manahub.feature.scanner.presentation.SoundManager
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
@@ -17,8 +29,13 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -81,11 +98,14 @@ class ScannerViewModelTest {
     private val addToWishlist: AddToWishlistUseCase = mockk()
     private val analyticsHelper: AnalyticsHelper = mockk(relaxed = true)
     private val soundManager: SoundManager = mockk(relaxed = true)
+    private val addScannedCardsToDeck: AddScannedCardsToDeckUseCase = mockk(relaxed = true)
     private val context: Context = mockk(relaxed = true)
 
     // ── ViewModel under test ───────────────────────────────────────────────────
 
     private lateinit var viewModel: ScannerViewModel
+    private lateinit var appScope: CoroutineScope
+    private lateinit var queueRepository: PersistentCardQueueRepository
 
     // ── Sample data ────────────────────────────────────────────────────────────
 
@@ -134,19 +154,30 @@ class ScannerViewModelTest {
         // needs a real Flow — a relaxed mock alone would return Unit for `collect` without ever
         // touching FlowCollector, which happens to be harmless here but this stub keeps intent explicit.
         every { userCardRepository.observeCollection() } returns emptyFlow()
+        // Real shared queue over an in-memory store: the VM's queue behaviour is exercised end to end.
+        appScope = CoroutineScope(SupervisorJob())
+        queueRepository = PersistentCardQueueRepository(store = InMemoryCardQueueStore())
         viewModel = ScannerViewModel(
+            savedStateHandle = SavedStateHandle(),
             cardRepository = cardRepository,
             userCardRepository = userCardRepository,
-            commitScannedCards = commitScannedCards,
-            addToWishlist = addToWishlist,
+            sharedQueueRepository = queueRepository,
+            queueActions = CardQueueActions.forScannedCards(
+                queueRepository = queueRepository,
+                commitScannedCards = commitScannedCards,
+                addToWishlist = addToWishlist,
+            ),
             analyticsHelper = analyticsHelper,
             soundManager = soundManager,
+            addScannedCardsToDeck = addScannedCardsToDeck,
             context = context,
+            appScope = appScope,
         )
     }
 
     @After
     fun tearDown() {
+        appScope.cancel()
         Dispatchers.resetMain()
     }
 
@@ -569,7 +600,7 @@ class ScannerViewModelTest {
         )
     }
 
-    private fun sampleScannedCard() = com.mmg.manahub.feature.scanner.presentation.ScannedCard(
+    private fun sampleScannedCard() = QueuedCard(
         card = defaultCard,
         quantity = 1,
         isFoil = false,
@@ -577,6 +608,7 @@ class ScannerViewModelTest {
         condition = "NM",
         setCode = "lea",
         timestamp = 1L,
+        id = "sample-id",
     )
 
     @Test
@@ -800,5 +832,265 @@ class ScannerViewModelTest {
             1, remaining.size,
         )
         assertEquals(defaultCard.scryfallId, remaining[0].card.scryfallId)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Deck Wizard UX polish plan, Run 1 §1.7: camera bind error clears correctly
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // onCameraBindFailed records via recordSafeNonFatal -> FirebaseCrashlytics.getInstance(),
+    // outside any runCatching -- needs a static mock in every test that calls it (see the class's
+    // own testing convention: CLAUDE.md "ViewModels that call Crashlytics outside a runCatching
+    // block need mockkStatic(FirebaseCrashlytics::class)").
+
+    @Test
+    fun onCameraBindFailed_setsCameraBindError_withoutTouchingError() {
+        io.mockk.mockkStatic(com.google.firebase.crashlytics.FirebaseCrashlytics::class)
+        every { com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
+        try {
+            viewModel.onCameraBindFailed(RuntimeException("bind failed"))
+
+            val state = viewModel.uiState.value
+            assertNotNull("a failed bind must set cameraBindError", state.cameraBindError)
+            assertNull("cameraBindError is separate from the general-purpose error field", state.error)
+        } finally {
+            io.mockk.unmockkStatic(com.google.firebase.crashlytics.FirebaseCrashlytics::class)
+        }
+    }
+
+    @Test
+    fun onCameraBound_clearsAPreviouslySetCameraBindError() {
+        io.mockk.mockkStatic(com.google.firebase.crashlytics.FirebaseCrashlytics::class)
+        every { com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
+        try {
+            viewModel.onCameraBindFailed(RuntimeException("bind failed"))
+            assertNotNull(viewModel.uiState.value.cameraBindError)
+
+            viewModel.onCameraBound()
+
+            assertNull("a successful (re)bind must clear the stale bind-error banner", viewModel.uiState.value.cameraBindError)
+        } finally {
+            io.mockk.unmockkStatic(com.google.firebase.crashlytics.FirebaseCrashlytics::class)
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Shared card queue (CardQueueRepository + CardQueueActions)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onAddAllToCollection_fullSuccess_emptiesQueueAndClosesSheet() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        viewModel.onOpenQueue()
+        coEvery { commitScannedCards(any()) } returns CommitScanResult(
+            committedCopies = 1, failedEntries = 0, entrySucceeded = listOf(true),
+        )
+
+        viewModel.onAddAllToCollection()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.scanSession.cards.isEmpty())
+        assertFalse(state.showQueueSheet)
+        assertFalse(state.isCommittingQueue)
+    }
+
+    @Test
+    fun onAddEntryToCollection_failure_keepsEntryInQueue() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        val entry = viewModel.uiState.value.scanSession.cards.single()
+        coEvery { commitScannedCards(any()) } returns CommitScanResult(
+            committedCopies = 0, failedEntries = 1, entrySucceeded = listOf(false),
+        )
+
+        viewModel.onAddEntryToCollection(entry)
+        advanceUntilIdle()
+
+        assertEquals(listOf(entry.id), viewModel.uiState.value.scanSession.cards.map { it.id })
+    }
+
+    @Test
+    fun queueMutations_areReflectedSynchronouslyInScanSession() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        val entry = viewModel.uiState.value.scanSession.cards.single()
+
+        viewModel.onDuplicateSessionCard(entry)
+        assertEquals(2, viewModel.uiState.value.scanSession.cards.size)
+
+        viewModel.onIncrementSessionCardQuantity(entry)
+        assertEquals(2, viewModel.uiState.value.scanSession.cards.first().quantity)
+
+        viewModel.onRemoveSessionCard(entry)
+        assertEquals(1, viewModel.uiState.value.scanSession.cards.size)
+        assertNotEquals(entry.id, viewModel.uiState.value.scanSession.cards.single().id)
+    }
+
+    @Test
+    fun onAddAllToCollection_leavingTheScannerMidBatch_stillRemovesTheWrittenEntries() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        val gate = CompletableDeferred<Unit>()
+        coEvery { commitScannedCards(any()) } coAnswers {
+            gate.await()
+            CommitScanResult(committedCopies = 1, failedEntries = 0, entrySucceeded = listOf(true))
+        }
+
+        viewModel.onAddAllToCollection()
+        advanceUntilIdle()
+        // Leaving the screen clears the ViewModel; the commit runs in the app scope.
+        viewModel.viewModelScope.cancel()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { commitScannedCards(any()) }
+        assertTrue(queueRepository.queue.value.isEmpty())
+        assertFalse(viewModel.uiState.value.isCommittingQueue)
+    }
+
+    @Test
+    fun onAddAllToWishlist_doubleTap_addsEachEntryOnceWithItsQuantity() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        viewModel.onIncrementSessionCardQuantity(viewModel.uiState.value.scanSession.cards.single())
+        val captured = slot<WishlistEntry>()
+        coEvery { addToWishlist(capture(captured)) } returns Result.success(Unit)
+
+        viewModel.onAddAllToWishlist()
+        viewModel.onAddAllToWishlist()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { addToWishlist(any()) }
+        assertEquals(2, captured.captured.quantity)
+    }
+
+    @Test
+    fun onAddEntryToCollection_doubleTap_commitsOnce() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        val entry = viewModel.uiState.value.scanSession.cards.single()
+        coEvery { commitScannedCards(any()) } returns CommitScanResult(
+            committedCopies = 1, failedEntries = 0, entrySucceeded = listOf(true),
+        )
+
+        viewModel.onAddEntryToCollection(entry)
+        viewModel.onAddEntryToCollection(entry)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { commitScannedCards(any()) }
+    }
+
+    @Test
+    fun removingTheLastEntry_closesTheQueueSheet() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        viewModel.onOpenQueue()
+
+        viewModel.onRemoveSessionCard(viewModel.uiState.value.scanSession.cards.single())
+
+        assertFalse(viewModel.uiState.value.showQueueSheet)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Deck target (scanning cards into a deck)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun deckViewModel(deckId: String = "deck-1") = ScannerViewModel(
+        savedStateHandle = SavedStateHandle(mapOf(ScannerTarget.DECK_ID_ARGUMENT to deckId)),
+        cardRepository = cardRepository,
+        userCardRepository = userCardRepository,
+        sharedQueueRepository = queueRepository,
+        queueActions = CardQueueActions.forScannedCards(
+            queueRepository = queueRepository,
+            commitScannedCards = commitScannedCards,
+            addToWishlist = addToWishlist,
+        ),
+        analyticsHelper = analyticsHelper,
+        soundManager = soundManager,
+        addScannedCardsToDeck = addScannedCardsToDeck,
+        context = context,
+        appScope = appScope,
+    )
+
+    @Test
+    fun deckTarget_scansIntoItsOwnQueue_neverTheSharedCollectionQueue() = runTest {
+        val deckVm = deckViewModel()
+
+        deckVm.onRecognitionResult(identified(similarity = 1.0f))
+        advanceUntilIdle()
+
+        assertEquals(ScannerTarget.Deck("deck-1"), deckVm.uiState.value.target)
+        assertEquals(1, deckVm.uiState.value.scanSession.cards.size)
+        assertTrue(queueRepository.queue.value.isEmpty())
+    }
+
+    @Test
+    fun deckTarget_addAllToDeck_removesCommittedEntries_andRefusesCollectionCommit() = runTest {
+        val deckVm = deckViewModel()
+        deckVm.onRecognitionResult(identified(similarity = 1.0f))
+        advanceUntilIdle()
+        val entry = deckVm.uiState.value.scanSession.cards.single()
+        coEvery { addScannedCardsToDeck("deck-1", any(), DeckBoard.MAINBOARD) } returns
+            AddScannedCardsToDeckResult(
+                committedEntryIds = setOf(entry.id),
+                blockedCommanderEntryIds = emptySet(),
+                committedCopies = 1,
+            )
+
+        deckVm.onAddAllToCollection()
+        deckVm.onAddAllToDeck(DeckBoard.MAINBOARD)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { commitScannedCards(any()) }
+        coVerify(exactly = 1) { addScannedCardsToDeck("deck-1", any(), DeckBoard.MAINBOARD) }
+        assertTrue(deckVm.uiState.value.scanSession.cards.isEmpty())
+        assertFalse(deckVm.uiState.value.isCommittingQueue)
+    }
+
+    @Test
+    fun collectionTarget_refusesDeckActions() = runTest {
+        viewModel.onRecognitionResult(identified(similarity = 1.0f))
+        advanceUntilIdle()
+
+        viewModel.onAddAllToDeck(DeckBoard.MAINBOARD)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { addScannedCardsToDeck(any(), any(), any()) }
+        assertEquals(1, viewModel.uiState.value.scanSession.cards.size)
+    }
+
+    @Test
+    fun updateSorting_togglesInversionAndReversesCards() = runTest {
+        viewModel.onRecognitionResult(identified(similarity = 1.0f, card = defaultCard))
+        advanceUntilIdle()
+        val secondCard = TestFixtures.buildCard(scryfallId = "card-abc-002", name = "Counterspell", setCode = "lea")
+        viewModel.onRecognitionResult(identified(similarity = 1.0f, card = secondCard))
+        advanceUntilIdle()
+
+        val initialCards = viewModel.uiState.value.scanSession.cards
+        assertEquals(2, initialCards.size)
+        assertEquals("Lightning Bolt", initialCards[0].card.name)
+        assertEquals("Counterspell", initialCards[1].card.name)
+        assertFalse(viewModel.uiState.value.isListInverted)
+
+        viewModel.updateSorting()
+        advanceUntilIdle()
+
+        val invertedCards = viewModel.uiState.value.scanSession.cards
+        assertEquals(2, invertedCards.size)
+        assertEquals("Counterspell", invertedCards[0].card.name)
+        assertEquals("Lightning Bolt", invertedCards[1].card.name)
+        assertTrue(viewModel.uiState.value.isListInverted)
+
+        viewModel.updateSorting()
+        advanceUntilIdle()
+
+        val restoredCards = viewModel.uiState.value.scanSession.cards
+        assertEquals(2, restoredCards.size)
+        assertEquals("Lightning Bolt", restoredCards[0].card.name)
+        assertEquals("Counterspell", restoredCards[1].card.name)
+        assertFalse(viewModel.uiState.value.isListInverted)
     }
 }

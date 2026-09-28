@@ -35,8 +35,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -96,10 +96,11 @@ fun LoginSheet(
     val mc = MaterialTheme.magicColors
     val uiState by authViewModel.uiState.collectAsStateWithLifecycle()
     val sessionState by authViewModel.sessionState.collectAsStateWithLifecycle()
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden }
-    )
+    val sheetState =
+        rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+            confirmValueChange = { it != SheetValue.Hidden },
+        )
 
     // Dismiss on successful authentication (sign-in/sign-up flow).
     LaunchedEffect(uiState) {
@@ -130,7 +131,7 @@ fun LoginSheet(
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp, start = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = {
                     authViewModel.resetUiState()
@@ -139,7 +140,7 @@ fun LoginSheet(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = stringResource(R.string.action_cancel),
-                        tint = mc.textSecondary
+                        tint = mc.textSecondary,
                     )
                 }
             }
@@ -211,10 +212,11 @@ private fun LoginSheetContent(
         EmailConfirmationContent(
             email = email,
             onOpenEmailApp = {
-                val intent = Intent(Intent.ACTION_MAIN).apply {
-                    addCategory(Intent.CATEGORY_APP_EMAIL)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
+                val intent =
+                    Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_APP_EMAIL)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
                 try {
                     context.startActivity(intent)
                 } catch (_: ActivityNotFoundException) {
@@ -232,38 +234,47 @@ private fun LoginSheetContent(
     val isLoading = uiState is AuthUiState.Loading
     // Show the standard error message, or the "no profile" banner when Google Sign-In
     // completes without a ManaHub account (shown on tab 1 after the auto-switch).
-    val errorMessage: String? = when (uiState) {
-        is AuthUiState.Error -> uiState.message
-        is AuthUiState.GoogleSignInNoProfile ->
-            stringResource(R.string.auth_error_no_profile_found)
-        else -> null
-    }
+    val errorMessage: String? =
+        when (uiState) {
+            is AuthUiState.Error -> {
+                uiState.message
+            }
 
-    val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = mc.primaryAccent,
-        unfocusedBorderColor = mc.textSecondary.copy(alpha = 0.4f),
-        focusedLabelColor = mc.primaryAccent,
-        unfocusedLabelColor = mc.textSecondary,
-        cursorColor = mc.primaryAccent,
-        focusedTextColor = mc.textPrimary,
-        unfocusedTextColor = mc.textPrimary,
-        errorBorderColor = mc.lifeNegative,
-        errorLabelColor = mc.lifeNegative,
-        errorCursorColor = mc.lifeNegative,
-        errorSupportingTextColor = mc.lifeNegative,
-    )
+            is AuthUiState.GoogleSignInNoProfile -> {
+                stringResource(R.string.auth_error_no_profile_found)
+            }
+
+            else -> {
+                null
+            }
+        }
+
+    val fieldColors =
+        OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = mc.primaryAccent,
+            unfocusedBorderColor = mc.textSecondary.copy(alpha = 0.4f),
+            focusedLabelColor = mc.primaryAccent,
+            unfocusedLabelColor = mc.textSecondary,
+            cursorColor = mc.primaryAccent,
+            focusedTextColor = mc.textPrimary,
+            unfocusedTextColor = mc.textPrimary,
+            errorBorderColor = mc.lifeNegative,
+            errorLabelColor = mc.lifeNegative,
+            errorCursorColor = mc.lifeNegative,
+            errorSupportingTextColor = mc.lifeNegative,
+        )
 
     Box(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(scrollState)
-                .imePadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 24.dp, vertical = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState)
+                    .imePadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-
             // ── Title ──────────────────────────────────────────────────────────
             Text(
                 text = stringResource(R.string.auth_sheet_title),
@@ -316,7 +327,6 @@ private fun LoginSheetContent(
             }
 
             Spacer(modifier = Modifier.height(20.dp))
-
 
             // ── Nickname field (sign-up only) ──────────────────────────────────
             if (selectedTab == 1) {
@@ -377,7 +387,6 @@ private fun LoginSheetContent(
                 enabled = !isLoading,
             )
 
-
             // ── Password field ─────────────────────────────────────────────────
             OutlinedTextField(
                 value = password,
@@ -387,14 +396,22 @@ private fun LoginSheetContent(
                 },
                 label = { Text(stringResource(R.string.auth_field_password)) },
                 singleLine = true,
-                visualTransformation = if (passwordVisible) VisualTransformation.None
-                else PasswordVisualTransformation(),
+                visualTransformation =
+                    if (passwordVisible) {
+                        VisualTransformation.None
+                    } else {
+                        PasswordVisualTransformation()
+                    },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
-                            imageVector = if (passwordVisible) Icons.Default.Visibility
-                            else Icons.Default.VisibilityOff,
+                            imageVector =
+                                if (passwordVisible) {
+                                    Icons.Default.Visibility
+                                } else {
+                                    Icons.Default.VisibilityOff
+                                },
                             contentDescription = if (passwordVisible) "Hide password" else "Show password",
                             tint = mc.textSecondary,
                         )
@@ -429,9 +446,10 @@ private fun LoginSheetContent(
                     text = errorMessage,
                     color = mc.lifeNegative,
                     style = ty.labelMedium,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
                 )
             }
 
@@ -449,13 +467,17 @@ private fun LoginSheetContent(
                     }
                 },
                 text = stringResource(R.string.auth_btn_continue),
-                enabled = !isLoading && email.isNotBlank() &&
-                        if (selectedTab == 1) passwordStrength.allMet && nickname.isNotBlank()
-                        else password.isNotBlank(),
+                enabled =
+                    !isLoading && email.isNotBlank() &&
+                        if (selectedTab == 1) {
+                            passwordStrength.allMet && nickname.isNotBlank()
+                        } else {
+                            password.isNotBlank()
+                        },
                 isLoading = isLoading,
                 modifier = Modifier.fillMaxWidth(),
                 style = MagicCtaStyle.Filled,
-                color = MagicCtaColor.Primary
+                color = MagicCtaColor.Primary,
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -500,7 +522,7 @@ private fun LoginSheetContent(
                 enabled = !isLoading,
                 modifier = Modifier.fillMaxWidth(),
                 style = MagicCtaStyle.Outlined,
-                color = MagicCtaColor.Neutral, 
+                color = MagicCtaColor.Neutral,
                 tintIcon = false,
                 icon = {
                     Surface(
@@ -513,11 +535,11 @@ private fun LoginSheetContent(
                                 painter = painterResource(R.drawable.ic_google),
                                 contentDescription = null,
                                 modifier = Modifier.size(12.dp),
-                                tint = Color.Unspecified
+                                tint = Color.Unspecified,
                             )
                         }
                     }
-                }
+                },
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -560,10 +582,11 @@ private fun EmailConfirmationContent(
     val ty = MaterialTheme.magicTypography
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 32.dp, vertical = 24.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 32.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(
@@ -600,13 +623,15 @@ private fun EmailConfirmationContent(
         // Open email app button
         Button(
             onClick = onOpenEmailApp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = mc.primaryAccent,
-                contentColor = mc.background,
-            ),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = mc.primaryAccent,
+                    contentColor = mc.background,
+                ),
             shape = RoundedCornerShape(12.dp),
         ) {
             Icon(
@@ -671,28 +696,37 @@ private fun LinkGoogleIdentityDialog(
                     onValueChange = { password = it },
                     label = { Text(stringResource(R.string.auth_link_google_password_hint)) },
                     singleLine = true,
-                    visualTransformation = if (passwordVisible) VisualTransformation.None
-                    else PasswordVisualTransformation(),
+                    visualTransformation =
+                        if (passwordVisible) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     trailingIcon = {
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
                             Icon(
-                                imageVector = if (passwordVisible) Icons.Default.Visibility
-                                else Icons.Default.VisibilityOff,
+                                imageVector =
+                                    if (passwordVisible) {
+                                        Icons.Default.Visibility
+                                    } else {
+                                        Icons.Default.VisibilityOff
+                                    },
                                 contentDescription = if (passwordVisible) "Hide password" else "Show password",
                                 tint = mc.textSecondary,
                             )
                         }
                     },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = mc.primaryAccent,
-                        unfocusedBorderColor = mc.textSecondary.copy(alpha = 0.4f),
-                        focusedLabelColor = mc.primaryAccent,
-                        unfocusedLabelColor = mc.textSecondary,
-                        cursorColor = mc.primaryAccent,
-                        focusedTextColor = mc.textPrimary,
-                        unfocusedTextColor = mc.textPrimary,
-                    ),
+                    colors =
+                        OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = mc.primaryAccent,
+                            unfocusedBorderColor = mc.textSecondary.copy(alpha = 0.4f),
+                            focusedLabelColor = mc.primaryAccent,
+                            unfocusedLabelColor = mc.textSecondary,
+                            cursorColor = mc.primaryAccent,
+                            focusedTextColor = mc.textPrimary,
+                            unfocusedTextColor = mc.textPrimary,
+                        ),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -744,12 +778,13 @@ private fun ResetPasswordDialog(
                 // stays visible after sending too, since the dialog itself doesn't auto-close.
                 AuthFlowStepsCard(
                     title = stringResource(R.string.auth_reset_steps_title),
-                    steps = listOf(
-                        stringResource(R.string.auth_reset_step_send),
-                        stringResource(R.string.auth_reset_step_open),
-                        stringResource(R.string.auth_reset_step_choose),
-                        stringResource(R.string.auth_reset_step_signout_all),
-                    ),
+                    steps =
+                        listOf(
+                            stringResource(R.string.auth_reset_step_send),
+                            stringResource(R.string.auth_reset_step_open),
+                            stringResource(R.string.auth_reset_step_choose),
+                            stringResource(R.string.auth_reset_step_signout_all),
+                        ),
                 )
                 EmailDeliveryNote(includeLinkFacts = true)
 
@@ -766,15 +801,16 @@ private fun ResetPasswordDialog(
                         label = { Text(stringResource(R.string.auth_field_email)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = mc.primaryAccent,
-                            unfocusedBorderColor = mc.textSecondary.copy(alpha = 0.4f),
-                            focusedLabelColor = mc.primaryAccent,
-                            unfocusedLabelColor = mc.textSecondary,
-                            cursorColor = mc.primaryAccent,
-                            focusedTextColor = mc.textPrimary,
-                            unfocusedTextColor = mc.textPrimary,
-                        ),
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = mc.primaryAccent,
+                                unfocusedBorderColor = mc.textSecondary.copy(alpha = 0.4f),
+                                focusedLabelColor = mc.primaryAccent,
+                                unfocusedLabelColor = mc.textSecondary,
+                                cursorColor = mc.primaryAccent,
+                                focusedTextColor = mc.textPrimary,
+                                unfocusedTextColor = mc.textPrimary,
+                            ),
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoading,
                     )

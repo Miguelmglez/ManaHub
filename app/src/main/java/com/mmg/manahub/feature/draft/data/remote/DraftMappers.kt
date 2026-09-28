@@ -1,16 +1,11 @@
 package com.mmg.manahub.feature.draft.data.remote
+// COMMENTS_REVIEWED: 2026-09-22
 
 import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.data.local.entity.DraftSetEntity
 import com.mmg.manahub.core.data.remote.dto.SetIndexEntryDto
-import com.mmg.manahub.core.data.remote.dto.YouTubeVideoDto
-import com.mmg.manahub.core.model.DraftVideo
 
-/**
- * Maps a [SetIndexEntryDto] from the Cloudflare sets-index.json to a [DraftSetEntity]
- * for Room persistence. The set code is used as both id and code for consistency
- * with the new Cloudflare-based data source.
- */
+// The Cloudflare index has no separate id, so the set code doubles as the id
 fun SetIndexEntryDto.toEntity(): DraftSetEntity = DraftSetEntity(
     id = code,
     code = code,
@@ -20,11 +15,9 @@ fun SetIndexEntryDto.toEntity(): DraftSetEntity = DraftSetEntity(
     guideVersion = contentVersions.guide,
     tierListVersion = contentVersions.tierList,
     boosterVersion = contentVersions.booster,
+    setImageUrl = setImage,
 )
 
-/**
- * Maps a [DraftSetEntity] from Room to the domain [DraftSet] model.
- */
 fun DraftSetEntity.toDomain(): DraftSet = DraftSet(
     id = id,
     code = code,
@@ -34,16 +27,5 @@ fun DraftSetEntity.toDomain(): DraftSet = DraftSet(
     guideVersion = guideVersion,
     tierListVersion = tierListVersion,
     boosterVersion = boosterVersion,
-)
-
-/**
- * Maps a [YouTubeVideoDto] from the YouTube Data API to the domain [DraftVideo] model.
- */
-fun YouTubeVideoDto.toDomain(): DraftVideo = DraftVideo(
-    videoId = id.videoId,
-    title = snippet.title,
-    description = snippet.description,
-    thumbnailUrl = snippet.thumbnails.high?.url ?: snippet.thumbnails.medium?.url ?: "",
-    channelName = snippet.channelTitle,
-    publishedAt = snippet.publishedAt,
+    setImageUrl = setImageUrl,
 )

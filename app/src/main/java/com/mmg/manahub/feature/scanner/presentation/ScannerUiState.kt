@@ -1,38 +1,24 @@
 package com.mmg.manahub.feature.scanner.presentation
+// COMMENTS_REVIEWED: 2026-09-16
 
 import android.graphics.PointF
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.QueuedCard
 import com.mmg.manahub.core.ui.components.MagicToastType
-import java.util.UUID
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Session models
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * A single card entry inside a scan session, capturing all collection parameters
- * chosen by the user at the moment of scanning.
- */
-data class ScannedCard(
-    val card: Card,
-    val quantity: Int,
-    val isFoil: Boolean,
-    val language: String,
-    val condition: String,
-    val setCode: String,
-    val timestamp: Long,
-    // Write-path hardening audit (2026-09-06): stable identity for queue operations (edit/remove/
-    // duplicate/partial-retry) -- timestamp alone collides when two entries share a millisecond.
-    val id: String = UUID.randomUUID().toString(),
-)
-
-/**
- * Accumulates all cards scanned in the current session.
- * Duplicate entries (same scryfallId + isFoil + language + condition) are
- * merged by incrementing [ScannedCard.quantity] rather than creating a new row.
+ * Snapshot of the scanner's persisted card queue: the shared app-wide
+ * [com.mmg.manahub.core.domain.repository.CardQueueRepository] for the collection target, or the
+ * scanned deck's own per-deck queue for a [ScannerTarget.Deck] target.
+ * Duplicate scans (same scryfallId + isFoil + language + condition) are merged by incrementing
+ * [QueuedCard.quantity] rather than creating a new row.
  */
 data class ScanSession(
-    val cards: List<ScannedCard> = emptyList(),
+    val cards: List<QueuedCard> = emptyList(),
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -50,6 +36,12 @@ data class ScanSession(
  *                                  left over from before the overlay.
  * @property lastDetectedCard       The most recently confirmed card from Scryfall.
  * @property error                  Transient error message shown in the bottom bar.
+ * @property cameraBindError        Deck Wizard UX polish plan, Run 1 §1.7: separate from [error]
+ *                                  (which has other, unrelated write-path uses) so clearing one
+ *                                  never clobbers the other. Set by
+ *                                  [ScannerViewModel.onCameraBindFailed], cleared by
+ *                                  [ScannerViewModel.onCameraBound] on the next successful
+ *                                  `bindToLifecycle` -- the banner used to never clear once shown.
  * @property scanSession            Accumulated cards for the current session.
  * @property selectedIsFoil         Current foil toggle in the mode bar.
  * @property selectedLanguage       Current language code in the mode bar (e.g. "en").
@@ -91,11 +83,11 @@ data class ScanSession(
  *                                  fully unbinds the camera (`cameraProvider.unbindAll()`, ~250 ms
  *                                  debounced) to actually save power, not just skip frames.
  * @property isAutoDeleteOnAddEnabled  True when a per-entry "Add to collection"/"Add to wishlist"
- *                                  action in [ScanQueueSheet] should also remove that entry from
+ *                                  action in `CardQueueSheet` should also remove that entry from
  *                                  the queue once the add succeeds.
  * @property ownedCardIdentityKeys  Live set of identity keys (`oracleId.ifBlank { name }`) already
  *                                  present in the user's collection — feeds the "already in
- *                                  collection" badge in [QueueCardItem]. Kept up to date by a
+ *                                  collection" badge in `CardQueueSheet`. Kept up to date by a
  *                                  [ScannerViewModel] collector on `UserCardRepository.observeCollection()`.
  * @property rateLimitedUntilMs     W2.10 (scanner-reliability-plan.md, 2026-08-24). Wall-clock
  *                                  epoch millis until which [CardRecognizer] is suspending every
@@ -105,12 +97,14 @@ data class ScanSession(
  *                                  `rememberRateLimitCountdownSeconds`.
  */
 data class ScannerUiState(
+    val target: ScannerTarget = ScannerTarget.Collection,
     val isFlashOn: Boolean = false,
     val hasFlash: Boolean = true,
     val isRecognitionPausedByUser: Boolean = false,
     val isSearching: Boolean = false,
     val lastDetectedCard: Card? = null,
     val error: String? = null,
+    val cameraBindError: String? = null,
     val scanSession: ScanSession = ScanSession(),
     // Mode bar state
     val selectedIsFoil: Boolean = false,
@@ -123,7 +117,7 @@ data class ScannerUiState(
     val showEditSheet: Boolean = false,
     val showPriceDetailSheet: Boolean = false,
     // Edit card
-    val editingCard: ScannedCard? = null,
+    val editingCard: QueuedCard? = null,
     val availablePrints: List<Card> = emptyList(),
     val isLoadingPrints: Boolean = false,
     // Toast
@@ -148,23 +142,28 @@ data class ScannerUiState(
     val languageMismatch: Boolean = false,
     // W2.10 (2026-08-24): active Scryfall rate-limit cooldown — see the field KDoc above.
     val rateLimitedUntilMs: Long? = null,
+    // Rolling FPS counter — only populated in DEBUG builds, always 0 in release
+    val fps: Int = 0,
+
     // Ambiguity resolution (normal mode only)
     val showAmbiguitySelector: Boolean = false,
     // Card Detail overlay (Phase 2 scanner UX, 2026-07-17)
     val selectedCardDetailId: String? = null,
     val returnToQueueOnDetailClose: Boolean = false,
-    // Rolling FPS counter — only populated in DEBUG builds, always 0 in release
-    val fps: Int = 0,
-
     // Variant selector sheet
     val showVariantSelector: Boolean = false,
-    val variantSelectorEntry: ScannedCard? = null,
+    val variantSelectorEntry: QueuedCard? = null,
     val cardVariants: List<Card> = emptyList(),
     val isLoadingVariants: Boolean = false,
     // Full-screen image viewer
     val expandedVariantImageUrl: String? = null,
 
-    // Re-entrancy guard for onAddAllToCollection -- a second tap before the first commit
-    // resolves must not double-commit the queue.
+    // Collection target: mirrors CardQueueActions.isCommitting (the app-wide "add all" guard).
+    // Deck target: the scanner's own deck-write guard.
     val isCommittingQueue: Boolean = false,
+    // Mirrors CardQueueActions.isAddingAllToWishlist.
+    val isAddingAllToWishlist: Boolean = false,
+    // Mirrors CardQueueActions.inFlightIds: queue rows whose controls are locked while written.
+    val inFlightQueueIds: Set<String> = emptySet(),
+    val isListInverted : Boolean = false
 )

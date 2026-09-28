@@ -1,4 +1,5 @@
 package com.mmg.manahub.app.navigation
+// COMMENTS_REVIEWED: 2026-09-16
 
 import android.content.Intent
 import android.net.Uri
@@ -53,11 +54,14 @@ import com.mmg.manahub.core.model.PlaytestSetup
 import com.mmg.manahub.core.push.ForegroundScreenTracker
 import com.mmg.manahub.core.push.PushDeeplinkRouter
 import com.mmg.manahub.core.ui.components.FullErrorState
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicBottomBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.PlayerTheme
+import com.mmg.manahub.feature.addcard.presentation.AddCardLaunchArgs
 import com.mmg.manahub.feature.addcard.presentation.AddCardScreen
 import com.mmg.manahub.feature.auth.data.repository.AuthRepositoryImpl
 import com.mmg.manahub.feature.auth.presentation.AccountManagementScreen
@@ -70,6 +74,7 @@ import com.mmg.manahub.feature.collection.presentation.CollectionScreen
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckDetailScreen
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksScreen
 import com.mmg.manahub.feature.competitive.presentation.CompetitiveScreen
+import com.mmg.manahub.feature.decks.presentation.DECK_STUDIO_SELECT_BUILD_TAB_KEY
 import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
 import com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
@@ -80,6 +85,7 @@ import com.mmg.manahub.feature.friends.presentation.FriendsScreen
 import com.mmg.manahub.feature.friends.presentation.detail.FriendDetailScreen
 import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherScreen
 import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherViewModel
+import com.mmg.manahub.feature.friends.presentation.invite.InviteErrorReason
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.presentation.GamePlayScreen
 import com.mmg.manahub.feature.game.presentation.GameSettings
@@ -90,7 +96,6 @@ import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import com.mmg.manahub.feature.home.presentation.HomeAction
 import com.mmg.manahub.feature.home.presentation.HomeHeroState
 import com.mmg.manahub.feature.home.presentation.HomeScreen
-import com.mmg.manahub.feature.massiveadd.presentation.MassiveAddCardScreen
 import com.mmg.manahub.feature.news.presentation.NewsScreen
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.manahub.feature.news.presentation.VideoPlayerScreen
@@ -255,7 +260,7 @@ fun AppNavGraph(
         }
     }
 
-    // Toast for invite results — shown at the global level so it is visible regardless of
+    // Global toast (invite results, exit prompt) — shown at the global level so it is visible regardless of
     // which screen the user ends up on after the InviteDispatcherScreen navigates away.
     val inviteToastState = rememberMagicToastState()
 
@@ -271,17 +276,19 @@ fun AppNavGraph(
                     inviteToastState.show(msg, MagicToastType.SUCCESS)
                 }
                 is InviteDispatcherViewModel.UiEvent.InviteError -> {
-                    val msg = when {
-                        event.isSelfInvite -> context.getString(R.string.friends_invite_self)
-                        event.isInvalidCode -> context.getString(R.string.friends_invite_invalid)
-                        else -> context.getString(R.string.friends_invite_error)
+                    val msg = when (event.reason) {
+                        InviteErrorReason.SELF_INVITE -> context.getString(R.string.friends_invite_self)
+                        InviteErrorReason.INVALID_CODE -> context.getString(R.string.friends_invite_invalid)
+                        InviteErrorReason.SESSION_EXPIRED -> context.getString(R.string.friends_invite_session_expired)
+                        InviteErrorReason.GENERIC -> context.getString(R.string.friends_invite_error)
                     }
                     inviteToastState.show(msg, MagicToastType.ERROR)
                 }
                 InviteDispatcherViewModel.UiEvent.NavigateAway -> {
-                    // Navigate to Profile, removing the invite screen from the back stack.
+                    // Replace the invite screen with Profile; single-top so an existing Profile is not stacked twice.
                     navController.navigate(Screen.Profile.baseRoute) {
                         popUpTo(Screen.FriendsInvite.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             }
@@ -289,6 +296,21 @@ fun AppNavGraph(
     }
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
+
+    // Composed before the NavHost so screen/sheet/overlay back handlers registered later win.
+    val exitGuard = remember { AppExitBackGuard(clock = android.os.SystemClock::elapsedRealtime) }
+    AppExitBackHandler(
+        atRoot = backStack != null && navController.previousBackStackEntry == null,
+        guard = exitGuard,
+        onShowPrompt = {
+            FirebaseCrashlytics.getInstance().log("app_exit_back_prompt_shown")
+            inviteToastState.show(
+                message = context.getString(R.string.app_exit_back_prompt),
+                type = MagicToastType.INFO,
+                durationMs = AppExitBackGuard.DEFAULT_WINDOW_MS,
+            )
+        },
+    )
 
     var pendingPlaytestSetup by remember { mutableStateOf<PlaytestSetup?>(null) }
     var pendingPlayerConfigs by remember { mutableStateOf<List<PlayerConfig>?>(null) }
@@ -383,8 +405,9 @@ fun AppNavGraph(
                                             navController.navigate(Screen.GameSetup.baseRoute)
                                         }
                                     }
+                                    HomeAction.OpenImportCollection -> navController.navigate(Screen.ImportCards.route)
                                     HomeAction.ScanCard -> navController.navigate(Screen.CollectionScanner.route)
-                                    HomeAction.SearchCard -> navController.navigate(Screen.CollectionAddCard.route)
+                                    HomeAction.SearchCard -> navController.navigate(Screen.CollectionAddCard.createRoute())
                                     HomeAction.CreateDeck -> navController.navigate(Screen.DeckStudio.createRoute(null))
                                     HomeAction.DraftGuide -> navController.navigate(Screen.Draft.route)
                                     HomeAction.DraftSimulator -> navController.navigate(Screen.Draft.route)
@@ -475,7 +498,7 @@ fun AppNavGraph(
                                     is HomeAction.OpenCompetitive->{
                                         navController.navigate(Screen.Competitive.route)
                                     }
-                                    is HomeAction.OpenMultiAdd-> navController.navigate(Screen.CollectionMassiveAddCard)
+                                    is HomeAction.OpenMultiAdd -> navController.navigate(Screen.CollectionAddCard.createRoute(multi = true))
                                     // ── Widget board: handled in HomeScreen/VM ───────────
                                     HomeAction.OpenWidgetGallery,
                                     HomeAction.ResetLayout,
@@ -490,6 +513,8 @@ fun AppNavGraph(
                                     is HomeAction.UpdateLayout,
                                     is HomeAction.SkipFirstStep,
                                     is HomeAction.SelectCommunityDecksCategory,
+                                    is HomeAction.SelectCommunityDecksFormat,
+                                    HomeAction.RollRulesTip,
                                     -> Unit
                                 }
                             },
@@ -522,7 +547,7 @@ fun AppNavGraph(
                             onCardClick = { id, key ->
                                 navController.navigate(Screen.CollectionCardDetail.createRoute(id, key))
                             },
-                            onAddCardClick = { navController.navigate(Screen.CollectionAddCard.route) },
+                            onAddCardClick = { navController.navigate(Screen.CollectionAddCard.createRoute()) },
                             onDeckClick = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
                             onPlaytestClick = { id ->
                                 navController.navigate(Screen.PlaytestSetup.createRoute(id))
@@ -535,6 +560,9 @@ fun AppNavGraph(
                                     Screen.TradeNegotiationDetail.createRoute(proposalId, rootProposalId)
                                 )
                             },
+                            onNavigateToAddFriends = {
+                                navController.navigate(Screen.FriendsList.route)
+                            },
                             onBrowseCommunityDecks = {
                                 navController.navigate(Screen.CommunityDecks.route)
                             },
@@ -544,7 +572,25 @@ fun AppNavGraph(
                     }
 
                     // Add card (tabbed: text search + scanner link)
-                    composable(Screen.CollectionAddCard.route) {
+                    composable(
+                        route = Screen.CollectionAddCard.route,
+                        arguments = listOf(
+                            navArgument(AddCardLaunchArgs.ARG_MULTI) {
+                                type = NavType.BoolType
+                                defaultValue = false
+                            },
+                            navArgument(AddCardLaunchArgs.ARG_SOURCE) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                            navArgument(AddCardLaunchArgs.ARG_SOURCE_ID) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                        ),
+                    ) {
                         AddCardScreen(
                             onNavigateBack = { navController.popBackStack() },
                             onNavigateToScanner = { navController.navigate(Screen.CollectionScanner.route) },
@@ -556,30 +602,77 @@ fun AppNavGraph(
                         )
                     }
 
-                    composable(Screen.CollectionMassiveAddCard.route) {
-                        MassiveAddCardScreen(
-                            onBack = { navController.popBackStack() },
-                            sharedTransitionScope = this@SharedTransitionLayout,
-                            animatedVisibilityScope = this@composable,
-                            onNavigateToCardDetail = { scryfallId ->
-                                navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
-                            },
-                        )
-                    }
-
                     composable(Screen.CollectionScanner.route) {
                         ScannerScreen(
                             onBack = { navController.popBackStack() },
                             onNavigateToCardDetail = { scryfallId ->
                                 navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
                             },
-                            onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.route) },
+                            onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.createRoute()) },
                             onNavigateToDeck = { id ->
                                 navController.navigate(Screen.DeckStudio.createRoute(id))
                             },
                             onNavigateToCommunityDecks = { cardName ->
                                 navController.navigate(Screen.CommunityDecksByCard.createRoute(cardName))
                             }
+                        )
+                    }
+                    composable(Screen.ImportCards.route){
+                            backStackEntry ->
+                        CollectionScreen(
+                            // G.1 fix: read the "tab" arg directly off THIS backStackEntry (always
+                            // reflects the current navigate() call, e.g. "decks" from the Draft
+                            // Simulator hand-off) rather than relying on CollectionViewModel's
+                            // SavedStateHandle-read-at-init (which freezes on the value seen the
+                            // FIRST time this destination's ViewModel was constructed — a restored
+                            // instance, per navigateTab's restoreState=true contract, keeps that
+                            // frozen value and never re-reads a fresh arg). See CollectionScreen's
+                            // initialTabArg LaunchedEffect for how this is applied.
+                            initialTabArg = backStackEntry.arguments?.getString("tab"),
+                            onCardClick = { id, key ->
+                                navController.navigate(Screen.CollectionCardDetail.createRoute(id, key))
+                            },
+                            onAddCardClick = { navController.navigate(Screen.CollectionAddCard.createRoute()) },
+                            onDeckClick = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
+                            onPlaytestClick = { id ->
+                                navController.navigate(Screen.PlaytestSetup.createRoute(id))
+                            },
+                            onNavigateToTradeProposal = { receiverId ->
+                                navController.navigate(Screen.CreateTradeProposal.createRoute(receiverId))
+                            },
+                            onNavigateToTradeThread = { proposalId, rootProposalId ->
+                                navController.navigate(
+                                    Screen.TradeNegotiationDetail.createRoute(proposalId, rootProposalId)
+                                )
+                            },
+                            onNavigateToAddFriends = {
+                                navController.navigate(Screen.FriendsList.route)
+                            },
+                            onBrowseCommunityDecks = {
+                                navController.navigate(Screen.CommunityDecks.route)
+                            },
+                            sharedTransitionScope = this@SharedTransitionLayout,
+                            animatedVisibilityScope = this@composable,
+                            openImport = true
+                        )
+                    }
+
+                    composable(
+                        route = Screen.DeckScanner.route,
+                        arguments = listOf(
+                            navArgument("deckId") { type = NavType.StringType },
+                        ),
+                    ) {
+                        ScannerScreen(
+                            onBack = { navController.popBackStack() },
+                            onNavigateToCardDetail = { scryfallId ->
+                                navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
+                            },
+                            onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.createRoute()) },
+                            onNavigateToDeck = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
+                            onNavigateToCommunityDecks = { cardName ->
+                                navController.navigate(Screen.CommunityDecksByCard.createRoute(cardName))
+                            },
                         )
                     }
 
@@ -593,15 +686,18 @@ fun AppNavGraph(
                                 defaultValue = null
                             }
                         ),
-                        enterTransition = { 
+                        enterTransition = {
                             fadeIn(tween(500))
                         },
-                        exitTransition = { fadeOut(tween(500)) }
+                        exitTransition = { fadeOut(tween(500)) },
+                        // The default pop exit slides the screen, which drags the shared card
+                        // image's source bounds sideways on the way back.
+                        popExitTransition = { fadeOut(tween(500)) },
                     ) { backStackEntry ->
                         val sharedTransitionKey = backStackEntry.arguments?.getString("sharedTransitionKey")
                         CardDetailScreen(
                             onBack              = { navController.popBackStack() },
-                            onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.route) },
+                            onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.createRoute()) },
                             onNavigateToDeck    = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
                             onNavigateToCard    = { id ->
                                 navController.navigate(Screen.CollectionCardDetail.createRoute(id)) {
@@ -631,6 +727,15 @@ fun AppNavGraph(
                     },
                     onCardClick = { scryfallId ->
                         navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
+                    },
+                    onSelectCards = { archidektId ->
+                        navController.navigate(
+                            Screen.CollectionAddCard.createRoute(
+                                multi = true,
+                                source = Screen.CollectionAddCard.Source.COMMUNITY,
+                                sourceId = archidektId.toString(),
+                            )
+                        )
                     },
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedVisibilityScope = this@composable,
@@ -736,11 +841,43 @@ fun AppNavGraph(
                     onNavigateToCommunityDeckDetail = { archidektId ->
                         navController.navigate(Screen.CommunityDeckDetail.createRoute(archidektId))
                     },
-                    onNavigateToWizard = { archetype, theme, tribe, colors, seeds ->
-                        navController.navigate(Screen.DeckWizard.createRoute(archetype, theme, tribe, colors, seeds))
+                    onNavigateToWizard = { deckId, format, archetype, theme, tribe, colors, seeds, replaceConfirmed ->
+                        navController.navigate(
+                            Screen.DeckWizard.createRoute(
+                                format = format, deckId = deckId,
+                                archetype = archetype, theme = theme, tribe = tribe, colors = colors, seeds = seeds,
+                                replaceConfirmed = replaceConfirmed,
+                            )
+                        )
                     },
-                    onNavigateToMassiveAddCards = {
-                        navController.navigate(Screen.CollectionMassiveAddCard.route)
+                    // Browse inspirations "Start building the deck": only offered on an empty deck, so nothing to replace.
+                    onNavigateToWizardWithSeeds = { deckId, format, seedCards ->
+                        navController.navigate(
+                            Screen.DeckWizard.createRoute(format = format, deckId = deckId, seedCards = seedCards, replaceConfirmed = false)
+                        )
+                    },
+                    // R15: onNavigateToWizardFromDraft is ONLY reached from Deck Studio's "Rebuild
+                    // with the Wizard" confirm dialog (see DeckStudioScreen.kt) -- always confirmed
+                    // by construction, so replaceConfirmed is hardcoded true here rather than
+                    // widening this callback's own signature for a single caller.
+                    onNavigateToWizardFromDraft = { deckId, format ->
+                        navController.navigate(
+                            Screen.DeckWizard.createRoute(format = format, deckId = deckId, replaceConfirmed = true)
+                        )
+                    },
+                    onNavigateToScanner = { deckId ->
+                        navController.navigate(Screen.DeckScanner.createRoute(deckId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToSelectCards = { deckId ->
+                        navController.navigate(
+                            Screen.CollectionAddCard.createRoute(
+                                multi = true,
+                                source = Screen.CollectionAddCard.Source.DECK,
+                                sourceId = deckId,
+                            )
+                        )
                     },
                 )
             }
@@ -754,15 +891,41 @@ fun AppNavGraph(
                     navArgument("tribe") { type = NavType.StringType; defaultValue = ""; nullable = false },
                     navArgument("colors") { type = NavType.StringType; defaultValue = ""; nullable = false },
                     navArgument("seeds") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                    navArgument("seedCards") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                    navArgument("format") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                    navArgument("deckId") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                    navArgument("replaceConfirmed") { type = NavType.BoolType; defaultValue = false },
                 ),
-            ) {
+            ) { backStackEntry ->
+                // Deck Wizard v4 (R13): "format"/"deckId" are now REQUIRED nav args (Screen
+                // .DeckWizard.createRoute) -- the wizard never has its own format step, and reads
+                // these to know its format from construction and to target the wizard's atomic
+                // write at this SAME existing draft instead of creating a new one.
+                val launchedFromDeckId = backStackEntry.arguments?.getString("deckId")?.takeIf { it.isNotEmpty() }
                 DeckWizardScreen(
                     onBack = { navController.popBackStack() },
                     onOpenDeckStudio = { deckId ->
-                        // Replace the wizard on the back stack with Deck Studio so system back from
-                        // Studio returns to whatever screen opened the wizard, not back to Result.
-                        navController.navigate(Screen.DeckStudio.createRoute(deckId)) {
-                            popUpTo(Screen.DeckWizard.route) { inclusive = true }
+                        if (launchedFromDeckId != null && launchedFromDeckId == deckId) {
+                            // Item 5 (Phase 6): the wizard filled the SAME draft that launched it --
+                            // pop back to reveal that EXISTING Studio entry (its Room-backed flow
+                            // picks up the new cards reactively) instead of pushing a second Studio
+                            // entry on top of it, which navigate+popUpTo below would do.
+                            // W7 Task C (R11): this pop-back reuses the EXISTING DeckStudioViewModel
+                            // instance, whose selectedTab keeps whatever was active before the
+                            // rebuild was launched -- signal it to land on Build via the previous
+                            // entry's own SavedStateHandle (DeckStudioViewModel consumes+clears it
+                            // once in init).
+                            navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.set(DECK_STUDIO_SELECT_BUILD_TAB_KEY, true)
+                            navController.popBackStack()
+                        } else {
+                            // Replace the wizard on the back stack with Deck Studio so system back
+                            // from Studio returns to whatever screen opened the wizard, not back to
+                            // Result. Only reached for a FRESH draft (no deckId arg was passed in).
+                            navController.navigate(Screen.DeckStudio.createRoute(deckId)) {
+                                popUpTo(Screen.DeckWizard.route) { inclusive = true }
+                            }
                         }
                     },
                     onCardClick = { id -> navController.navigate(Screen.CollectionCardDetail.createRoute(id)) },
@@ -950,13 +1113,8 @@ fun AppNavGraph(
                     },
                 ),
             ) { backStackEntry ->
-                // Optional deep-link tab argument: "achievements" → Achievements tab,
-                // "quests" → Quests tab, else Overview.
-                val initialTab = when (backStackEntry.arguments?.getString("tab")?.lowercase()) {
-                    "achievements" -> ProfileTab.ACHIEVEMENTS
-                    "quests" -> ProfileTab.QUESTS
-                    else -> ProfileTab.OVERVIEW
-                }
+                // A gamification tab only opens once gamification is known to be available.
+                val initialTab = ProfileTab.fromRouteArg(backStackEntry.arguments?.getString("tab"))
                 ProfileScreen(
                     onSettingsClick = { navController.navigate(Screen.Settings.route) },
                     onStatsClick = { navController.navigate(Screen.Stats.route) },
@@ -991,8 +1149,12 @@ fun AppNavGraph(
                         // Sign-out/delete-account both leave the user unauthenticated — return to
                         // Profile's Unauthenticated card rather than staying on an account screen
                         // that no longer makes sense.
-                        navController.navigate(Screen.Profile.baseRoute) {
-                            popUpTo(Screen.AccountManagement.route) { inclusive = true }
+                        // Return to the existing Profile entry instead of stacking a second one (P-22).
+                        if (!navController.popBackStack(Screen.Profile.route, inclusive = false)) {
+                            navController.navigate(Screen.Profile.baseRoute) {
+                                popUpTo(Screen.AccountManagement.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         }
                     },
                 )
@@ -1168,15 +1330,7 @@ fun AppNavGraph(
                 ),
             ) { backStack ->
                 val code = backStack.arguments?.getString("code") ?: ""
-                InviteDispatcherScreen(
-                    code = code,
-                    onNavigateAway = {
-                        navController.navigate(Screen.Profile.baseRoute) {
-                            popUpTo(Screen.FriendsInvite.route) { inclusive = true }
-                        }
-                    },
-                    inviteVm = inviteVm,
-                )
+                InviteDispatcherScreen(code = code, inviteVm = inviteVm)
             }
 
             // ── Trades shared list (deep link) ────────────────────────────────
@@ -1189,14 +1343,19 @@ fun AppNavGraph(
                     },
                 ),
             ) {
-                TradesSharedListScreen(onBack = { navController.popBackStack() })
+                TradesSharedListScreen(
+                    onBack = { navController.popBackStack() },
+                    onCardClick = { scryfallId -> navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId)) },
+                )
             }
 
             // ── Trade proposal editor ─────────────────────────────────────────
             composable(
                 route     = Screen.CreateTradeProposal.route,
                 arguments = listOf(
-                    navArgument("receiverId") { type = NavType.StringType },
+                    navArgument("receiverId") {
+                        type = NavType.StringType; nullable = true; defaultValue = null
+                    },
                     navArgument("parentProposalId") {
                         type = NavType.StringType; nullable = true; defaultValue = null
                     },
@@ -1304,30 +1463,62 @@ fun AppNavGraph(
                 // entry's CreationExtras (carrying the `tournamentId` nav arg) — the exact equivalent of
                 // the old hiltViewModel(entry).
                 val tournamentVm: TournamentViewModel = koinViewModel(viewModelStoreOwner = entry)
+                var conflictingMatch by remember { mutableStateOf<Pair<Long, Long>?>(null) }
+                val launchTournamentMatch: (Long, Long) -> Boolean = { matchId, tId ->
+                    val (playerIds, configs) = tournamentVm.buildPlayerConfigsForMatch(matchId)
+                    if (configs.isEmpty()) {
+                        false
+                    } else {
+                        val mode = tournamentVm.getGameMode()
+                        pendingPlayerConfigs = configs
+                        pendingLayout = LayoutTemplates.getDefaultLayout(configs.size)
+                        pendingGameSettings = GameSettings()
+                        pendingTournamentMatchId = matchId
+                        pendingTournamentId = tId
+                        pendingTournamentPlayers = playerIds
+                        pendingTournamentMode = mode
+                        navController.navigate(Screen.GamePlay.createRoute(mode.name, configs.size))
+                        true
+                    }
+                }
                 TournamentScreen(
                     tournamentId = tournamentId,
                     onNavigateBack = { navController.popBackStack() },
                     onStartMatch = { matchId, tId ->
-                        val (playerIds, configs) = tournamentVm.buildPlayerConfigsForMatch(matchId)
-                        if (configs.isNotEmpty()) {
-                            val mode = tournamentVm.getGameMode()
-                            val layout = LayoutTemplates.getDefaultLayout(configs.size)
-                            pendingPlayerConfigs = configs
-                            pendingLayout = layout
-                            pendingTournamentMatchId = matchId
-                            pendingTournamentId = tId
-                            pendingTournamentPlayers = playerIds
-                            pendingTournamentMode = mode
-                            navController.navigate(
-                                Screen.GamePlay.createRoute(
-                                    mode.name,
-                                    configs.size
-                                )
-                            )
+                        val running = gameUiState
+                        when {
+                            // Resume in place (same as the Play FAB): re-initialising would reset every life total
+                            running.isGameRunning && running.activeTournamentMatchId == matchId -> {
+                                navController.navigate(
+                                    Screen.GamePlay.createRoute(running.mode.name, running.players.size)
+                                ) { launchSingleTop = true }
+                                true
+                            }
+                            running.isGameRunning -> {
+                                conflictingMatch = matchId to tId
+                                false
+                            }
+                            else -> launchTournamentMatch(matchId, tId)
                         }
                     },
                     viewModel = tournamentVm,
                 )
+                conflictingMatch?.let { (matchId, tId) ->
+                    MagicAlertDialog(
+                        onDismissRequest = { conflictingMatch = null },
+                        title = stringResource(R.string.tournament_game_in_progress_title),
+                        text = stringResource(R.string.tournament_game_in_progress_body),
+                        confirmLabel = stringResource(R.string.tournament_game_in_progress_confirm),
+                        confirmColor = MagicCtaColor.Error,
+                        onConfirm = {
+                            conflictingMatch = null
+                            gameVm.finishGame()
+                            launchTournamentMatch(matchId, tId)
+                        },
+                        dismissLabel = stringResource(R.string.tournament_game_in_progress_cancel),
+                        onDismiss = { conflictingMatch = null },
+                    )
+                }
             }
 
             // ── Game flow ─────────────────────────────────────────────────────
@@ -1392,6 +1583,7 @@ fun AppNavGraph(
                     },
                     onNavigateToTournamentSetup = { navController.navigate(Screen.TournamentSetup.route) },
                     onNavigateToTournamentDetail = { id -> navController.navigate(Screen.TournamentDetail.route(id)) },
+                    onNavigateToTournamentList = { navController.navigate(Screen.TournamentList.route) },
                     prefilledJoinCode = joinCode,
                 )
             }

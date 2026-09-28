@@ -86,4 +86,22 @@ class HomeScreenGreetingTest {
         val seen = (0L until 4L).map { day -> resolveGreetingVariant(hour = 9, epochDay = day, hasName = true) }.toSet()
         assertEquals(4, seen.size)
     }
+
+    @Test
+    fun `greeting hour and day both come from local time`() {
+        // 2026-09-23T22:30Z is already 08:30 on 2026-09-24 at UTC+10.
+        val nowMs = 1_790_202_600_000L
+        val (hour, epochDay) = localGreetingClock(nowMs, java.util.TimeZone.getTimeZone("GMT+10"))
+        assertEquals(8, hour)
+        assertEquals(nowMs / 86_400_000L + 1, epochDay)
+    }
+
+    @Test
+    fun `greeting clock handles zones behind UTC across midnight`() {
+        // 2026-09-24T01:00Z is still 21:00 on 2026-09-23 at UTC-4.
+        val nowMs = 1_790_211_600_000L
+        val (hour, epochDay) = localGreetingClock(nowMs, java.util.TimeZone.getTimeZone("GMT-4"))
+        assertEquals(21, hour)
+        assertEquals(nowMs / 86_400_000L - 1, epochDay)
+    }
 }

@@ -186,8 +186,8 @@ CMP `navigation-compose` swap (androidx → JetBrains artifact — near-mechanic
 sealed `Screen.kt`), `window.bindToNavigation()` URL routing; port MVP screens leaf-first (Auth →
 Search/CardDetail → Collection → Decks/Deck Studio → News → reduced Home). ViewModels are already
 Koin + constructor-clean; screens move to `commonMain` as they port. Non-MVP destinations show a
-graceful "not available on web" state behind a `PlatformCapabilities` flag. `compose-design-reviewer`
-audits each ported screen (12 themes, NeonVoid + HallowedPrint).
+graceful "not available on web" state behind a `PlatformCapabilities` flag. `android-edge-case-tester`
+audits each ported screen (behavior + UI: 12 themes, NeonVoid + HallowedPrint).
 **Gate:** MVP flows fully navigable in the browser; Android pixel-identical (same shared composables).
 
 ### W5 — Parity, polish, security, telemetry

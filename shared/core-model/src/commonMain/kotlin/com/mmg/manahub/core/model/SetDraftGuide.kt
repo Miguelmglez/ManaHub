@@ -16,6 +16,7 @@ package com.mmg.manahub.core.model
  * @property keyCommonsByColor Best commons grouped by color label (e.g. "{W} White"), schema v2.
  *   Has been emitted in the JSON for a long time but was never modelled until now, so v1 guides
  *   silently carried this data without the app ever showing it. Empty map when unavailable.
+ * @property keyUncommonsByColor Best uncommons grouped by color label. Empty map when unavailable.
  * @property formatSpeed Overall format speed descriptor (e.g. "Fast", "Slow/Grindy"), schema v2,
  *   from `set_overview.format_speed`. Empty when unavailable.
  */
@@ -31,6 +32,7 @@ data class SetDraftGuide(
     val archetypes: List<ArchetypeGuide>,
     val keyCommonsByColor: Map<String, List<ArchetypeKeyCard>> = emptyMap(),
     val formatSpeed: String = "",
+    val keyUncommonsByColor: Map<String, List<ArchetypeKeyCard>> = emptyMap(),
 )
 
 /**

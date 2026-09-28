@@ -15,8 +15,12 @@ import com.mmg.manahub.feature.game.domain.model.Player
 import com.mmg.manahub.feature.game.domain.model.PlayerResult
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -427,5 +431,89 @@ class GameSessionRepositoryImplTest {
         val victimEntity = capturedPlayers.captured.find { it.playerId == p1.id }
         assertEquals("COMMANDER_DAMAGE", victimEntity?.eliminationReason)
         assertEquals(21, victimEntity?.commanderDamageReceived)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Per-seat stats (ADR-001): sessions without a local seat
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given tournament game with no app-user seat when saveGameSession then no seat is local and the win is not personal`() = runTest {
+        // Arrange — tournament configs never flag a seat as isAppUser (no local-seat concept yet)
+        val p0 = buildPlayer(id = 0, name = "Alice", isAppUser = false)
+        val p1 = buildPlayer(id = 1, name = "Bob",   isAppUser = false, defeated = true)
+        val result = buildGameResult(
+            winner        = p0,
+            allPlayers    = listOf(p0, p1),
+            playerResults = listOf(
+                buildPlayerResult(p0, finalLife = 12),
+                buildPlayerResult(p1, finalLife = 0, eliminationReason = EliminationReason.LIFE),
+            ),
+        )
+        val capturedPlayers = slot<List<PlayerSessionEntity>>()
+        coEvery { dao.insertSessionWithPlayers(any(), capture(capturedPlayers)) } returns 7L
+        val capturedEvent = slot<ProgressionEvent>()
+        coEvery { progressionEventBus.emit(capture(capturedEvent)) } returns Unit
+
+        // Act
+        val id = repository.saveGameSession(result.toSessionData())
+
+        // Assert — the session persists, but no seat is the device owner and the win is not credited
+        assertEquals(7L, id)
+        assertTrue(capturedPlayers.captured.none { it.isLocal })
+        val event = capturedEvent.captured as ProgressionEvent.GameFinished
+        assertTrue("A game with no local seat must never credit a personal win", !event.isLocalWin)
+        assertEquals(null, event.localFinalLife)
+    }
+
+    @Test
+    fun `given a seat with a deck and archetype when saveGameSession then both land on player_sessions`() = runTest {
+        // Per-deck and matchup stats GROUP BY ps.deck_id / ps.archetype, so the seat row must carry them
+        val p0 = buildPlayer(id = 0, name = "Alice", isAppUser = true)
+        val p1 = buildPlayer(id = 1, name = "Bob", defeated = true)
+        val result = buildGameResult(
+            winner        = p0,
+            allPlayers    = listOf(p0, p1),
+            playerResults = listOf(
+                buildPlayerResult(p0, finalLife = 11),
+                buildPlayerResult(p1, finalLife = 0, eliminationReason = EliminationReason.LIFE),
+            ),
+        )
+        val sessionData = result.toSessionData().let { data ->
+            data.copy(
+                playerResults = data.playerResults.map { pr ->
+                    if (pr.player.isAppUser) pr.copy(deckId = "deck-uuid-1", archetype = "AGGRO") else pr
+                },
+            )
+        }
+        val capturedPlayers = slot<List<PlayerSessionEntity>>()
+        coEvery { dao.insertSessionWithPlayers(any(), capture(capturedPlayers)) } returns 5L
+
+        repository.saveGameSession(sessionData)
+
+        val localSeat = capturedPlayers.captured.single { it.isLocal }
+        assertEquals("deck-uuid-1", localSeat.deckId)
+        assertEquals("AGGRO", localSeat.archetype)
+        val opponent = capturedPlayers.captured.single { !it.isLocal }
+        assertEquals(null, opponent.deckId)
+    }
+
+    @Test
+    fun `given local-seat outcomes when observeCurrentStreak then counts only the leading consecutive wins`() = runTest {
+        // Arrange — most-recent first: W, W, L, W → streak of 2
+        every { dao.observeLocalSessionOutcomes() } returns flowOf(listOf(true, true, false, true))
+
+        // Act
+        val streak = repository.observeCurrentStreak().first()
+
+        // Assert
+        assertEquals(2, streak)
+    }
+
+    @Test
+    fun `given no local-seat sessions when observeCurrentStreak then streak is zero`() = runTest {
+        every { dao.observeLocalSessionOutcomes() } returns flowOf(emptyList())
+
+        assertEquals(0, repository.observeCurrentStreak().first())
     }
 }

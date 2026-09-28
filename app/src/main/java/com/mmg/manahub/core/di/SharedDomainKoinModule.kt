@@ -1,5 +1,9 @@
 package com.mmg.manahub.core.di
+// COMMENTS_REVIEWED: 2026-09-16
 
+import com.mmg.manahub.core.domain.collection.transfer.ResolveCollectionImportUseCase
+import com.mmg.manahub.core.domain.usecase.collection.CommitImportedCardsUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.AddAllToWishlistUseCase
 import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.cache.ManaSymbolStore
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
@@ -15,6 +19,7 @@ import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.UpdateCollectionEntryUseCase
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
+import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.data.usecase.stats.GetTradeStatsUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
@@ -28,10 +33,11 @@ import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSimSetUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetCardsPageUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetGuideUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
-import com.mmg.manahub.feature.draft.domain.usecase.GetSetVideosUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.MakePickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.ObserveDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.StartDraftUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.AddScannedCardsToDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.CalculateDeckValueSummaryUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
@@ -127,7 +133,6 @@ fun sharedDomainKoinModule(
     single { GetDraftableSetsUseCase(repository = get()) }
     single { GetSetGuideUseCase(repository = get()) }
     single { GetSetTierListUseCase(repository = get()) }
-    single { GetSetVideosUseCase(repository = get()) }
     single { GetSetCardsPageUseCase(repository = get()) }
     single { ObserveDraftUseCase(repository = get()) }
     single { GetDraftableSimSetUseCase(repository = get(), ioDispatcher = Dispatchers.IO) }
@@ -162,8 +167,7 @@ fun sharedDomainKoinModule(
         )
     }
 
-    // ── Trades use cases. AddToWishlistUseCase is ALSO consumed by the still-Hilt (excluded)
-    //    ScannerViewModel via the reverse KoinToHiltBridgeModule — same singleton instance either way. ──
+    // ── Trades use cases. ──
     single { AddToWishlistUseCase(repo = get(), authRepo = get()) }
     single { MigrateLocalTradeListsUseCase(wishlistRepo = get(), openForTradeRepo = get()) }
     // Card Versions & Languages, Phase 1A.
@@ -190,15 +194,30 @@ fun sharedDomainKoinModule(
             userCardRepository = get(),
         )
     }
-    // Also consumed by the still-Hilt (excluded) ScannerViewModel via the reverse
-    // KoinToHiltBridgeModule — same singleton instance either way.
     single {
         CommitScannedCardsUseCase(
             addCardToCollection = get(),
             progressionEventBus = get(),
         )
     }
+    // App-wide so its commit guard covers the shared queue from every screen (also bridged to Hilt).
+    single {
+        CardQueueActions.forScannedCards(
+            queueRepository = get(),
+            commitScannedCards = get(),
+            addToWishlist = get(),
+        )
+    }
+
+    // Collection import: batched resolution, no-XP commits and batched wishlist writes.
+    single { ResolveCollectionImportUseCase(cardRepository = get(), crashReporter = get()) }
+    single {
+        CommitImportedCardsUseCase(userCardRepository = get(), crashReporter = get(), progressionEventBus = get())
+    }
+    single { AddAllToWishlistUseCase(repo = get(), authRepo = get()) }
 
     // ── Deck use cases. ──
     single { GetDeckGameStatsUseCase(gameSessionRepository = get(), cardRepository = get()) }
+    single<AddScannedCardsToDeckUseCase> { AddScannedCardsToDeckUseCase(deckRepository = get()) }
+    single<CalculateDeckValueSummaryUseCase> { CalculateDeckValueSummaryUseCase() }
 }

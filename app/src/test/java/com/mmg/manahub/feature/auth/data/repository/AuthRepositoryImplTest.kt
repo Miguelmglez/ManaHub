@@ -817,13 +817,123 @@ class AuthRepositoryImplTest {
     }
 
     @Test
-    fun `given SessionStatus RefreshFailure when sessionState collected then emits Unauthenticated`() = runTest {
+    fun `given RefreshFailure with no prior session and nothing stored when sessionState collected then emits Unauthenticated`() = runTest {
+        val sessionManager = mockk<io.github.jan.supabase.auth.SessionManager>(relaxed = true)
+        coEvery { sessionManager.loadSession() } returns null
+        every { supabaseAuth.sessionManager } returns sessionManager
         sessionStatusFlow.value = SessionStatus.RefreshFailure(cause = mockk(relaxed = true))
 
         repository.sessionState.test {
             assertEquals(SessionState.Unauthenticated, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `given Authenticated then RefreshFailure when sessionState observed then stays Authenticated`() = runTest {
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val sessionMock = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+        }
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        val emitted = mutableListOf<SessionState>()
+        sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
+        val collectJob = launch { repoForTest.sessionState.collect { emitted += it } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        sessionStatusFlow.value = SessionStatus.RefreshFailure(cause = mockk(relaxed = true))
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        val state = repoForTest.sessionState.value
+        collectJob.cancel()
+
+        assertTrue(state is SessionState.Authenticated)
+        assertEquals("user-uuid-001", (state as SessionState.Authenticated).user.id)
+        assertTrue(emitted.none { it is SessionState.Unauthenticated })
+    }
+
+    @Test
+    fun `given Authenticated then explicit sign-out when sessionState observed then emits Unauthenticated`() = runTest {
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val sessionMock = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+        }
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
+        val collectJob = launch { repoForTest.sessionState.collect { } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        sessionStatusFlow.value = SessionStatus.NotAuthenticated(isSignOut = true)
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+        // A refresh failure after a real sign-out must not resurrect the previous user.
+        val sessionManager = mockk<io.github.jan.supabase.auth.SessionManager>(relaxed = true)
+        coEvery { sessionManager.loadSession() } returns null
+        every { supabaseAuth.sessionManager } returns sessionManager
+        sessionStatusFlow.value = SessionStatus.RefreshFailure(cause = mockk(relaxed = true))
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        val state = repoForTest.sessionState.value
+        collectJob.cancel()
+
+        assertEquals(SessionState.Unauthenticated, state)
+    }
+
+    @Test
+    fun `given cold-start RefreshFailure with a stored session when sessionState collected then emits Authenticated`() = runTest {
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val storedSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+        }
+        val sessionManager = mockk<io.github.jan.supabase.auth.SessionManager>(relaxed = true)
+        coEvery { sessionManager.loadSession() } returns storedSession
+        every { supabaseAuth.sessionManager } returns sessionManager
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        sessionStatusFlow.value = SessionStatus.RefreshFailure(cause = mockk(relaxed = true))
+
+        val collectJob = launch { repoForTest.sessionState.collect { } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        val state = repoForTest.sessionState.value
+        collectJob.cancel()
+
+        assertTrue(state is SessionState.Authenticated)
+        assertEquals("user-uuid-001", (state as SessionState.Authenticated).user.id)
     }
 
     @Test
@@ -866,6 +976,97 @@ class AuthRepositoryImplTest {
 
         assertTrue(state is SessionState.Authenticated)
         assertTrue((state as SessionState.Authenticated).user.hasPassword)
+    }
+
+    @Test
+    fun `given a fetched profile without avatar when sessionState enriches then the local avatar is removed and the identity claimed`() = runTest {
+        // P-12: a fetched user_profiles row is authoritative, so a null avatar is a removal that must
+        // reach this device. P-13: the cached identity is claimed for this user before syncing.
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val sessionMock = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+        }
+        coEvery { userProfileDataSource.fetchUserProfile("user-uuid-001") } returns UserProfileDto(
+            id = "user-uuid-001",
+            nickname = "Jace",
+            profileCompleted = true,
+        )
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
+
+        val collectJob = launch { repoForTest.sessionState.collect { } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+        collectJob.cancel()
+
+        coVerify { userPreferencesDataStore.claimProfileIdentity("user-uuid-001") }
+        coVerify { userPreferencesDataStore.saveAvatarUrl(null) }
+        coVerify { userPreferencesDataStore.savePlayerName("Jace") }
+    }
+
+    @Test
+    fun `given a successful deleteAccount then the cached nickname and avatar are cleared`() = runTest {
+        every { supabaseAuth.currentUserOrNull() } returns buildUserInfoMock()
+        coEvery { supabaseAuth.signOut(any()) } just Runs
+
+        val result = repository.deleteAccount()
+
+        assertTrue(result is AuthResult.Success)
+        coVerify(exactly = 1) { userPreferencesDataStore.clearProfileIdentity() }
+    }
+
+    @Test
+    fun `given signOut then the cached nickname and avatar are kept for the guest`() = runTest {
+        coEvery { supabaseAuth.signOut(any()) } just Runs
+
+        repository.signOut()
+
+        coVerify(exactly = 0) { userPreferencesDataStore.clearProfileIdentity() }
+    }
+
+    @Test
+    fun `local recovery signout clears account identity even after the session was revoked`() = runTest {
+        every { supabaseAuth.currentUserOrNull() } returns null
+        coEvery { userPreferencesDataStore.hasAccountProfileIdentity() } returns true
+        coEvery { supabaseAuth.signOut(any()) } just Runs
+
+        repository.abandonRecoverySession()
+
+        coVerify(exactly = 1) { userPreferencesDataStore.clearProfileIdentity() }
+    }
+
+    @Test
+    fun `a failed identity claim never writes account A details into ownerless guest storage`() = runTest {
+        val user = buildUserInfoMock(id = "user-a", nicknameMetadata = "Account A")
+        every { supabaseAuth.currentUserOrNull() } returns user
+        coEvery { userPreferencesDataStore.claimProfileIdentity("user-a") } throws IllegalStateException("disk failure")
+
+        repository.signInWithEmail("a@example.com", "password123")
+
+        coVerify(exactly = 0) { userPreferencesDataStore.savePlayerName(any()) }
+        coVerify(exactly = 0) { userPreferencesDataStore.saveAvatarUrl(any()) }
+        coVerify(exactly = 0) { userPreferencesDataStore.markProfileIdentityVerifiedGuest() }
+    }
+
+    @Test
+    fun `given account A signs out then its cached identity is cleared before account B signs in offline`() = runTest {
+        every { supabaseAuth.currentUserOrNull() } returns buildUserInfoMock(id = "user-a", email = "a@example.com")
+        coEvery { supabaseAuth.signOut(any()) } just Runs
+
+        val result = repository.signOut()
+
+        assertTrue(result is AuthResult.Success)
+        coVerify(exactly = 1) { userPreferencesDataStore.clearProfileIdentity() }
     }
 
     // ══════════════════════════════════════════════════════════════════════════

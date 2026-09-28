@@ -12,7 +12,9 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.gamification.domain.GamificationAvailability
 import com.mmg.manahub.core.util.recordNonFatal
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
@@ -21,9 +23,8 @@ import java.util.concurrent.TimeUnit
  * (ADR-002 §11, Phase 4).
  *
  * Mirrors [com.mmg.manahub.core.sync.CollectionSyncWorker]'s shape: a periodic (1h) and a one-time
- * builder, [NetworkType.CONNECTED], exponential backoff, and the `getCurrentUser()?.id ?:
- * Result.success()` guest guard. Anonymous guests have a real Supabase id (like collection sync), so
- * this runs for them too.
+ * builder, [NetworkType.CONNECTED], exponential backoff with a bounded attempt count. Runs only for a
+ * signed-in user who already owns the local store; guests (no account) are skipped.
  *
  * KMP migration — Hilt→Koin cutover batch 6: converted from `@HiltWorker`/`@AssistedInject` to a plain
  * [CoroutineWorker] resolved by Koin's `worker { }` DSL, registered in `gamificationEngineKoinModule`
@@ -39,6 +40,7 @@ class GamificationSyncWorker(
     private val gamificationSyncManager: GamificationSyncManager,
     private val authRepository: AuthRepository,
     private val userPreferencesDataStore: UserPreferencesDataStore,
+    private val gamificationAvailability: GamificationAvailability,
 ) : CoroutineWorker(appContext, workerParams) {
 
     companion object {
@@ -92,33 +94,30 @@ class GamificationSyncWorker(
     }
 
     override suspend fun doWork(): Result {
-        // Defense in depth (WS1+WS3 Part A item 3, backend-performance-optimization-plan.md §1):
-        // ManaHubApp cancels this worker's unique work reactively when the gamification master
-        // flag is off, but an ALREADY-enqueued periodic request (scheduled before the flag was
-        // last flipped off, e.g. from a previous install) can still fire before that cancel lands.
-        // Re-check the flag here so such a stray run reaches Supabase zero times.
-        if (!userPreferencesDataStore.gamificationEnabledFlow.first()) {
-            // WS7 telemetry (2026-07-29, ADR-005 Decision 1): this is the direct empirical proof
-            // point that the reactive cancel in ManaHubApp actually holds in the field — should fire
-            // near-never. Frequent firing means the cancel isn't landing before an already-enqueued
-            // periodic run fires (see this method's own class KDoc / defense-in-depth comment above).
+        // Defense in depth: the backend gate cancels this work when gamification is unavailable, but an
+        // already-enqueued run can fire before that cancel lands.
+        if (!gamificationAvailability.availableFlow.first()) {
+            // Field proof that the gate's cancel holds; should fire near-never.
             recordNonFatal("gamification_sync_worker_self_aborted_flag_off")
             return Result.success()
         }
 
-        // Guest users without any Supabase account (no current user) — skip entirely. Anonymous guests
-        // DO have an id, so they sync (local progress is preserved/merged into the anon account).
         val userId = authRepository.getCurrentUser()?.id ?: return Result.success()
+        // Only the gate claims or switches the store; syncing another account's store would merge it here.
+        if (userPreferencesDataStore.getGamificationOwnerUserId() != userId) return Result.success()
 
-        return try {
-            gamificationSyncManager.sync(userId).fold(
-                onSuccess = { Result.success() },
-                // Transient failure (network blip, Supabase timeout) — retry; watermark was not advanced.
-                onFailure = { Result.retry() },
-            )
+        val result = try {
+            gamificationSyncManager.sync(userId)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            // Give up after 3 attempts to avoid draining the battery on a persistent failure.
-            if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
+            kotlin.Result.failure(e)
+        }
+        return when {
+            result.isSuccess -> Result.success()
+            // Bounded: a persistent failure must not retry with backoff forever.
+            runAttemptCount >= MAX_ATTEMPTS -> Result.failure()
+            else -> Result.retry()
         }
     }
 }

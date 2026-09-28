@@ -1,6 +1,6 @@
 # ADR-002 — Gamification system
 
-- **Status**: Accepted (Phase 0 in progress)
+- **Status**: Accepted (Phases 0–4 built; restoration and release verification in progress as of 2026-09-25)
 - **Date**: 2026-06-11
 - **Supersedes**: the stateless `core/domain/usecase/achievements/CheckAchievementsUseCase`
   (removed in Phase 1)
@@ -11,6 +11,8 @@
 > of each phase, re-read this file, `CLAUDE.md`, and the relevant `MEMORY.md` entries to restore
 > state. The full spec lives in the (gitignored, transient) implementation prompt; the **decisions**
 > live here.
+> Phase-by-phase entries below are historical records. The 2026-09 amendments in §§2 and 11 and
+> ADR-005 define current availability and sync behavior where earlier text differs.
 
 ## Context
 
@@ -21,7 +23,7 @@ cosmetics) that:
   visibility — it is never required for progression.
 - **Reinforces real value**: rewards actions that make the app better for the user (logging games,
   surveys, building decks, collecting) — not engagement farming.
-- Is **opt-out first-class**: a master toggle hides all gamification UI. Streaks use freeze tokens,
+- Is **opt-out first-class**: availability gates UI and backend work. Streaks use freeze tokens,
   never punishment. No new push notifications in v1.
 - **Grandfathers** existing content: all 12 themes stay free; only NEW cosmetics are born locked.
 
@@ -39,15 +41,15 @@ and reacts.
   that already performs the commit), **one `bus.emit(...)` after a successful commit** — never in
   ViewModels or composables. Choke points identified in Phase 0:
   `GameSessionRepositoryImpl` (game save), survey answer save, collection add/scan repository,
-  `DeckRepositoryImpl` (deck save), `TournamentRepositoryImpl` (tournament finish),
-  `TradesRepositoryImpl` (trade accept success), `FriendRepositoryImpl` (friend accept), plus an
-  `AppOpenedToday` emission at app start.
+  `DeckRepositoryImpl` (first persisted mainboard card), `TournamentRepositoryImpl` (tournament
+  finish), `TradesRepositoryImpl` (first observation of completion), `FriendRepositoryImpl`
+  (confirmed friend or invite), plus `AppOpenedToday` while availability is on.
 
 ### 2. Engine starts in `ManaHubApp`
 
-`ManaHubApp` already owns `appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)` and collects
-`authRepository.sessionState`. The engine's bus collector is launched there. Processing is dispatched
-to `@DefaultDispatcher`.
+`ManaHubApp` owns an application scope. `GamificationBackendGate` starts and stops the engine's
+bus collector with availability, and schedules or cancels workers in the same transition. Processing
+is dispatched to the default dispatcher.
 
 ### 3. Idempotency via an XP ledger
 
@@ -61,8 +63,8 @@ This is the foundation of both crash-safety and (Phase 4) conflict-free sync —
 
 - **Family A** — derivable from existing Room data (card counts, win totals, deck counts):
   recomputed via queries on relevant events; supports **retroactive unlocks** for new achievements.
-  A one-shot backfill runs on first launch after the migration (flagged in DataStore; celebration UI
-  suppressed during backfill).
+  An idempotent backfill runs on each OFF→ON availability transition; historical unlock celebrations
+  are suppressed during backfill.
 - **Family B** — temporal/streak/windowed (win streaks, daily activity, all quests): **stateful
   counters** persisted in the new entities, advanced only by events.
 
@@ -149,6 +151,30 @@ real unlock wins). The level curve formula is **duplicated server-side** in
 `batch_upsert_xp_transactions` (SQL) — this coupling is intentional and documented here so both sides
 stay in sync if the curve constants change. **Quests are NOT synced in v1** (deterministically
 regenerable per §9; claimed XP syncs through the ledger).
+
+**2026-09 restoration amendment:** Client pulls use keyset-paged `get_*_page` RPCs (server cap 500),
+not unbounded `*_changes_since`. Ledger order uses server-assigned `server_seq`; mutable tables use
+server-set `changed_at` plus a stable primary-key tie breaker. The client persists a cursor after
+each applied page, pushes in slices of at most 500, and advances the local ledger watermark only
+over confirmed pushes and contiguous applied pulls. Old RPCs stay available for shipped clients.
+P0 and P1b–P1e were deployed and verified in production on 2026-09-25; P1a is a schema snapshot,
+not a migration to replay. The release flag remains off pending device and release-candidate
+verification. A local store belongs to one account; switching accounts wipes that store before a
+full pull. A null owner can claim only
+verified guest progress: an upgraded legacy store may have account A's data without the new
+owner key, so null alone is not proof of guest origin.
+The post-deployment advisors returned project-wide security and unused-index warnings; these need
+separate triage before a release candidate and did not identify a P1e-specific failure.
+Availability for an authenticated session must also require the store owner to equal that
+session's user id. A signed-out guest may use only a separately verified guest store; an old
+account's retained store must remain inaccessible to guest UI and event processing.
+See ADR-008 for the safe-watermark rationale.
+
+**Availability amendment:** `GamificationAvailability` combines the compile-time release flag,
+remote kill switch, and user opt-out preference. ADR-005 Decision 1 supersedes the original
+always-running engine: when unavailable, the engine, workers, sync, and UI stop. Each OFF→ON
+transition reruns derived catch-up and reconciliation. Event-only XP and counters missed while off
+are intentionally not recovered.
 
 ## Out of scope for v1 (do NOT build)
 

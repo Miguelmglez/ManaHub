@@ -21,7 +21,8 @@ package com.mmg.manahub.core.model
  * @return The number of cards that must be selected in the bottom-N step, in `[0, drawCount - 1]`.
  */
 fun computeRequiredBottomCount(drawCount: Int, startCount: Int, mulligansUsed: Int): Int =
-    maxOf(drawCount - startCount, mulligansUsed).coerceIn(0, drawCount - 1)
+    // coerceIn throws on an empty range, so a drawCount of 0 must not produce 0..-1.
+    maxOf(drawCount - startCount, mulligansUsed).coerceIn(0, (drawCount - 1).coerceAtLeast(0))
 
 /**
  * Locates which indices into [hand] correspond to "Custom your hand" forced copies, so the

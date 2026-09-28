@@ -46,6 +46,7 @@ fun searchWidgetsKoinModule(): Module = module {
             scryfallDataSource = get(),
             buildQuery = get(),
             userPreferencesDataStore = get(),
+            savedStateHandle = get(),
         )
     }
     viewModel {

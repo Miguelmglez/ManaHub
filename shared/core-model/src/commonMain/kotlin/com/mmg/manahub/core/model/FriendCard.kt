@@ -16,6 +16,7 @@ package com.mmg.manahub.core.model
  * @property isFoil Whether this entry is a foil copy.
  * @property condition Condition descriptor (e.g. "NM", "LP"), or null.
  * @property language Language code (e.g. "en", "ja"), or null.
+ * @property rowId Server row id, unique within a list; null from the legacy `get_friend_collection` RPC.
  */
 data class FriendCard(
     val sourceList: String,
@@ -36,4 +37,5 @@ data class FriendCard(
     val isStale: Boolean,
     val condition: String?,
     val language: String?,
+    val rowId: String? = null,
 )

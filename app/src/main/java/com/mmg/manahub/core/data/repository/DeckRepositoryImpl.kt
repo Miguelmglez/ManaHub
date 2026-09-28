@@ -1,17 +1,23 @@
 package com.mmg.manahub.core.data.repository
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DeckSummaryRow
+import com.mmg.manahub.core.data.local.dao.ScannerDeckCardAddition
 import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.entity.DeckEntity
 import com.mmg.manahub.core.data.local.mapper.toDomainDeck
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckCardSource
+import com.mmg.manahub.core.model.DeckCreationSource
 import com.mmg.manahub.core.model.DeckSlot
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DeckWithCards
+import com.mmg.manahub.core.domain.repository.CardSlotWrite
+import com.mmg.manahub.core.domain.repository.DeckCardAddition
+import com.mmg.manahub.core.domain.repository.DeckCardAdditionResult
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
@@ -21,6 +27,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Local-first implementation of [DeckRepository].
@@ -45,6 +52,9 @@ class DeckRepositoryImpl(
 
     private val gson = Gson()
     private val listType = object : TypeToken<List<String>>() {}.type
+
+    // Decks created this process whose DeckCreated waits for the first mainboard card; lost on process death by design.
+    private val pendingCreations = ConcurrentHashMap<String, DeckCreationSource>()
 
     // ── Observables ───────────────────────────────────────────────────────────
 
@@ -85,6 +95,13 @@ class DeckRepositoryImpl(
         name: String,
         description: String,
         format: String,
+    ): String = createDeck(name, description, format, DeckCreationSource.BUILT)
+
+    override suspend fun createDeck(
+        name: String,
+        description: String,
+        format: String,
+        source: DeckCreationSource,
     ): String = withContext(ioDispatcher) {
         val now = System.currentTimeMillis()
         val id = UUID.randomUUID().toString()
@@ -102,16 +119,33 @@ class DeckRepositoryImpl(
                 createdAt = now,
             )
         )
-        // Emit after the create commit (ADR-002 §1). Idempotency key deck_created:{id}
-        // makes the one-time create grant safe under retries.
+        pendingCreations[id] = source
+        id
+    }
+
+    override suspend fun tagDeckCreationSource(deckId: String, source: DeckCreationSource) {
+        pendingCreations.computeIfPresent(deckId) { _, _ -> source }
+    }
+
+    /**
+     * Emits the one-time [ProgressionEvent.DeckCreated] once a deck created this process holds a
+     * mainboard card (restore plan D8): an empty draft never earns anything, and the ledger key
+     * `deck_created:{id}` dedupes any replay. Call after the card write committed.
+     */
+    private suspend fun emitDeckCreatedOnFirstMainboardCard(deckId: String) {
+        if (!pendingCreations.containsKey(deckId)) return
+        if (deckDao.getDeckCards(deckId).none { !it.isSideboard && it.quantity > 0 }) return
+        val deck = deckDao.getDeckById(deckId) ?: return
+        // remove() is the claim: concurrent writers race here and exactly one emits.
+        val source = pendingCreations.remove(deckId) ?: return
         progressionEventBus.emit(
             ProgressionEvent.DeckCreated(
-                deckId = id,
-                format = format,
+                deckId = deckId,
+                format = deck.format,
+                source = source,
                 occurredAt = Clock.System.now(),
             )
         )
-        id
     }
 
     override suspend fun updateDeck(deck: Deck) = withContext(ioDispatcher) {
@@ -138,6 +172,7 @@ class DeckRepositoryImpl(
     }
 
     override suspend fun deleteDeck(deckId: String) = withContext(ioDispatcher) {
+        pendingCreations.remove(deckId)
         // Soft delete — the row stays so SyncManager can push the deletion to Supabase.
         deckDao.softDeleteDeck(deckId, System.currentTimeMillis())
     }
@@ -162,7 +197,32 @@ class DeckRepositoryImpl(
             deckDao.getDeckById(deckId)?.let { deck ->
                 deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
             }
+            if (!isSideboard) emitDeckCreatedOnFirstMainboardCard(deckId)
         }
+    }
+
+    override suspend fun mergeScannerCards(
+        deckId: String,
+        additions: List<DeckCardAddition>,
+    ): DeckCardAdditionResult = withContext(ioDispatcher) {
+        val result = deckDao.mergeScannerCards(
+            deckId = deckId,
+            additions = additions.map { addition ->
+                ScannerDeckCardAddition(
+                    entryId = addition.entryId,
+                    scryfallId = addition.scryfallId,
+                    oracleId = addition.oracleId,
+                    quantity = addition.quantity,
+                    isSideboard = addition.isSideboard,
+                )
+            },
+        )
+        if (result.committedCopies > 0) emitDeckCreatedOnFirstMainboardCard(deckId)
+        DeckCardAdditionResult(
+            committedEntryIds = result.committedEntryIds,
+            blockedCommanderEntryIds = result.blockedCommanderEntryIds,
+            committedCopies = result.committedCopies,
+        )
     }
 
     override suspend fun removeCardFromDeck(
@@ -218,6 +278,7 @@ class DeckRepositoryImpl(
             deckDao.getDeckById(deckId)?.let { deck ->
                 deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
             }
+            if (fromSideboard) emitDeckCreatedOnFirstMainboardCard(deckId)
         }
     }
 
@@ -253,12 +314,14 @@ class DeckRepositoryImpl(
         deckId: String,
         archetypeOverride: String?,
         themesOverride: List<String>,
+        posture: String?,
     ) {
         withContext(ioDispatcher) {
             deckDao.updateArchetypeOverride(
                 deckId = deckId,
                 archetypeOverride = archetypeOverride,
                 themesOverrideJson = if (themesOverride.isEmpty()) null else gson.toJson(themesOverride),
+                postureOverride = posture,
                 updatedAt = System.currentTimeMillis(),
             )
         }
@@ -268,6 +331,25 @@ class DeckRepositoryImpl(
         withContext(ioDispatcher) {
             deckDao.updateTribeOverride(
                 deckId = deckId,
+                tribeOverride = tribeOverride,
+                updatedAt = System.currentTimeMillis(),
+            )
+        }
+    }
+
+    override suspend fun updateStrategyPin(
+        deckId: String,
+        archetypeOverride: String?,
+        themesOverride: List<String>,
+        posture: String?,
+        tribeOverride: String?,
+    ) {
+        withContext(ioDispatcher) {
+            deckDao.updateStrategyPin(
+                deckId = deckId,
+                archetypeOverride = archetypeOverride,
+                themesOverrideJson = if (themesOverride.isEmpty()) null else gson.toJson(themesOverride),
+                postureOverride = posture,
                 tribeOverride = tribeOverride,
                 updatedAt = System.currentTimeMillis(),
             )
@@ -284,6 +366,69 @@ class DeckRepositoryImpl(
         }
     }
 
+    /**
+     * Deck Wizard Commander v3 plan (Phase 6, D12): overrides the commonMain default (non-atomic
+     * clearDeck + addCardToDeck loop) with a genuine single-transaction Room write via
+     * [DeckDao.replaceAllCardsWithSource] -- a cancelled or failed build leaves the draft exactly as
+     * it was, never empty-then-partial.
+     */
+    override suspend fun replaceAllCardsWithSource(deckId: String, slots: List<CardSlotWrite>) {
+        withContext(ioDispatcher) {
+            val entities = slots.map { slot ->
+                DeckCardEntity(
+                    deckId = deckId,
+                    scryfallId = slot.scryfallId,
+                    quantity = slot.quantity,
+                    isSideboard = slot.isSideboard,
+                    source = slot.source.name,
+                )
+            }
+            deckDao.replaceAllCardsWithSource(deckId, entities)
+            emitDeckCreatedOnFirstMainboardCard(deckId)
+        }
+    }
+
+    /**
+     * Deck Wizard Commander v3 plan (Phase 8, JOB 2): overrides the commonMain default (4 separate
+     * suspend calls) with a genuine single-transaction Room write via [DeckDao.persistWizardBuild]
+     * -- see that method's KDoc for the data-corruption gap this closes. Deck Wizard 60-card wave
+     * (v6, plan §5 Phase 1.3): renamed from `persistCommanderBuild` -- pure rename.
+     */
+    override suspend fun persistWizardBuild(
+        deckId: String,
+        slots: List<CardSlotWrite>,
+        archetypeOverride: String?,
+        themesOverride: List<String>,
+        posture: String?,
+        tribeOverride: String?,
+        strategyLocked: Boolean,
+        commanderCardId: String?,
+    ) {
+        withContext(ioDispatcher) {
+            val entities = slots.map { slot ->
+                DeckCardEntity(
+                    deckId = deckId,
+                    scryfallId = slot.scryfallId,
+                    quantity = slot.quantity,
+                    isSideboard = slot.isSideboard,
+                    source = slot.source.name,
+                )
+            }
+            deckDao.persistWizardBuild(
+                deckId = deckId,
+                cards = entities,
+                archetypeOverride = archetypeOverride,
+                themesOverrideJson = if (themesOverride.isEmpty()) null else gson.toJson(themesOverride),
+                postureOverride = posture,
+                tribeOverride = tribeOverride,
+                strategyLocked = strategyLocked,
+                commanderCardId = commanderCardId,
+                updatedAt = System.currentTimeMillis(),
+            )
+            emitDeckCreatedOnFirstMainboardCard(deckId)
+        }
+    }
+
     override suspend fun replaceAllCards(deckId: String, slots: List<Triple<String, Int, Boolean>>) {
         withContext(ioDispatcher) {
             val entities = slots.map { (scryfallId, quantity, isSideboard) ->
@@ -293,6 +438,7 @@ class DeckRepositoryImpl(
             deckDao.getDeckById(deckId)?.let { deck ->
                 deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
             }
+            emitDeckCreatedOnFirstMainboardCard(deckId)
         }
     }
 

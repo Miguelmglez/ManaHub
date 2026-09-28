@@ -7,12 +7,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -20,16 +20,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.rounded.CollectionsBookmark
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -52,41 +48,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.model.BASIC_LAND_NAMES
-import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.ui.Res
-import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRow
-import com.mmg.manahub.core.ui.components.CardRarity
-import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
-import com.mmg.manahub.core.ui.components.SetSymbol
-import com.mmg.manahub.core.ui.components.manaColorFor
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.ButtonShape
-import com.mmg.manahub.core.ui.theme.CardCornerRadius
-import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
-import com.mmg.manahub.core.ui.theme.SmallCardShape
-import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -277,6 +260,26 @@ internal fun MovementRow(
 }
 
 /**
+ * A generic container row for extra supporting content (badges, warnings, metadata)
+ * shown below a [CardRow]. Mirrors the styling of [MovementRow].
+ */
+@Composable
+internal fun ExtraSupportingRow(
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit
+) {
+    val spacing = MaterialTheme.spacing
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = spacing.md, end = spacing.md, top = spacing.xxs, bottom = spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        content = content
+    )
+}
+
+/**
  * Bottom sheet that lets the user add/remove the five basic lands.
  *
  * VM-agnostic: pass the current basic-land counts and resolve a mana symbol per
@@ -352,7 +355,7 @@ internal fun AddBasicLandsRow(onClick: () -> Unit, modifier: Modifier = Modifier
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick)
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(spacing.md), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-            Icon(Icons.Default.Park, null, tint = mc.primaryAccent, modifier = Modifier.size(20.dp))
+            Icon(painterResource(R.drawable.ic_land), null, tint = mc.primaryAccent, modifier = Modifier.size(20.dp))
             Text(stringResource(R.string.deckdetail_add_basic_lands), style = ty.bodyMedium, color = mc.primaryAccent, modifier = Modifier.weight(1f))
             Icon(Icons.Default.Add, null, tint = mc.primaryAccent, modifier = Modifier.size(18.dp))
         }

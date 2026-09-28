@@ -3,6 +3,8 @@ package com.mmg.manahub.feature.trades.data.repository
 import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.core.data.local.entity.LocalOpenForTradeEntity
 import com.mmg.manahub.core.data.remote.trades.OpenForTradeRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.KeysetDrain
+import com.mmg.manahub.core.data.remote.dto.OpenForTradeEntryDto
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -67,7 +69,7 @@ class OpenForTradeRepositoryImplTest {
 
     @Before
     fun setUp() {
-        repository = OpenForTradeRepositoryImpl(dao = dao, remote = remote)
+        repository = OpenForTradeRepositoryImpl(dao = dao, remote = remote, currentUserId = { USER_ID })
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -78,7 +80,7 @@ class OpenForTradeRepositoryImplTest {
     fun `given scryfallId and localCollectionId when addLocal then entity is inserted with those values`() = runTest {
         // Arrange — addLocal looks up any existing row for this collection id first (§2.1
         // upsert-by-collection-id pattern); no existing row here, so it upserts a new entity.
-        coEvery { dao.getByCollectionId(any()) } returns null
+        coEvery { dao.getByCollectionId(any(), any()) } returns null
         val capturedEntity = slot<LocalOpenForTradeEntity>()
         coEvery { dao.upsert(capture(capturedEntity)) } returns Unit
 
@@ -97,7 +99,7 @@ class OpenForTradeRepositoryImplTest {
 
     @Test
     fun `given addLocal when called then entity is inserted with synced false`() = runTest {
-        coEvery { dao.getByCollectionId(any()) } returns null
+        coEvery { dao.getByCollectionId(any(), any()) } returns null
         val capturedEntity = slot<LocalOpenForTradeEntity>()
         coEvery { dao.upsert(capture(capturedEntity)) } returns Unit
 
@@ -108,7 +110,7 @@ class OpenForTradeRepositoryImplTest {
 
     @Test
     fun `given addLocal when called then entity receives a non-blank UUID id`() = runTest {
-        coEvery { dao.getByCollectionId(any()) } returns null
+        coEvery { dao.getByCollectionId(any(), any()) } returns null
         val capturedEntity = slot<LocalOpenForTradeEntity>()
         coEvery { dao.upsert(capture(capturedEntity)) } returns Unit
 
@@ -125,7 +127,7 @@ class OpenForTradeRepositoryImplTest {
         val capturedFirst  = slot<LocalOpenForTradeEntity>()
         val capturedSecond = slot<LocalOpenForTradeEntity>()
 
-        coEvery { dao.getByCollectionId(any()) } returns null
+        coEvery { dao.getByCollectionId(any(), any()) } returns null
         coEvery { dao.upsert(capture(capturedFirst)) } returns Unit
         repository.addLocal(scryfallId = "card-a", localCollectionId = "col-a")
 
@@ -140,7 +142,7 @@ class OpenForTradeRepositoryImplTest {
 
     @Test
     fun `given dao upsert throws when addLocal then returns Result failure`() = runTest {
-        coEvery { dao.getByCollectionId(any()) } returns null
+        coEvery { dao.getByCollectionId(any(), any()) } returns null
         coEvery { dao.upsert(any()) } throws RuntimeException("constraint violation")
 
         val result = repository.addLocal("card-001", "col-001")
@@ -157,12 +159,12 @@ class OpenForTradeRepositoryImplTest {
         val result = repository.removeLocal("oft-entry-id-001")
 
         assertTrue(result.isSuccess)
-        coVerify(exactly = 1) { dao.deleteById("oft-entry-id-001") }
+        coVerify(exactly = 1) { dao.deleteById("oft-entry-id-001", any()) }
     }
 
     @Test
     fun `given dao deleteById throws when removeLocal then returns Result failure`() = runTest {
-        coEvery { dao.deleteById(any()) } throws RuntimeException("not found")
+        coEvery { dao.deleteById(any(), any()) } throws RuntimeException("not found")
 
         val result = repository.removeLocal("oft-entry-id-001")
 
@@ -180,7 +182,7 @@ class OpenForTradeRepositoryImplTest {
             buildEntity(id = "oft-1", localCollectionId = "col-uuid-A"),
             buildEntity(id = "oft-2", localCollectionId = "col-uuid-B"),
         )
-        coEvery { dao.getUnsynced() } returns unsyncedRows
+        coEvery { dao.getUnsynced(any()) } returns unsyncedRows
         val capturedIds = slot<List<String>>()
         coEvery { remote.batchAddOpenForTradeEntries(capture(capturedIds)) } returns Result.success(Unit)
 
@@ -200,10 +202,10 @@ class OpenForTradeRepositoryImplTest {
             buildEntity(id = "oft-2", localCollectionId = "col-2"),
             buildEntity(id = "oft-3", localCollectionId = "col-3"),
         )
-        coEvery { dao.getUnsynced() } returns unsyncedRows
+        coEvery { dao.getUnsynced(any()) } returns unsyncedRows
         coEvery { remote.batchAddOpenForTradeEntries(any()) } returns Result.success(Unit)
         val capturedSyncedIds = slot<List<String>>()
-        coEvery { dao.markSynced(capture(capturedSyncedIds)) } returns Unit
+        coEvery { dao.markSynced(capture(capturedSyncedIds), any()) } returns Unit
 
         repository.migrateLocalToRemote(USER_ID)
 
@@ -214,13 +216,13 @@ class OpenForTradeRepositoryImplTest {
     fun `given unsynced rows when migrateLocalToRemote succeeds then rows are marked synced and NOT cleared`() = runTest {
         // Entries remain in Room after a successful sync (clearSynced removed) so that
         // observeLocal() continues to show them without re-downloading from remote.
-        coEvery { dao.getUnsynced() } returns listOf(buildEntity(id = "oft-1"))
+        coEvery { dao.getUnsynced(any()) } returns listOf(buildEntity(id = "oft-1"))
         coEvery { remote.batchAddOpenForTradeEntries(any()) } returns Result.success(Unit)
 
         repository.migrateLocalToRemote(USER_ID)
 
-        coVerify(exactly = 1) { dao.markSynced(listOf("oft-1")) }
-        coVerify(exactly = 0) { dao.clearSynced() }
+        coVerify(exactly = 1) { dao.markSynced(listOf("oft-1"), any()) }
+        coVerify(exactly = 0) { dao.clearSynced(any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -229,7 +231,7 @@ class OpenForTradeRepositoryImplTest {
 
     @Test
     fun `given no unsynced rows when migrateLocalToRemote then returns Result success with 0`() = runTest {
-        coEvery { dao.getUnsynced() } returns emptyList()
+        coEvery { dao.getUnsynced(any()) } returns emptyList()
 
         val result = repository.migrateLocalToRemote(USER_ID)
 
@@ -239,7 +241,7 @@ class OpenForTradeRepositoryImplTest {
 
     @Test
     fun `given no unsynced rows when migrateLocalToRemote then batchAddOpenForTradeEntries is NOT called`() = runTest {
-        coEvery { dao.getUnsynced() } returns emptyList()
+        coEvery { dao.getUnsynced(any()) } returns emptyList()
 
         repository.migrateLocalToRemote(USER_ID)
 
@@ -248,12 +250,12 @@ class OpenForTradeRepositoryImplTest {
 
     @Test
     fun `given no unsynced rows when migrateLocalToRemote then markSynced and clearSynced are NOT called`() = runTest {
-        coEvery { dao.getUnsynced() } returns emptyList()
+        coEvery { dao.getUnsynced(any()) } returns emptyList()
 
         repository.migrateLocalToRemote(USER_ID)
 
-        coVerify(exactly = 0) { dao.markSynced(any()) }
-        coVerify(exactly = 0) { dao.clearSynced() }
+        coVerify(exactly = 0) { dao.markSynced(any(), any()) }
+        coVerify(exactly = 0) { dao.clearSynced(any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -263,7 +265,7 @@ class OpenForTradeRepositoryImplTest {
     @Test
     fun `given remote batchAdd fails when migrateLocalToRemote then returns Result failure`() = runTest {
         val unsyncedRows = listOf(buildEntity(id = "oft-1"), buildEntity(id = "oft-2"))
-        coEvery { dao.getUnsynced() } returns unsyncedRows
+        coEvery { dao.getUnsynced(any()) } returns unsyncedRows
         coEvery { remote.batchAddOpenForTradeEntries(any()) } returns Result.failure(RuntimeException("503"))
 
         val result = repository.migrateLocalToRemote(USER_ID)
@@ -274,13 +276,13 @@ class OpenForTradeRepositoryImplTest {
     @Test
     fun `given remote batchAdd fails when migrateLocalToRemote then markSynced is NOT called`() = runTest {
         // getOrThrow() throws inside runCatching → markSynced is never reached
-        coEvery { dao.getUnsynced() } returns listOf(buildEntity(id = "oft-1"))
+        coEvery { dao.getUnsynced(any()) } returns listOf(buildEntity(id = "oft-1"))
         coEvery { remote.batchAddOpenForTradeEntries(any()) } returns Result.failure(RuntimeException("network"))
 
         repository.migrateLocalToRemote(USER_ID)
 
-        coVerify(exactly = 0) { dao.markSynced(any()) }
-        coVerify(exactly = 0) { dao.clearSynced() }
+        coVerify(exactly = 0) { dao.markSynced(any(), any()) }
+        coVerify(exactly = 0) { dao.clearSynced(any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -292,7 +294,7 @@ class OpenForTradeRepositoryImplTest {
         // Simulate a real DB: getByCollectionId reflects whatever the last upsert wrote.
         var stored: LocalOpenForTradeEntity? = null
         val upsertedIds = mutableListOf<String>()
-        coEvery { dao.getByCollectionId("col-shared") } answers { stored }
+        coEvery { dao.getByCollectionId("col-shared", any()) } answers { stored }
         coEvery { dao.upsert(any()) } coAnswers {
             val entity = firstArg<LocalOpenForTradeEntity>()
             upsertedIds += entity.id
@@ -322,7 +324,7 @@ class OpenForTradeRepositoryImplTest {
     fun `given two concurrent addAndSync calls for the same localCollectionId then the mutex serializes them into a single row`() = runTest {
         var stored: LocalOpenForTradeEntity? = null
         val upsertedIds = mutableListOf<String>()
-        coEvery { dao.getByCollectionId("col-shared") } answers { stored }
+        coEvery { dao.getByCollectionId("col-shared", any()) } answers { stored }
         coEvery { dao.upsert(any()) } coAnswers {
             val entity = firstArg<LocalOpenForTradeEntity>()
             upsertedIds += entity.id
@@ -349,6 +351,7 @@ class OpenForTradeRepositoryImplTest {
 
     @Test
     fun `given removeByCollectionIdAndSync when remote succeeds then the remote delete happens before the local row is removed`() = runTest {
+        coEvery { dao.getByCollectionId("col-1", USER_ID) } returns buildEntity(localCollectionId = "col-1")
         coEvery { remote.removeByUserCardId("col-1") } returns Result.success(Unit)
 
         val result = repository.removeByCollectionIdAndSync("col-1")
@@ -356,12 +359,13 @@ class OpenForTradeRepositoryImplTest {
         assertTrue(result.isSuccess)
         coVerifyOrder {
             remote.removeByUserCardId("col-1")
-            dao.deleteByCollectionId("col-1")
+            dao.deleteByCollectionId("col-1", any())
         }
     }
 
     @Test
     fun `given removeByCollectionIdAndSync when the remote call fails then the local row is NOT deleted`() = runTest {
+        coEvery { dao.getByCollectionId("col-1", USER_ID) } returns buildEntity(localCollectionId = "col-1")
         // Regression test for §2.2: the old local-then-remote order deleted the local row
         // FIRST, so a remote failure left the server row alive — the next syncFromRemote()
         // would resurrect the entry the user just removed. Remote-first means a remote
@@ -371,6 +375,61 @@ class OpenForTradeRepositoryImplTest {
         val result = repository.removeByCollectionIdAndSync("col-1")
 
         assertTrue(result.isFailure)
-        coVerify(exactly = 0) { dao.deleteByCollectionId(any()) }
+        coVerify(exactly = 0) { dao.deleteByCollectionId(any(), any()) }
+    }
+
+    @Test
+    fun `given trade apply already removed the local offer then remote removal still runs`() = runTest {
+        coEvery { dao.getByCollectionId("col-1", USER_ID) } returns null
+        coEvery { remote.removeByUserCardId("col-1") } returns Result.success(Unit)
+
+        val result = repository.removeByCollectionIdAndSync("col-1")
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 1) { remote.removeByUserCardId("col-1") }
+        coVerify(exactly = 1) { dao.deleteByCollectionId("col-1", USER_ID) }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 8 — syncFromRemote: eviction only after a complete keyset drain
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun offerDto(id: String) =
+        OpenForTradeEntryDto(id = id, userId = USER_ID, userCardId = "row-$id", createdAt = "2024-01-01T00:00:00Z")
+
+    @Test
+    fun `given a partial drain when syncFromRemote then fetched rows are kept and nothing is evicted`() = runTest {
+        coEvery { remote.drainOpenForTrade(USER_ID) } returns
+            KeysetDrain(listOf(offerDto("o1")), isComplete = false, failure = RuntimeException("page 2 failed"))
+        coEvery { dao.getSyncedIds(any()) } returns listOf("o1", "o-old")
+
+        val result = repository.syncFromRemote(USER_ID)
+
+        assertTrue(result.isFailure)
+        coVerify { dao.upsertAll(match { rows -> rows.map { it.id } == listOf("o1") }) }
+        coVerify(exactly = 0) { dao.deleteSyncedByIds(any(), any()) }
+        coVerify(exactly = 0) { dao.deleteSyncedNotIn(any(), any()) }
+        coVerify(exactly = 0) { dao.clearSynced(any()) }
+    }
+
+    @Test
+    fun `given a drain stopped at its page cap when syncFromRemote then nothing is evicted`() = runTest {
+        coEvery { remote.drainOpenForTrade(USER_ID) } returns KeysetDrain(listOf(offerDto("o1")), isComplete = false)
+
+        val result = repository.syncFromRemote(USER_ID)
+
+        assertTrue(result.isFailure)
+        coVerify(exactly = 0) { dao.deleteSyncedByIds(any(), any()) }
+    }
+
+    @Test
+    fun `given a complete drain when syncFromRemote then only synced rows the server no longer has are evicted`() = runTest {
+        coEvery { remote.drainOpenForTrade(USER_ID) } returns KeysetDrain.complete(listOf(offerDto("o1")))
+        coEvery { dao.getSyncedIds(any()) } returns listOf("o1", "o-old")
+
+        val result = repository.syncFromRemote(USER_ID)
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 1) { dao.deleteSyncedByIds(listOf("o-old"), any()) }
     }
 }

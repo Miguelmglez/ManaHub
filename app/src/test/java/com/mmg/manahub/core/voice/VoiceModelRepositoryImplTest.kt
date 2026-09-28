@@ -8,12 +8,14 @@ import com.mmg.manahub.core.voice.domain.VoiceModelState
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okio.Buffer
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -275,6 +277,57 @@ class VoiceModelRepositoryImplTest {
     // ══════════════════════════════════════════════════════════════════════════
     //  GROUP 3 — Idempotent download
     // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given two concurrent downloads for one language then only one HTTP request is sent`() = runTest {
+        // The Downloading guard used to run AFTER withContext(Dispatchers.IO), so a double tap
+        // started two downloads writing into the same temp zip and model directory.
+        enqueueValidModelResponse()
+        enqueueValidModelResponse()
+        val repo = buildRepository()
+
+        val first = launch { repo.download(VoiceLanguage.ENGLISH) }
+        val second = launch { repo.download(VoiceLanguage.ENGLISH) }
+        first.join()
+        second.join()
+
+        assertEquals(
+            "A concurrent second download must be rejected by the state guard",
+            1,
+            server.requestCount,
+        )
+    }
+
+    @Test
+    fun `given a zip entry escaping the model directory then extraction is rejected`() = runTest {
+        // Zip-slip: "../" entries must never write outside voice-models/<lang>
+        val baos = java.io.ByteArrayOutputStream()
+        ZipOutputStream(baos).use { zos ->
+            zos.putNextEntry(ZipEntry("vosk-model-small-en-us-0.15/"))
+            zos.closeEntry()
+            zos.putNextEntry(ZipEntry("vosk-model-small-en-us-0.15/../../../evil.txt"))
+            zos.write("pwned".toByteArray())
+            zos.closeEntry()
+        }
+        val body = Buffer().write(baos.toByteArray())
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(body)
+                .addHeader("Content-Length", body.size.toString()),
+        )
+        val repo = buildRepository()
+
+        repo.download(VoiceLanguage.ENGLISH)
+
+        assertTrue(
+            "A zip-slip entry must not land outside the model directory",
+            !File(filesDir, "evil.txt").exists() &&
+                !File(filesDir.parentFile, "evil.txt").exists(),
+        )
+        assertTrue(
+            "A rejected extraction must not report Ready",
+            repo.modelStates.value[VoiceLanguage.ENGLISH] !is VoiceModelState.Ready,
+        )
+    }
 
     @Test
     fun `given state is already Ready when download called again then no extra HTTP request is sent`() = runTest {

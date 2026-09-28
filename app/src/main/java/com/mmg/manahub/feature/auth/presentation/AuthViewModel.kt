@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.auth.presentation
 
+import com.mmg.manahub.core.domain.auth.NicknameValidationResult
+import com.mmg.manahub.core.domain.auth.NicknameValidator
 import android.content.Context
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -838,13 +840,13 @@ class AuthViewModel(
      *
      * Returns a user-facing error string if invalid, or null if validation passes.
      */
-    private fun validateNickname(nickname: String): String? {
-        val trimmed = nickname.trim()
-        if (trimmed.isBlank()) return appContext.getString(R.string.auth_error_nickname_required)
-        if (trimmed.length > NICKNAME_MAX_LENGTH) return appContext.getString(R.string.auth_error_nickname_too_long)
-        if (!NICKNAME_PATTERN.matches(trimmed)) return appContext.getString(R.string.auth_error_nickname_invalid)
-        return null
-    }
+    private fun validateNickname(nickname: String): String? =
+        when (NicknameValidator.validate(nickname)) {
+            NicknameValidationResult.VALID -> null
+            NicknameValidationResult.REQUIRED -> appContext.getString(R.string.auth_error_nickname_required)
+            NicknameValidationResult.TOO_LONG -> appContext.getString(R.string.auth_error_nickname_too_long)
+            NicknameValidationResult.INVALID_CHARACTERS -> appContext.getString(R.string.auth_error_nickname_invalid)
+        }
 
     companion object {
         /** Returns true when the password satisfies all sign-up requirements. */
@@ -854,11 +856,6 @@ class AuthViewModel(
             password.any { it.isUpperCase() } &&
             password.any { it.isDigit() } &&
             password.any { !it.isLetterOrDigit() }
-
-        private const val NICKNAME_MAX_LENGTH = 30
-
-        /** Alphanumeric, spaces, hyphens, underscores, apostrophes. No leading/trailing spaces. */
-        private val NICKNAME_PATTERN = Regex("^[\\w\\s'\\-]{1,30}$")
 
         private val EMAIL_PATTERN: Pattern = Pattern.compile(
             "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"

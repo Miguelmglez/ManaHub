@@ -83,6 +83,15 @@ class CollectionProfileUseCaseTest {
     }
 
     @Test
+    fun `commander candidates are NOT capped by the shared strategies-tribes limit (F10)`() = runTest(dispatcher) {
+        val commanders = (1..20).map { i ->
+            card(id = "cmd-$i", name = "Commander $i", typeLine = "Legendary Creature — Human", colorIdentity = listOf("R"))
+        }
+        val profile = useCase(commanders, limit = 5)
+        assertEquals(20, profile.commanderCandidates.size, "commanderCandidates must not share dominantStrategies/Tribes' small `limit` default")
+    }
+
+    @Test
     fun `a non-legendary creature is never a commander candidate`() = runTest(dispatcher) {
         val creature = card(name = "Just A Creature", typeLine = "Creature — Human")
         val profile = useCase(listOf(creature))

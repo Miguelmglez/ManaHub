@@ -1,7 +1,6 @@
 package com.mmg.manahub.core.ui.components.search
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,15 +37,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -61,6 +57,7 @@ import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import org.koin.androidx.compose.koinViewModel
@@ -128,20 +125,12 @@ fun SetPickerSheet(
                     style = ty.titleMedium,
                     color = mc.textPrimary,
                 )
-            }
-
-            // ── Header ──
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
                 if (selectedSetCodes.isNotEmpty()) {
+                    Spacer(modifier = Modifier.weight(1f))
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = mc.primaryAccent.copy(0.15f),
+                        modifier = Modifier.padding(horizontal = 8.dp)
                     ) {
                         Text(
                             stringResource(
@@ -244,7 +233,8 @@ fun SetPickerSheet(
 
                     LazyColumn(
                         modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         items(
                             items = uiState.filteredSets,
@@ -254,7 +244,6 @@ fun SetPickerSheet(
                                 set = set,
                                 isSelected = selectedSetCodes.contains(set.code),
                                 onClick = { onToggleSet(set) },
-                                showCheckbox = !singleSelection,
                             )
                         }
                     }
@@ -287,19 +276,19 @@ private fun SetPickerRow(
     set: MagicSet,
     isSelected: Boolean,
     onClick: () -> Unit,
-    showCheckbox: Boolean = true,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
 
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(10.dp),
+        shape = CardShape,
         color = if (isSelected) mc.primaryAccent.copy(0.1f) else Color.Transparent,
+        border = if (isSelected) BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.3f))else BorderStroke(0.dp, Color.Transparent),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -335,28 +324,6 @@ private fun SetPickerRow(
                     set.releasedAt?.let { date ->
                         Text("·", color = mc.textDisabled)
                         Text(date.take(4), style = ty.bodySmall, color = mc.textDisabled)
-                    }
-                }
-            }
-
-            // Checkbox visual (hidden in single-selection mode)
-            if (showCheckbox) {
-                Box(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(
-                            if (isSelected) mc.primaryAccent else mc.surfaceVariant,
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = if (isSelected) mc.primaryAccent else mc.surfaceVariant,
-                            shape = RoundedCornerShape(4.dp),
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (isSelected) {
-                        Text("✓", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

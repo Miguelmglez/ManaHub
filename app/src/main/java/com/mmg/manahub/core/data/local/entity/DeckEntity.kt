@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.data.local.entity
+// COMMENTS_REVIEWED: 2026-09-08
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
@@ -41,6 +42,10 @@ data class DeckEntity(
     // True for a wizard-built deck (D4 hard no-cut guarantee). Additive, defaults false so every
     // pre-migration/manually-created deck is unaffected.
     @ColumnInfo(name = "strategy_locked") val strategyLocked: Boolean = false,
+    // ── Deck Wizard Commander v3 plan (v54, D5) ──────────────────────────────
+    // Raw PostureId.name, nullable (no default pin). A SEPARATE column from archetype_override/
+    // themes_override/tribe_override -- see Deck.postureOverride's KDoc for why.
+    @ColumnInfo(name = "posture_override") val postureOverride: String? = null,
 )
 
 /** Cross-reference: which cards belong to which deck (mainboard + sideboard). */

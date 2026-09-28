@@ -1,5 +1,7 @@
 package com.mmg.manahub.core.data.remote
 
+// COMMENTS_REVIEWED: 2026-09-16
+
 import com.mmg.manahub.core.data.remote.dto.CardCollectionRequestDto
 import com.mmg.manahub.core.data.remote.dto.CardCollectionResponseDto
 import com.mmg.manahub.core.data.remote.dto.CardDto
@@ -92,6 +94,12 @@ class ScryfallClient(
             parameter("dir", dir)
             parameter("unique", unique)
             parameter("page", page)
+        }.body()
+
+    suspend fun getRandomCard(q: String? = null): CardDto =
+        httpClient.get("${baseUrl}cards/random") {
+            header("Cache-Control", "no-cache, no-store")
+            q?.let { parameter("q", it) }
         }.body()
 
     /** Fetches a single card by its Scryfall UUID. */

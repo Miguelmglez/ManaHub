@@ -9,12 +9,12 @@ import kotlinx.coroutines.flow.asSharedFlow
  * Application-wide bus carrying [ProgressionEvent]s from feature write-paths to the
  * gamification engine (ADR-002 §1).
  *
- * Features emit; the engine collects on an application-scope coroutine. There is **no
- * replay** — an event missed because the engine has not started yet is acceptable
- * (the ledger + Family-A backfill reconcile derivable progress on next launch). The
- * buffer absorbs short bursts; on overflow the OLDEST event is dropped rather than
- * suspending the emitter, so a slow consumer can never back-pressure a repository's
- * commit path.
+ * Features emit; the engine collects only while gamification is available. There is **no
+ * replay**: an event emitted while the engine is stopped is dropped for good. Only DERIVED
+ * achievements and entitlements are recomputed by the catch-up that runs on every enable
+ * transition; per-event XP, counters, streaks and quests are not retroactive. The buffer
+ * absorbs short bursts; on overflow the OLDEST event is dropped rather than suspending the
+ * emitter, so a slow consumer can never back-pressure a repository's commit path.
  */
 class ProgressionEventBus {
 

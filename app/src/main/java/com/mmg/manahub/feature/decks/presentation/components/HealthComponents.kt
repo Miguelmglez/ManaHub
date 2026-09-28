@@ -52,7 +52,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
@@ -328,7 +327,7 @@ fun PillarTile(
             width = if (expanded) 2.dp else 1.dp,
             color = if (expanded) statusColor else mc.surfaceVariant.copy(alpha = 0.5f)
         ),
-        modifier = modifier.heightIn(min = 100.dp),
+        modifier = modifier.heightIn(min = 72.dp),
     ) {
         Column(
             modifier = Modifier.padding(MaterialTheme.spacing.sm),
@@ -364,14 +363,14 @@ fun PillarTile(
                 style = ty.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                 color = statusColor,
             )
-            Text(
+            /*Text(
                 text = pillarLabel,
                 style = ty.labelSmall,
                 color = mc.textSecondary,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-            )
+            )*/
         }
     }
 }

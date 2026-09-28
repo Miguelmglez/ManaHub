@@ -27,7 +27,7 @@ import kotlinx.datetime.toLocalDateTime
 class StreakTracker(
     private val dao: GamificationDao,
     private val clock: Clock,
-    private val timeZone: TimeZone,
+    private val timeZoneProvider: () -> TimeZone,
 ) {
 
     /**
@@ -41,7 +41,7 @@ class StreakTracker(
     suspend fun process(event: ProgressionEvent) {
         when (event) {
             is ProgressionEvent.AppOpenedToday -> {
-                val today = clock.now().toLocalDateTime(timeZone).date
+                val today = clock.now().toLocalDateTime(timeZoneProvider()).date
                 dao.upsertStreak(advance(dao.getStreak(TYPE_DAILY_ACTIVITY), today, TYPE_DAILY_ACTIVITY))
             }
 

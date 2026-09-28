@@ -2,10 +2,10 @@ package com.mmg.manahub.feature.draft.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
-import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.data.remote.mapper.toDomain
 import com.mmg.manahub.core.model.Card
@@ -14,14 +14,13 @@ import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import com.mmg.manahub.feature.draft.data.DraftRepositoryImpl.Companion.VALID_SET_CODE
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
+import com.mmg.manahub.core.data.local.entity.DraftSetEntity
 import com.mmg.manahub.core.data.remote.CloudflareContentClient
-import com.mmg.manahub.core.data.remote.YouTubeClient
 import com.mmg.manahub.feature.draft.data.remote.toDomain
 import com.mmg.manahub.feature.draft.data.remote.toEntity
 import com.mmg.manahub.core.model.ArchetypeGuide
 import com.mmg.manahub.core.model.ArchetypeKeyCard
 import com.mmg.manahub.core.model.DraftCardStats
-import com.mmg.manahub.core.model.DraftVideo
 import com.mmg.manahub.core.model.MechanicExamples
 import com.mmg.manahub.core.model.MechanicGuide
 import com.mmg.manahub.core.model.MechanicKeyCard
@@ -30,6 +29,8 @@ import com.mmg.manahub.core.model.SetTierList
 import com.mmg.manahub.core.model.TierCard
 import com.mmg.manahub.core.model.TierGroup
 import com.mmg.manahub.core.domain.repository.DraftRepository
+import com.mmg.manahub.core.util.recordSafeNonFatal
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -38,166 +39,151 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Implementation of [DraftRepository] that fetches draft content from the Cloudflare Worker
- * and caches it locally in [filesDir] (JSON files) and Room (set metadata).
- *
- * Cache strategy:
- * - **Set list**: Room cache with 24h TTL. Falls back to stale Room data on network error.
- * - **Guide / Tier-list**: Per-set JSON files in `filesDir/draft/{setCode}/`.
- *   Invalidated when the content version stored in SharedPreferences differs from the
- *   version in the sets-index. No automatic TTL — content only refreshes when the
- *   Worker publishes a new version.
- *
- * No assets/ reads. If Cloudflare is unreachable and no local file exists, an error is returned.
- *
- * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
- * native Koin `single` in [com.mmg.manahub.app.di.coreBridgeKoinModule].
- */
 class DraftRepositoryImpl(
     private val context: Context,
     private val scryfallApi: ScryfallClient,
     private val scryfallQueue: ScryfallRequestQueue,
-    private val youTubeClient: YouTubeClient,
     private val cloudflareClient: CloudflareContentClient,
     private val draftSetDao: DraftSetDao,
     private val gson: Gson,
     private val draftPrefs: SharedPreferences,
     private val ioDispatcher: CoroutineDispatcher,
+    private val nowMillis: () -> Long = System::currentTimeMillis,
 ) : DraftRepository {
 
     companion object {
-        private const val CACHE_DURATION_MS = 24 * 60 * 60 * 1000L // 24 hours
-        private const val VIDEO_CACHE_DURATION_MS = 60 * 60 * 1000L // 1 hour
+        private const val MANIFEST_CACHE_DURATION_MS = 5 * 60 * 1000L
+        private const val FAILURE_COOLDOWN_MS = 5 * 60 * 1000L
         private const val PREF_GUIDE_VERSION = "pref_draft_%s_guide_version"
         private const val PREF_TIER_VERSION = "pref_draft_%s_tier_version"
 
-        /** Allowlist: set codes must be 2–6 lowercase ASCII letters/digits (e.g. "2x2", "40k"). */
         private val VALID_SET_CODE = Regex("^[a-z0-9]{2,6}$")
     }
 
-    private val videoCache = ConcurrentHashMap<String, Pair<Long, List<DraftVideo>>>()
     private val guideMutexes = ConcurrentHashMap<String, Mutex>()
     private val tierMutexes = ConcurrentHashMap<String, Mutex>()
+    private val manifestMutex = Mutex()
+    @Volatile
+    private var manifestRefreshGeneration = 0L
+    private var lastManifestRefreshFailure: Exception? = null
+    private var lastManifestRefreshFailureAt: Long? = null
+    private val artifactRefreshFailures = ConcurrentHashMap<ArtifactFailureKey, TimedFailure>()
 
     private fun guideMutex(code: String) = guideMutexes.computeIfAbsent(code) { Mutex() }
     private fun tierMutex(code: String) = tierMutexes.computeIfAbsent(code) { Mutex() }
 
-    // -------------------------------------------------------------------------
-    // getDraftableSets — Cloudflare sets-index.json with Room cache
-    // -------------------------------------------------------------------------
+    // Parsed models keyed by set code; only read/written under that set's mutex
+    private val parsedGuides = ConcurrentHashMap<String, VersionedModel<SetDraftGuide>>()
+    private val parsedTierLists = ConcurrentHashMap<String, VersionedModel<SetTierList>>()
+
+    private data class VersionedModel<T>(val version: String?, val model: T)
+    private data class TimedFailure(val error: Exception, val failedAt: Long)
+    private data class ArtifactFailureKey(
+        val setCode: String,
+        val artifactType: ArtifactType,
+        val remoteVersion: String,
+    )
+
+    private enum class ArtifactType(val telemetryValue: String) {
+        GUIDE("guide"),
+        TIER_LIST("tier_list"),
+    }
+
+    private sealed interface RemoteVersionLookup {
+        data class Present(val version: String) : RemoteVersionLookup
+        data object MissingSet : RemoteVersionLookup
+        data class Failure(val error: Exception) : RemoteVersionLookup
+    }
 
     override suspend fun getDraftableSets(forceRefresh: Boolean): DataResult<List<DraftSet>> {
         return withContext(ioDispatcher) {
+            val refreshFailure = ensureManifestFresh(forceRefresh)
             try {
-                val cachedTime = draftSetDao.getLastCachedTime()
-                val isCacheFresh = cachedTime != null &&
-                    (System.currentTimeMillis() - cachedTime) < CACHE_DURATION_MS
-
-                if (!forceRefresh && isCacheFresh) {
-                    val cached = draftSetDao.getAllSetsSnapshot()
-                    if (cached.isNotEmpty()) {
-                        return@withContext DataResult.Success(cached.map { it.toDomain() })
-                    }
-                }
-
-                val response = cloudflareClient.getSetsIndex()
-                val entities = response.sets.map { it.toEntity() }
-                draftSetDao.replaceAll(entities)
-
-                DataResult.Success(entities.map { it.toDomain() })
-            } catch (e: Exception) {
                 val cached = draftSetDao.getAllSetsSnapshot()
                 if (cached.isNotEmpty()) {
-                    DataResult.Success(cached.map { it.toDomain() }, isStale = true)
+                    DataResult.Success(
+                        data = cached.map { it.toDomain() },
+                        isStale = refreshFailure != null,
+                    )
                 } else {
-                    DataResult.Error(e.message ?: "Failed to load sets")
+                    DataResult.Error(refreshFailure?.message ?: "No draft sets are available")
                 }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                DataResult.Error(e.message ?: "Failed to load sets")
             }
         }
     }
 
-    // -------------------------------------------------------------------------
-    // getSetGuide — Cloudflare guide.json with versioned local file cache
-    // -------------------------------------------------------------------------
-
     override suspend fun getSetGuide(setCode: String): DataResult<SetDraftGuide> {
         return withContext(ioDispatcher) {
+            val safeCode = sanitizeSetCode(setCode)
             try {
-                val safeCode = sanitizeSetCode(setCode)
+                val manifestFailure = ensureManifestFresh(forceRefresh = false)
                 guideMutex(safeCode).withLock {
                     val localFile = guideFile(safeCode)
-                    val storedVersion = draftPrefs.getString(PREF_GUIDE_VERSION.format(safeCode), null)
-                    val remoteVersion = getRemoteGuideVersion(safeCode)
-
-                    val needsRefresh = !localFile.exists() ||
-                        (remoteVersion != null && remoteVersion != storedVersion)
-
-                    if (needsRefresh) {
-                        val jsonString = cloudflareClient.getSetGuide(safeCode)
-                        saveJsonToFile(jsonString, localFile)
-                        if (remoteVersion != null) {
-                            draftPrefs.edit()
-                                .putString(PREF_GUIDE_VERSION.format(safeCode), remoteVersion)
-                                .apply()
-                        }
-                    }
-
-                    if (!localFile.exists()) {
-                        DataResult.Error("Guide not available for $safeCode")
-                    } else {
-                        val jsonObject = gson.fromJson(localFile.readText(), JsonObject::class.java)
-                        DataResult.Success(parseGuide(safeCode, jsonObject))
-                    }
+                    val remoteVersion = manifestFailure?.let(RemoteVersionLookup::Failure)
+                        ?: getRemoteVersion(safeCode) { it.guideVersion }
+                    loadVersionedArtifact(
+                        safeCode = safeCode,
+                        artifactType = ArtifactType.GUIDE,
+                        localFile = localFile,
+                        preferenceKey = PREF_GUIDE_VERSION.format(safeCode),
+                        remoteVersionLookup = remoteVersion,
+                        parsedModels = parsedGuides,
+                        unavailableMessage = "Guide not available for $safeCode",
+                        fetch = { version -> cloudflareClient.getSetGuide(safeCode, version) },
+                        parse = { json -> parseAndValidateGuide(safeCode, json) },
+                    )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                reportArtifactFailure(
+                    safeCode = safeCode,
+                    artifactType = ArtifactType.GUIDE,
+                    error = e,
+                    staleFallback = false,
+                    tag = "draft_artifact_local_cache_failed",
+                )
                 DataResult.Error(e.message ?: "Failed to load guide for $setCode")
             }
         }
     }
 
-    // -------------------------------------------------------------------------
-    // getSetTierList — Cloudflare tier-list.json with versioned local file cache
-    // -------------------------------------------------------------------------
-
     override suspend fun getSetTierList(setCode: String): DataResult<SetTierList> {
         return withContext(ioDispatcher) {
+            val safeCode = sanitizeSetCode(setCode)
             try {
-                val safeCode = sanitizeSetCode(setCode)
+                val manifestFailure = ensureManifestFresh(forceRefresh = false)
                 tierMutex(safeCode).withLock {
                     val localFile = tierListFile(safeCode)
-                    val storedVersion = draftPrefs.getString(PREF_TIER_VERSION.format(safeCode), null)
-                    val remoteVersion = getRemoteTierVersion(safeCode)
-
-                    val needsRefresh = !localFile.exists() ||
-                        (remoteVersion != null && remoteVersion != storedVersion)
-
-                    if (needsRefresh) {
-                        val jsonString = cloudflareClient.getSetTierList(safeCode)
-                        saveJsonToFile(jsonString, localFile)
-                        if (remoteVersion != null) {
-                            draftPrefs.edit()
-                                .putString(PREF_TIER_VERSION.format(safeCode), remoteVersion)
-                                .apply()
-                        }
-                    }
-
-                    if (!localFile.exists()) {
-                        DataResult.Error("Tier list not available for $safeCode")
-                    } else {
-                        val jsonObject = gson.fromJson(localFile.readText(), JsonObject::class.java)
-                        DataResult.Success(parseTierList(safeCode, jsonObject))
-                    }
+                    val remoteVersion = manifestFailure?.let(RemoteVersionLookup::Failure)
+                        ?: getRemoteVersion(safeCode) { it.tierListVersion }
+                    loadVersionedArtifact(
+                        safeCode = safeCode,
+                        artifactType = ArtifactType.TIER_LIST,
+                        localFile = localFile,
+                        preferenceKey = PREF_TIER_VERSION.format(safeCode),
+                        remoteVersionLookup = remoteVersion,
+                        parsedModels = parsedTierLists,
+                        unavailableMessage = "Tier list not available for $safeCode",
+                        fetch = { version -> cloudflareClient.getSetTierList(safeCode, version) },
+                        parse = { json -> parseAndValidateTierList(safeCode, json) },
+                    )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                reportArtifactFailure(
+                    safeCode = safeCode,
+                    artifactType = ArtifactType.TIER_LIST,
+                    error = e,
+                    staleFallback = false,
+                    tag = "draft_artifact_local_cache_failed",
+                )
                 DataResult.Error(e.message ?: "Failed to load tier list for $setCode")
             }
         }
     }
-
-    // -------------------------------------------------------------------------
-    // getSetCards — Scryfall (unchanged)
-    // -------------------------------------------------------------------------
 
     override suspend fun getSetCards(setCode: String, page: Int): DataResult<List<Card>> {
         return withContext(ioDispatcher) {
@@ -235,10 +221,7 @@ class DraftRepositoryImpl(
                 }
                 DataResult.Success(result.data.toDomain() to result.hasMore)
             } catch (first: Exception) {
-                // OkHttp may return a bare HTTP 304 to Retrofit when the cached response body
-                // was evicted from the disk cache (e.g. Coil image loads fill the 50 MB cache).
-                // Retrofit throws HttpException(304) in that case. Retry once without cache so
-                // Scryfall returns a full 200 response.
+                // A bare 304 arrives when the disk-cached body was evicted; retry once uncached
                 try {
                     val poolQuery = buildPoolQuery(setCode, extraPoolSets)
                     val result = scryfallQueue.execute {
@@ -257,15 +240,7 @@ class DraftRepositoryImpl(
         }
     }
 
-    /**
-     * Builds the Scryfall pool query for [setCode], widened to also include [extraPoolSets]
-     * when non-empty (e.g. SOS's booster.json declares `extraPoolSets = ["soa"]` for its
-     * Mystical Archive sheet). Every set code is re-sanitized here via [sanitizeSetCode] even
-     * though [DraftSimRepositoryImpl.parseBoosterConfig] already filters `extraPoolSets` against
-     * the same allowlist — defense in depth, since this string is interpolated directly into a
-     * Scryfall query. When [extraPoolSets] is empty the query is unchanged from before this
-     * feature: `set:$setCode lang:en`.
-     */
+    // Extra set codes are re-sanitized (defense in depth): they are interpolated straight into a Scryfall query
     private fun buildPoolQuery(setCode: String, extraPoolSets: List<String>): String {
         val safeSetCode = sanitizeSetCode(setCode)
         val safeExtras = extraPoolSets.mapNotNull { code ->
@@ -277,52 +252,6 @@ class DraftRepositoryImpl(
         val setClause = (listOf(safeSetCode) + safeExtras).joinToString(" or ") { "set:$it" }
         return "($setClause) lang:en"
     }
-
-    // -------------------------------------------------------------------------
-    // getSetVideos — YouTube API with in-memory cache (unchanged)
-    // -------------------------------------------------------------------------
-
-    override suspend fun getSetVideos(setCode: String, setName: String): DataResult<List<DraftVideo>> {
-        return withContext(ioDispatcher) {
-            val cacheKey = "$setCode:$setName"
-            val cached = videoCache[cacheKey]
-            if (cached != null && (System.currentTimeMillis() - cached.first) < VIDEO_CACHE_DURATION_MS) {
-                return@withContext DataResult.Success(cached.second)
-            }
-
-            if (BuildConfig.YOUTUBE_API_KEY.isBlank()) {
-                return@withContext DataResult.Error("YouTube API key not configured")
-            }
-
-            try {
-                val query = "$setName MTG draft guide"
-                val enResults = runCatching {
-                    youTubeClient.searchVideos(query = query, language = "en")
-                }.getOrNull()?.items ?: emptyList()
-
-                val esResults = runCatching {
-                    youTubeClient.searchVideos(query = query, language = "es")
-                }.getOrNull()?.items ?: emptyList()
-
-                val seenIds = mutableSetOf<String>()
-                val combined = mutableListOf<DraftVideo>()
-                for (item in enResults + esResults) {
-                    if (seenIds.add(item.id.videoId)) {
-                        combined.add(item.toDomain())
-                    }
-                }
-
-                videoCache[cacheKey] = System.currentTimeMillis() to combined
-                DataResult.Success(combined)
-            } catch (e: Exception) {
-                DataResult.Error(e.message ?: "Failed to load videos")
-            }
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // resolveCardId / getCardByName — Scryfall (unchanged)
-    // -------------------------------------------------------------------------
 
     override suspend fun resolveCardId(cardName: String, setCode: String): DataResult<String> {
         return withContext(ioDispatcher) {
@@ -356,28 +285,14 @@ class DraftRepositoryImpl(
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers — file paths
-    // -------------------------------------------------------------------------
-
-    /**
-     * Sanitizes [setCode] to a safe, lowercase string matching [VALID_SET_CODE].
-     * Throws [IllegalArgumentException] for any code that does not match, preventing
-     * path-traversal attacks when the value is used as a directory component.
-     */
+    // Allowlist guards path traversal: the code becomes a cache directory name
     private fun sanitizeSetCode(setCode: String): String {
         val normalized = setCode.lowercase().trim()
         require(VALID_SET_CODE.matches(normalized)) { "Invalid set code: '$normalized'" }
         return normalized
     }
 
-    /**
-     * Returns (and creates if necessary) the per-set cache directory.
-     * Throws [IOException] if the directory cannot be created — callers must not
-     * swallow this, as it indicates the device is out of storage or has a permissions issue.
-     *
-     * @param setCode Already-sanitized (lowercase) set code.
-     */
+    // Throws instead of returning a missing dir: out-of-storage must surface, not be swallowed
     private fun draftDir(setCode: String): File {
         val dir = File(context.filesDir, "draft/$setCode")
         if (!dir.exists() && !dir.mkdirs()) {
@@ -392,54 +307,479 @@ class DraftRepositoryImpl(
     private fun tierListFile(setCode: String): File =
         File(draftDir(setCode), "tier-list.json")
 
-    /**
-     * Writes [jsonString] to [file] atomically: first writes to a sibling `.tmp` file,
-     * then renames it into place. This prevents a partially-written file from being
-     * read as valid JSON if the process is killed mid-write.
-     */
-    private fun saveJsonToFile(jsonString: String, file: File) {
-        val tmp = File(file.parent, "${file.name}.tmp")
-        try {
-            tmp.writeText(jsonString)
-            if (!tmp.renameTo(file)) {
-                file.writeText(tmp.readText())
+    private suspend fun ensureManifestFresh(forceRefresh: Boolean): Exception? {
+        val observedRefreshGeneration = manifestRefreshGeneration
+        val observedCachedTime = try {
+            draftSetDao.getLastCachedTime()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return manifestMutex.withLock {
+                if (manifestRefreshGeneration != observedRefreshGeneration) {
+                    return@withLock lastManifestRefreshFailure
+                }
+                if (!forceRefresh && isManifestFailureCoolingDown()) {
+                    return@withLock lastManifestRefreshFailure
+                }
+                registerManifestFailure(e, forceRefresh, staleFallback = false)
             }
+        }
+        if (!forceRefresh && isManifestFresh(observedCachedTime)) return null
+        if (!forceRefresh && isManifestFailureCoolingDown()) return lastManifestRefreshFailure
+
+        return manifestMutex.withLock {
+            if (manifestRefreshGeneration != observedRefreshGeneration) {
+                return@withLock lastManifestRefreshFailure
+            }
+            if (!forceRefresh && isManifestFailureCoolingDown()) {
+                return@withLock lastManifestRefreshFailure
+            }
+            val currentCachedTime = try {
+                draftSetDao.getLastCachedTime()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return@withLock registerManifestFailure(
+                    error = e,
+                    forceRefresh = forceRefresh,
+                    staleFallback = observedCachedTime != null,
+                )
+            }
+            val anotherCallerRefreshed = currentCachedTime != observedCachedTime &&
+                isManifestFresh(currentCachedTime)
+            if ((!forceRefresh && isManifestFresh(currentCachedTime)) || anotherCallerRefreshed) {
+                return@withLock null
+            }
+
+            val refreshFailure = try {
+                val response = cloudflareClient.getSetsIndex()
+                require(response.indexVersion.isNotBlank()) { "Draft sets manifest has no version" }
+                require(response.sets.isNotEmpty()) { "Draft sets manifest is empty" }
+                require(response.sets.map { it.code }.distinct().size == response.sets.size) {
+                    "Draft sets manifest contains duplicate set codes"
+                }
+                val cachedAt = nowMillis()
+                val entities = response.sets.map { entry ->
+                    require(VALID_SET_CODE.matches(entry.code)) {
+                        "Draft sets manifest contains an invalid set code"
+                    }
+                    require(entry.contentVersions.guide.isNotBlank()) {
+                        "Draft sets manifest contains a blank guide version"
+                    }
+                    require(entry.contentVersions.tierList.isNotBlank()) {
+                        "Draft sets manifest contains a blank tier-list version"
+                    }
+                    entry.toEntity().copy(cachedAt = cachedAt)
+                }
+                draftSetDao.replaceAll(entities)
+                null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                e
+            }
+            if (refreshFailure == null) {
+                lastManifestRefreshFailure = null
+                lastManifestRefreshFailureAt = null
+                manifestRefreshGeneration++
+                null
+            } else {
+                registerManifestFailure(
+                    error = refreshFailure,
+                    forceRefresh = forceRefresh,
+                    staleFallback = currentCachedTime != null,
+                )
+            }
+        }
+    }
+
+    private fun registerManifestFailure(
+        error: Exception,
+        forceRefresh: Boolean,
+        staleFallback: Boolean,
+    ): Exception {
+        lastManifestRefreshFailure = error
+        lastManifestRefreshFailureAt = nowMillis()
+        manifestRefreshGeneration++
+        reportManifestFailure(error, forceRefresh, staleFallback)
+        return error
+    }
+
+    private fun isManifestFailureCoolingDown(): Boolean {
+        val failedAt = lastManifestRefreshFailureAt ?: return false
+        val age = nowMillis() - failedAt
+        return lastManifestRefreshFailure != null && age in 0 until FAILURE_COOLDOWN_MS
+    }
+
+    private fun isManifestFresh(cachedAt: Long?): Boolean {
+        if (cachedAt == null) return false
+        val age = nowMillis() - cachedAt
+        return age in 0 until MANIFEST_CACHE_DURATION_MS
+    }
+
+    private suspend fun <T> loadVersionedArtifact(
+        safeCode: String,
+        artifactType: ArtifactType,
+        localFile: File,
+        preferenceKey: String,
+        remoteVersionLookup: RemoteVersionLookup,
+        parsedModels: ConcurrentHashMap<String, VersionedModel<T>>,
+        unavailableMessage: String,
+        fetch: suspend (String) -> String,
+        parse: (String) -> T,
+    ): DataResult<T> {
+        val storedVersion = draftPrefs.getString(preferenceKey, null)
+        val existingModel = parsedModels[safeCode]?.model ?: loadLocalArtifact(
+            safeCode = safeCode,
+            artifactType = artifactType,
+            localFile = localFile,
+            parse = parse,
+        )?.also { parsedModels[safeCode] = VersionedModel(storedVersion, it) }
+
+        val remoteVersion = when (remoteVersionLookup) {
+            RemoteVersionLookup.MissingSet -> {
+                clearArtifactCache(
+                    safeCode = safeCode,
+                    artifactType = artifactType,
+                    localFile = localFile,
+                    preferenceKey = preferenceKey,
+                    parsedModels = parsedModels,
+                )
+                return DataResult.Error(unavailableMessage)
+            }
+            is RemoteVersionLookup.Failure -> {
+                return existingModel?.let { DataResult.Success(it, isStale = true) }
+                    ?: DataResult.Error(remoteVersionLookup.error.message ?: unavailableMessage)
+            }
+            is RemoteVersionLookup.Present -> remoteVersionLookup.version
+        }
+
+        clearArtifactFailuresForOtherVersions(safeCode, artifactType, remoteVersion)
+        val needsRefresh = existingModel == null || !localFile.exists() ||
+            remoteVersion != storedVersion
+        if (!needsRefresh) return DataResult.Success(existingModel)
+
+        val failureKey = ArtifactFailureKey(safeCode, artifactType, remoteVersion)
+        if (existingModel != null && isArtifactFailureCoolingDown(failureKey)) {
+            return DataResult.Success(existingModel, isStale = true)
+        }
+
+        return try {
+            val downloadedJson = fetch(remoteVersion)
+            val downloadedModel = parse(downloadedJson)
+            replaceJsonFile(downloadedJson, localFile)
+            draftPrefs.edit().putString(preferenceKey, remoteVersion).apply()
+            parsedModels[safeCode] = VersionedModel(remoteVersion, downloadedModel)
+            artifactRefreshFailures.remove(failureKey)
+            reportArtifactReplacement(safeCode, artifactType)
+            DataResult.Success(downloadedModel)
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            artifactRefreshFailures[failureKey] = TimedFailure(e, nowMillis())
+            reportArtifactFailure(
+                safeCode = safeCode,
+                artifactType = artifactType,
+                error = e,
+                staleFallback = existingModel != null,
+                tag = "draft_artifact_refresh_failed",
+            )
+            existingModel?.let { DataResult.Success(it, isStale = true) }
+                ?: DataResult.Error(e.message ?: unavailableMessage)
+        }
+    }
+
+    private fun <T> loadLocalArtifact(
+        safeCode: String,
+        artifactType: ArtifactType,
+        localFile: File,
+        parse: (String) -> T,
+    ): T? {
+        val temporaryFile = File(localFile.parent, "${localFile.name}.tmp")
+        val backupFile = File(localFile.parent, "${localFile.name}.bak")
+        var mainFailure: Exception? = null
+
+        if (localFile.exists()) {
+            try {
+                val model = parse(localFile.readText())
+                cleanupRecoveryFiles(safeCode, artifactType, temporaryFile, backupFile)
+                return model
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                mainFailure = e
+            }
+        }
+
+        if (backupFile.exists() && backupFile.isFile) {
+            try {
+                val model = parse(backupFile.readText())
+                mainFailure?.let {
+                    reportArtifactFailure(
+                        safeCode,
+                        artifactType,
+                        it,
+                        staleFallback = true,
+                        tag = "draft_artifact_local_cache_failed",
+                    )
+                }
+                restoreBackup(
+                    safeCode = safeCode,
+                    artifactType = artifactType,
+                    localFile = localFile,
+                    temporaryFile = temporaryFile,
+                    backupFile = backupFile,
+                    parse = parse,
+                )
+                return model
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val failure = mainFailure ?: e
+                reportArtifactFailure(
+                    safeCode,
+                    artifactType,
+                    failure,
+                    staleFallback = false,
+                    tag = "draft_artifact_local_cache_failed",
+                )
+                return null
+            }
+        }
+
+        mainFailure?.let {
+            reportArtifactFailure(
+                safeCode,
+                artifactType,
+                it,
+                staleFallback = false,
+                tag = "draft_artifact_local_cache_failed",
+            )
+        }
+        return null
+    }
+
+    private fun <T> restoreBackup(
+        safeCode: String,
+        artifactType: ArtifactType,
+        localFile: File,
+        temporaryFile: File,
+        backupFile: File,
+        parse: (String) -> T,
+    ) {
+        try {
+            if (temporaryFile.exists() && !temporaryFile.delete()) {
+                throw IOException("Failed to clear temporary draft cache file")
+            }
+            backupFile.copyTo(localFile, overwrite = true)
+            parse(localFile.readText())
+            if (!backupFile.delete()) throw IOException("Failed to clear restored draft cache backup")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            reportArtifactFailure(
+                safeCode,
+                artifactType,
+                e,
+                staleFallback = true,
+                tag = "draft_artifact_local_cache_failed",
+            )
+        }
+    }
+
+    private fun cleanupRecoveryFiles(
+        safeCode: String,
+        artifactType: ArtifactType,
+        temporaryFile: File,
+        backupFile: File,
+    ) {
+        try {
+            listOf(temporaryFile, backupFile).forEach { recoveryFile ->
+                if (recoveryFile.exists() && !recoveryFile.delete()) {
+                    throw IOException("Failed to clear stale draft cache recovery file")
+                }
+            }
+        } catch (e: Exception) {
+            reportArtifactFailure(
+                safeCode,
+                artifactType,
+                e,
+                staleFallback = true,
+                tag = "draft_artifact_local_cache_failed",
+            )
+        }
+    }
+
+    private fun <T> clearArtifactCache(
+        safeCode: String,
+        artifactType: ArtifactType,
+        localFile: File,
+        preferenceKey: String,
+        parsedModels: ConcurrentHashMap<String, VersionedModel<T>>,
+    ) {
+        parsedModels.remove(safeCode)
+        artifactRefreshFailures.keys.removeAll { it.setCode == safeCode && it.artifactType == artifactType }
+        try {
+            val files = listOf(
+                localFile,
+                File(localFile.parent, "${localFile.name}.tmp"),
+                File(localFile.parent, "${localFile.name}.bak"),
+            )
+            files.forEach { file ->
+                if (file.exists() && !file.delete()) throw IOException("Failed to clear unpublished draft content")
+            }
+            draftPrefs.edit().remove(preferenceKey).apply()
+        } catch (e: Exception) {
+            reportArtifactFailure(
+                safeCode,
+                artifactType,
+                e,
+                staleFallback = false,
+                tag = "draft_artifact_local_cache_failed",
+            )
+        }
+    }
+
+    private fun isArtifactFailureCoolingDown(key: ArtifactFailureKey): Boolean {
+        val failure = artifactRefreshFailures[key] ?: return false
+        val age = nowMillis() - failure.failedAt
+        if (age in 0 until FAILURE_COOLDOWN_MS) return true
+        artifactRefreshFailures.remove(key, failure)
+        return false
+    }
+
+    private fun clearArtifactFailuresForOtherVersions(
+        safeCode: String,
+        artifactType: ArtifactType,
+        remoteVersion: String,
+    ) {
+        artifactRefreshFailures.keys.removeAll {
+            it.setCode == safeCode && it.artifactType == artifactType && it.remoteVersion != remoteVersion
+        }
+    }
+
+    private fun replaceJsonFile(jsonString: String, file: File) {
+        val tmp = File(file.parent, "${file.name}.tmp")
+        val backup = File(file.parent, "${file.name}.bak")
+        try {
+            if (tmp.exists() && !tmp.delete()) {
+                throw IOException("Failed to clear temporary draft cache file")
+            }
+            tmp.writeText(jsonString)
+            if (!file.exists()) {
+                if (!tmp.renameTo(file)) throw IOException("Failed to install draft cache file")
+                return
+            }
+
+            if (backup.exists() && !backup.delete()) {
+                throw IOException("Failed to clear draft cache backup")
+            }
+            if (!file.renameTo(backup)) throw IOException("Failed to back up draft cache file")
+
+            try {
+                if (!tmp.renameTo(file)) throw IOException("Failed to install draft cache file")
+            } catch (replacementFailure: Exception) {
+                try {
+                    if (file.exists() && !file.delete()) {
+                        throw IOException("Failed to remove incomplete draft cache file")
+                    }
+                    if (!backup.renameTo(file)) {
+                        backup.copyTo(file, overwrite = true)
+                    }
+                    if (backup.exists()) backup.delete()
+                } catch (restoreFailure: Exception) {
+                    replacementFailure.addSuppressed(restoreFailure)
+                }
+                throw replacementFailure
+            }
+            if (backup.exists()) backup.delete()
         } finally {
             if (tmp.exists()) tmp.delete()
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers — version lookup from Room cache
-    // -------------------------------------------------------------------------
+    private suspend fun getRemoteVersion(
+        safeCode: String,
+        selectVersion: (DraftSetEntity) -> String,
+    ): RemoteVersionLookup = try {
+        val set = draftSetDao.getSetByCode(safeCode) ?: return RemoteVersionLookup.MissingSet
+        val version = selectVersion(set)
+        if (version.isBlank()) {
+            RemoteVersionLookup.Failure(IOException("Draft artifact version is blank"))
+        } else {
+            RemoteVersionLookup.Present(version)
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        RemoteVersionLookup.Failure(e)
+    }
 
-    /**
-     * Returns the guide version stored in Room for [safeCode] (already lowercase), or null if not cached.
-     * This avoids a network call just to check if the version changed.
-     */
-    private suspend fun getRemoteGuideVersion(safeCode: String): String? =
-        draftSetDao.getSetByCode(safeCode)?.guideVersion
+    private fun reportManifestFailure(
+        error: Exception,
+        forceRefresh: Boolean,
+        staleFallback: Boolean,
+    ) {
+        if (error is CancellationException) return
+        runCatching {
+            FirebaseCrashlytics.getInstance().apply {
+                setCustomKey("draft_manifest_force_refresh", forceRefresh)
+                setCustomKey("draft_manifest_stale_fallback", staleFallback)
+                log("draft_manifest_refresh_failed")
+            }
+            recordSafeNonFatal("draft_manifest_refresh_failed", error)
+        }
+    }
 
-    private suspend fun getRemoteTierVersion(safeCode: String): String? =
-        draftSetDao.getSetByCode(safeCode)?.tierListVersion
+    private fun reportArtifactFailure(
+        safeCode: String,
+        artifactType: ArtifactType,
+        error: Exception,
+        staleFallback: Boolean,
+        tag: String,
+    ) {
+        if (error is CancellationException) return
+        runCatching {
+            FirebaseCrashlytics.getInstance().apply {
+                setCustomKey("draft_artifact_set_code", safeCode)
+                setCustomKey("draft_artifact_type", artifactType.telemetryValue)
+                setCustomKey("draft_artifact_stale_fallback", staleFallback)
+                log(tag)
+            }
+            recordSafeNonFatal(tag, error)
+        }
+    }
 
-    // -------------------------------------------------------------------------
-    // Private helpers — JSON parsing (guide)
-    // -------------------------------------------------------------------------
+    private fun reportArtifactReplacement(
+        safeCode: String,
+        artifactType: ArtifactType,
+    ) {
+        runCatching {
+            FirebaseCrashlytics.getInstance().apply {
+                setCustomKey("draft_artifact_set_code", safeCode)
+                setCustomKey("draft_artifact_type", artifactType.telemetryValue)
+                log("draft_artifact_cache_replaced")
+            }
+        }
+    }
 
-    /**
-     * Parses the new guide.json format from Cloudflare into a [SetDraftGuide] domain model.
-     *
-     * JSON structure:
-     * ```
-     * {
-     *   "metadata": { "set_name", "set_code", "last_updated" },
-     *   "set_overview": { "summary", "color_ranking", "color_notes", "key_gameplay_notes" },
-     *   "mechanics": [ { "name", "summary", "performance", "key_examples": { "overperformers", "underperformers" } } ],
-     *   "archetype_tier_list": { "tier_1": [...], "tier_2": [...], ... }
-     * }
-     * ```
-     */
+    private fun parseAndValidateGuide(setCode: String, jsonString: String): SetDraftGuide {
+        val json = gson.fromJson(jsonString, JsonObject::class.java)
+            ?: throw IOException("Guide JSON is empty")
+        val guide = parseGuide(setCode, json)
+        require(guide.setName.isNotBlank()) { "Guide JSON has no set name" }
+        require(json.get("set_overview")?.isJsonObject == true) { "Guide JSON has no set overview" }
+        return guide
+    }
+
+    private fun parseAndValidateTierList(setCode: String, jsonString: String): SetTierList {
+        val json = gson.fromJson(jsonString, JsonObject::class.java)
+            ?: throw IOException("Tier-list JSON is empty")
+        val tierList = parseTierList(setCode, json)
+        require(tierList.setName.isNotBlank()) { "Tier-list JSON has no set name" }
+        require(json.get("categories")?.isJsonArray == true) { "Tier-list JSON has no categories" }
+        return tierList
+    }
+
     private fun parseGuide(setCode: String, json: JsonObject): SetDraftGuide {
         val metadata = json.getAsJsonObject("metadata")
         val setName = metadata?.get("set_name").safeAsString()
@@ -473,6 +813,14 @@ class DraftRepositoryImpl(
                 colorLabel to cards
             } ?: emptyMap()
 
+        val keyUncommonsByColor = json.getAsJsonObject("key_uncommons_by_color")
+            ?.entrySet()
+            ?.associate { (colorLabel, cardsElement) ->
+                val cards = cardsElement.takeIf { it.isJsonArray }?.asJsonArray
+                    ?.map { parseArchetypeKeyCard(it.asJsonObject) } ?: emptyList()
+                colorLabel to cards
+            } ?: emptyMap()
+
         return SetDraftGuide(
             setCode = setCode.uppercase(),
             setName = setName,
@@ -485,17 +833,11 @@ class DraftRepositoryImpl(
             archetypes = archetypes,
             keyCommonsByColor = keyCommonsByColor,
             formatSpeed = formatSpeed,
+            keyUncommonsByColor = keyUncommonsByColor,
         )
     }
 
-    /**
-     * Parses a single mechanic object from the JSON array.
-     *
-     * The `key_examples` field has two legal shapes:
-     * - **JsonObject** with optional `overperformers`/`underperformers` arrays of card objects.
-     * - **JsonArray** of card objects (flat list; placed in [MechanicExamples.overperformers]).
-     * - Absent or JsonNull → [MechanicGuide.keyExamples] is null.
-     */
+    // key_examples is either {overperformers, underperformers} or a flat array (treated as overperformers)
     private fun parseMechanic(obj: JsonObject): MechanicGuide {
         val keyExamplesElement = obj.get("key_examples")
         val examples: MechanicExamples? = when {
@@ -527,10 +869,6 @@ class DraftRepositoryImpl(
         )
     }
 
-    /**
-     * Parses a single card object inside `key_examples`.
-     * Image fields default to empty string when the card omits `image_uris`.
-     */
     private fun parseMechanicKeyCard(obj: JsonObject): MechanicKeyCard {
         val imageUris = obj.getAsJsonObject("image_uris")
         val colors = obj.getAsJsonArray("colors")?.map { it.asString } ?: emptyList()
@@ -555,10 +893,6 @@ class DraftRepositoryImpl(
         )
     }
 
-    /**
-     * Flattens archetype_tier_list (keyed tier_1..tier_5) into a single ordered list.
-     * Tier key order: tier_1 → tier_5.
-     */
     private fun parseArchetypeTierList(obj: JsonObject?): List<ArchetypeGuide> {
         if (obj == null) return emptyList()
         val result = mutableListOf<ArchetypeGuide>()
@@ -596,10 +930,6 @@ class DraftRepositoryImpl(
         )
     }
 
-    /**
-     * Parses a guide card object (archetype key/signpost/avoid cards, key-commons-by-color entries).
-     * All four contexts share the same shape, so a single parser covers them.
-     */
     private fun parseArchetypeKeyCard(obj: JsonObject): ArchetypeKeyCard {
         val imageUris = obj.getAsJsonObject("image_uris")
         val colors = obj.getAsJsonArray("colors")
@@ -623,23 +953,6 @@ class DraftRepositoryImpl(
         )
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers — JSON parsing (tier list)
-    // -------------------------------------------------------------------------
-
-    /**
-     * Parses the new tier-list.json format from Cloudflare into a [SetTierList] domain model.
-     *
-     * JSON structure:
-     * ```
-     * {
-     *   "metadata": { "set_name", "set_code", "last_updated", "tier_key": { "S": "...", ... } },
-     *   "categories": [
-     *     { "priority", "description", "tier_label", "cards": [ { card fields } ] }
-     *   ]
-     * }
-     * ```
-     */
     private fun parseTierList(setCode: String, json: JsonObject): SetTierList {
         val metadata = json.getAsJsonObject("metadata")
         val setName = metadata?.get("set_name").safeAsString()
@@ -705,7 +1018,6 @@ class DraftRepositoryImpl(
         )
     }
 
-    /** Parses the optional per-card 17Lands `stats` object (schema v2). Null when absent. */
     private fun parseCardStats(obj: JsonObject?): DraftCardStats? {
         if (obj == null) return null
         return DraftCardStats(
@@ -715,37 +1027,20 @@ class DraftRepositoryImpl(
         )
     }
 
-    // -------------------------------------------------------------------------
-    // Null-safe JsonElement extension functions — guard against JsonNull values
-    // -------------------------------------------------------------------------
-
-    /**
-     * Returns [JsonElement.asString] or [default] if the element is null or [com.google.gson.JsonNull].
-     * Using `?.asString` alone does NOT protect against JsonNull — Gson throws
-     * [UnsupportedOperationException] when `asString` is called on a JsonNull element.
-     */
+    // `?.asString` alone throws on JsonNull, hence the explicit isJsonNull checks below
     private fun JsonElement?.safeAsString(default: String = ""): String =
         if (this == null || isJsonNull) default else asString
 
-    /**
-     * Returns [JsonElement.asInt] or [default] if the element is null or [com.google.gson.JsonNull].
-     */
     private fun JsonElement?.safeAsInt(default: Int = 0): Int =
         if (this == null || isJsonNull) default else asInt
 
-    /**
-     * Returns [JsonElement.asDouble] or null if the element is null, [com.google.gson.JsonNull],
-     * or not a valid number. Schema v2 fields (e.g. "cmc") use this instead of a numeric default
-     * because 0.0 is a legitimate value and must not be conflated with "field absent".
-     */
+    // Null, not 0.0, for absent numbers: 0.0 is a legitimate cmc
     private fun JsonElement?.safeAsDoubleOrNull(): Double? =
         if (this == null || isJsonNull) null else runCatching { asDouble }.getOrNull()
 
-    /** Returns [JsonElement.asInt] or null if the element is null, JsonNull, or not a valid int. */
     private fun JsonElement?.safeAsIntOrNull(): Int? =
         if (this == null || isJsonNull) null else runCatching { asInt }.getOrNull()
 
-    /** Returns [JsonElement.asBoolean] or null if the element is null, JsonNull, or not a valid boolean. */
     private fun JsonElement?.safeAsBooleanOrNull(): Boolean? =
         if (this == null || isJsonNull) null else runCatching { asBoolean }.getOrNull()
 }

@@ -23,6 +23,8 @@ sealed class NextRoundResult {
 data class AdvancementPlan(
     val result: NextRoundResult,
     val matchesToInsert: List<TournamentMatch> = emptyList(),
+    /** Swiss pairings that had to repeat a previous matchup (see SwissPairingResult). */
+    val forcedRematches: Int = 0,
     val tournamentFinished: Boolean = false,
 )
 
@@ -91,10 +93,18 @@ class GenerateNextRoundUseCase {
                     AdvancementPlan(NextRoundResult.TournamentFinished, tournamentFinished = true)
                 } else {
                     val standings = StandingsCalculator.calculate(players, finishedMatches)
-                    val pairings  = SwissEngine.generateNextRound(standings, finishedMatches)
+                    val pairing   = SwissEngine.generateNextRoundWithDiagnostics(standings, finishedMatches)
                     val nextRound = currentRound + 1
-                    val matches   = buildMatches(tournament.id, nextRound, pairings, orderOffset)
-                    AdvancementPlan(NextRoundResult.RoundGenerated(nextRound), matchesToInsert = matches)
+                    val matches   = buildMatches(tournament.id, nextRound, pairing.pairings, orderOffset)
+                    if (matches.isEmpty()) {
+                        AdvancementPlan(NextRoundResult.TournamentFinished, tournamentFinished = true)
+                    } else {
+                        AdvancementPlan(
+                            NextRoundResult.RoundGenerated(nextRound),
+                            matchesToInsert = matches,
+                            forcedRematches = pairing.forcedRematches,
+                        )
+                    }
                 }
             }
 
@@ -105,7 +115,13 @@ class GenerateNextRoundUseCase {
                     val pairings  = SingleEliminationEngine.generateNextRound(currentRoundMatches)
                     val nextRound = currentRound + 1
                     val matches   = buildMatches(tournament.id, nextRound, pairings, orderOffset)
-                    AdvancementPlan(NextRoundResult.RoundGenerated(nextRound), matchesToInsert = matches)
+                    // A draw in a knockout leaves no winner to advance: an empty next round would
+                    // soft-lock the bracket as "RoundGenerated" with nothing to play
+                    if (matches.isEmpty()) {
+                        AdvancementPlan(NextRoundResult.TournamentFinished, tournamentFinished = true)
+                    } else {
+                        AdvancementPlan(NextRoundResult.RoundGenerated(nextRound), matchesToInsert = matches)
+                    }
                 }
             }
 

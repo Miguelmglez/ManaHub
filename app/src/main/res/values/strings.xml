@@ -5,6 +5,7 @@
     ═══════════════════════════════════════════ -->
     <string name="app_name">ManaHub</string>
     <string name="app_tagline">Your Magic companion</string>
+    <string name="app_exit_back_prompt">Press back again to close the app</string>
     <string name="splash_tagline">Your Magic Companion</string>
 
     <!-- Acciones comunes -->
@@ -123,6 +124,8 @@
     <string name="addcard_search_min_chars">Type at least 2 characters to search</string>
     <string name="addcard_no_results">No cards found</string>
     <string name="addcard_no_results_subtitle">Try searching in another language\nor check the spelling</string>
+    <string name="addcard_server_unavailable_title">Server currently unavailable</string>
+    <string name="addcard_server_unavailable_subtitle">Scryfall is currently unavailable. Try again in a moment.</string>
     <string name="addcard_index_title">Browse the MTG universe!</string>
     <string name="addcard_index_subtitle">Type the name of a card or open the Advanced search to find by its attributes</string>
 
@@ -130,6 +133,49 @@
     <string name="addcard_spotlight_header">Latest Set: %1$s</string>
     <string name="addcard_language_button">Search language: %1$s. Tap to change.</string>
     <string name="addcard_language_sheet_title">Search language</string>
+    <string name="addcard_multi_select_title">Select multiple</string>
+    <string name="addcard_multi_select_enabled">Multi-select enabled</string>
+    <string name="addcard_multi_select_disabled">Multi-select disabled</string>
+    <string name="addcard_multi_select_toggle_cd">Select multiple cards</string>
+    <string name="addcard_multi_select_toggle_action">Select or deselect card</string>
+    <string name="addcard_multi_select_open_details">Open card details</string>
+    <string name="addcard_clear_deck_cards">Clear deck cards</string>
+    <string name="addcard_select_all">Select all</string>
+    <string name="addcard_unselect_all">Unselect all</string>
+    <string name="addcard_select_missing">Select missing</string>
+    <string name="addcard_deck_load_error">Could not load the cards of this deck.</string>
+    <string name="addcard_deck_empty_title">No cards in this deck</string>
+    <string name="addcard_deck_empty_subtitle">Clear deck cards to search every card instead.</string>
+    <string name="addcard_deck_nothing_new_selected">These cards are already selected</string>
+    <string name="addcard_selection_locked_while_adding">%1$s is being added to your collection</string>
+    <plurals name="addcard_deck_cards_selected">
+        <item quantity="one">%d card selected</item>
+        <item quantity="other">%d cards selected</item>
+    </plurals>
+    <plurals name="addcard_multi_select_proceed">
+        <item quantity="one">Proceed with %d selected</item>
+        <item quantity="other">Proceed with %d selected</item>
+    </plurals>
+    <plurals name="addcard_queue_added_all_to_collection">
+        <item quantity="one">%d card added to Collection</item>
+        <item quantity="other">%d cards added to Collection</item>
+    </plurals>
+    <plurals name="addcard_queue_added_all_to_wishlist">
+        <item quantity="one">%d card added to Wishlist</item>
+        <item quantity="other">%d cards added to Wishlist</item>
+    </plurals>
+    <plurals name="addcard_queue_add_all_partial_failure">
+        <item quantity="one">%1$d of %2$d card could not be added — kept in queue</item>
+        <item quantity="other">%1$d of %2$d cards could not be added — kept in queue</item>
+    </plurals>
+    <plurals name="card_queue_title">
+        <item quantity="one">%d card in queue</item>
+        <item quantity="other">%d cards in queue</item>
+    </plurals>
+    <string name="card_queue_set_and_number">%1$s #%2$s</string>
+    <string name="card_queue_clear_cd">Clear queue</string>
+    <string name="card_queue_decrease_quantity_cd">Decrease quantity</string>
+    <string name="card_queue_increase_quantity_cd">Increase quantity</string>
     <string name="shared_foil">Foil</string>
 
 
@@ -142,6 +188,9 @@
     <string name="card_condition_pl">Played</string>
     <string name="card_condition_p">Poor</string>
 
+    <!-- ══════════════════════════════════════════
+         MULTI ADD CARD SCREEN
+    ═══════════════════════════════════════════ -->
     <!-- ══════════════════════════════════════════
          CARD DETAIL SCREEN
     ═══════════════════════════════════════════ -->
@@ -163,6 +212,7 @@
 
     <!-- Card Detail — External Links section -->
     <string name="carddetail_links_title">External Links</string>
+    <string name="carddetail_links_open_failed">Couldn\'t open this link</string>
     <string name="carddetail_links_references">References</string>
     <string name="carddetail_links_community">Community</string>
     <string name="carddetail_links_purchase">Where to Buy</string>
@@ -268,7 +318,7 @@
     <string name="tagdictionary_labels_section">Labels</string>
     <string name="tagdictionary_patterns_hint">One rule per line. Combine required terms with \' + \'. Prefix a term with \'!\' to exclude. Example: gain + life + !gain control</string>
     <string name="tagdictionary_patterns_en_label">Patterns</string>
-    <string name="tagdictionary_system_readonly">System tag · read-only</string>
+    <string name="tagdictionary_system_category_readonly">%1$s · System tag · read-only</string>
     <string name="tagdictionary_create_custom_tag">Create custom tag</string>
     <string name="tagdictionary_create_custom_tag_description">Create custom tag</string>
     <string name="tagdictionary_create_label_hint">Give your custom tag a name</string>
@@ -295,6 +345,7 @@
     <string name="scanner_ocr_scanning">Scanning</string>
     <string name="scanner_ocr_paused">Paused</string>
     <string name="scanner_permission_denied_settings">Camera permission denied. Open Settings to enable it.</string>
+    <string name="scanner_invalid_link">This scanner link is invalid.</string>
 
     <!-- Scanner — no-modal UI (bulk scanner) -->
     <string name="scanner_hash_db_missing">Card database not loaded — scanner identification disabled</string>
@@ -307,9 +358,16 @@
     <string name="scanner_toast_added_all_to_collection">%1$d items added to Collection</string>
     <string name="scanner_toast_add_failed">Could not add %1$s — try again</string>
     <string name="scanner_toast_add_all_partial_failure">%1$d of %2$d cards could not be added — kept in queue</string>
-    <string name="scanner_queue_title">%1$d cards scanned</string>
     <string name="scanner_queue_search_hint">Filter by name…</string>
     <string name="scanner_queue_button_desc">Scan queue</string>
+    <string name="scanner_pause_recognition">Pause card recognition</string>
+    <string name="scanner_resume_recognition">Resume card recognition</string>
+    <string name="scanner_select_language">Select scan language</string>
+    <string name="scanner_disable_sound">Disable scanner sounds</string>
+    <string name="scanner_enable_sound">Enable scanner sounds</string>
+    <string name="scanner_disable_flash">Turn off scanner flash</string>
+    <string name="scanner_enable_flash">Turn on scanner flash</string>
+    <string name="scanner_remove_detected_card">Remove detected card</string>
     <string name="scanner_add_all">+ Add to collection</string>
     <string name="scanner_clear_session">Clear</string>
     <string name="scanner_quick_mode">Quick Mode</string>
@@ -362,12 +420,43 @@
     <string name="scanner_edit_save">Save details</string>
     <string name="scanner_edit_sheet_title">Edit scanned card</string>
     <string name="scanner_permission_camera_required">Camera permission required</string>
+    <string name="scanner_camera_bind_failed">Camera could not be started. Check permission and try again.</string>
     <string name="scanner_permission_grant">Grant permission</string>
     <string name="scanner_language_sheet_title">Scan language</string>
     <string name="scanner_duplicate_entry">Duplicate</string>
     <string name="scanner_queue_auto_delete_title">Auto-delete on add</string>
     <string name="scanner_queue_auto_delete_desc">Remove entry from the queue when added to collection or wishlist</string>
     <string name="scanner_already_in_collection">Already in your collection</string>
+
+    <!-- Scanner — deck target queue -->
+    <string name="scanner_deck_queue_title">Scan queue for deck (%1$d)</string>
+    <string name="scanner_deck_queue_clear_all">Discard all scanned cards</string>
+    <string name="scanner_deck_queue_empty_title">No cards scanned yet</string>
+    <string name="scanner_deck_queue_empty_subtitle">Scan cards to add them to this deck.</string>
+    <string name="scanner_deck_queue_no_matches_title">No matching cards</string>
+    <string name="scanner_deck_queue_no_matches_subtitle">Try a different card name.</string>
+    <string name="scanner_deck_queue_auto_delete_title">Remove entry after adding it to the deck</string>
+    <string name="scanner_deck_queue_auto_delete_desc">Automatically remove successful additions from this queue</string>
+    <string name="scanner_deck_queue_auto_delete_a11y">Toggle automatic queue removal after adding to the deck</string>
+    <string name="scanner_deck_add_all_mainboard">Add all to Mainboard</string>
+    <string name="scanner_deck_add_all_sideboard">Add all to Sideboard</string>
+    <string name="scanner_deck_action_mainboard">Mainboard</string>
+    <string name="scanner_deck_action_sideboard">Sideboard</string>
+    <string name="scanner_deck_action_discard">Discard</string>
+    <string name="scanner_deck_action_mainboard_a11y">Add %1$s to Mainboard</string>
+    <string name="scanner_deck_action_sideboard_a11y">Add %1$s to Sideboard</string>
+    <string name="scanner_deck_action_discard_a11y">Discard %1$s</string>
+    <string name="scanner_deck_decrease_quantity_a11y">Decrease %1$s quantity</string>
+    <string name="scanner_deck_increase_quantity_a11y">Increase %1$s quantity</string>
+    <string name="scanner_deck_close_queue_a11y">Close deck scan queue</string>
+    <string name="scanner_deck_add_success">Added %1$d card(s) to %2$s.</string>
+    <string name="scanner_deck_add_blocked_commander">Commander entries were blocked. Add them to Sideboard instead.</string>
+    <string name="scanner_deck_add_no_cards">No cards were added.</string>
+    <string name="scanner_deck_add_failed">Could not add cards to the deck.</string>
+    <plurals name="scanner_deck_add_partial_success">
+        <item quantity="one">Added %1$d card(s); %2$d commander entry was blocked.</item>
+        <item quantity="other">Added %1$d card(s); %2$d commander entries were blocked.</item>
+    </plurals>
 
     <!-- ══════════════════════════════════════════
          STATS SCREEN
@@ -454,6 +543,17 @@
     <string name="stats_section_deck_performance">Deck Performance</string>
     <string name="stats_section_matchups">Matchup win rates</string>
     <string name="stats_section_history">History</string>
+    <string name="stats_clear_set_filter">Clear set filter</string>
+    <string name="stats_open_deck">Open deck</string>
+    <string name="stats_game_options">Game options</string>
+    <string name="stats_result_win">W</string>
+    <string name="stats_result_loss">L</string>
+    <string name="stats_result_draw">D</string>
+    <string name="stats_color_distribution_hint">Percent of cards containing each color</string>
+    <string name="stats_collection_error">Collection statistics are unavailable</string>
+    <string name="stats_collection_empty_title">No cards yet</string>
+    <string name="stats_collection_empty_subtitle">Add cards to see your collection statistics</string>
+    <string name="stats_games_error">Game statistics are unavailable</string>
     <string name="stats_empty_decks_subtitle">Associate games with decks via the post-game survey to see deck stats here</string>
     <string name="stats_empty_history_subtitle">Recorded game sessions will appear here</string>
 
@@ -667,6 +767,7 @@
     <string name="deckbuilder_save_changes_button">Save changes</string>
     <string name="deckbuilder_saved_button">Saved</string>
     <string name="deckbuilder_share_chooser">Share Deck</string>
+    <string name="deckstudio_select_cards">Select cards</string>
     <string name="deckbuilder_move_to_sideboard">1x To Sideboard</string>
     <string name="deckbuilder_from_sideboard">1x From Sideboard</string>
     <string name="deckbuilder_move_to_mainboard">1x To Mainboard</string>
@@ -838,27 +939,56 @@
          role-coverage-bar list; every pillar (not just Plan roles) renders sections now. -->
     <string name="deck_analysis_section_progress_format">%1$d / %2$d</string>
     <string name="deck_analysis_section_browse">Browse for %1$s</string>
+    <!-- Deck Wizard v4 plan (W4.4/E2): tone-aware ring content description, appended to the plain
+         "N / ideal" text so a screen-reader user gets the same RAMP/HEALTHY/OVER_LIMIT/ALERT signal
+         a sighted user gets from color alone. -->
+    <string name="deck_analysis_ring_tone_building">building up</string>
+    <string name="deck_analysis_ring_tone_healthy">healthy</string>
+    <string name="deck_analysis_ring_tone_over_ideal">over your ideal, not a problem</string>
+    <string name="deck_analysis_ring_tone_over_max">over your max, this needs attention</string>
     <!-- Suggestions Tab UI Polish plan (W3, 2026-08-25): placeholder shown in a CardSectionRow
          whose section.contributions is empty — every section now renders a consistent visual
          anchor instead of the LazyRow simply being absent. -->
     <string name="deck_analysis_section_empty">No cards yet</string>
 
+    <!-- Counted section slot whose Card could not be resolved yet -->
+    <string name="deck_analysis_section_card_unresolved">Card details unavailable</string>
+
     <!-- Deck Analysis Engine v3, Phase 5 (UI, 2026-08-27): PillarTile's "not applicable" state
          (PillarResult.notApplicable) — SYNERGY on a zero-edge deck. Never renders as "0". -->
     <string name="deck_analysis_pillar_not_applicable_badge">N/A</string>
 
-    <!-- Deck Analysis Engine v3, Phase 5 (UI): the synergy-package section list inside the SYNERGY
-         pillar detail — one card per live axis, producers -> payoffs, ArchetypeResemblanceComponents/
-         SynergyAxisComponents.kt. -->
-    <string name="deck_analysis_synergy_packages_header">Synergy packages</string>
+    <!-- SYNERGY "Engines": one card per producer -> payoff pair, real counts, an incomplete badge,
+         Browse on each side. SynergyAxisComponents.kt. -->
+    <string name="deck_analysis_synergy_packages_header">Engines</string>
     <string name="deck_analysis_synergy_not_applicable_title">No detectable synergy plan</string>
     <string name="deck_analysis_synergy_not_applicable_body">This deck has no producer→payoff pairs the engine can detect. That doesn\'t mean it\'s poorly built — a straightforward removal-and-card-advantage plan can legitimately have no synergy graph at all — it just means this pillar has nothing to measure, so it\'s excluded from your score instead of scored as zero.</string>
-    <string name="deck_analysis_synergy_no_live_packages">No live synergy package yet — a package needs both producers and payoffs to count.</string>
-    <string name="deck_analysis_axis_package_header">%1$s package</string>
+    <string name="deck_analysis_synergy_no_live_engines_title">No engines yet</string>
+    <string name="deck_analysis_synergy_no_live_engines_body">An engine needs a producer or payoff side with real numbers in the deck. Add cards on either side to see one appear here.</string>
+    <string name="deck_analysis_engine_title">%1$s engine</string>
+    <string name="deck_analysis_engine_counts">%1$d producers → %2$d payoffs</string>
+    <string name="deck_analysis_engine_missing_payoffs">Missing payoffs</string>
+    <string name="deck_analysis_engine_missing_producers">Missing producers</string>
     <string name="deck_analysis_axis_producers_label">Producers</string>
     <string name="deck_analysis_axis_payoffs_label">Payoffs</string>
-    <string name="deck_analysis_axis_live_badge">LIVE</string>
-    <string name="deck_analysis_axis_health_caption">%1$d producers → %2$d payoffs · %3$d%% healthy</string>
+
+    <!-- One plain-language sentence per axis describing the producer -> payoff loop. -->
+    <string name="deck_analysis_engine_sentence_life">Cards that gain life fuel cards that reward gaining life.</string>
+    <string name="deck_analysis_engine_sentence_death">Cards that sacrifice or kill your own creatures fuel cards that reward creatures dying.</string>
+    <string name="deck_analysis_engine_sentence_tokens">Cards that make tokens fuel cards that reward having lots of creatures or counters.</string>
+    <string name="deck_analysis_engine_sentence_counters">Cards that add +1/+1 counters fuel cards that reward having counters.</string>
+    <string name="deck_analysis_engine_sentence_landfall">Extra land drops fuel cards that trigger when a land enters the battlefield.</string>
+    <string name="deck_analysis_engine_sentence_graveyard">Cards that fill your graveyard fuel cards that recur from it or reward it being full.</string>
+    <string name="deck_analysis_engine_sentence_etb">Cards that blink or return creatures fuel cards that trigger when a creature enters.</string>
+    <string name="deck_analysis_engine_sentence_spells">Instants and sorceries fuel cards that reward casting them.</string>
+    <string name="deck_analysis_engine_sentence_artifacts">Artifacts fuel cards that reward controlling them.</string>
+    <string name="deck_analysis_engine_sentence_enchantments">Enchantments fuel cards that reward controlling them.</string>
+    <string name="deck_analysis_engine_sentence_attached">Equipment and Auras fuel cards that reward attacking or blocking with an equipped or enchanted creature.</string>
+    <string name="deck_analysis_engine_sentence_attack">Cards that give haste or evasion fuel cards that reward attacking.</string>
+    <string name="deck_analysis_engine_sentence_planeswalkers">Planeswalkers fuel cards that add counters to them.</string>
+    <string name="deck_analysis_engine_sentence_group">Cards that share a benefit with every player fuel cards that reward everyone drawing cards or gaining life together.</string>
+    <string name="deck_analysis_engine_sentence_engine">Counterspells and protection spells hold your plan together long enough for your finishers to close the game.</string>
+    <string name="deck_analysis_engine_sentence_generic">Producers on this axis fuel the payoffs that reward it.</string>
 
     <!-- Deck Analysis Engine v3, Phase 5 (UI): per-AxisKey English fallback labels — a presentation-
          layer mirror of AnalysisEngine's own private AXIS_LABELS map (core-domain stays string-free
@@ -881,19 +1011,17 @@
     <string name="deck_analysis_axis_group">Group Effects</string>
     <string name="deck_analysis_axis_mill_opp">Mill (Opponent)</string>
     <string name="deck_analysis_axis_lock">Stax Lock</string>
-    <string name="deck_analysis_axis_engine">Engine</string>
+    <string name="deck_analysis_axis_engine">Support</string>
     <string name="deck_analysis_axis_tribe_format">%1$s (Tribe)</string>
 
-    <!-- Deck Analysis Engine v3, Phase 5 (UI): the archetype resemblance card — macro/posture/
-         themes + the full 5-way resemblance profile (ArchetypeResemblanceComponents.kt). Never a
-         "no plan" bucket: there is always a nearest plan with an honest confidence beside it. -->
-    <string name="deck_analysis_archetype_header">Archetype signal</string>
+    <!-- Deck Analysis Engine v3: the macro/hybrid label ("Custom" or "Control / Midrange") folded
+         into StrategyPlanChip's second line since the Deck Wizard UX polish plan, Run 1 §1.6 (the
+         separate "Archetype signal" card was deleted; see ArchetypeResolution.planLabel()). -->
     <string name="deck_analysis_archetype_custom_label">Custom</string>
     <string name="deck_analysis_archetype_hybrid_format">%1$s / %2$s</string>
-    <string name="deck_analysis_archetype_confidence_margin">%1$d%% margin over runner-up</string>
-    <string name="deck_analysis_archetype_ambiguous_caption">No single archetype is confident enough yet — here\'s how this deck resembles each one.</string>
-    <string name="deck_analysis_resemblance_row_format">%1$d%%</string>
-    <string name="deck_analysis_posture_prefix">Posture: %1$s</string>
+    <!-- StrategyPlanChip's "Detected: X" second line (Run 1 §1.6) — never confidence/margin text. -->
+    <string name="deck_studio_strategy_detected_format">Detected: %1$s</string>
+    <string name="deck_studio_strategy_detected_with_posture_format">Detected: %1$s · %2$s</string>
 
     <!-- ══════════════════════════════════════════
          DECK DOCTOR — CUT &amp; ADD SUGGESTIONS
@@ -948,7 +1076,6 @@
     <string name="deck_seeds_search_hint">Search a card to seed your deck…</string>
     <string name="deck_seeds_picked_title">Seed cards</string>
     <string name="deck_seeds_identity_colors">Color identity</string>
-    <string name="deck_seeds_identity_colorless">Colorless</string>
 
     <!-- Deck Studio — unified hybrid deck builder (manual + suggestions + seed auto-build) -->
     <string name="deck_studio_title">Deck Studio</string>
@@ -957,6 +1084,35 @@
     <string name="deck_studio_discard_confirm_title">Discard this deck?</string>
     <string name="deck_studio_discard_confirm_body">This deck is empty and hasn\'t been named. It won\'t be saved.</string>
     <string name="deck_studio_add_card_fab">Add card to deck</string>
+    <string name="deck_studio_add_cards_title">Add cards</string>
+    <string name="deck_studio_search_manually">Search manually</string>
+    <string name="deck_studio_search_manually_desc">Browse your collection or all cards</string>
+    <string name="deck_studio_scan_cards">Scan cards</string>
+    <string name="deck_studio_scan_cards_desc">Use the camera to recognize cards</string>
+    <string name="deck_studio_scan_cards_unavailable">Load the deck before scanning cards.</string>
+    <string name="deck_studio_add_cards_method_a11y">Choose how to add cards</string>
+    <string name="deck_studio_deck_value">Estimated deck value</string>
+    <string name="deck_studio_deck_value_mainboard">Mainboard</string>
+    <string name="deck_studio_deck_value_sideboard">Sideboard</string>
+    <string name="deck_studio_deck_value_empty">No cards</string>
+    <string name="deck_studio_deck_value_unknown">No price data</string>
+    <string name="deck_studio_deck_value_partial">%1$d cards without price</string>
+    <string name="deck_studio_deck_value_mainboard_a11y">Mainboard estimated value: %1$s</string>
+    <string name="deck_studio_deck_value_sideboard_a11y">Sideboard estimated value: %1$s</string>
+    <string name="deck_studio_add_cards_subtitle">Choose how to add cards to this deck.</string>
+    <string name="deck_studio_add_cards_manual_title">Search manually</string>
+    <string name="deck_studio_add_cards_manual_subtitle">Find cards by name or advanced filters.</string>
+    <string name="deck_studio_add_cards_scan_title">Scan cards</string>
+    <string name="deck_studio_add_cards_scan_subtitle">Use your camera to add cards to this deck.</string>
+    <string name="deck_studio_add_cards_scan_disabled">Load a deck before scanning cards.</string>
+    <string name="deck_studio_value_title">Deck value</string>
+    <string name="deck_studio_value_mainboard">Mainboard</string>
+    <string name="deck_studio_value_sideboard">Sideboard</string>
+    <string name="deck_studio_value_accessibility">%1$s value: %2$s</string>
+    <plurals name="deck_studio_value_missing_copies">
+        <item quantity="one">%1$d copy without a price</item>
+        <item quantity="other">%1$d copies without a price</item>
+    </plurals>
     <string name="deck_studio_suggestions_tab_health">Health</string>
     <string name="deck_studio_suggestions_tab_cuts">Cuts</string>
     <string name="deck_studio_suggestions_tab_adds">Adds</string>
@@ -984,17 +1140,16 @@
     <!-- Deck Analysis Engine v2 Phase 0 carve-out (interim StrategyCatalog.isValidCombination guard) -->
     <string name="deck_studio_archetype_invalid_combo_warning">This archetype and theme combination isn\'t supported yet.</string>
     <string name="deck_studio_archetype_plan_updated">Deck plan updated</string>
-    <string name="deck_studio_strategy_unlocked">Strategy unlocked</string>
-    <string name="deck_studio_strategy_locked_title">Built by the wizard</string>
-    <string name="deck_studio_strategy_locked_body">This deck\'s strategy is locked, so the Doctor won\'t suggest cutting any card the wizard placed. Unlock it to edit the deck plan and allow those cards to be suggested as cuts again.</string>
-    <string name="deck_studio_strategy_locked_unlock_action">Unlock strategy</string>
-    <string name="deck_studio_unlock_strategy_confirm_title">Unlock this deck\'s strategy?</string>
-    <string name="deck_studio_unlock_strategy_confirm_body">The Deck Doctor will be able to suggest cutting cards the wizard placed, and you\'ll be able to change the deck plan again. This can\'t be undone automatically.</string>
-    <string name="deck_studio_unlock_strategy_confirm_action">Unlock</string>
     <string name="deck_studio_empty_title">Your deck is empty</string>
     <string name="deck_studio_empty_subtitle">Add cards with the + button, or pick one of the options below.</string>
     <string name="deck_studio_build_from_seed">Build from Seed</string>
     <string name="deck_studio_build_from_seed_desc">Pick a few cards you love and we\'ll build a full deck around them.</string>
+    <!-- Deck Wizard Commander v3 plan (Phase 6, item 4): Studio's own "regenerate this draft
+         through the wizard" entry point, Commander only, gated by the same
+         DECK_BUILDER_V2_ENABLED flag as the rest of the wizard's Studio reachability. -->
+    <string name="deck_studio_rebuild_with_wizard">Rebuild with the Wizard</string>
+    <string name="deck_studio_rebuild_confirm_title">Replace this deck\'s cards?</string>
+    <string name="deck_studio_rebuild_confirm_message">The wizard will replace every card in this deck with a fresh build from your collection. This can\'t be undone.</string>
     <string name="deck_studio_more_options">More options</string>
     <string name="deck_studio_browse_inspirations">Browse Inspirations</string>
     <string name="deck_studio_browse_inspirations_desc">Discover strategies and combos hiding in your own collection.</string>
@@ -1020,8 +1175,6 @@
     <string name="deck_studio_expand_section">Expand section</string>
     <string name="deck_studio_collapse_section">Collapse section</string>
     <!-- Inspirations (Discoveries) surface (Phase 4) -->
-    <string name="deck_studio_inspirations_title">Inspirations</string>
-    <string name="deck_studio_inspirations_subtitle">Synergies found in your collection. Tap one to seed a new deck.</string>
     <string name="deck_studio_inspirations_empty_title">No inspirations yet</string>
     <string name="deck_studio_inspirations_empty_subtitle">Add more cards to your collection and we\'ll surface synergies you can build around.</string>
     <string name="deck_studio_inspiration_fit">%1$d cards</string>
@@ -1033,28 +1186,53 @@
     <!-- Deck Wizard & Engine Rework plan, WS 1.3: the Strategies tab splits into two sections:
          Strategy clusters and Tribe (creature-type) clusters are disjoint taxonomy axes and must
          never render as one mixed labeled list. -->
-    <string name="deck_studio_inspirations_section_strategies">Strategies</string>
-    <string name="deck_studio_inspirations_section_tribes">Tribes (creature types)</string>
-    <string name="deck_studio_inspirations_search_hint">Search strategies or pick a card…</string>
     <string name="deck_studio_inspirations_search_clear">Clear search</string>
-    <string name="deck_studio_inspirations_search_empty_title">No matches</string>
-    <string name="deck_studio_inspirations_search_empty_subtitle">Try a different search term or card.</string>
-    <string name="deck_studio_inspirations_matching_cards">Matching cards (%1$d)</string>
     <string name="deck_studio_combos_empty_title">No combos found</string>
-    <string name="deck_studio_combos_empty_subtitle">We didn\'t find any known combos in your collection yet.</string>
     <string name="deck_studio_combos_complete_header">Ready to build (%1$d)</string>
     <string name="deck_studio_combos_almost_header">One card away (%1$d)</string>
-    <string name="deck_studio_combos_missing_card">Missing: %1$s</string>
+    <!-- Browse inspirations (60-card empty decks) -->
+    <string name="deck_inspirations_subtitle">Explore the synergies and combos in your collection, pick the cards you like and start a deck from them.</string>
+    <string name="deck_inspirations_search_owned_hint">Search your collection</string>
+    <string name="deck_inspirations_pinned_strategies">Synergies with this card</string>
+    <string name="deck_inspirations_pinned_combos">Combos with this card</string>
+    <string name="deck_inspirations_clear_pinned_a11y">Choose another card</string>
+    <string name="deck_inspirations_pick_card_a11y">Explore this card</string>
+    <string name="deck_inspirations_search_empty">No card in your collection matches your search</string>
+    <string name="deck_inspirations_section_engines">Engines (%1$d)</string>
+    <string name="deck_inspirations_section_tribes">Tribes (%1$d)</string>
+    <string name="deck_inspirations_card_no_synergies_title">No synergies for this card</string>
+    <string name="deck_inspirations_card_no_synergies_subtitle">This card isn\'t part of any engine or tribe in your collection yet. Try another one.</string>
+    <string name="deck_inspirations_synergies_error">We couldn\'t analyze your collection.</string>
+    <string name="deck_inspirations_tribe_counts">%1$d creatures · %2$d payoffs</string>
+    <string name="deck_inspirations_producers_only_counts">%1$d producers</string>
+    <string name="deck_inspirations_combos_idle_title">Explore combos</string>
+    <string name="deck_inspirations_combos_idle_subtitle">Search for a card in your collection to explore possible combos</string>
+    <string name="deck_inspirations_combos_empty_subtitle">Commander Spellbook has no combos with this card for this format.</string>
+    <string name="deck_inspirations_combos_error">We couldn\'t load combos right now.</string>
+    <string name="deck_inspirations_combos_more_away_header">2+ cards away (%1$d)</string>
+    <string name="deck_inspirations_combos_loading_more">Loading more combos…</string>
+    <string name="deck_inspirations_combo_untitled">Combo</string>
+    <string name="deck_inspirations_combo_ready_badge">Ready</string>
+    <string name="deck_inspirations_combo_missing_badge">%1$d missing</string>
+    <string name="deck_inspirations_combo_missing_piece">Missing</string>
+    <string name="deck_inspirations_combo_how_it_works">How it works</string>
+    <string name="deck_inspirations_combo_added">Added to selection</string>
+    <string name="deck_inspirations_combo_pieces_unresolved">Some combo pieces couldn\'t be loaded and were skipped.</string>
+    <string name="deck_inspirations_add_to_selection">Add to selection</string>
+    <string name="deck_inspirations_in_selection">In your selection: %1$d</string>
+    <string name="deck_inspirations_selected_pill">%1$d cards selected</string>
+    <string name="deck_inspirations_selected_pill_a11y">%1$d cards selected, opens the list</string>
+    <string name="deck_inspirations_start_building">Start building the deck</string>
+    <string name="deck_inspirations_queue_title">Selected cards (%1$d)</string>
+    <string name="deck_inspirations_queue_empty_title">No cards selected yet</string>
+    <string name="deck_inspirations_queue_empty_subtitle">Add cards from the synergies or combos to start your deck.</string>
+    <string name="deck_inspirations_browse_sheet_title">Add to your selection</string>
 
     <!-- Deck Builder v2 — wizard (docs/plans/deck-builder-v2-plan.md §3.4) -->
     <string name="deck_wizard_title">Build a Deck</string>
     <string name="deck_wizard_step_of">Step %1$d of %2$d</string>
     <string name="deck_wizard_next">Next</string>
-    <string name="deck_wizard_coming_soon">Coming soon</string>
-    <string name="deck_wizard_build_this">Build this</string>
-    <!-- Step 1 — Format -->
-    <string name="deck_wizard_format_title">Choose a format</string>
-    <string name="deck_wizard_format_subtitle">Commander and Casual have the deepest deck templates today.</string>
+    <!-- Format rules copy, reused by DeckCreationSheet's format picker (the wizard itself has no format step, Deck Wizard v4 R13) -->
     <string name="deck_wizard_format_desc_commander">100-card singleton deck: 99 cards plus a legendary commander that sets your color identity. Starts at 40 life — 21+ combat damage from one commander is also a loss.</string>
     <string name="deck_wizard_format_desc_casual">60-card minimum deck with up to 4 copies of any card (basic lands excluded). Starts at 20 life under standard 2-player rules.</string>
     <string name="deck_wizard_format_desc_standard">Rotating format — legal sets are roughly the last two years.</string>
@@ -1072,51 +1250,51 @@
     <string name="deck_wizard_entry_colors_subtitle">Pick colors first, then choose from the strategies that fit them best.</string>
     <string name="deck_wizard_entry_strategy_title">Start from strategy</string>
     <string name="deck_wizard_entry_strategy_subtitle">Browse every archetype and theme, then pick the colors that fit it.</string>
+    <!-- SEED_PICK ("Start from cards", Deck Wizard 60-card wave v6, plan §5 Phase 5.2) -->
+    <string name="deck_wizard_seed_pick_title">Pick your cards</string>
+    <string name="deck_wizard_seed_pick_subtitle">Search your collection or beyond — we\'ll suggest a strategy that fits them.</string>
+    <string name="deck_wizard_seed_pick_idle_header">Cards in your collection</string>
+    <string name="deck_wizard_seed_pick_empty">No cards match — try a different name or filter.</string>
+    <string name="deck_wizard_seeds_added_pill">%1$d cards added</string>
+    <!-- Gate 5 audit (design P1): the pill's own TalkBack content description; the visible text
+         alone doesn't announce that tapping it opens the seed queue list. -->
+    <string name="deck_wizard_seeds_added_pill_a11y">%1$d cards added, opens the list</string>
+    <string name="deck_wizard_seed_queue_title">Your cards (%1$d)</string>
+    <string name="deck_wizard_seed_queue_empty_title">No cards added yet</string>
+    <string name="deck_wizard_seed_queue_empty_subtitle">Search above and tap Add to deck.</string>
+    <string name="deck_wizard_seed_copy_cap">Up to %1$d copies of a card</string>
+    <string name="deck_wizard_seed_cap_reached">Your deck can hold %1$d cards</string>
+    <string name="deck_wizard_seeds_required">Add at least one card to continue.</string>
+    <string name="deck_wizard_seed_cards_handoff_failed">We couldn\'t load the cards you picked. Add them again to continue.</string>
+    <string name="deck_wizard_strategy_subtitle_seeds">for your %1$d cards</string>
+    <string name="deck_wizard_unsupported_format_toast">The wizard can\'t build this format yet.</string>
     <!-- Step 2 — Direction -->
-    <string name="deck_wizard_direction_title">Pick a direction</string>
-    <string name="deck_wizard_direction_subtitle">Start from your commander, your collection\'s strengths, or a few seed cards.</string>
     <string name="deck_wizard_commander_section_title">Commander</string>
     <string name="deck_wizard_commander_search_hint">Search for a commander…</string>
     <string name="deck_wizard_commander_required">Pick a commander to continue.</string>
     <string name="deck_wizard_change_commander">Change commander</string>
-    <string name="deck_wizard_direction_leans_title">Your collection leans…</string>
-    <string name="deck_wizard_direction_leans_empty">Add more cards to your collection to see suggested directions.</string>
-    <string name="deck_wizard_direction_chip_strategy">%1$s · %2$d</string>
-    <string name="deck_wizard_direction_chip_tribe">%1$d %2$s</string>
     <string name="deck_wizard_seed_picker_toggle">Add seed cards (optional)</string>
-    <string name="deck_wizard_suggested_strategies_title">Suggested strategies</string>
-    <string name="deck_wizard_suggested_strategies_hint">Add a seed card above to see strategy suggestions.</string>
-    <string name="deck_wizard_suggested_strategies_empty">None of your seeds line up with a known strategy yet — you can still continue without one.</string>
     <string name="deck_wizard_seed_coherence_warning">These seed cards don\'t share much in common — the build may end up unfocused. Consider trimming to cards with a clearer shared theme.</string>
     <string name="deck_wizard_zoom_card">Zoom %1$s</string>
     <!-- Flow A — Workstream 3.1 color selector (locked-by-seed colors + coherence hints) -->
-    <string name="deck_wizard_seed_colors_title">Colors</string>
-    <string name="deck_wizard_color_locked_by_seeds">%1$s, locked by a seed card</string>
     <string name="deck_wizard_misfit_hint_title">Better without:</string>
     <!-- Flow B — colors-first (Deck Engine Unification plan §5 Phase 3.3) -->
     <string name="deck_wizard_colors_flow_title">Pick your colors</string>
     <string name="deck_wizard_colors_flow_subtitle">We\'ll show the strategies that work best in these colors.</string>
     <string name="deck_wizard_colors_flow_pick_hint">Pick at least one color to see viable strategies.</string>
-    <string name="deck_wizard_colors_flow_no_matches">No known strategies fit this color combination yet — you can still continue without one.</string>
     <string name="deck_wizard_colors_required">Pick at least one color to continue.</string>
-    <string name="deck_wizard_viable_strategies_title">Viable strategies</string>
     <!-- Flow C — strategy-first (Deck Engine Unification plan §5 Phase 3.4) -->
     <string name="deck_wizard_strategy_required">Pick an archetype or theme to continue.</string>
     <string name="deck_wizard_strategy_flow_title">Pick a strategy</string>
     <string name="deck_wizard_strategy_flow_subtitle">Browse every archetype and theme, then we\'ll rank the colors that fit it best.</string>
     <string name="deck_wizard_strategy_search_hint">Search archetypes and themes…</string>
     <string name="deck_wizard_strategy_search_empty">No archetype or theme matches that search.</string>
-    <string name="deck_wizard_archetypes_title">Archetypes</string>
-    <string name="deck_wizard_themes_title">Themes</string>
     <string name="deck_wizard_color_combos_title">Best color combos for this strategy</string>
     <string name="deck_wizard_color_combos_empty">No curated color combo for this pick yet — you can still set colors on the next step.</string>
     <!-- Flow B/C shared — suggested seeds -->
     <string name="deck_wizard_suggested_seeds_title">Suggested seeds from your collection</string>
     <string name="deck_wizard_suggested_seeds_subtitle">Tap to include a card as a starting seed (optional).</string>
     <!-- Step 3 — Identity -->
-    <string name="deck_wizard_identity_title">Set your identity</string>
-    <string name="deck_wizard_identity_subtitle_commander">Colors are set by your commander.</string>
-    <string name="deck_wizard_identity_subtitle_casual">Pick the colors this deck should play.</string>
     <string name="deck_wizard_color_discipline_hint">3+ colors can hurt consistency unless your collection has strong fixing. Consider narrowing to 2.</string>
     <string name="deck_wizard_theme_picker_title">Theme (optional)</string>
     <string name="deck_wizard_color_fixed_by_commander">%1$s, fixed by commander</string>
@@ -1171,6 +1349,8 @@
     <string name="deck_curated_strategy_picker_search_placeholder">Search strategies</string>
     <string name="deck_curated_strategy_picker_core_plans_header">Core plans</string>
     <string name="deck_curated_strategy_picker_themed_header">Build-around themes</string>
+    <!-- Run 1 §1.6: the per-row match-percentage badge. -->
+    <string name="deck_curated_strategy_picker_match_format">%1$d%%</string>
     <string name="deck_curated_strategy_picker_no_results">No strategies match your search.</string>
     <string name="deck_curated_strategy_picker_auto_detect_hint_current">Currently: %1$s</string>
     <string name="deck_curated_strategy_picker_auto_detect_hint_manual">Let ManaHub pick your plan from the cards already in this deck</string>
@@ -1183,29 +1363,73 @@
     <string name="deck_wizard_commander_pick_title">Pick your commander</string>
     <string name="deck_wizard_commander_pick_subtitle">Filter by color, then search your collection or beyond.</string>
     <string name="deck_wizard_commander_pick_empty">No commander candidates match this filter yet.</string>
-    <string name="deck_wizard_include_outside_collection_title">Include cards outside your collection</string>
-    <string name="deck_wizard_include_outside_collection_subtitle">Search Scryfall too, not just what you own</string>
+    <!-- Deck Wizard Commander v3 plan (Phase 3.2) -->
+    <string name="deck_wizard_commanders_in_collection">Available commanders in your collection</string>
+    <string name="deck_wizard_commander_advanced_search">Advanced search</string>
+    <!-- Deck Wizard Commander v4 plan, Run 2 W2 review (P1.1/P1.2) -->
+    <string name="deck_wizard_commander_pick_idle_empty">No eligible commanders in your collection yet. Try searching Scryfall by name above.</string>
+    <string name="deck_wizard_commander_search_error">Something went wrong searching for commanders. Try again.</string>
+    <!-- Deck Wizard Commander v4 plan (W2.1/W2.2) -->
+    <string name="deck_wizard_commander_active_filters">%1$d active filter(s)</string>
+    <string name="deck_wizard_commander_clear_filters">Clear filters</string>
     <string name="deck_wizard_strategy_step_title">Pick a strategy</string>
+    <string name="deck_wizard_strategy_owned_count">You own %1$d cards</string>
     <string name="deck_wizard_strategy_step_subtitle">These are the game plans your commander supports best.</string>
+    <!-- Deck Wizard Commander v3 plan (Phase 4.2) -->
+    <string name="deck_wizard_strategy_step_title_for">Pick a strategy for %1$s</string>
+    <string name="deck_wizard_strategy_recommended_header">Recommended for %1$s</string>
+    <string name="deck_wizard_strategy_recommended_empty">%1$s doesn\'t clearly push toward one of these plans — try Partial fit below, or go Custom.</string>
+    <!-- Deck Wizard 60-card wave (v6), plan §5 Phase 5.3: StrategyRecommendationList's fallback copy
+         for a non-Commander/non-Cards context (COLOR_PICK) with no natural "for <name>" phrase. -->
+    <string name="deck_wizard_strategy_recommended_header_generic">Recommended for you</string>
+    <string name="deck_wizard_strategy_recommended_empty_generic">Nothing here clearly fits yet — try Partial fit below, or go Custom.</string>
+    <string name="deck_wizard_strategy_partial_fit_subtitle_generic">These can work, but nothing here pushes you toward them.</string>
+    <!-- The Cards flow's own "Recommended for X"/"partial fit" context label; pairs with the
+         existing deck_wizard_strategy_subtitle_seeds ("for your %1$d cards") for the step subtitle. -->
+    <string name="deck_wizard_strategy_context_seeds">your %1$d cards</string>
+    <string name="deck_wizard_strategy_partial_fit_expand">Partial fit</string>
+    <string name="deck_wizard_strategy_partial_fit_collapse">Hide partial fit</string>
+    <string name="deck_wizard_strategy_partial_fit_subtitle">These can work, but %1$s doesn\'t push you toward them.</string>
+    <string name="deck_wizard_strategy_partial_fit_state_expanded">Expanded</string>
+    <string name="deck_wizard_strategy_partial_fit_state_collapsed">Collapsed</string>
+    <string name="deck_wizard_strategy_custom_header">Custom</string>
+    <string name="deck_wizard_strategy_custom_title">Custom</string>
+    <string name="deck_wizard_strategy_custom_description">The engine will detect the plan from what you build.</string>
     <string name="deck_wizard_manual_adds_title">Add specific cards (optional)</string>
     <string name="deck_wizard_manual_adds_subtitle">We\'ll fill everything else automatically — this step is fully skippable.</string>
     <string name="deck_wizard_manual_adds_role_progress">%1$d / %2$d</string>
     <string name="deck_wizard_manual_adds_search_hint">Search cards…</string>
     <string name="deck_wizard_manual_adds_empty">No cards match this search yet.</string>
     <string name="deck_wizard_manual_adds_added_title">Added</string>
+    <!-- Plan sections step (Commander only, replaces Manual adds — Deck Wizard Commander v3 plan, Phase 5) -->
+    <string name="deck_wizard_plan_sections_title">Fill in your plan</string>
+    <!-- Deck Wizard 60-card wave (v6), plan §8 "Rename in place": generalized now that PLAN_SECTIONS
+         is shared by every anchor, not just Commander manual adds. -->
+    <string name="deck_wizard_plan_sections_subtitle">We\'ll build the rest from your collection — add cards to any category, or skip this step.</string>
+    <string name="deck_wizard_plan_sections_error">We couldn\'t analyze your plan right now. You can still continue.</string>
+    <string name="deck_wizard_plan_sections_kept_outside_plan">Kept — outside the plan</string>
+    <string name="deck_wizard_plan_sections_owned_hint">%1$d in your collection</string>
+    <string name="deck_wizard_plan_sections_added_title">Your cards</string>
+    <string name="deck_wizard_manual_add_rejected">That card doesn\'t fit this deck\'s color identity or format legality.</string>
+    <plurals name="deck_wizard_seeds_pruned_outside_identity">
+        <item quantity="one">%1$d card outside the deck\'s colors was removed</item>
+        <item quantity="other">%1$d cards outside the deck\'s colors were removed</item>
+    </plurals>
     <!-- Step 4 — Review -->
     <string name="deck_wizard_review_title">Review &amp; generate</string>
     <string name="deck_wizard_review_commander_section">Commander</string>
     <string name="deck_wizard_review_format">Format</string>
-    <string name="deck_wizard_review_direction">Direction</string>
-    <string name="deck_wizard_review_direction_none">Not set</string>
     <string name="deck_wizard_review_colors">Colors</string>
-    <string name="deck_wizard_review_seeds">Seed cards</string>
-    <string name="deck_wizard_fill_lands_title">Fill basic lands automatically</string>
-    <string name="deck_wizard_fill_lands_subtitle">Color-weighted from the final mana curve</string>
-    <string name="deck_wizard_use_community_data_title">Also use community trends</string>
-    <string name="deck_wizard_use_community_data_subtitle">Prioritize your owned cards that are popular in similar decks</string>
-    <string name="deck_wizard_expectation_copy">This is a deeper build — we compare community-known decks against your collection, so it can take a little longer than the old builder.</string>
+    <!-- Deck Wizard Commander v3 plan (Phase 6, 6.2) -->
+    <string name="deck_wizard_review_strategy_section">Strategy</string>
+    <string name="deck_wizard_review_manual_adds_count">Manual adds (%1$d)</string>
+    <!-- Deck Wizard 60-card wave (v6, plan §5 Phase 5.4, S12) -->
+    <string name="deck_wizard_review_your_cards">Your cards (%1$d)</string>
+    <string name="deck_wizard_review_owned_copies_note">The wizard adds at most the copies you own of each card.</string>
+    <string name="deck_wizard_commander_expectation_copy">Built only from your collection — any gaps are reported, never filled with weak cards.</string>
+    <!-- Deck Wizard Commander v4 plan (W5.2, G10/R8) -->
+    <string name="deck_wizard_include_nonbasic_lands_title">Include non-basic lands</string>
+    <string name="deck_wizard_include_nonbasic_lands_subtitle">On: draws your owned dual/utility lands, balanced against basics. Off: basics only.</string>
     <string name="deck_wizard_generate_cta">Generate deck</string>
     <!-- Generating -->
     <string name="deck_wizard_stage_validating">Checking your setup…</string>
@@ -1220,6 +1444,15 @@
     <string name="deck_wizard_build_error_title">Something went wrong</string>
     <string name="deck_wizard_build_error">We couldn\'t build the deck. Please try again.</string>
     <string name="deck_wizard_retry">Try again</string>
+    <!-- Deck Wizard v4 (R15) structural guard: shown when the launched deck gained cards while the
+         wizard was open and the launch was never confirmed. The write is refused, deck untouched. -->
+    <string name="deck_wizard_replace_not_confirmed">This deck already has cards, so nothing was changed. Go back and confirm to replace it.</string>
+    <!-- Deck Wizard Commander v3 plan (Phase 6, 6.3) -->
+    <string name="deck_wizard_commander_stage_resolving_plan">Resolving your plan…</string>
+    <string name="deck_wizard_commander_stage_placing_manual_adds">Placing your manual adds…</string>
+    <string name="deck_wizard_commander_stage_placing_cards">Placing cards from your collection…</string>
+    <string name="deck_wizard_commander_stage_verifying">Verifying and refining…</string>
+    <string name="deck_wizard_commander_stage_writing_deck">Writing your deck…</string>
     <!-- Deck Doctor staged progress (Deck Wizard & Engine Rework plan, Workstream 8.4): mirrors
          the wizard's own "Generating" stage copy above; same visual language, separate strings
          since this is the Suggestions tab's full-analysis pass, not a deck build. -->
@@ -1229,17 +1462,46 @@
     <string name="deck_wizard_gaps_title">Couldn\'t fill from your collection</string>
     <string name="deck_wizard_gap_row_with_colors">Missing %1$d %2$s in %3$s</string>
     <string name="deck_wizard_gap_row_no_colors">Missing %1$d %2$s</string>
-    <string name="deck_wizard_result_report_title">Category fill</string>
     <string name="deck_wizard_report_chip">%1$s %2$d/%3$d</string>
-    <string name="deck_wizard_result_from_collection">From your collection</string>
-    <string name="deck_wizard_result_community_picks">Community picks to look for</string>
     <string name="deck_wizard_suggested_copies">Suggested: %1$d copies</string>
     <string name="deck_wizard_source_community">Built from community data</string>
     <string name="deck_wizard_source_synthetic">Built from your deck archetype</string>
     <string name="deck_wizard_open_studio">Open in Deck Studio</string>
+    <!-- deck_wizard_commander_result_fill_summary / deck_wizard_commander_result_gap_row (Deck Wizard
+         Commander v3 plan, Phase 6) were REMOVED (W7 Task D, plan 7.5) alongside CommanderResultContent. -->
     <string name="deck_wizard_suggestion_added">%1$s added</string>
-    <string name="deck_wizard_name_suffix_deck">%1$s Deck</string>
-    <string name="deck_wizard_name_default">New %1$s Deck</string>
+    <!-- Deck Wizard v4, W7 Task B (R10): the Choice screen -->
+    <string name="deck_wizard_choice_title">A few close calls</string>
+    <string name="deck_wizard_choice_subtitle">Several cards were an equally good fit — pick your favorites, or let the wizard decide.</string>
+    <!-- W7 fix 6 (design review P2): deck_wizard_choice_section_progress merges the old
+         two-line "Choose N" + "x/N selected" pair into one. -->
+    <string name="deck_wizard_choice_section_progress">%1$d of %2$d chosen</string>
+    <string name="deck_wizard_choice_wizards_pick">Wizard\'s pick</string>
+    <string name="deck_wizard_choice_decided_by_you">Decided by you</string>
+    <string name="deck_wizard_choice_still_on_wizards_picks">Still on the wizard\'s picks</string>
+    <string name="deck_wizard_choice_show_more">Show %1$d more</string>
+    <string name="deck_wizard_choice_autofill_section">Choose the rest for me</string>
+    <string name="deck_wizard_choice_finish">Let the wizard finish</string>
+    <string name="deck_wizard_choice_error_title">Nothing to choose from</string>
+    <string name="deck_wizard_choice_error_message">The draft build is missing — go back and generate again.</string>
+    <string name="deck_wizard_choice_cap_reached">You can choose up to %1$d — deselect one first</string>
+    <string name="deck_wizard_choice_view_details">View details for %1$s</string>
+    <string name="deck_wizard_choice_sections_progress">%1$d of %2$d sections decided</string>
+    <!-- Deck Wizard Commander v5 (D4): the fallback-fill flag on the Choice screen. -->
+    <string name="deck_wizard_choice_fallback_title">Not enough on-plan cards in your collection</string>
+    <string name="deck_wizard_choice_fallback_standalone_subtitle">These %1$d cards fill the gap — each is individually strong, just not part of your deck\'s plan.</string>
+    <string name="deck_wizard_choice_fallback_offplan_subtitle">These %1$d cards fill the gap as a last resort — your collection had nothing better left.</string>
+
+    <!-- Deck Wizard 60-card wave v6 P4: CardDetailSheet seed-selection mode (plan 4.2). -->
+    <string name="deck_wizard_add_to_deck">Add to deck</string>
+    <string name="deck_wizard_seed_in_deck">In deck: %1$d</string>
+    <string name="deck_wizard_seed_owned">You own %1$d</string>
+    <string name="deck_wizard_seed_not_owned">Not in your collection</string>
+
+    <!-- CardQueueSheet (Deck Wizard 60-card wave v6 P4, plan 4.3) — generic, extracted from the
+         scanner's own DeckScannerQueueSheet. -->
+    <string name="card_queue_search_placeholder">Filter cards</string>
+    <string name="card_queue_clear_all">Remove all</string>
 
     <!-- Score reasons -->
     <string name="deck_reason_synergy">Synergy</string>
@@ -1340,6 +1602,14 @@
     <string name="game_mode_standard">STANDARD</string>
     <string name="game_mode_commander">COMMANDER</string>
     <string name="game_fallen_label">FALLEN</string>
+    <string name="game_turn_order_move_up">Move earlier in turn order</string>
+    <string name="game_turn_order_move_down">Move later in turn order</string>
+    <string name="game_counter_icon_picker">Choose counter icon</string>
+    <string name="game_end_turn_short">END</string>
+    <string name="game_commander_damage_dealt">Damage Dealt</string>
+    <string name="game_commander_damage_received">Damage Received</string>
+    <string name="game_online_session_abandoned">The host closed this game.</string>
+    <string name="game_action_leave">Leave</string>
     <string name="game_fallen_life">Ran out of life</string>
     <string name="game_fallen_poison">Poison</string>
     <string name="game_fallen_commander">Commander damage</string>
@@ -1475,6 +1745,25 @@
 
     <!-- Profile Editing -->
     <string name="profile_edit_title">Edit Profile</string>
+    <string name="profile_edit_save_failed">Couldn\'t save your profile. Check your connection and try again.</string>
+    <string name="profile_edit_discard_title">Discard changes?</string>
+    <string name="profile_edit_discard_text">Your unsaved profile changes will be lost.</string>
+    <string name="profile_edit_remove_avatar_title">Remove photo?</string>
+    <string name="profile_edit_remove_avatar_text">Your profile will show your initial instead of the artwork.</string>
+    <string name="profile_edit_remove_avatar_failed">Couldn\'t remove your photo. Check your connection and try again.</string>
+    <string name="profile_rate_app">Rate the app</string>
+    <string name="profile_rate_app_unavailable">Couldn\'t open the Play Store.</string>
+    <string name="profile_update_available">New app update available</string>
+    <string name="profile_update_downloading">Downloading update…</string>
+    <string name="profile_update_ready">Update ready — tap to restart</string>
+    <string name="profile_stats_error">Couldn\'t load your collection stats.</string>
+    <string name="profile_open_stats_a11y">Open stats</string>
+    <plurals name="profile_pending_friend_requests">
+        <item quantity="one">%1$d pending friend request</item>
+        <item quantity="other">%1$d pending friend requests</item>
+    </plurals>
+    <string name="feedback_discard_title">Discard feedback?</string>
+    <string name="feedback_discard_text">Your message and attachment will be lost.</string>
     <string name="profile_edit_avatar_label">Profile Avatar</string>
     <string name="profile_edit_avatar_filter_label">Filter planeswalkers by color</string>
     <string name="profile_edit_avatar_remove">Remove photo</string>
@@ -1764,6 +2053,10 @@
     <string name="playtest_battle_field_empty_permanents">Play permanents here</string>
     <string name="playtest_battle_graveyard_label">Graveyard</string>
     <string name="playtest_battle_hand_label">Hand</string>
+    <string name="playtest_battle_action_play">Play</string>
+    <string name="playtest_battle_action_play_land">Play as Land</string>
+    <string name="playtest_battle_exile_label">Exile</string>
+    <string name="playtest_battle_action_return_to_hand">Return to Hand</string>
 
     <!-- ══════════════════════════════════════════
          TOURNAMENT SCREEN
@@ -1809,6 +2102,23 @@
     <string name="tournament_empty_action">Create your first tournament</string>
     <string name="tournament_default_name">Tournament</string>
     <string name="tournament_pause_cd">Pause tournament</string>
+    <string name="tournament_resume_cd">Resume tournament</string>
+    <string name="tournament_action_failed">That action could not be completed. Try again.</string>
+    <string name="tournament_result_already_recorded">This match already has a result.</string>
+    <string name="tournament_load_failed">This tournament could not be loaded.</string>
+    <string name="tournament_loading">Loading tournament…</string>
+    <string name="tournament_list_loading">Loading tournaments…</string>
+    <string name="tournament_no_matches_title">No matches yet</string>
+    <string name="tournament_no_matches_subtitle">Matches appear here once the first round is generated.</string>
+    <string name="tournament_confirm_winner">Confirm %1$s won</string>
+    <string name="tournament_name_required">Enter a tournament name.</string>
+    <string name="tournament_create_failed">The tournament could not be created. Try again.</string>
+    <string name="tournament_paused_toast">Tournament is paused. Resume it to continue.</string>
+    <string name="tournament_delete_cd">Delete %1$s</string>
+    <string name="tournament_delete_title">Delete tournament?</string>
+    <string name="tournament_delete_body">%1$s and all its players and matches will be removed. This cannot be undone.</string>
+    <string name="tournament_delete_confirm">Delete</string>
+    <string name="tournament_shared_first_label">🏆 Tied for first</string>
     <string name="tournament_record_result_manual">Record result manually</string>
     <string name="tournament_who_won">Who won?</string>
     <string name="tournament_match_win">WIN</string>
@@ -2053,6 +2363,9 @@
     <string name="settings_privacy_trade_list">Public trade list</string>
     <string name="settings_privacy_trade_list_subtitle">Let friends see your trade offers</string>
     <string name="settings_privacy_error">Could not update privacy settings. Please try again.</string>
+    <string name="settings_notification_prefs_error">Could not save notification preferences. Please try again.</string>
+    <string name="settings_sign_in_required">Sign in to change this setting.</string>
+    <string name="settings_system_settings_unavailable">Notification settings are not available on this device.</string>
     <string name="settings_privacy_voice_title">Voice commands</string>
     <string name="settings_privacy_voice_subtitle">Microphone audio is processed on-device only. No audio is recorded or transmitted.</string>
 
@@ -2114,6 +2427,7 @@
     <string name="advsearch_clear">Clear all</string>
     <string name="advsearch_search_button">Search cards</string>
     <string name="advsearch_query_preview">Built query</string>
+    <string name="advsearch_section_locked">Locked filters</string>
     <string name="advsearch_section_name">Card name</string>
     <string name="advsearch_name_hint">e.g. Lightning Bolt</string>
     <string name="advsearch_name_exact">Exact name only</string>
@@ -2254,6 +2568,11 @@
     <string name="advsearch_colormatch_picker_title">Color match</string>
     <string name="advsearch_section_tags">Tags</string>
     <string name="advsearch_tags_hint">Any card or user tag</string>
+    <string name="advsearch_collection_tags_title">Collection tags</string>
+    <string name="advsearch_global_tags_title">Card mechanics</string>
+    <string name="advsearch_tags_search_hint">Search tags by name or key</string>
+    <string name="advsearch_tags_empty">No tags available</string>
+    <string name="advsearch_tags_no_matches">No matching tags</string>
     <string name="advsearch_section_function">Card function</string>
     <string name="advsearch_function_hint">e.g. Ramp, Board Wipe, Recursion…</string>
     <string name="advsearch_function_selected_count">%1$d functions selected</string>
@@ -2346,7 +2665,6 @@
     <string name="draft_tab_guide">Guide</string>
     <string name="draft_tab_tier_list">Tier List</string>
     <string name="draft_tab_cards">Cards</string>
-    <string name="draft_tab_videos">Videos</string>
     <string name="draft_guide_overview">Overview</string>
     <string name="draft_guide_mechanics">Mechanics</string>
     <string name="draft_guide_archetypes">Archetypes</string>
@@ -2366,8 +2684,6 @@
     <string name="draft_sort_collector">Collector #</string>
     <string name="draft_win_rate_approx">≈%1$.1f%% WR</string>
     <string name="draft_win_rate_disclaimer">Based on AI analysis, approximate values</string>
-    <string name="draft_videos_empty">No videos found for this set</string>
-    <string name="draft_videos_error">Could not load videos</string>
     <string name="draft_key_cards">Key Cards</string>
     <string name="draft_key_cards_label">Key Cards:</string>
     <string name="draft_sort_by_label">Sort by:</string>
@@ -2379,9 +2695,7 @@
     <string name="draft_retry">Retry</string>
     <string name="draft_stale_data">Showing cached data. Pull to refresh.</string>
     <string name="draft_cards_all">All Cards</string>
-    <string name="draft_guide_videos">Videos</string>
     <string name="draft_card_artist">Artist: %1$s</string>
-    <string name="draft_color_ranking_label">Color Ranking:</string>
     <string name="draft_key_notes_label">Key Notes:</string>
     <string name="draft_mechanic_overperformers">Overperformers</string>
     <string name="draft_mechanic_underperformers">Underperformers</string>
@@ -2390,7 +2704,17 @@
     <string name="draft_pick_order_rank">Pick #%1$d</string>
     <string name="draft_cards_to_avoid_label">Cards to Avoid</string>
     <string name="draft_archetype_win_rate">%1$.1f%% Win Rate</string>
-    <string name="draft_key_commons_by_color">Key Commons by Color</string>
+    <string name="draft_key_commons_label">Commons</string>
+    <string name="draft_key_uncommons_label">Uncommons</string>
+    <string name="draft_guide_color_ranking">Color Ranking</string>
+    <string name="draft_guide_state_expanded">Expanded</string>
+    <string name="draft_guide_state_collapsed">Collapsed</string>
+    <string name="draft_guide_loading">Loading guide</string>
+    <string name="draft_search_clear">Clear search</string>
+    <plurals name="draft_guide_section_count">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
 
     <!-- Draft Simulator -->
     <string name="draft_sim_setup_title">Draft Simulator</string>
@@ -2727,6 +3051,25 @@
     <string name="friends_invite_success">Now you are friends with %1$s</string>
     <string name="friends_invite_success_generic">New friendship accepted!</string>
     <string name="friends_invite_error">Could not accept the invitation</string>
+    <string name="friends_invite_session_expired">Sign in again to accept the invitation</string>
+    <string name="friends_error_already_linked">You are already friends with this player, or a request is pending.</string>
+    <string name="friends_error_self_request">That is your own game tag.</string>
+    <string name="friends_error_not_permitted">Complete your profile to send friend requests.</string>
+    <string name="friends_error_request_gone">That request no longer exists.</string>
+    <string name="friends_search_invalid">Game tags are 6 letters or numbers.</string>
+    <string name="friends_search_failed">Could not search right now. Check your connection.</string>
+    <string name="friends_refresh_failed">Could not refresh your friends. Showing saved data.</string>
+    <string name="friends_result_self">This is you</string>
+    <string name="friends_result_already_friends">Already friends</string>
+    <string name="friends_result_request_pending">Request pending</string>
+    <string name="friends_result_accept_request">Accept request</string>
+    <string name="friends_accept_request_hint">Accept friend request from %1$s</string>
+    <string name="friends_decline_request_hint">Decline friend request from %1$s</string>
+    <string name="friends_open_friend_action">Open friend</string>
+    <string name="friends_detail_more_options">More options</string>
+    <string name="friends_detail_not_found_title">Not in your friends list</string>
+    <string name="friends_detail_not_found_body">This player is no longer in your friends list.</string>
+    <string name="friend_stats_no_data_title">No stats yet</string>
     <!-- Friend detail screen -->
     <string name="friend_detail_tab_folder">Folder</string>
     <string name="friend_detail_tab_stats">Stats</string>
@@ -2739,25 +3082,56 @@
     <string name="friend_folder_empty_wishlist">%1$s\'s wishlist is empty or not public</string>
     <string name="friend_folder_empty_trade">%1$s\'s trade list is empty or not public</string>
     <string name="friend_folder_error">Could not load cards. Check your connection.</string>
+    <string name="friend_folder_error_generic">Something went wrong while loading these cards.</string>
+    <string name="friend_folder_access_denied_title">This list is private</string>
+    <string name="friend_folder_access_denied_body">%1$s has not shared this list with you.</string>
+    <string name="friend_folder_no_results_title">No matching cards</string>
+    <string name="friend_folder_session_expired_title">Session expired</string>
+    <string name="friend_folder_session_expired_body">Sign in again to browse your friend\'s cards.</string>
+    <string name="friend_folder_profile_incomplete_title">Finish your profile first</string>
+    <string name="friend_folder_profile_incomplete_body">Complete your profile to browse your friends\' cards.</string>
+    <plurals name="friend_folder_unindexed_empty">
+        <item quantity="one">%1$d card in this list is still being indexed. Try again in a few minutes.</item>
+        <item quantity="other">%1$d cards in this list are still being indexed. Try again in a few minutes.</item>
+    </plurals>
+    <plurals name="friend_folder_unindexed_note">
+        <item quantity="one">%1$d card is still being indexed and may be missing from these results.</item>
+        <item quantity="other">%1$d cards are still being indexed and may be missing from these results.</item>
+    </plurals>
+    <string name="friend_folder_no_results_body">Nothing in this list matches your search.</string>
+    <string name="friend_folder_clear_search">Clear search</string>
+    <string name="friend_folder_min_length_hint">Type at least %1$d characters to search by name</string>
+    <string name="friend_folder_unknown_card">Unknown card</string>
+    <string name="friend_folder_load_more_error">Could not load more cards.</string>
+    <string name="friend_folder_searching">Searching</string>
+    <string name="friend_folder_clear_text">Clear search text</string>
+    <string name="friend_folder_remove_criterion">Remove filter %1$s</string>
+    <string name="friend_folder_advanced_search_active">Advanced search, %1$d filters active</string>
+    <string name="advsearch_chip_name_exact">Exact name</string>
+    <string name="advsearch_chip_oracle">Text: “%1$s”</string>
+    <string name="advsearch_chip_type">Type: %1$s</string>
+    <string name="advsearch_chip_type_exclude">Not: %1$s</string>
+    <string name="advsearch_chip_colors">Colors %1$s %2$s</string>
+    <string name="advsearch_chip_identity">Identity %1$s %2$s</string>
+    <string name="advsearch_chip_color_mode_any">any of</string>
+    <string name="advsearch_chip_mana_value">MV %1$s %2$d</string>
+    <string name="advsearch_chip_power">Power %1$s %2$d</string>
+    <string name="advsearch_chip_toughness">Toughness %1$s %2$d</string>
+    <string name="advsearch_chip_rarity">Rarity: %1$s</string>
+    <string name="advsearch_chip_set">Set: %1$s</string>
+    <string name="advsearch_chip_format_legal">Legal in: %1$s</string>
+    <string name="advsearch_chip_format_not_legal">Not legal in: %1$s</string>
+    <string name="advsearch_chip_language">Language: %1$s</string>
     <string name="friend_history_tab_trades">Trades</string>
     <string name="friend_history_tab_games">Games</string>
     <string name="friend_history_trades_empty">No trades yet with %1$s</string>
-    <string name="friend_history_games_coming_soon">Coming soon — multiplayer games will be tracked when online sessions launch.</string>
-    <string name="friend_history_games_empty">No online games played with %1$s yet.</string>
-    <string name="friend_history_games_error">Could not load match history. Check your connection.</string>
-    <string name="friend_history_games_title">%1$d games played</string>
-    <string name="friend_history_games_wins">Wins</string>
-    <string name="friend_history_games_losses">Losses</string>
-    <string name="friend_history_games_winrate">Win rate</string>
-    <string name="friend_history_games_last_played">Last played %1$s</string>
     <string name="friend_history_trade_row_cards_offered_received">%1$d cards offered / %2$d cards received</string>
     <string name="friend_history_trade_row_updated">Updated %1$s</string>
-    <string name="friend_stats_error">Could not load stats. Tap to retry.</string>
+    <string name="friend_stats_error">Could not load stats.</string>
+    <string name="friend_stats_collection_value">Collection value</string>
     <string name="friend_stats_no_data">%1$s hasn\'t shared their stats yet.</string>
     <string name="friend_stats_total_cards">Total cards</string>
     <string name="friend_stats_unique_cards">Unique cards</string>
-    <string name="friend_stats_value_eur">Value (EUR)</string>
-    <string name="friend_stats_value_usd">Value (USD)</string>
     <string name="friend_stats_favourite_color">Favourite color</string>
     <string name="friend_stats_most_valuable_color">Most valuable color</string>
     <string name="friend_stats_section_colour_affinity">Colour Affinity</string>
@@ -2800,6 +3174,14 @@
     <string name="trades_shared_list_not_found">Link not found</string>
     <string name="trades_shared_list_title">Shared list</string>
     <string name="trades_shared_list_by">Shared list from @%s</string>
+    <string name="trades_shared_list_type_wishlist">Wishlist</string>
+    <string name="trades_shared_list_type_open_for_trade">Open for trade</string>
+    <string name="trades_shared_list_empty">This list is empty</string>
+    <string name="trades_shared_list_error">Couldn\'t load this list</string>
+    <string name="trades_shared_list_any_variant">Any version</string>
+    <string name="trades_unknown_card">Unknown card</string>
+    <string name="trades_friend_collection_load_error">Couldn\'t load more of their collection</string>
+    <string name="trades_scryfall_search_error">Search failed. Check your connection and try again.</string>
     <string name="trades_migration_synced_n_cards">Synced %d cards from this device to your account.</string>
     <string name="trades_select_card_id_hint">Enter card Scryfall ID</string>
     <string name="trades_foil">Foil</string>
@@ -2812,7 +3194,13 @@
     <string name="trades_add_card">Add card</string>
     <string name="trades_review_collection_chip">Review my collection</string>
     <string name="trades_review_collection_warning">Proposals with \'Review my collection\' cannot be accepted directly — only declined or countered.</string>
-    <string name="trades_save_draft">Save draft</string>
+    <string name="trades_collection_apply_deferred">Your collection will update when the trade is completed.</string>
+    <string name="trades_undo_collection_changes">Undo collection changes</string>
+    <string name="trades_items_load_failed">The cards in this proposal could not be loaded.</string>
+    <string name="trades_friend_switch_title">Change trade partner?</string>
+    <string name="trades_friend_switch_body">Cards from the current friend\'s lists will be removed from this proposal.</string>
+    <string name="trades_friend_switch_confirm">Change friend</string>
+    <string name="trades_friend_switch_confirm_none">Remove friend</string>
     <string name="trades_send_proposal">Send proposal</string>
     <string name="trades_discard">Discard</string>
     <string name="trades_quantity">Qty</string>
@@ -2939,6 +3327,8 @@
     <string name="trades_proposal_version">Proposal v%d</string>
     <string name="trades_review_collection_placeholder">Review my collection</string>
     <string name="trades_no_proposals_yet">No proposals in this thread yet.</string>
+    <string name="trades_thread_load_error">Couldn\'t load this trade</string>
+    <string name="trades_history_load_error">Couldn\'t load your trades</string>
     <string name="trades_action_accept">Accept</string>
     <string name="trades_action_decline">Decline</string>
     <string name="trades_action_cancel">Cancel</string>
@@ -2992,6 +3382,14 @@
     <string name="trades_history_your_turn">Your turn</string>
     <string name="trades_history_refreshing">Updating…</string>
     <string name="trades_history_pull_to_refresh">Pull to refresh</string>
+    <string name="trades_quantity_multiplier">×%1$d</string>
+    <string name="trades_list_bullet">•</string>
+    <plurals name="trades_items_more">
+        <item quantity="one">…and %1$d more</item>
+        <item quantity="other">…and %1$d more</item>
+    </plurals>
+    <string name="trades_section_state_expanded">Expanded</string>
+    <string name="trades_section_state_collapsed">Collapsed</string>
 
     <!-- ══════════════════════════════════════════
          SCANNER — language names + wishlist button
@@ -3056,6 +3454,11 @@
     <string name="lobby_error_active_room">You already have an active room. Close it before creating another.</string>
     <string name="lobby_error_full">The room is full.</string>
     <string name="lobby_error_not_found">Room not found or already started.</string>
+    <string name="lobby_error_connection">No connection. Check your network and try again.</string>
+    <string name="lobby_error_timeout">The server took too long to respond. Try again.</string>
+    <string name="lobby_error_server">The server is unavailable right now. Try again in a moment.</string>
+    <string name="lobby_error_sign_in">Your session expired. Sign in again to continue.</string>
+    <string name="lobby_error_display_name">Enter a name between 1 and 32 characters.</string>
     <string name="lobby_header_subtitle">Multiplayer session</string>
     <string name="lobby_existing_session_title">You already have an active room</string>
     <string name="lobby_existing_session_subtitle">Code: %1$s · %2$s · %3$d players</string>
@@ -3064,6 +3467,10 @@
     <string name="lobby_existing_session_abandon">Abandon &amp; create new</string>
     <string name="lobby_session_finished_msg">The game has ended.</string>
     <string name="lobby_session_abandoned_msg">The host closed the room.</string>
+    <string name="tournament_game_in_progress_title">A game is in progress</string>
+    <string name="tournament_game_in_progress_body">Another game is still running. Abandon it and start this match?</string>
+    <string name="tournament_game_in_progress_confirm">Abandon and start</string>
+    <string name="tournament_game_in_progress_cancel">Keep playing</string>
     <string name="lobby_action_close_room">Close room</string>
     <string name="lobby_action_leave_room">Leave room</string>
 
@@ -3210,7 +3617,10 @@
 
     <!-- Home widget board overhaul, TASK 5b — Community Decks widget -->
     <string name="home_community_decks_empty">No community decks available right now.</string>
-    <string name="home_community_decks_category_a11y">Choose category</string>
+    <string name="home_community_decks_category_a11y">Choose format and category</string>
+    <string name="home_community_decks_selection">%1$s</string>
+    <string name="home_community_decks_format_section">Format</string>
+    <string name="home_community_decks_category_section">Category</string>
     <string name="home_community_decks_category_sheet_title">Browse by</string>
     <string name="home_community_decks_category_popular">Popular</string>
     <string name="home_community_decks_category_popular_desc">Trending decks the community is brewing.</string>
@@ -3268,6 +3678,7 @@
     <string name="home_gallery_category_social">Social</string>
     <string name="home_gallery_category_tournament">Tournament</string>
     <string name="home_gallery_category_community">Community</string>
+    <string name="home_widget_desc_greeting_header">Displays personalized greeting title and profile picture button.</string>
     <string name="home_widget_desc_context_hero">Your most relevant next action</string>
     <string name="home_widget_desc_quick_actions">One-tap shortcuts</string>
     <string name="home_widget_desc_game_stats_hub">Win rate, best deck and nemesis</string>
@@ -3292,8 +3703,10 @@
     <string name="quick_start_scan_card">Scan Card</string>
     <string name="quick_start_deck_builder">Deck Builder</string>
     <string name="quick_start_draft_guides">Draft Guides</string>
+    <string name="quick_start_import_collection">Import collection</string>
     <string name="quick_start_search_card">Search Card</string>
     <string name="quick_start_my_decks">My Decks</string>
+    <string name="quick_start_new_deck">New Deck</string>
     <string name="quick_start_news">News</string>
     <string name="quick_start_my_stats">My Stats</string>
     <string name="quick_start_friends">Friends</string>
@@ -3311,13 +3724,14 @@
     <string name="quick_start_sheet_draft_guide">Draft guide</string>
     <string name="quick_start_sheet_search_card">Search card</string>
     <string name="quick_start_sheet_decks">My decks</string>
+    <string name="quick_start_sheet_new_deck">New deck</string>
     <string name="quick_start_sheet_news">News</string>
     <string name="quick_start_sheet_stats">Stats</string>
     <string name="quick_start_sheet_friends">Friends</string>
     <string name="quick_start_sheet_trades">Trades</string>
     <string name="quick_start_sheet_community">Community Decks</string>
     <string name="quick_start_sheet_settings">Settings</string>
-    <string name="quick_start_sheet_multi_add">Add multiple cards</string>
+    <string name="quick_start_sheet_multi_add">Add cards</string>
 
     <!-- Home feature overhaul — account nudge card -->
     <string name="home_nudge_title">Protect &amp; connect</string>
@@ -3331,6 +3745,7 @@
 
     <!-- Rules tips (rotated by day) -->
     <string name="home_rules_tip_label">Did you know?</string>
+    <string name="home_rules_tip_roll_a11y">Roll another tip</string>
 
     <!-- Rules tip categories (Home feature overhaul Phase 2.4) -->
     <string name="tip_category_fundamentals">Fundamentals</string>
@@ -3344,6 +3759,7 @@
     <string name="tip_category_modern_mechanics">Modern Mechanics</string>
 
     <!-- Widget titles -->
+    <string name="widget_title_greeting_header">Greeting</string>
     <string name="widget_title_context_hero">Today</string>
     <string name="widget_title_quick_actions">Quick actions</string>
     <string name="widget_title_continue">Continue</string>
@@ -3412,7 +3828,6 @@
          FIRST STEPS CAROUSEL (Home hero widget)
     ═══════════════════════════════════════════ -->
     <string name="first_steps_section_label">Get Started</string>
-    <string name="first_steps_cta_label">Let\'s go</string>
     <string name="first_step_skip">Skip</string>
     <string name="first_steps_all_done_title">You\'re all set!</string>
     <string name="first_steps_all_done_subtitle">Explore more from the dashboard.</string>
@@ -3711,6 +4126,7 @@
     <string name="community_deck_import_success">Deck imported successfully</string>
     <string name="community_deck_import_partial">Deck imported (%1$d of %2$d cards resolved)</string>
     <string name="community_deck_import_failed">Failed to import deck</string>
+    <string name="community_deck_select_cards_cd">Select cards from this deck</string>
     <string name="community_deck_owned_count">%1$d in your collection</string>
     <string name="community_deck_missing_count">%1$d missing</string>
     <string name="community_deck_error_not_found">Deck not found on Archidekt</string>
@@ -3857,4 +4273,83 @@
     <string name="home_daily_puzzle_unavailable">Today\'s puzzle isn\'t available right now</string>
     <string name="home_daily_puzzle_cta">Play</string>
 
+    <!-- Collection import / export -->
+    <string name="collection_transfer_sheet_title">Collection file tools</string>
+    <string name="collection_export_option">Export collection</string>
+    <string name="collection_export_option_desc">Save or share the cards currently shown</string>
+    <string name="collection_export_option_disabled">Nothing is shown to export</string>
+    <string name="collection_import_option">Import to collection</string>
+    <string name="collection_import_option_desc">Paste a list or pick a Moxfield, ManaBox or text file</string>
+    <string name="collection_import_title">Import to collection</string>
+    <string name="collection_import_hint">Paste a Moxfield or MTG Arena list such as 4 Lightning Bolt (2X2) 117 *F*, or import a Moxfield or ManaBox CSV. Section headers are ignored and every card goes into one review list.</string>
+    <string name="collection_import_placeholder">4 Lightning Bolt (2X2) 117 *F*\n1x Sol Ring\n2 Counterspell</string>
+    <string name="collection_import_from_file">Import from file</string>
+    <string name="collection_import_progress">Resolving cards: %1$d / %2$d lines</string>
+    <string name="collection_import_error_nothing_recognized">No card lines were recognized.</string>
+    <string name="collection_import_error_nothing_resolved">None of these cards could be found.</string>
+    <string name="collection_import_error_rate_limited">Scryfall is busy. Try again in %1$d s.</string>
+    <string name="collection_import_error_lookup_failed">Couldn\'t reach Scryfall. Check your connection and try again.</string>
+    <string name="collection_import_error_file_too_large">This file is too large (5 MB maximum).</string>
+    <string name="collection_import_error_file_unreadable">Couldn\'t read this file.</string>
+    <string name="collection_import_error_too_many_lines">This list is too long. Import up to %1$d cards at a time.</string>
+    <string name="collection_import_resume_title">Import waiting for review</string>
+    <plurals name="collection_import_resume_text">
+        <item quantity="one">%d card from a previous import is still waiting for review.</item>
+        <item quantity="other">%d cards from a previous import are still waiting for review.</item>
+    </plurals>
+    <string name="collection_import_resume_review">Review queue</string>
+    <string name="collection_import_resume_import_more">Import more</string>
+    <plurals name="collection_import_show_unresolved">
+        <item quantity="one">Show %d line not found</item>
+        <item quantity="other">Show %d lines not found</item>
+    </plurals>
+    <plurals name="collection_import_resolved">
+        <item quantity="one">%d card ready to review</item>
+        <item quantity="other">%d cards ready to review</item>
+    </plurals>
+    <!-- Two-number plurals below select on the SECOND number, so the first stays plural in both. -->
+    <plurals name="collection_import_resolved_with_unresolved">
+        <item quantity="one">%1$d cards ready to review, %2$d line not found</item>
+        <item quantity="other">%1$d cards ready to review, %2$d lines not found</item>
+    </plurals>
+    <plurals name="collection_import_resolved_with_capped">
+        <item quantity="one">%1$d cards ready to review; %2$d copy over the %3$d limit was dropped</item>
+        <item quantity="other">%1$d cards ready to review; %2$d copies over the %3$d limit were dropped</item>
+    </plurals>
+    <string name="collection_import_unresolved_title">Lines not found</string>
+    <plurals name="collection_import_unresolved_text">
+        <item quantity="one">%d line could not be matched to a card:</item>
+        <item quantity="other">%d lines could not be matched to a card:</item>
+    </plurals>
+    <plurals name="collection_import_unresolved_text_capped">
+        <item quantity="one">Showing %1$d of %2$d line that could not be matched to a card:</item>
+        <item quantity="other">Showing %1$d of %2$d lines that could not be matched to a card:</item>
+    </plurals>
+    <string name="collection_import_unresolved_copy">Copy lines</string>
+    <string name="collection_import_unresolved_copied">Lines copied</string>
+    <string name="collection_export_title">Export collection</string>
+    <string name="collection_export_format_label">Format</string>
+    <string name="collection_export_format_text">Text (.txt)</string>
+    <string name="collection_export_format_text_desc">Moxfield / MTG Arena list — condition and language are not included</string>
+    <string name="collection_export_format_moxfield">Moxfield CSV (.csv)</string>
+    <string name="collection_export_format_moxfield_desc">Moxfield collection import</string>
+    <string name="collection_export_format_manabox">ManaBox CSV (.csv)</string>
+    <string name="collection_export_format_manabox_desc">Includes Scryfall IDs</string>
+    <string name="collection_export_save">Save</string>
+    <string name="collection_export_share">Share</string>
+    <string name="collection_export_share_chooser">Share collection export</string>
+    <plurals name="collection_export_saved">
+        <item quantity="one">Exported %d row</item>
+        <item quantity="other">Exported %d rows</item>
+    </plurals>
+    <plurals name="collection_export_saved_with_skipped">
+        <item quantity="one">Exported %1$d rows; %2$d row skipped (card data not available yet)</item>
+        <item quantity="other">Exported %1$d rows; %2$d rows skipped (card data not available yet)</item>
+    </plurals>
+    <plurals name="collection_export_saved_with_loose_printings">
+        <item quantity="one">Exported %1$d rows; %2$d row has no printing details and will re-import as any version</item>
+        <item quantity="other">Exported %1$d rows; %2$d rows have no printing details and will re-import as any version</item>
+    </plurals>
+    <string name="collection_export_nothing">Nothing to export</string>
+    <string name="collection_export_failed">Export failed. Try again.</string>
 </resources>

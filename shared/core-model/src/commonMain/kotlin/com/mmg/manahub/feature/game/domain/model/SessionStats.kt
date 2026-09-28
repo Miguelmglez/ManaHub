@@ -44,6 +44,7 @@ data class SessionHistoryEntry(
     val winnerName: String,
     val surveyStatus: String,
     val localIsWinner: Boolean,
+    val isDraw: Boolean = false,
     val localDeckId: String?,
     val localDeckName: String?,
     /** Number of OTHER seats in the session (total seats - the local seat itself). */

@@ -21,6 +21,10 @@ data class PlayerResultData(
     val eliminationReason: EliminationReason?,
     val totalCommanderDamageDealt: Int,
     val totalCommanderDamageReceived: Int,
+    /** Deck UUID this seat played, when known at game end (the survey fills the local seat later). */
+    val deckId: String? = null,
+    /** Deck archetype for this seat, when known at game end (the survey classifies opponents later). */
+    val archetype: String? = null,
 )
 
 data class GameSessionData(

@@ -17,7 +17,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -48,12 +50,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -61,6 +65,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.InlineErrorState
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.theme.ButtonShape
@@ -91,7 +99,7 @@ fun TournamentSetupScreen(
         HexGridBackground(modifier = Modifier.fillMaxSize(), color = mc.primaryAccent.copy(alpha = 0.05f))
 
         Scaffold(
-            contentWindowInsets = WindowInsets.statusBars,
+            contentWindowInsets = WindowInsets.statusBars.union(WindowInsets.navigationBars),
             topBar = {
                 TopAppBar(
                     title = {
@@ -158,14 +166,8 @@ fun TournamentSetupScreen(
                     SectionLabel(stringResource(R.string.tournament_format_label))
                     Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
                         listOf("COMMANDER", "STANDARD", "DRAFT").forEach { fmt ->
-                            val label = when (fmt) {
-                                "COMMANDER" -> stringResource(R.string.format_commander)
-                                "STANDARD"  -> stringResource(R.string.format_standard)
-                                "DRAFT"     -> stringResource(R.string.format_draft)
-                                else        -> fmt.lowercase().replaceFirstChar { it.uppercase() }
-                            }
                             FormatChip(
-                                label    = label,
+                                label    = tournamentFormatLabel(fmt),
                                 selected = uiState.format == fmt,
                                 onClick  = { viewModel.onFormatChange(fmt) },
                                 modifier = Modifier.weight(1f),
@@ -202,8 +204,8 @@ fun TournamentSetupScreen(
                     }
                 }
 
-                // ── Matches per pairing ────────────────────────────────────────────
-                item {
+                // ── Matches per pairing (round robin only: Swiss/Single Elim always play one match) ──
+                if (uiState.structure == "ROUND_ROBIN") item {
                     SectionLabel(stringResource(R.string.tournament_matches_per_pairing))
                     // The VM clamps matchesPerPairing to [1, 3]; mirror that range in the stepper.
                     val canDecrease = uiState.matchesPerPairing > 1
@@ -313,20 +315,12 @@ fun TournamentSetupScreen(
                         verticalAlignment     = Alignment.Bottom,
                     ) {
                         SectionLabel(stringResource(R.string.tournament_players_label, uiState.players.size))
-                        TextButton(
-                            onClick          = { viewModel.addPlayer() },
-                            modifier         = Modifier.padding(bottom = MaterialTheme.spacing.xs),
-                            contentPadding   = PaddingValues(
-                                horizontal = MaterialTheme.spacing.md,
-                                vertical   = MaterialTheme.spacing.xs,
-                            )
-                        ) {
-                            Text(
-                                stringResource(R.string.tournament_add_player),
-                                color = mc.primaryAccent,
-                                style = MaterialTheme.magicTypography.labelLarge,
-                            )
-                        }
+                        MagicCtaButton(
+                            onClick = { viewModel.addPlayer() },
+                            text = stringResource(R.string.tournament_add_player),
+                            style = MagicCtaStyle.Ghost,
+                            modifier = Modifier.padding(bottom = MaterialTheme.spacing.xs),
+                        )
                     }
                     HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
                 }
@@ -335,7 +329,9 @@ fun TournamentSetupScreen(
                 itemsIndexed(uiState.players, key = { _, p -> p.id }) { index, config ->
                     PlayerConfigRow(
                         config       = config,
-                        usedThemes   = uiState.players.filter { it.id != config.id }.map { it.theme },
+                        usedThemes   = remember(uiState.players, config.id) {
+                            uiState.players.filter { it.id != config.id }.map { it.theme }
+                        },
                         onNameChange = { name -> viewModel.updatePlayerName(index, name) },
                         onColorChange = { theme -> viewModel.updatePlayerTheme(index, theme) },
                         onRemove     = if (uiState.players.size > 2) ({ viewModel.removePlayer(index) }) else null,
@@ -345,44 +341,24 @@ fun TournamentSetupScreen(
                 // ── Create button ──────────────────────────────────────────────────
                 item {
                     Spacer(Modifier.height(MaterialTheme.spacing.lg))
-                    Button(
-                        onClick  = { viewModel.createTournament() },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape    = ButtonShape,
-                        colors   = ButtonDefaults.buttonColors(
-                            containerColor = mc.primaryAccent,
-                            disabledContainerColor = mc.primaryAccent.copy(alpha = 0.5f)
-                        ),
-                        enabled  = !uiState.isCreating && uiState.name.isNotBlank(),
-                    ) {
-                        if (uiState.isCreating) {
-                            MagicLoadingSpinner(
-                                modifier    = Modifier.size(24.dp),
-                            )
-                        } else {
-                            Text(
-                                stringResource(R.string.tournament_create_button),
-                                style = MaterialTheme.magicTypography.labelLarge,
-                            )
-                        }
-                    }
+                    MagicCtaButton(
+                        onClick = { viewModel.createTournament() },
+                        text = stringResource(R.string.tournament_create_button),
+                        enabled = !uiState.isCreating && uiState.name.isNotBlank(),
+                        isLoading = uiState.isCreating,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
 
-                if (uiState.error != null) {
+                uiState.error?.let { error ->
                     item {
-                        Surface(
-                            color = mc.lifeNegative.copy(alpha = 0.1f),
-                            shape = CardShape,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text     = uiState.error!!,
-                                style    = MaterialTheme.magicTypography.bodySmall,
-                                color    = mc.lifeNegative,
-                                modifier = Modifier.padding(MaterialTheme.spacing.md),
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                        InlineErrorState(
+                            message = when (error) {
+                                TournamentSetupError.NAME_REQUIRED -> stringResource(R.string.tournament_name_required)
+                                TournamentSetupError.CREATE_FAILED -> stringResource(R.string.tournament_create_failed)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             }
@@ -501,7 +477,7 @@ private fun PlayerConfigRow(
     onRemove:     (() -> Unit)?,
 ) {
     val mc            = MaterialTheme.magicColors
-    var showPicker by remember { mutableStateOf(false) }
+    var showPicker by rememberSaveable { mutableStateOf(false) }
     val colorTriggerLabel = stringResource(R.string.tournament_color_selected_cd, config.theme.name)
     val removePlayerLabel = stringResource(R.string.tournament_remove_player_cd)
 
@@ -583,15 +559,15 @@ private fun ColorPickerDialog(
     onDismiss:  () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    AlertDialog(
+    MagicAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor   = mc.surface,
-        title            = {
-            Text(stringResource(R.string.gamesetup_choose_color), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
-        },
-        text = {
+        title = stringResource(R.string.gamesetup_choose_color),
+        dismissLabel = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        content = {
             Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
-                PlayerTheme.ALL.chunked(5).forEach { row ->
+                // 4 per row: five 48dp targets overflow a 360dp-wide dialog
+                PlayerTheme.ALL.chunked(4).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md)) {
                         row.forEach { theme ->
                             val taken = theme in usedThemes && theme != current
@@ -603,26 +579,30 @@ private fun ColorPickerDialog(
                             Box(
                                 modifier = Modifier
                                     .minimumInteractiveComponentSize()
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (taken) theme.accent.copy(alpha = 0.25f)
-                                        else theme.accent
-                                    )
-                                    .border(
-                                        width = if (theme == current) 3.dp else 1.dp,
-                                        color = if (theme == current) mc.textPrimary
-                                                else theme.accent.copy(alpha = 0.4f),
-                                        shape = CircleShape,
-                                    )
-                                    .clickable(enabled = !taken) { onSelect(theme) }
+                                    .clickable(enabled = !taken, role = Role.Button) { onSelect(theme) }
                                     .semantics { contentDescription = swatchLabel },
-                            )
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (taken) theme.accent.copy(alpha = 0.25f)
+                                            else theme.accent
+                                        )
+                                        .border(
+                                            width = if (theme == current) 3.dp else 1.dp,
+                                            color = if (theme == current) mc.textPrimary
+                                                    else theme.accent.copy(alpha = 0.4f),
+                                            shape = CircleShape,
+                                        )
+                                )
+                            }
                         }
                     }
                 }
             }
         },
-        confirmButton = {},
     )
 }

@@ -24,7 +24,7 @@ class DrawHandUseCase {
         library: List<Card>,
         count: Int,
     ): Pair<List<Card>, List<Card>> {
-        val safeCount = count.coerceAtMost(library.size)
+        val safeCount = count.coerceIn(0, library.size)
         val hand = library.take(safeCount)
         val remaining = library.drop(safeCount)
         return hand to remaining

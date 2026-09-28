@@ -67,16 +67,13 @@ class InferDeckArchetypeUseCaseTest {
 
     @Test
     fun controlShapedDeckClassifiesAsControl() {
-        // Phase 3a-CALIBRATION: CONTROL's own §2.1 `inevitability` prototype (0.80, Commander) is
-        // the SECOND-highest of the 5 macros -- a pure removal+counterspell shell with literally no
-        // card-draw/finisher signal (the 2 untagged "filler" cards previously) cannot reach it, so
-        // real card-advantage engines and a couple of real finisher threats are added below (a
-        // textbook Commander control deck genuinely runs both) rather than tuning a constant.
+        // ADR-009 Amendment R2b: `inevitability` no longer counts `finisher` density, so this
+        // shell's card-advantage suite must carry the axis alone -- 10 draw-engine copies, not 4.
         val mainboard = buildList {
             repeat(7) { add(entry(card(id = "ctl-removal-$it", typeLine = "Instant", cmc = 4.0, tags = listOf(CardTag.REMOVAL)))) }
             repeat(3) { add(entry(card(id = "ctl-wrath-$it", typeLine = "Sorcery", cmc = 4.0, tags = listOf(CardTag.WRATH)))) }
             repeat(8) { add(entry(card(id = "ctl-counter-$it", typeLine = "Instant", cmc = 4.0, tags = listOf(CardTag.COUNTERSPELL)))) }
-            repeat(4) { add(entry(card(id = "ctl-filler-$it", typeLine = "Sorcery", cmc = 4.0, tags = listOf(CardTag.DRAW_ENGINE)))) }
+            repeat(10) { add(entry(card(id = "ctl-filler-$it", typeLine = "Sorcery", cmc = 4.0, tags = listOf(CardTag.DRAW_ENGINE)))) }
             repeat(4) { add(entry(card(id = "ctl-finisher-$it", typeLine = "Legendary Planeswalker — Elspeth", cmc = 5.0, tags = listOf(CardTag.WIN_CON)))) }
         }
         val result = useCase(mainboard, ArchetypeFormat.COMMANDER)
@@ -196,18 +193,13 @@ class InferDeckArchetypeUseCaseTest {
     @Test
     fun standardControlShapedDeckClassifiesAsControl() {
         // Dimir control playset shape: spot removal + a wrath effect + a heavy counterspell suite
-        // + real card-advantage/finisher signal. Phase 3a-CALIBRATION: CONTROL's own §2.1
-        // `inevitability` prototype (0.75, 60-card) requires REAL card_draw/finisher density, not
-        // just interaction -- the untagged "Read the Bones" filler (a real card-draw sorcery in
-        // paper Magic) previously contributed nothing, and this fixture had no finisher at all.
-        // Both fixes below give this deck its own honest, textbook-Dimir-control identity (a real
-        // draw-two spell tagged as such, a genuine planeswalker win condition) rather than tuning a
-        // constant to force the resolver's hand.
+        // + real card-advantage signal. ADR-009 Amendment R2b: `inevitability` no longer counts
+        // `finisher` density, so 10 draw-engine copies (not 4) carry this axis for CONTROL.
         val mainboard = buildList {
             repeat(7) { add(entry(card(id = "std-ctl-removal-$it", name = "Cut Down", typeLine = "Instant", cmc = 4.0, tags = listOf(CardTag.REMOVAL)))) }
             repeat(3) { add(entry(card(id = "std-ctl-wrath-$it", name = "Sunfall", typeLine = "Sorcery", cmc = 4.0, tags = listOf(CardTag.WRATH)))) }
             repeat(8) { add(entry(card(id = "std-ctl-counter-$it", name = "Negate", typeLine = "Instant", cmc = 4.0, tags = listOf(CardTag.COUNTERSPELL)))) }
-            repeat(4) { add(entry(card(id = "std-ctl-filler-$it", name = "Read the Bones", typeLine = "Sorcery", cmc = 4.0, tags = listOf(CardTag.DRAW_ENGINE)))) }
+            repeat(10) { add(entry(card(id = "std-ctl-filler-$it", name = "Read the Bones", typeLine = "Sorcery", cmc = 4.0, tags = listOf(CardTag.DRAW_ENGINE)))) }
             repeat(4) { add(entry(card(id = "std-ctl-finisher-$it", name = "The Wandering Emperor", typeLine = "Legendary Planeswalker — Emperor", cmc = 3.0, tags = listOf(CardTag.WIN_CON)))) }
         }
         val result = useCase(mainboard, ArchetypeFormat.SIXTY)
@@ -380,7 +372,7 @@ class InferDeckArchetypeUseCaseTest {
             repeat(7) { add(entry(card(id = "res-removal-$it", typeLine = "Instant", cmc = 4.0, tags = listOf(CardTag.REMOVAL)))) }
             repeat(3) { add(entry(card(id = "res-wrath-$it", typeLine = "Sorcery", cmc = 4.0, tags = listOf(CardTag.WRATH)))) }
             repeat(8) { add(entry(card(id = "res-counter-$it", typeLine = "Instant", cmc = 4.0, tags = listOf(CardTag.COUNTERSPELL)))) }
-            repeat(4) { add(entry(card(id = "res-filler-$it", typeLine = "Sorcery", cmc = 4.0, tags = listOf(CardTag.DRAW_ENGINE)))) }
+            repeat(10) { add(entry(card(id = "res-filler-$it", typeLine = "Sorcery", cmc = 4.0, tags = listOf(CardTag.DRAW_ENGINE)))) }
             repeat(4) { add(entry(card(id = "res-finisher-$it", typeLine = "Legendary Planeswalker — Elspeth", cmc = 5.0, tags = listOf(CardTag.WIN_CON)))) }
         }
         val result = useCase(mainboard, ArchetypeFormat.COMMANDER)

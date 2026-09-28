@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.local.entity.LocalWishlistEntity
 import com.mmg.manahub.core.data.remote.trades.WishlistRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.WishlistEntryDto
 import com.mmg.manahub.core.model.WishlistEntry
+import com.mmg.manahub.core.data.remote.trades.KeysetDrain
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -53,6 +54,7 @@ class WishlistRepositoryImplTest {
     // ── Constants ─────────────────────────────────────────────────────────────
 
     private val USER_ID = "user-uuid-001"
+    private var activeUserId = USER_ID
 
     // ── Fixture helpers ───────────────────────────────────────────────────────
 
@@ -103,7 +105,8 @@ class WishlistRepositoryImplTest {
 
     @Before
     fun setUp() {
-        repository = WishlistRepositoryImpl(dao = dao, remote = remote)
+        activeUserId = USER_ID
+        repository = WishlistRepositoryImpl(dao = dao, remote = remote, currentUserId = { activeUserId })
 
         // decrementByAttributes' no-match branch calls recordSafeNonFatal(), which reaches
         // FirebaseCrashlytics.getInstance() outside any runCatching — must be mocked so
@@ -126,7 +129,7 @@ class WishlistRepositoryImplTest {
         // Arrange — observeLocal() reads observeAllWithCard() (the @Relation join used to
         // enrich each row with its Card), not the card-less observeAll().
         val entity = buildEntity(id = "e-001", scryfallId = "card-xyz", matchAnyVariant = true)
-        every { dao.observeAllWithCard() } returns flowOf(listOf(LocalWishlistWithCard(entity, card = null)))
+        every { dao.observeAllWithCard(any()) } returns flowOf(listOf(LocalWishlistWithCard(entity, card = null)))
 
         // Act + Assert
         repository.observeLocal().test {
@@ -151,7 +154,7 @@ class WishlistRepositoryImplTest {
             condition = "LP",
             language = "ja",
         )
-        every { dao.observeAllWithCard() } returns flowOf(listOf(LocalWishlistWithCard(entity, card = null)))
+        every { dao.observeAllWithCard(any()) } returns flowOf(listOf(LocalWishlistWithCard(entity, card = null)))
 
         // Act + Assert
         repository.observeLocal().test {
@@ -167,7 +170,7 @@ class WishlistRepositoryImplTest {
 
     @Test
     fun `given dao emits empty list when observeLocal then emits empty list`() = runTest {
-        every { dao.observeAllWithCard() } returns flowOf(emptyList())
+        every { dao.observeAllWithCard(any()) } returns flowOf(emptyList())
 
         repository.observeLocal().test {
             assertTrue(awaitItem().isEmpty())
@@ -179,7 +182,7 @@ class WishlistRepositoryImplTest {
     fun `given entity when observeLocal then userId in domain entry is empty string`() = runTest {
         // LocalWishlistEntity has no userId column; toDomain() sets userId = ""
         val entity = buildEntity(id = "e-001")
-        every { dao.observeAllWithCard() } returns flowOf(listOf(LocalWishlistWithCard(entity, card = null)))
+        every { dao.observeAllWithCard(any()) } returns flowOf(listOf(LocalWishlistWithCard(entity, card = null)))
 
         repository.observeLocal().test {
             val entry = awaitItem().first()
@@ -197,7 +200,7 @@ class WishlistRepositoryImplTest {
         // Arrange: blank id triggers UUID.randomUUID(). addLocal looks up an existing row for
         // these attributes first (dedup-by-attributes) — no existing row here, so it inserts.
         val entry = buildEntry(id = "")
-        coEvery { dao.getByAttributes(any(), any(), any(), any(), any()) } returns null
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any(), any()) } returns null
         val capturedEntity = slot<LocalWishlistEntity>()
         coEvery { dao.insert(capture(capturedEntity)) } returns Unit
 
@@ -215,7 +218,7 @@ class WishlistRepositoryImplTest {
     @Test
     fun `given entry with non-blank id when addLocal then that id is preserved in entity`() = runTest {
         val entry = buildEntry(id = "predefined-id-001")
-        coEvery { dao.getByAttributes(any(), any(), any(), any(), any()) } returns null
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any(), any()) } returns null
         val capturedEntity = slot<LocalWishlistEntity>()
         coEvery { dao.insert(capture(capturedEntity)) } returns Unit
 
@@ -227,7 +230,7 @@ class WishlistRepositoryImplTest {
     @Test
     fun `given entry when addLocal then entity has synced false`() = runTest {
         val entry = buildEntry()
-        coEvery { dao.getByAttributes(any(), any(), any(), any(), any()) } returns null
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any(), any()) } returns null
         val capturedEntity = slot<LocalWishlistEntity>()
         coEvery { dao.insert(capture(capturedEntity)) } returns Unit
 
@@ -239,7 +242,7 @@ class WishlistRepositoryImplTest {
     @Test
     fun `given entry with specific cardId when addLocal then entity scryfallId matches cardId`() = runTest {
         val entry = buildEntry(cardId = "target-card-scryfall-001")
-        coEvery { dao.getByAttributes(any(), any(), any(), any(), any()) } returns null
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any(), any()) } returns null
         val capturedEntity = slot<LocalWishlistEntity>()
         coEvery { dao.insert(capture(capturedEntity)) } returns Unit
 
@@ -254,7 +257,7 @@ class WishlistRepositoryImplTest {
         val existing = buildEntity(id = "existing-id", quantity = 1)
         val entry = buildEntry(cardId = existing.scryfallId)
         
-        coEvery { dao.getByAttributes(any(), any(), any(), any(), any()) } returns existing
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any(), any()) } returns existing
         val capturedEntity = slot<LocalWishlistEntity>()
         coEvery { dao.update(capture(capturedEntity)) } returns Unit
 
@@ -271,7 +274,7 @@ class WishlistRepositoryImplTest {
     fun `given no existing entry with same attributes when addLocal then call insert`() = runTest {
         // Arrange
         val entry = buildEntry()
-        coEvery { dao.getByAttributes(any(), any(), any(), any(), any()) } returns null
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any(), any()) } returns null
         coEvery { dao.insert(any()) } returns Unit
 
         // Act
@@ -285,7 +288,7 @@ class WishlistRepositoryImplTest {
     @Test
     fun `given dao insert throws when addLocal then returns Result failure`() = runTest {
         val entry = buildEntry()
-        coEvery { dao.getByAttributes(any(), any(), any(), any(), any()) } returns null
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any(), any()) } returns null
         coEvery { dao.insert(any()) } throws RuntimeException("disk full")
 
         val result = repository.addLocal(entry)
@@ -304,12 +307,12 @@ class WishlistRepositoryImplTest {
 
         // Assert
         assertTrue(result.isSuccess)
-        coVerify(exactly = 1) { dao.deleteById("entry-to-remove") }
+        coVerify(exactly = 1) { dao.deleteById("entry-to-remove", any()) }
     }
 
     @Test
     fun `given dao deleteById throws when removeLocal then returns Result failure`() = runTest {
-        coEvery { dao.deleteById(any()) } throws RuntimeException("sqlite error")
+        coEvery { dao.deleteById(any(), any()) } throws RuntimeException("sqlite error")
 
         val result = repository.removeLocal("some-id")
 
@@ -328,7 +331,7 @@ class WishlistRepositoryImplTest {
             buildEntity(id = "u-2", scryfallId = "card-2"),
             buildEntity(id = "u-3", scryfallId = "card-3"),
         )
-        coEvery { dao.getUnsynced() } returns unsyncedRows
+        coEvery { dao.getUnsynced(any()) } returns unsyncedRows
         coEvery { remote.batchAddWishlistEntries(any()) } returns Result.success(Unit)
 
         // Act
@@ -347,7 +350,7 @@ class WishlistRepositoryImplTest {
             buildEntity(id = "u-2", scryfallId = "card-2", matchAnyVariant = false, isFoil = true),
             buildEntity(id = "u-3", scryfallId = "card-3"),
         )
-        coEvery { dao.getUnsynced() } returns unsyncedRows
+        coEvery { dao.getUnsynced(any()) } returns unsyncedRows
         val capturedDtos = slot<List<WishlistEntryDto>>()
         coEvery { remote.batchAddWishlistEntries(capture(capturedDtos)) } returns Result.success(Unit)
 
@@ -372,10 +375,10 @@ class WishlistRepositoryImplTest {
             buildEntity(id = "u-2"),
             buildEntity(id = "u-3"),
         )
-        coEvery { dao.getUnsynced() } returns unsyncedRows
+        coEvery { dao.getUnsynced(any()) } returns unsyncedRows
         coEvery { remote.batchAddWishlistEntries(any()) } returns Result.success(Unit)
         val capturedIds = slot<List<String>>()
-        coEvery { dao.markSynced(capture(capturedIds)) } returns Unit
+        coEvery { dao.markSynced(capture(capturedIds), any()) } returns Unit
 
         // Act
         repository.migrateLocalToRemote(USER_ID)
@@ -389,15 +392,15 @@ class WishlistRepositoryImplTest {
         // Entries remain in Room after a successful sync (clearSynced removed) so that
         // observeLocal() continues to show them without re-downloading from remote.
         val unsyncedRows = listOf(buildEntity(id = "u-1"), buildEntity(id = "u-2"))
-        coEvery { dao.getUnsynced() } returns unsyncedRows
+        coEvery { dao.getUnsynced(any()) } returns unsyncedRows
         coEvery { remote.batchAddWishlistEntries(any()) } returns Result.success(Unit)
 
         // Act
         repository.migrateLocalToRemote(USER_ID)
 
         // Assert: markSynced was called, clearSynced was NOT
-        coVerify(exactly = 1) { dao.markSynced(any()) }
-        coVerify(exactly = 0) { dao.clearSynced() }
+        coVerify(exactly = 1) { dao.markSynced(any(), any()) }
+        coVerify(exactly = 0) { dao.clearSynced(any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -406,7 +409,7 @@ class WishlistRepositoryImplTest {
 
     @Test
     fun `given no unsynced rows when migrateLocalToRemote then returns Result success with count 0`() = runTest {
-        coEvery { dao.getUnsynced() } returns emptyList()
+        coEvery { dao.getUnsynced(any()) } returns emptyList()
 
         val result = repository.migrateLocalToRemote(USER_ID)
 
@@ -416,7 +419,7 @@ class WishlistRepositoryImplTest {
 
     @Test
     fun `given no unsynced rows when migrateLocalToRemote then batchAddWishlistEntries is NOT called`() = runTest {
-        coEvery { dao.getUnsynced() } returns emptyList()
+        coEvery { dao.getUnsynced(any()) } returns emptyList()
 
         repository.migrateLocalToRemote(USER_ID)
 
@@ -425,12 +428,12 @@ class WishlistRepositoryImplTest {
 
     @Test
     fun `given no unsynced rows when migrateLocalToRemote then markSynced and clearSynced are NOT called`() = runTest {
-        coEvery { dao.getUnsynced() } returns emptyList()
+        coEvery { dao.getUnsynced(any()) } returns emptyList()
 
         repository.migrateLocalToRemote(USER_ID)
 
-        coVerify(exactly = 0) { dao.markSynced(any()) }
-        coVerify(exactly = 0) { dao.clearSynced() }
+        coVerify(exactly = 0) { dao.markSynced(any(), any()) }
+        coVerify(exactly = 0) { dao.clearSynced(any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -441,7 +444,7 @@ class WishlistRepositoryImplTest {
     fun `given remote batchAdd fails when migrateLocalToRemote then returns Result failure`() = runTest {
         // Arrange
         val unsyncedRows = listOf(buildEntity(id = "u-1"), buildEntity(id = "u-2"))
-        coEvery { dao.getUnsynced() } returns unsyncedRows
+        coEvery { dao.getUnsynced(any()) } returns unsyncedRows
         coEvery { remote.batchAddWishlistEntries(any()) } returns Result.failure(RuntimeException("network error"))
 
         // Act
@@ -455,15 +458,15 @@ class WishlistRepositoryImplTest {
     fun `given remote batchAdd fails when migrateLocalToRemote then markSynced is NOT called`() = runTest {
         // getOrThrow() throws inside runCatching → markSynced is never reached
         val unsyncedRows = listOf(buildEntity(id = "u-1"))
-        coEvery { dao.getUnsynced() } returns unsyncedRows
+        coEvery { dao.getUnsynced(any()) } returns unsyncedRows
         coEvery { remote.batchAddWishlistEntries(any()) } returns Result.failure(RuntimeException("500"))
 
         // Act
         repository.migrateLocalToRemote(USER_ID)
 
         // Assert: local state unchanged — rows remain unsynced
-        coVerify(exactly = 0) { dao.markSynced(any()) }
-        coVerify(exactly = 0) { dao.clearSynced() }
+        coVerify(exactly = 0) { dao.markSynced(any(), any()) }
+        coVerify(exactly = 0) { dao.clearSynced(any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -473,7 +476,7 @@ class WishlistRepositoryImplTest {
     @Test
     fun `given removeLocal on a synced row when remote succeeds then the remote removal happens before the local delete`() = runTest {
         val entity = buildEntity(id = "e-1", synced = true)
-        coEvery { dao.getById("e-1") } returns entity
+        coEvery { dao.getById("e-1", any()) } returns entity
         coEvery { remote.removeWishlistEntry("e-1") } returns Result.success(Unit)
 
         val result = repository.removeLocal("e-1")
@@ -481,7 +484,7 @@ class WishlistRepositoryImplTest {
         assertTrue(result.isSuccess)
         coVerifyOrder {
             remote.removeWishlistEntry("e-1")
-            dao.deleteById("e-1")
+            dao.deleteById("e-1", any())
         }
     }
 
@@ -491,25 +494,25 @@ class WishlistRepositoryImplTest {
         // next syncFromRemote() re-download and "resurrect" the entry the user just removed.
         // Remote-first means a remote failure now leaves the local row untouched.
         val entity = buildEntity(id = "e-1", synced = true)
-        coEvery { dao.getById("e-1") } returns entity
+        coEvery { dao.getById("e-1", any()) } returns entity
         coEvery { remote.removeWishlistEntry("e-1") } returns Result.failure(RuntimeException("network down"))
 
         val result = repository.removeLocal("e-1")
 
         assertTrue(result.isFailure)
-        coVerify(exactly = 0) { dao.deleteById(any()) }
+        coVerify(exactly = 0) { dao.deleteById(any(), any()) }
     }
 
     @Test
     fun `given removeLocal on an UNSYNCED row then no remote call is made and the local row is deleted directly`() = runTest {
         val entity = buildEntity(id = "e-1", synced = false)
-        coEvery { dao.getById("e-1") } returns entity
+        coEvery { dao.getById("e-1", any()) } returns entity
 
         val result = repository.removeLocal("e-1")
 
         assertTrue(result.isSuccess)
         coVerify(exactly = 0) { remote.removeWishlistEntry(any()) }
-        coVerify(exactly = 1) { dao.deleteById("e-1") }
+        coVerify(exactly = 1) { dao.deleteById("e-1", any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -520,27 +523,27 @@ class WishlistRepositoryImplTest {
     fun `given an exact attribute match exists when decrementByAttributes then that exact entry is decremented`() = runTest {
         val exactMatch = buildEntity(id = "exact", scryfallId = "card-x", quantity = 3, matchAnyVariant = false, isFoil = true, condition = "LP", language = "en", synced = false)
         val otherVariant = buildEntity(id = "other", scryfallId = "card-x", quantity = 1, matchAnyVariant = false, isFoil = false, condition = "NM", language = "en", synced = false)
-        coEvery { dao.getByScryfallId("card-x") } returns listOf(otherVariant, exactMatch)
+        coEvery { dao.getByScryfallId("card-x", any()) } returns listOf(otherVariant, exactMatch)
 
         val result = repository.decrementByAttributes("card-x", quantity = 1, isFoil = true, condition = "LP", language = "en")
 
         assertTrue(result.isSuccess)
-        coVerify(exactly = 1) { dao.updateQuantity("exact", 2) }
-        coVerify(exactly = 0) { dao.updateQuantity("other", any()) }
-        coVerify(exactly = 0) { dao.deleteById(any()) }
+        coVerify(exactly = 1) { dao.updateQuantity("exact", 2, any()) }
+        coVerify(exactly = 0) { dao.updateQuantity("other", any(), any()) }
+        coVerify(exactly = 0) { dao.deleteById(any(), any()) }
     }
 
     @Test
     fun `given no exact match but a matchAnyVariant entry exists when decrementByAttributes then the matchAnyVariant entry is decremented`() = runTest {
         val anyVariant = buildEntity(id = "any", scryfallId = "card-x", quantity = 2, matchAnyVariant = true, isFoil = null, condition = null, language = null, synced = false)
         val wrongVariant = buildEntity(id = "wrong", scryfallId = "card-x", quantity = 5, matchAnyVariant = false, isFoil = true, condition = "LP", language = "de", synced = false)
-        coEvery { dao.getByScryfallId("card-x") } returns listOf(wrongVariant, anyVariant)
+        coEvery { dao.getByScryfallId("card-x", any()) } returns listOf(wrongVariant, anyVariant)
 
         val result = repository.decrementByAttributes("card-x", quantity = 1, isFoil = false, condition = "NM", language = "en")
 
         assertTrue(result.isSuccess)
-        coVerify(exactly = 1) { dao.updateQuantity("any", 1) }
-        coVerify(exactly = 0) { dao.updateQuantity("wrong", any()) }
+        coVerify(exactly = 1) { dao.updateQuantity("any", 1, any()) }
+        coVerify(exactly = 0) { dao.updateQuantity("wrong", any(), any()) }
     }
 
     @Test
@@ -549,42 +552,42 @@ class WishlistRepositoryImplTest {
         // silently decrement a completely different variant than the one actually traded.
         val wrongVariant1 = buildEntity(id = "w1", scryfallId = "card-x", quantity = 1, matchAnyVariant = false, isFoil = true, condition = "LP", language = "de")
         val wrongVariant2 = buildEntity(id = "w2", scryfallId = "card-x", quantity = 1, matchAnyVariant = false, isFoil = true, condition = "MP", language = "fr")
-        coEvery { dao.getByScryfallId("card-x") } returns listOf(wrongVariant1, wrongVariant2)
+        coEvery { dao.getByScryfallId("card-x", any()) } returns listOf(wrongVariant1, wrongVariant2)
 
         val result = repository.decrementByAttributes("card-x", quantity = 1, isFoil = false, condition = "NM", language = "en")
 
         assertTrue(result.isSuccess)
-        coVerify(exactly = 0) { dao.updateQuantity(any(), any()) }
-        coVerify(exactly = 0) { dao.deleteById(any()) }
+        coVerify(exactly = 0) { dao.updateQuantity(any(), any(), any()) }
+        coVerify(exactly = 0) { dao.deleteById(any(), any()) }
     }
 
     @Test
     fun `given no wishlist entries for the scryfallId when decrementByAttributes then it no-ops without hitting the dao`() = runTest {
-        coEvery { dao.getByScryfallId("card-x") } returns emptyList()
+        coEvery { dao.getByScryfallId("card-x", any()) } returns emptyList()
 
         val result = repository.decrementByAttributes("card-x", quantity = 1, isFoil = false, condition = "NM", language = "en")
 
         assertTrue(result.isSuccess)
-        coVerify(exactly = 0) { dao.updateQuantity(any(), any()) }
-        coVerify(exactly = 0) { dao.deleteById(any()) }
+        coVerify(exactly = 0) { dao.updateQuantity(any(), any(), any()) }
+        coVerify(exactly = 0) { dao.deleteById(any(), any()) }
     }
 
     @Test
     fun `given an exact match whose resulting quantity drops to zero when decrementByAttributes then the entry is deleted not updated`() = runTest {
         val exactMatch = buildEntity(id = "exact", scryfallId = "card-x", quantity = 1, matchAnyVariant = false, isFoil = false, condition = "NM", language = "en", synced = false)
-        coEvery { dao.getByScryfallId("card-x") } returns listOf(exactMatch)
+        coEvery { dao.getByScryfallId("card-x", any()) } returns listOf(exactMatch)
 
         val result = repository.decrementByAttributes("card-x", quantity = 1, isFoil = false, condition = "NM", language = "en")
 
         assertTrue(result.isSuccess)
-        coVerify(exactly = 1) { dao.deleteById("exact") }
-        coVerify(exactly = 0) { dao.updateQuantity(any(), any()) }
+        coVerify(exactly = 1) { dao.deleteById("exact", any()) }
+        coVerify(exactly = 0) { dao.updateQuantity(any(), any(), any()) }
     }
 
     @Test
     fun `given the matched entry is synced when decrementByAttributes then the remote update fires before the local quantity update`() = runTest {
         val exactMatch = buildEntity(id = "exact", scryfallId = "card-x", quantity = 3, matchAnyVariant = false, isFoil = false, condition = "NM", language = "en", synced = true)
-        coEvery { dao.getByScryfallId("card-x") } returns listOf(exactMatch)
+        coEvery { dao.getByScryfallId("card-x", any()) } returns listOf(exactMatch)
         coEvery { remote.updateWishlistQuantity("exact", 2) } returns Result.success(Unit)
 
         val result = repository.decrementByAttributes("card-x", quantity = 1, isFoil = false, condition = "NM", language = "en")
@@ -592,7 +595,47 @@ class WishlistRepositoryImplTest {
         assertTrue(result.isSuccess)
         coVerifyOrder {
             remote.updateWishlistQuantity("exact", 2)
-            dao.updateQuantity("exact", 2)
+            dao.updateQuantity("exact", 2, any())
         }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  syncFromRemote: eviction only after a complete keyset drain
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun wishDto(id: String) =
+        WishlistEntryDto(id = id, userId = "user-1", cardId = "card-$id", matchAnyVariant = true, createdAt = "2024-01-01T00:00:00Z")
+
+    @Test
+    fun `given a partial drain when syncFromRemote then fetched rows are kept and nothing is evicted`() = runTest {
+        activeUserId = "user-1"
+        coEvery { remote.drainWishlist("user-1") } returns
+            KeysetDrain(listOf(wishDto("w1")), isComplete = false, failure = RuntimeException("page 2 failed"))
+        coEvery { dao.getSyncedIds(any()) } returns listOf("w1", "w-old")
+
+        val result = repository.syncFromRemote("user-1")
+
+        assertTrue(result.isFailure)
+        coVerify { dao.upsertAll(match { rows -> rows.map { it.id } == listOf("w1") }) }
+        coVerify(exactly = 0) { dao.deleteSyncedByIds(any(), any()) }
+        coVerify(exactly = 0) { dao.deleteSyncedNotIn(any(), any()) }
+        coVerify(exactly = 0) { dao.clearSynced(any()) }
+    }
+
+    @Test
+    fun `given a complete drain when syncFromRemote then stale synced rows are evicted in bounded chunks`() = runTest {
+        activeUserId = "user-1"
+        val remoteRows = (1..3).map { wishDto("w$it") }
+        coEvery { remote.drainWishlist("user-1") } returns KeysetDrain.complete(remoteRows)
+        val stale = (1..1200).map { "old-$it" }
+        coEvery { dao.getSyncedIds(any()) } returns remoteRows.map { it.id } + stale
+
+        val result = repository.syncFromRemote("user-1")
+
+        assertTrue(result.isSuccess)
+        val chunks = mutableListOf<List<String>>()
+        coVerify { dao.deleteSyncedByIds(capture(chunks), any()) }
+        assertEquals(stale.toSet(), chunks.flatten().toSet())
+        assertTrue(chunks.all { it.size <= 500 })
     }
 }

@@ -1,9 +1,12 @@
 package com.mmg.manahub.feature.home.presentation
 
+// COMMENTS_REVIEWED: 2026-09-16
+
+import com.mmg.manahub.util.testGamificationAvailability
 import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.model.CollectionStats
+import com.mmg.manahub.core.model.CollectionSummary
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.PersistedWidget
@@ -63,7 +66,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -95,6 +101,8 @@ class HomeViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
+    private val crashlyticsMock: FirebaseCrashlytics = mockk(relaxed = true)
+
     private val sessionStateFlow = MutableStateFlow<SessionState>(SessionState.Unauthenticated)
     private val isCoolingDownFlow = MutableStateFlow(false)
     private val totalGamesFlow = MutableStateFlow(0)
@@ -114,8 +122,11 @@ class HomeViewModelTest {
     private val questBoardFlow = MutableStateFlow(QuestBoard.empty)
     private val streakFlow = MutableStateFlow(StreakUiModel(current = 0, longest = 0, freezeTokens = 0))
 
-    /** Backing store for the persisted layout — saveHomeLayout writes here so reads round-trip. */
+    /** Backing store for the persisted layout — layout writes land here so reads round-trip. */
     private val savedLayoutTokens = MutableStateFlow<String?>(null)
+
+    /** Number of layout writes that actually changed the stored layout. */
+    private var layoutWriteCount = 0
 
     /**
      * Backing store for the First Steps completion-seen flag (Home widget board overhaul, TASK 3)
@@ -160,7 +171,7 @@ class HomeViewModelTest {
         // HomeViewModel resolves FirebaseCrashlytics.getInstance() at construction (additive
         // telemetry, no PII) — mock the static so the un-initialized FirebaseApp doesn't throw.
         mockkStatic(FirebaseCrashlytics::class)
-        every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
+        every { FirebaseCrashlytics.getInstance() } returns crashlyticsMock
         stubDefaultDependencies()
     }
 
@@ -178,7 +189,7 @@ class HomeViewModelTest {
         every { userPrefsDataStore.observeSkippedFirstSteps() } returns flowOf(emptySet())
         every { userPrefsDataStore.isNudgeCoolingDown() } returns isCoolingDownFlow
         every { userPrefsDataStore.avatarUrlFlow } returns flowOf(null)
-        every { statsRepository.observeCollectionStats(any()) } returns
+        every { statsRepository.observeCollectionSummary() } returns
             flowOf(emptyCollectionStats())
         every { deckRepository.observeAllDeckSummaries() } returns deckSummariesFlow
         every { gameSessionRepository.observeTotalGames() } returns totalGamesFlow
@@ -194,17 +205,19 @@ class HomeViewModelTest {
 
         // Phase 2 stats flows.
         every { gameSessionRepository.observeLocalWins() } returns flowOf(0)
+        every { gameSessionRepository.observeLocalDraws() } returns flowOf(0)
         every { gameSessionRepository.observeLocalSessionHistory(any()) } returns flowOf(emptyList())
         every { gameSessionRepository.observeDeckStats() } returns flowOf(emptyList())
         every { gameSessionRepository.observeMostFrequentElimination() } returns flowOf(null)
-        every { gameSessionRepository.observeAvgWinTurn(any()) } returns flowOf(null)
+        every { gameSessionRepository.observeAvgWinTurn() } returns flowOf(null)
         every { gameSessionRepository.observeAvgLifeOnWin() } returns flowOf(null)
         every { gameSessionRepository.observeAvgLifeOnLoss() } returns flowOf(null)
 
         // Phase 3 stubs.
         coEvery { draftRepository.getDraftableSets(any()) } returns DataResult.Success(emptyList())
-        // Discover widget random-card fetch: default to an empty result.
+        // Discover row and random-card fetches default to empty results.
         coEvery { cardRepository.searchCards(any(), any(), any()) } returns DataResult.Success(emptyList())
+        coEvery { cardRepository.getRandomCard("lang:en") } returns DataResult.Error("No random card")
         // Default-random-set seeding: no sets available (falls back to the global random query).
         coEvery { scryfallRemoteDataSource.getAllSets() } returns emptyList()
         // CRITICAL (same "relaxed mock's unstubbed Flow never emits" gotcha noted below for
@@ -255,7 +268,6 @@ class HomeViewModelTest {
         every { userPrefsDataStore.homeCommunityDecksCategoryFlow } returns flowOf(null)
 
         // Gamification (Phase 2): enabled with empty board / zeroed streak / level 1.
-        every { userPrefsDataStore.gamificationEnabledFlow } returns gamificationEnabledFlow
         every { gamificationRepository.observeProgression() } returns progressionFlow
         every { gamificationRepository.observeActiveQuests() } returns questBoardFlow
         every { gamificationRepository.observeDailyActivityStreak() } returns streakFlow
@@ -270,6 +282,26 @@ class HomeViewModelTest {
         coEvery { userPrefsDataStore.saveHomeLayout(capture(layoutSlot)) } answers {
             savedLayoutTokens.value = layoutSlot.captured.joinToString(",") { "${it.persistedId}:${it.size.name}" }
         }
+        // Mirrors UserPreferencesDataStore.updateHomeLayout: transform the CURRENT stored value and
+        // write only when it changed.
+        coEvery { userPrefsDataStore.updateHomeLayout(any(), any()) } answers {
+            val default = firstArg<List<PersistedWidget>>()
+            @Suppress("UNCHECKED_CAST")
+            val transform = secondArg<Any>() as (List<PersistedWidget>) -> List<PersistedWidget>
+            val current = decodeLayout(savedLayoutTokens.value, default)
+            val updated = transform(current).distinctBy { it.persistedId }
+            if (updated != current) {
+                layoutWriteCount++
+                savedLayoutTokens.value = updated.joinToString(",") { "${it.persistedId}:${it.size.name}" }
+            }
+        }
+        every { userPrefsDataStore.homeCommunityDecksFormatFlow } returns flowOf(null)
+        every { userPrefsDataStore.competitiveEnabledFlow } returns flowOf(false)
+    }
+
+    /** Persists [types] as the saved board so a test controls which widgets are placed. */
+    private fun seedLayout(vararg types: HomeWidgetType) {
+        savedLayoutTokens.value = types.joinToString(",") { "${it.persistedId}:MEDIUM" }
     }
 
     /** Mirrors UserPreferencesDataStore decode: unknown ids/sizes are skipped; empty → default. */
@@ -287,7 +319,11 @@ class HomeViewModelTest {
         return parsed.ifEmpty { default }
     }
 
-    private fun buildViewModel(): HomeViewModel = HomeViewModel(
+    private fun buildViewModel(
+        communityAggregateRepository: com.mmg.manahub.core.domain.repository.CommunityAggregateRepository? = null,
+        getTodayPuzzleUseCase: com.mmg.manahub.feature.puzzle.domain.usecase.GetTodayPuzzleUseCase? = null,
+        puzzleEnabled: Boolean = false,
+    ): HomeViewModel = HomeViewModel(
         userPrefsDataStore = userPrefsDataStore,
         statsRepository = statsRepository,
         deckRepository = deckRepository,
@@ -304,6 +340,7 @@ class HomeViewModelTest {
         wishlistRepository = wishlistRepository,
         getAccountNudgeUseCase = GetAccountNudgeUseCase(),
         gamificationRepository = gamificationRepository,
+        gamificationAvailability = testGamificationAvailability(gamificationEnabledFlow),
         userCardRepository = userCardRepository,
         tradesRepository = tradesRepository,
         openForTradeRepository = openForTradeRepository,
@@ -312,6 +349,10 @@ class HomeViewModelTest {
         playtestRepository = playtestRepository,
         syncManager = syncManager,
         searchCommunityDecksUseCase = searchCommunityDecksUseCase,
+        communityAggregateRepository = communityAggregateRepository,
+        getTodayPuzzleUseCase = getTodayPuzzleUseCase,
+        puzzleEnabled = puzzleEnabled,
+        ioDispatcher = testDispatcher,
     )
 
     /** Builds a quest UI model for tests (title/description are irrelevant for VM logic). */
@@ -336,11 +377,10 @@ class HomeViewModelTest {
         xpReward = xpReward,
     )
 
-    private fun emptyCollectionStats() = CollectionStats(
-        totalCards = 0, uniqueCards = 0, totalDecks = 0,
+    private fun emptyCollectionStats() = CollectionSummary(
+        totalCards = 0, uniqueCards = 0,
         totalValueUsd = 0.0, totalValueEur = 0.0,
-        mostValuableCards = emptyList(), byColor = emptyMap(), byRarity = emptyMap(),
-        byType = emptyMap(), cmcDistribution = emptyMap(), bySet = emptyMap(),
+        byColor = emptyMap(), byRarity = emptyMap(),
     )
 
     private fun collectionStatsWithCards(uniqueCards: Int) =
@@ -432,7 +472,7 @@ class HomeViewModelTest {
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Unauthenticated
             isCoolingDownFlow.value = false
-            every { statsRepository.observeCollectionStats(any()) } returns
+            every { statsRepository.observeCollectionSummary() } returns
                 flowOf(collectionStatsWithCards(10))
 
             val vm = buildViewModel()
@@ -449,7 +489,7 @@ class HomeViewModelTest {
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Unauthenticated
             isCoolingDownFlow.value = false
-            every { statsRepository.observeCollectionStats(any()) } returns
+            every { statsRepository.observeCollectionSummary() } returns
                 flowOf(collectionStatsWithCards(9))
 
             val vm = buildViewModel()
@@ -467,7 +507,7 @@ class HomeViewModelTest {
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Unauthenticated
             isCoolingDownFlow.value = false
-            every { statsRepository.observeCollectionStats(any()) } returns
+            every { statsRepository.observeCollectionSummary() } returns
                 flowOf(collectionStatsWithCards(0))
             deckSummariesFlow.value = listOf(deckSummary("d1"), deckSummary("d2"))
 
@@ -485,7 +525,7 @@ class HomeViewModelTest {
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Unauthenticated
             isCoolingDownFlow.value = false
-            every { statsRepository.observeCollectionStats(any()) } returns
+            every { statsRepository.observeCollectionSummary() } returns
                 flowOf(collectionStatsWithCards(0))
             deckSummariesFlow.value = listOf(deckSummary())
             totalGamesFlow.value = 3
@@ -505,7 +545,7 @@ class HomeViewModelTest {
     fun `given authenticated then accountNudge is null regardless of collection size`() =
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Authenticated(authUser())
-            every { statsRepository.observeCollectionStats(any()) } returns
+            every { statsRepository.observeCollectionSummary() } returns
                 flowOf(collectionStatsWithCards(100))
             deckSummariesFlow.value = listOf(deckSummary("d1"), deckSummary("d2"), deckSummary("d3"))
             totalGamesFlow.value = 99
@@ -545,7 +585,7 @@ class HomeViewModelTest {
     fun `given cooldown active then milestone nudge is suppressed`() = runTest(testDispatcher) {
         sessionStateFlow.value = SessionState.Unauthenticated
         isCoolingDownFlow.value = true
-        every { statsRepository.observeCollectionStats(any()) } returns
+        every { statsRepository.observeCollectionSummary() } returns
             flowOf(collectionStatsWithCards(10))
         deckSummariesFlow.value = listOf(deckSummary("d1"), deckSummary("d2"))
         totalGamesFlow.value = 3
@@ -672,42 +712,23 @@ class HomeViewModelTest {
     // ── Hero resolution ───────────────────────────────────────────────────────
 
     @Test
-    fun `hero is ActiveDraft when draft status is DRAFTING`() = runTest(testDispatcher) {
+    fun `hero stays Welcome while a draft is DRAFTING (hero pinned to First Steps)`() = runTest(testDispatcher) {
         activeDraftFlow.value = draftingState(setCode = "MKM")
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
 
-        val hero = vm.state.value.hero
-        assertTrue("Expected ActiveDraft but was $hero", hero is HomeHeroState.ActiveDraft)
-        assertEquals("MKM", (hero as HomeHeroState.ActiveDraft).setName)
+        assertTrue(vm.state.value.hero is HomeHeroState.Welcome)
     }
 
     @Test
-    fun `hero ActiveDraft setName is uppercased`() = runTest(testDispatcher) {
-        activeDraftFlow.value = draftingState(setCode = "mkm")
-
-        val vm = buildViewModel()
-        backgroundScope.launch { vm.state.collect {} }
-        advanceUntilIdle()
-
-        assertEquals("MKM", (vm.state.value.hero as HomeHeroState.ActiveDraft).setName)
-    }
-
-    @Test
-    fun `hero is Summary when totalGames greater than 0 and no active draft`() =
+    fun `hero stays Welcome with an empty completion list once every step is skipped and games exist`() =
         runTest(testDispatcher) {
-            activeDraftFlow.value = null
             totalGamesFlow.value = 5
-            every { userPrefsDataStore.playerNameFlow } returns flowOf("Miguel")
-            // Skip all first steps so the hero resolves past Welcome(non-empty).
             every { userPrefsDataStore.observeSkippedFirstSteps() } returns flowOf(
                 ALL_FIRST_STEPS.map { it.id }.toSet()
             )
-            // Home widget board overhaul, TASK 3: the empty-Welcome completion card is shown once
-            // before Summary — mark it already-seen so this test (about the Summary/totalGames
-            // relationship, not the completion-flag mechanic) reaches Summary directly.
             every { userPrefsDataStore.firstStepsCompletionSeenFlow } returns flowOf(true)
 
             val vm = buildViewModel()
@@ -715,10 +736,8 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             val hero = vm.state.value.hero
-            assertTrue("Expected Summary but was $hero", hero is HomeHeroState.Summary)
-            hero as HomeHeroState.Summary
-            assertEquals("Miguel", hero.playerName)
-            assertEquals(5, hero.totalGames)
+            assertTrue("Expected Welcome but was $hero", hero is HomeHeroState.Welcome)
+            assertTrue((hero as HomeHeroState.Welcome).steps.isEmpty())
         }
 
     @Test
@@ -831,7 +850,7 @@ class HomeViewModelTest {
 
     @Test
     fun `libraryStats uniqueCards reflects stats from statsRepository`() = runTest(testDispatcher) {
-        every { statsRepository.observeCollectionStats(any()) } returns
+        every { statsRepository.observeCollectionSummary() } returns
             flowOf(collectionStatsWithCards(42))
 
         val vm = buildViewModel()
@@ -857,35 +876,25 @@ class HomeViewModelTest {
 
     @Test
     fun `state updates reactively when totalGames flow changes`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
         totalGamesFlow.value = 0
-        activeDraftFlow.value = null
-        // Skip all first steps AND mark the completion card already-seen (Home widget board
-        // overhaul, TASK 3 — otherwise the FIRST emission is the empty-Welcome completion card,
-        // not Summary, regardless of totalGames) so this test isolates the totalGames→Summary
-        // relationship this test is actually about.
-        every { userPrefsDataStore.observeSkippedFirstSteps() } returns flowOf(
-            ALL_FIRST_STEPS.map { it.id }.toSet()
-        )
-        every { userPrefsDataStore.firstStepsCompletionSeenFlow } returns flowOf(true)
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
-        assertTrue(vm.state.value.hero is HomeHeroState.Summary)
+        assertNull(vm.state.value.accountNudge)
 
-        totalGamesFlow.value = 1
+        totalGamesFlow.value = 3
         advanceUntilIdle()
 
-        val hero = vm.state.value.hero
-        assertTrue(hero is HomeHeroState.Summary)
-        assertEquals(1, (hero as HomeHeroState.Summary).totalGames)
+        assertEquals(NudgeTrigger.GAME_MILESTONE, vm.state.value.accountNudge?.trigger)
     }
 
     @Test
     fun `state updates reactively when auth session changes to Authenticated`() =
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Unauthenticated
-            every { statsRepository.observeCollectionStats(any()) } returns
+            every { statsRepository.observeCollectionSummary() } returns
                 flowOf(collectionStatsWithCards(10))
 
             val vm = buildViewModel()
@@ -928,7 +937,7 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             val layout = vm.state.value.layout
-            assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+            assertEquals(HomeWidgetType.GREETING_HEADER, layout.first().type)
             // The signed-out default surfaces discovery widgets, not signed-in hubs.
             assertTrue(layout.any { it.type == HomeWidgetType.LATEST_SETS })
             assertTrue(layout.any { it.type == HomeWidgetType.CARD_OF_THE_DAY })
@@ -946,8 +955,8 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             val layout = vm.state.value.layout
-            assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
-            assertTrue(layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
+            assertEquals(HomeWidgetType.GREETING_HEADER, layout.first().type)
+            assertTrue(layout.any { it.type == HomeWidgetType.YOUR_DECKS_SHELF })
             assertTrue(layout.any { it.type == HomeWidgetType.COLLECTION_STATS_HUB })
         }
 
@@ -994,7 +1003,7 @@ class HomeViewModelTest {
             val layout = vm.state.value.layout
             assertEquals(HomeWidgetType.GAME_STATS_HUB, layout.last().type)
             assertContiguousCategoryRuns(layout)
-            coVerify(atLeast = 1) { userPrefsDataStore.saveHomeLayout(any()) }
+            assertTrue(layoutWriteCount >= 1)
         }
 
     @Test
@@ -1007,6 +1016,11 @@ class HomeViewModelTest {
             // end. SOCIAL_HUB was later split into FRIENDS + COMMUNITY_DECKS (Home widget board
             // overhaul, TASK 5c) — FRIENDS is the SOCIAL-category widget in the default layout now.
             sessionStateFlow.value = SessionState.Authenticated(authUser())
+            savedLayoutTokens.value = listOf(
+                "context_hero", "quick_actions", "game_stats_hub", "your_decks_shelf",
+                "collection_stats_hub", "recently_added", "trades_hub", "friends",
+                "latest_sets", "mtg_news", "rules_tip",
+            ).joinToString(",") { "$it:MEDIUM" }
 
             val vm = buildViewModel()
             backgroundScope.launch { vm.state.collect {} }
@@ -1026,7 +1040,7 @@ class HomeViewModelTest {
             // NOT split off to the end of the board behind the DISCOVER run.
             assertEquals(socialIndex + 1, tradesIndex)
             assertContiguousCategoryRuns(layout)
-            coVerify(atLeast = 1) { userPrefsDataStore.saveHomeLayout(any()) }
+            assertEquals(2, layoutWriteCount)
         }
 
     @Test
@@ -1036,13 +1050,14 @@ class HomeViewModelTest {
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
-        val before = vm.state.value.layout.count { it.type == HomeWidgetType.GAME_STATS_HUB }
+        val before = vm.state.value.layout.count { it.type == HomeWidgetType.COLLECTION_STATS_HUB }
+        assertEquals(1, before)
 
-        vm.onAction(HomeAction.AddWidget(HomeWidgetType.GAME_STATS_HUB))
+        vm.onAction(HomeAction.AddWidget(HomeWidgetType.COLLECTION_STATS_HUB))
         advanceUntilIdle()
 
-        assertEquals(before, vm.state.value.layout.count { it.type == HomeWidgetType.GAME_STATS_HUB })
-        coVerify(exactly = 0) { userPrefsDataStore.saveHomeLayout(any()) }
+        assertEquals(before, vm.state.value.layout.count { it.type == HomeWidgetType.COLLECTION_STATS_HUB })
+        assertEquals(0, layoutWriteCount)
     }
 
     @Test
@@ -1052,13 +1067,13 @@ class HomeViewModelTest {
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
-        assertTrue(vm.state.value.layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
+        assertTrue(vm.state.value.layout.any { it.type == HomeWidgetType.RECENTLY_ADDED })
 
-        vm.onAction(HomeAction.RemoveWidget(HomeWidgetType.GAME_STATS_HUB))
+        vm.onAction(HomeAction.RemoveWidget(HomeWidgetType.RECENTLY_ADDED))
         advanceUntilIdle()
 
-        assertFalse(vm.state.value.layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
-        coVerify(atLeast = 1) { userPrefsDataStore.saveHomeLayout(any()) }
+        assertFalse(vm.state.value.layout.any { it.type == HomeWidgetType.RECENTLY_ADDED })
+        assertTrue(layoutWriteCount >= 1)
     }
 
     @Test
@@ -1073,7 +1088,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertTrue(vm.state.value.layout.any { it.type == HomeWidgetType.CONTEXT_HERO })
-        coVerify(exactly = 0) { userPrefsDataStore.saveHomeLayout(any()) }
+        assertEquals(0, layoutWriteCount)
     }
 
     @Test
@@ -1090,7 +1105,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertEquals(firstNonHero, vm.state.value.layout[3].type)
-        coVerify(atLeast = 1) { userPrefsDataStore.saveHomeLayout(any()) }
+        assertTrue(layoutWriteCount >= 1)
     }
 
     @Test
@@ -1106,7 +1121,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertEquals(before, vm.state.value.layout)
-        coVerify(exactly = 0) { userPrefsDataStore.saveHomeLayout(any()) }
+        assertEquals(0, layoutWriteCount)
     }
 
     // ── Persistence round-trip ────────────────────────────────────────────────
@@ -1122,6 +1137,7 @@ class HomeViewModelTest {
 
         assertEquals(
             listOf(
+                WidgetInstance(HomeWidgetType.GREETING_HEADER, WidgetSize.MEDIUM),
                 WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
                 WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM),
             ),
@@ -1139,7 +1155,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val ids = vm.state.value.layout.map { it.type }
-        assertEquals(listOf(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.GAME_STATS_HUB), ids)
+        assertEquals(listOf(HomeWidgetType.GREETING_HEADER, HomeWidgetType.CONTEXT_HERO, HomeWidgetType.GAME_STATS_HUB), ids)
     }
 
     @Test
@@ -1151,9 +1167,12 @@ class HomeViewModelTest {
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
 
-        // The HUGE token is dropped; only game_stats_hub survives.
+        // The HUGE token is dropped; only game_stats_hub survives (plus GREETING_HEADER migration).
         assertEquals(
-            listOf(WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM)),
+            listOf(
+                WidgetInstance(HomeWidgetType.GREETING_HEADER, WidgetSize.MEDIUM),
+                WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM),
+            ),
             vm.state.value.layout,
         )
     }
@@ -1188,7 +1207,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertEquals(before, vm.state.value.layout)
-        coVerify(exactly = 0) { userPrefsDataStore.saveHomeLayout(any()) }
+        assertEquals(0, layoutWriteCount)
     }
 
     @Test
@@ -1204,7 +1223,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertEquals(before, vm.state.value.layout)
-        coVerify(exactly = 0) { userPrefsDataStore.saveHomeLayout(any()) }
+        assertEquals(0, layoutWriteCount)
     }
 
     // ── AddWidget default size ────────────────────────────────────────────────
@@ -1236,7 +1255,7 @@ class HomeViewModelTest {
 
         val layout = vm.state.value.layout
         assertTrue(layout.isNotEmpty())
-        assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+        assertEquals(HomeWidgetType.GREETING_HEADER, layout.first().type)
     }
 
     // ── ResetLayout produces correct auth-appropriate default ─────────────────
@@ -1255,7 +1274,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val layout = vm.state.value.layout
-        assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+        assertEquals(HomeWidgetType.GREETING_HEADER, layout.first().type)
         assertFalse(layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
         assertTrue(layout.any { it.type == HomeWidgetType.LATEST_SETS })
     }
@@ -1267,14 +1286,15 @@ class HomeViewModelTest {
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
 
-        vm.onAction(HomeAction.RemoveWidget(HomeWidgetType.GAME_STATS_HUB))
+        vm.onAction(HomeAction.RemoveWidget(HomeWidgetType.YOUR_DECKS_SHELF))
         advanceUntilIdle()
+        assertFalse(vm.state.value.layout.any { it.type == HomeWidgetType.YOUR_DECKS_SHELF })
 
         vm.onAction(HomeAction.ResetLayout)
         advanceUntilIdle()
 
         val layout = vm.state.value.layout
-        assertTrue(layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
+        assertTrue(layout.any { it.type == HomeWidgetType.YOUR_DECKS_SHELF })
         assertTrue(layout.any { it.type == HomeWidgetType.COLLECTION_STATS_HUB })
     }
 
@@ -1432,10 +1452,8 @@ class HomeViewModelTest {
         }
 
     @Test
-    fun `hero is QuestsReady with the claimable count when quests are completed and gamification enabled`() =
+    fun `claimable quests take the hero above the welcome (D13)`() =
         runTest(testDispatcher) {
-            // Two completed (claimable) quests; an active draft is also running but QuestsReady wins.
-            activeDraftFlow.value = draftingState(setCode = "MKM")
             questBoardFlow.value = QuestBoard(
                 daily = listOf(quest("d1", status = "COMPLETED"), quest("d2", status = "COMPLETED")),
                 weekly = emptyList(),
@@ -1445,16 +1463,14 @@ class HomeViewModelTest {
             backgroundScope.launch { vm.state.collect {} }
             advanceUntilIdle()
 
-            val hero = vm.state.value.hero
-            assertTrue("Expected QuestsReady but was $hero", hero is HomeHeroState.QuestsReady)
-            assertEquals(2, (hero as HomeHeroState.QuestsReady).count)
+            assertEquals(HomeHeroState.QuestsReady(count = 2), vm.state.value.hero)
+            assertEquals(2, vm.state.value.gamification?.claimableCount)
         }
 
     @Test
-    fun `hero is NOT QuestsReady when gamification is disabled even with claimable quests`() =
+    fun `claimable quests never take the hero while gamification is unavailable`() =
         runTest(testDispatcher) {
             gamificationEnabledFlow.value = false
-            activeDraftFlow.value = draftingState(setCode = "MKM")
             questBoardFlow.value = QuestBoard(
                 daily = listOf(quest("d1", status = "COMPLETED")),
                 weekly = emptyList(),
@@ -1464,7 +1480,23 @@ class HomeViewModelTest {
             backgroundScope.launch { vm.state.collect {} }
             advanceUntilIdle()
 
-            assertTrue(vm.state.value.hero is HomeHeroState.ActiveDraft)
+            assertTrue(vm.state.value.hero is HomeHeroState.Welcome)
+            assertFalse(vm.state.value.gamificationEnabled)
+        }
+
+    @Test
+    fun `the hero returns to the welcome once every quest is claimed`() =
+        runTest(testDispatcher) {
+            questBoardFlow.value = QuestBoard(daily = listOf(quest("d1", status = "COMPLETED")), weekly = emptyList())
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+            assertTrue(vm.state.value.hero is HomeHeroState.QuestsReady)
+
+            questBoardFlow.value = QuestBoard(daily = listOf(quest("d1", status = "CLAIMED")), weekly = emptyList())
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value.hero is HomeHeroState.Welcome)
         }
 
     @Test
@@ -1530,8 +1562,7 @@ class HomeViewModelTest {
 
     @Test
     fun `RefreshRandomCard reaches LOADED and sets the random card`() = runTest(testDispatcher) {
-        coEvery { cardRepository.searchCards(any(), any(), any()) } returns
-            DataResult.Success(listOf(discoverCard("r1")))
+        coEvery { cardRepository.getRandomCard("lang:en") } returns DataResult.Success(discoverCard("r1"))
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
@@ -1542,6 +1573,7 @@ class HomeViewModelTest {
 
         assertEquals(DiscoverLoadState.LOADED, vm.state.value.randomCardLoadState)
         assertEquals("r1", vm.state.value.cardOfTheDay?.scryfallId)
+        coVerify(atLeast = 2) { cardRepository.getRandomCard("lang:en") }
     }
 
     // ── News filters (persisted, shared with NewsScreen) ──────────────────────
@@ -1781,7 +1813,7 @@ class HomeViewModelTest {
             sessionStateFlow.value = SessionState.Authenticated(authUser())
             every { tradesRepository.observeActiveProposals() } returns
                 kotlinx.coroutines.flow.flow { throw RuntimeException("boom") }
-            every { statsRepository.observeCollectionStats(any()) } returns flowOf(collectionStatsWithCards(5))
+            every { statsRepository.observeCollectionSummary() } returns flowOf(collectionStatsWithCards(5))
 
             val vm = buildViewModel()
             backgroundScope.launch { vm.state.collect {} }
@@ -1799,6 +1831,7 @@ class HomeViewModelTest {
         // on every process start — without an explicit warm-up call TRADES_HUB's Inbox always shows
         // "0 pending trades" on a fresh Home open, even with real pending proposals waiting.
         sessionStateFlow.value = SessionState.Authenticated(authUser())
+        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
@@ -1810,6 +1843,7 @@ class HomeViewModelTest {
     @Test
     fun `init never calls refreshProposals when signed out`() = runTest(testDispatcher) {
         sessionStateFlow.value = SessionState.Unauthenticated
+        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
@@ -1824,6 +1858,7 @@ class HomeViewModelTest {
     fun `tradeSuggestionPreviews resolves matched cards and counterparty names when authenticated`() =
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Authenticated(authUser())
+            seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
             coEvery { tradeSuggestionsRepository.getSuggestions() } returns
                 Result.success(listOf(tradeSuggestion("c1")))
             every { friendRepository.observeFriends() } returns flowOf(
@@ -1848,6 +1883,7 @@ class HomeViewModelTest {
     fun `tradeSuggestionPreviews is an empty (not null) list when unauthenticated`() =
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Unauthenticated
+            seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
 
             val vm = buildViewModel()
             backgroundScope.launch { vm.state.collect {} }
@@ -1860,6 +1896,7 @@ class HomeViewModelTest {
     @Test
     fun `tradeSuggestionPreviews defaults to empty when getSuggestions fails`() = runTest(testDispatcher) {
         sessionStateFlow.value = SessionState.Authenticated(authUser())
+        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
         coEvery { tradeSuggestionsRepository.getSuggestions() } returns Result.failure(RuntimeException("network"))
 
         val vm = buildViewModel()
@@ -1873,6 +1910,7 @@ class HomeViewModelTest {
     fun `tradeSuggestionPreviews drops a suggestion whose card cannot be resolved locally`() =
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Authenticated(authUser())
+            seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
             coEvery { tradeSuggestionsRepository.getSuggestions() } returns
                 Result.success(listOf(tradeSuggestion("unresolvable")))
             coEvery { cardRepository.getCardsByIds(listOf("unresolvable")) } returns emptyList()
@@ -1947,6 +1985,7 @@ class HomeViewModelTest {
             // item-only refreshItemsForThread(rootId), which skips that redundant metadata re-fetch
             // (safe here specifically because metadata was just refreshed).
             sessionStateFlow.value = SessionState.Authenticated(authUser())
+            seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
             val proposal = tradeProposal(id = "p1", status = TradeStatus.PROPOSED, receiverId = "uid-1")
             every { tradesRepository.observeAllProposals() } returns flowOf(listOf(proposal))
 
@@ -1961,6 +2000,7 @@ class HomeViewModelTest {
     @Test
     fun `item-count hydration never fires when refreshProposals fails`() = runTest(testDispatcher) {
         sessionStateFlow.value = SessionState.Authenticated(authUser())
+        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
         coEvery { tradesRepository.refreshProposals(any()) } returns Result.failure(RuntimeException("network"))
 
         val vm = buildViewModel()
@@ -2191,7 +2231,7 @@ class HomeViewModelTest {
         }
 
     @Test
-    fun `once seen, the hero skips the completion card and falls through to Summary`() =
+    fun `once seen, the completion flag is never written again`() =
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Authenticated(authUser())
             every { userPrefsDataStore.observeSkippedFirstSteps() } returns
@@ -2203,7 +2243,7 @@ class HomeViewModelTest {
             backgroundScope.launch { vm.state.collect {} }
             advanceUntilIdle()
 
-            assertTrue(vm.state.value.hero is HomeHeroState.Summary)
+            assertTrue(vm.state.value.hero is HomeHeroState.Welcome)
             coVerify(exactly = 0) { userPrefsDataStore.markFirstStepsCompletionSeen() }
         }
 
@@ -2288,7 +2328,7 @@ class HomeViewModelTest {
         runTest(testDispatcher) {
             every { userCardRepository.observeRecentlyAdded(any()) } returns
                 kotlinx.coroutines.flow.flow { throw RuntimeException("db error") }
-            every { statsRepository.observeCollectionStats(any()) } returns flowOf(collectionStatsWithCards(1))
+            every { statsRepository.observeCollectionSummary() } returns flowOf(collectionStatsWithCards(1))
 
             val vm = buildViewModel()
             backgroundScope.launch { vm.state.collect {} }
@@ -2400,12 +2440,34 @@ class HomeViewModelTest {
         assertEquals(3, vm.state.value.lastGameRecap?.opponentCount)
     }
 
+    @Test
+    fun `win rate excludes draws from its denominator`() = runTest(testDispatcher) {
+        totalGamesFlow.value = 2
+        every { gameSessionRepository.observeLocalWins() } returns flowOf(1)
+        every { gameSessionRepository.observeLocalDraws() } returns flowOf(1)
+        every { gameSessionRepository.observeLocalSessionHistory(any()) } returns flowOf(
+            listOf(
+                com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry(
+                    sessionId = 1L, mode = "COMMANDER", totalTurns = 5, durationMs = 1_000L,
+                    playedAt = 1_000L, winnerName = "Local", surveyStatus = "COMPLETED",
+                    localIsWinner = true, localDeckId = null, localDeckName = null,
+                ),
+            ),
+        )
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(100, vm.state.value.winRate?.percentage)
+        assertEquals(1, vm.state.value.winRate?.totalGames)
+    }
+
     // ── First Steps: buildVisibleSteps condition table (Phase 2.2) ─────────────
 
     @Test
     fun `STEP_FIRST_ADD_CARD is hidden once the collection has at least one unique card`() =
         runTest(testDispatcher) {
-            every { statsRepository.observeCollectionStats(any()) } returns flowOf(collectionStatsWithCards(1))
+            every { statsRepository.observeCollectionSummary() } returns flowOf(collectionStatsWithCards(1))
 
             val vm = buildViewModel()
             backgroundScope.launch { vm.state.collect {} }
@@ -2486,7 +2548,7 @@ class HomeViewModelTest {
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Authenticated(authUser())
             every { friendRepository.observeFriendCount() } returns flowOf(2)
-            every { statsRepository.observeCollectionStats(any()) } returns flowOf(collectionStatsWithCards(3))
+            every { statsRepository.observeCollectionSummary() } returns flowOf(collectionStatsWithCards(3))
 
             val vm = buildViewModel()
             backgroundScope.launch { vm.state.collect {} }
@@ -2518,7 +2580,7 @@ class HomeViewModelTest {
     @Test
     fun `STEP_FIRST_OPEN_FOR_TRADE is hidden once the open-for-trade list has an entry`() =
         runTest(testDispatcher) {
-            every { statsRepository.observeCollectionStats(any()) } returns flowOf(collectionStatsWithCards(1))
+            every { statsRepository.observeCollectionSummary() } returns flowOf(collectionStatsWithCards(1))
             sessionStateFlow.value = SessionState.Authenticated(authUser())
             every { openForTradeRepository.observeLocal() } returns flowOf(listOf(openForTradeEntry()))
 
@@ -2613,7 +2675,7 @@ class HomeViewModelTest {
         runTest(testDispatcher) {
             every { userPrefsDataStore.observeSkippedFirstSteps() } returns flowOf(setOf(STEP_FIRST_ADD_CARD))
             // Condition would otherwise show this step (collection empty).
-            every { statsRepository.observeCollectionStats(any()) } returns flowOf(collectionStatsWithCards(0))
+            every { statsRepository.observeCollectionSummary() } returns flowOf(collectionStatsWithCards(0))
 
             val vm = buildViewModel()
             backgroundScope.launch { vm.state.collect {} }
@@ -2635,8 +2697,9 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val expected = listOf(
+            HomeWidgetType.GREETING_HEADER,
             HomeWidgetType.CONTEXT_HERO, HomeWidgetType.QUICK_ACTIONS,
-            HomeWidgetType.COLLECTION_STATS_HUB,
+            HomeWidgetType.COLLECTION_STATS_HUB, HomeWidgetType.COMMUNITY_DECKS,
             HomeWidgetType.CARD_OF_THE_DAY, HomeWidgetType.DISCOVER_CARDS,
             HomeWidgetType.LATEST_SETS, HomeWidgetType.RULES_TIP, HomeWidgetType.MTG_NEWS,
         )
@@ -2653,11 +2716,12 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val expected = listOf(
+            HomeWidgetType.GREETING_HEADER,
             HomeWidgetType.CONTEXT_HERO, HomeWidgetType.QUICK_ACTIONS,
-            HomeWidgetType.GAME_STATS_HUB,
+            HomeWidgetType.COMMUNITY_DECKS,
             HomeWidgetType.YOUR_DECKS_SHELF, HomeWidgetType.COLLECTION_STATS_HUB, HomeWidgetType.RECENTLY_ADDED,
-            HomeWidgetType.TRADES_HUB, HomeWidgetType.FRIENDS,
             HomeWidgetType.LATEST_SETS, HomeWidgetType.MTG_NEWS, HomeWidgetType.RULES_TIP,
+            HomeWidgetType.DISCOVER_CARDS, HomeWidgetType.CARD_OF_THE_DAY,
         )
         assertEquals(expected, vm.state.value.layout.map { it.type })
     }
@@ -2706,7 +2770,7 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             assertEquals(
-                listOf(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.RULES_TIP),
+                listOf(HomeWidgetType.GREETING_HEADER, HomeWidgetType.CONTEXT_HERO, HomeWidgetType.RULES_TIP),
                 vm.state.value.layout.map { it.type },
             )
         }
@@ -2731,6 +2795,7 @@ class HomeViewModelTest {
             // rate-limit budget.
             coVerify(exactly = 0) { scryfallRemoteDataSource.getAllSets() }
             coVerify(exactly = 0) { cardRepository.searchCards(any(), any(), any()) }
+            coVerify(exactly = 0) { cardRepository.getRandomCard("lang:en") }
 
             // Once the sync leaves SYNCING, the deferred fetches proceed.
             syncStateFlow.value = com.mmg.manahub.core.sync.SyncState.SUCCESS
@@ -2748,6 +2813,7 @@ class HomeViewModelTest {
 
             coVerify(atLeast = 1) { scryfallRemoteDataSource.getAllSets() }
             coVerify(atLeast = 1) { cardRepository.searchCards(any(), any(), any()) }
+            coVerify(atLeast = 1) { cardRepository.getRandomCard("lang:en") }
         }
 
     @Test
@@ -2764,5 +2830,397 @@ class HomeViewModelTest {
 
             coVerify(atLeast = 1) { scryfallRemoteDataSource.getAllSets() }
             coVerify(atLeast = 1) { cardRepository.searchCards(any(), any(), any()) }
+            coVerify(atLeast = 1) { cardRepository.getRandomCard("lang:en") }
         }
+
+    // ── Loading contract: auth gate, restarts, caches, gating (Home audit 2026-09-23) ──
+
+    /** Collects [HomeViewModel.state] until cancelled, recording every emission. */
+    private fun kotlinx.coroutines.test.TestScope.recordStates(vm: HomeViewModel): MutableList<HomeUiState> {
+        val emissions = mutableListOf<HomeUiState>()
+        backgroundScope.launch { vm.state.collect { emissions += it } }
+        // advanceUntilIdle() alone skips background-only work, so start the collector explicitly.
+        runCurrent()
+        return emissions
+    }
+
+    @Test
+    fun `a WhileSubscribed restart never re-emits a null decks slice`() = runTest(testDispatcher) {
+        deckSummariesFlow.value = listOf(deckSummary())
+        val vm = buildViewModel()
+        val firstCollector = backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+        assertNotNull(vm.state.value.decks)
+
+        firstCollector.cancel()
+        // Long enough for every nested WhileSubscribed(5s) upstream to stop.
+        advanceTimeBy(30_000)
+        runCurrent()
+
+        val emissions = recordStates(vm)
+        advanceUntilIdle()
+
+        assertTrue(emissions.isNotEmpty())
+        assertTrue(emissions.all { it.decks != null && it.boardReady && it.libraryStats != null })
+    }
+
+    @Test
+    fun `a resubscribe keeps signed-in trades content and never refetches network one-shots`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB, HomeWidgetType.COMMUNITY_DECKS)
+            coEvery { searchCommunityDecksUseCase(any()) } returns DataResult.Success(
+                com.mmg.manahub.core.model.CommunityDeckSearchResult(totalCount = 0, hasMore = false, decks = emptyList()),
+            )
+            val vm = buildViewModel()
+            val first = backgroundScope.launch {
+                launch { vm.state.collect {} }
+                launch { vm.communityDecksFlow.collect {} }
+            }
+            advanceUntilIdle()
+            assertNotNull(vm.state.value.recentTrades)
+            assertNotNull(vm.communityDecksFlow.value)
+
+            first.cancel()
+            advanceTimeBy(30_000)
+            runCurrent()
+
+            val emissions = recordStates(vm)
+            val decks = mutableListOf<List<com.mmg.manahub.core.model.CommunityDeckSummary>?>()
+            backgroundScope.launch { vm.communityDecksFlow.collect { decks += it } }
+            runCurrent()
+            advanceUntilIdle()
+            assertTrue(emissions.isNotEmpty())
+            assertTrue(decks.isNotEmpty())
+
+            assertTrue(emissions.all { it.auth is AuthGate.SignedIn })
+            assertTrue(emissions.all { it.recentTrades != null && it.tradeSuggestionPreviews != null })
+            assertTrue(emissions.none { it.hero is HomeHeroState.Loading })
+            assertTrue(decks.none { it == null })
+            coVerify(exactly = 1) { tradeSuggestionsRepository.getSuggestions() }
+            coVerify(exactly = 1) { searchCommunityDecksUseCase(any()) }
+        }
+
+    @Test
+    fun `while auth is unknown the board is not ready and the signed-out default is never loaded`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Loading
+            val vm = buildViewModel()
+            val emissions = recordStates(vm)
+            advanceUntilIdle()
+
+            assertTrue(emissions.isNotEmpty())
+            assertFalse(vm.state.value.boardReady)
+            assertTrue(vm.state.value.hero is HomeHeroState.Loading)
+            assertNull(vm.state.value.accountNudge)
+            assertTrue(vm.widgetReadiness.value.values.none { it })
+            io.mockk.verify(exactly = 0) { userPrefsDataStore.homeLayoutFlow(any()) }
+
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value.boardReady)
+            assertTrue(vm.state.value.layout.any { it.type == HomeWidgetType.YOUR_DECKS_SHELF })
+            // No emission ever offered the signed-out "create account" step or the account nudge.
+            assertTrue(
+                emissions.none { state ->
+                    (state.hero as? HomeHeroState.Welcome)?.steps?.any { it.id == STEP_FIRST_CREATE_ACCOUNT } == true
+                },
+            )
+            assertTrue(emissions.none { it.accountNudge != null })
+        }
+
+    @Test
+    fun `account-gated widgets are ready as placeholders when signed out`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB, HomeWidgetType.FRIENDS)
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.widgetReadiness.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(true, vm.widgetReadiness.value[HomeWidgetType.TRADES_HUB])
+        assertEquals(true, vm.widgetReadiness.value[HomeWidgetType.FRIENDS])
+        assertEquals(true, vm.widgetReadiness.value[HomeWidgetType.CONTEXT_HERO])
+    }
+
+    @Test
+    fun `a signed-in trades hub is not ready until its data lands`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
+        val proposals = MutableSharedFlow<List<TradeProposal>>()
+        every { tradesRepository.observeActiveProposals() } returns proposals
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.widgetReadiness.collect {} }
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value.boardReady)
+        assertEquals(false, vm.widgetReadiness.value[HomeWidgetType.TRADES_HUB])
+
+        proposals.emit(emptyList())
+        advanceUntilIdle()
+
+        assertEquals(true, vm.widgetReadiness.value[HomeWidgetType.TRADES_HUB])
+    }
+
+    @Test
+    fun `a later sign-in re-warms trades when the hub is on the board`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+        coVerify(exactly = 0) { tradesRepository.refreshProposals(any()) }
+
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { tradesRepository.refreshProposals("uid-1") }
+    }
+
+    @Test
+    fun `trades warm-up and suggestions never run while the hub is off the board`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.MTG_NEWS)
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { tradesRepository.refreshProposals(any()) }
+        coVerify(exactly = 0) { tradeSuggestionsRepository.getSuggestions() }
+    }
+
+    @Test
+    fun `a throwing activity source degrades to defaults instead of crashing the board`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Unauthenticated
+            every { gameSessionRepository.observeTotalGames() } returns
+                kotlinx.coroutines.flow.flow { throw RuntimeException("games") }
+            every { draftSimRepository.observeActiveSession() } returns
+                kotlinx.coroutines.flow.flow { throw RuntimeException("draft") }
+            every { tournamentRepository.observeTournaments() } returns
+                kotlinx.coroutines.flow.flow { throw RuntimeException("tournaments") }
+            every { statsRepository.observeCollectionSummary() } returns
+                kotlinx.coroutines.flow.flow { throw RuntimeException("stats") }
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val state = vm.state.value
+            assertTrue(state.boardReady)
+            assertTrue(state.accountNudgeResolved)
+            assertEquals(0, state.libraryStats?.uniqueCards)
+            assertTrue(state.gameStatsLoaded)
+            assertNull(state.activeTournamentSummary)
+        }
+
+    @Test
+    fun `a superseded discover refresh never reports FAILED or a non-fatal`() = runTest(testDispatcher) {
+        var calls = 0
+        coEvery { cardRepository.searchCards(any(), any(), any()) } coAnswers {
+            calls++
+            if (calls == 1) {
+                // The repository swallows the cancellation and returns an error, as some do.
+                try {
+                    kotlinx.coroutines.awaitCancellation()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    DataResult.Error("cancelled")
+                }
+            } else {
+                DataResult.Success(listOf(discoverCard("c2")))
+            }
+        }
+        val vm = buildViewModel()
+        val emissions = recordStates(vm)
+        advanceUntilIdle()
+        assertEquals(1, calls)
+
+        vm.onAction(HomeAction.RefreshDiscover)
+        advanceUntilIdle()
+
+        assertEquals(DiscoverLoadState.LOADED, vm.state.value.discoverLoadState)
+        assertTrue(emissions.none { it.discoverLoadState == DiscoverLoadState.FAILED })
+        io.mockk.verify(exactly = 0) { crashlyticsMock.recordException(any()) }
+    }
+
+    @Test
+    fun `a user-picked discover set is never overridden by the random seed`() = runTest(testDispatcher) {
+        val syncState = MutableStateFlow(com.mmg.manahub.core.sync.SyncState.SYNCING)
+        every { syncManager.syncState } returns syncState
+        val seeded = com.mmg.manahub.core.model.MagicSet(
+            code = "rnd", name = "Random", setType = com.mmg.manahub.core.model.SetType.EXPANSION,
+            releasedAt = null, cardCount = 200, iconSvgUri = "",
+        )
+        coEvery { scryfallRemoteDataSource.getAllSets() } returns listOf(seeded)
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        vm.onAction(HomeAction.SelectDiscoverSet(null))
+        syncState.value = com.mmg.manahub.core.sync.SyncState.IDLE
+        advanceUntilIdle()
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { kotlinx.coroutines.delay(50) }
+        advanceUntilIdle()
+
+        assertNull(vm.state.value.discoverSet)
+    }
+
+    @Test
+    fun `two AddWidget taps before DataStore re-emits both persist`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        vm.onAction(HomeAction.AddWidget(HomeWidgetType.GAME_STATS_HUB))
+        vm.onAction(HomeAction.AddWidget(HomeWidgetType.RECENTLY_ADDED))
+        advanceUntilIdle()
+
+        val types = vm.state.value.layout.map { it.type }
+        assertTrue(HomeWidgetType.GAME_STATS_HUB in types)
+        assertTrue(HomeWidgetType.RECENTLY_ADDED in types)
+        assertEquals(2, layoutWriteCount)
+    }
+
+    @Test
+    fun `daily puzzle is never fetched while the feature flag is off`() = runTest(testDispatcher) {
+        val getTodayPuzzle = mockk<com.mmg.manahub.feature.puzzle.domain.usecase.GetTodayPuzzleUseCase>()
+        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.DAILY_PUZZLE)
+        val vm = buildViewModel(getTodayPuzzleUseCase = getTodayPuzzle, puzzleEnabled = false)
+        backgroundScope.launch { vm.dailyPuzzleFlow.collect {} }
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { getTodayPuzzle() }
+        assertEquals(DailyPuzzleWidgetState.Unavailable, vm.dailyPuzzleFlow.value)
+    }
+
+    @Test
+    fun `daily puzzle is fetched once while on the board and survives a resubscribe`() = runTest(testDispatcher) {
+        val getTodayPuzzle = mockk<com.mmg.manahub.feature.puzzle.domain.usecase.GetTodayPuzzleUseCase>()
+        coEvery { getTodayPuzzle() } returns DataResult.Success(
+            com.mmg.manahub.core.model.puzzle.Puzzle(
+                date = kotlinx.datetime.LocalDate(2026, 9, 23),
+                type = com.mmg.manahub.core.model.puzzle.PuzzleType.GUESS_CARD,
+                payloadJson = "{}",
+            ),
+        )
+        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.DAILY_PUZZLE)
+        val vm = buildViewModel(getTodayPuzzleUseCase = getTodayPuzzle, puzzleEnabled = true)
+        val first = backgroundScope.launch { vm.dailyPuzzleFlow.collect {} }
+        advanceUntilIdle()
+        assertTrue(vm.dailyPuzzleFlow.value is DailyPuzzleWidgetState.Loaded)
+
+        first.cancel()
+        advanceTimeBy(30_000)
+        runCurrent()
+        val states = mutableListOf<DailyPuzzleWidgetState>()
+        backgroundScope.launch { vm.dailyPuzzleFlow.collect { states += it } }
+        runCurrent()
+        advanceUntilIdle()
+        assertTrue(states.isNotEmpty())
+
+        assertTrue(states.all { it is DailyPuzzleWidgetState.Loaded })
+        coVerify(exactly = 1) { getTodayPuzzle() }
+    }
+
+    @Test
+    fun `trending is only fetched while its widget is on the board`() = runTest(testDispatcher) {
+        val repo = mockk<com.mmg.manahub.core.domain.repository.CommunityAggregateRepository>()
+        coEvery { repo.getTrending(any()) } returns DataResult.Success(
+            com.mmg.manahub.core.model.TrendingSnapshot(week = "2026-W39", topCommanders = emptyList(), topCards = emptyList()),
+        )
+        val vm = buildViewModel(communityAggregateRepository = repo)
+        backgroundScope.launch { vm.trendingFlow.collect {} }
+        backgroundScope.launch { vm.trendingLoadedFlow.collect {} }
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+        coVerify(exactly = 0) { repo.getTrending(any()) }
+        assertFalse(vm.trendingLoadedFlow.value)
+
+        vm.onAction(HomeAction.AddWidget(HomeWidgetType.TRENDING_COMMANDERS))
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { repo.getTrending(any()) }
+        assertTrue(vm.trendingLoadedFlow.value)
+        assertNotNull(vm.trendingFlow.value)
+    }
+
+    @Test
+    fun `community decks search applies the persisted format filter`() = runTest(testDispatcher) {
+        every { userPrefsDataStore.homeCommunityDecksFormatFlow } returns flowOf("MODERN")
+        val filters = slot<com.mmg.manahub.core.model.CommunityDeckSearchFilters>()
+        coEvery { searchCommunityDecksUseCase(capture(filters)) } returns DataResult.Success(
+            com.mmg.manahub.core.model.CommunityDeckSearchResult(totalCount = 0, hasMore = false, decks = emptyList()),
+        )
+        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.COMMUNITY_DECKS)
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.communityDecksFlow.collect {} }
+        backgroundScope.launch { vm.communityDecksFormatFlow.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(
+            com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckFormatFilter.MODERN,
+            vm.communityDecksFormatFlow.value,
+        )
+        assertEquals(
+            com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckFormatFilter.MODERN.apiId,
+            filters.captured.deckFormatId,
+        )
+        assertEquals(emptyList<com.mmg.manahub.core.model.CommunityDeckSummary>(), vm.communityDecksFlow.value)
+    }
+
+    @Test
+    fun `an unknown persisted community decks format falls back to every format`() = runTest(testDispatcher) {
+        every { userPrefsDataStore.homeCommunityDecksFormatFlow } returns flowOf("NOT_A_FORMAT")
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.communityDecksFormatFlow.collect {} }
+        advanceUntilIdle()
+
+        assertNull(vm.communityDecksFormatFlow.value)
+    }
+
+    @Test
+    fun `SelectCommunityDecksFormat persists the enum name, null clears it`() = runTest(testDispatcher) {
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        vm.onAction(
+            HomeAction.SelectCommunityDecksFormat(
+                com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckFormatFilter.PAUPER,
+            ),
+        )
+        vm.onAction(HomeAction.SelectCommunityDecksFormat(null))
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { userPrefsDataStore.saveHomeCommunityDecksFormat("PAUPER") }
+        coVerify(exactly = 1) { userPrefsDataStore.saveHomeCommunityDecksFormat(null) }
+    }
+
+    @Test
+    fun `RollRulesTip always moves to a different valid tip`() = runTest(testDispatcher) {
+        val vm = buildViewModel()
+        val start = vm.rulesTipIndexFlow.value
+        assertEquals(dailyRulesTipIndex(System.currentTimeMillis()), start)
+
+        repeat(20) {
+            val before = vm.rulesTipIndexFlow.value
+            vm.onAction(HomeAction.RollRulesTip)
+            val after = vm.rulesTipIndexFlow.value
+            assertNotEquals(before, after)
+            assertTrue(after in RULES_TIPS_DAILY_ORDER.indices)
+        }
+    }
+
+    @Test
+    fun `news items repeated by id are collapsed before reaching the board`() = runTest(testDispatcher) {
+        val feed = listOf(newsArticle("1"), newsArticle("1"), newsArticle("2"))
+        every { getNewsFeedUseCase() } returns flowOf(feed)
+        stubEnabledEnglishSourcesFor(feed)
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(listOf("1", "2"), vm.state.value.recentNews?.map { it.id })
+    }
 }

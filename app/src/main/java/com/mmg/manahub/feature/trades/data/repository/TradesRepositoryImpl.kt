@@ -2,18 +2,18 @@ package com.mmg.manahub.feature.trades.data.repository
 
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
-import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
-import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
-import com.mmg.manahub.core.data.remote.trades.TradesRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.TradeItemDto
 import com.mmg.manahub.core.data.remote.dto.TradeItemRequestDto
 import com.mmg.manahub.core.data.remote.dto.TradeProposalDto
+import com.mmg.manahub.core.data.remote.trades.TradesRemoteDataSource
+import com.mmg.manahub.core.data.repository.TradesRepository
+import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.core.model.ReviewFlags
 import com.mmg.manahub.core.model.TradeItem
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
-import com.mmg.manahub.core.model.ReviewFlags
-import com.mmg.manahub.core.data.repository.TradesRepository
 import com.mmg.manahub.core.util.recordSafeNonFatal
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.datetime.Clock
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
@@ -42,6 +43,9 @@ class TradesRepositoryImpl(
 
     private val cache = MutableStateFlow<List<TradeProposal>>(emptyList())
 
+    // Trade keys already put on the bus this process, so every refresh does not re-emit the history.
+    private val emittedTradeKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
     override fun observeActiveProposals(): Flow<List<TradeProposal>> =
         cache.map { list -> list.filter { it.status.isActive } }
 
@@ -58,42 +62,39 @@ class TradesRepositoryImpl(
         if (proposalsResult.isFailure) return Result.failure(proposalsResult.exceptionOrNull()!!)
 
         val dtos = proposalsResult.getOrThrow().distinctBy { it.id }
+        emitNewlyCompletedTrades(dtos)
         // The existing-items merge is computed INSIDE the update lambda so a concurrent
         // refreshProposalThread() call can't interleave a read-then-write and silently drop
         // the other call's freshly-fetched items (trades audit §2.8, 2026-07-10).
         cache.update { current ->
             val existingById = current.associateBy { it.id }
             // Preserve items already loaded for any proposal in the cache.
-            dtos.map { dto -> dto.toDomain(existingById[dto.id]?.items ?: emptyList()) }
+            dtos.map { dto -> dto.toDomain(existingById[dto.id]) }
         }
         return Result.success(Unit)
     }
 
     override suspend fun refreshProposalThread(rootProposalId: String, userId: String): Result<Unit> {
-        // Fetch fresh proposal metadata for all of the user's proposals.
-        val proposalsResult = remote.fetchProposals(userId)
-        if (proposalsResult.isFailure) return Result.failure(proposalsResult.exceptionOrNull()!!)
+        // Only this thread's proposals: a whole-account fetch per thread open wastes the call budget.
+        val dtos = remote.fetchProposals(userId, rootProposalId)
+            .getOrElse { return Result.failure(it) }
+            .filter { it.rootProposalId == rootProposalId }
+            .distinctBy { it.id }
+        emitNewlyCompletedTrades(dtos)
 
-        val dtos = proposalsResult.getOrThrow().distinctBy { it.id }
+        val threadItems = fetchItemsForProposals(dtos.map { it.id })
 
-        val threadItems = fetchItemsForProposals(
-            dtos.filter { it.rootProposalId == rootProposalId }.map { it.id }
-        )
-
-        // For proposals in this thread: use the freshly-fetched items. For others: preserve
-        // whatever items are in the cache. Computed inside update() — see §2.8 note above.
+        // A thread proposal whose item fetch failed keeps whatever the cache already had; other
+        // threads are left untouched. Computed inside update() — see the §2.8 note above.
         cache.update { current ->
             val existingById = current.associateBy { it.id }
-            dtos.map { dto ->
-                val fetched = threadItems[dto.id]
-                if (fetched != null) {
-                    dto.toDomain(fetched.first, fetched.second)
-                } else {
-                    dto.toDomain(existingById[dto.id]?.items ?: emptyList())
-                }
+            val refreshed = dtos.map { dto ->
+                val fetched = threadItems[dto.id]?.getOrNull()
+                if (fetched != null) dto.toDomain(fetched.first, fetched.second) else dto.toDomain(existingById[dto.id])
             }
+            current.filterNot { it.rootProposalId == rootProposalId } + refreshed
         }
-        return Result.success(Unit)
+        return threadItems.firstItemFailure()?.let { Result.failure(it) } ?: Result.success(Unit)
     }
 
     override suspend fun refreshItemsForThread(rootProposalId: String): Result<Unit> {
@@ -109,12 +110,15 @@ class TradesRepositoryImpl(
 
         cache.update { current ->
             current.map { proposal ->
-                val fetched = threadItems[proposal.id] ?: return@map proposal
-                proposal.copy(items = fetched.first.map { it.toDomain(fetched.second) })
+                val fetched = threadItems[proposal.id]?.getOrNull() ?: return@map proposal
+                proposal.copy(items = fetched.first.map { it.toDomain(fetched.second) }, itemsLoaded = true)
             }
         }
-        return Result.success(Unit)
+        return threadItems.firstItemFailure()?.let { Result.failure(it) } ?: Result.success(Unit)
     }
+
+    private fun Map<String, Result<*>>.firstItemFailure(): Throwable? =
+        values.firstNotNullOfOrNull { it.exceptionOrNull() }
 
     /**
      * Fetches [TradeItemDto]s + a Room card lookup map for each of [proposalIds], CONCURRENTLY.
@@ -128,11 +132,13 @@ class TradesRepositoryImpl(
      */
     private suspend fun fetchItemsForProposals(
         proposalIds: List<String>,
-    ): Map<String, Pair<List<TradeItemDto>, Map<String, CardEntity>>> = coroutineScope {
+    ): Map<String, Result<Pair<List<TradeItemDto>, Map<String, CardEntity>>>> = coroutineScope {
         proposalIds.map { proposalId ->
             async {
-                val itemsResult = remote.fetchProposalItems(proposalId)
-                val itemDtos = if (itemsResult.isSuccess) itemsResult.getOrThrow() else emptyList()
+                // A failed fetch must never read as "this proposal has no cards".
+                val itemDtos = remote.fetchProposalItems(proposalId).getOrElse { e ->
+                    return@async proposalId to Result.failure<Pair<List<TradeItemDto>, Map<String, CardEntity>>>(e)
+                }
                 val cardIds = itemDtos.map { it.cardId }.distinct()
                 if (cardIds.isNotEmpty()) {
                     // Pre-warm Room for any card the user never cached (typically the
@@ -144,7 +150,7 @@ class TradesRepositoryImpl(
                 val cardMap: Map<String, CardEntity> = if (cardIds.isNotEmpty()) {
                     cardDao.getByIds(cardIds).associateBy { it.scryfallId }
                 } else emptyMap()
-                proposalId to (itemDtos to cardMap)
+                proposalId to Result.success(itemDtos to cardMap)
             }
         }.awaitAll().toMap()
     }
@@ -156,6 +162,15 @@ class TradesRepositoryImpl(
         includesReviewFromReceiver: Boolean,
         autoSend: Boolean,
     ): Result<String> = remote.createProposal(receiverId, items, includesReviewFromProposer, includesReviewFromReceiver, autoSend)
+
+    override suspend fun createProposalWithRequestId(
+        receiverId: String,
+        items: List<TradeItemRequestDto>,
+        includesReviewFromProposer: Boolean,
+        includesReviewFromReceiver: Boolean,
+        autoSend: Boolean,
+        clientRequestId: String,
+    ): Result<String> = remote.createProposal(receiverId, items, includesReviewFromProposer, includesReviewFromReceiver, autoSend, clientRequestId)
 
     override suspend fun editProposal(
         proposalId: String,
@@ -179,32 +194,51 @@ class TradesRepositoryImpl(
         reviewFlags: ReviewFlags,
     ): Result<String> = remote.counterProposal(parentProposalId, items, reviewFlags)
 
+    override suspend fun counterProposalWithRequestId(
+        parentProposalId: String,
+        items: List<TradeItemRequestDto>,
+        reviewFlags: ReviewFlags,
+        clientRequestId: String,
+    ): Result<String> = remote.counterProposal(parentProposalId, items, reviewFlags, clientRequestId)
+
+    // Accepting does not complete a trade (it can still be revoked): no progression here (D7).
     override suspend fun acceptProposal(proposalId: String): Result<Unit> =
-        remote.acceptProposal(proposalId).also { result ->
-            // Emit only after a successful accept (ADR-002 §1). Idempotency key
-            // trade:{proposalId} means a second accept (e.g. the counterparty's device,
-            // or a retry) grants XP at most once per proposal.
-            if (result.isSuccess) {
-                progressionEventBus.emit(
-                    ProgressionEvent.TradeCompleted(
-                        tradeId = proposalId,
-                        occurredAt = Clock.System.now(),
-                    )
-                )
-            }
-        }
+        remote.acceptProposal(proposalId)
 
     override suspend fun revokeAcceptance(proposalId: String): Result<Unit> =
         remote.revokeAcceptance(proposalId)
 
+    // COMPLETED needs both parties; the caller's post-success thread refresh observes it and emits.
     override suspend fun markCompleted(proposalId: String): Result<Unit> =
         remote.markCompleted(proposalId)
 
     override fun clearCache() {
         cache.value = emptyList()
+        emittedTradeKeys.clear()
     }
 
-    private fun TradeProposalDto.toDomain(existingItems: List<TradeItem>) = TradeProposal(
+    /**
+     * Emits [ProgressionEvent.TradeCompleted] for every COMPLETED proposal in [dtos] not yet emitted
+     * this process (restore plan D7). Runs on every server-status observation, so BOTH parties earn it;
+     * the key `trade:{rootProposalId}` is global per user, so the ledger dedupes repeats across
+     * processes and devices and a replay never advances the trade counters (D10).
+     */
+    private suspend fun emitNewlyCompletedTrades(dtos: List<TradeProposalDto>) {
+        dtos.asSequence()
+            .filter { it.status == TradeStatus.COMPLETED.name }
+            .map { it.rootProposalId.ifBlank { it.id } }
+            .distinct()
+            .filter { emittedTradeKeys.add(it) }
+            .toList()
+            .forEach { tradeId ->
+                progressionEventBus.emit(
+                    ProgressionEvent.TradeCompleted(tradeId = tradeId, occurredAt = Clock.System.now())
+                )
+            }
+    }
+
+    /** Metadata-only mapping that keeps [existing]'s items and their loaded state. */
+    private fun TradeProposalDto.toDomain(existing: TradeProposal?) = TradeProposal(
         id = id,
         status = status.toTradeStatusOrFallback(),
         proposerId = proposerId,
@@ -217,9 +251,10 @@ class TradesRepositoryImpl(
         proposerMarkedCompletedAt = proposerMarkedCompletedAt?.parseIso(),
         receiverMarkedCompletedAt = receiverMarkedCompletedAt?.parseIso(),
         cancellationReason = cancellationReason,
-        items = existingItems,
+        items = existing?.items ?: emptyList(),
         createdAt = createdAt.parseIso() ?: 0L,
         updatedAt = updatedAt.parseIso() ?: 0L,
+        itemsLoaded = existing?.itemsLoaded ?: false,
     )
 
     private fun TradeProposalDto.toDomain(items: List<TradeItemDto>, cardMap: Map<String, CardEntity> = emptyMap()) = TradeProposal(
@@ -252,7 +287,7 @@ class TradesRepositoryImpl(
         language = language,
         cardId = cardId,
         cardName = cardMap[cardId]?.name ?: "",
-        imageUrl = cardMap[cardId]?.let { it.imageArtCrop ?: it.imageNormal },
+        imageUrl = cardMap[cardId]?.imageNormal,
         typeLine = cardMap[cardId]?.typeLine,
         setCode = cardMap[cardId]?.setCode,
         setName = cardMap[cardId]?.setName,

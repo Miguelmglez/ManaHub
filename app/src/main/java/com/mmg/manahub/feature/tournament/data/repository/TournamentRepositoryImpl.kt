@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.tournament.data.repository
 
+import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
@@ -284,6 +285,10 @@ class TournamentRepositoryImpl(
                     players.map { it.toDomain() },
                     matchesAfterFinish.map { it.toDomain() },
                 )
+                if (plan.forcedRematches > 0) {
+                    // Legal but worth knowing: every remaining opponent had already been played
+                    recordNonFatal("tournament_swiss_forced_rematch: count=${plan.forcedRematches}")
+                }
                 val advanceKind = when {
                     plan.tournamentFinished                        -> TournamentDao.AdvanceKind.TOURNAMENT_FINISHED
                     plan.result is NextRoundResult.RoundGenerated -> TournamentDao.AdvanceKind.ROUND_GENERATED

@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.usecase
+// COMMENTS_REVIEWED: 2026-09-08
 
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.model.Card
@@ -136,6 +137,11 @@ class EvaluateDeckUseCase(
      *        [evaluateDeckUseCaseV2] for P5's [com.mmg.manahub.feature.decks.domain.engine.Finding
      *        .SideboardOversized] check. Appended LAST and defaulted so every existing call site
      *        keeps compiling unchanged.
+     * @param emitProgression Deck Wizard Commander v3 plan (Phase 0 / E4) — when `false`, skips the
+     *        [ProgressionEvent.FeatureExplored] emit below. A repeated wizard-side re-evaluation
+     *        (verify + refine passes) is not a real user "exploration" of the Deck Doctor feature
+     *        each time — only a genuine Studio/Doctor read should advance that quest. Defaulted
+     *        `true` so every existing call site keeps emitting exactly as before.
      * @return a [DeckHealth] bundling the [DeckEvaluation], the [DeckProfile] it was built from,
      *         the resolved [ArchetypeResolution] (always present — GENERIC/no-themes when the
      *         deck carries no archetype signal, so the Studio header chip always has something to
@@ -152,6 +158,13 @@ class EvaluateDeckUseCase(
         commanderTags: List<CardTag> = emptyList(),
         scoreWeightOverrides: ScoreWeightOverrides = ScoreWeightOverrides.NONE,
         sideboardCount: Int = 0,
+        emitProgression: Boolean = true,
+        // Deck Wizard Commander v3 plan (Phase 0 / E3, D5, fixes F3) -- raw PostureId.name from
+        // Deck.postureOverride, or null/blank/unrecognized to let the pin/inference paths carry no
+        // posture. Only consulted on the PIN branch of resolveArchetype (a manual archetype/theme
+        // override honors its sibling posture pin); the INFERENCE branch already resolves its own
+        // posture from InferDeckArchetypeUseCase, untouched by this param.
+        postureOverride: String? = null,
     ): DeckHealth = withContext(ioDispatcher) {
         val colorIdentity = deriveColorIdentity(mainboard, commanderIdentity)
 
@@ -173,13 +186,16 @@ class EvaluateDeckUseCase(
         // a cut/add the same day advances the quest at most once. The emit grants 0 XP (no ledger row);
         // it is fire-and-forget on the bus and never affects the returned analysis. Fires EXACTLY ONCE
         // per invoke() call — the v2 pipeline below reuses this SAME call's profile/resolution, it
-        // does not trigger a second emit.
-        progressionEventBus.emit(
-            ProgressionEvent.FeatureExplored(
-                featureKey = FEATURE_DECK_DOCTOR,
-                occurredAt = Clock.System.now(),
+        // does not trigger a second emit. Deck Wizard Commander v3 plan (E4): skipped when
+        // [emitProgression] is false (a wizard-internal re-evaluation, not a real feature visit).
+        if (emitProgression) {
+            progressionEventBus.emit(
+                ProgressionEvent.FeatureExplored(
+                    featureKey = FEATURE_DECK_DOCTOR,
+                    occurredAt = Clock.System.now(),
+                )
             )
-        )
+        }
 
         val archetypeFormat = ArchetypeFormat.of(format)
         // The resolution used by BOTH the legacy layer below and the v2 pipeline — computed once,
@@ -191,6 +207,7 @@ class EvaluateDeckUseCase(
             resolveArchetype(
                 mainboard, archetypeFormat, archetypeOverride, themesOverride, commanderTags,
                 commanderColorIdentity = commanderIdentity.mapNotNull(::symbolToColor).toSet(),
+                postureOverride = postureOverride,
             )
         }
 
@@ -276,6 +293,7 @@ class EvaluateDeckUseCase(
         themesOverride: List<String>,
         commanderTags: List<CardTag>,
         commanderColorIdentity: Set<ManaColor>,
+        postureOverride: String? = null,
     ): ArchetypeResolution {
         val pinnedMacro = archetypeOverride?.let { raw -> ArchetypeId.entries.firstOrNull { it.name == raw } }
         val pinnedThemes = themesOverride.mapNotNull { raw -> ThemeId.entries.firstOrNull { it.name == raw } }.take(2)
@@ -286,8 +304,13 @@ class EvaluateDeckUseCase(
             // the bare generic baseline" convention), rather than coercing to a removed enum value.
             // No [ArchetypeResolution.resemblance] here -- a manual pin has no axes-based distance
             // computation to report (resemblance is specifically the INFERENCE path's output).
+            // Deck Wizard Commander v3 plan (E3, fixes F3): the sibling posture pin, parsed the
+            // same defensive way (entries.firstOrNull, never .valueOf()) -- an unrecognized/blank
+            // string resolves to `null` (no posture), never a crash.
+            val pinnedPosture = postureOverride?.let { raw -> PostureId.entries.firstOrNull { it.name == raw } }
             return ArchetypeResolution(
                 macro = pinnedMacro,
+                posture = pinnedPosture,
                 themes = pinnedThemes,
                 isManualOverride = true,
                 confidence = 1f,
@@ -321,9 +344,19 @@ class EvaluateDeckUseCase(
         resolution: ArchetypeResolution,
     ): DeckEvaluation {
         val colorCount = colorIdentity.size
+        // Deck Wizard Commander v3 plan (E3, fixes F3): a MANUAL posture pin is now threaded into
+        // the skeleton resolution -- before this fix, a posture pin was stored on
+        // ArchetypeResolution but never reached the skeleton's own posture-aware role bands, so
+        // e.g. a "Voltron" pin graded identically to a plain macro pick. Gated on
+        // [ArchetypeResolution.isManualOverride] deliberately: the INFERENCE path already resolved
+        // `resolution.posture` before this fix (see [resolveArchetype]'s inferred branch) without
+        // ever reaching the skeleton this way, and this phase's scope is the PIN path only --
+        // widening this to the inference path too is a separate, not-yet-calibrated change (the
+        // golden/corpus suites were calibrated without it) left for a future pass.
         val skeleton: ResolvedArchetypeSkeleton = ArchetypeSkeletonResolver.resolveWithColor(
             format = format,
             archetype = resolution.macro,
+            posture = resolution.posture.takeIf { resolution.isManualOverride },
             themes = resolution.themes,
             identity = colorIdentity,
         )

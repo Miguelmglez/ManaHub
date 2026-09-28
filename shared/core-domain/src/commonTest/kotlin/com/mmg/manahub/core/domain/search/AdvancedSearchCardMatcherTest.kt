@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.domain.search
 
 import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.CardFace
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.CollectionSource
 import com.mmg.manahub.core.model.ColorMatchMode
@@ -36,6 +37,25 @@ class AdvancedSearchCardMatcherTest {
         colors = emptyList(),
         colorIdentity = listOf("G"),
     )
+
+    @Test
+    fun `multicolor is independent of letter comparison and chosen field`() {
+        val monoWithMulticolorIdentity = card(id = "split", name = "Split", colors = listOf("W"), colorIdentity = listOf("W", "U"))
+        val blueWhite = card(id = "wu", name = "Blue White", colors = listOf("W", "U"), colorIdentity = listOf("W", "U"))
+        val blueBlack = card(id = "ub", name = "Blue Black", colors = listOf("U", "B"), colorIdentity = listOf("U", "B"))
+        val colorless = card(id = "none", name = "None", colors = emptyList(), colorIdentity = emptyList())
+        for (mode in ColorMatchMode.entries) {
+            assertTrue(AdvancedSearchCardMatcher.matchesCriterion(blueWhite, SearchCriterion.Colors(setOf("M"), mode)))
+            assertFalse(AdvancedSearchCardMatcher.matchesCriterion(monoWithMulticolorIdentity, SearchCriterion.Colors(setOf("M"), mode)))
+            assertTrue(AdvancedSearchCardMatcher.matchesCriterion(monoWithMulticolorIdentity, SearchCriterion.ColorIdentity(setOf("M"), mode)))
+            assertFalse(AdvancedSearchCardMatcher.matchesCriterion(colorless, SearchCriterion.Colors(setOf("M"), mode)))
+        }
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(blueWhite, SearchCriterion.Colors(setOf("M", "W"), ColorMatchMode.AT_LEAST)))
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(blueBlack, SearchCriterion.Colors(setOf("M", "W"), ColorMatchMode.AT_LEAST)))
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(blueWhite, SearchCriterion.Colors(setOf("M", "W"), ColorMatchMode.EXACTLY)))
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(blueWhite, SearchCriterion.Colors(setOf("M", "W", "U"), ColorMatchMode.EXACTLY)))
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(blueWhite, SearchCriterion.Colors(setOf("M", "W"), ColorMatchMode.ANY_OF)))
+    }
 
     // ── Basic criteria ────────────────────────────────────────────────────────
 
@@ -509,5 +529,85 @@ class AdvancedSearchCardMatcherTest {
         // anything else re-creates the remote-vs-local split the mode enum exists to close.
         assertTrue(AdvancedSearchCardMatcher.matchesCriterion(bolt, SearchCriterion.Colors(emptySet(), ColorMatchMode.AT_MOST)))
         assertTrue(AdvancedSearchCardMatcher.matchesCriterion(bolt, SearchCriterion.ColorIdentity(emptySet(), ColorMatchMode.AT_MOST)))
+    }
+
+    @Test
+    fun `CommanderEligible delegates to CommanderEligibility, agreeing with the wizard's own owned-commander grid`() {
+        val legendaryCreature = card(id = "cmd-x", name = "Some Legend", typeLine = "Legendary Creature — Human")
+        val nonLegendary = card(id = "creature-x", name = "Some Creature", typeLine = "Creature — Human")
+        val canBeCommander = card(id = "pw-x", name = "Some Planeswalker", typeLine = "Legendary Planeswalker — Test", oracleText = "Some Planeswalker can be your commander.")
+
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(legendaryCreature, SearchCriterion.CommanderEligible))
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(canBeCommander, SearchCriterion.CommanderEligible))
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(nonLegendary, SearchCriterion.CommanderEligible))
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(bolt, SearchCriterion.CommanderEligible))
+    }
+
+    // ── Whole-type matching (same rule as the search_friend_cards RPC) ─────────
+
+    private fun typed(typeLine: String, faces: List<CardFace>? = null) =
+        card(id = typeLine, typeLine = typeLine).copy(cardFaces = faces)
+
+    private fun face(typeLine: String) = CardFace(
+        name = "Face", printedName = null, manaCost = null, typeLine = typeLine, oracleText = null,
+        power = null, toughness = null, loyalty = null, defense = null, flavorText = null,
+        imageNormal = null, imageArtCrop = null,
+    )
+
+    private fun types(vararg types: String, matchAll: Boolean = true, exclude: Boolean = false) =
+        SearchCriterion.CardType(types.toSet(), matchAll, exclude)
+
+    @Test
+    fun `Rat matches a Rat but not a Pirate`() {
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(typed("Creature — Rat"), types("Rat")))
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(typed("Creature — Human Pirate"), types("Rat")))
+    }
+
+    @Test
+    fun `Ape does not match Shapeshifter and Ant does not match Giant`() {
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(typed("Creature — Shapeshifter"), types("Ape")))
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(typed("Creature — Giant Warrior"), types("Ant")))
+    }
+
+    @Test
+    fun `Human matches inside a multi-type line, case-insensitively`() {
+        val card = typed("Legendary Creature — Human Pirate")
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(card, types("human")))
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(card, types("Legendary", "Pirate")))
+    }
+
+    @Test
+    fun `multi-word and hyphenated types match whole`() {
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(typed("Legendary Creature — Time Lord Doctor"), types("Time Lord")))
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(typed("Legendary Creature — Time Lordling"), types("Time Lord")))
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(typed("Artifact Creature — Assembly-Worker"), types("Assembly-Worker")))
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(typed("Artifact Creature — Assembly-Worker"), types("Worker")))
+    }
+
+    @Test
+    fun `exclude drops only whole-type matches`() {
+        val exclude = types("Rat", exclude = true)
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(typed("Creature — Human Pirate"), exclude))
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(typed("Creature — Rat Ninja"), exclude))
+    }
+
+    @Test
+    fun `any-of needs one whole type`() {
+        val anyOf = types("Rat", "Ape", matchAll = false)
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(typed("Creature — Pirate Shapeshifter"), anyOf))
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(typed("Creature — Ape"), anyOf))
+    }
+
+    @Test
+    fun `a double-faced card matches on either face`() {
+        val dfc = typed(
+            "Creature — Human Werewolf // Creature — Werewolf",
+            faces = listOf(face("Creature — Human Werewolf"), face("Creature — Werewolf")),
+        )
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(dfc, types("Werewolf")))
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(dfc, types("Human")))
+        val facesOnly = typed("Card", faces = listOf(face("Enchantment — Saga"), face("Creature — Rat")))
+        assertTrue(AdvancedSearchCardMatcher.matchesCriterion(facesOnly, types("Rat")))
+        assertFalse(AdvancedSearchCardMatcher.matchesCriterion(facesOnly, types("Rat", exclude = true)))
     }
 }

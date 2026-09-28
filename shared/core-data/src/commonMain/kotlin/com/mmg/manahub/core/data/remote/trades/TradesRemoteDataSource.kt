@@ -9,7 +9,6 @@ import com.mmg.manahub.core.model.ReviewFlags
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -31,19 +30,41 @@ class TradesRemoteDataSource(
 ) {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
-    suspend fun fetchProposals(userId: String): Result<List<TradeProposalDto>> =
-        safeCall {
-            supabaseClient.postgrest["trade_proposals"]
-                .select {
-                    filter {
+    /**
+     * Every proposal where [userId] is a participant, optionally only the thread rooted at
+     * [rootProposalId], drained page by page in `(created_at, id)` order. Fails unless every page
+     * was fetched, so a truncated list can never replace the cached one.
+     */
+    suspend fun fetchProposals(userId: String, rootProposalId: String? = null): Result<List<TradeProposalDto>> =
+        drainByCreatedAt(
+            id = { it.id },
+            createdAt = { it.createdAt },
+        ) { after, limit -> fetchProposalsPage(userId, rootProposalId, after, limit) }.toResult()
+
+    /** One `(created_at, id)` keyset page of [fetchProposals]. */
+    suspend fun fetchProposalsPage(
+        userId: String,
+        rootProposalId: String?,
+        after: CreatedAtCursor?,
+        limit: Int,
+    ): Result<List<TradeProposalDto>> = safeCall {
+        supabaseClient.postgrest["trade_proposals"]
+            .select {
+                filter {
+                    if (rootProposalId != null) eq("root_proposal_id", rootProposalId)
+                    // Two top-level `or` groups would overwrite each other, so they are nested under one `and`.
+                    and {
                         or {
                             eq("proposer_id", userId)
                             eq("receiver_id", userId)
                         }
+                        if (after != null) afterCreatedAt(after)
                     }
                 }
-                .decodeList<TradeProposalDto>()
-        }
+                createdAtPage(limit)
+            }
+            .decodeList<TradeProposalDto>()
+    }
 
     suspend fun fetchProposalItems(proposalId: String): Result<List<TradeItemDto>> =
         safeCall {
@@ -58,6 +79,7 @@ class TradesRemoteDataSource(
         includesReviewFromProposer: Boolean,
         includesReviewFromReceiver: Boolean,
         autoSend: Boolean,
+        clientRequestId: String? = null,
     ): Result<String> = safeCall {
         val params = buildJsonObject {
             put("p_receiver_id", receiverId)
@@ -65,8 +87,13 @@ class TradesRemoteDataSource(
             put("p_includes_review_from_proposer", includesReviewFromProposer)
             put("p_includes_review_from_receiver", includesReviewFromReceiver)
             put("p_auto_send", autoSend)
+            if (clientRequestId != null) put("p_client_request_id", clientRequestId)
         }
         supabaseClient.postgrest.rpc("create_proposal", params).decodeAs<String>()
+    }.let { result ->
+        if (clientRequestId != null && result.exceptionOrNull().isMissingRpcOverload()) {
+            createProposal(receiverId, items, includesReviewFromProposer, includesReviewFromReceiver, autoSend)
+        } else result
     }
 
     suspend fun editProposal(
@@ -116,6 +143,7 @@ class TradesRemoteDataSource(
         parentProposalId: String,
         items: List<TradeItemRequestDto>,
         reviewFlags: ReviewFlags,
+        clientRequestId: String? = null,
     ): Result<String> = safeCall {
         val params = buildJsonObject {
             put("p_parent_proposal_id", parentProposalId)
@@ -124,8 +152,13 @@ class TradesRemoteDataSource(
                 put("from_proposer", reviewFlags.fromProposer)
                 put("from_receiver", reviewFlags.fromReceiver)
             })
+            if (clientRequestId != null) put("p_client_request_id", clientRequestId)
         }
         supabaseClient.postgrest.rpc("counter_proposal", params).decodeAs<String>()
+    }.let { result ->
+        if (clientRequestId != null && result.exceptionOrNull().isMissingRpcOverload()) {
+            counterProposal(parentProposalId, items, reviewFlags)
+        } else result
     }
 
     suspend fun acceptProposal(proposalId: String): Result<Unit> = safeCall {
@@ -153,13 +186,11 @@ class TradesRemoteDataSource(
     }
 
     private suspend fun <T> safeCall(block: suspend () -> T): Result<T> =
-        withContext(dispatcherProvider.io) {
-            try {
-                Result.success(block())
-            } catch (e: RestException) {
-                Result.failure(parseTradeError(e.message))
-            } catch (e: Exception) {
-                Result.failure(e)
-            }
+        dispatcherProvider.remoteResult(block).recoverCatching { e ->
+            // Trade RPC errors carry a typed token in the message; everything else passes through.
+            throw if (e is RestException) parseTradeError(e.message) else e
         }
+
+    private fun Throwable?.isMissingRpcOverload(): Boolean =
+        this?.message?.contains("PGRST202") == true
 }

@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.ui.components
+// COMMENTS_REVIEWED: 2026-09-17
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,11 +31,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +52,7 @@ import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.PriceFormatter
+import kotlinx.coroutines.launch
 
 /**
  * Reusable bottom sheet that lists all available art variants (printings) of a card so
@@ -80,12 +82,17 @@ fun VariantSelectorSheet(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { newValue ->
-            if (newValue == SheetValue.Hidden) !isLoading else true
-        },
     )
+    fun requestDismiss() {
+        if (isLoading) return
+        scope.launch {
+            sheetState.hide()
+            onDismiss()
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -100,7 +107,7 @@ fun VariantSelectorSheet(
                     .padding(horizontal = 4.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onDismiss) {
+                IconButton(onClick = ::requestDismiss, enabled = !isLoading) {
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "Close",

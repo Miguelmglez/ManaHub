@@ -9,6 +9,7 @@ import com.mmg.manahub.core.data.local.entity.DraftSessionEntity
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.DeckCreationSource
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.data.remote.CloudflareContentClient
@@ -453,6 +454,7 @@ class DraftSimRepositoryImpl(
                     name = "Draft — ${setCode.uppercase()}",
                     description = "Auto-generated from Draft Simulator",
                     format = "DRAFT",
+                    source = DeckCreationSource.DRAFT,
                 )
 
                 // Resolve each basic land's real Scryfall id (ScoringDraftDeckBuilder only computes

@@ -17,6 +17,9 @@ class ObserveSessionUseCase @Inject constructor(
 
     suspend fun disconnect(sessionId: String) = repository.disconnectRealtime(sessionId)
 
+    /** Drops buffered events so a snapshot is never followed by deltas it already accounts for. */
+    fun clearReplay(sessionId: String) = repository.clearReplay(sessionId)
+
     operator fun invoke(sessionId: String): Flow<SessionEvent> =
         repository.observeSession(sessionId)
 }

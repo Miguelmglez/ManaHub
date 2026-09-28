@@ -9,13 +9,15 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.auth.AuthUser
+import com.mmg.manahub.core.domain.config.DefaultsOnlyRemoteConfigRepository
+import com.mmg.manahub.core.gamification.domain.DefaultGamificationAvailability
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -33,11 +35,26 @@ class GamificationSyncWorkerTest {
     private val gamificationSyncManager: GamificationSyncManager = mockk(relaxed = true)
     private val authRepository: AuthRepository = mockk()
     private val userPreferencesDataStore: UserPreferencesDataStore = mockk()
+    private val optIn = MutableStateFlow(true)
+    private val availability = DefaultGamificationAvailability(
+        remoteConfigRepository = DefaultsOnlyRemoteConfigRepository(),
+        userOptInFlow = optIn,
+        compileEnabled = true,
+    )
+    private val user = AuthUser(
+        id = "user-123",
+        email = null,
+        nickname = null,
+        gameTag = null,
+        avatarUrl = null,
+        provider = "email",
+    )
 
     @Before
     fun setUp() {
         mockkStatic(FirebaseCrashlytics::class)
         every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
+        coEvery { userPreferencesDataStore.getGamificationOwnerUserId() } returns "user-123"
     }
 
     @After
@@ -45,8 +62,9 @@ class GamificationSyncWorkerTest {
         unmockkStatic(FirebaseCrashlytics::class)
     }
 
-    private fun buildWorker(): GamificationSyncWorker =
+    private fun buildWorker(runAttemptCount: Int = 0): GamificationSyncWorker =
         TestListenableWorkerBuilder<GamificationSyncWorker>(mockk<Context>(relaxed = true))
+            .setRunAttemptCount(runAttemptCount)
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(
                     appContext: Context,
@@ -58,13 +76,14 @@ class GamificationSyncWorkerTest {
                     gamificationSyncManager,
                     authRepository,
                     userPreferencesDataStore,
+                    availability,
                 )
             })
             .build()
 
     @Test
-    fun `doWork returns success and never calls sync when gamification flag is off`() = runBlocking {
-        every { userPreferencesDataStore.gamificationEnabledFlow } returns flowOf(false)
+    fun `doWork returns success and never calls sync when gamification is unavailable`() = runBlocking {
+        optIn.value = false
 
         val result = buildWorker().doWork()
 
@@ -75,7 +94,6 @@ class GamificationSyncWorkerTest {
 
     @Test
     fun `doWork returns success without syncing when there is no current user`() = runBlocking {
-        every { userPreferencesDataStore.gamificationEnabledFlow } returns flowOf(true)
         coEvery { authRepository.getCurrentUser() } returns null
 
         val result = buildWorker().doWork()
@@ -85,16 +103,7 @@ class GamificationSyncWorkerTest {
     }
 
     @Test
-    fun `doWork syncs the current user when gamification flag is on`() = runBlocking {
-        every { userPreferencesDataStore.gamificationEnabledFlow } returns flowOf(true)
-        val user = AuthUser(
-            id = "user-123",
-            email = null,
-            nickname = null,
-            gameTag = null,
-            avatarUrl = null,
-            provider = "email",
-        )
+    fun `doWork syncs the current user when available and the user owns the store`() = runBlocking {
         coEvery { authRepository.getCurrentUser() } returns user
         coEvery { gamificationSyncManager.sync("user-123") } returns Result.success(Unit)
 
@@ -102,5 +111,51 @@ class GamificationSyncWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify(exactly = 1) { gamificationSyncManager.sync("user-123") }
+    }
+
+    @Test
+    fun `doWork skips sync when the local store belongs to another account`() = runBlocking {
+        coEvery { authRepository.getCurrentUser() } returns user
+        coEvery { userPreferencesDataStore.getGamificationOwnerUserId() } returns "someone-else"
+
+        val result = buildWorker().doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify(exactly = 0) { gamificationSyncManager.sync(any()) }
+    }
+
+    @Test
+    fun `doWork skips sync when the store is still guest owned`() = runBlocking {
+        coEvery { authRepository.getCurrentUser() } returns user
+        coEvery { userPreferencesDataStore.getGamificationOwnerUserId() } returns null
+
+        val result = buildWorker().doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify(exactly = 0) { gamificationSyncManager.sync(any()) }
+    }
+
+    @Test
+    fun `doWork retries a failed sync below the attempt cap`() = runBlocking {
+        coEvery { authRepository.getCurrentUser() } returns user
+        coEvery { gamificationSyncManager.sync("user-123") } returns Result.failure(RuntimeException("net"))
+
+        assertEquals(ListenableWorker.Result.retry(), buildWorker(runAttemptCount = 2).doWork())
+    }
+
+    @Test
+    fun `doWork gives up on a failed sync at the attempt cap`() = runBlocking {
+        coEvery { authRepository.getCurrentUser() } returns user
+        coEvery { gamificationSyncManager.sync("user-123") } returns Result.failure(RuntimeException("net"))
+
+        assertEquals(ListenableWorker.Result.failure(), buildWorker(runAttemptCount = 3).doWork())
+    }
+
+    @Test
+    fun `doWork gives up on a thrown sync at the attempt cap`() = runBlocking {
+        coEvery { authRepository.getCurrentUser() } returns user
+        coEvery { gamificationSyncManager.sync("user-123") } throws IllegalStateException("boom")
+
+        assertEquals(ListenableWorker.Result.failure(), buildWorker(runAttemptCount = 3).doWork())
     }
 }

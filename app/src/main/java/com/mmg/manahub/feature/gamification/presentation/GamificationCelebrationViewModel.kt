@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.gamification.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.gamification.domain.GamificationAvailability
 import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -32,19 +33,19 @@ import kotlinx.coroutines.launch
  * first time it sees -1. After a level-up is shown, [onLevelUpShown] advances the baseline by one due
  * level, so a multi-level jump surfaces each level in turn.
  *
- * ### Master toggle
- * When gamification is disabled, [current] is forced to null and the dismiss handlers are no-ops —
- * nothing is consumed, so pending celebrations remain queued for if the user re-enables gamification.
+ * ### Availability gate
+ * When [GamificationAvailability] reports unavailable, [current] is forced to null and the baseline
+ * seed waits — nothing is consumed, so pending celebrations stay queued for when it becomes available.
  *
  * ### KMP migration — Phase 1 Hilt->Koin cutover
  * Resolved via `koinViewModel()` from `gamificationKoinModule` (see
- * `feature/gamification/di/GamificationKoinModule.kt`). Both constructor deps are already bridged
- * Hilt-owned singletons in `coreBridgeKoinModule`, resolved via `get()` — no new bridging needed.
+ * `feature/gamification/di/GamificationKoinModule.kt`); every dependency is resolved via `get()`.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GamificationCelebrationViewModel(
     private val repository: GamificationRepository,
     private val userPreferencesDataStore: UserPreferencesDataStore,
+    private val gamificationAvailability: GamificationAvailability,
 ) : ViewModel() {
 
     /**
@@ -68,7 +69,7 @@ class GamificationCelebrationViewModel(
             repository.observePendingCelebrations().catch { emit(emptyList()) },
             repository.observeProgression().map { it.level }.catch { emit(1) },
             userPreferencesDataStore.lastCelebratedLevelFlow.catch { emit(-1) },
-            userPreferencesDataStore.gamificationEnabledFlow.catch { emit(false) },
+            gamificationAvailability.availableFlow.catch { emit(false) },
         ) { pending, currentLevel, lastCelebrated, enabled ->
             when {
                 !enabled -> null
@@ -93,6 +94,8 @@ class GamificationCelebrationViewModel(
         // OUTSIDE the combine (no side effects in a transform).
         viewModelScope.launch {
             runCatching {
+                // Never touch gamification storage while the feature is unavailable.
+                gamificationAvailability.availableFlow.first { it }
                 if (userPreferencesDataStore.getLastCelebratedLevel() == -1) {
                     val currentLevel = repository.observeProgression().first().level
                     userPreferencesDataStore.setLastCelebratedLevel(currentLevel)

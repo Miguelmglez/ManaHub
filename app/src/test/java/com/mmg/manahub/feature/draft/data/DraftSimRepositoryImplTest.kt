@@ -147,7 +147,7 @@ class DraftSimRepositoryImplTest {
             basics = emptyList(),
             sideboard = listOf(sideboardCard),
         )
-        coEvery { deckRepository.createDeck(any(), any(), any()) } returns "deck-1"
+        coEvery { deckRepository.createDeck(any(), any(), any(), any()) } returns "deck-1"
         val slotsCapture = slot<List<Triple<String, Int, Boolean>>>()
         coEvery { deckRepository.replaceAllCards("deck-1", capture(slotsCapture)) } just Runs
 
@@ -164,7 +164,7 @@ class DraftSimRepositoryImplTest {
         val dupeCard = DraftCard(DraftTestFixtures.fakeCard(2))
         val seat = DraftSeat(index = 0, isHuman = true, pool = listOf(dupeCard, dupeCard))
         val deck = DraftDeck(mainboard = emptyList(), basics = emptyList(), sideboard = listOf(dupeCard, dupeCard))
-        coEvery { deckRepository.createDeck(any(), any(), any()) } returns "deck-2"
+        coEvery { deckRepository.createDeck(any(), any(), any(), any()) } returns "deck-2"
         val slotsCapture = slot<List<Triple<String, Int, Boolean>>>()
         coEvery { deckRepository.replaceAllCards("deck-2", capture(slotsCapture)) } just Runs
 
@@ -180,7 +180,7 @@ class DraftSimRepositoryImplTest {
             mainboard = emptyList(),
             basics = listOf(BasicLandSlot(scryfallId = "", name = "Forest", count = 8)),
         )
-        coEvery { deckRepository.createDeck(any(), any(), any()) } returns "deck-3"
+        coEvery { deckRepository.createDeck(any(), any(), any(), any()) } returns "deck-3"
         coEvery { cardRepository.searchCardByName("Forest") } returns
             DataResult.Success(DraftTestFixtures.fakeCard(99).copy(scryfallId = "forest-id"))
         val slotsCapture = slot<List<Triple<String, Int, Boolean>>>()

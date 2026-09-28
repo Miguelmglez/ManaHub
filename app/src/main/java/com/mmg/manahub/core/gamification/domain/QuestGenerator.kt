@@ -71,7 +71,7 @@ object QuestGenerator {
         expiresAt: Long,
         previousPeriodTemplateIds: Set<String>,
     ): List<QuestInstanceEntity> {
-        val pool = QuestCatalog.forPeriod(period)
+        val pool = QuestCatalog.forPeriod(period).filter { it.isAvailable }
         val random = Random(fnv1a64("$stableId|$periodKey"))
 
         // Deterministic shuffle of the whole pool, THEN stable-partition fresh-before-repeated so the

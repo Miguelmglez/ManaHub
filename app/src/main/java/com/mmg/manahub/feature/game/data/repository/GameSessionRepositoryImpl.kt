@@ -57,6 +57,8 @@ class GameSessionRepositoryImpl(
                 commanderDamageDealt    = pr.totalCommanderDamageDealt,
                 commanderDamageReceived = pr.totalCommanderDamageReceived,
                 isWinner                = pr.player.id == data.winner.id,
+                deckId                  = pr.deckId,
+                archetype               = pr.archetype,
                 // Persist the app user's seat so the post-game survey can determine
                 // win/loss reliably (see ADR-001). isWinner alone is insufficient —
                 // every finished game has a winner.
@@ -95,11 +97,12 @@ class GameSessionRepositoryImpl(
     override fun observeTotalGames(): Flow<Int> =
         dao.observeTotalGames()
 
-    override fun observeWins(playerName: String): Flow<Int> =
-        dao.observeWins(playerName)
-
     override fun observeLocalWins(): Flow<Int> =
         dao.observeLocalWins()
+
+    override fun observeLocalDraws(): Flow<Int> = dao.observeLocalDraws()
+
+    override fun observeLocalSessionOutcomes(): Flow<List<Boolean?>> = dao.observeLocalSessionOutcomes()
 
     override fun observeLocalSessionHistory(limit: Int): Flow<List<SessionHistoryEntry>> =
         dao.observeLocalSessionHistory(limit).map { rows ->
@@ -113,6 +116,7 @@ class GameSessionRepositoryImpl(
                     winnerName    = row.winnerName,
                     surveyStatus  = row.surveyStatus,
                     localIsWinner = row.localIsWinner,
+                    isDraw       = row.isDraw,
                     localDeckId   = row.localDeckId,
                     localDeckName = row.localDeckName,
                     opponentCount = row.opponentCount.coerceAtLeast(0),
@@ -149,16 +153,12 @@ class GameSessionRepositoryImpl(
             ec?.let { EliminationStats(it.eliminationReason, it.count) }
         }
 
-    override fun observeAvgWinTurn(playerName: String): Flow<Double?> =
-        dao.observeAvgWinTurn(playerName)
+    override fun observeAvgWinTurn(): Flow<Double?> =
+        dao.observeLocalAvgWinTurn()
 
-    override fun observeCurrentStreak(playerName: String): Flow<Int> =
-        dao.observeAllSessionSummaries().map { sessions ->
-            var streak = 0
-            for (session in sessions) {
-                if (session.winnerName == playerName) streak++ else break
-            }
-            streak
+    override fun observeCurrentStreak(): Flow<Int> =
+        dao.observeLocalSessionOutcomes().map { outcomes ->
+            outcomes.takeWhile { it != false }.count { it == true }
         }
 
     override fun observePendingSurveyCount(): Flow<Int> =
@@ -187,8 +187,8 @@ class GameSessionRepositoryImpl(
             }
         }
 
-    override fun observeSingleDeckStats(deckId: String, playerName: String): Flow<SingleDeckStats?> =
-        dao.observeSingleDeckStats(deckId, playerName).map { row ->
+    override fun observeSingleDeckStats(deckId: String): Flow<SingleDeckStats?> =
+        dao.observeLocalSingleDeckStats(deckId).map { row ->
             row?.let {
                 SingleDeckStats(
                     deckId = it.deckId,

@@ -4,6 +4,7 @@ import com.mmg.manahub.core.data.network.ArchidektRequestQueue
 import com.mmg.manahub.core.data.remote.ArchidektClient
 import com.mmg.manahub.tools.tagpipeline.archidekt.ArchidektCategorySampler
 import com.mmg.manahub.tools.tagpipeline.archidekt.resolveDominantCategories
+import com.mmg.manahub.tools.tagpipeline.catalog.MechanicCatalogPublisher
 import com.mmg.manahub.tools.tagpipeline.edhrec.EdhrecThemeClient
 import com.mmg.manahub.tools.tagpipeline.io.DiskCache
 import com.mmg.manahub.tools.tagpipeline.io.PIPELINE_JSON
@@ -51,12 +52,14 @@ fun main(args: Array<String>) {
     val (subcommand, rest) = when (args.firstOrNull()) {
         "run" -> "run" to args.drop(1).toTypedArray()
         "upload" -> "upload" to args.drop(1).toTypedArray()
+        "catalog" -> "catalog" to args.drop(1).toTypedArray()
         else -> "run" to args // backward-compatible default: no subcommand = pipeline run
     }
 
     when (subcommand) {
         "run" -> runPipeline(rest)
         "upload" -> runUpload(rest)
+        "catalog" -> runCatalog(rest)
     }
 }
 
@@ -91,7 +94,7 @@ private fun runPipeline(args: Array<String>) {
         emptySequence()
     } else {
         System.err.println("[tag-pipeline] fetching oracle_tags bulk file...")
-        bulkClient.streamOracleTagsOrEmpty()
+        bulkClient.streamOracleTags()
     }
 
     val themeIndex = if (opts.skipEdhrec) {
@@ -118,7 +121,7 @@ private fun runPipeline(args: Array<String>) {
 
     val sinceFilter = opts.since?.let { path ->
         System.err.println("[tag-pipeline] --since $path: loading watermark manifest...")
-        SinceFilter(SinceWatermark.loadManifest(path))
+        SinceWatermark.loadCompleteManifest(path)
     }
 
     val rows = pipeline.buildRows(
@@ -130,6 +133,7 @@ private fun runPipeline(args: Array<String>) {
         since = sinceFilter,
         archidektCategoryByOracleId = archidektCategoryByOracleId,
         archetypeIndexByCardName = archetypeIndex,
+        requireOracleTags = !opts.skipOracleTags,
     )
 
     val count = writeJsonl(opts.out, CardStrategyTagsRow.serializer(), rows)
@@ -166,8 +170,31 @@ private fun sampleArchidektCategories(
         httpClient.close()
     }
 } catch (e: Exception) {
-    System.err.println("[tag-pipeline] Archidekt enrichment failed, continuing without it: ${e.message}")
-    emptyMap()
+    error("Archidekt source unavailable; refusing incomplete publication: ${e.message}")
+}
+
+private fun runCatalog(args: Array<String>) {
+    var cacheDir = Path.of("build", "tag-pipeline-cache")
+    var report: Path? = null
+    var dryRun = false
+    var supabaseUrl: String? = null
+    var i = 0
+    while (i < args.size) {
+        when (val arg = args[i]) {
+            "--cache-dir" -> { cacheDir = Path.of(requireValue(args, i, arg)); i++ }
+            "--report" -> { report = Path.of(requireValue(args, i, arg)); i++ }
+            "--supabase-url" -> { supabaseUrl = requireValue(args, i, arg); i++ }
+            "--dry-run" -> dryRun = true
+            else -> error("Unknown catalog argument: $arg")
+        }
+        i++
+    }
+    val output = requireNotNull(report) { "catalog requires --report <path>" }
+    val credentials = if (dryRun) "dry-run" else SupabaseCredentials.resolveServiceRoleKey()
+    val url = SupabaseCredentials.resolveUrl(supabaseUrl)
+    val publisher = MechanicCatalogPublisher(url, credentials)
+    val result = publisher.publish(ScryfallBulkClient(DiskCache(cacheDir)).streamOracleCards(), output, dryRun)
+    System.err.println("[tag-pipeline] catalog: ${result.published.size} verified new keywords, ${result.needsReview.size} need review")
 }
 
 private class RunOptions(
@@ -226,6 +253,10 @@ private class RunOptions(
                 i++
             }
 
+            require(limit != null || (!skipEdhrec && !skipOracleTags)) {
+                "--skip-edhrec and --skip-oracle-tags are only allowed with --limit smoke tests"
+            }
+
             return RunOptions(
                 out = out ?: throw IllegalArgumentException("--out <path> is required"),
                 cacheDir = cacheDir,
@@ -268,7 +299,7 @@ private fun runUpload(args: Array<String>) {
     if (opts.dryRun) {
         System.err.println("[tag-pipeline] --dry-run: validating batching only, no network calls, no credentials required")
         val uploader = SupabaseUploader(SupabaseUploadConfig(supabaseUrl = supabaseUrl, serviceRoleKey = "dry-run", batchSize = opts.batchSize))
-        val summary = uploader.uploadRows(readJsonl(opts.input, CardStrategyTagsRow.serializer(), gzip = false), dryRun = true)
+        val summary = uploader.uploadRows(readJsonl(opts.input, CardStrategyTagsRow.serializer(), gzip = false, strict = true), dryRun = true)
         System.err.println("[tag-pipeline] dry-run: ${summary.rowsSubmitted} row(s) across ${summary.batchCount} batch(es) would be uploaded")
         return
     }
@@ -280,12 +311,12 @@ private fun runUpload(args: Array<String>) {
         exitProcess(1)
     }
 
-    val uploader = SupabaseUploader(SupabaseUploadConfig(supabaseUrl = supabaseUrl, serviceRoleKey = serviceRoleKey, batchSize = opts.batchSize))
+    val uploader = SupabaseUploader(SupabaseUploadConfig(supabaseUrl = supabaseUrl, serviceRoleKey = serviceRoleKey, batchSize = opts.batchSize, verifyReadback = true))
 
     val runId = uploader.startPipelineRun(pipelineVersion = PIPELINE_VERSION.toString())
     System.err.println("[tag-pipeline] pipeline_runs row started" + (runId?.let { " (id=$it)" } ?: " (bookkeeping unavailable, continuing)"))
 
-    val summary = uploader.uploadRows(readJsonl(opts.input, CardStrategyTagsRow.serializer(), gzip = false))
+    val summary = uploader.uploadRows(readJsonl(opts.input, CardStrategyTagsRow.serializer(), gzip = false, strict = true))
     System.err.println(
         "[tag-pipeline] upload complete: ${summary.rowsSubmitted} row(s) across ${summary.batchCount} " +
             "batch(es), ${summary.failedBatches} batch(es) failed",

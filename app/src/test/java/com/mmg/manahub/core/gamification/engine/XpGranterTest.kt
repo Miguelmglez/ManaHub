@@ -8,6 +8,7 @@ import com.mmg.manahub.core.gamification.domain.LevelCurve
 import com.mmg.manahub.core.gamification.domain.XpConfig
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.domain.model.XpSourceCategory
+import com.mmg.manahub.core.model.DeckCreationSource
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -60,7 +61,7 @@ class XpGranterTest {
         dataStore = mockk(relaxed = true)
         coEvery { dataStore.getOrCreateGamificationDeviceId() } returns deviceId
         val clock = FixedClock(fixedInstant)
-        granter = XpGranter(dao, clock, timeZone, dataStore)
+        granter = XpGranter(dao, clock, { timeZone }, dataStore)
 
         // Default happy-path stubs. Individual tests override as needed.
         coEvery { dao.hasTransaction(any()) } returns false
@@ -98,7 +99,7 @@ class XpGranterTest {
 
     @Test
     fun `game without win grants only the logged amount`() = runTest {
-        val outcome = granter.grant(
+        val outcome = granter.grantOutcome(
             ProgressionEvent.GameFinished(
                 sessionId = 1L, isLocalWin = false, mode = "casual", playerCount = 2,
                 durationMs = 0L, winTurn = null, localFinalLife = null, occurredAt = now,
@@ -109,7 +110,7 @@ class XpGranterTest {
 
     @Test
     fun `local win stacks the win bonus on top of the logged amount`() = runTest {
-        val outcome = granter.grant(
+        val outcome = granter.grantOutcome(
             ProgressionEvent.GameFinished(
                 sessionId = 2L, isLocalWin = true, mode = "casual", playerCount = 2,
                 durationMs = 0L, winTurn = 7, localFinalLife = 12, occurredAt = now,
@@ -123,11 +124,12 @@ class XpGranterTest {
         // survey is device-scoped, so the pre-check sees the prefixed key.
         coEvery { dao.hasTransaction("dev:$deviceId:survey:5") } returns true
 
-        val outcome = granter.grant(
+        val result = granter.grant(
             ProgressionEvent.SurveyCompleted(surveyId = 5L, sessionId = 1L, occurredAt = now)
         )
 
-        assertEquals(0, outcome.xpGranted)
+        assertEquals(XpGrantResult.Duplicate, result)
+        assertEquals(0, result.outcome.xpGranted)
         coVerify(exactly = 0) { dao.grantXpAtomically(any(), any(), any(), any()) }
     }
 
@@ -136,12 +138,13 @@ class XpGranterTest {
         // hasTransaction misses (false) but the atomic insert loses the race and is not applied.
         coEvery { dao.grantXpAtomically(any(), any(), any(), any()) } returns noopResult()
 
-        val outcome = granter.grant(
+        val result = granter.grant(
             ProgressionEvent.SurveyCompleted(surveyId = 9L, sessionId = 1L, occurredAt = now)
         )
 
-        assertEquals(0, outcome.xpGranted)
-        assertFalse(outcome.leveledUp)
+        // A lost insert race means another grant already wrote the key: a duplicate, not "no XP".
+        assertEquals(XpGrantResult.Duplicate, result)
+        assertFalse(result.outcome.leveledUp)
     }
 
     @Test
@@ -157,7 +160,7 @@ class XpGranterTest {
             dao.grantXpAtomically(capture(txnSlot), any(), any(), any())
         } coAnswers { appliedResult(secondArg<Int>()) }
 
-        val outcome = granter.grant(
+        val outcome = granter.grantOutcome(
             ProgressionEvent.CardsAdded(addedCopies = 0, addedUnique = 5, occurredAt = now)
         )
 
@@ -172,7 +175,7 @@ class XpGranterTest {
             dao.sumXpForCategorySince(XpSourceCategory.COLLECTION.name, any())
         } returns XpConfig.collectionDailyCapXp
 
-        val outcome = granter.grant(
+        val outcome = granter.grantOutcome(
             ProgressionEvent.CardsAdded(addedCopies = 3, addedUnique = 2, occurredAt = now)
         )
 
@@ -187,7 +190,7 @@ class XpGranterTest {
         } returns 96 // 4 remaining
 
         // 3 cards * 3 = 9 raw, clamped to 4.
-        val outcome = granter.grant(
+        val outcome = granter.grantOutcome(
             ProgressionEvent.CardScanned(scanBatchId = "batch-1", count = 3, occurredAt = now)
         )
 
@@ -200,8 +203,8 @@ class XpGranterTest {
             dao.countDistinctSourceRefForCategorySince(XpSourceCategory.DECK.name, any())
         } returns 2 // under the cap of 3
 
-        val outcome = granter.grant(
-            ProgressionEvent.DeckCreated(deckId = "deck-1", format = "standard", occurredAt = now)
+        val outcome = granter.grantOutcome(
+            ProgressionEvent.DeckCreated(deckId = "deck-1", format = "standard", source = DeckCreationSource.BUILT, occurredAt = now)
         )
 
         assertEquals(XpConfig.deckCreated, outcome.xpGranted)
@@ -213,8 +216,8 @@ class XpGranterTest {
             dao.countDistinctSourceRefForCategorySince(XpSourceCategory.DECK.name, any())
         } returns XpConfig.maxRewardedDecksPerDay
 
-        val outcome = granter.grant(
-            ProgressionEvent.DeckCreated(deckId = "deck-4", format = "standard", occurredAt = now)
+        val outcome = granter.grantOutcome(
+            ProgressionEvent.DeckCreated(deckId = "deck-4", format = "standard", source = DeckCreationSource.WIZARD, occurredAt = now)
         )
 
         assertEquals(0, outcome.xpGranted)
@@ -222,8 +225,35 @@ class XpGranterTest {
     }
 
     @Test
+    fun `imported community and draft decks grant no xp and write no ledger row`() = runTest {
+        listOf(DeckCreationSource.IMPORT, DeckCreationSource.COMMUNITY, DeckCreationSource.DRAFT).forEach { source ->
+            val result = granter.grant(
+                ProgressionEvent.DeckCreated(deckId = "deck-$source", format = "commander", source = source, occurredAt = now)
+            )
+            assertEquals(XpGrantResult.NoXp, result)
+        }
+        coVerify(exactly = 0) { dao.grantXpAtomically(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `wizard deck is rewarded like a built deck`() = runTest {
+        val outcome = granter.grantOutcome(
+            ProgressionEvent.DeckCreated(deckId = "deck-w", format = "commander", source = DeckCreationSource.WIZARD, occurredAt = now)
+        )
+        assertEquals(XpConfig.deckCreated, outcome.xpGranted)
+    }
+
+    @Test
+    fun `collection changed grants no xp and writes no ledger row`() = runTest {
+        val result = granter.grant(ProgressionEvent.CollectionChanged(occurredAt = now))
+
+        assertEquals(XpGrantResult.NoXp, result)
+        coVerify(exactly = 0) { dao.grantXpAtomically(any(), any(), any(), any()) }
+    }
+
+    @Test
     fun `plain deck save grants no xp but is not an error`() = runTest {
-        val outcome = granter.grant(
+        val outcome = granter.grantOutcome(
             ProgressionEvent.DeckSaved(deckId = "deck-1", cardCount = 60, occurredAt = now)
         )
         assertEquals(0, outcome.xpGranted)
@@ -236,7 +266,7 @@ class XpGranterTest {
             dao.countDistinctSourceRefForCategorySince(XpSourceCategory.SOCIAL.name, any())
         } returns XpConfig.maxRewardedFriendsPerWeek
 
-        val outcome = granter.grant(
+        val outcome = granter.grantOutcome(
             ProgressionEvent.FriendAdded(friendId = "friend-6", occurredAt = now)
         )
 
@@ -249,7 +279,7 @@ class XpGranterTest {
             dao.countDistinctSourceRefForCategorySince(XpSourceCategory.SOCIAL.name, any())
         } returns 4
 
-        val outcome = granter.grant(
+        val outcome = granter.grantOutcome(
             ProgressionEvent.FriendAdded(friendId = "friend-5", occurredAt = now)
         )
 
@@ -260,7 +290,7 @@ class XpGranterTest {
 
     @Test
     fun `puzzle solved grants the base puzzle amount`() = runTest {
-        val outcome = granter.grant(
+        val outcome = granter.grantOutcome(
             ProgressionEvent.PuzzleSolved(
                 puzzleDate = LocalDate(2026, 8, 6), type = "GUESS_CARD",
                 attemptsUsed = 3, perfect = false, occurredAt = now,
@@ -273,7 +303,7 @@ class XpGranterTest {
     fun `a perfect GUESS_CARD solve does not stack the perfect bonus`() = runTest {
         // GUESS_CARD is explicitly excluded from the perfect bonus even if perfect somehow reads
         // true — no shipped puzzle type is designed to set it, so this must never silently pay out.
-        val outcome = granter.grant(
+        val outcome = granter.grantOutcome(
             ProgressionEvent.PuzzleSolved(
                 puzzleDate = LocalDate(2026, 8, 6), type = "GUESS_CARD",
                 attemptsUsed = 1, perfect = true, occurredAt = now,
@@ -285,7 +315,7 @@ class XpGranterTest {
     @Test
     fun `a perfect solve of a future non-GUESS_CARD type stacks the perfect bonus`() = runTest {
         // Forward-compat: a future puzzle type that legitimately sets perfect = true gets the bonus.
-        val outcome = granter.grant(
+        val outcome = granter.grantOutcome(
             ProgressionEvent.PuzzleSolved(
                 puzzleDate = LocalDate(2026, 8, 6), type = "ART_REVEAL",
                 attemptsUsed = 1, perfect = true, occurredAt = now,
@@ -317,7 +347,7 @@ class XpGranterTest {
     fun `duplicate puzzle solve for the same date is a no-op`() = runTest {
         coEvery { dao.hasTransaction("puzzle:2026-08-06:solved") } returns true
 
-        val outcome = granter.grant(
+        val outcome = granter.grantOutcome(
             ProgressionEvent.PuzzleSolved(
                 puzzleDate = LocalDate(2026, 8, 6), type = "GUESS_CARD",
                 attemptsUsed = 4, perfect = false, occurredAt = now,
@@ -330,7 +360,7 @@ class XpGranterTest {
 
     @Test
     fun `tournament win stacks the win bonus`() = runTest {
-        val outcome = granter.grant(
+        val outcome = granter.grantOutcome(
             ProgressionEvent.TournamentCompleted(
                 tournamentId = 1L, type = "swiss", isLocalWinner = true, occurredAt = now,
             )
@@ -352,7 +382,7 @@ class XpGranterTest {
     private suspend fun weeklyWindowStartFor(locale: Locale): Long {
         Locale.setDefault(locale)
         // Re-create the granter so it is constructed under the test locale (no hidden state, but explicit).
-        val granterUnderLocale = XpGranter(dao, FixedClock(fixedInstant), timeZone, dataStore)
+        val granterUnderLocale = XpGranter(dao, FixedClock(fixedInstant), { timeZone }, dataStore)
         val sinceSlot = slot<Long>()
         coEvery {
             dao.countDistinctSourceRefForCategorySince(XpSourceCategory.SOCIAL.name, capture(sinceSlot))
@@ -401,7 +431,7 @@ class XpGranterTest {
         }
         val ds = mockk<UserPreferencesDataStore>(relaxed = true)
         coEvery { ds.getOrCreateGamificationDeviceId() } returns deviceUuid
-        XpGranter(freshDao, FixedClock(fixedInstant), timeZone, ds).grant(event)
+        XpGranter(freshDao, FixedClock(fixedInstant), { timeZone }, ds).grant(event)
         return keySlot.captured.idempotencyKey
     }
 
@@ -450,7 +480,7 @@ class XpGranterTest {
         } coAnswers { appliedResult(secondArg<Int>()) }
 
         // Survey grants 25 XP, enough to cross into level 2 from one-below-threshold.
-        val outcome = granter.grant(
+        val outcome = granter.grantOutcome(
             ProgressionEvent.SurveyCompleted(surveyId = 1L, sessionId = 1L, occurredAt = now)
         )
 
@@ -458,4 +488,23 @@ class XpGranterTest {
         assertEquals(LevelCurve.levelForTotalXp(expectedTotal), outcome.newLevel)
         assertTrue("crossing the level-2 threshold must set leveledUp", outcome.leveledUp)
     }
+
+    @Test
+    fun `an event that maps to no XP reports NoXp, not a duplicate`() = runTest {
+        val result = granter.grant(ProgressionEvent.DeckSaved(deckId = "d1", cardCount = 3, occurredAt = now))
+
+        assertEquals(XpGrantResult.NoXp, result)
+    }
+
+    @Test
+    fun `a fresh grant reports Applied with its outcome`() = runTest {
+        val result = granter.grant(
+            ProgressionEvent.SurveyCompleted(surveyId = 3L, sessionId = 1L, occurredAt = now)
+        )
+
+        assertTrue(result is XpGrantResult.Applied)
+        assertEquals(XpConfig.surveyCompleted, result.outcome.xpGranted)
+    }
+
+    private suspend fun XpGranter.grantOutcome(event: ProgressionEvent) = grant(event).outcome
 }

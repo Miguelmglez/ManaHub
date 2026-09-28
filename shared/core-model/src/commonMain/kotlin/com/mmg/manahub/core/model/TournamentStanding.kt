@@ -32,4 +32,6 @@ data class TournamentStanding(
     val gwPercent: Double = 0.33,
     /** Opponent Game Win % (DCI tiebreaker, floored at 33 %). */
     val ogwPercent: Double = 0.33,
+    /** True when this player shares first place: every sporting tiebreaker tied and only seed order separated them. */
+    val isSharedFirst: Boolean = false,
 )

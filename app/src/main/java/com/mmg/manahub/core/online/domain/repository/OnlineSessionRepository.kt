@@ -36,10 +36,14 @@ interface OnlineSessionRepository {
     fun observeSession(sessionId: String): Flow<SessionEvent>
     suspend fun connectRealtime(sessionId: String)
     suspend fun disconnectRealtime(sessionId: String)
-    suspend fun broadcastLifeDelta(sessionId: String, slotIndex: Int, newLife: Int)
-    suspend fun broadcastPhaseChange(sessionId: String, newPhase: String, activePlayerSlot: Int, turnNumber: Int)
-    suspend fun broadcastCounterUpdate(sessionId: String, slotIndex: Int, counterType: String, newValue: Int)
-    suspend fun broadcastCommanderDamage(sessionId: String, targetSlot: Int, sourceSlot: Int, newDamage: Int)
-    suspend fun broadcastDefeatConfirmed(sessionId: String, slotIndex: Int)
-    suspend fun broadcastLandToggled(sessionId: String, slotIndex: Int, played: Boolean)
+
+    /** Drops buffered events for [sessionId]; call right after applying an authoritative snapshot. */
+    fun clearReplay(sessionId: String)
+    // broadcast* never throw; false means the message was not sent (no live channel or SDK failure)
+    suspend fun broadcastLifeDelta(sessionId: String, slotIndex: Int, newLife: Int): Boolean
+    suspend fun broadcastPhaseChange(sessionId: String, newPhase: String, activePlayerSlot: Int, turnNumber: Int): Boolean
+    suspend fun broadcastCounterUpdate(sessionId: String, slotIndex: Int, counterType: String, newValue: Int): Boolean
+    suspend fun broadcastCommanderDamage(sessionId: String, targetSlot: Int, sourceSlot: Int, newDamage: Int): Boolean
+    suspend fun broadcastDefeatConfirmed(sessionId: String, slotIndex: Int): Boolean
+    suspend fun broadcastLandToggled(sessionId: String, slotIndex: Int, played: Boolean): Boolean
 }

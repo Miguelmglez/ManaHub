@@ -136,6 +136,8 @@ class CollectionViewModelSyncTest {
         userPreferencesRepository = userPreferencesRepository,
         analyticsHelper           = analyticsHelper,
         collectionMergeConflictResolver = collectionMergeConflictResolver,
+        fileGateway = io.mockk.mockk(relaxed = true),
+        crashReporter = io.mockk.mockk(relaxed = true),
     )
 
     // ══════════════════════════════════════════════════════════════════════════

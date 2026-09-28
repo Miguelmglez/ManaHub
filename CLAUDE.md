@@ -54,14 +54,10 @@ output; do not restore `es`/`de` locale branches. → memory: `feedback_language
 // StateFlow self-assignment is a no-op on cold flow, safe to call
 ```
 
-**Removing stale comments is mandatory:** `android-kotlin-architect` + `kmp-web-fullstack-dev` agents MUST, on first touch of a file, delete all outdated/obvious/multi-line comments. **Mark the file with a gitignored `.comments-reviewed` tag** (add `// COMMENTS_REVIEWED: 2026-09-06` as the first line after the package declaration) so agents skip it on future edits — never re-review a marked file unless the comment itself changes.
-
-→ memory: `feedback_comment_precision_2026-09-06`
+No mandatory comment-review pass: do not audit or strip a file's existing comments just because you touched it, and do not add `// COMMENTS_REVIEWED` markers (rule removed 2026-09-22). Apply the rules above only to comments you write or directly modify.
 
 ## Build commands
 
-- YouTube API key is optional (Draft Guide video is silently disabled without it). Add
-  `YOUTUBE_API_KEY=...` to `local.properties` (git-ignored) → injected into `BuildConfig.YOUTUBE_API_KEY`.
 - Room schemas export to `app/schemas/` via `ksp { arg("room.schemaLocation", ...) }`.
 
 ## Architecture
@@ -75,6 +71,14 @@ Most features: a `Screen.kt` Composable, a `ViewModel.kt` (`@HiltViewModel`), op
 Features with their own data layer (Draft, News) add `data/`, `domain/`, `di/` sub-packages.
 
 ## Kotlin Multiplatform migration (IN PROGRESS — Android + Web)
+
+**Web implementation is paused by user direction (2026-09-25).** Until the user explicitly asks to
+resume it, do not edit `wasmJsMain` or `:webApp`, port Android features to web, run web builds, or
+expand this restoration with web-only changes. Record web implications in
+`docs/web-gamification-restore-debt-2026-09-25.md` and continue the Android scope. During this pause,
+the web-build clause in the definition of done below is deferred; Android compilation and affected
+tests remain required. This prevents a paused platform from repeatedly interrupting Android work
+while preserving a concrete backlog for the eventual web session.
 
 The project is migrating to **KMP, targeting Android + Web (Compose Multiplatform / `wasmJs`)**.
 iOS/Desktop are out of scope for now but the structure must not preclude them. **DI is moving Hilt →
@@ -127,8 +131,9 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
 - **Every `RETURNS SETOF` RPC must be keyset-paginated below `db-max-rows`.** PostgREST silently
   truncates at 1000 with no signal to the client. Paginate on `(updated_at, id)` — tie-safe — keeping
   the window filter and the cursor as separate predicates, and cap the page size **server-side**.
-  Drain via `PagedSync.drainPages` (`:shared:core-data` commonMain). Still unpaginated: the five
-  gamification `*_changes_since` RPCs.
+  Drain via `PagedSync.drainPages` (`:shared:core-data` commonMain). The gamification client now
+  uses `get_*_page` RPCs; their 2026-09 migrations were deployed on 2026-09-25. Keep the release
+  flag off pending device and release-candidate verification. Legacy unpaginated RPCs remain for shipped clients.
 - **Ownership data never depends on cache metadata.** A `user_card_collection` row inserts whether or
   not its `CardEntity` is cached; unresolved ids get a `stale_reason = "pending_hydration"`
   placeholder so the row stays visible and counted. Consumers that aggregate card fields (stats,
@@ -136,7 +141,26 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
 - → memory: `feedback_sync_watermark_never_past_unapplied`, `feedback_setof_rpc_must_be_paginated`,
   `feedback_idempotency_gate_tests_own_completion`, `project_collection_sync_data_loss_2026-09`
 
-### Database (Room v53)
+### Local game statistics
+Personal game totals and derived gamification counts include only sessions with an `is_local = 1`
+seat; a nonlocal or tournament session cannot become the user's game merely because it has a
+`game_sessions` row. Detect draws by `winnerId = -1`, never `winnerName = "Draw"` (a valid player name).
+Draws count as games but not as decisive games for win percentage, and a draw
+neither extends nor breaks a win streak. Keep Stats, Profile, Home, and achievements consistent so
+one recorded session cannot produce conflicting numbers or undeserved rewards.
+
+### Account-owned local caches
+An absent owner key on an upgraded installation is not proof that persisted data belongs to a
+guest. Legacy account data may predate the owner marker and survive sign-out, so never upload or
+show it under a new account by claiming `owner == null` alone. Require verified guest provenance,
+quarantine or wipe ambiguous legacy rows, and gate cache reads as well as writes by owner. Serialize
+session transitions so an old clear or claim job cannot modify the next account's cache.
+Account-owned UI `StateFlow`s must clear their visible state on every session identity change and
+expire replay after their last observer stops. A retained ViewModel can otherwise show account A's
+last screen value for a frame when account B returns from the navigation back stack, even if the
+underlying Room query is correctly scoped to B. Cancel old account jobs before subscribing to B.
+
+### Database (Room v56)
 - DB file `mtg_collection.db`. The `UserCardEntity` → `CardEntity` FK was **removed in v53** (ADR-008);
   do not reintroduce it. It was `ON DELETE RESTRICT` from v38 to v52.
 - Migration chain 1→53, gaps at 7–10 and 15–17 covered by `fallbackToDestructiveMigration()` (dev-only;
@@ -154,6 +178,9 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
   indices; those index names must match Room's generated names byte for byte or
   `runMigrationsAndValidate` crash-loops every user at launch (destructive fallback covers only
   v1–24). Guarded by `Migration52To53Test`.
+  v54 = additive `decks.posture_override`; v55 = additive `draft_sets.setImageUrl` (Draft);
+  v56 = additive `trade_collection_sync.pending_apply` + nullable `owner_user_id` on
+  `local_wishlists`/`local_open_for_trade` (Trades audit H4/H8).
   Every migration since v39 follows the same pattern: a top-level `val MIGRATION_x_y` in its own file,
   `CREATE TABLE IF NOT EXISTS …` / `ADD COLUMN … TEXT NOT NULL DEFAULT '…'` guarded by a
   `columnExists` check where applicable, CardDao upsert untouched → no CASCADE risk.
@@ -199,6 +226,9 @@ branch color on the active theme or `isSystemInDarkTheme()`.
   `MaterialTheme.spacing`, shapes via named tokens (`CardShape`, `ChipShape`, `ButtonShape`,
   `BottomSheetShape`). **Never** use `MaterialTheme.colorScheme`/`typography` directly, and never
   hardcode a `Color`, `dp` font size, or shape.
+- Reserve `textDisabled` for genuinely disabled controls. Informational subtitles, including
+  `EmptyState` guidance, use a readable text token such as `textSecondary`; disabled styling made
+  the Stats empty-state instruction illegible on dark palettes.
 - `magicTypography` has **no `titleSmall`** (use `titleMedium` for small headers). Available:
   display{Large,Medium}, title{Large,Medium}, label{Large,Medium,Small}, body{Large,Medium,Small}.
 - New theme = a `MagicColors` + `MagicTypography` instance + a branch in `MagicTheme`'s `when(theme)`.
@@ -212,8 +242,34 @@ Box { Scaffold { ... }; MagicToastHost(toastState) }
 ```
 
 ### Shared UI components (`core/ui/components/`)
-Reuse before writing inline: `EmptyState`, `InlineErrorState`, `FullErrorState`, `MagicToast(Host/State)`,
-`CardGridItem`, `CardListItem`, `AddToCollectionSheet`, `CardSearchSheet`, `TradeSelectionSheet`.
+Two locations: `shared/core-ui/src/commonMain/.../core/ui/components/` (KMP, default home for new ones) and
+`app/src/main/java/com/mmg/manahub/core/ui/components/` (Android-only). **Reuse before writing inline** —
+a hand-rolled equivalent of anything below is a review finding. Inventory (what it replaces in brackets):
+- **Actions & selection:** `MagicCtaButton` [Button/OutlinedButton/TextButton/Surface+clickable] ·
+  `MagicFilterChip` [FilterChip/InputChip/custom pills] · `ManaTabRow` [TabRow/Tab, top-level sub-tabs] ·
+  `MagicSegmentedControl` [chip rows used as tabs; 2–4 views, also nested under a `ManaTabRow`] ·
+  `MagicSelectionItem` [custom selectable rows in pick-one lists/sheets] · `ManaHubSelector` /
+  `ManaHubBottomSheetSelector<T>` [dropdowns / hand-rolled single-select sheets, text-only items] ·
+  `SectionHeader` [custom collapsible header rows] · `ManaColorPicker` [WUBRG chips].
+- **Feedback & states:** `EmptyState` (optional CTA; `fillMaxWidth()` inside lists) · `InlineErrorState` /
+  `FullErrorState` (+ `rememberRateLimitCountdownSeconds` to gate retry) · `MagicToastHost`/
+  `rememberMagicToastState` (always pass `MagicToastType.ERROR` for errors; default is SUCCESS) ·
+  `MagicAlertDialog` · `MagicLoadingSpinner(size = MagicLoadingSize.*)` [CircularProgressIndicator; Android]
+  · `MagicProgressBar` / `MagicLoadingFooter` [LinearProgressIndicator, pagination footer] ·
+  `PullRefreshHeader` + `rememberPullRefreshState` [PullToRefreshBox/SwipeRefresh].
+- **Cards:** `CardName` · `CardListItem` / `CardGridItem` / `CardRow` [hand-built card rows/tiles] ·
+  `MagicCard` [raw card-art `AsyncImage`] · `MagicCardInspectionOverlay` · `CardFullScreenDialog` /
+  `FullScreenImageViewer` · `CardTagChip` / `CardTagGroup` · `SetSymbol` · `ManaCostImages` / `OracleText`
+  [text-rendered costs/rules] · `ManaCurveChart` / `CircularDistribution` / `MiniProgressRing`.
+- **Badges & people:** `CopyBadge` [tiny count/label pills] · `FoilBadge` · `RarityDot` · `LanguageBadge` ·
+  `StaleBadge`/`StaleWarningBanner` · `AvatarImage(avatarUrl, initials, size)` [Box+CircleShape+AsyncImage].
+- **Sheets & pickers:** `AddCardSheet` (foil/condition/language/qty) · `ConditionSelectorSheet` ·
+  `LanguageSelectorSheet` · `VariantSelectorSheet` · `TradeSelectionSheet` · `CardPickerField` /
+  `CardSearchField` · Android-only: `CardSearchSheet`, `CardQueueSheet`, `DeckCardQueueSheet`,
+  `ShareProfileSheet`, `search/AdvancedSearchSheet` + its pickers (`SetPickerSheet`, `TagPickerSheet`, …).
+- **Content tiles:** `DeckItem` · `DraftSetCard` · `NewsItemCard` · game setup (`GameModeSelector`,
+  `LayoutTemplateSelector`, `PlayerCountStepper`, `PlayerEditSheet`, `FloatingDelta`) · `MagicBottomBar` ·
+  themed backgrounds (`HexGridBackground` + 5 palette backgrounds) · `InlineIcons` / `manaColorFor`.
 
 **Mandatory component usage:**
 - **Card names:** always use `CardName` (substitutes "A-" prefix + post-"//" with Alchemy icon, supports `showFrontOnly`/`fontWeight`)
@@ -281,8 +337,10 @@ When working on any Composable/screen/visual element, follow these non-negotiabl
 - Accessibility: meaningful `contentDescription` (or `null` if decorative), AA contrast, correct
   semantics, edge-to-edge insets.
 
-To build/redesign UI use the **`compose-ui`** skill; to audit/polish, delegate to the
-**`compose-design-reviewer`** subagent (`mobile-game-ui-designer` is the generative counterpart).
+To build/redesign UI use the **`compose-ui`** skill (`mobile-game-ui-designer` is the generative
+design counterpart). There is no separate design-review agent: UI/design audits (tokens, 12 palettes,
+accessibility, states, lazy-list keys) are part of the **`android-edge-case-tester`** audit, done while
+it reviews the implementation.
 
 ## Feature notes
 
@@ -330,6 +388,10 @@ Unified deck editor + Deck Doctor suggestion engine — see `app/src/main/java/c
 ### Home dashboard & widget board (`feature/home/`)
 See `app/src/main/java/com/mmg/manahub/feature/home/CLAUDE.md`.
 
+### Collection import / export (`feature/collection/`)
+Overflow menu on the Cards tab: paste/file import into a private review queue, and export of the
+visible rows — see `app/src/main/java/com/mmg/manahub/feature/collection/CLAUDE.md`.
+
 ### Gamification (`core/gamification/`)
 Cross-cutting XP/levels/achievements/quests/streaks/cosmetics engine — see `app/src/main/java/com/mmg/manahub/core/gamification/CLAUDE.md`.
 
@@ -352,6 +414,10 @@ third-party API calls by design. See `app/src/main/java/com/mmg/manahub/feature/
   (schema migration, data-loss surface).
 - Unit tests: MockK (`io.mockk`) + Turbine (`app.cash.turbine`). Instrumented Room tests: in-memory DB
   on device/emulator. Test classes mirror source package paths.
+- Instrumented `androidTest` method names must be DEX-safe identifiers without spaces. Kotlin
+  backtick names with spaces compile to JVM classes but D8 rejects their generated coroutine class
+  names when the app targets DEX versions below 040. For Room Flow timing assertions, await an
+  explicit first-emission signal before mutating the DAO; `yield()` does not prove subscription.
 - **`testDebugUnitTest --tests "<pattern>"` compiles the ENTIRE `src/test` source set first** — a compile
   error in any unrelated test file fails the whole run and zero tests execute. To verify one suite in
   isolation when others are broken, temporarily move the broken files aside, run, then restore.
@@ -379,7 +445,9 @@ valuable user metrics:
   `FirebaseCrashlytics.getInstance()`. Events/keys are `snake_case` (`action_context_result`); ≤3-4
   custom keys per operation; instrumentation is **ADDITIVE**, never a substitute for existing error
   handling; **NEVER log PII** (emails, real names, tokens, raw free-text queries — log length/enum-id
-  only). The auditor's running spec lives in `.claude/agent-memory/crashlytics-ux-auditor/` (keys/events
+  only). For external errors, strip the nested cause as well as the outer message: Crashlytics records
+  the whole throwable graph, so wrapping a remote error with a safe message can still leak its response.
+  The auditor's running spec lives in `.claude/agent-memory/crashlytics-ux-auditor/` (keys/events
   already defined — consult it to avoid duplicates).
 - → memory: `feedback_telemetry_review_on_every_feature`
 
@@ -412,12 +480,23 @@ broadly applicable; never duplicate between the two). → skill: `memory-protoco
 
 The goal: no agent should hit the same bug or repeat the same design mistake twice.
 
+### Agent configuration source of truth
+
+Codex loads the active roster from `.codex/agents/`; `.claude/agents/` is the aligned mirror for
+Claude-based runs. Keep the same nine roles and concise routing descriptions in both locations:
+`agent-team-orchestrator`, `android-kotlin-architect`, `kmp-web-fullstack-dev`,
+`android-edge-case-tester`, `android-security-auditor`, `android-unit-test-writer`,
+`backend-supabase-expert`, `crashlytics-ux-auditor`, and `mobile-game-ui-designer`
+(`compose-design-reviewer` was retired 2026-09-22; its UI audit now belongs to
+`android-edge-case-tester`). The two Kotlin owners are deliberately asymmetric: Android/pure shared
+work belongs to the architect; web-target and web-driven shared work belongs directly to the web
+developer. Reviewers and auditors supply precise implementation briefs rather than editing Kotlin.
+
 ## Security notes
 
 - HTTP logging `BODY` in debug only, `NONE` in release (`NetworkModule.kt`).
   `network_security_config.xml` blocks cleartext. Room DB + DataStore excluded from Drive auto-backup
   (`backup_rules.xml` / `data_extraction_rules.xml`). Scryfall queries sanitised with an allowlist.
-  YouTube key injected via OkHttp interceptor (not in Retrofit signatures or Logcat).
 
 ### Pre-push security gate (MANDATORY)
 Before any PR or push (even "docs-only"), run the **`pre-push-security-gate` skill**: it delegates a
@@ -445,6 +524,9 @@ Apply to every new migration/RPC/trigger/view:
    policy expression; writes to a table whose UPDATE/DELETE policy is intentionally `false`; bootstrap
    writes before the caller is a participant; cross-user session cleanup; reading a materialized view).
 10. `enqueue_notification` is permanently REVOKE-protected (accepts arbitrary `recipient_id`).
+11. `friendships` inserts must create only `PENDING` rows, and neither participant ID may change
+    after insert. Enforce both in RLS and a database trigger: a client that can forge `ACCEPTED`
+    or rewrite a participant can read another user's friend-only collection through valid RPCs.
 
 → memory: `feedback_supabase_security_audit_2026-06-02`
 
@@ -454,7 +536,7 @@ This project has a knowledge graph at graphify-out/ with god nodes, community st
 
 Rules:
 - **Mandatory for ALL agents and subagents (architect, edge-case-tester, orchestrator, explore, etc.):** before grepping or reading source files broadly to find or understand code, **orient via the graph first** — `graphify query "<question>"` / `graphify explain "<concept>"` / `graphify path "<A>" "<B>"`, or the wiki at `graphify-out/wiki/index.md`. The graph returns a scoped subgraph at a fraction of the token cost of raw search; only fall back to direct `Grep`/`Read` once the graph has pointed you at the relevant files (or when modifying/debugging specific code, where the graph lacks the detail). This keeps token consumption low across the whole agent team. **Do not revert or treat this rule as out-of-scope cleanup** — it is a standing project rule.
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists **and the CLI is available**. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. When the executable is unavailable, begin at `graphify-out/wiki/index.md`, then use `graph.json` / `manifest.json` and only then targeted source inspection; the precomputed graph remains valid and must not be regenerated merely because the command is absent.
 - A wiki exists at graphify-out/wiki/index.md — use it as the entry point for broad codebase navigation: read the index, then follow its `[[wiki-links]]` into community/god-node articles BEFORE falling back to raw source browsing or GRAPH_REPORT.md (this is the lower-token path).
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- After modifying code, run `graphify update .` to keep the graph current when the executable is available (AST-only, no API cost). If it is unavailable, report the deferred update and do not attempt to recreate the existing graph by another mechanism.
