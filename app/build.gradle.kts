@@ -199,7 +199,7 @@ android {
             // KMP migration — Phase 3: Manually link CMP resources from :shared:core-ui
             // until the android-kmp-library + CMP resource merging is stabilized.
             assets.srcDirs(
-                file("build/generated/cmp-assets"),
+                layout.buildDirectory.dir("generated/cmp-assets"),
             )
         }
         getByName("androidTest") {

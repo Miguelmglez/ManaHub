@@ -21,6 +21,26 @@ plugins {
     alias(libs.plugins.kotlin.jvm) apply false
 }
 
+// Separate worktrees so concurrent builds cannot overwrite each other's outputs.
+val checkoutKey = java.security.MessageDigest.getInstance("SHA-256")
+    .digest(rootProject.rootDir.canonicalPath.toByteArray(java.nio.charset.StandardCharsets.UTF_8))
+    .take(8)
+    .joinToString(separator = "") { byte ->
+        (byte.toInt() and 0xff).toString(radix = 16).padStart(length = 2, padChar = '0')
+    }
+val externalBuildRoot = File("E:/Projects/ManaHub-build/${rootProject.name}-$checkoutKey")
+
+allprojects {
+    val projectBuildPath = if (path == ":") "root" else path.removePrefix(":").replace(':', '/')
+    val projectBuildDirectory = externalBuildRoot.resolve(projectBuildPath)
+    layout.buildDirectory.set(projectBuildDirectory)
+    extensions.extraProperties.set(
+        "kotlin.project.persistent.dir",
+        projectBuildDirectory.resolve("kotlin-project-state").absolutePath,
+    )
+    extensions.extraProperties.set("kotlin.project.persistent.dir.gradle.disableWrite", true)
+}
+
 // Web roadmap W0 (:webApp, wasmJs target): the Kotlin/Wasm Gradle plugin registers its OWN
 // Node.js-distribution repository at project-configuration time (to download the Node.js binary
 // used by the wasmJs toolchain), which conflicts with settings.gradle.kts's
