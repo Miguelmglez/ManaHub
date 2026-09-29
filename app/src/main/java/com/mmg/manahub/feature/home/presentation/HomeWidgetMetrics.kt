@@ -171,7 +171,7 @@ fun computeHomeWidgetMetrics(lh: HomeLineHeights, sp: Spacing): HomeWidgetMetric
 
     val heights = mapOf(
         HomeWidgetType.GREETING_HEADER to greetingHeader,
-        HomeWidgetType.CONTEXT_HERO to heroCarousel,
+        HomeWidgetType.GET_STARTED to heroCarousel,
         HomeWidgetType.QUICK_ACTIONS to shell + quickActionTile * 2 + sp.xxs + SlotSlack,
         HomeWidgetType.PROGRESSION_HUB to shell +
             max(LevelBadgeSize, lh.titleMedium + sp.xs + ProgressBarHeight) + sp.xxs +

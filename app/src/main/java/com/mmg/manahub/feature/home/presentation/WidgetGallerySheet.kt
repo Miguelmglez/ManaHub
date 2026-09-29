@@ -767,7 +767,7 @@ private val HomeWidgetType.description: String
     @ReadOnlyComposable
     get() = when (this) {
         HomeWidgetType.GREETING_HEADER -> stringResource(R.string.home_widget_desc_greeting_header)
-        HomeWidgetType.CONTEXT_HERO -> stringResource(R.string.home_widget_desc_context_hero)
+        HomeWidgetType.GET_STARTED -> stringResource(R.string.home_widget_desc_context_hero)
         HomeWidgetType.QUICK_ACTIONS -> stringResource(R.string.home_widget_desc_quick_actions)
         HomeWidgetType.PROGRESSION_HUB -> stringResource(R.string.home_widget_desc_progression_hub)
         HomeWidgetType.QUESTS_HUB -> stringResource(R.string.home_widget_desc_quests_hub)

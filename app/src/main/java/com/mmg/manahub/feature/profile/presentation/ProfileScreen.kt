@@ -3,7 +3,6 @@ package com.mmg.manahub.feature.profile.presentation
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -74,6 +73,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -89,6 +89,7 @@ import com.mmg.manahub.core.model.CollectionStats
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicGlowCard
 import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
@@ -370,7 +371,7 @@ private fun openStoreListing(context: Context): Boolean {
     )
     for (target in targets) {
         try {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
+            context.startActivity(Intent(Intent.ACTION_VIEW, target.toUri()))
             return true
         } catch (_: ActivityNotFoundException) {
             // Try the next target.
@@ -900,21 +901,24 @@ private fun ProfileKpiSection(
 private fun KpiCell(
     label: String,
     value: String,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
     accent: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
-    Column(
-        modifier = modifier
-            .clip(CardShape)
-            .background(mc.surface)
-            .padding(vertical = spacing.md, horizontal = spacing.sm),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(spacing.xxs, Alignment.CenterVertically),
+    MagicGlowCard(
+        modifier = modifier,
     ) {
-        Text(value, style = MaterialTheme.magicTypography.titleLarge, color = if (accent) mc.goldMtg else mc.primaryAccent)
-        Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary, textAlign = TextAlign.Center)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(vertical = spacing.md, horizontal = spacing.sm),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(spacing.xxs, Alignment.CenterVertically),
+        ) {
+            Text(value, style = MaterialTheme.magicTypography.titleLarge, color = if (accent) mc.goldMtg else mc.primaryAccent)
+            Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary, textAlign = TextAlign.Center)
+        }
     }
 }
 
@@ -930,33 +934,36 @@ private fun ColorStatCard(
 ) {
     val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
-    Column(
-        modifier = modifier
-            .clip(CardShape)
-            .background(mc.surface)
-            .padding(vertical = spacing.md, horizontal = spacing.sm),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(spacing.xxs, Alignment.CenterVertically),
+    MagicGlowCard(
+        modifier = modifier,
     ) {
-        when {
-            colors.isNullOrEmpty() ->
-                Text("—", style = MaterialTheme.magicTypography.titleLarge, color = mc.primaryAccent)
-            colors.size == 1 -> ManaSymbolImage(token = colors.first(), size = 26.dp)
-            else -> Row(
-                horizontalArrangement = Arrangement.spacedBy(spacing.xxs),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                colors.take(MAX_TOP_VALUE_SYMBOLS).forEach { ManaSymbolImage(token = it, size = 20.dp) }
-                if (colors.size > MAX_TOP_VALUE_SYMBOLS) {
-                    Text(
-                        text = "+${colors.size - MAX_TOP_VALUE_SYMBOLS}",
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.textSecondary,
-                    )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(vertical = spacing.md, horizontal = spacing.sm),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(spacing.xxs, Alignment.CenterVertically),
+        ) {
+            when {
+                colors.isNullOrEmpty() ->
+                    Text("—", style = MaterialTheme.magicTypography.titleLarge, color = mc.primaryAccent)
+                colors.size == 1 -> ManaSymbolImage(token = colors.first(), size = 26.dp)
+                else -> Row(
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xxs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    colors.take(MAX_TOP_VALUE_SYMBOLS).forEach { ManaSymbolImage(token = it, size = 20.dp) }
+                    if (colors.size > MAX_TOP_VALUE_SYMBOLS) {
+                        Text(
+                            text = "+${colors.size - MAX_TOP_VALUE_SYMBOLS}",
+                            style = MaterialTheme.magicTypography.labelSmall,
+                            color = mc.textSecondary,
+                        )
+                    }
                 }
             }
+            Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary, textAlign = TextAlign.Center)
         }
-        Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary, textAlign = TextAlign.Center)
     }
 }
 
@@ -972,7 +979,7 @@ private fun CollectionSummarySection(
     val spacing = MaterialTheme.spacing
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
         SectionTitle(stringResource(R.string.profile_collection_summary))
-        Surface(shape = CardShape, color = mc.surface) {
+        MagicGlowCard(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1048,7 +1055,7 @@ private fun ProfileLinkRow(
 ) {
     val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
-    Surface(onClick = onClick, modifier = modifier.fillMaxWidth(), shape = CardShape, color = mc.surface) {
+    MagicGlowCard(onClick = onClick, modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

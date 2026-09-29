@@ -53,8 +53,8 @@ enum class HomeWidgetType(
         icon = Icons.Default.AccountCircle,
         isAlwaysPresent = true,
     ),
-    CONTEXT_HERO(
-        persistedId = "context_hero",
+    GET_STARTED(
+        persistedId = "get_started",
         defaultTitleRes = R.string.widget_title_context_hero,
         supportedSizes = setOf(WidgetSize.MEDIUM),
         category = WidgetCategory.ACTIVITY,

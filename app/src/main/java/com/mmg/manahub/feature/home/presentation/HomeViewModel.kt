@@ -1958,7 +1958,7 @@ class HomeViewModel(
          */
         private val DEFAULT_LAYOUT_SIGNED_OUT = listOf(
             WidgetInstance(HomeWidgetType.GREETING_HEADER, WidgetSize.MEDIUM),
-            WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
+            WidgetInstance(HomeWidgetType.GET_STARTED, WidgetSize.MEDIUM),
             WidgetInstance(HomeWidgetType.QUICK_ACTIONS, WidgetSize.MEDIUM),
             WidgetInstance(HomeWidgetType.COLLECTION_STATS_HUB, WidgetSize.MEDIUM),
             WidgetInstance(HomeWidgetType.COMMUNITY_DECKS, WidgetSize.MEDIUM),
@@ -1971,7 +1971,7 @@ class HomeViewModel(
 
         private val DEFAULT_LAYOUT_SIGNED_IN = listOf(
             WidgetInstance(HomeWidgetType.GREETING_HEADER, WidgetSize.MEDIUM),
-            WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
+            WidgetInstance(HomeWidgetType.GET_STARTED, WidgetSize.MEDIUM),
             WidgetInstance(HomeWidgetType.QUICK_ACTIONS, WidgetSize.MEDIUM),
             WidgetInstance(HomeWidgetType.COMMUNITY_DECKS, WidgetSize.MEDIUM),
             WidgetInstance(HomeWidgetType.YOUR_DECKS_SHELF, WidgetSize.MEDIUM),
