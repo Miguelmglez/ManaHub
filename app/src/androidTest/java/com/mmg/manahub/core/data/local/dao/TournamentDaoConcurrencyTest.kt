@@ -84,7 +84,7 @@ class TournamentDaoConcurrencyTest {
     // ── C3: repeated finish of an already-FINISHED match is a no-op ───────────────
 
     @Test
-    fun `finishing an already-FINISHED match is a no-op and does not finish the tournament twice`() = runBlocking {
+    fun finishingAnAlreadyFINISHEDMatchIsANoOpAndDoesNotFinishTheTournamentTwice() = runBlocking {
         val (tournamentId, matchId) = seedSingleMatchBracket()
         val winnerId = dao.getMatchById(matchId)!!.playerIds.trim('[', ']').split(",")[0].toLong()
 
@@ -121,7 +121,7 @@ class TournamentDaoConcurrencyTest {
     // ── C3: two concurrent finishes generate exactly one next round ───────────────
 
     @Test
-    fun `two concurrent finishMatch on the same match generate exactly one next round`() = runBlocking {
+    fun twoConcurrentFinishMatchOnTheSameMatchGenerateExactlyOneNextRound() = runBlocking {
         // 4-player SINGLE_ELIM: both round-1 matches finished, the SECOND finish should generate round 2.
         // We race two finishes of the SAME (second) match: exactly one must win and generate the final.
         val tournamentId = dao.insertTournament(

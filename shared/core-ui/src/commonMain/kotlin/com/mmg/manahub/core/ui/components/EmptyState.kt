@@ -78,7 +78,7 @@ fun EmptyState(
             Text(
                 text = subtitle,
                 style = ty.bodySmall,
-                color = mc.textDisabled,
+                color = mc.textSecondary,
                 textAlign = TextAlign.Center,
             )
         }

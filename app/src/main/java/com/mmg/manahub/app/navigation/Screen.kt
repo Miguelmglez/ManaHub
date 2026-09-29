@@ -44,6 +44,8 @@ sealed class Screen(val route: String) {
     }
 
     object CollectionScanner  : Screen("collection/scanner")
+
+    object ImportCards  : Screen("collection/import")
     object DeckScanner : Screen("deck/{deckId}/scanner") {
         fun createRoute(deckId: String): String {
             require(deckId.isNotBlank()) { "deckId must not be blank" }

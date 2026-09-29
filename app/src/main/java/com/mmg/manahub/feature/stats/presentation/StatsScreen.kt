@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.stats.presentation
 
 // TODO: Re-enable when Survey review for games is fully implemented
 // import com.mmg.manahub.core.data.local.entity.SurveyStatus
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
@@ -13,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -23,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,8 +46,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Style
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -76,10 +77,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -110,6 +114,7 @@ import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaColorPicker
 import com.mmg.manahub.core.ui.components.ManaCurveChart
+import com.mmg.manahub.core.ui.components.SectionHeader
 import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.search.SetPickerSheet
@@ -117,13 +122,16 @@ import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ExtraSmallCardShape
 import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.SmallCardShape
+import com.mmg.manahub.core.ui.theme.ThemeBackground
+import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.util.TimeAgoFormatter
+import com.mmg.manahub.feature.game.domain.model.ArchetypeMatchupData
 import org.koin.androidx.compose.koinViewModel
-import java.util.Locale
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -141,9 +149,27 @@ fun StatsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val toastState = rememberMagicToastState()
+    val deleteSuccessLabel = stringResource(R.string.delete_game_toast)
+    val deleteErrorLabel = stringResource(R.string.delete_game_error)
+
+    LaunchedEffect(uiState.deleteSessionSuccess) {
+        when (uiState.deleteSessionSuccess) {
+            true -> {
+                toastState.show(deleteSuccessLabel, MagicToastType.SUCCESS)
+                viewModel.clearDeleteSessionMessage()
+            }
+            false -> {
+                toastState.show(deleteErrorLabel, MagicToastType.ERROR)
+                viewModel.clearDeleteSessionMessage()
+            }
+            null -> Unit
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        ThemeBackground(modifier = Modifier.fillMaxSize())
         Scaffold(
+            containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets.statusBars,
             topBar = {
                 TopAppBar(
@@ -202,7 +228,7 @@ fun StatsScreen(
                                 onClick = { viewModel.onTabSelected(tab) },
                                 text = {
                                     Text(
-                                        text = tabLabels[index].uppercase(Locale.getDefault()),
+                                        text = tabLabels[index].uppercase(),
                                         style = MaterialTheme.magicTypography.labelMedium,
                                     )
                                 },
@@ -216,18 +242,16 @@ fun StatsScreen(
                     uiState.hasGameStats && uiState.selectedTab == StatsTab.GAMES -> {
                         GameStatsContent(
                             uiState = uiState,
-                            toastState = toastState,
                             onReviewSurvey = onReviewSurvey,
                             onDeckClick = onDeckClick,
                             onDeleteSession = viewModel::deleteSession,
-                            onClearDeleteMessage = viewModel::clearDeleteSessionMessage,
+                            onRetry = viewModel::retryGameStats,
                         )
                     }
 
                     uiState.hasTradeStats && uiState.selectedTab == StatsTab.TRADES -> {
                         TradeStatsContent(
                             state = uiState.tradeStats,
-                            currency = uiState.currency,
                             onRetry = viewModel::retryTradeStats,
                         )
                     }
@@ -237,6 +261,7 @@ fun StatsScreen(
                             uiState = uiState,
                             onColorSelected = viewModel::onColorSelected,
                             onSetSelected = viewModel::onSetSelected,
+                            onRetry = viewModel::retryCollectionStats,
                             onCardClick = onCardClick,
                             sharedTransitionScope = sharedTransitionScope,
                             animatedVisibilityScope = animatedVisibilityScope,
@@ -247,6 +272,70 @@ fun StatsScreen(
         }
 
         MagicToastHost(state = toastState)
+    }
+}
+
+/**
+ * Premium container card with CONTEXT_HERO gradient styling, gradient border, and colored shadow.
+ */
+@Composable
+private fun PremiumCard(
+    modifier: Modifier = Modifier,
+    shape: Shape = CardShape,
+    border: BorderStroke? = null,
+    onClick: (() -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val defaultBorder = remember(mc.primaryAccent) {
+        BorderStroke(
+            1.dp,
+            Brush.horizontalGradient(
+                listOf(
+                    mc.primaryAccent.copy(alpha = 0.4f),
+                    mc.primaryAccent.copy(alpha = 0.12f),
+                    mc.primaryAccent.copy(alpha = 0.4f),
+                )
+            )
+        )
+    }
+    val backgroundBrush = remember(mc.surfaceVariant, mc.surface) {
+        Brush.verticalGradient(
+            colors = listOf(
+                mc.surfaceVariant.copy(alpha = 0.85f),
+                mc.surface.copy(alpha = 0.95f),
+            )
+        )
+    }
+
+    val cardModifier = modifier
+        .coloredShadow(
+            color = mc.primaryAccent.copy(alpha = 0.12f),
+            borderRadius = 16.dp,
+            blurRadius = 16.dp,
+        )
+        .clip(shape)
+        .background(brush = backgroundBrush)
+
+    if (onClick != null) {
+        Surface(
+            onClick = onClick,
+            modifier = cardModifier,
+            color = Color.Transparent,
+            shape = shape,
+            border = border ?: defaultBorder,
+        ) {
+            content()
+        }
+    } else {
+        Surface(
+            modifier = cardModifier,
+            color = Color.Transparent,
+            shape = shape,
+            border = border ?: defaultBorder,
+        ) {
+            content()
+        }
     }
 }
 
@@ -267,6 +356,7 @@ private fun CollectionStatsContent(
     uiState: StatsUiState,
     onColorSelected: (MtgColor?) -> Unit,
     onSetSelected: (MagicSet?) -> Unit,
+    onRetry: () -> Unit,
     onCardClick: (String, String?) -> Unit,
     sharedTransitionScope: SharedTransitionScope?,
     animatedVisibilityScope: AnimatedVisibilityScope?,
@@ -275,7 +365,15 @@ private fun CollectionStatsContent(
     val mc = MaterialTheme.magicColors
     val sp = MaterialTheme.spacing
     val stats = uiState.stats
-    var showSetPicker by remember { mutableStateOf(false) }
+    var showSetPicker by rememberSaveable { mutableStateOf(false) }
+
+    var inventoryValueExpanded by rememberSaveable { mutableStateOf(true) }
+    var combatMechanicsExpanded by rememberSaveable { mutableStateOf(true) }
+    var aestheticsArtExpanded by rememberSaveable { mutableStateOf(true) }
+    var distributionsExpanded by rememberSaveable { mutableStateOf(true) }
+    var hallOfFameExpanded by rememberSaveable { mutableStateOf(true) }
+    var setCompletionExpanded by rememberSaveable { mutableStateOf(true) }
+    var collectionEraExpanded by rememberSaveable { mutableStateOf(true) }
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -302,6 +400,7 @@ private fun CollectionStatsContent(
                                     "R" -> MtgColor.R
                                     "G" -> MtgColor.G
                                     "C" -> MtgColor.COLORLESS
+                                    "M" -> MtgColor.MULTICOLOR
                                     else -> null
                                 }
                             onColorSelected(color)
@@ -310,6 +409,8 @@ private fun CollectionStatsContent(
                         spacing = sp.sm,
                         itemSize = 48.dp,
                         symbolSize = 32.dp,
+                        isMultiColorExclusive = false,
+                        colors = listOf("W", "U", "B", "R", "G", "M", "C"),
                     )
 
                     SetFilterRow(
@@ -319,18 +420,12 @@ private fun CollectionStatsContent(
                         mc = mc,
                     )
 
-                    // Read-only price-freshness label (2026-07-28 backend perf plan — prices
-                    // refresh automatically once a day via PriceRefreshWorker; Stats only ever
-                    // displays the last-refreshed timestamp, it never triggers a refresh itself).
+                    // Read-only price-freshness label
                     uiState.lastRefreshedAt?.let { lastRefreshedAt ->
-                        // NOTE: TimeAgoFormatter.format() already appends "ago" (e.g. "3h ago") —
-                        // do not wrap it in a "…%1$s ago" string resource (stats_updated_ago has
-                        // that exact shape and would read "Updated 3h ago ago"); "Unlocked %1$s"
-                        // (achievement_unlocked_ago) is the correct established pattern.
                         Text(
                             text = "Updated ${TimeAgoFormatter.format(lastRefreshedAt)}",
                             style = MaterialTheme.magicTypography.labelSmall,
-                            color = mc.textDisabled,
+                            color = mc.textSecondary,
                         )
                     }
                 }
@@ -342,6 +437,23 @@ private fun CollectionStatsContent(
                         MagicLoadingSpinner()
                     }
                 }
+            } else if (uiState.error != null) {
+                item(key = "collection_error", contentType = "error") {
+                    InlineErrorState(
+                        message = stringResource(R.string.stats_collection_error),
+                        retryLabel = stringResource(R.string.action_retry),
+                        onRetry = onRetry,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = sp.lg),
+                    )
+                }
+            } else if (stats != null && stats.totalCards == 0 && uiState.selectedColor == null && uiState.selectedSet == null) {
+                item(key = "collection_empty", contentType = "empty") {
+                    EmptyState(
+                        title = stringResource(R.string.stats_collection_empty_title),
+                        subtitle = stringResource(R.string.stats_collection_empty_subtitle),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             } else if (stats != null) {
                 // 1. Inventory & Value
                 item(key = "collection_section_inventory_value") {
@@ -349,6 +461,8 @@ private fun CollectionStatsContent(
                         modifier = Modifier.padding(horizontal = sp.lg),
                         title = stringResource(R.string.stats_section_inventory_value),
                         icon = Icons.Default.Star,
+                        expanded = inventoryValueExpanded,
+                        onToggle = { inventoryValueExpanded = !inventoryValueExpanded },
                     ) {
                         InventoryValueGrid(stats = stats, currency = uiState.currency)
                     }
@@ -360,6 +474,8 @@ private fun CollectionStatsContent(
                         modifier = Modifier.padding(horizontal = sp.lg),
                         title = stringResource(R.string.stats_section_combat_mechanics),
                         icon = painterResource(R.drawable.ic_battle),
+                        expanded = combatMechanicsExpanded,
+                        onToggle = { combatMechanicsExpanded = !combatMechanicsExpanded },
                     ) {
                         CombatMechanicsSection(stats = stats)
                     }
@@ -371,6 +487,8 @@ private fun CollectionStatsContent(
                         modifier = Modifier.padding(horizontal = sp.lg),
                         title = stringResource(R.string.stats_section_aesthetics_art),
                         icon = Icons.Default.Star,
+                        expanded = aestheticsArtExpanded,
+                        onToggle = { aestheticsArtExpanded = !aestheticsArtExpanded },
                     ) {
                         AestheticsArtSection(
                             stats = stats,
@@ -387,6 +505,8 @@ private fun CollectionStatsContent(
                         modifier = Modifier.padding(horizontal = sp.lg),
                         title = stringResource(R.string.stats_section_distributions),
                         icon = Icons.Default.BarChart,
+                        expanded = distributionsExpanded,
+                        onToggle = { distributionsExpanded = !distributionsExpanded },
                     ) {
                         DistributionsSection(stats = stats, mc = mc)
                     }
@@ -398,6 +518,8 @@ private fun CollectionStatsContent(
                         modifier = Modifier.padding(horizontal = sp.lg),
                         title = stringResource(R.string.stats_section_hall_of_fame),
                         icon = Icons.Default.Star,
+                        expanded = hallOfFameExpanded,
+                        onToggle = { hallOfFameExpanded = !hallOfFameExpanded },
                     ) {
                         HallOfFameSection(
                             stats = stats,
@@ -409,47 +531,53 @@ private fun CollectionStatsContent(
                     }
                 }
 
-                // 6. Set Completion (Phase 2) — global/unfiltered, top sets by completion ratio.
+                // 6. Set Completion
                 if (uiState.setCompletions.isNotEmpty()) {
                     item(key = "collection_section_set_completion") {
                         StatsSection(
                             modifier = Modifier.padding(horizontal = sp.lg),
                             title = stringResource(R.string.stats_section_set_completion),
                             icon = Icons.Default.Layers,
+                            expanded = setCompletionExpanded,
+                            onToggle = { setCompletionExpanded = !setCompletionExpanded },
                         ) {
                             SetCompletionSection(completions = uiState.setCompletions)
                         }
                     }
                 }
 
-                // 7. Collection Era (2026-07 stats expansion) — replaces the retired
-                // month-by-month Collection Growth chart; owned card quantity by release decade.
-                // CircularDistributionSection is self-titled/self-carded, so it is placed directly
-                // rather than nested inside another StatsSection header.
+                // 7. Collection Era
                 if (stats.decadeDistribution.isNotEmpty()) {
                     item(key = "collection_section_era") {
-                        val decadeOrder = remember(stats.decadeDistribution) { stats.decadeDistribution.keys.sorted() }
-                        CircularDistributionSection(
+                        StatsSection(
                             modifier = Modifier.padding(horizontal = sp.lg),
                             title = stringResource(R.string.stats_label_collection_era),
-                            data = stats.decadeDistribution,
-                            colorMapper = { label ->
-                                val index = decadeOrder.indexOf(label).coerceAtLeast(0)
-                                val palette =
-                                    listOf(
-                                        mc.primaryAccent,
-                                        mc.secondaryAccent,
-                                        mc.goldMtg,
-                                        mc.lifePositive,
-                                        mc.lifeNegative,
-                                        mc.manaU,
-                                        mc.manaR,
-                                        mc.manaG,
-                                        mc.manaW,
-                                    )
-                                palette[index % palette.size]
-                            },
-                        )
+                            icon = Icons.Default.BarChart,
+                            expanded = collectionEraExpanded,
+                            onToggle = { collectionEraExpanded = !collectionEraExpanded },
+                        ) {
+                            val decadeOrder = remember(stats.decadeDistribution) { stats.decadeDistribution.keys.sorted() }
+                            CircularDistributionSection(
+                                title = null,
+                                data = stats.decadeDistribution,
+                                colorMapper = { label ->
+                                    val index = decadeOrder.indexOf(label).coerceAtLeast(0)
+                                    val palette =
+                                        listOf(
+                                            mc.primaryAccent,
+                                            mc.secondaryAccent,
+                                            mc.goldMtg,
+                                            mc.lifePositive,
+                                            mc.lifeNegative,
+                                            mc.manaU,
+                                            mc.manaR,
+                                            mc.manaG,
+                                            mc.manaW,
+                                        )
+                                    palette[index % palette.size]
+                                },
+                            )
+                        }
                     }
                 }
 
@@ -483,14 +611,13 @@ private fun SetFilterRow(
 ) {
     val ty = MaterialTheme.magicTypography
     val sp = MaterialTheme.spacing
-    Surface(
+    PremiumCard(
         onClick = onClick,
         shape = CardShape,
-        color = mc.surface,
         border =
             BorderStroke(
-                width = if (selectedSet != null) 1.5.dp else 0.5.dp,
-                color = if (selectedSet != null) mc.primaryAccent else mc.surfaceVariant.copy(alpha = 0.5f),
+                width = if (selectedSet != null) 1.5.dp else 1.dp,
+                color = if (selectedSet != null) mc.primaryAccent else mc.surfaceVariant.copy(alpha = 0.4f),
             ),
         modifier = Modifier.fillMaxWidth().height(48.dp),
     ) {
@@ -531,8 +658,8 @@ private fun SetFilterRow(
             )
 
             if (selectedSet != null) {
-                IconButton(onClick = onClear, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(16.dp))
+                IconButton(onClick = onClear) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.stats_clear_set_filter), tint = mc.textSecondary, modifier = Modifier.size(16.dp))
                 }
             } else {
                 Icon(
@@ -550,44 +677,46 @@ private fun SetFilterRow(
 private fun StatsSection(
     title: String,
     icon: Any, // ImageVector or Painter
+    expanded: Boolean,
+    onToggle: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val sp = MaterialTheme.spacing
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(sp.lg)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(sp.md),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            when (icon) {
-                is androidx.compose.ui.graphics.vector.ImageVector -> {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = mc.primaryAccent,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-
-                is androidx.compose.ui.graphics.painter.Painter -> {
-                    Icon(
-                        painter = icon,
-                        contentDescription = null,
-                        tint = mc.primaryAccent,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(sp.md)) {
+        when (icon) {
+            is ImageVector -> {
+                SectionHeader(
+                    title = title.uppercase(),
+                    expanded = expanded,
+                    onToggle = onToggle,
+                    icon = icon,
+                    iconColor = mc.primaryAccent,
+                    titleColor = mc.textPrimary,
+                )
             }
-            Text(
-                text = title.uppercase(),
-                style = MaterialTheme.magicTypography.labelLarge,
-                color = mc.textPrimary,
-                letterSpacing = 2.sp,
-            )
+
+            is Painter -> {
+                SectionHeader(
+                    title = title.uppercase(),
+                    expanded = expanded,
+                    onToggle = onToggle,
+                    titleColor = mc.textPrimary,
+                    leading = {
+                        Icon(
+                            painter = icon,
+                            contentDescription = null,
+                            tint = mc.primaryAccent,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    },
+                )
+            }
         }
-        content()
+        AnimatedVisibility(visible = expanded) {
+            content()
+        }
     }
 }
 
@@ -597,43 +726,42 @@ private fun InventoryValueGrid(
     currency: PreferredCurrency,
 ) {
     val sp = MaterialTheme.spacing
-    Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(sp.md)) {
+    Column(verticalArrangement = Arrangement.spacedBy(sp.sm)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(sp.sm)) {
             StatCard(
                 label = stringResource(R.string.stats_total_cards),
                 value = stats.totalCards.toString(),
-                modifier = Modifier.weight(1f).height(90.dp),
+                modifier = Modifier.weight(1f).heightIn(min = 60.dp),
             )
             StatCard(
                 label = stringResource(R.string.stats_unique_cards),
                 value = stats.uniqueCards.toString(),
-                modifier = Modifier.weight(1f).height(90.dp),
+                modifier = Modifier.weight(1f).heightIn(min = 60.dp),
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(sp.md)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(sp.sm)) {
             val totalValue = if (currency == PreferredCurrency.USD) stats.totalValueUsd else stats.totalValueEur
             CurrencyStatCard(
                 label = stringResource(R.string.stats_label_est_value),
                 value = PriceFormatter.format(totalValue, currency),
-                modifier = Modifier.weight(1f).height(90.dp),
+                modifier = Modifier.weight(1f).heightIn(min = 60.dp),
             )
             StatCard(
                 label = stringResource(R.string.stats_decks_saved),
                 value = stats.totalDecks.toString(),
-                modifier = Modifier.weight(1f).height(90.dp),
+                modifier = Modifier.weight(1f).heightIn(min = 60.dp),
             )
         }
-        // Phase 2 (2026-07 stats expansion) — avg/median card value, active currency.
-        Row(horizontalArrangement = Arrangement.spacedBy(sp.md)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(sp.sm)) {
             CurrencyStatCard(
                 label = stringResource(R.string.stats_label_avg_card_value),
                 value = PriceFormatter.format(stats.avgCardValue, currency),
-                modifier = Modifier.weight(1f).height(90.dp),
+                modifier = Modifier.weight(1f).heightIn(min = 60.dp),
             )
             CurrencyStatCard(
                 label = stringResource(R.string.stats_label_median_card_value),
                 value = PriceFormatter.format(stats.medianCardValue, currency),
-                modifier = Modifier.weight(1f).height(90.dp),
+                modifier = Modifier.weight(1f).heightIn(min = 60.dp),
             )
         }
     }
@@ -648,19 +776,17 @@ private fun CurrencyStatCard(
 ) {
     val mc = MaterialTheme.magicColors
     val sp = MaterialTheme.spacing
-    Card(
+    PremiumCard(
         modifier = modifier,
-        shape = CardShape,
-        colors = CardDefaults.cardColors(containerColor = mc.surfaceVariant),
     ) {
         Column(
-            modifier = Modifier.padding(sp.lg).fillMaxSize(),
+            modifier = Modifier.padding(horizontal = sp.md, vertical = sp.sm).fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 text = value,
-                style = MaterialTheme.magicTypography.titleLarge.copy(fontSize = 20.sp),
+                style = MaterialTheme.magicTypography.titleLarge,
                 color = mc.goldMtg,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -693,10 +819,8 @@ private fun CombatMechanicsSection(stats: CollectionStats) {
                 modifier = Modifier.weight(1.2f),
             )
 
-            Card(
-                modifier = Modifier.weight(0.8f).height(100.dp),
-                shape = CardShape,
-                colors = CardDefaults.cardColors(containerColor = mc.surfaceVariant),
+            PremiumCard(
+                modifier = Modifier.weight(0.8f).heightIn(min = 100.dp),
                 border = BorderStroke(1.dp, manaGradient),
             ) {
                 Column(
@@ -706,7 +830,7 @@ private fun CombatMechanicsSection(stats: CollectionStats) {
                 ) {
                     Text(
                         text = "%.2f".format(stats.avgManaValue),
-                        style = MaterialTheme.magicTypography.titleLarge.copy(fontSize = 24.sp),
+                        style = MaterialTheme.magicTypography.titleLarge,
                         color = mc.textPrimary,
                         textAlign = TextAlign.Center,
                     )
@@ -736,20 +860,18 @@ private fun CombatStatsBox(
 ) {
     val mc = MaterialTheme.magicColors
     val sp = MaterialTheme.spacing
-    Card(
-        modifier = modifier.height(100.dp),
-        shape = CardShape,
-        colors = CardDefaults.cardColors(containerColor = mc.surfaceVariant),
+    PremiumCard(
+        modifier = modifier.heightIn(min = 100.dp),
         border = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.5f)),
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Row(
                 modifier = Modifier.fillMaxSize().padding(horizontal = sp.sm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
             ) {
                 Column(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -761,12 +883,12 @@ private fun CombatStatsBox(
                     )
                     Text(
                         text = "%.1f".format(avgPower),
-                        style = MaterialTheme.magicTypography.displayMedium.copy(fontSize = 24.sp),
+                        style = MaterialTheme.magicTypography.displayMedium,
                         color = mc.textPrimary,
                     )
                     Text(
                         text = "AVG\nPOWER",
-                        style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 9.sp, lineHeight = 10.sp),
+                        style = MaterialTheme.magicTypography.labelSmall,
                         color = mc.textSecondary,
                         textAlign = TextAlign.Center,
                     )
@@ -774,13 +896,13 @@ private fun CombatStatsBox(
 
                 Text(
                     text = "/",
-                    style = MaterialTheme.magicTypography.displayMedium.copy(fontSize = 24.sp),
+                    style = MaterialTheme.magicTypography.displayMedium,
                     color = mc.goldMtg,
                     modifier = Modifier.padding(horizontal = sp.sm),
                 )
 
                 Column(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -792,12 +914,12 @@ private fun CombatStatsBox(
                     )
                     Text(
                         text = "%.1f".format(avgToughness),
-                        style = MaterialTheme.magicTypography.displayMedium.copy(fontSize = 24.sp),
+                        style = MaterialTheme.magicTypography.displayMedium,
                         color = mc.textPrimary,
                     )
                     Text(
                         text = "AVG\nTOUGHNESS",
-                        style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 9.sp, lineHeight = 10.sp),
+                        style = MaterialTheme.magicTypography.labelSmall,
                         color = mc.textSecondary,
                         textAlign = TextAlign.Center,
                     )
@@ -840,7 +962,6 @@ private fun AestheticsArtSection(
             mc = mc,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            // Hall of Fame enrichment (2026-07 stats expansion) — gallery of the top artist's owned cards.
             if (stats.topArtistCards.isNotEmpty()) {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(sp.md),
@@ -877,7 +998,7 @@ private fun ArtistCardTile(
     val imageModifier =
         Modifier
             .width(100.dp)
-            .aspectRatio(0.717f) // full MTG card aspect ratio (745:1040)
+            .aspectRatio(0.717f)
             .clip(SmallCardShape)
 
     val finalImageModifier =
@@ -916,21 +1037,20 @@ private fun AestheticStatCard(
 ) {
     val mc = MaterialTheme.magicColors
     val sp = MaterialTheme.spacing
+    val safePercentage = percentage.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f
 
     val foilColors =
         listOf(
-            Color(0xFF00E5FF),
-            Color(0xFFBF00FF),
-            Color(0xFFFFD700),
-            Color(0xFF00FFCC),
+            mc.secondaryAccent,
+            mc.primaryAccent,
+            mc.goldMtg,
+            mc.manaG,
         )
     val foilBrush = Brush.linearGradient(colors = foilColors)
 
-    Card(
-        modifier = modifier.height(115.dp),
-        shape = CardShape,
-        colors = CardDefaults.cardColors(containerColor = mc.surface),
-        border = if (isFoil) BorderStroke(1.5.dp, foilBrush) else BorderStroke(1.dp, mc.surfaceVariant),
+    PremiumCard(
+        modifier = modifier.heightIn(min = 115.dp),
+        border = if (isFoil) BorderStroke(1.5.dp, foilBrush) else null,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (isFoil) {
@@ -952,7 +1072,7 @@ private fun AestheticStatCard(
                     )
                     Text(
                         text = value,
-                        style = MaterialTheme.magicTypography.displayMedium.copy(fontSize = 32.sp),
+                        style = MaterialTheme.magicTypography.displayMedium,
                         color = mc.textPrimary,
                     )
                 }
@@ -960,7 +1080,7 @@ private fun AestheticStatCard(
                 Column(verticalArrangement = Arrangement.spacedBy(sp.sm)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         Text(
-                            text = "${(percentage * 100).toInt()}% " + stringResource(R.string.stats_label_total).lowercase(),
+                            text = "${(safePercentage * 100).toInt()}% " + stringResource(R.string.stats_label_total).lowercase(),
                             style = MaterialTheme.magicTypography.labelSmall,
                             color = mc.textSecondary,
                         )
@@ -976,7 +1096,7 @@ private fun AestheticStatCard(
                         Box(
                             modifier =
                                 Modifier
-                                    .fillMaxWidth(percentage)
+                                    .fillMaxWidth(safePercentage)
                                     .fillMaxHeight()
                                     .clip(CircleShape)
                                     .background(
@@ -1048,8 +1168,6 @@ private fun HallOfFameSection(
             }
         }
 
-        // Phase 2 (2026-07 stats expansion) — most-duplicated card, half-width tile.
-        // Hall of Fame enrichment — most-DISTINCT-variants card fills the other half.
         if (stats.mostDuplicatedCard != null || stats.mostVariantsCard != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(sp.lg)) {
                 stats.mostDuplicatedCard?.let { card ->
@@ -1102,7 +1220,6 @@ private fun HallOfFameSection(
             }
         }
 
-        // Phase 2 — top-10 value concentration KPI, near the most-valuable list.
         if (stats.mostValuableCards.isNotEmpty()) {
             CuriousStatBox(
                 label = stringResource(R.string.stats_label_value_concentration),
@@ -1127,9 +1244,7 @@ private fun HallOfFameSection(
 }
 
 /**
- * Generic Hall of Fame card tile (art-crop image + name + set + a caller-supplied badge line).
- * Backs BOTH the most-duplicated-card and most-variants-card stats (2026-07 stats expansion) —
- * only the badge text differs between the two axes.
+ * Generic Hall of Fame card tile.
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -1146,10 +1261,9 @@ private fun HallOfFameCardTile(
     badgeIconTint: Color = mc.textPrimary,
 ) {
     val sp = MaterialTheme.spacing
-    Card(
-        modifier = modifier.clickable { onCardClick() },
-        shape = CardShape,
-        colors = CardDefaults.cardColors(containerColor = mc.surface),
+    PremiumCard(
+        modifier = modifier,
+        onClick = onCardClick,
     ) {
         Column {
             val imageModifier = Modifier.fillMaxWidth().aspectRatio(4f / 3f)
@@ -1232,16 +1346,17 @@ private fun DistributionsSection(
     stats: CollectionStats,
     mc: MagicColors,
 ) {
-    val context = LocalContext.current
     val whiteName = stringResource(R.string.stats_color_white)
     val blueName = stringResource(R.string.stats_color_blue)
     val blackName = stringResource(R.string.stats_color_black)
     val redName = stringResource(R.string.stats_color_red)
     val greenName = stringResource(R.string.stats_color_green)
     val colorlessName = stringResource(R.string.stats_color_colorless)
+    val multicolorName = stringResource(R.string.collection_filter_multicolor)
+    val unknownName = stringResource(R.string.stats_color_unknown)
 
     val colorData =
-        remember(stats.byColor, whiteName, blueName, blackName, redName, greenName, colorlessName) {
+        remember(stats.byColor, whiteName, blueName, blackName, redName, greenName, colorlessName, multicolorName, unknownName) {
             stats.byColor.entries.associate { (color, count) ->
                 val name =
                     when (color) {
@@ -1251,7 +1366,8 @@ private fun DistributionsSection(
                         MtgColor.R -> redName
                         MtgColor.G -> greenName
                         MtgColor.COLORLESS -> colorlessName
-                        else -> context.getString(R.string.stats_color_unknown)
+                        MtgColor.MULTICOLOR -> multicolorName
+                        else -> unknownName
                     }
                 name to count
             }
@@ -1263,16 +1379,17 @@ private fun DistributionsSection(
             data = colorData,
             colorMapper = { label ->
                 when (label) {
-                    whiteName -> Color(0xFFF9FAFA)
-                    blueName -> Color(0xFF0E68AB)
-                    blackName -> Color(0xFF150B00)
-                    redName -> Color(0xFFD3202A)
-                    greenName -> Color(0xFF00733E)
-                    colorlessName -> Color(0xFF90ADBB)
+                    whiteName -> mc.manaW
+                    blueName -> mc.manaU
+                    blackName -> mc.manaB
+                    redName -> mc.manaR
+                    greenName -> mc.manaG
+                    colorlessName -> mc.manaC
                     else -> mc.primaryAccent
                 }
             },
             isColor = true,
+            displayTotal = stats.totalCards,
         )
         CircularDistributionSection(
             title = stringResource(R.string.stats_dist_type),
@@ -1292,13 +1409,13 @@ private fun DistributionsSection(
                         mc.goldMtg,
                         mc.lifePositive,
                         mc.lifeNegative,
-                        Color(0xFF9B6EFF),
-                        Color(0xFFE8A030),
-                        Color(0xFFC0C0C0),
-                        Color(0xFFB0C4DE),
-                        Color(0xFFFF6AD5),
-                        Color(0xFF00E5FF),
-                        Color(0xFFBF00FF),
+                        mc.commanderAccent,
+                        mc.goldMtg,
+                        mc.textSecondary,
+                        mc.manaU,
+                        mc.manaR,
+                        mc.manaG,
+                        mc.manaB,
                     )
                 palette[index % palette.size]
             },
@@ -1313,18 +1430,17 @@ private fun DistributionsSection(
                 },
             colorMapper = { label ->
                 when (label.lowercase()) {
-                    "common" -> Color(0xFFC0C0C0)
-                    "uncommon" -> Color(0xFFB0C4DE)
-                    "rare" -> Color(0xFFC9A84C)
-                    "mythic" -> Color(0xFFE8A030)
-                    else -> Color(0xFF9B6EFF)
+                    "common" -> mc.textSecondary
+                    "uncommon" -> mc.manaU
+                    "rare" -> mc.goldMtg
+                    "mythic" -> mc.manaR
+                    else -> mc.primaryAccent
                 }
             },
         )
 
         DistributionSection(title = stringResource(R.string.stats_dist_strategy), data = stats.autoTagDistribution)
 
-        // Phase 2 (2026-07 stats expansion)
         DistributionSection(title = stringResource(R.string.stats_dist_keywords), data = stats.keywordDistribution)
         FormatCoverageRow(coverage = stats.formatCoverage, mc = mc)
     }
@@ -1346,10 +1462,8 @@ private fun FormatCoverageRow(
         )
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sp.sm)) {
             coverage.forEach { (label, count) ->
-                Card(
+                PremiumCard(
                     modifier = Modifier.weight(1f),
-                    shape = CardShape,
-                    colors = CardDefaults.cardColors(containerColor = mc.surface),
                 ) {
                     Column(
                         modifier = Modifier.padding(vertical = sp.md).fillMaxWidth(),
@@ -1373,19 +1487,17 @@ private fun StatCard(
 ) {
     val mc = MaterialTheme.magicColors
     val sp = MaterialTheme.spacing
-    Card(
+    PremiumCard(
         modifier = modifier,
-        shape = CardShape,
-        colors = CardDefaults.cardColors(containerColor = mc.surfaceVariant),
     ) {
         Column(
-            modifier = Modifier.padding(sp.lg).fillMaxWidth(),
+            modifier = Modifier.padding(horizontal = sp.md, vertical = sp.sm).fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 value,
-                style = MaterialTheme.magicTypography.titleLarge.copy(fontSize = 24.sp),
+                style = MaterialTheme.magicTypography.titleLarge,
                 color = valueColor ?: mc.textPrimary,
                 textAlign = TextAlign.Center,
             )
@@ -1402,13 +1514,11 @@ private fun CuriousStatBox(
     percentage: Float? = null,
     supportingText: String? = null,
     mc: MagicColors,
-    content: @Composable (androidx.compose.foundation.layout.ColumnScope.() -> Unit)? = null,
+    content: @Composable (ColumnScope.() -> Unit)? = null,
 ) {
     val sp = MaterialTheme.spacing
-    Card(
+    PremiumCard(
         modifier = modifier,
-        shape = CardShape,
-        colors = CardDefaults.cardColors(containerColor = mc.surface),
     ) {
         Column(Modifier.padding(sp.md)) {
             Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
@@ -1438,7 +1548,7 @@ private fun CuriousStatBox(
                     Box(
                         modifier =
                             Modifier
-                                .fillMaxWidth(percentage)
+                                .fillMaxWidth(percentage.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f)
                                 .fillMaxHeight()
                                 .clip(CircleShape)
                                 .background(
@@ -1470,10 +1580,9 @@ private fun HistoryCard(
     modifier: Modifier = Modifier,
 ) {
     val sp = MaterialTheme.spacing
-    Card(
-        modifier = modifier.clickable { onCardClick() },
-        shape = CardShape,
-        colors = CardDefaults.cardColors(containerColor = mc.surface),
+    PremiumCard(
+        modifier = modifier,
+        onClick = onCardClick,
     ) {
         Column {
             val imageModifier = Modifier.fillMaxWidth().aspectRatio(4f / 3f)
@@ -1531,21 +1640,30 @@ private fun HistoryCard(
 
                 Spacer(Modifier.height(sp.md))
 
-                val price = if (currency == PreferredCurrency.USD) card.priceUsd else card.priceEur
-                if (price > 0) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
-                        PriceFormatter.format(price, currency),
-                        style = MaterialTheme.magicTypography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = mc.goldMtg,
-                    )
-                } else {
-                    Text(
-                        "—",
-                        style = MaterialTheme.magicTypography.labelMedium,
+                        text = stringResource(R.string.stats_label_est_value),
+                        style = MaterialTheme.magicTypography.labelSmall,
                         color = mc.textSecondary,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.End,
                     )
+                    val price = if (currency == PreferredCurrency.USD) card.priceUsd else card.priceEur
+                    if (price > 0) {
+                        Text(
+                            PriceFormatter.format(price, currency),
+                            style = MaterialTheme.magicTypography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = mc.goldMtg,
+                        )
+                    } else {
+                        Text(
+                            "—",
+                            style = MaterialTheme.magicTypography.labelMedium,
+                            color = mc.textSecondary,
+                        )
+                    }
                 }
             }
         }
@@ -1569,13 +1687,10 @@ private fun MostValuableSection(
         }
     if (filteredCards.isEmpty()) return
 
-    Card(
-        shape = CardShape,
-        colors = CardDefaults.cardColors(containerColor = mc.surface),
-    ) {
+    PremiumCard {
         Column {
             filteredCards.forEachIndexed { index, card ->
-                val key = "stats-valuable-${card.scryfallId}"
+                val key = "stats-valuable-${card.scryfallId}-${card.isFoil}"
                 ListItem(
                     modifier = Modifier.clickable { onCardClick(card.scryfallId, key) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -1593,7 +1708,8 @@ private fun MostValuableSection(
                                 text = "#${index + 1}",
                                 style = MaterialTheme.magicTypography.labelLarge,
                                 color = mc.primaryAccent.copy(alpha = 0.8f),
-                                modifier = Modifier.width(36.dp),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.width(32.dp),
                             )
                             val imageModifier = Modifier.width(40.dp).height(56.dp).clip(ExtraSmallCardShape)
                             val finalImageModifier =
@@ -1665,13 +1781,11 @@ private fun SetStatsSection(
         horizontalArrangement = Arrangement.spacedBy(sp.md),
     ) {
         stats.topSetByCount?.let { (setCode, count) ->
-            Card(
+            PremiumCard(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
-                shape = CardShape,
-                colors = CardDefaults.cardColors(containerColor = mc.surface),
             ) {
                 Column(
-                    modifier = Modifier.padding(sp.lg).fillMaxWidth(),
+                    modifier = Modifier.padding(sp.lg).fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -1701,13 +1815,11 @@ private fun SetStatsSection(
         }
 
         stats.topSetByValue?.let { (setCode, value) ->
-            Card(
+            PremiumCard(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
-                shape = CardShape,
-                colors = CardDefaults.cardColors(containerColor = mc.surface),
             ) {
                 Column(
-                    modifier = Modifier.padding(sp.lg).fillMaxWidth(),
+                    modifier = Modifier.padding(sp.lg).fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -1740,10 +1852,11 @@ private fun SetStatsSection(
 
 @Composable
 private fun CircularDistributionSection(
-    title: String,
+    title: String? = null,
     data: Map<String, Int>,
     colorMapper: (String) -> Color,
     isColor: Boolean = false,
+    displayTotal: Int? = null,
     modifier: Modifier = Modifier,
 ) {
     if (data.isEmpty()) return
@@ -1751,16 +1864,23 @@ private fun CircularDistributionSection(
     val sp = MaterialTheme.spacing
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(sp.lg)) {
-        Text(title, style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+        if (!title.isNullOrEmpty()) {
+            Text(title, style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+        }
+        if (isColor) {
+            Text(
+                text = stringResource(R.string.stats_color_distribution_hint),
+                style = MaterialTheme.magicTypography.labelSmall,
+                color = mc.textSecondary,
+            )
+        }
 
-        Card(
-            shape = CardShape,
-            colors = CardDefaults.cardColors(containerColor = mc.surface),
-        ) {
+        PremiumCard {
             CircularDistribution(
                 data = data,
                 colorMapper = colorMapper,
                 isColor = isColor,
+                displayTotal = displayTotal,
                 modifier = Modifier.padding(vertical = sp.md, horizontal = sp.lg),
             )
         }
@@ -1782,9 +1902,7 @@ private fun DistributionSection(
     val sp = MaterialTheme.spacing
     Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
         Text(title, style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
-        Card(
-            shape = CardShape,
-            colors = CardDefaults.cardColors(containerColor = mc.surface),
+        PremiumCard(
             modifier = Modifier.padding(bottom = sp.xs),
         ) {
             Column(Modifier.padding(sp.lg), verticalArrangement = Arrangement.spacedBy(sp.md)) {
@@ -1830,10 +1948,7 @@ private fun SetCompletionSection(completions: List<SetCompletion>) {
     if (completions.isEmpty()) return
     val mc = MaterialTheme.magicColors
     val sp = MaterialTheme.spacing
-    Card(
-        shape = CardShape,
-        colors = CardDefaults.cardColors(containerColor = mc.surface),
-    ) {
+    PremiumCard {
         Column(Modifier.padding(sp.lg), verticalArrangement = Arrangement.spacedBy(sp.lg)) {
             completions.forEach { completion ->
                 key(completion.set.code) {
@@ -1892,9 +2007,6 @@ private fun SetCompletionSection(completions: List<SetCompletion>) {
 // Games tab
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Formats a duration given in milliseconds as "Xm Ys".
- */
 private fun formatDuration(durationMs: Long): String {
     val totalSeconds = durationMs / 1000
     val minutes = totalSeconds / 60
@@ -1902,52 +2014,33 @@ private fun formatDuration(durationMs: Long): String {
     return "${minutes}m ${seconds.toString().padStart(2, '0')}s"
 }
 
-/**
- * Root composable for the Games tab content.
- *
- * @param onReviewSurvey Navigates to the survey screen in REVIEW mode.
- * @param onDeckClick Navigates to the deck detail screen.
- * @param onDeleteSession Triggers deletion of a session after double confirmation. The success
- *   toast fires only after [StatsUiState.deleteSessionSuccess] confirms the delete actually
- *   succeeded — never optimistically at confirm-click time (Phase 1 audit fix).
- * @param onClearDeleteMessage Clears the one-shot delete result after its toast has been shown.
- */
 @Composable
 private fun GameStatsContent(
     uiState: StatsUiState,
-    toastState: com.mmg.manahub.core.ui.components.MagicToastState,
     onReviewSurvey: (Long) -> Unit,
     onDeckClick: (String) -> Unit,
     onDeleteSession: (Long) -> Unit,
-    onClearDeleteMessage: () -> Unit,
+    onRetry: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val sp = MaterialTheme.spacing
 
-    // Delete confirmation state: holds the session id pending first confirmation
     var showFirstConfirm by rememberSaveable { mutableStateOf<Long?>(null) }
-    // Second confirmation: holds the session id pending final irreversible confirm
     var showFinalConfirm by rememberSaveable { mutableStateOf<Long?>(null) }
 
-    val deleteSuccessLabel = stringResource(R.string.delete_game_toast)
-    val deleteErrorLabel = stringResource(R.string.delete_game_error)
-    LaunchedEffect(uiState.deleteSessionSuccess) {
-        when (uiState.deleteSessionSuccess) {
-            true -> {
-                toastState.show(deleteSuccessLabel, MagicToastType.SUCCESS)
-                onClearDeleteMessage()
-            }
-
-            false -> {
-                toastState.show(deleteErrorLabel, MagicToastType.ERROR)
-                onClearDeleteMessage()
-            }
-
-            null -> {
-                Unit
-            }
-        }
+    if (uiState.gameError) {
+        InlineErrorState(
+            message = stringResource(R.string.stats_games_error),
+            retryLabel = stringResource(R.string.action_retry),
+            onRetry = onRetry,
+            modifier = Modifier.fillMaxWidth().padding(sp.lg),
+        )
+        return
+    }
+    if (uiState.gameStats == null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { MagicLoadingSpinner() }
+        return
     }
 
     LazyColumn(
@@ -1960,7 +2053,6 @@ private fun GameStatsContent(
     ) {
         item(key = "games_top_spacer") { Spacer(Modifier.height(sp.sm)) }
 
-        // ── KPI grid ─────────────────────────────────────────────────────────
         uiState.gameStats?.let { gs ->
             item(key = "games_kpi_grid") {
                 Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
@@ -1968,64 +2060,42 @@ private fun GameStatsContent(
                         StatCard(
                             label = stringResource(R.string.stats_kpi_total_games),
                             value = gs.totalGames.toString(),
-                            modifier = Modifier.weight(1f).height(90.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 60.dp),
                         )
                         StatCard(
                             label = stringResource(R.string.stats_kpi_winrate),
                             value = "${(gs.winrate * 100).toInt()}%",
-                            modifier = Modifier.weight(1f).height(90.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 60.dp),
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(sp.md)) {
                         StatCard(
                             label = stringResource(R.string.stats_kpi_avg_duration),
                             value = formatDuration(gs.avgDurationMs),
-                            modifier = Modifier.weight(1f).height(90.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 60.dp),
                         )
-                        // Phase 3: the single "Favorite Mode" KPI is REPLACED by the "Win Rate by Mode"
-                        // breakdown section below (a superset — the top mode is its first, highest-
-                        // games row), so this slot now surfaces mostFrequentLoss instead (was already
-                        // computed but never rendered — Phase 1 audit finding).
                         StatCard(
                             label = stringResource(R.string.stats_kpi_most_common_defeat),
                             value = gs.mostFrequentLoss ?: "—",
-                            modifier = Modifier.weight(1f).height(90.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 60.dp),
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(sp.md)) {
                         StatCard(
                             label = stringResource(R.string.stats_kpi_current_streak),
                             value = gs.currentStreak.toString(),
-                            modifier = Modifier.weight(1f).height(90.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 60.dp),
                         )
                         StatCard(
                             label = stringResource(R.string.stats_kpi_best_streak),
                             value = gs.bestStreak.toString(),
-                            modifier = Modifier.weight(1f).height(90.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 60.dp),
                         )
                     }
-
-                    // TODO: Re-enable when Survey review for games is fully implemented
-//                if (gs.pendingSurveys > 0) {
-//                    Card(
-//                        modifier = Modifier.fillMaxWidth(),
-//                        shape    = CardShape,
-//                        colors   = CardDefaults.cardColors(containerColor = mc.goldMtg.copy(alpha = 0.15f)),
-//                        border   = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.4f)),
-//                    ) {
-//                        Text(
-//                            text     = stringResource(R.string.stats_pending_surveys, gs.pendingSurveys),
-//                            style    = ty.bodySmall,
-//                            color    = mc.goldMtg,
-//                            modifier = Modifier.padding(horizontal = sp.lg, vertical = sp.md),
-//                        )
-//                    }
-//                }
                 }
             }
         }
 
-        // ── Win rate by mode ─────────────────────────────────────────────────
         if (uiState.modeWinrates.isNotEmpty()) {
             item(key = "games_winrate_by_mode") {
                 Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
@@ -2035,10 +2105,7 @@ private fun GameStatsContent(
                         color = mc.textPrimary,
                         letterSpacing = 2.sp,
                     )
-                    Card(
-                        shape = CardShape,
-                        colors = CardDefaults.cardColors(containerColor = mc.surface),
-                    ) {
+                    PremiumCard {
                         Column(
                             modifier = Modifier.padding(sp.lg),
                             verticalArrangement = Arrangement.spacedBy(sp.lg),
@@ -2050,7 +2117,6 @@ private fun GameStatsContent(
             }
         }
 
-        // ── Win rate by player count ─────────────────────────────────────────
         if (uiState.playerCountWinrates.isNotEmpty()) {
             item(key = "games_winrate_by_player_count") {
                 Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
@@ -2060,10 +2126,7 @@ private fun GameStatsContent(
                         color = mc.textPrimary,
                         letterSpacing = 2.sp,
                     )
-                    Card(
-                        shape = CardShape,
-                        colors = CardDefaults.cardColors(containerColor = mc.surface),
-                    ) {
+                    PremiumCard {
                         Column(
                             modifier = Modifier.padding(sp.lg),
                             verticalArrangement = Arrangement.spacedBy(sp.lg),
@@ -2075,7 +2138,6 @@ private fun GameStatsContent(
             }
         }
 
-        // ── Deck performance ─────────────────────────────────────────────────
         item(key = "games_deck_performance") {
             Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
                 Text(
@@ -2092,10 +2154,7 @@ private fun GameStatsContent(
                         modifier = Modifier.fillMaxWidth().height(140.dp),
                     )
                 } else {
-                    Card(
-                        shape = CardShape,
-                        colors = CardDefaults.cardColors(containerColor = mc.surface),
-                    ) {
+                    PremiumCard {
                         Column(
                             modifier = Modifier.padding(sp.lg),
                             verticalArrangement = Arrangement.spacedBy(sp.lg),
@@ -2113,7 +2172,6 @@ private fun GameStatsContent(
             }
         }
 
-        // ── Matchup win rates (by opponent archetype) ─────────────────────────
         if (uiState.archetypeMatchups.isNotEmpty()) {
             item(key = "games_archetype_matchups") {
                 Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
@@ -2123,10 +2181,7 @@ private fun GameStatsContent(
                         color = mc.textPrimary,
                         letterSpacing = 2.sp,
                     )
-                    Card(
-                        shape = CardShape,
-                        colors = CardDefaults.cardColors(containerColor = mc.surface),
-                    ) {
+                    PremiumCard {
                         Column(
                             modifier = Modifier.padding(sp.lg),
                             verticalArrangement = Arrangement.spacedBy(sp.lg),
@@ -2140,7 +2195,6 @@ private fun GameStatsContent(
             }
         }
 
-        // ── Recent form ──────────────────────────────────────────────────────
         if (uiState.recentForm.isNotEmpty()) {
             item(key = "games_recent_form") {
                 Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
@@ -2153,7 +2207,7 @@ private fun GameStatsContent(
                     Row(horizontalArrangement = Arrangement.spacedBy(sp.xs)) {
                         uiState.recentForm.forEach { entry ->
                             key(entry.sessionId) {
-                                RecentFormBadge(isWin = entry.isWin, mc = mc)
+                                RecentFormBadge(isWin = entry.isWin, isDraw = entry.isDraw, mc = mc)
                             }
                         }
                     }
@@ -2161,44 +2215,34 @@ private fun GameStatsContent(
             }
         }
 
-        // ── Session history ───────────────────────────────────────────────────
-        item(key = "games_session_history") {
-            Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
-                Text(
-                    text = stringResource(R.string.stats_section_history).uppercase(),
-                    style = ty.labelLarge,
-                    color = mc.textPrimary,
-                    letterSpacing = 2.sp,
+        item(key = "games_session_history_header", contentType = "header") {
+            Text(
+                text = stringResource(R.string.stats_section_history).uppercase(),
+                style = ty.labelLarge,
+                color = mc.textPrimary,
+                letterSpacing = 2.sp,
+            )
+        }
+        if (uiState.sessionHistory.isEmpty()) {
+            item(key = "games_session_history_empty", contentType = "empty") {
+                EmptyState(
+                    title = stringResource(R.string.stats_section_history),
+                    subtitle = stringResource(R.string.stats_empty_history_subtitle),
+                    modifier = Modifier.fillMaxWidth().height(140.dp),
                 )
-
-                if (uiState.sessionHistory.isEmpty()) {
-                    EmptyState(
-                        title = stringResource(R.string.stats_section_history),
-                        subtitle = stringResource(R.string.stats_empty_history_subtitle),
-                        modifier = Modifier.fillMaxWidth().height(140.dp),
+            }
+        } else {
+            items(
+                items = uiState.sessionHistory,
+                key = { "history_${it.sessionId}" },
+                contentType = { "history_row" },
+            ) { item ->
+                PremiumCard {
+                    SessionHistoryRow(
+                        item = item,
+                        mc = mc,
+                        onDeleteRequest = { showFirstConfirm = item.sessionId },
                     )
-                } else {
-                    Card(
-                        shape = CardShape,
-                        colors = CardDefaults.cardColors(containerColor = mc.surface),
-                    ) {
-                        Column {
-                            uiState.sessionHistory.forEachIndexed { index, item ->
-                                SessionHistoryRow(
-                                    item = item,
-                                    mc = mc,
-                                    onDeleteRequest = { showFirstConfirm = item.sessionId },
-                                )
-                                if (index < uiState.sessionHistory.size - 1) {
-                                    HorizontalDivider(
-                                        thickness = 0.5.dp,
-                                        color = mc.surfaceVariant.copy(alpha = 0.4f),
-                                        modifier = Modifier.padding(horizontal = sp.lg),
-                                    )
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -2207,8 +2251,6 @@ private fun GameStatsContent(
             Spacer(Modifier.height(sp.xxl))
         }
     }
-
-    // ── Delete dialogs ────────────────────────────────────────────────────────
 
     showFirstConfirm?.let { sessionId ->
         MagicAlertDialog(
@@ -2255,7 +2297,8 @@ private fun DeckPerformanceRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clickable { onDeckClick() },
+                .heightIn(min = 48.dp)
+                .clickable(role = Role.Button, onClickLabel = stringResource(R.string.stats_open_deck)) { onDeckClick() },
         verticalArrangement = Arrangement.spacedBy(sp.xs),
     ) {
         Row(
@@ -2288,7 +2331,7 @@ private fun DeckPerformanceRow(
 
 @Composable
 private fun ArchetypeMatchupItem(
-    matchup: com.mmg.manahub.feature.game.domain.model.ArchetypeMatchupData,
+    matchup: ArchetypeMatchupData,
     mc: MagicColors,
 ) {
     val ty = MaterialTheme.magicTypography
@@ -2399,45 +2442,40 @@ private fun PlayerCountWinrateRow(
     }
 }
 
-/**
- * One decorative W/L badge in the "Recent form" strip (Phase 3, 2026-07 stats expansion).
- * Non-interactive — mirrors [SessionHistoryRow]'s win/loss badge styling.
- */
 @Composable
 private fun RecentFormBadge(
     isWin: Boolean,
+    isDraw: Boolean,
     mc: MagicColors,
 ) {
     val ty = MaterialTheme.magicTypography
+    val badgeColor = when {
+        isDraw -> mc.textSecondary
+        isWin -> mc.lifePositive
+        else -> mc.lifeNegative
+    }
     Surface(
         shape = CardShape,
-        color = if (isWin) mc.lifePositive.copy(alpha = 0.2f) else mc.lifeNegative.copy(alpha = 0.15f),
+        color = badgeColor.copy(alpha = 0.2f),
         modifier = Modifier.size(28.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
-                text = if (isWin) "W" else "L",
+                text = when { isDraw -> stringResource(R.string.stats_result_draw); isWin -> stringResource(R.string.stats_result_win); else -> stringResource(R.string.stats_result_loss) },
                 style = ty.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = if (isWin) mc.lifePositive else mc.lifeNegative,
+                color = badgeColor,
             )
         }
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Trades tab (Phase 4, 2026-07 stats expansion)
+// Trades tab
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Root composable for the Trades tab content. Unlike every other Stats section, [state] is a real
- * network round-trip (see [GetTradeStatsUseCase][com.mmg.manahub.core.data.usecase.stats.GetTradeStatsUseCase])
- * triggered lazily on tab activation, so all four states (idle/loading, content, empty, error) are
- * handled explicitly rather than assuming data is already there.
- */
 @Composable
 private fun TradeStatsContent(
     state: TradeStatsUiState,
-    currency: PreferredCurrency,
     onRetry: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -2474,10 +2512,6 @@ private fun TradeStatsContent(
         is TradeStatsUiState.Content -> {
             val stats = state.stats
             if (stats.completedTradesCount == 0) {
-                // Defensive: the TRADES tab is only shown when the cheap visibility warm-up saw a
-                // COMPLETED proposal, so this branch should be unreachable in practice — kept as a
-                // fallback in case that cache was stale (e.g. a cross-account race) when the fresh
-                // fetch here landed.
                 EmptyState(
                     title = stringResource(R.string.stats_trades_empty_title),
                     subtitle = stringResource(R.string.stats_trades_empty_subtitle),
@@ -2500,27 +2534,27 @@ private fun TradeStatsContent(
                                 StatCard(
                                     label = stringResource(R.string.stats_kpi_completed_trades),
                                     value = stats.completedTradesCount.toString(),
-                                    modifier = Modifier.weight(1f).height(90.dp),
+                                    modifier = Modifier.weight(1f).heightIn(min = 60.dp),
                                 )
                                 StatCard(
                                     label = stringResource(R.string.stats_kpi_cards_sent),
                                     value = stats.cardsSent.toString(),
-                                    modifier = Modifier.weight(1f).height(90.dp),
+                                    modifier = Modifier.weight(1f).heightIn(min = 60.dp),
                                 )
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(sp.md)) {
                                 StatCard(
                                     label = stringResource(R.string.stats_kpi_cards_received),
                                     value = stats.cardsReceived.toString(),
-                                    modifier = Modifier.weight(1f).height(90.dp),
+                                    modifier = Modifier.weight(1f).heightIn(min = 60.dp),
                                 )
                                 val deltaSign = if (stats.netValueDelta >= 0) "+" else "−"
-                                val deltaMagnitude = PriceFormatter.format(kotlin.math.abs(stats.netValueDelta), currency)
+                                val deltaMagnitude = PriceFormatter.format(abs(stats.netValueDelta), stats.currency)
                                 StatCard(
                                     label = stringResource(R.string.stats_kpi_net_value),
                                     value = "$deltaSign$deltaMagnitude",
                                     valueColor = if (stats.netValueDelta >= 0) mc.lifePositive else mc.lifeNegative,
-                                    modifier = Modifier.weight(1f).height(90.dp),
+                                    modifier = Modifier.weight(1f).heightIn(min = 60.dp),
                                 )
                             }
                         }
@@ -2530,7 +2564,7 @@ private fun TradeStatsContent(
                         Text(
                             text = stringResource(R.string.stats_trades_net_value_note),
                             style = ty.labelSmall,
-                            color = mc.textDisabled,
+                            color = mc.textSecondary,
                         )
                     }
 
@@ -2543,10 +2577,7 @@ private fun TradeStatsContent(
                                     color = mc.textPrimary,
                                     letterSpacing = 2.sp,
                                 )
-                                Card(
-                                    shape = CardShape,
-                                    colors = CardDefaults.cardColors(containerColor = mc.surface),
-                                ) {
+                                PremiumCard {
                                     Row(
                                         modifier = Modifier.fillMaxWidth().padding(sp.lg),
                                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -2598,26 +2629,19 @@ private fun SessionHistoryRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(sp.md),
     ) {
-        // Win/loss badge
         Surface(
             shape = CardShape,
-            color =
-                if (item.isWin) {
-                    mc.lifePositive.copy(alpha = 0.2f)
-                } else {
-                    mc.lifeNegative.copy(alpha = 0.15f)
-                },
+            color = when { item.isDraw -> mc.textSecondary; item.isWin -> mc.lifePositive; else -> mc.lifeNegative }.copy(alpha = 0.2f),
         ) {
             Text(
-                text = if (item.isWin) "W" else "L",
+                text = when { item.isDraw -> stringResource(R.string.stats_result_draw); item.isWin -> stringResource(R.string.stats_result_win); else -> stringResource(R.string.stats_result_loss) },
                 style = ty.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = if (item.isWin) mc.lifePositive else mc.lifeNegative,
+                color = when { item.isDraw -> mc.textSecondary; item.isWin -> mc.lifePositive; else -> mc.lifeNegative },
                 modifier = Modifier.padding(horizontal = sp.sm, vertical = sp.xs),
             )
         }
 
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(sp.xxs)) {
-            // Mode + duration
             Row(horizontalArrangement = Arrangement.spacedBy(sp.sm)) {
                 Text(
                     text = item.mode,
@@ -2627,7 +2651,7 @@ private fun SessionHistoryRow(
                 Text(
                     text = "·",
                     style = ty.bodySmall,
-                    color = mc.textDisabled,
+                    color = mc.textSecondary,
                 )
                 Text(
                     text = formatDuration(item.durationMs),
@@ -2636,14 +2660,12 @@ private fun SessionHistoryRow(
                 )
             }
 
-            // Date
             Text(
                 text = TimeAgoFormatter.format(item.playedAt),
                 style = ty.labelSmall,
-                color = mc.textDisabled,
+                color = mc.textSecondary,
             )
 
-            // Deck name
             item.deckName?.let { name ->
                 Text(
                     text = name,
@@ -2653,17 +2675,13 @@ private fun SessionHistoryRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-
-            // TODO: Re-enable when Survey review for games is fully implemented
-//            SurveyStatusChip(item = item, mc = mc)
         }
 
-        // Trailing more-options button with dropdown
         Box(modifier = Modifier.wrapContentSize(Alignment.TopEnd)) {
-            IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = { menuExpanded = true }) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.stats_game_options),
                     tint = mc.textDisabled,
                     modifier = Modifier.size(18.dp),
                 )
@@ -2672,14 +2690,6 @@ private fun SessionHistoryRow(
                 expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false },
             ) {
-                // TODO: Re-enable when Survey review for games is fully implemented
-//                DropdownMenuItem(
-//                    text    = { Text(stringResource(R.string.action_review_survey)) },
-//                    onClick = {
-//                        menuExpanded = false
-//                        onReviewSurvey()
-//                    },
-//                )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.action_delete_game), color = mc.lifeNegative) },
                     onClick = {
@@ -2692,35 +2702,6 @@ private fun SessionHistoryRow(
     }
 }
 
-// TODO: Re-enable when Survey review for games is fully implemented
-// @Composable
-// private fun SurveyStatusChip(item: GameHistoryItem, mc: MagicColors) {
-//    val ty = MaterialTheme.magicTypography
-//    val (label, color) = when (item.surveyStatus) {
-//        SurveyStatus.PENDING   -> stringResource(R.string.survey_pending) to mc.goldMtg.copy(alpha = 0.7f)
-//        SurveyStatus.PARTIAL   -> stringResource(R.string.survey_partial) to mc.goldMtg.copy(alpha = 0.5f)
-//        SurveyStatus.COMPLETED -> {
-//            val timestamp = item.surveyStatus.let {
-//                stringResource(R.string.survey_completed)
-//            }
-//            timestamp to mc.lifePositive.copy(alpha = 0.7f)
-//        }
-//        SurveyStatus.SKIPPED   -> stringResource(R.string.survey_skipped) to mc.textDisabled
-//    }
-//
-//    Surface(
-//        shape = RoundedCornerShape(4.dp),
-//        color = color.copy(alpha = 0.15f),
-//    ) {
-//        Text(
-//            text     = label,
-//            style    = ty.labelSmall,
-//            color    = color,
-//            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-//        )
-//    }
-// }
-
 fun MtgColor.toDisplayNameRes(): Int =
     when (this) {
         MtgColor.W -> R.string.stats_color_white
@@ -2729,5 +2710,6 @@ fun MtgColor.toDisplayNameRes(): Int =
         MtgColor.R -> R.string.stats_color_red
         MtgColor.G -> R.string.stats_color_green
         MtgColor.COLORLESS -> R.string.stats_color_colorless
+        MtgColor.MULTICOLOR -> R.string.collection_filter_multicolor
         else -> R.string.stats_color_unknown
     }

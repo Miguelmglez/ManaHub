@@ -11,5 +11,10 @@ class CreateTradeProposalUseCase(private val repo: TradesRepository) {
         includesReviewFromProposer: Boolean = false,
         includesReviewFromReceiver: Boolean = false,
         autoSend: Boolean = false,
-    ) = repo.createProposal(receiverId, items, includesReviewFromProposer, includesReviewFromReceiver, autoSend)
+        clientRequestId: String? = null,
+    ) = if (clientRequestId == null) {
+        repo.createProposal(receiverId, items, includesReviewFromProposer, includesReviewFromReceiver, autoSend)
+    } else {
+        repo.createProposalWithRequestId(receiverId, items, includesReviewFromProposer, includesReviewFromReceiver, autoSend, clientRequestId)
+    }
 }

@@ -16,6 +16,7 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.PLAYABLE_SET_TYPES
 import com.mmg.manahub.core.model.SetType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 
 /**
@@ -405,5 +406,13 @@ class ScryfallRemoteDataSource(
         }
 
     private suspend fun <T> safeCall(block: suspend () -> T): Result<T> =
-        withContext(dispatcherProvider.io) { runCatching { block() } }
+        withContext(dispatcherProvider.io) {
+            try {
+                Result.success(block())
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Result.failure(error)
+            }
+        }
 }

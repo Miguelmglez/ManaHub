@@ -1,5 +1,10 @@
 package com.mmg.manahub.feature.trades.presentation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,7 +18,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.People
@@ -30,6 +37,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,9 +45,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.OpenForTradeEntry
+import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.ui.components.AvatarImage
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.CopyBadge
@@ -48,6 +58,7 @@ import com.mmg.manahub.core.ui.components.MagicSegmentedControl
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.SectionHeader
+import com.mmg.manahub.core.ui.components.rememberFabVisibility
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -55,9 +66,7 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
 import com.mmg.manahub.feature.auth.presentation.LoginSheet
-import com.mmg.manahub.core.model.Friend
-import com.mmg.manahub.core.model.OpenForTradeEntry
-import com.mmg.manahub.core.model.WishlistEntry
+import org.koin.androidx.compose.koinViewModel
 import java.util.Locale
 
 /** Reserves room above the bottom bar for the screen's FloatingActionButton (matches the
@@ -77,6 +86,17 @@ fun TradesScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toastState = rememberMagicToastState()
     var showLoginSheet by remember { mutableStateOf(false) }
+
+    val myListState = rememberLazyListState()
+    val friendsListState = rememberLazyListState()
+    val historyListState = rememberLazyListState()
+
+    val activeListState = when (uiState.selectedTab) {
+        TradesMainTab.MY_LIST -> myListState
+        TradesMainTab.FRIENDS -> friendsListState
+        TradesMainTab.HISTORY -> historyListState
+    }
+    val isFabVisible = rememberFabVisibility(activeListState)
 
     val syncFailedMessage = stringResource(R.string.trades_sync_failed)
     LaunchedEffect(Unit) {
@@ -113,6 +133,7 @@ fun TradesScreen(
                         TradesMainTab.MY_LIST -> MyListContent(
                             uiState = uiState,
                             onCardClick = onCardClick,
+                            listState = myListState,
                         )
 
                         TradesMainTab.FRIENDS -> FriendsContent(
@@ -121,27 +142,32 @@ fun TradesScreen(
                                 onNavigateToProposal(friend.userId)
                             },
                             onAddFriends = onNavigateToAddFriends,
+                            listState = friendsListState,
                         )
 
                         TradesMainTab.HISTORY -> TradesHistoryScreen(
                             onOpenThread = onNavigateToThread,
                             onLoginClick = { showLoginSheet = true },
+                            listState = historyListState,
                         )
                     }
                 }
             }
         }
 
-        // ── FAB — hidden when unauthenticated ─────────────────────────────────
-        if (uiState.isLoggedIn) {
-            val mc = MaterialTheme.magicColors
+        val mc = MaterialTheme.magicColors
+        AnimatedVisibility(
+            visible = uiState.isLoggedIn && isFabVisible,
+            enter = fadeIn() + scaleIn(),
+            exit = fadeOut() + scaleOut(),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(MaterialTheme.spacing.lg)
+        ) {
             FloatingActionButton(
                 onClick = { onNavigateToProposal(null) },
                 containerColor = mc.primaryAccent,
                 contentColor = mc.background,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(MaterialTheme.spacing.lg)
             ) {
                 Icon(
                     Icons.Default.Add,
@@ -198,12 +224,14 @@ private fun TradesSubNavigation(
 private fun MyListContent(
     uiState: TradesUiState,
     onCardClick: (String) -> Unit,
+    listState: LazyListState = rememberLazyListState(),
 ) {
-    var wishlistExpanded by remember { mutableStateOf(true) }
-    var offersExpanded by remember { mutableStateOf(true) }
+    var wishlistExpanded by rememberSaveable { mutableStateOf(true) }
+    var offersExpanded by rememberSaveable { mutableStateOf(true) }
     val spacing = MaterialTheme.spacing
 
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = FabClearance),
         verticalArrangement = Arrangement.spacedBy(0.dp),
@@ -279,6 +307,7 @@ private fun FriendsContent(
     friends: List<Friend>,
     onFriendClick: (Friend) -> Unit,
     onAddFriends: () -> Unit,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val spacing = MaterialTheme.spacing
     if (friends.isEmpty()) {
@@ -290,6 +319,7 @@ private fun FriendsContent(
         )
     } else {
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = spacing.lg, top = spacing.sm, end = spacing.lg, bottom = FabClearance),
             verticalArrangement = Arrangement.spacedBy(spacing.sm),

@@ -16,6 +16,7 @@ import com.mmg.manahub.core.gamification.domain.GamificationCatchUp
 import com.mmg.manahub.core.gamification.domain.GamificationWorkScheduler
 import com.mmg.manahub.core.gamification.engine.DefaultGamificationCatchUp
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
@@ -148,7 +149,7 @@ fun gamificationEngineKoinModule(
     single { AchievementEvaluator(dao = get(), statsDao = get(), clock = get(), crashReporter = get()) }
     single { QuestEvaluator(dao = get(), clock = get(), timeZoneProvider = timeZoneProvider) }
     single { StreakTracker(dao = get(), clock = get(), timeZoneProvider = timeZoneProvider) }
-    single { EntitlementGranter(dao = get(), clock = get()) }
+    single { EntitlementGranter(dao = get(), clock = get(), crashReporter = get()) }
     single { QuestStableIdProvider(authRepository = get(), dataStore = get()) }
 
     single<GamificationEngine> {
@@ -199,6 +200,18 @@ fun gamificationEngineKoinModule(
         DefaultGamificationAvailability(
             remoteConfigRepository = get(),
             userOptInFlow = get<UserPreferencesDataStore>().gamificationEnabledFlow,
+            accountScopeReadyFlow = combine(
+                get<AuthRepository>().sessionState,
+                get<UserPreferencesDataStore>().gamificationOwnerUserIdFlow,
+                get<UserPreferencesDataStore>().gamificationVerifiedGuestFlow,
+            ) { session, owner, verifiedGuest ->
+                isGamificationStoreReady(
+                    authenticatedUserId = (session as? SessionState.Authenticated)?.user?.id,
+                    isUnauthenticated = session is SessionState.Unauthenticated,
+                    owner = owner,
+                    verifiedGuest = verifiedGuest,
+                )
+            },
         )
     }
     single { GamificationLocalStore(dao = get(), userPreferencesDataStore = get()) }
@@ -223,6 +236,7 @@ fun gamificationEngineKoinModule(
             workScheduler = get(),
             catchUp = get(),
             accountScope = get(),
+            scopeExternallyManaged = true,
             signedInUserId = get<AuthRepository>().sessionState
                 .map { state -> (state as? SessionState.Authenticated)?.user?.id },
             appForegroundEvents = get<AppForegroundTracker>().foregroundEvents,
@@ -251,4 +265,15 @@ fun gamificationEngineKoinModule(
             gamificationAvailability = get(),
         )
     }
+}
+
+internal fun isGamificationStoreReady(
+    authenticatedUserId: String?,
+    isUnauthenticated: Boolean,
+    owner: String?,
+    verifiedGuest: Boolean,
+): Boolean = when {
+    authenticatedUserId != null -> owner == authenticatedUserId
+    isUnauthenticated -> owner == null && verifiedGuest
+    else -> false
 }

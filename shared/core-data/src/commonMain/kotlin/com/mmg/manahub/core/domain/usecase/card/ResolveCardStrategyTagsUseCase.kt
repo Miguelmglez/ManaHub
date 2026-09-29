@@ -2,11 +2,16 @@ package com.mmg.manahub.core.domain.usecase.card
 
 import com.mmg.manahub.core.data.remote.edhrec.CARD_TAG_KEY_TO_THEME_ID
 import com.mmg.manahub.core.data.remote.edhrec.EdhrecCardTagEnrichmentSourceContract
+import com.mmg.manahub.core.data.tagging.StrategyAnalyzer
 import com.mmg.manahub.core.data.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsSubmission
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.SuggestedTag
+import com.mmg.manahub.core.model.TagCategory
+import com.mmg.manahub.core.model.TagDictionaryEntry
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 
 /**
@@ -28,8 +33,8 @@ import com.mmg.manahub.feature.decks.domain.engine.ThemeId
  *    entirely — this is also the fix for "adding many cards freezes the app," since most adds now
  *    resolve as a cheap cache/table hit with zero local CPU work. User-confirmed tags already on
  *    the card ([existingTagsJson]) are still preserved (a cheap JSON-parse union, no analyzer run)
- *    — never silently dropped just because the analyzer itself was skipped. No suggested tags are
- *    produced on a hit ([CardStrategyTagsResult.Found] only ever carries auto-CONFIRMED tags).
+     *    — never silently dropped just because the analyzer itself was skipped. The payload's
+     *    suggestions retain their confidence and stay unconfirmed.
  * 2. **Genuine miss** ([CardStrategyTagsResult.NotFound]/[CardStrategyTagsResult.Error]/blank
  *    `oracleId`) → run the on-device rule engine as before, PLUS a lightweight EDHREC shortlist
  *    check ([edhrecEnrichment]) that can promote a low-confidence SUGGESTED tag to CONFIRMED when
@@ -45,7 +50,9 @@ class ResolveCardStrategyTagsUseCase(
     private val computeCardTags: ComputeCardTagsUseCase,
     private val cardStrategyTagsRepository: CardStrategyTagsRepository,
     private val edhrecEnrichment: EdhrecCardTagEnrichmentSourceContract,
+    private val remoteMechanicsProvider: () -> Collection<TagDictionaryEntry> = { emptyList() },
 ) {
+    private val remoteStrategyAnalyzer = StrategyAnalyzer(remoteMechanicsProvider)
     suspend operator fun invoke(
         card: Card,
         existingTagsJson: String?,
@@ -79,7 +86,7 @@ class ResolveCardStrategyTagsUseCase(
         suggestThreshold: Float = SuggestTagsUseCase.DEFAULT_SUGGEST_THRESHOLD,
     ): ComputeCardTagsUseCase.Result {
         if (prefetched is CardStrategyTagsResult.Found) {
-            return prefetched.toResolvedResult(existingTagsJson)
+            return prefetched.toResolvedResult(card, existingTagsJson, autoThreshold, suggestThreshold)
         }
 
         // Genuine miss (or blank oracleId, which can never have a precomputed row): fall back to
@@ -102,6 +109,7 @@ class ResolveCardStrategyTagsUseCase(
                 oracleId = card.oracleId,
                 submission = CardStrategyTagsSubmission(
                     tags = finalResult.confirmedTags.map { it.key },
+                    suggestions = finalResult.suggestedTags,
                     themes = edhrecConfirmed.mapKeys { (themeId, _) -> themeId.name },
                 ),
             )
@@ -110,16 +118,42 @@ class ResolveCardStrategyTagsUseCase(
         return finalResult
     }
 
-    /** Precomputed-hit path: union the remote's confirmed tags with whatever the user had already
-     *  confirmed on this card — never re-run the analyzer, never produce suggestions. */
-    private fun CardStrategyTagsResult.Found.toResolvedResult(existingTagsJson: String?): ComputeCardTagsUseCase.Result {
+    /** Precomputed-hit path keeps confirmed tags and suggestions without re-running the analyzer. */
+    private fun CardStrategyTagsResult.Found.toResolvedResult(
+        card: Card,
+        existingTagsJson: String?,
+        autoThreshold: Float,
+        suggestThreshold: Float,
+    ): ComputeCardTagsUseCase.Result {
         val existingConfirmed = existingTagsJson
             ?.takeIf { it.isNotBlank() && it != "[]" }
             ?.toTagList()
             .orEmpty()
+        val catalogEntries = remoteMechanicsProvider()
+        val catalogKeys = catalogEntries.mapTo(mutableSetOf()) { it.key }
+        val ruleMatches = if (catalogKeys.isEmpty()) emptyList() else
+            remoteStrategyAnalyzer.analyze(card).filter { it.tag.key in catalogKeys }
+        val keywordMatches = catalogEntries.asSequence()
+            .filter { it.category == TagCategory.KEYWORD }
+            .filter { entry ->
+                val label = entry.labels["en"] ?: return@filter false
+                card.keywords.any { it.equals(label, ignoreCase = true) }
+            }
+            .map { entry -> SuggestedTag(CardTag(entry.key, entry.category), 1f, "catalog_keyword") }
+            .toList()
+        val catalogMatches = (ruleMatches + keywordMatches)
+            .groupBy { it.tag.key }
+            .values.map { matches -> matches.maxBy { it.confidence } }
+        val newlyConfirmed = catalogMatches.filter { it.confidence >= autoThreshold }.map { it.tag }
+        val confirmed = (existingConfirmed + tags + newlyConfirmed).distinctBy { it.key }
+        val confirmedKeys = confirmed.mapTo(mutableSetOf()) { it.key }
+        val remainingSuggestions = (suggestions + catalogMatches.filter { it.confidence >= suggestThreshold })
+            .filterNot { it.tag.key in confirmedKeys }
+            .groupBy { it.tag.key }
+            .values.map { matches -> matches.maxBy { it.confidence } }
         return ComputeCardTagsUseCase.Result(
-            confirmedTags = (existingConfirmed + tags).distinct(),
-            suggestedTags = emptyList(),
+            confirmedTags = confirmed,
+            suggestedTags = remainingSuggestions,
         )
     }
 

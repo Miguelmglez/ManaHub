@@ -19,6 +19,7 @@ import com.mmg.manahub.core.data.remote.dto.UserSearchResultDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
@@ -34,38 +35,55 @@ class FriendshipClient(
     private val httpClient: HttpClient,
     private val baseUrl: String,
 ) {
+    /** One keyset page ordered by `id`; [afterId] is the last id of the previous page. */
     suspend fun getFriendships(
         statusFilter: String = "eq.ACCEPTED",
-        select: String = "id,user_id_1,user_id_2,status,created_at",
+        select: String = FRIENDSHIP_COLUMNS,
         or: String,
+        afterId: String? = null,
+        limit: Int? = null,
     ): List<FriendshipDto> =
         httpClient.get("${baseUrl}friendships") {
             parameter("status", statusFilter)
             parameter("select", select)
             parameter("or", or)
+            keysetPage(afterId, limit)
         }.body()
 
     suspend fun getPendingRequests(
         userId2Filter: String,
         statusFilter: String = "eq.PENDING",
-        select: String = "id,user_id_1,user_id_2,status,created_at",
+        select: String = FRIENDSHIP_COLUMNS,
+        afterId: String? = null,
+        limit: Int? = null,
     ): List<FriendshipDto> =
         httpClient.get("${baseUrl}friendships") {
             parameter("user_id_2", userId2Filter)
             parameter("status", statusFilter)
             parameter("select", select)
+            keysetPage(afterId, limit)
         }.body()
 
     suspend fun getOutgoingPendingRequests(
         userId1Filter: String,
         statusFilter: String = "eq.PENDING",
-        select: String = "id,user_id_1,user_id_2,status,created_at",
+        select: String = FRIENDSHIP_COLUMNS,
+        afterId: String? = null,
+        limit: Int? = null,
     ): List<FriendshipDto> =
         httpClient.get("${baseUrl}friendships") {
             parameter("user_id_1", userId1Filter)
             parameter("status", statusFilter)
             parameter("select", select)
+            keysetPage(afterId, limit)
         }.body()
+
+    private fun HttpRequestBuilder.keysetPage(afterId: String?, limit: Int?) {
+        if (limit == null) return
+        parameter("order", "id.asc")
+        parameter("limit", limit)
+        if (afterId != null) parameter("id", "gt.$afterId")
+    }
 
     suspend fun searchByGameTag(
         gameTagFilter: String,

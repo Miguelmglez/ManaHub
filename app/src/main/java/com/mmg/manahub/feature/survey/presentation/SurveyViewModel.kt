@@ -304,7 +304,7 @@ class SurveyViewModel(
      * draw sentinel (winnerId = -1) or an explicit "Draw" winner name.
      */
     private fun isDrawSession(winnerId: Int, winnerName: String): Boolean =
-        winnerId == -1 || winnerName.equals("Draw", ignoreCase = true)
+        winnerId == -1
 
     // ── Setters (Phase 3) ───────────────────────────────────────────────────────
 

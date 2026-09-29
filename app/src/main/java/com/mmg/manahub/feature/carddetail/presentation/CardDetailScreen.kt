@@ -6,7 +6,6 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -15,6 +14,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -122,6 +122,7 @@ import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.tagging.label
+import com.mmg.manahub.core.tagging.TagDictionary
 import com.mmg.manahub.core.ui.CardSharedBoundsTransform
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.AddCardSheet
@@ -480,7 +481,7 @@ private fun CardDetailLoadError(
     FullErrorState(
         message = when {
             rateLimitRetryAfterMs != null -> stringResource(R.string.error_rate_limited_message)
-            error == "SCRYFALL_404" -> stringResource(R.string.error_card_not_found)
+            error == "SCRYFALL_404" || error?.contains("404") == true -> stringResource(R.string.addcard_server_unavailable_subtitle)
             else -> stringResource(R.string.error_scryfall)
         },
         retryLabel = if (remainingSeconds > 0) {
@@ -781,14 +782,34 @@ private fun CardDetailContent(
             }
 
             if (card.imageBackNormal != null) {
-                Text(
-                    text = if (showBackFace)
-                        stringResource(R.string.carddetail_flip_see_front)
-                    else
-                        stringResource(R.string.carddetail_flip_see_back),
-                    style = MaterialTheme.magicTypography.labelMedium,
-                    color = MaterialTheme.magicColors.primaryAccent,
-                )
+                val mc = MaterialTheme.magicColors
+                Surface(
+                    onClick = { showBackFace = !showBackFace },
+                    shape = ChipShape,
+                    color = mc.primaryAccent.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.3f)),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SwapHoriz,
+                            contentDescription = null,
+                            tint = mc.primaryAccent,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = if (showBackFace)
+                                stringResource(R.string.carddetail_flip_see_front)
+                            else
+                                stringResource(R.string.carddetail_flip_see_back),
+                            style = MaterialTheme.magicTypography.labelMedium,
+                            color = mc.primaryAccent,
+                        )
+                    }
+                }
             }
         }
 
@@ -1373,6 +1394,7 @@ private fun CollectionCopyRow(
     Surface(
         color = mc.surface,
         shape = SmallCardShape,
+        border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.2f)),
     ) {
         Row(
             modifier = Modifier
@@ -1381,14 +1403,20 @@ private fun CollectionCopyRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AsyncImage(
-                model = printing.imageNormal,
-                contentDescription = printing.name,
-                contentScale = ContentScale.Crop,
+            Box(
                 modifier = Modifier
                     .width(44.dp)
-                    .height(60.dp),
-            )
+                    .height(60.dp)
+                    .clip(SmallCardShape)
+                    .border(BorderStroke(0.5.dp, mc.textDisabled.copy(alpha = 0.3f)), SmallCardShape)
+            ) {
+                AsyncImage(
+                    model = printing.imageNormal,
+                    contentDescription = printing.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
 
             Column(
                 modifier = Modifier.weight(1f),
@@ -1437,7 +1465,7 @@ private fun CollectionCopyRow(
                     }
                 }
 
-                // Static quantity + per-printing price (steppers removed — edit via the Edit button)
+                // Static quantity + per-printing price
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1457,29 +1485,40 @@ private fun CollectionCopyRow(
                 }
             }
 
-            IconButton(
-                onClick = { onEdit(entry) },
-                // 40dp keeps the row compact while staying above the minimum touch target.
-                modifier = Modifier.size(40.dp),
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = stringResource(R.string.carddetail_edit_entry_description),
-                    tint = mc.textSecondary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            IconButton(
-                onClick = { onRequestDelete(userCard) },
-                // 40dp keeps the row compact while staying above the minimum touch target.
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = stringResource(R.string.action_delete),
-                    tint = mc.lifeNegative,
-                    modifier = Modifier.size(18.dp),
-                )
+                Surface(
+                    onClick = { onEdit(entry) },
+                    shape = CircleShape,
+                    color = mc.surfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = stringResource(R.string.carddetail_edit_entry_description),
+                            tint = mc.textSecondary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+                Surface(
+                    onClick = { onRequestDelete(userCard) },
+                    shape = CircleShape,
+                    color = mc.lifeNegative.copy(alpha = 0.1f),
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = stringResource(R.string.action_delete),
+                            tint = mc.lifeNegative,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
             }
         }
     }
@@ -1598,6 +1637,7 @@ private fun WishlistEntryRow(
     Surface(
         color = mc.surface,
         shape = SmallCardShape,
+        border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.2f)),
     ) {
         Row(
             modifier = Modifier
@@ -1606,15 +1646,20 @@ private fun WishlistEntryRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AsyncImage(
-                model = printing?.imageNormal,
-                contentDescription = printing?.name,
-                contentScale = ContentScale.Crop,
+            Box(
                 modifier = Modifier
                     .width(44.dp)
                     .height(60.dp)
-                    .clip(CardShape),
-            )
+                    .clip(SmallCardShape)
+                    .border(BorderStroke(0.5.dp, mc.textDisabled.copy(alpha = 0.3f)), SmallCardShape)
+            ) {
+                AsyncImage(
+                    model = printing?.imageNormal,
+                    contentDescription = printing?.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
 
             Column(
                 modifier = Modifier.weight(1f),
@@ -1651,7 +1696,7 @@ private fun WishlistEntryRow(
                     if (entry.isFoil) FoilBadge()
                 }
 
-                // Static quantity + per-printing price (steppers removed — edit via the Edit button)
+                // Static quantity + per-printing price
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1671,29 +1716,40 @@ private fun WishlistEntryRow(
                 }
             }
 
-            IconButton(
-                onClick = { onEdit(entry) },
-                // 40dp keeps the row compact while staying above the minimum touch target.
-                modifier = Modifier.size(40.dp),
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = stringResource(R.string.carddetail_edit_entry_description),
-                    tint = mc.textSecondary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            IconButton(
-                onClick = { onRequestDelete(entry) },
-                // 40dp keeps the row compact while staying above the minimum touch target.
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = stringResource(R.string.action_delete),
-                    tint = mc.lifeNegative,
-                    modifier = Modifier.size(18.dp),
-                )
+                Surface(
+                    onClick = { onEdit(entry) },
+                    shape = CircleShape,
+                    color = mc.surfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = stringResource(R.string.carddetail_edit_entry_description),
+                            tint = mc.textSecondary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+                Surface(
+                    onClick = { onRequestDelete(entry) },
+                    shape = CircleShape,
+                    color = mc.lifeNegative.copy(alpha = 0.1f),
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = stringResource(R.string.action_delete),
+                            tint = mc.lifeNegative,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
             }
         }
     }
@@ -2102,6 +2158,7 @@ private fun TagPickerSheet(
 
     // Built-in categories (excluding CUSTOM which is the fallback for raw custom tags)
     val builtInCategories = TagCategory.entries.filter { it != TagCategory.CUSTOM }
+    val catalogTags = TagDictionary.all().map { CardTag(it.key, it.category) }
 
     // User-created category keys that don't map to built-in categories
     val userCustomCategoryKeys = userDefinedTags
@@ -2211,7 +2268,9 @@ private fun TagPickerSheet(
             // ── Built-in categories ──────────────────────────────────────────
             builtInCategories.forEach { category ->
                 val canonical =
-                    CardTag.canonical.filter { it.category == category && it.key !in excludedBuiltInKeys }
+                    (CardTag.canonical + catalogTags)
+                        .distinctBy { it.key }
+                        .filter { it.category == category && it.key !in excludedBuiltInKeys }
                 val userDefined =
                     userDefinedTags.filter { it.categoryKey == category.name }
                 val items = canonical.map {

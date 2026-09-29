@@ -93,6 +93,10 @@ object AdvancedSearchCardMatcher {
             else criterion.functions.any(check)
         }
 
+        is SearchCriterion.AnyOf -> criterion.alternatives.any { alternative ->
+            alternative.all { matchesCriterion(card, it, lenient, isWishlisted, isForTrade) }
+        }
+
         is SearchCriterion.Colors -> matchesColorSet(card.colors, criterion.colors, criterion.mode)
 
         is SearchCriterion.ColorIdentity ->
@@ -265,7 +269,10 @@ object AdvancedSearchCardMatcher {
         if (criterionColors.isEmpty()) return true
         val card = cardColors.map { it.uppercase() }.toSet()
         val wanted = criterionColors.map { it.uppercase() }.toSet()
-        val letters = wanted - COLORLESS
+        val letters = wanted - COLORLESS - "M"
+        val wantsMulticolor = "M" in wanted
+        if (wantsMulticolor && card.size < 2) return false
+        if (letters.isEmpty() && COLORLESS !in wanted) return true
         val wantsColorless = COLORLESS in wanted
         return when (mode) {
             // `(c>=w or c>=u)` / `(… or c=c)`

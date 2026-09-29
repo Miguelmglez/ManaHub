@@ -19,6 +19,7 @@ package com.mmg.manahub.core.model
  */
 enum class QuickStartAction(val persistedId: String) {
     SCAN_CARD("scan_card"),
+    IMPORT_COLLECTION("import_collection"),
     CREATE_DECK("create_deck"),
     DRAFT_GUIDE("draft_guide"),
 
@@ -37,7 +38,7 @@ enum class QuickStartAction(val persistedId: String) {
          * Default shortcut set for zero-data users: scan a card, build a deck,
          * search for a card, or view collection stats.
          */
-        val defaults = listOf(SCAN_CARD, DECKS, SEARCH_CARD, STATS)
+        val defaults = listOf(SCAN_CARD, DECKS, SEARCH_CARD, IMPORT_COLLECTION)
 
         /** Resolves a persisted id back to its action, or null if unknown/removed. */
         fun fromPersistedId(id: String): QuickStartAction? =

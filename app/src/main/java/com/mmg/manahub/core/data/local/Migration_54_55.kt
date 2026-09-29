@@ -3,7 +3,9 @@ package com.mmg.manahub.core.data.local
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-/** v54 → v55: additive nullable `draft_sets.setImageUrl` (Draft); guarded so a retry is safe. */
+/**
+ * v54 → v55 — Adds `setImageUrl` TEXT (nullable) to the `draft_sets` table.
+ */
 val MIGRATION_54_55 = object : Migration(54, 55) {
     override fun migrate(db: SupportSQLiteDatabase) {
         if (!columnExists(db, "draft_sets", "setImageUrl")) {

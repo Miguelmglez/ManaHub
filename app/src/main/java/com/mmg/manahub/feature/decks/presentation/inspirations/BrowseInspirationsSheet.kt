@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.decks.presentation.inspirations
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,13 +10,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -29,10 +38,9 @@ import com.mmg.manahub.core.ui.components.DeckCardQueueSheet
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicSegmentedControl
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastState
-import com.mmg.manahub.core.ui.components.ManaTabItem
-import com.mmg.manahub.core.ui.components.ManaTabRow
 import com.mmg.manahub.core.ui.theme.BottomSheetShape
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -44,6 +52,7 @@ import com.mmg.manahub.feature.decks.presentation.wizard.SeedsAddedPill
 import com.mmg.manahub.feature.decks.presentation.wizard.WizardCardInspectionHost
 import com.mmg.manahub.feature.decks.presentation.wizard.WizardStickyButton
 import com.mmg.manahub.feature.decks.presentation.wizard.rememberWizardCardInspectionState
+import kotlinx.coroutines.launch
 
 /** Every state and callback the Browse inspirations sheet needs; the sheet itself holds no business state. */
 internal class BrowseInspirationsActions(
@@ -77,7 +86,18 @@ internal fun BrowseInspirationsSheet(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var isClosingProgrammatically by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { value ->
+            if (value == SheetValue.Hidden && !isClosingProgrammatically) {
+                false
+            } else {
+                true
+            }
+        },
+    )
     val inspection = rememberWizardCardInspectionState()
 
     ModalBottomSheet(
@@ -85,6 +105,7 @@ internal fun BrowseInspirationsSheet(
         sheetState = sheetState,
         shape = BottomSheetShape,
         containerColor = mc.background,
+        dragHandle = null,
     ) {
         WizardCardInspectionHost(
             state = inspection,
@@ -123,12 +144,31 @@ internal fun BrowseInspirationsSheet(
         ) {
             Column(Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.padding(horizontal = spacing.lg)) {
-                    Text(
-                        text = stringResource(R.string.deck_studio_browse_inspirations),
-                        style = ty.titleLarge,
-                        color = mc.textPrimary,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(top = spacing.xs),
-                    )
+                    ) {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    isClosingProgrammatically = true
+                                    sheetState.hide()
+                                    actions.onDismiss()
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.action_close),
+                                tint = mc.textSecondary,
+                            )
+                        }
+                        Text(
+                            text = stringResource(R.string.deck_studio_browse_inspirations),
+                            style = ty.titleLarge,
+                            color = mc.textPrimary,
+                        )
+                    }
                     Text(
                         text = stringResource(R.string.deck_inspirations_subtitle),
                         style = ty.bodySmall,
@@ -136,19 +176,17 @@ internal fun BrowseInspirationsSheet(
                         modifier = Modifier.padding(top = spacing.xxs, bottom = spacing.sm),
                     )
                 }
-                ManaTabRow(
-                    items = listOf(
-                        ManaTabItem(
-                            label = stringResource(R.string.deck_studio_inspirations_tab_strategies),
-                            selected = state.tab == InspirationsTab.STRATEGIES,
-                            onClick = { actions.onSelectTab(InspirationsTab.STRATEGIES) },
-                        ),
-                        ManaTabItem(
-                            label = stringResource(R.string.deck_studio_inspirations_tab_combos),
-                            selected = state.tab == InspirationsTab.COMBOS,
-                            onClick = { actions.onSelectTab(InspirationsTab.COMBOS) },
-                        ),
+                MagicSegmentedControl(
+                    options = listOf(
+                        stringResource(R.string.deck_studio_inspirations_tab_strategies),
+                        stringResource(R.string.deck_studio_inspirations_tab_combos),
                     ),
+                    selectedIndex = if (state.tab == InspirationsTab.STRATEGIES) 0 else 1,
+                    onOptionSelected = { index ->
+                        val selectedTab = if (index == 0) InspirationsTab.STRATEGIES else InspirationsTab.COMBOS
+                        actions.onSelectTab(selectedTab)
+                    },
+                    modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.xs),
                 )
 
                 Box(Modifier.weight(1f).fillMaxWidth()) {

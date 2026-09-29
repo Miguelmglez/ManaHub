@@ -33,7 +33,6 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
-import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.LandTargetResolver
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
@@ -2178,9 +2177,9 @@ class DeckStudioViewModelTest {
                 savedStateHandle = handle,
             )
             advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
-            assertEquals(DeckStudioTab.SUGGESTIONS, vm.uiState.value.selectedTab)
+            assertEquals(DeckStudioTab.ANALYSIS, vm.uiState.value.selectedTab)
 
             // Simulate AppNavGraph's pop-back write onto this SAME instance's handle.
             handle[DECK_STUDIO_SELECT_BUILD_TAB_KEY] = true
@@ -2229,7 +2228,7 @@ class DeckStudioViewModelTest {
             assertFalse("suggestionsLoaded must be false before tab select", vm.uiState.value.suggestionsLoaded)
 
             // Act
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
 
             // Assert — lazy first analysis completed.
@@ -2245,7 +2244,7 @@ class DeckStudioViewModelTest {
             stubResolvableDeck()
             val vm = createVm()
             advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
             val healthAfterFirst = vm.uiState.value.health
 
@@ -2254,7 +2253,7 @@ class DeckStudioViewModelTest {
             coEvery { cardRepository.searchWithRawQuery(any()) } returns emptyList()
 
             // Act — select SUGGESTIONS again (suggestionsLoaded = true already).
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
 
             // Assert — health unchanged (no re-analysis), no second loadAnalysis kicked off.
@@ -2268,7 +2267,7 @@ class DeckStudioViewModelTest {
             stubResolvableDeck()
             val vm = createVm()
             advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
             assertTrue(vm.uiState.value.suggestionsLoaded)
             vm.onSelectTab(DeckStudioTab.BUILD)
@@ -2293,7 +2292,7 @@ class DeckStudioViewModelTest {
         stubResolvableDeck()
         val vm = createVm()
         advanceUntilIdle()
-        vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+        vm.onSelectTab(DeckStudioTab.ANALYSIS)
         advanceUntilIdle()
         assertTrue(vm.uiState.value.suggestionsLoaded)
         vm.onSelectTab(DeckStudioTab.BUILD)
@@ -2325,7 +2324,7 @@ class DeckStudioViewModelTest {
         coEvery { cardRepository.searchWithRawQuery(any()) } returns emptyList()
         val vm = createVm()
         advanceUntilIdle()
-        vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+        vm.onSelectTab(DeckStudioTab.ANALYSIS)
         advanceUntilIdle()
         assertTrue(vm.uiState.value.suggestionsLoaded)
 
@@ -2354,7 +2353,7 @@ class DeckStudioViewModelTest {
         coEvery { cardRepository.searchWithRawQuery(any()) } returns emptyList()
         val vm = createVm()
         advanceUntilIdle()
-        vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+        vm.onSelectTab(DeckStudioTab.ANALYSIS)
         advanceUntilIdle()
         assertTrue(vm.uiState.value.suggestionsLoaded)
 
@@ -2377,7 +2376,7 @@ class DeckStudioViewModelTest {
             stubResolvableDeck()
             val vm = createVm()
             advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
             assertTrue(vm.uiState.value.suggestionsLoaded)
             val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
@@ -2389,7 +2388,7 @@ class DeckStudioViewModelTest {
             // Assert — recomputed in place: still loaded, still on the SAME tab, new count visible.
             assertTrue("must stay loaded -- an incremental recompute, not an invalidate",
                 vm.uiState.value.suggestionsLoaded)
-            assertEquals(DeckStudioTab.SUGGESTIONS, vm.uiState.value.selectedTab)
+            assertEquals(DeckStudioTab.ANALYSIS, vm.uiState.value.selectedTab)
             assertEquals(
                 "the added copy must be reflected in the SAME health snapshot",
                 initialNonLandCount + 1,
@@ -2417,7 +2416,7 @@ class DeckStudioViewModelTest {
         coEvery { cardRepository.searchWithRawQuery(any()) } returns emptyList()
         val vm = createVm()
         advanceUntilIdle()
-        vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+        vm.onSelectTab(DeckStudioTab.ANALYSIS)
         advanceUntilIdle()
         val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
 
@@ -2427,7 +2426,7 @@ class DeckStudioViewModelTest {
 
         // Assert
         assertTrue(vm.uiState.value.suggestionsLoaded)
-        assertEquals(DeckStudioTab.SUGGESTIONS, vm.uiState.value.selectedTab)
+        assertEquals(DeckStudioTab.ANALYSIS, vm.uiState.value.selectedTab)
         assertEquals(initialNonLandCount - 1, vm.uiState.value.health!!.profile.nonLandCount)
     }
 
@@ -2438,7 +2437,7 @@ class DeckStudioViewModelTest {
             stubResolvableDeck()
             val vm = createVm()
             advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
             val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
             // 1 call already spent on the full loadAnalysis pass above.
@@ -2468,7 +2467,7 @@ class DeckStudioViewModelTest {
             stubResolvableDeck()
             val vm = createVm()
             advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
             val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
 
@@ -2494,7 +2493,7 @@ class DeckStudioViewModelTest {
             stubResolvableDeck()
             val vm = createVm()
             advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
             val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
             coVerify(exactly = 1) {
@@ -2508,7 +2507,7 @@ class DeckStudioViewModelTest {
             advanceUntilIdle()
             assertEquals(initialNonLandCount, vm.uiState.value.health!!.profile.nonLandCount)
 
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
 
             // Assert — the return itself triggers the ONE deferred evaluation and now shows the add.
@@ -2525,7 +2524,7 @@ class DeckStudioViewModelTest {
             stubResolvableDeck()
             val vm = createVm()
             advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
             val initialNonLandCount = vm.uiState.value.health!!.profile.nonLandCount
             coVerify(exactly = 1) {
@@ -2545,7 +2544,7 @@ class DeckStudioViewModelTest {
             }
 
             // Act — return to SUGGESTIONS; nothing is dirty, so no further evaluation runs.
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
 
             coVerify(exactly = 2) {
@@ -2985,7 +2984,7 @@ class DeckStudioViewModelTest {
             stubResolvableDeck()
             val vm = createVm()
             advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
             assertTrue("suggestionsLoaded must be true before format change",
                 vm.uiState.value.suggestionsLoaded)
@@ -3210,7 +3209,7 @@ class DeckStudioViewModelTest {
                 savedStateHandle = SavedStateHandle(emptyMap()),
             )
             advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            vm.onSelectTab(DeckStudioTab.ANALYSIS)
             advanceUntilIdle()
             assertTrue("suggestionsLoaded must be true before import", vm.uiState.value.suggestionsLoaded)
 
@@ -3685,7 +3684,7 @@ class DeckStudioViewModelTest {
         stubResolvableDeck()
         val vm = createVm()
         advanceUntilIdle()
-        vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+        vm.onSelectTab(DeckStudioTab.ANALYSIS)
         advanceUntilIdle()
         assertTrue("suggestionsLoaded must be true before applyLandSuggestions",
             vm.uiState.value.suggestionsLoaded)

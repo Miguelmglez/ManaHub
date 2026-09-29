@@ -109,7 +109,7 @@ class CardDaoConcurrencyTest {
     // ── Race: two concurrent unionTags calls never lose either contribution ────
 
     @Test
-    fun `two concurrent unionTags calls for the same card both land`() = runBlocking {
+    fun twoConcurrentUnionTagsCallsForTheSameCardBothLand() = runBlocking {
         val scryfallId = "card-1"
         dao.insertIgnore(makeCard(scryfallId))
 
@@ -131,7 +131,7 @@ class CardDaoConcurrencyTest {
     }
 
     @Test
-    fun `sequential unionTags calls with overlapping tags merge without duplicates`() = runBlocking {
+    fun sequentialUnionTagsCallsWithOverlappingTagsMergeWithoutDuplicates() = runBlocking {
         val scryfallId = "card-2"
         dao.insertIgnore(makeCard(scryfallId, tagsJson = listOf(CardTag.REMOVAL).toTagsJson()))
 
@@ -150,7 +150,7 @@ class CardDaoConcurrencyTest {
     // ── Safe no-ops ──────────────────────────────────────────────────────────
 
     @Test
-    fun `unionTags with an empty additional list is a no-op`() = runBlocking {
+    fun unionTagsWithAnEmptyAdditionalListIsANoOp() = runBlocking {
         val scryfallId = "card-3"
         dao.insertIgnore(makeCard(scryfallId, tagsJson = listOf(CardTag.REMOVAL).toTagsJson()))
 
@@ -161,7 +161,7 @@ class CardDaoConcurrencyTest {
     }
 
     @Test
-    fun `unionTags for a row that does not exist never throws`() = runBlocking {
+    fun unionTagsForARowThatDoesNotExistNeverThrows() = runBlocking {
         // No insert — the row simply isn't cached yet. Must be a silent no-op, not a crash.
         dao.unionTags("missing-card", listOf(CardTag.REMOVAL))
     }

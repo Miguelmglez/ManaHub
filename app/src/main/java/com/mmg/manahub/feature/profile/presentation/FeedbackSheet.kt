@@ -1,34 +1,26 @@
 package com.mmg.manahub.feature.profile.presentation
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,29 +36,40 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.core.util.recordSafeNonFatal
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // ---------------------------------------------------------------------------
 // SECURITY: The feedback recipient address is kept as a private compile-time
@@ -91,27 +94,35 @@ private const val MAX_IMAGE_BYTES = 10L * 1024L * 1024L // 10 MB
 private val ALLOWED_MIME_TYPES = setOf("image/jpeg", "image/png", "image/webp", "image/gif")
 
 /**
- * Validates that the [uri] refers to an acceptable image file.
+ * Validates that the [uri] refers to an acceptable image file. Performs provider IPC, so it must run
+ * off the main thread.
  *
  * - MIME type: read from [android.content.ContentResolver.getType] (not from file extension).
- * - File size: measured via [android.os.ParcelFileDescriptor.statSize] (not from metadata extras).
+ * - File size: measured via [android.os.ParcelFileDescriptor.statSize] (not from metadata extras). An
+ *   unknown size (-1) is rejected, otherwise it would bypass the cap.
  *
- * @return `true` if the file passes all security checks, `false` otherwise.
+ * @return true if the file passes all checks; false otherwise, including when the provider throws
+ *   (for example a cloud-only document).
  */
-private fun isImageSafe(context: android.content.Context, uri: Uri): Boolean {
-    // MIME check — derived from content, not filename
-    val mimeType = context.contentResolver.getType(uri) ?: return false
-    if (mimeType !in ALLOWED_MIME_TYPES) return false
-    // Size check — actual fstat, not spoofable metadata
-    val size = context.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: return false
-    return size <= MAX_IMAGE_BYTES
+private fun isImageSafe(context: android.content.Context, uri: Uri): Boolean = try {
+    val mimeType = context.contentResolver.getType(uri)
+    if (mimeType == null || mimeType !in ALLOWED_MIME_TYPES) {
+        false
+    } else {
+        val size = context.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: -1L
+        size in 0..MAX_IMAGE_BYTES
+    }
+} catch (e: Exception) {
+    recordSafeNonFatal("feedback_attachment_check_failed", e)
+    false
 }
 
 /**
  * A [ModalBottomSheet] that lets the user compose and send feedback via email.
  *
- * The sheet cannot be dismissed by dragging — only via the explicit Cancel/X controls.
- * The recipient email address is defined as a private constant and never surfaced in the UI.
+ * Drag and scrim taps cannot dismiss it while a draft exists; system Back then asks to discard it.
+ * The draft survives configuration changes. The recipient address is a private constant and is never
+ * surfaced in the UI.
  *
  * @param onDismiss Called after the sheet has been fully hidden.
  */
@@ -122,18 +133,22 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
     val toastState = rememberMagicToastState()
 
-    // Sheet state — confirmValueChange blocks drag-to-dismiss.
+    var messageText by rememberSaveable { mutableStateOf("") }
+    var attachedImageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var showEmptyError by rememberSaveable { mutableStateOf(false) }
+    var isSending by remember { mutableStateOf(false) }
+    var isCheckingAttachment by remember { mutableStateOf(false) }
+    var showDiscardDialog by rememberSaveable { mutableStateOf(false) }
+
+    val hasDraft = messageText.isNotBlank() || attachedImageUri != null
+    val allowHide by rememberUpdatedState(!hasDraft)
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden },
+        confirmValueChange = { it != SheetValue.Hidden || allowHide },
     )
-
-    var messageText by remember { mutableStateOf("") }
-    var attachedImageUri by remember { mutableStateOf<Uri?>(null) }
-    var showEmptyError by remember { mutableStateOf(false) }
-    var isSending by remember { mutableStateOf(false) }
 
     /** Hides the sheet and notifies the caller. */
     fun dismiss() {
@@ -154,16 +169,21 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
 
     // ── Image pickers ─────────────────────────────────────────────────────────
 
-    /** Handles a URI returned by either picker; validates and attaches or shows error. */
+    val invalidFileMessage = stringResource(R.string.feedback_invalid_file)
+    val chooserFailedMessage = stringResource(R.string.error_unknown)
+
+    /** Validates a picked URI off the main thread, then attaches it or shows an error. */
     fun onImagePicked(uri: Uri?) {
         if (uri == null) return
-        if (isImageSafe(context, uri)) {
-            attachedImageUri = uri
-        } else {
-            toastState.show(
-                message = context.getString(R.string.feedback_invalid_file),
-                type = MagicToastType.ERROR,
-            )
+        isCheckingAttachment = true
+        scope.launch {
+            val safe = withContext(Dispatchers.IO) { isImageSafe(context, uri) }
+            isCheckingAttachment = false
+            if (safe) {
+                attachedImageUri = uri
+            } else {
+                toastState.show(message = invalidFileMessage, type = MagicToastType.ERROR)
+            }
         }
     }
 
@@ -218,7 +238,7 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
         val subject = "ManaHub Feedback (${BuildConfig.VERSION_NAME} - ${BuildConfig.VERSION_CODE})"
         val imageUri = attachedImageUri
         val intent = if (imageUri != null) {
-            val attachmentMime = context.contentResolver.getType(imageUri) ?: "image/*"
+            val attachmentMime = runCatching { context.contentResolver.getType(imageUri) }.getOrNull() ?: "image/*"
             Intent(Intent.ACTION_SEND).apply {
                 type = attachmentMime
                 putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_EMAIL))
@@ -236,43 +256,48 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
             }
         }
 
-        context.startActivity(
-            Intent.createChooser(intent, context.getString(R.string.feedback_chooser_title)),
-        )
+        try {
+            context.startActivity(
+                Intent.createChooser(intent, context.getString(R.string.feedback_chooser_title)),
+            )
+        } catch (e: ActivityNotFoundException) {
+            recordSafeNonFatal("feedback_chooser_unavailable", e)
+            isSending = false
+            toastState.show(message = chooserFailedMessage, type = MagicToastType.ERROR)
+            return
+        }
 
-        // Reset state and close after launching the chooser
         resetAndDismiss()
     }
 
     // ── UI ────────────────────────────────────────────────────────────────────
 
     ModalBottomSheet(
-        onDismissRequest = { /* blocked — use explicit controls only */ },
+        onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = mc.backgroundSecondary,
         dragHandle = null, // we provide our own header row
     ) {
+        BackHandler(enabled = hasDraft) { showDiscardDialog = true }
+
         Box(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 24.dp)
+                    .padding(horizontal = spacing.lg)
+                    .padding(bottom = spacing.xl)
                     .navigationBarsPadding(),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing.lg),
             ) {
 
                 // ── Header ────────────────────────────────────────────────────
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp),
+                        .padding(top = spacing.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(
-                        onClick = { dismiss() },
-                        modifier = Modifier.offset(x = (-12).dp)
-                    ) {
+                    IconButton(onClick = { if (hasDraft) showDiscardDialog = true else dismiss() }) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = stringResource(R.string.feedback_cancel),
@@ -283,12 +308,11 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
                         text = stringResource(R.string.feedback_title),
                         style = ty.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                         color = mc.textPrimary,
-                        modifier = Modifier.offset(x = (-8).dp)
                     )
                 }
 
                 // ── Text field ────────────────────────────────────────────────
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
                     OutlinedTextField(
                         value = messageText,
                         onValueChange = { newValue ->
@@ -326,11 +350,10 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
                             focusedContainerColor = mc.surface,
                             unfocusedContainerColor = mc.surface,
                         ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = CardShape,
                         textStyle = ty.bodyMedium.copy(color = mc.textPrimary),
                     )
 
-                    // Character counter
                     Text(
                         text = stringResource(R.string.feedback_char_count, messageText.length),
                         style = ty.labelSmall,
@@ -340,7 +363,7 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
                 }
 
                 // ── Image attachment ──────────────────────────────────────────
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -351,26 +374,22 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
                             style = ty.bodySmall,
                             color = mc.textSecondary,
                         )
-                        IconButton(
-                            onClick = { openImagePicker() },
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(mc.surface),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AddPhotoAlternate,
-                                contentDescription = stringResource(R.string.feedback_attach),
-                                tint = mc.primaryAccent,
-                                modifier = Modifier.size(22.dp),
-                            )
+                        if (isCheckingAttachment) {
+                            MagicLoadingSpinner(size = MagicLoadingSize.Small)
+                        } else {
+                            IconButton(onClick = { openImagePicker() }) {
+                                Icon(
+                                    imageVector = Icons.Default.AddPhotoAlternate,
+                                    contentDescription = stringResource(R.string.feedback_attach),
+                                    tint = mc.primaryAccent,
+                                )
+                            }
                         }
                     }
 
-                    // Thumbnail of the selected image, if any
                     val currentUri = attachedImageUri
                     if (currentUri != null) {
-                        Box(modifier = Modifier.size(80.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             AsyncImage(
                                 model = ImageRequest.Builder(context)
                                     .data(currentUri)
@@ -379,35 +398,15 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .border(
-                                        width = 1.dp,
-                                        color = mc.surfaceVariant,
-                                        shape = RoundedCornerShape(8.dp),
-                                    ),
+                                    .size(80.dp)
+                                    .clip(ChipShape)
+                                    .border(width = 1.dp, color = mc.surfaceVariant, shape = ChipShape),
                             )
-                            // Remove image button
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .align(Alignment.TopEnd)
-                                    .offset(x = 6.dp, y = (-6).dp)
-                                    .clip(RoundedCornerShape(50))
-                                    .background(mc.backgroundSecondary)
-                                    .border(
-                                        width = 1.dp,
-                                        color = mc.surfaceVariant,
-                                        shape = RoundedCornerShape(50),
-                                    )
-                                    .clickable { attachedImageUri = null },
-                                contentAlignment = Alignment.Center,
-                            ) {
+                            IconButton(onClick = { attachedImageUri = null }) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = stringResource(R.string.action_remove),
                                     tint = mc.textSecondary,
-                                    modifier = Modifier.size(12.dp),
                                 )
                             }
                         }
@@ -415,42 +414,21 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
                 }
 
                 // ── Send button ───────────────────────────────────────────────
-                Button(
+                MagicCtaButton(
                     onClick = { sendFeedback() },
-                    enabled = !isSending,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = mc.primaryAccent,
-                        contentColor = Color.White,
-                        disabledContainerColor = mc.primaryAccent.copy(alpha = 0.5f),
-                        disabledContentColor = Color.White.copy(alpha = 0.5f),
-                    ),
-                ) {
-                    if (isSending) {
-                        MagicLoadingSpinner(
-                            modifier = Modifier.size(20.dp),
-                        )
-                    } else {
+                    text = stringResource(R.string.feedback_send),
+                    enabled = !isCheckingAttachment,
+                    isLoading = isSending,
+                    style = MagicCtaStyle.Filled,
+                    color = MagicCtaColor.Primary,
+                    icon = {
                         Icon(
-                            imageVector = Icons.Default.Send,
+                            imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = null,
-                            modifier = Modifier
-                                .size(18.dp)
-                                .padding(end = 0.dp),
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(R.string.feedback_send),
-                            style = ty.bodyMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 15.sp
-                            ),
-                        )
-                    }
-                }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
             // Toast overlay — positioned on top of all sheet content
@@ -459,5 +437,21 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
                 modifier = Modifier.matchParentSize(),
             )
         }
+    }
+
+    if (showDiscardDialog) {
+        MagicAlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = stringResource(R.string.feedback_discard_title),
+            text = stringResource(R.string.feedback_discard_text),
+            confirmLabel = stringResource(R.string.action_discard),
+            onConfirm = {
+                showDiscardDialog = false
+                resetAndDismiss()
+            },
+            dismissLabel = stringResource(R.string.action_cancel),
+            onDismiss = { showDiscardDialog = false },
+            confirmColor = MagicCtaColor.Error,
+        )
     }
 }

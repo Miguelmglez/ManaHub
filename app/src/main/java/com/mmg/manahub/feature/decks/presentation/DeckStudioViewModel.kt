@@ -37,7 +37,6 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
 import com.mmg.manahub.feature.decks.domain.engine.BasicLandPlanner
-import com.mmg.manahub.feature.decks.domain.engine.CategoryVocabulary
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
@@ -139,7 +138,7 @@ sealed interface DeckStudioEvent {
  *
  * BUILD is the manual editor (Phase 1). SUGGESTIONS is a Phase-2 stub.
  */
-enum class DeckStudioTab { BUILD, SUGGESTIONS }
+enum class DeckStudioTab { BUILD, ANALYSIS }
 
 
 /**
@@ -981,10 +980,10 @@ class DeckStudioViewModel(
     // ── Tab / UI toggles ──────────────────────────────────────────────────────
 
     fun onSelectTab(tab: DeckStudioTab) {
-        if (tab == DeckStudioTab.SUGGESTIONS && deckFormat == DeckFormat.DRAFT) return
+        if (tab == DeckStudioTab.ANALYSIS && deckFormat == DeckFormat.DRAFT) return
         // Leaving Suggestions mid-recompute cancels the debounced pass -- the cache stays primed,
         // and a pending mutation is picked up by recomputeNowIfDirty() below on return.
-        if (_uiState.value.selectedTab == DeckStudioTab.SUGGESTIONS && tab != DeckStudioTab.SUGGESTIONS) {
+        if (_uiState.value.selectedTab == DeckStudioTab.ANALYSIS && tab != DeckStudioTab.ANALYSIS) {
             deckDoctorOrchestrator.cancelPendingRecompute()
         }
         _uiState.update { it.copy(selectedTab = tab) }
@@ -993,7 +992,7 @@ class DeckStudioViewModel(
         // and avoids a Scryfall call for a deck the user may never analyse). Reads the
         // orchestrator's TRUE current state directly (not the merged _uiState, which is
         // only eventually-consistent via the init collector) so this gate is race-free.
-        if (tab == DeckStudioTab.SUGGESTIONS && ::deckId.isInitialized) {
+        if (tab == DeckStudioTab.ANALYSIS && ::deckId.isInitialized) {
             if (!deckDoctorOrchestrator.state.value.isLoaded) {
                 deckDoctorOrchestrator.loadAnalysis(deckId)
             } else {
@@ -1061,7 +1060,7 @@ class DeckStudioViewModel(
         }
         // While Suggestions is showing, recompute incrementally instead of invalidating --
         // invalidateSuggestions() would drop the orchestrator's primed AnalysisCache.
-        val recomputeInline = !isSideboard && _uiState.value.selectedTab == DeckStudioTab.SUGGESTIONS
+        val recomputeInline = !isSideboard && _uiState.value.selectedTab == DeckStudioTab.ANALYSIS
         if (!recomputeInline) invalidateSuggestions()
         viewModelScope.launch {
             // resolveCard hits getCardById, which can throw. Keep it INSIDE the
@@ -1118,7 +1117,7 @@ class DeckStudioViewModel(
             FirebaseCrashlytics.getInstance().log("deck_studio_commander_mutation_blocked")
             return
         }
-        val recomputeInline = !isSideboard && _uiState.value.selectedTab == DeckStudioTab.SUGGESTIONS
+        val recomputeInline = !isSideboard && _uiState.value.selectedTab == DeckStudioTab.ANALYSIS
         if (!recomputeInline) invalidateSuggestions()
         viewModelScope.launch {
             val currentQty = currentQuantity(scryfallId, isSideboard)
@@ -1141,7 +1140,7 @@ class DeckStudioViewModel(
 
     /** Removes a card slot entirely (the "delete" action in the detail sheet). */
     fun removeCard(scryfallId: String, isSideboard: Boolean = false) {
-        val recomputeInline = !isSideboard && _uiState.value.selectedTab == DeckStudioTab.SUGGESTIONS
+        val recomputeInline = !isSideboard && _uiState.value.selectedTab == DeckStudioTab.ANALYSIS
         if (!recomputeInline) invalidateSuggestions()
         viewModelScope.launch {
             runCatching { deckRepository.removeCardFromDeck(deckId, scryfallId, isSideboard) }

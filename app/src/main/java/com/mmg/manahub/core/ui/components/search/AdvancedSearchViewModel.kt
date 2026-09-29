@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.ui.components.search
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
@@ -31,6 +32,7 @@ class AdvancedSearchViewModel(
     private val scryfallDataSource: ScryfallRemoteDataSource,
     private val buildQuery: BuildScryfallQueryUseCase,
     private val userPreferencesDataStore: UserPreferencesDataStore,
+    private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
 
     data class UiState(
@@ -86,6 +88,7 @@ class AdvancedSearchViewModel(
         // the sheet with a clear (X) action -- see the Oracle text / Mana production sections.
         val oracleTerms: SearchCriterion.OracleTerms? = null,
         val manaProduction: SearchCriterion.ManaProduction? = null,
+        val sectionAlternatives: SearchCriterion.AnyOf? = null,
         val orderBy: SearchOrder = SearchOrder.NAME,
         val orderDirection: SearchDirection = SearchDirection.ASC,
         val builtQuery: String = "",
@@ -98,6 +101,7 @@ class AdvancedSearchViewModel(
         /** Which of the user's lists results come from — mutually exclusive, never intersecting. */
         val collectionSource: CollectionSource = CollectionSource.COLLECTION,
         val filterTags: Set<String> = emptySet(),
+        val filterTagQueries: Map<String, String> = emptyMap(),
         /**
          * Deck Wizard Commander v3 plan (Phase 3.2/3.4, D14): criteria the CALLER wants
          * non-removable for this open (e.g. [SearchCriterion.CommanderEligible]). Seeded once per
@@ -113,6 +117,20 @@ class AdvancedSearchViewModel(
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    private val _sectionExpansion = MutableStateFlow(savedStateHandle.get<Map<String, Boolean>>("section_expansion") ?: emptyMap())
+    val sectionExpansion: StateFlow<Map<String, Boolean>> = _sectionExpansion.asStateFlow()
+
+    fun setSectionExpanded(key: String, expanded: Boolean) {
+        val updated = _sectionExpansion.value + (key to expanded)
+        _sectionExpansion.value = updated
+        savedStateHandle["section_expansion"] = updated
+    }
+
+    fun clearSectionAlternatives() {
+        _uiState.update { it.copy(sectionAlternatives = null) }
+        updateBuiltQuery()
+    }
 
     init {
         viewModelScope.launch {
@@ -161,11 +179,12 @@ class AdvancedSearchViewModel(
             criteria.add(SearchCriterion.Format(s.selectedFormat, s.formatLegal))
         s.oracleTerms?.let { criteria.add(it) }
         s.manaProduction?.let { criteria.add(it) }
+        s.sectionAlternatives?.let { criteria.add(it) }
         // COLLECTION is the implicit default, so it contributes no criterion (and no filter badge).
         if (s.collectionSource != CollectionSource.COLLECTION)
             criteria.add(SearchCriterion.CollectionStatus(s.collectionSource))
         if (s.filterTags.isNotEmpty())
-            criteria.add(SearchCriterion.HasTag(s.filterTags.toList()))
+            criteria.add(SearchCriterion.HasTag(s.filterTags.toList(), s.filterTagQueries.filterKeys { it in s.filterTags }))
 
         return AdvancedSearchQuery(mergeLocked(criteria, s.lockedCriteria), s.orderBy, s.orderDirection)
     }
@@ -341,10 +360,17 @@ class AdvancedSearchViewModel(
         updateBuiltQuery()
     }
 
-    fun toggleFilterTag(key: String) {
+    fun toggleFilterTag(key: String, verifiedScryfallQuery: String? = null) {
         val current = _uiState.value.filterTags.toMutableSet()
-        if (current.contains(key)) current.remove(key) else current.add(key)
-        _uiState.update { it.copy(filterTags = current) }
+        val queries = _uiState.value.filterTagQueries.toMutableMap()
+        if (current.contains(key)) {
+            current.remove(key)
+            queries.remove(key)
+        } else {
+            current.add(key)
+            if (verifiedScryfallQuery != null) queries[key] = verifiedScryfallQuery
+        }
+        _uiState.update { it.copy(filterTags = current, filterTagQueries = queries) }
         updateBuiltQuery()
     }
 
@@ -399,6 +425,7 @@ class AdvancedSearchViewModel(
                     cardFunction = criterion.functions,
                     cardFunctionMatchAll = criterion.matchAll,
                 )
+                is SearchCriterion.AnyOf -> next.copy(sectionAlternatives = criterion)
                 is SearchCriterion.Colors -> next.copy(
                     selectedColors = criterion.colors,
                     colorMode = criterion.mode,
@@ -428,7 +455,10 @@ class AdvancedSearchViewModel(
                 is SearchCriterion.ManaProduction -> next.copy(manaProduction = criterion)
                 is SearchCriterion.OracleTerms -> next.copy(oracleTerms = criterion)
                 is SearchCriterion.CollectionStatus -> next.copy(collectionSource = criterion.source)
-                is SearchCriterion.HasTag -> next.copy(filterTags = criterion.keys.toSet())
+                is SearchCriterion.HasTag -> next.copy(
+                    filterTags = criterion.keys.toSet(),
+                    filterTagQueries = criterion.verifiedScryfallQueries,
+                )
                 // Deck Wizard Commander v3 plan (Phase 3.4, D14): no backing UiState field --
                 // CommanderEligible is only ever seeded via a caller's `lockedCriteria`, not this
                 // sheet's own toggleable filters, so it is a no-op here (same convention as Loyalty/

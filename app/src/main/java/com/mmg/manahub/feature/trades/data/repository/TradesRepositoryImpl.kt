@@ -2,18 +2,18 @@ package com.mmg.manahub.feature.trades.data.repository
 
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
-import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
-import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
-import com.mmg.manahub.core.data.remote.trades.TradesRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.TradeItemDto
 import com.mmg.manahub.core.data.remote.dto.TradeItemRequestDto
 import com.mmg.manahub.core.data.remote.dto.TradeProposalDto
+import com.mmg.manahub.core.data.remote.trades.TradesRemoteDataSource
+import com.mmg.manahub.core.data.repository.TradesRepository
+import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.core.model.ReviewFlags
 import com.mmg.manahub.core.model.TradeItem
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
-import com.mmg.manahub.core.model.ReviewFlags
-import com.mmg.manahub.core.data.repository.TradesRepository
 import com.mmg.manahub.core.util.recordSafeNonFatal
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -163,6 +163,15 @@ class TradesRepositoryImpl(
         autoSend: Boolean,
     ): Result<String> = remote.createProposal(receiverId, items, includesReviewFromProposer, includesReviewFromReceiver, autoSend)
 
+    override suspend fun createProposalWithRequestId(
+        receiverId: String,
+        items: List<TradeItemRequestDto>,
+        includesReviewFromProposer: Boolean,
+        includesReviewFromReceiver: Boolean,
+        autoSend: Boolean,
+        clientRequestId: String,
+    ): Result<String> = remote.createProposal(receiverId, items, includesReviewFromProposer, includesReviewFromReceiver, autoSend, clientRequestId)
+
     override suspend fun editProposal(
         proposalId: String,
         expectedVersion: Int,
@@ -184,6 +193,13 @@ class TradesRepositoryImpl(
         items: List<TradeItemRequestDto>,
         reviewFlags: ReviewFlags,
     ): Result<String> = remote.counterProposal(parentProposalId, items, reviewFlags)
+
+    override suspend fun counterProposalWithRequestId(
+        parentProposalId: String,
+        items: List<TradeItemRequestDto>,
+        reviewFlags: ReviewFlags,
+        clientRequestId: String,
+    ): Result<String> = remote.counterProposal(parentProposalId, items, reviewFlags, clientRequestId)
 
     // Accepting does not complete a trade (it can still be revoked): no progression here (D7).
     override suspend fun acceptProposal(proposalId: String): Result<Unit> =
@@ -271,7 +287,7 @@ class TradesRepositoryImpl(
         language = language,
         cardId = cardId,
         cardName = cardMap[cardId]?.name ?: "",
-        imageUrl = cardMap[cardId]?.let { it.imageArtCrop ?: it.imageNormal },
+        imageUrl = cardMap[cardId]?.imageNormal,
         typeLine = cardMap[cardId]?.typeLine,
         setCode = cardMap[cardId]?.setCode,
         setName = cardMap[cardId]?.setName,

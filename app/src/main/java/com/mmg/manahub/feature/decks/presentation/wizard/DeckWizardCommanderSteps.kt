@@ -1,4 +1,6 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
+
+import com.mmg.manahub.core.ui.components.MagicActiveFiltersBar
 // COMMENTS_REVIEWED: 2026-09-21
 
 import androidx.compose.animation.AnimatedContent
@@ -334,23 +336,11 @@ internal fun CommanderPickStepContent(
 
                         if (filterCount > 0) {
                             item(key = "active_filters") {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        stringResource(R.string.deck_wizard_commander_active_filters, filterCount),
-                                        style = ty.bodySmall,
-                                        color = mc.primaryAccent,
-                                    )
-                                    MagicCtaButton(
-                                        onClick = onClearFilters,
-                                        text = stringResource(R.string.deck_wizard_commander_clear_filters),
-                                        style = MagicCtaStyle.Ghost,
-                                        color = MagicCtaColor.Error,
-                                    )
-                                }
+                                MagicActiveFiltersBar(
+                                    text = stringResource(R.string.deck_wizard_commander_active_filters, filterCount),
+                                    clearLabel = stringResource(R.string.deck_wizard_commander_clear_filters),
+                                    onClear = onClearFilters,
+                                )
                             }
                         } else if (isIdle) {
                             item(key = "collection_header") {
@@ -414,6 +404,8 @@ internal fun CommanderPickStepContent(
                 onApplyStructuredSearch(query)
                 showAdvancedSearch = false
             },
+            onClear = onApplyStructuredSearch,
+            stateKey = "wizard_commander",
             appliedQuery = uiState.commanderStructuredQuery,
             lockedCriteria = lockedCriteria.toSet(),
         )

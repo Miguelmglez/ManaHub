@@ -157,6 +157,21 @@ abstract class CardDao {
     """)
     abstract suspend fun getScryfallIdsMissingStrategyTags(limit: Int): List<String>
 
+    @Query("""
+        SELECT DISTINCT c.scryfall_id FROM cards c
+        JOIN card_strategy_tags_cache t ON t.oracle_id = c.oracle_id
+        WHERE c.oracle_id != ''
+          AND CAST(t.pipeline_version AS INTEGER) > 0
+          AND CAST(t.pipeline_version AS INTEGER) < CAST(:currentVersion AS INTEGER)
+          AND (
+              c.scryfall_id IN (SELECT scryfall_id FROM user_card_collection WHERE is_deleted = 0)
+              OR c.scryfall_id IN (SELECT scryfall_id FROM local_wishlists)
+              OR c.scryfall_id IN (SELECT scryfall_id FROM deck_cards)
+          )
+        LIMIT :limit
+    """)
+    abstract suspend fun getScryfallIdsWithOutdatedStrategyTags(currentVersion: String, limit: Int): List<String>
+
     // Per-printing write-gap repair (2026-09-07). getScryfallIdsMissingStrategyTags above excludes a
     // card as soon as ANY row with its oracle_id is cached, but the tag write targets a single
     // scryfall_id -- so a user who owns two printings of one card had the second printing excluded
@@ -182,6 +197,26 @@ abstract class CardDao {
         LIMIT :limit
     """)
     abstract suspend fun getScryfallIdsWithUnwrittenStrategyTags(limit: Int): List<String>
+
+    @Query("""
+        SELECT c.* FROM cards c
+        WHERE c.scryfall_id > :afterScryfallId
+          AND c.oracle_id <> ''
+          AND c.stale_reason IS NULL
+          AND EXISTS (
+              SELECT 1 FROM user_card_collection u
+              WHERE u.scryfall_id = c.scryfall_id
+                AND u.user_id = :ownerUserId
+                AND u.is_deleted = 0
+          )
+        ORDER BY c.scryfall_id
+        LIMIT :limit
+    """)
+    abstract suspend fun getOwnedCardsForMechanicRefresh(
+        ownerUserId: String,
+        afterScryfallId: String,
+        limit: Int,
+    ): List<CardEntity>
 
     // Strategy tags are an ORACLE-wide property shared by every printing, but they are stored per
     // scryfall_id -- this is how a resolution fans out to all of a card's cached printings instead

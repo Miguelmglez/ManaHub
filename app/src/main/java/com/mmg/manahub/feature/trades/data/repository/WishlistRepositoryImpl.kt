@@ -2,8 +2,11 @@ package com.mmg.manahub.feature.trades.data.repository
 
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
 import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
+import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
 import com.mmg.manahub.core.data.local.dao.LocalWishlistWithCard
 import com.mmg.manahub.core.data.local.entity.LocalWishlistEntity
+import com.mmg.manahub.core.data.local.TradeListOwner
+import com.mmg.manahub.feature.trades.data.TradeWishlistCleanup
 import com.mmg.manahub.core.data.remote.trades.WishlistRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.WishlistEntryDto
 import com.mmg.manahub.core.model.WishlistEntry
@@ -14,6 +17,8 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Instant
@@ -34,6 +39,9 @@ class WishlistRepositoryImpl(
     private val remote: WishlistRemoteDataSource,
     // Signed-in account id, stamped on new rows so they never migrate into another account.
     private val currentUserId: suspend () -> String? = { null },
+    private val sessionUserId: Flow<String?> = flowOf(null),
+    private val syncDao: TradeCollectionSyncDao? = null,
+    private val tradeWishlistCleanup: TradeWishlistCleanup? = null,
 ) : WishlistRepository {
 
     // Serialises concurrent addLocal calls to prevent the TOCTOU race on the
@@ -44,36 +52,46 @@ class WishlistRepositoryImpl(
     private val addMutex = Mutex()
 
     override fun observeLocal(): Flow<List<WishlistEntry>> =
-        dao.observeAllWithCard().map { list -> list.map { it.toDomain() } }
+        sessionUserId.flatMapLatest { dao.observeAllWithCard(TradeListOwner.key(it)) }
+            .map { list -> list.map { it.toDomain() } }
 
     override fun observeByScryfallId(scryfallId: String): Flow<List<WishlistEntry>> =
-        dao.observeByScryfallIdWithCard(scryfallId).map { list -> list.map { it.toDomain() } }
+        sessionUserId.flatMapLatest { dao.observeByScryfallIdWithCard(scryfallId, TradeListOwner.key(it)) }
+            .map { list -> list.map { it.toDomain() } }
 
     override fun observeVersionsByOracle(oracleId: String, name: String): Flow<List<WishlistEntry>> =
-        dao.observeVersionsByOracle(oracleId, name).map { list -> list.map { it.toDomain() } }
+        sessionUserId.flatMapLatest { dao.observeVersionsByOracle(oracleId, name, TradeListOwner.key(it)) }
+            .map { list -> list.map { it.toDomain() } }
 
-    override fun observeUnsyncedCount(): Flow<Int> = dao.observeUnsyncedCount()
+    override fun observeUnsyncedCount(): Flow<Int> =
+        sessionUserId.flatMapLatest { dao.observeUnsyncedCount(TradeListOwner.key(it)) }
 
     override suspend fun addLocal(entry: WishlistEntry): Result<Unit> = addMutex.withLock {
         runCatching {
+            val owner = TradeListOwner.key(currentUserId())
             val existing = dao.getByAttributes(
                 scryfallId = entry.cardId,
                 matchAnyVariant = entry.matchAnyVariant,
                 isFoil = entry.isFoil,
                 condition = entry.condition,
                 language = entry.language,
+                ownerUserId = owner,
             )
             if (existing != null) {
+                drainPendingTradeEdit(owner, existing.id)
                 dao.update(existing.copy(quantity = existing.quantity + entry.quantity))
             } else {
-                dao.insert(entry.toEntity(currentUserId()))
+                dao.insert(entry.toEntity(owner))
             }
         }
     }
 
     override suspend fun addAllLocal(entries: List<WishlistEntry>): Result<Unit> = addMutex.withLock {
         runCatching {
-            val owner = currentUserId()
+            val owner = TradeListOwner.key(currentUserId())
+            if (syncDao?.getPendingWishlistIds(owner)?.isNotEmpty() == true) {
+                tradeWishlistCleanup?.drain(owner)?.getOrThrow()
+            }
             dao.addOrMergeAll(entries.map { it.toEntity(owner) })
         }
     }
@@ -83,32 +101,42 @@ class WishlistRepositoryImpl(
         // call, means the next syncFromRemote() re-downloads and "resurrects" the entry the
         // user just removed. Remote-first (mirrors the OpenForTrade §2.2 fix): only delete
         // locally once the server row is confirmed gone (trades audit §2.3, 2026-07-10).
-        val existing = dao.getById(id)
+        val owner = TradeListOwner.key(currentUserId())
+        val existing = dao.getById(id, owner)
+        if (existing != null) drainPendingTradeEdit(owner, id)
         if (existing?.synced == true) {
             remote.removeWishlistEntry(id).getOrThrow()
         }
-        dao.deleteById(id)
+        dao.deleteById(id, owner)
     }
 
     override suspend fun updateQuantityLocal(id: String, quantity: Int): Result<Unit> = runCatching {
-        val existing = dao.getById(id)
+        val owner = TradeListOwner.key(currentUserId())
+        val existing = dao.getById(id, owner)
+        if (existing != null) drainPendingTradeEdit(owner, id)
         if (quantity <= 0) {
             if (existing?.synced == true) {
                 remote.removeWishlistEntry(id).getOrThrow()
             }
-            dao.deleteById(id)
+            dao.deleteById(id, owner)
         } else {
             // Same remote-first resurrection guard as removeLocal() above, for the
             // decrement-not-delete path (trades audit §2.3, 2026-07-10).
             if (existing?.synced == true) {
                 remote.updateWishlistQuantity(id, quantity).getOrThrow()
             }
-            dao.updateQuantity(id, quantity)
+            dao.updateQuantity(id, quantity, owner)
         }
     }
 
     override suspend fun getRemote(userId: String): Result<List<WishlistEntry>> =
         remote.getWishlist(userId).map { dtos -> dtos.map { it.toDomain() } }
+
+    private suspend fun drainPendingTradeEdit(owner: String, wishlistId: String) {
+        if (syncDao?.getPendingWishlistIds(owner)?.contains(wishlistId) == true) {
+            tradeWishlistCleanup?.drain(owner)?.getOrThrow()
+        }
+    }
 
     override suspend fun addRemote(entry: WishlistEntry): Result<Unit> =
         remote.addWishlistEntry(entry.toDto())
@@ -117,13 +145,15 @@ class WishlistRepositoryImpl(
         remote.removeWishlistEntry(id)
 
     override suspend fun evictForeignAccountRows(userId: String): Result<Unit> = runCatching {
-        dao.deleteForeignAccountRows(userId)
+        require(currentUserId() == userId)
+        dao.deleteAmbiguousRows()
     }
 
     override suspend fun migrateLocalToRemote(userId: String): Result<Int> = runCatching {
-        // A previous account's unsynced rows must never be pushed into this account.
-        dao.deleteForeignAccountRows(userId)
-        val unsynced = dao.getUnsynced()
+        require(currentUserId() == userId)
+        // Owner-scoped reads exclude another account's pending rows without deleting them.
+        dao.deleteAmbiguousRows()
+        val unsynced = dao.getUnsynced(userId)
         if (unsynced.isEmpty()) return@runCatching 0
 
         val dtos = unsynced.map { it.toDto(userId) }
@@ -135,14 +165,17 @@ class WishlistRepositoryImpl(
         // Entries remain in Room after sync (clearSynced removed) so that
         // observeLocal() continues to show them without re-downloading from remote.
         remote.batchAddWishlistEntries(dtos).getOrThrow()
-        dao.markSynced(unsynced.map { it.id })
+        require(currentUserId() == userId)
+        dao.markSynced(unsynced.map { it.id }, userId)
         dao.stampOwner(unsynced.map { it.id }, userId)
         unsynced.size
     }
 
     override suspend fun syncFromRemote(userId: String): Result<Unit> = try {
-        dao.deleteForeignAccountRows(userId)
+        require(currentUserId() == userId)
+        dao.deleteAmbiguousRows()
         val drain = remote.drainWishlist(userId)
+        require(currentUserId() == userId)
         val entities = drain.rows.map { dto ->
             LocalWishlistEntity(
                 id = dto.id,
@@ -159,7 +192,9 @@ class WishlistRepositoryImpl(
                 ownerUserId = userId,
             )
         }
-        if (entities.isNotEmpty()) dao.upsertAll(entities)
+        val pendingIds = syncDao?.getPendingWishlistIds(userId)?.toSet().orEmpty()
+        val safeEntities = entities.filterNot { it.id in pendingIds }
+        if (safeEntities.isNotEmpty()) dao.upsertAll(safeEntities)
         val incomplete = drain.incompleteFailure()
         if (incomplete != null) {
             // Rows past the failed page were never seen, so nothing local may be evicted this pass.
@@ -167,7 +202,7 @@ class WishlistRepositoryImpl(
         } else {
             // Evict synced rows the server no longer returns; unsynced local rows are never touched.
             val remoteIds = entities.mapTo(HashSet()) { it.id }
-            dao.getSyncedIds().filterNot { it in remoteIds }.chunked(EVICT_CHUNK_SIZE).forEach { dao.deleteSyncedByIds(it) }
+            dao.getSyncedIds(userId).filterNot { it in remoteIds || it in pendingIds }.chunked(EVICT_CHUNK_SIZE).forEach { dao.deleteSyncedByIds(it, userId) }
             Result.success(Unit)
         }
     } catch (e: CancellationException) {
@@ -178,17 +213,19 @@ class WishlistRepositoryImpl(
 
     override suspend fun decrementByScryfallId(scryfallId: String, quantity: Int): Result<Unit> =
         runCatching {
-            val entries = dao.getByScryfallId(scryfallId)
+            val owner = TradeListOwner.key(currentUserId())
+            val entries = dao.getByScryfallId(scryfallId, owner)
             entries.forEach { entry ->
+                drainPendingTradeEdit(owner, entry.id)
                 val newQty = entry.quantity - quantity
                 // Remote-first resurrection guard for synced rows, same as removeLocal() /
                 // updateQuantityLocal() above (trades audit §2.3, 2026-07-10).
                 if (newQty <= 0) {
                     if (entry.synced) remote.removeWishlistEntry(entry.id).getOrThrow()
-                    dao.deleteById(entry.id)
+                    dao.deleteById(entry.id, owner)
                 } else {
                     if (entry.synced) remote.updateWishlistQuantity(entry.id, newQty).getOrThrow()
-                    dao.updateQuantity(entry.id, newQty)
+                    dao.updateQuantity(entry.id, newQty, owner)
                 }
             }
         }
@@ -200,7 +237,8 @@ class WishlistRepositoryImpl(
         condition: String,
         language: String,
     ): Result<Unit> = runCatching {
-        val entries = dao.getByScryfallId(scryfallId)
+        val owner = TradeListOwner.key(currentUserId())
+        val entries = dao.getByScryfallId(scryfallId, owner)
         if (entries.isEmpty()) return@runCatching
         val exactMatch = entries.firstOrNull { e ->
             (e.isFoil ?: false) == isFoil &&
@@ -221,13 +259,14 @@ class WishlistRepositoryImpl(
             )
             return@runCatching
         }
+        drainPendingTradeEdit(owner, target.id)
         val newQty = target.quantity - quantity
         if (newQty <= 0) {
             if (target.synced) remote.removeWishlistEntry(target.id).getOrThrow()
-            dao.deleteById(target.id)
+            dao.deleteById(target.id, owner)
         } else {
             if (target.synced) remote.updateWishlistQuantity(target.id, newQty).getOrThrow()
-            dao.updateQuantity(target.id, newQty)
+            dao.updateQuantity(target.id, newQty, owner)
         }
     }
 
@@ -237,18 +276,20 @@ class WishlistRepositoryImpl(
         // wishlist add (trades audit §2.12, 2026-07-10).
         val entity = addMutex.withLock {
             runCatching {
+                require(currentUserId() == userId)
                 val existing = dao.getByAttributes(
                     scryfallId = entry.cardId,
                     matchAnyVariant = entry.matchAnyVariant,
                     isFoil = entry.isFoil,
                     condition = entry.condition,
                     language = entry.language,
+                    ownerUserId = userId,
                 )
                 if (existing != null) {
                     existing.copy(quantity = existing.quantity + entry.quantity)
                         .also { dao.update(it) }
                 } else {
-                    entry.toEntity(currentUserId()).also { dao.insert(it) }
+                    entry.toEntity(userId).also { dao.insert(it) }
                 }
             }
         }.getOrElse { return Result.failure(it) }
@@ -259,7 +300,7 @@ class WishlistRepositoryImpl(
         // even though the add worked locally). The row stays synced=false and is retried by the
         // next migrateLocalToRemote()/addAndSync call (trades audit §2.12, 2026-07-10).
         remote.batchAddWishlistEntries(listOf(entity.toDto(userId)))
-            .onSuccess { dao.markSynced(listOf(entity.id)) }
+            .onSuccess { if (currentUserId() == userId) dao.markSynced(listOf(entity.id), userId) }
             .onFailure { e -> recordSafeNonFatal("wishlist_add_and_sync_remote_failed", e) }
 
         return Result.success(Unit)
@@ -275,11 +316,9 @@ class WishlistRepositoryImpl(
         userId: String?,
     ): Result<UpdateEntryOutcome> = addMutex.withLock {
         runCatching {
-            FirebaseCrashlytics.getInstance().apply {
-                setCustomKey("wishlist_edit_entry_id", entryId)
-                setCustomKey("wishlist_edit_new_card_id", newCardId)
-            }
-            val edited = dao.getById(entryId)
+            val owner = TradeListOwner.key(currentUserId())
+            if (userId != null) require(userId == owner)
+            val edited = dao.getById(entryId, owner)
             if (edited == null) {
                 // A2 (edge-case audit, 2026-07-15): the entry no longer exists (concurrent delete
                 // from another device/sync, or a stale UI reference). Previously this branch
@@ -299,6 +338,7 @@ class WishlistRepositoryImpl(
                 isFoil = isFoil,
                 condition = condition,
                 language = language,
+                ownerUserId = owner,
             )
 
             if (existing != null && existing.id != entryId) {
@@ -326,7 +366,7 @@ class WishlistRepositoryImpl(
                         throw e
                     }
                 }
-                dao.deleteById(edited.id)
+                dao.deleteById(edited.id, owner)
                 FirebaseCrashlytics.getInstance().apply {
                     setCustomKey("wishlist_edit_merge_outcome", "merged")
                     log("wishlist_entry_update_merge_outcome")

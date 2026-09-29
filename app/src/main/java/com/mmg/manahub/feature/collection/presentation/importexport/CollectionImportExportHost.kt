@@ -118,6 +118,8 @@ fun CollectionImportHost(
             onToggleAutoDeleteOnAdd = viewModel::onToggleAutoDeleteOnAdd,
             onIncrementQuantity = viewModel::onIncrementQuantity,
             onDecrementQuantity = viewModel::onDecrementQuantity,
+            isListInverted = state.isListInverted,
+            updateSorting = viewModel::updateSorting
         )
     }
 

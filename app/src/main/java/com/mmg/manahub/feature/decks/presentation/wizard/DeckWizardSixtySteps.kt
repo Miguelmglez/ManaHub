@@ -1,4 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.wizard
+
 // COMMENTS_REVIEWED: 2026-09-21
 
 import androidx.compose.animation.AnimatedContent
@@ -11,6 +12,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +26,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -41,17 +42,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -71,6 +71,7 @@ import com.mmg.manahub.core.ui.components.DeckCardQueueItem
 import com.mmg.manahub.core.ui.components.DeckCardQueueSheet
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.InlineErrorState
+import com.mmg.manahub.core.ui.components.MagicActiveFiltersBar
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
@@ -95,6 +96,7 @@ import com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery
 import com.mmg.manahub.feature.decks.domain.engine.isLegalForFormat
 import com.mmg.manahub.feature.decks.presentation.components.TribeOption
 import com.mmg.manahub.feature.decks.presentation.components.TribePickerSection
+import kotlinx.coroutines.launch
 
 /**
  * The criteria SEED_PICK's own [AdvancedSearchSheet] open locks non-removable: [format]'s legality
@@ -278,23 +280,11 @@ internal fun SeedPickStepContent(
 
                 if (filterCount > 0) {
                     item(key = "active_filters") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                stringResource(R.string.deck_wizard_commander_active_filters, filterCount),
-                                style = ty.bodySmall,
-                                color = mc.primaryAccent,
-                            )
-                            MagicCtaButton(
-                                onClick = onClearFilters,
-                                text = stringResource(R.string.deck_wizard_commander_clear_filters),
-                                style = MagicCtaStyle.Ghost,
-                                color = MagicCtaColor.Error,
-                            )
-                        }
+                        MagicActiveFiltersBar(
+                            text = stringResource(R.string.deck_wizard_commander_active_filters, filterCount),
+                            clearLabel = stringResource(R.string.deck_wizard_commander_clear_filters),
+                            onClear = onClearFilters,
+                        )
                     }
                 } else if (isIdle) {
                     item(key = "idle_header") {
@@ -362,6 +352,8 @@ internal fun SeedPickStepContent(
                 onApplyStructuredSearch(query)
                 showAdvancedSearch = false
             },
+            onClear = onApplyStructuredSearch,
+            stateKey = "wizard_seed",
             appliedQuery = uiState.seedPickStructuredQuery,
             lockedCriteria = lockedCriteria.toSet(),
         )
@@ -421,7 +413,7 @@ internal fun SeedsAddedPill(
             shape = ChipShape,
             color = mc.primaryAccent.copy(alpha = 0.14f),
             modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.xs).heightIn(min = 48.dp)
-                .semantics { contentDescription = pillDescription },
+                .semantics { this.contentDescription = pillDescription },
         ) {
             Box(Modifier.fillMaxWidth().padding(spacing.sm), contentAlignment = Alignment.Center) {
                 AnimatedContent(

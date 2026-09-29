@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.domain.repository
 
 import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.SuggestedTag
 
 /**
  * Outcome of a [CardStrategyTagsRepository.getStrategyTags] lookup.
@@ -20,6 +21,7 @@ sealed class CardStrategyTagsResult {
      *   local [com.mmg.manahub.core.data.tagging.TagDictionary] (an unresolvable key — a taxonomy
      *   drift between the offline pipeline and the app's current dictionary — is silently dropped
      *   rather than guessed).
+     * @param suggestions role evidence above the classifier floor that remains unconfirmed.
      * @param tribes bare tribe words (Deck Engine Unification plan D5/Phase 2 tribal granularity) —
      *   NOT persisted as [CardTag]s (mirrors the app's own rule that `tribe:` fingerprint keys are
      *   runtime-only); exposed here only for callers that want the raw signal.
@@ -28,6 +30,7 @@ sealed class CardStrategyTagsResult {
      */
     data class Found(
         val tags: List<CardTag>,
+        val suggestions: List<SuggestedTag> = emptyList(),
         val tribes: List<String> = emptyList(),
         val isStale: Boolean = false,
     ) : CardStrategyTagsResult()
@@ -63,6 +66,7 @@ sealed class CardStrategyTagsResult {
  */
 data class CardStrategyTagsSubmission(
     val tags: List<String>,
+    val suggestions: List<SuggestedTag> = emptyList(),
     val themes: Map<String, Float> = emptyMap(),
     val archetypes: Map<String, Float> = emptyMap(),
     val tribes: List<String> = emptyList(),

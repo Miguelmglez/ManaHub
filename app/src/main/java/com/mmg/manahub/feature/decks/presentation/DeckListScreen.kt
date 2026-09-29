@@ -1,58 +1,55 @@
 package com.mmg.manahub.feature.decks.presentation
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.R
-import org.jetbrains.compose.resources.painterResource
 import com.mmg.manahub.core.ui.Res
-import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.components.DeckItem
+import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.components.rememberFabVisibility
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.decks.presentation.components.DeckImportSheet
+import org.jetbrains.compose.resources.painterResource
+import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,52 +72,63 @@ fun DeckListScreen(
         }
     }
 
-    Scaffold(
-        containerColor = mc.background,
-        contentWindowInsets = WindowInsets(0),
-        floatingActionButton = {
-            if (uiState.decks.isNotEmpty()) {
-                FloatingActionButton(
-                    onClick = { showCreateSheet = true },
-                    containerColor = mc.primaryAccent,
-                    contentColor = mc.background,
+    val listState = rememberLazyListState()
+    val isFabVisible = rememberFabVisibility(listState)
+
+    Box(modifier = Modifier.fillMaxSize().background(mc.background)) {
+        HexGridBackground(modifier = Modifier.fillMaxSize(), color = mc.primaryAccent.copy(alpha = 0.05f))
+
+        Scaffold(
+            containerColor = Color.Transparent,
+            contentWindowInsets = WindowInsets(0),
+            floatingActionButton = {
+                AnimatedVisibility(
+                    visible = uiState.decks.isNotEmpty() && isFabVisible,
+                    enter = fadeIn() + scaleIn(),
+                    exit = fadeOut() + scaleOut(),
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
+                    FloatingActionButton(
+                        onClick = { showCreateSheet = true },
+                        containerColor = mc.primaryAccent,
+                        contentColor = mc.background,
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                    }
                 }
             }
-        }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(mc.background)
-                .padding(padding)
-        ) {
-            when {
-                uiState.isLoading -> MagicLoadingSpinner(
-                    modifier = Modifier.align(Alignment.Center),
-                )
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                when {
+                    uiState.isLoading -> MagicLoadingSpinner(
+                        modifier = Modifier.align(Alignment.Center),
+                    )
 
-                uiState.decks.isEmpty() -> EmptyDecksState(
-                    onCreateClick = { showCreateSheet = true },
-                    onBrowseCommunityDecks = onBrowseCommunityDecks,
-                    modifier      = Modifier.align(Alignment.Center),
-                )
+                    uiState.decks.isEmpty() -> EmptyDecksState(
+                        onCreateClick = { showCreateSheet = true },
+                        onBrowseCommunityDecks = onBrowseCommunityDecks,
+                        modifier      = Modifier.align(Alignment.Center),
+                    )
 
-                else -> {
-                    LazyColumn(
-                        modifier            = Modifier.fillMaxSize(),
-                        contentPadding      = PaddingValues(top = 8.dp, bottom = 80.dp),
-                        verticalArrangement = Arrangement.spacedBy(0.dp),
-                    ) {
-                        items(uiState.decks, key = { it.id }) { deck ->
-                            DeckItem(
-                                deck             = deck,
-                                onClick          = { onDeckClick(deck.id) },
-                                onDelete         = { viewModel.deleteDeck(deck.id) },
-                                onPlaytest       = if (deck.cardCount > 0) ({ onPlaytestClick(deck.id) }) else null,
-                                cardBackPainter  = painterResource(Res.drawable.mtg_card_back),
-                            )
+                    else -> {
+                        LazyColumn(
+                            state               = listState,
+                            modifier            = Modifier.fillMaxSize(),
+                            contentPadding      = PaddingValues(top = 8.dp, bottom = 80.dp),
+                            verticalArrangement = Arrangement.spacedBy(0.dp),
+                        ) {
+                            items(uiState.decks, key = { it.id }) { deck ->
+                                DeckItem(
+                                    deck             = deck,
+                                    onClick          = { onDeckClick(deck.id) },
+                                    onDelete         = { viewModel.deleteDeck(deck.id) },
+                                    onPlaytest       = if (deck.cardCount > 0) ({ onPlaytestClick(deck.id) }) else null,
+                                    cardBackPainter  = painterResource(Res.drawable.mtg_card_back),
+                                )
+                            }
                         }
                     }
                 }
@@ -164,66 +172,27 @@ private fun EmptyDecksState(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     Column(
-        modifier            = modifier.padding(32.dp),
+        modifier            = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.Center,
     ) {
-        // Aesthetic Placeholder for empty state
-        Box(
-            modifier = Modifier
-                .size(120.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            mc.primaryAccent.copy(alpha = 0.2f),
-                            mc.background,
-                        )
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector        = Icons.AutoMirrored.Filled.LibraryBooks,
-                contentDescription = null,
-                tint               = mc.textDisabled,
-                modifier           = Modifier.size(64.dp),
-            )
-        }
-        
-        Text(
-            stringResource(R.string.decklist_empty_title),
-            style = ty.titleMedium,
-            color = mc.textPrimary,
+        EmptyState(
+            title       = stringResource(R.string.decklist_empty_title),
+            subtitle    = stringResource(R.string.decklist_empty_subtitle),
+            icon        = Icons.Default.AutoAwesome,
+            actionLabel = stringResource(R.string.decklist_empty_action),
+            onAction    = onCreateClick,
+            modifier    = Modifier,
         )
-        Text(
-            stringResource(R.string.decklist_empty_subtitle),
-            style = ty.bodyMedium,
-            color = mc.textSecondary,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-        Spacer(Modifier.height(4.dp))
-        OutlinedButton(
-            onClick = onCreateClick,
-            colors  = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent),
-            border  = BorderStroke(1.dp, mc.primaryAccent),
-            shape   = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                stringResource(R.string.decklist_empty_action),
-                style = ty.labelLarge,
-            )
-        }
-        
+
         TextButton(
-            onClick = onBrowseCommunityDecks,
-            modifier = Modifier.fillMaxWidth()
+            onClick  = onBrowseCommunityDecks,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp),
         ) {
             Text(
-                "Browse Community Decks",
+                text  = "Browse Community Decks",
                 style = ty.labelLarge,
-                color = mc.textSecondary
+                color = mc.textSecondary,
             )
         }
     }

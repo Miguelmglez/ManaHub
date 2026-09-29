@@ -8,10 +8,10 @@ import kotlin.test.assertTrue
 class ArchetypeRoleClassifierCategoryVocabularyTest {
 
     @Test
-    fun cardConfirmedOnlyWithPlusCounters_countsAsCountersPayoff() {
+    fun cardConfirmedOnlyWithPlusCounters_doesNotCountAsCountersPayoff() {
         val cardTag = card(tags = listOf(CardTag("plus_counters", TagCategory.STRATEGY)))
         val roles = ArchetypeRoleClassifier.classify(cardTag)
-        assertTrue((roles["counters_payoff"] ?: 0f) > 0f, "expected counters_payoff > 0, got $roles")
+        assertTrue((roles["counters_payoff"] ?: 0f) == 0f, "expected counters_payoff == 0, got $roles")
     }
 
     @Test

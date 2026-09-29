@@ -258,6 +258,7 @@ interface UserCardRepository {
         additions: List<TradeCollectionLine>,
         shouldApply: suspend () -> Boolean,
         onApplied: suspend () -> Unit,
+        onOfferRemovals: suspend (List<String>) -> Unit = {},
     ): TradeCollectionApplyResult? {
         if (!shouldApply()) return null
         deductions.forEach {
@@ -266,6 +267,7 @@ interface UserCardRepository {
         additions.forEach {
             addOrIncrement(it.scryfallId, it.isFoil, it.condition, it.language, isForTrade = false, userId, it.quantity)
         }
+        onOfferRemovals(emptyList())
         onApplied()
         return TradeCollectionApplyResult()
     }

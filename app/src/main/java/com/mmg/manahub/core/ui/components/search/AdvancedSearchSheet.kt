@@ -4,6 +4,7 @@ package com.mmg.manahub.core.ui.components.search
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -77,6 +78,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -98,14 +100,19 @@ import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.SearchDirection
 import com.mmg.manahub.core.model.SearchOrder
 import com.mmg.manahub.core.tagging.label
+import com.mmg.manahub.core.tagging.CardMechanicCatalogRepository
+import com.mmg.manahub.core.tagging.TagDictionary
+import com.mmg.manahub.core.data.tagging.verifiedQueryOrNull
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.ManaColorPicker
 import com.mmg.manahub.core.ui.components.SectionHeader
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 import com.mmg.manahub.feature.collection.presentation.SortDirection as CollectionSortDirection
 import com.mmg.manahub.feature.collection.presentation.SortOrder as CollectionSortOrder
 
@@ -114,6 +121,7 @@ import com.mmg.manahub.feature.collection.presentation.SortOrder as CollectionSo
 fun AdvancedSearchSheet(
     onDismiss: () -> Unit,
     onSearch: (advancedQuery: AdvancedSearchQuery, rawScryfall: String) -> Unit,
+    onClear: ((AdvancedSearchQuery) -> Unit)? = null,
     isCollectionMode: Boolean = false,
     // Friend-list search: only criteria the search_friend_cards RPC can evaluate are offered.
     friendListMode: Boolean = false,
@@ -144,11 +152,23 @@ fun AdvancedSearchSheet(
     onCollectionSortChange: ((CollectionSortOrder) -> Unit)? = null,
     onCollectionSortDirectionChange: ((CollectionSortDirection) -> Unit)? = null,
     onCollectionGroupingChange: ((CollectionGroupingMode) -> Unit)? = null,
+    stateKey: String = "advanced_search",
     viewModel: AdvancedSearchViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val mechanicCatalog: CardMechanicCatalogRepository = koinInject()
+    val catalogEntries by mechanicCatalog.entries.collectAsStateWithLifecycle()
+    val globalTags = remember(catalogEntries) {
+        catalogEntries.filter { it.verifiedQueryOrNull() != null }
+            .mapNotNull { row -> TagDictionary.get(row.key)?.let { com.mmg.manahub.core.model.CardTag(row.key, it.category) } }
+            .toSet()
+    }
+    val sectionExpansion by viewModel.sectionExpansion.collectAsStateWithLifecycle()
+    fun expanded(section: String, default: Boolean, active: Boolean) =
+        sectionExpansion["$stateKey:$section"] ?: (default || active)
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
     val scope = rememberCoroutineScope()
     var canDismiss by remember { mutableStateOf(false) }
     // The friend-list RPC takes inclusive min/max ranges, which cannot express "not equal".
@@ -160,7 +180,7 @@ fun AdvancedSearchSheet(
     // Seeds once per open from what the caller has applied, an empty query INCLUDED -- skipping
     // the empty case is what let a filter from an earlier, unrelated open stay live and invisible,
     // silently zeroing the next search (Card Advantage regression, 2026-09-07).
-    LaunchedEffect(Unit) {
+    LaunchedEffect(stateKey, appliedQuery, lockedCriteria) {
         viewModel.setLockedCriteria(lockedCriteria.toList())
         viewModel.seedFrom(appliedQuery ?: AdvancedSearchQuery())
     }
@@ -220,11 +240,25 @@ fun AdvancedSearchSheet(
                     color = mc.textPrimary,
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(onClick = viewModel::clearAll) {
+                TextButton(
+                    onClick = {
+                        viewModel.clearAll()
+                        if (isCollectionMode) {
+                            onCollectionSortChange?.invoke(CollectionSortOrder.DATE_ADDED)
+                            onCollectionSortDirectionChange?.invoke(CollectionSortDirection.DESC)
+                            onCollectionGroupingChange?.invoke(CollectionGroupingMode.NONE)
+                        }
+                        onClear?.invoke(viewModel.uiState.value.currentQuery)
+                    },
+                    contentPadding = PaddingValues(horizontal = spacing.sm, vertical = 0.dp),
+                ) {
                     Text(
-                        stringResource(R.string.advsearch_clear),
+                        text = stringResource(R.string.advsearch_clear).uppercase(),
                         color = mc.lifeNegative,
-                        style = ty.titleMedium
+                        style = ty.labelLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp,
+                        ),
                     )
                 }
             }
@@ -241,9 +275,11 @@ fun AdvancedSearchSheet(
 
                 // ── Locked filters (Deck Wizard Commander v3 plan, D14) ──
                 if (uiState.lockedCriteria.isNotEmpty()) {
-                    item {
+                    item(key = "locked") {
                         SearchSection(
                             title = stringResource(R.string.advsearch_section_locked),
+                            expandedState = expanded("locked", true, true),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:locked", it) },
                             icon = Icons.Default.Lock,
                             titleColor = mc.textPrimary,
                             iconColor = mc.goldMtg,
@@ -264,11 +300,12 @@ fun AdvancedSearchSheet(
                         }
                     }
                 }
-
-                // ── Name ──
-                item {
+// ── Name ──
+                item(key = "name") {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_name),
+                            expandedState = expanded("name", true, uiState.nameValue.isNotBlank()),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:name", it) },
                         icon = Icons.Default.Search,
                         titleColor = mc.textPrimary,
                         iconColor = mc.goldMtg,
@@ -305,37 +342,244 @@ fun AdvancedSearchSheet(
                         }
                     }
                 }
+// ── Collection status (collection mode only) ──
+                if (isCollectionMode) {
+                    item(key = "collection_source") {
+                        SearchSection(
+                            title = stringResource(R.string.advsearch_section_collection_status),
+                            expandedState = expanded("collection_source", true, uiState.collectionSource != CollectionSource.COLLECTION),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:collection_source", it) },
+                            icon = Icons.Default.CollectionsBookmark,
+                            titleColor = mc.textPrimary,
+                            iconColor = mc.goldMtg,
+                        ) {
+                            // Single-select SOURCES, not intersecting flags: "In wishlist" lists the
+                            // wishlist itself, so re-tapping the active chip is a no-op rather than
+                            // a "no list selected" state.
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                CollectionSource.entries.forEach { source ->
+                                    MagicFilterChip(
+                                        selected = uiState.collectionSource == source,
+                                        onClick = { viewModel.setCollectionSource(source) },
+                                        label = stringResource(source.labelRes),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+// ── Sort ──
+                if (isCollectionMode && collectionSortOrder != null) {
+                    // Collection-mode Sort: uses the Collection's own SortOrder enum and
+                    // a separate ASC/DESC toggle, mirroring the CommunityAdvancedSearchSheet pattern.
+                    item(key = "sort") {
+                        SearchSection(
+                            title = stringResource(R.string.advsearch_section_sort),
+                            expandedState = expanded("sort", true, false),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:sort", it) },
+                            icon = Icons.Default.Sort,
+                            titleColor = mc.textPrimary,
+                            iconColor = mc.goldMtg,
+                        ) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                CollectionSortOrder.entries.forEach { order ->
+                                    MagicFilterChip(
+                                        selected = collectionSortOrder == order,
+                                        onClick = { onCollectionSortChange?.invoke(order) },
+                                        label = stringResource(when(order) {
+                                            CollectionSortOrder.DATE_ADDED -> R.string.collection_sort_date
+                                            CollectionSortOrder.NAME -> R.string.collection_sort_name
+                                            CollectionSortOrder.PRICE -> R.string.collection_sort_price
+                                            CollectionSortOrder.RARITY -> R.string.collection_sort_rarity
+                                        }),
+                                    )
+                                }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf(
+                                    CollectionSortDirection.ASC to stringResource(R.string.advsearch_dir_asc),
+                                    CollectionSortDirection.DESC to stringResource(R.string.advsearch_dir_desc),
+                                ).forEach { (dir, label) ->
+                                    MagicFilterChip(
+                                        selected = collectionSortDirection == dir,
+                                        onClick = { onCollectionSortDirectionChange?.invoke(dir) },
+                                        label = label,
+                                    )
+                                }
+                            }
+                        }
+                    }
 
-                // ── Oracle text ──
-                item {
+                    // ── Group By (collection mode only) ──
+                    item(key = "group") {
+                        SearchSection(
+                            title = stringResource(R.string.collection_grouping_label),
+                            expandedState = expanded("group", true, false),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:group", it) },
+                            icon = Icons.Default.Layers,
+                            titleColor = mc.textPrimary,
+                            iconColor = mc.goldMtg,
+                        ) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                CollectionGroupingMode.entries.forEach { mode ->
+                                    MagicFilterChip(
+                                        selected = collectionGroupingMode == mode,
+                                        onClick = { onCollectionGroupingChange?.invoke(mode) },
+                                        label = stringResource(when(mode) {
+                                            CollectionGroupingMode.NONE -> R.string.collection_grouping_none
+                                            CollectionGroupingMode.TYPE -> R.string.collection_grouping_type
+                                            CollectionGroupingMode.COLOR -> R.string.collection_grouping_color
+                                            CollectionGroupingMode.CMC -> R.string.collection_sort_cmc
+                                            CollectionGroupingMode.SET -> R.string.collection_grouping_set
+                                            CollectionGroupingMode.RARITY -> R.string.collection_sort_rarity
+                                        }),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else if (!isCollectionMode && !friendListMode) {
+                    // Scryfall search mode: uses SearchOrder / SearchDirection from the AdvancedSearchViewModel.
+                    item(key = "sort") {
+                        SearchSection(
+                            title = stringResource(R.string.advsearch_section_sort),
+                            expandedState = expanded("sort", true, false),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:sort", it) },
+                            icon = Icons.Default.Sort,
+                            titleColor = mc.textPrimary,
+                            iconColor = mc.goldMtg,
+                        ) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                SearchOrder.entries.forEach { order ->
+                                    MagicFilterChip(
+                                        selected = uiState.orderBy == order,
+                                        onClick = { viewModel.setOrder(order, uiState.orderDirection) },
+                                        label = stringResource(when(order) {
+                                            SearchOrder.NAME -> R.string.advsearch_sort_name
+                                            SearchOrder.CMC -> R.string.advsearch_sort_cmc
+                                            SearchOrder.PRICE_EUR -> R.string.advsearch_sort_price_eur
+                                            SearchOrder.PRICE_USD -> R.string.advsearch_sort_price_usd
+                                            SearchOrder.RARITY -> R.string.advsearch_sort_rarity
+                                            SearchOrder.RELEASED -> R.string.advsearch_sort_released
+                                            SearchOrder.COLOR -> R.string.advsearch_sort_color
+                                        }),
+                                    )
+                                }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf(
+                                    SearchDirection.ASC to stringResource(R.string.advsearch_dir_asc),
+                                    SearchDirection.DESC to stringResource(R.string.advsearch_dir_desc),
+                                ).forEach { (dir, label) ->
+                                    MagicFilterChip(
+                                        selected = uiState.orderDirection == dir,
+                                        onClick = { viewModel.setOrder(uiState.orderBy, dir) },
+                                        label = label,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+// ── Colors ──
+                item(key = "colors") {
                     SearchSection(
-                        title = stringResource(R.string.advsearch_section_oracle),
-                        icon = Icons.Default.Description,
+                        title = stringResource(R.string.advsearch_section_colors),
+                            expandedState = expanded("colors", true, uiState.selectedColors.isNotEmpty()),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:colors", it) },
+                        icon = Icons.Default.Palette,
                         titleColor = mc.textPrimary,
                         iconColor = mc.goldMtg,
                     ) {
-                        OutlinedTextField(
-                            value = uiState.oracleText,
-                            onValueChange = viewModel::setOracleText,
-                            placeholder = {
-                                Text(
-                                    stringResource(R.string.advsearch_oracle_hint),
-                                    color = mc.textDisabled,
-                                    style = ty.bodyLarge
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(
+                                false to stringResource(R.string.advsearch_color_mode_color),
+                                true to stringResource(R.string.advsearch_color_mode_identity)
+                            ).forEach { (isIdentity, label) ->
+                                MagicFilterChip(
+                                    selected = uiState.useColorIdentity == isIdentity,
+                                    onClick = { viewModel.setUseColorIdentity(isIdentity) },
+                                    label = label,
                                 )
-                            },
+                            }
+                        }
+                        ManaColorPicker(
+                            selectedColors = uiState.selectedColors,
+                            onToggleColor = viewModel::toggleColor,
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = magicOutlinedTextFieldColors(mc),
-                            maxLines = 2,
+                            isMultiColorExclusive = false,
+                            colors = listOf("M","W", "U", "B", "R", "G", "C")
                         )
+
+                        var showColorModePicker by remember { mutableStateOf(false) }
+                        val isNonDefaultColorMode = uiState.colorMode != ColorMatchMode.ANY_OF
+
+                        Surface(
+                            onClick = { showColorModePicker = true },
+                            shape = RoundedCornerShape(12.dp),
+                            color = mc.surface,
+                            border = BorderStroke(
+                                width = if (isNonDefaultColorMode) 1.5.dp else 0.5.dp,
+                                color = if (isNonDefaultColorMode) mc.primaryAccent else mc.surfaceVariant,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.advsearch_colormatch_label),
+                                    style = ty.bodyMedium,
+                                    color = mc.textSecondary,
+                                )
+                                Text(
+                                    text = stringResource(uiState.colorMode.labelRes),
+                                    style = ty.bodyLarge,
+                                    color = if (isNonDefaultColorMode) mc.primaryAccent else mc.textPrimary,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = mc.textDisabled,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+
+                        if (showColorModePicker) {
+                            ColorMatchModePickerSheet(
+                                selectedMode = uiState.colorMode,
+                                onSelectMode = {
+                                    viewModel.setColorMode(it)
+                                    showColorModePicker = false
+                                },
+                                onDismiss = { showColorModePicker = false },
+                            )
+                        }
                     }
                 }
-
-                // ── Card type ──
-                item {
+// ── Card type ──
+                item(key = "type") {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_type),
+                            expandedState = expanded("type", true, uiState.cardType.isNotEmpty()),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:type", it) },
                         icon = Icons.Default.Style,
                         titleColor = mc.textPrimary,
                         iconColor = mc.goldMtg,
@@ -443,328 +687,12 @@ fun AdvancedSearchSheet(
                         }
                     }
                 }
-
-                // ── Card function ── (works in both Scryfall-search and Collection-filter modes,
-                // same as Card type above — not gated by isCollectionMode)
-                if (!friendListMode) item {
-                    SearchSection(
-                        title = stringResource(R.string.advsearch_section_function),
-                        icon = Icons.Default.Bolt,
-                        titleColor = mc.textPrimary,
-                        iconColor = mc.goldMtg,
-                    ) {
-                        var showFunctionPicker by remember { mutableStateOf(false) }
-
-                        Surface(
-                            onClick = { showFunctionPicker = true },
-                            shape = RoundedCornerShape(12.dp),
-                            color = mc.surface,
-                            border = BorderStroke(
-                                width = if (uiState.cardFunction.isNotEmpty()) 1.5.dp else 0.5.dp,
-                                color = if (uiState.cardFunction.isNotEmpty()) mc.primaryAccent else mc.surfaceVariant,
-                            ),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Icon(
-                                    Icons.Default.Search,
-                                    contentDescription = null,
-                                    tint = if (uiState.cardFunction.isNotEmpty()) mc.primaryAccent else mc.textDisabled,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                                Text(
-                                    text = if (uiState.cardFunction.isEmpty())
-                                        stringResource(R.string.advsearch_function_hint)
-                                    else
-                                        stringResource(R.string.advsearch_function_selected_count, uiState.cardFunction.size),
-                                    style = ty.bodyLarge,
-                                    color = if (uiState.cardFunction.isNotEmpty()) mc.primaryAccent else mc.textDisabled,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                Icon(
-                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                    contentDescription = null,
-                                    tint = mc.textDisabled,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        }
-
-                        if (uiState.cardFunction.isNotEmpty()) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.padding(top = 8.dp),
-                            ) {
-                                uiState.cardFunction.forEach { value ->
-                                    val label = com.mmg.manahub.core.model.CardFunctionOption.allFunctions
-                                        .find { it.scryfallValue == value }?.label ?: value
-                                    InputChip(
-                                        selected = true,
-                                        onClick = { viewModel.toggleCardFunction(value) },
-                                        label = { Text(label, style = ty.labelMedium) },
-                                        trailingIcon = {
-                                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(12.dp))
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Checkbox(
-                                checked = uiState.cardFunctionMatchAll,
-                                onCheckedChange = viewModel::setCardFunctionMatchAll,
-                                colors = CheckboxDefaults.colors(checkedColor = mc.primaryAccent),
-                            )
-                            Text(
-                                "Match ALL selected functions (AND)",
-                                style = ty.bodyMedium,
-                                color = mc.textSecondary,
-                            )
-                        }
-
-                        if (showFunctionPicker) {
-                            CardFunctionPickerSheet(
-                                selectedFunctions = uiState.cardFunction,
-                                onToggleFunction = viewModel::toggleCardFunction,
-                                onDismiss = { showFunctionPicker = false },
-                            )
-                        }
-                    }
-                }
-
-                // ── Mana production (Suggestions Tab UI Polish plan, W11) ── seeded ONLY from
-                // Deck Analysis's "Browse for X" translation -- no manual picker exists, this is
-                // a read-only summary + a single clear action, rendered only while active.
-                if (uiState.manaProduction != null && !friendListMode) {
-                    item {
-                        val mp = uiState.manaProduction!!
-                        SearchSection(
-                            title = stringResource(R.string.advsearch_section_mana_production),
-                            icon = Icons.Default.Bolt,
-                            titleColor = mc.textPrimary,
-                            iconColor = mc.goldMtg,
-                        ) {
-                            val minDistinctColors = mp.minDistinctColors
-                            val summary = when {
-                                mp.colors.isNotEmpty() -> stringResource(
-                                    R.string.advsearch_mana_production_colors,
-                                    mp.colors.sorted().joinToString(""),
-                                )
-                                minDistinctColors != null -> stringResource(
-                                    R.string.advsearch_mana_production_threshold,
-                                    minDistinctColors,
-                                )
-                                else -> ""
-                            }
-                            InputChip(
-                                selected = true,
-                                onClick = viewModel::clearManaProduction,
-                                label = { Text(summary, style = ty.labelMedium) },
-                                trailingIcon = {
-                                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(12.dp))
-                                },
-                            )
-                        }
-                    }
-                }
-
-                // ── Curated oracle match (Suggestions Tab UI Polish plan, W11) ── seeded ONLY
-                // from Deck Analysis's TagDictionary-translated role fragments. Read-only (each
-                // term is a curated compile-time constant, not user-editable) -- one clear action
-                // removes the whole criterion. Still a real, structured AdvancedSearchSheet field,
-                // never a raw string in CardSearchSheet's plain search bar (D8's own mandate).
-                if (uiState.oracleTerms != null && !friendListMode) {
-                    item {
-                        val terms = uiState.oracleTerms!!
-                        SearchSection(
-                            title = stringResource(R.string.advsearch_section_oracle_terms),
-                            icon = Icons.Default.Description,
-                            titleColor = mc.textPrimary,
-                            iconColor = mc.goldMtg,
-                        ) {
-                            val allTerms = terms.allOf + terms.anyOfGroups.flatten() + terms.typeLineAnyOf
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                allTerms.forEach { term ->
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = mc.surfaceVariant,
-                                    ) {
-                                        Text(
-                                            text = term,
-                                            style = ty.labelMedium,
-                                            color = mc.textPrimary,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        )
-                                    }
-                                }
-                            }
-                            TextButton(onClick = viewModel::clearOracleTerms) {
-                                Text(stringResource(R.string.advsearch_clear), color = mc.lifeNegative, style = ty.bodyMedium)
-                            }
-                        }
-                    }
-                }
-
-                // ── Colors ──
-                item {
-                    SearchSection(
-                        title = stringResource(R.string.advsearch_section_colors),
-                        icon = Icons.Default.Palette,
-                        titleColor = mc.textPrimary,
-                        iconColor = mc.goldMtg,
-                    ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(
-                                false to stringResource(R.string.advsearch_color_mode_color),
-                                true to stringResource(R.string.advsearch_color_mode_identity)
-                            ).forEach { (isIdentity, label) ->
-                                MagicFilterChip(
-                                    selected = uiState.useColorIdentity == isIdentity,
-                                    onClick = { viewModel.setUseColorIdentity(isIdentity) },
-                                    label = label,
-                                )
-                            }
-                        }
-                        ManaColorPicker(
-                            selectedColors = uiState.selectedColors,
-                            onToggleColor = viewModel::toggleColor,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = listOf("W", "U", "B", "R", "G", "C")
-                        )
-
-                        var showColorModePicker by remember { mutableStateOf(false) }
-                        val isNonDefaultColorMode = uiState.colorMode != ColorMatchMode.ANY_OF
-
-                        Surface(
-                            onClick = { showColorModePicker = true },
-                            shape = RoundedCornerShape(12.dp),
-                            color = mc.surface,
-                            border = BorderStroke(
-                                width = if (isNonDefaultColorMode) 1.5.dp else 0.5.dp,
-                                color = if (isNonDefaultColorMode) mc.primaryAccent else mc.surfaceVariant,
-                            ),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.advsearch_colormatch_label),
-                                    style = ty.bodyMedium,
-                                    color = mc.textSecondary,
-                                )
-                                Text(
-                                    text = stringResource(uiState.colorMode.labelRes),
-                                    style = ty.bodyLarge,
-                                    color = if (isNonDefaultColorMode) mc.primaryAccent else mc.textPrimary,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                Icon(
-                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                    contentDescription = null,
-                                    tint = mc.textDisabled,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        }
-
-                        if (showColorModePicker) {
-                            ColorMatchModePickerSheet(
-                                selectedMode = uiState.colorMode,
-                                onSelectMode = {
-                                    viewModel.setColorMode(it)
-                                    showColorModePicker = false
-                                },
-                                onDismiss = { showColorModePicker = false },
-                            )
-                        }
-                    }
-                }
-
-                // ── Mana value (CMC) ──
-                item {
-                    SearchSection(
-                        title = stringResource(R.string.advsearch_section_mana),
-                        icon = Icons.Default.FlashOn,
-                        titleColor = mc.textPrimary,
-                        iconColor = mc.goldMtg,
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            OperatorSelector(
-                                selected = uiState.manaCostOp,
-                                options = operatorOptions,
-                                onSelect = { op -> viewModel.setManaCost(uiState.manaCostValue, op) },
-                            )
-                            OutlinedTextField(
-                                value = uiState.manaCostValue,
-                                onValueChange = { v -> viewModel.setManaCost(v, uiState.manaCostOp) },
-                                placeholder = { Text(stringResource(R.string.advsearch_mana_hint), color = mc.textDisabled, style = ty.bodyLarge) },
-                                modifier = Modifier.width(100.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = magicOutlinedTextFieldColors(mc),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                singleLine = true,
-                            )
-                        }
-                    }
-                }
-
-                // ── Rarity ──
-                item {
-                    SearchSection(
-                        title = stringResource(R.string.advsearch_section_rarity),
-                        icon = Icons.Default.Diamond,
-                        titleColor = mc.textPrimary,
-                        iconColor = mc.goldMtg,
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                listOf("common",
-                                    "uncommon",
-                                    "rare",
-                                    "mythic",
-                                ).forEach { rarity ->
-                                    val isSelected = uiState.selectedRarity.contains(rarity)
-                                    MagicFilterChip(
-                                        selected = isSelected,
-                                        onClick = { viewModel.updateRarity(rarity) },
-                                        label = stringResource(when (rarity) {
-                                            "common"   -> R.string.stats_rarity_common
-                                            "uncommon" -> R.string.stats_rarity_uncommon
-                                            "rare"     -> R.string.stats_rarity_rare
-                                            else       -> R.string.stats_rarity_mythic
-                                        }),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ── Set / Collection ──
-                item {
+// ── Set / Collection ──
+                item(key = "set") {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_set),
+                            expandedState = expanded("set", false, uiState.selectedSets.isNotEmpty()),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:set", it) },
                         icon = Icons.Default.Layers,
                         titleColor = mc.textPrimary,
                         iconColor = mc.goldMtg,
@@ -883,11 +811,311 @@ fun AdvancedSearchSheet(
                         }
                     }
                 }
+// ── Rarity ──
+                item(key = "rarity") {
+                    SearchSection(
+                        title = stringResource(R.string.advsearch_section_rarity),
+                            expandedState = expanded("rarity", false, uiState.selectedRarity.isNotEmpty()),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:rarity", it) },
+                        icon = Icons.Default.Diamond,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                listOf("common",
+                                    "uncommon",
+                                    "rare",
+                                    "mythic",
+                                ).forEach { rarity ->
+                                    val isSelected = uiState.selectedRarity.contains(rarity)
+                                    MagicFilterChip(
+                                        selected = isSelected,
+                                        onClick = { viewModel.updateRarity(rarity) },
+                                        label = stringResource(when (rarity) {
+                                            "common"   -> R.string.stats_rarity_common
+                                            "uncommon" -> R.string.stats_rarity_uncommon
+                                            "rare"     -> R.string.stats_rarity_rare
+                                            else       -> R.string.stats_rarity_mythic
+                                        }),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+// ── Mana value (CMC) ──
+                item(key = "mana_value") {
+                    SearchSection(
+                        title = stringResource(R.string.advsearch_section_mana),
+                            expandedState = expanded("mana_value", false, uiState.manaCostValue.isNotBlank()),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:mana_value", it) },
+                        icon = Icons.Default.FlashOn,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            OperatorSelector(
+                                selected = uiState.manaCostOp,
+                                options = operatorOptions,
+                                onSelect = { op -> viewModel.setManaCost(uiState.manaCostValue, op) },
+                            )
+                            OutlinedTextField(
+                                value = uiState.manaCostValue,
+                                onValueChange = { v -> viewModel.setManaCost(v, uiState.manaCostOp) },
+                                placeholder = { Text(stringResource(R.string.advsearch_mana_hint), color = mc.textDisabled, style = ty.bodyLarge) },
+                                modifier = Modifier.width(100.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = magicOutlinedTextFieldColors(mc),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                            )
+                        }
+                    }
+                }
+// ── Format legality ──
+                item(key = "format") {
+                    SearchSection(
+                        title = stringResource(R.string.advsearch_section_format),
+                            expandedState = expanded("format", false, uiState.selectedFormat.isNotEmpty()),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:format", it) },
+                        icon = Icons.Default.Gavel,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                stringResource(R.string.advsearch_format_legal),
+                                style = ty.bodyMedium,
+                                color = mc.textSecondary,
+                            )
+                            Switch(
+                                checked = uiState.formatLegal,
+                                onCheckedChange = { legal ->
+                                    viewModel.updateLegalSwitch(legal)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = mc.lifePositive,
+                                    uncheckedTrackColor = mc.lifeNegative,
+                                ),
+                            )
+                            Text(
+                                if (uiState.formatLegal)
+                                    stringResource(R.string.advsearch_format_is_legal)
+                                else
+                                    stringResource(R.string.advsearch_format_is_banned),
+                                style = ty.bodyMedium,
+                                color = if (uiState.formatLegal) mc.lifePositive else mc.lifeNegative,
+                            )
+                        }
+                        data class FormatOption(val scryfallValue: String, val labelRes: Int)
+                        val formatOptions = listOf(
+                            FormatOption("commander", R.string.format_commander),
+                            FormatOption("standard",  R.string.format_standard),
+                            FormatOption("modern",    R.string.format_modern),
+                            FormatOption("legacy",    R.string.format_legacy),
+                            FormatOption("vintage",   R.string.format_vintage),
+                            FormatOption("pioneer",   R.string.format_pioneer),
+                            FormatOption("pauper",    R.string.format_pauper),
+                            FormatOption("historic",  R.string.format_historic),
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            formatOptions.forEach { option ->
+                                MagicFilterChip(
+                                    selected = uiState.selectedFormat.contains(option.scryfallValue),
+                                    onClick = {
+                                       viewModel.updateFormat(option.scryfallValue)
+                                    },
+                                    label = stringResource(option.labelRes),
+                                )
+                            }
+                        }
+                    }
+                }
+// ── Max price ──
+                if (!friendListMode) item(key = "price") {
+                    SearchSection(
+                        title = stringResource(R.string.advsearch_section_price),
+                            expandedState = expanded("price", false, uiState.priceMax.isNotBlank()),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:price", it) },
+                        icon = Icons.Default.MonetizationOn,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("≤", fontSize = 18.sp, color = mc.textSecondary)
+                            OutlinedTextField(
+                                value = uiState.priceMax,
+                                onValueChange = { v -> viewModel.setPrice(v, uiState.priceCurrency) },
+                                placeholder = { Text(stringResource(R.string.advsearch_price_hint), color = mc.textDisabled, style = ty.bodyLarge) },
+                                modifier = Modifier.width(100.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = magicOutlinedTextFieldColors(mc),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true,
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf(
+                                    "eur" to stringResource(R.string.price_symbol_eur),
+                                    "usd" to stringResource(R.string.price_symbol_usd)
+                                ).forEach { (curr, symbol) ->
+                                    MagicFilterChip(
+                                        selected = uiState.priceCurrency == curr,
+                                        onClick = { viewModel.setPrice(uiState.priceMax, curr) },
+                                        label = symbol,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+// ── Oracle text ──
+                item(key = "oracle") {
+                    SearchSection(
+                        title = stringResource(R.string.advsearch_section_oracle),
+                            expandedState = expanded("oracle", false, uiState.oracleText.isNotBlank()),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:oracle", it) },
+                        icon = Icons.Default.Description,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
+                    ) {
+                        OutlinedTextField(
+                            value = uiState.oracleText,
+                            onValueChange = viewModel::setOracleText,
+                            placeholder = {
+                                Text(
+                                    stringResource(R.string.advsearch_oracle_hint),
+                                    color = mc.textDisabled,
+                                    style = ty.bodyLarge
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = magicOutlinedTextFieldColors(mc),
+                            maxLines = 2,
+                        )
+                    }
+                }
+// ── Card function ── (works in both Scryfall-search and Collection-filter modes,
+                // same as Card type above — not gated by isCollectionMode)
+                if (!friendListMode) item(key = "function") {
+                    SearchSection(
+                        title = stringResource(R.string.advsearch_section_function),
+                            expandedState = expanded("function", false, uiState.cardFunction.isNotEmpty()),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:function", it) },
+                        icon = Icons.Default.Bolt,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
+                    ) {
+                        var showFunctionPicker by remember { mutableStateOf(false) }
 
-                // ── Power / Toughness ──
-                item {
+                        Surface(
+                            onClick = { showFunctionPicker = true },
+                            shape = RoundedCornerShape(12.dp),
+                            color = mc.surface,
+                            border = BorderStroke(
+                                width = if (uiState.cardFunction.isNotEmpty()) 1.5.dp else 0.5.dp,
+                                color = if (uiState.cardFunction.isNotEmpty()) mc.primaryAccent else mc.surfaceVariant,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = if (uiState.cardFunction.isNotEmpty()) mc.primaryAccent else mc.textDisabled,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                Text(
+                                    text = if (uiState.cardFunction.isEmpty())
+                                        stringResource(R.string.advsearch_function_hint)
+                                    else
+                                        stringResource(R.string.advsearch_function_selected_count, uiState.cardFunction.size),
+                                    style = ty.bodyLarge,
+                                    color = if (uiState.cardFunction.isNotEmpty()) mc.primaryAccent else mc.textDisabled,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = mc.textDisabled,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+
+                        if (uiState.cardFunction.isNotEmpty()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(top = 8.dp),
+                            ) {
+                                uiState.cardFunction.forEach { value ->
+                                    val label = com.mmg.manahub.core.model.CardFunctionOption.allFunctions
+                                        .find { it.scryfallValue == value }?.label ?: value
+                                    InputChip(
+                                        selected = true,
+                                        onClick = { viewModel.toggleCardFunction(value) },
+                                        label = { Text(label, style = ty.labelMedium) },
+                                        trailingIcon = {
+                                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(12.dp))
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Checkbox(
+                                checked = uiState.cardFunctionMatchAll,
+                                onCheckedChange = viewModel::setCardFunctionMatchAll,
+                                colors = CheckboxDefaults.colors(checkedColor = mc.primaryAccent),
+                            )
+                            Text(
+                                "Match ALL selected functions (AND)",
+                                style = ty.bodyMedium,
+                                color = mc.textSecondary,
+                            )
+                        }
+
+                        if (showFunctionPicker) {
+                            CardFunctionPickerSheet(
+                                selectedFunctions = uiState.cardFunction,
+                                onToggleFunction = viewModel::toggleCardFunction,
+                                onDismiss = { showFunctionPicker = false },
+                            )
+                        }
+                    }
+                }
+// ── Power / Toughness ──
+                item(key = "stats") {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_stats),
+                            expandedState = expanded("stats", false, uiState.powerValue.isNotBlank() || uiState.toughnessValue.isNotBlank()),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:stats", it) },
                         icon = Icons.Default.BarChart,
                         titleColor = mc.textPrimary,
                         iconColor = mc.goldMtg,
@@ -970,146 +1198,13 @@ fun AdvancedSearchSheet(
                         }
                     }
                 }
-
-                // ── Max price ──
-                if (!friendListMode) item {
-                    SearchSection(
-                        title = stringResource(R.string.advsearch_section_price),
-                        icon = Icons.Default.MonetizationOn,
-                        titleColor = mc.textPrimary,
-                        iconColor = mc.goldMtg,
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("≤", fontSize = 18.sp, color = mc.textSecondary)
-                            OutlinedTextField(
-                                value = uiState.priceMax,
-                                onValueChange = { v -> viewModel.setPrice(v, uiState.priceCurrency) },
-                                placeholder = { Text(stringResource(R.string.advsearch_price_hint), color = mc.textDisabled, style = ty.bodyLarge) },
-                                modifier = Modifier.width(100.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = magicOutlinedTextFieldColors(mc),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                singleLine = true,
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf(
-                                    "eur" to stringResource(R.string.price_symbol_eur),
-                                    "usd" to stringResource(R.string.price_symbol_usd)
-                                ).forEach { (curr, symbol) ->
-                                    MagicFilterChip(
-                                        selected = uiState.priceCurrency == curr,
-                                        onClick = { viewModel.setPrice(uiState.priceMax, curr) },
-                                        label = symbol,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ── Format legality ──
-                item {
-                    SearchSection(
-                        title = stringResource(R.string.advsearch_section_format),
-                        icon = Icons.Default.Gavel,
-                        titleColor = mc.textPrimary,
-                        iconColor = mc.goldMtg,
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Text(
-                                stringResource(R.string.advsearch_format_legal),
-                                style = ty.bodyMedium,
-                                color = mc.textSecondary,
-                            )
-                            Switch(
-                                checked = uiState.formatLegal,
-                                onCheckedChange = { legal ->
-                                    viewModel.updateLegalSwitch(legal)
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = mc.lifePositive,
-                                    uncheckedTrackColor = mc.lifeNegative,
-                                ),
-                            )
-                            Text(
-                                if (uiState.formatLegal)
-                                    stringResource(R.string.advsearch_format_is_legal)
-                                else
-                                    stringResource(R.string.advsearch_format_is_banned),
-                                style = ty.bodyMedium,
-                                color = if (uiState.formatLegal) mc.lifePositive else mc.lifeNegative,
-                            )
-                        }
-                        data class FormatOption(val scryfallValue: String, val labelRes: Int)
-                        val formatOptions = listOf(
-                            FormatOption("commander", R.string.format_commander),
-                            FormatOption("standard",  R.string.format_standard),
-                            FormatOption("modern",    R.string.format_modern),
-                            FormatOption("legacy",    R.string.format_legacy),
-                            FormatOption("vintage",   R.string.format_vintage),
-                            FormatOption("pioneer",   R.string.format_pioneer),
-                            FormatOption("pauper",    R.string.format_pauper),
-                            FormatOption("historic",  R.string.format_historic),
-                        )
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            formatOptions.forEach { option ->
-                                MagicFilterChip(
-                                    selected = uiState.selectedFormat.contains(option.scryfallValue),
-                                    onClick = {
-                                       viewModel.updateFormat(option.scryfallValue)
-                                    },
-                                    label = stringResource(option.labelRes),
-                                )
-                            }
-                        }
-                    }
-                }
-
-
-                // ── Collection status (collection mode only) ──
-                if (isCollectionMode) {
-                    item {
-                        SearchSection(
-                            title = stringResource(R.string.advsearch_section_collection_status),
-                            icon = Icons.Default.CollectionsBookmark,
-                            titleColor = mc.textPrimary,
-                            iconColor = mc.goldMtg,
-                        ) {
-                            // Single-select SOURCES, not intersecting flags: "In wishlist" lists the
-                            // wishlist itself, so re-tapping the active chip is a no-op rather than
-                            // a "no list selected" state.
-                            FlowRow(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                CollectionSource.entries.forEach { source ->
-                                    MagicFilterChip(
-                                        selected = uiState.collectionSource == source,
-                                        onClick = { viewModel.setCollectionSource(source) },
-                                        label = stringResource(source.labelRes),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ── Tags (collection mode only) ──
-                if (isCollectionMode) {
-                    item {
+// ── Tags ──
+                if (isCollectionMode || (!friendListMode && globalTags.isNotEmpty())) {
+                    item(key = "tags") {
                         SearchSection(
                             title = stringResource(R.string.advsearch_section_tags),
+                            expandedState = expanded("tags", false, uiState.filterTags.isNotEmpty()),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:tags", it) },
                             icon = Icons.Default.LocalOffer,
                             titleColor = mc.textPrimary,
                             iconColor = mc.goldMtg,
@@ -1162,7 +1257,8 @@ fun AdvancedSearchSheet(
                                     modifier = Modifier.padding(top = 8.dp),
                                 ) {
                                     uiState.filterTags.forEach { key ->
-                                        val tagLabel = getAvailableTags().find { it.key == key }?.label() ?: key
+                                        val tagLabel = (if (isCollectionMode) getAvailableTags() else globalTags)
+                                            .find { it.key == key }?.label() ?: key
                                         InputChip(
                                             selected = true,
                                             onClick = { viewModel.toggleFilterTag(key) },
@@ -1177,132 +1273,118 @@ fun AdvancedSearchSheet(
 
                             if (showTagPicker) {
                                 TagPickerSheet(
-                                    availableTags = getAvailableTags(),
+                                    availableTags = if (isCollectionMode) getAvailableTags() else globalTags,
+                                    titleRes = if (isCollectionMode) R.string.advsearch_collection_tags_title else R.string.advsearch_global_tags_title,
                                     selectedTags = uiState.filterTags,
-                                    onToggleTag = viewModel::toggleFilterTag,
+                                    onToggleTag = { key ->
+                                        viewModel.toggleFilterTag(
+                                            key,
+                                            if (isCollectionMode) null else mechanicCatalog.verifiedQueryFor(key),
+                                        )
+                                    },
                                     onDismiss = { showTagPicker = false },
                                 )
                             }
                         }
                     }
                 }
-
-                // ── Sort ──
-                if (isCollectionMode && collectionSortOrder != null) {
-                    // Collection-mode Sort: uses the Collection's own SortOrder enum and
-                    // a separate ASC/DESC toggle, mirroring the CommunityAdvancedSearchSheet pattern.
-                    item {
+// ── Mana production (Suggestions Tab UI Polish plan, W11) ── seeded ONLY from
+                // Deck Analysis's "Browse for X" translation -- no manual picker exists, this is
+                // a read-only summary + a single clear action, rendered only while active.
+                if (uiState.manaProduction != null && !friendListMode) {
+                    item(key = "mana_production") {
+                        val mp = uiState.manaProduction!!
                         SearchSection(
-                            title = stringResource(R.string.advsearch_section_sort),
-                            icon = Icons.Default.Sort,
+                            title = stringResource(R.string.advsearch_section_mana_production),
+                            expandedState = expanded("mana_production", false, uiState.manaProduction != null),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:mana_production", it) },
+                            icon = Icons.Default.Bolt,
                             titleColor = mc.textPrimary,
                             iconColor = mc.goldMtg,
                         ) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                CollectionSortOrder.entries.forEach { order ->
-                                    MagicFilterChip(
-                                        selected = collectionSortOrder == order,
-                                        onClick = { onCollectionSortChange?.invoke(order) },
-                                        label = stringResource(when(order) {
-                                            CollectionSortOrder.DATE_ADDED -> R.string.collection_sort_date
-                                            CollectionSortOrder.NAME -> R.string.collection_sort_name
-                                            CollectionSortOrder.PRICE -> R.string.collection_sort_price
-                                            CollectionSortOrder.RARITY -> R.string.collection_sort_rarity
-                                        }),
-                                    )
-                                }
+                            val minDistinctColors = mp.minDistinctColors
+                            val summary = when {
+                                mp.colors.isNotEmpty() -> stringResource(
+                                    R.string.advsearch_mana_production_colors,
+                                    mp.colors.sorted().joinToString(""),
+                                )
+                                minDistinctColors != null -> stringResource(
+                                    R.string.advsearch_mana_production_threshold,
+                                    minDistinctColors,
+                                )
+                                else -> ""
                             }
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf(
-                                    CollectionSortDirection.ASC to stringResource(R.string.advsearch_dir_asc),
-                                    CollectionSortDirection.DESC to stringResource(R.string.advsearch_dir_desc),
-                                ).forEach { (dir, label) ->
-                                    MagicFilterChip(
-                                        selected = collectionSortDirection == dir,
-                                        onClick = { onCollectionSortDirectionChange?.invoke(dir) },
-                                        label = label,
-                                    )
-                                }
-                            }
+                            InputChip(
+                                selected = true,
+                                onClick = viewModel::clearManaProduction,
+                                label = { Text(summary, style = ty.labelMedium) },
+                                trailingIcon = {
+                                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(12.dp))
+                                },
+                            )
                         }
                     }
-
-                    // ── Group By (collection mode only) ──
-                    item {
+                }
+// ── Curated oracle match (Suggestions Tab UI Polish plan, W11) ── seeded ONLY
+                // from Deck Analysis's TagDictionary-translated role fragments. Read-only (each
+                // term is a curated compile-time constant, not user-editable) -- one clear action
+                // removes the whole criterion. Still a real, structured AdvancedSearchSheet field,
+                // never a raw string in CardSearchSheet's plain search bar (D8's own mandate).
+                if (uiState.sectionAlternatives != null && !friendListMode) {
+                    item(key = "section_alternatives") {
+                        val count = uiState.sectionAlternatives!!.alternatives.size
                         SearchSection(
-                            title = stringResource(R.string.collection_grouping_label),
-                            icon = Icons.Default.Layers,
+                            title = "Strategy roles",
+                            expandedState = expanded("section_alternatives", false, true),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:section_alternatives", it) },
+                            icon = Icons.Default.Description,
                             titleColor = mc.textPrimary,
                             iconColor = mc.goldMtg,
                         ) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                CollectionGroupingMode.entries.forEach { mode ->
-                                    MagicFilterChip(
-                                        selected = collectionGroupingMode == mode,
-                                        onClick = { onCollectionGroupingChange?.invoke(mode) },
-                                        label = stringResource(when(mode) {
-                                            CollectionGroupingMode.NONE -> R.string.collection_grouping_none
-                                            CollectionGroupingMode.TYPE -> R.string.collection_grouping_type
-                                            CollectionGroupingMode.COLOR -> R.string.collection_grouping_color
-                                            CollectionGroupingMode.CMC -> R.string.collection_sort_cmc
-                                            CollectionGroupingMode.SET -> R.string.collection_grouping_set
-                                            CollectionGroupingMode.RARITY -> R.string.collection_sort_rarity
-                                        }),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                } else if (!isCollectionMode && !friendListMode) {
-                    // Scryfall search mode: uses SearchOrder / SearchDirection from the AdvancedSearchViewModel.
-                    item {
-                        SearchSection(
-                            title = stringResource(R.string.advsearch_section_sort),
-                            icon = Icons.Default.Sort,
-                            titleColor = mc.textPrimary,
-                            iconColor = mc.goldMtg,
-                        ) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                SearchOrder.entries.forEach { order ->
-                                    MagicFilterChip(
-                                        selected = uiState.orderBy == order,
-                                        onClick = { viewModel.setOrder(order, uiState.orderDirection) },
-                                        label = stringResource(when(order) {
-                                            SearchOrder.NAME -> R.string.advsearch_sort_name
-                                            SearchOrder.CMC -> R.string.advsearch_sort_cmc
-                                            SearchOrder.PRICE_EUR -> R.string.advsearch_sort_price_eur
-                                            SearchOrder.PRICE_USD -> R.string.advsearch_sort_price_usd
-                                            SearchOrder.RARITY -> R.string.advsearch_sort_rarity
-                                            SearchOrder.RELEASED -> R.string.advsearch_sort_released
-                                            SearchOrder.COLOR -> R.string.advsearch_sort_color
-                                        }),
-                                    )
-                                }
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf(
-                                    SearchDirection.ASC to stringResource(R.string.advsearch_dir_asc),
-                                    SearchDirection.DESC to stringResource(R.string.advsearch_dir_desc),
-                                ).forEach { (dir, label) ->
-                                    MagicFilterChip(
-                                        selected = uiState.orderDirection == dir,
-                                        onClick = { viewModel.setOrder(uiState.orderBy, dir) },
-                                        label = label,
-                                    )
-                                }
+                            Text("Match any of $count role alternatives", style = ty.bodyMedium, color = mc.textSecondary)
+                            TextButton(onClick = viewModel::clearSectionAlternatives) {
+                                Text(stringResource(R.string.advsearch_clear), color = mc.lifeNegative, style = ty.bodyMedium)
                             }
                         }
                     }
                 }
+                if (uiState.oracleTerms != null && !friendListMode) {
+                    item(key = "oracle_terms") {
+                        val terms = uiState.oracleTerms!!
+                        SearchSection(
+                            title = stringResource(R.string.advsearch_section_oracle_terms),
+                            expandedState = expanded("oracle_terms", false, uiState.oracleTerms != null),
+                            onExpandedChange = { viewModel.setSectionExpanded("$stateKey:oracle_terms", it) },
+                            icon = Icons.Default.Description,
+                            titleColor = mc.textPrimary,
+                            iconColor = mc.goldMtg,
+                        ) {
+                            val allTerms = terms.allOf + terms.anyOfGroups.flatten() + terms.typeLineAnyOf
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                allTerms.forEach { term ->
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = mc.surfaceVariant,
+                                    ) {
+                                        Text(
+                                            text = term,
+                                            style = ty.labelMedium,
+                                            color = mc.textPrimary,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        )
+                                    }
+                                }
+                            }
+                            TextButton(onClick = viewModel::clearOracleTerms) {
+                                Text(stringResource(R.string.advsearch_clear), color = mc.lifeNegative, style = ty.bodyMedium)
+                            }
+                        }
+                    }
+                }
+
             }
 
             // ── Search / Apply button ───────────────────────────────────────────
@@ -1674,6 +1756,7 @@ fun CardFunctionPickerSheet(
 @Composable
 fun TagPickerSheet(
     availableTags: Set<com.mmg.manahub.core.model.CardTag>,
+    @StringRes titleRes: Int,
     selectedTags: Set<String>,
     onToggleTag: (String) -> Unit,
     onDismiss: () -> Unit,
@@ -1681,10 +1764,13 @@ fun TagPickerSheet(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    
-    // Convert to list for LazyColumn, sorted by label
-    val tagList = remember(availableTags) { 
-        availableTags.toList().sortedBy { it.label() }
+    var searchText by remember { mutableStateOf("") }
+    val tagList = remember(availableTags, searchText) {
+        val query = searchText.trim()
+        availableTags.asSequence()
+            .filter { query.isEmpty() || it.key.contains(query, ignoreCase = true) || it.label().contains(query, ignoreCase = true) }
+            .sortedBy { it.label() }
+            .toList()
     }
 
     ModalBottomSheet(
@@ -1703,15 +1789,30 @@ fun TagPickerSheet(
                     Icon(Icons.Default.Close, contentDescription = "Close", tint = mc.textPrimary)
                 }
                 Text(
-                    "Collection Tags",
+                    stringResource(titleRes),
                     style = ty.titleLarge,
                     color = mc.textPrimary,
                     modifier = Modifier.weight(1f)
                 )
             }
+            OutlinedTextField(
+                value = searchText,
+                onValueChange = { searchText = it },
+                label = { Text(stringResource(R.string.advsearch_tags_search_hint)) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            )
             if (tagList.isEmpty()) {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    Text("No tags in your collection", style = ty.bodyLarge, color = mc.textSecondary)
+                    Text(
+                        stringResource(
+                            if (searchText.isBlank()) R.string.advsearch_tags_empty
+                            else R.string.advsearch_tags_no_matches,
+                        ),
+                        style = ty.bodyLarge,
+                        color = mc.textSecondary,
+                    )
                 }
             } else {
                 LazyColumn(
@@ -1726,21 +1827,20 @@ fun TagPickerSheet(
                         val tag = tagList[index]
                         val isSelected = selectedTags.contains(tag.key)
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth()
+                                .toggleable(value = isSelected, role = Role.Checkbox, onValueChange = { onToggleTag(tag.key) }),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Checkbox(
                                 checked = isSelected,
-                                onCheckedChange = { onToggleTag(tag.key) },
+                                onCheckedChange = null,
                                 colors = CheckboxDefaults.colors(checkedColor = mc.primaryAccent)
                             )
-                            Text(
-                                tag.label(),
-                                style = ty.bodyLarge,
-                                color = mc.textPrimary,
-                                modifier = Modifier.weight(1f)
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(tag.label(), style = ty.bodyLarge, color = mc.textPrimary)
+                                Text(tag.key, style = ty.bodySmall, color = mc.textSecondary)
+                            }
                         }
                     }
                 }

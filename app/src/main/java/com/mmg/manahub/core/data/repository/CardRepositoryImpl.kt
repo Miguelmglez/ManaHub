@@ -27,7 +27,11 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.card.ResolveCardStrategyTagsUseCase
 import com.mmg.manahub.core.util.recordSafeNonFatal
 import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -71,6 +75,19 @@ class CardRepositoryImpl @Inject constructor(
             }
         }
 
+    private suspend fun isConfirmedEmptySearch(error: Throwable?): Boolean {
+        if (error !is ClientRequestException || error.response.status != HttpStatusCode.NotFound) return false
+        val body = runCatching { Json.parseToJsonElement(error.response.bodyAsText()).jsonObject }.getOrNull()
+            ?: return false
+        val details = body["details"]?.jsonPrimitive?.content.orEmpty()
+        return body["object"]?.jsonPrimitive?.content == "error" &&
+            body["code"]?.jsonPrimitive?.content == "not_found" &&
+            body["status"]?.jsonPrimitive?.content == "404" &&
+            (details == "Your search returned no results." ||
+                details.startsWith("Your query didn’t match any cards.") ||
+                details.startsWith("Your query didn't match any cards."))
+    }
+
     override suspend fun searchCards(query: String, page: Int, bypassCache: Boolean): DataResult<List<Card>> =
         withContext(ioDispatcher) {
             val result = remote.searchCards(query, page, bypassCache)
@@ -88,8 +105,8 @@ class CardRepositoryImpl @Inject constructor(
                 DataResult.Success(cards)
             } else {
                 val exception = result.exceptionOrNull()
-                if (exception is ClientRequestException && exception.response.status == HttpStatusCode.NotFound) {
-                    DataResult.Error("SCRYFALL_404")
+                if (isConfirmedEmptySearch(exception)) {
+                    DataResult.Success(emptyList())
                 } else {
                     DataResult.Error(exception?.message ?: "Unknown error")
                 }
@@ -129,8 +146,8 @@ class CardRepositoryImpl @Inject constructor(
                 DataResult.Success(paginated)
             } else {
                 val exception = result.exceptionOrNull()
-                if (exception is ClientRequestException && exception.response.status == HttpStatusCode.NotFound) {
-                    DataResult.Error("SCRYFALL_404")
+                if (isConfirmedEmptySearch(exception)) {
+                    DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(emptyList(), false, 0, confirmedNoMatches404 = true))
                 } else {
                     DataResult.Error(exception?.message ?: "Unknown error")
                 }

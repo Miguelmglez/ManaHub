@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -195,7 +196,7 @@ fun CommunityDeckDetailScreen(
                         if (deck != null && deck.cards.isNotEmpty()) {
                             IconButton(onClick = { onSelectCards(deck.archidektId) }) {
                                 Icon(
-                                    imageVector = Icons.Default.Checklist,
+                                    imageVector = Icons.Default.LibraryAdd,
                                     contentDescription = stringResource(R.string.community_deck_select_cards_cd),
                                     tint = mc.textSecondary,
                                 )

@@ -10,7 +10,11 @@ import com.mmg.manahub.core.data.local.mapper.toSuggestedTagsJson
 import com.mmg.manahub.core.data.local.mapper.toTagsJson
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
+import com.mmg.manahub.core.data.repository.CURRENT_CARD_STRATEGY_PIPELINE_VERSION
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
@@ -82,14 +86,57 @@ class HydrateCollectionStrategyTagsUseCase(
         val hasMoreWork: Boolean,
     )
 
+    data class CatalogPageResult(
+        val lastScryfallId: String?,
+        val hasMore: Boolean,
+    )
+
+    suspend fun rehydrateCatalogPage(
+        ownerUserId: String,
+        afterScryfallId: String,
+        limit: Int = CATALOG_PAGE_SIZE,
+        isOwnerActive: () -> Boolean = { true },
+    ): CatalogPageResult = withContext(ioDispatcher) {
+        require(ownerUserId.isNotBlank() && limit in 1..CATALOG_PAGE_SIZE)
+        if (!isOwnerActive()) throw CancellationException("Collection owner changed")
+        val cards = cardDao.getOwnedCardsForMechanicRefresh(ownerUserId, afterScryfallId, limit)
+        if (cards.isEmpty()) return@withContext CatalogPageResult(null, false)
+
+        val updates = cards.map { entity ->
+            currentCoroutineContext().ensureActive()
+            if (!isOwnerActive()) throw CancellationException("Collection owner changed")
+            val card = entity.toDomainCard()
+            val result = resolveCardStrategyTags.resolveWithPrefetched(
+                card = card,
+                existingTagsJson = entity.tags,
+                prefetched = CardStrategyTagsResult.Found(
+                    tags = emptyList(),
+                    suggestions = card.suggestedTags,
+                ),
+            )
+            CardTagsUpdate(
+                scryfallId = entity.scryfallId,
+                tagsJson = result.confirmedTags.toTagsJson(),
+                suggestedJson = result.suggestedTags.toSuggestedTagsJson(),
+            )
+        }
+        currentCoroutineContext().ensureActive()
+        if (!isOwnerActive()) throw CancellationException("Collection owner changed")
+        cardDao.updateTagsAndSuggestionsBatch(updates)
+        CatalogPageResult(cards.last().scryfallId, cards.size == limit)
+    }
+
     suspend operator fun invoke(
         batchSize: Int = DEFAULT_BATCH_SIZE,
         onDeviceCap: Int = DEFAULT_ON_DEVICE_CAP,
         repairCap: Int = DEFAULT_REPAIR_CAP,
     ): Result = withContext(ioDispatcher) {
         val missingIds = query("candidate_query") { cardDao.getScryfallIdsMissingStrategyTags(batchSize) }
+        val outdatedIds = query("outdated_query") {
+            cardDao.getScryfallIdsWithOutdatedStrategyTags(CURRENT_CARD_STRATEGY_PIPELINE_VERSION, batchSize)
+        }
         val unwrittenIds = query("repair_query") { cardDao.getScryfallIdsWithUnwrittenStrategyTags(repairCap) }
-        val candidateIds = (missingIds + unwrittenIds).distinct()
+        val candidateIds = (missingIds + outdatedIds + unwrittenIds).distinct()
         if (candidateIds.isEmpty()) return@withContext EMPTY_RESULT
 
         val candidates = candidateIds.chunked(ROOM_LOOKUP_CHUNK)
@@ -110,6 +157,13 @@ class HydrateCollectionStrategyTagsUseCase(
         val misses = candidates.filter { it.oracleId !in hits }
         val onDeviceCount = runOnDeviceFallback(misses.take(onDeviceCap))
 
+        val outdatedPageAdvanced = if (precomputedCount > 0 && outdatedIds.size >= batchSize) {
+            val nextOutdatedIds = query("outdated_progress_query") {
+                cardDao.getScryfallIdsWithOutdatedStrategyTags(CURRENT_CARD_STRATEGY_PIPELINE_VERSION, batchSize)
+            }
+            nextOutdatedIds != outdatedIds
+        } else false
+
         crashReporter.log("card_tag_hydration_run")
         crashReporter.setCustomKey("tag_hydration_candidates", candidateIds.size.toString())
         crashReporter.setCustomKey("tag_hydration_precomputed", precomputedCount.toString())
@@ -121,7 +175,7 @@ class HydrateCollectionStrategyTagsUseCase(
             precomputedCount = precomputedCount,
             repairedCount = repairedCount,
             onDeviceCount = onDeviceCount,
-            hasMoreWork = precomputedCount > 0 && missingIds.size >= batchSize,
+            hasMoreWork = precomputedCount > 0 && (missingIds.size >= batchSize || outdatedPageAdvanced),
         )
     }
 
@@ -152,13 +206,16 @@ class HydrateCollectionStrategyTagsUseCase(
         }
 
         var written = 0
+        var repaired = 0
         updates.chunked(WRITE_CHUNK).forEach { chunk ->
             runCatching { cardDao.updateTagsAndSuggestionsBatch(chunk) }
-                .onSuccess { written += chunk.size }
+                .onSuccess {
+                    written += chunk.size
+                    repaired += chunk.count { it.scryfallId !in candidateIds }
+                }
                 .onFailure { e -> recordFailure("persist", e) }
         }
-        val repaired = updates.count { it.scryfallId !in candidateIds }
-        return written to if (written == 0) 0 else repaired
+        return written to repaired
     }
 
     /** Sequential, never parallel — same rationale as `CardRepositoryImpl.backfillMissingOracleIds`:
@@ -213,6 +270,8 @@ class HydrateCollectionStrategyTagsUseCase(
 
         /** Per-run ceiling on the network-free repair query (see [CardDao.getScryfallIdsWithUnwrittenStrategyTags]). */
         const val DEFAULT_REPAIR_CAP = 500
+
+        const val CATALOG_PAGE_SIZE = 200
 
         /** SQLite caps host parameters per statement; chunk every `IN (:ids)` read below it. */
         private const val ROOM_LOOKUP_CHUNK = 400

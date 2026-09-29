@@ -119,4 +119,109 @@ class GameSessionDaoWinrateInstrumentedTest {
         assertEquals(2 to 1, byCount[3])
         assertEquals(1 to 1, byCount[2])
     }
+
+    // ── observeTotalGames (D12: local-seat denominator) ──────────────────────────
+
+    /** Inserts a session whose seats are all non-local (e.g. a tournament match). */
+    private suspend fun insertSessionWithoutLocalSeat() {
+        val session = GameSessionEntity(
+            durationMs = 1000L,
+            mode = "STANDARD",
+            totalTurns = 5,
+            playerCount = 2,
+            winnerId = 0,
+            winnerName = "A",
+        )
+        val players = listOf(
+            PlayerSessionEntity(
+                sessionId = 0, playerId = 0, playerName = "A", finalLife = 20, finalPoison = 0,
+                eliminationReason = null, isWinner = true, isLocal = false,
+            ),
+            PlayerSessionEntity(
+                sessionId = 0, playerId = 1, playerName = "B", finalLife = 0, finalPoison = 0,
+                eliminationReason = "LIFE", isWinner = false, isLocal = false,
+            ),
+        )
+        gameSessionDao.insertSessionWithPlayers(session, players)
+    }
+
+    @Test
+    fun observeTotalGames_countsOnlySessionsWithALocalSeat() = runTest {
+        insertSession(mode = "COMMANDER", playerCount = 2, localIsWinner = true)
+        insertSession(mode = "COMMANDER", playerCount = 2, localIsWinner = true)
+        insertSessionWithoutLocalSeat()
+        insertSessionWithoutLocalSeat()
+
+        assertEquals(2, gameSessionDao.observeTotalGames().first())
+        assertEquals(2, gameSessionDao.observeLocalWins().first())
+    }
+
+    @Test
+    fun observeTotalGames_isZeroWhenNoSessionHasALocalSeat() = runTest {
+        insertSessionWithoutLocalSeat()
+
+        assertEquals(0, gameSessionDao.observeTotalGames().first())
+    }
+
+    @Test
+    fun gamificationCounts_excludeSessionsWithoutLocalSeat() = runTest {
+        repeat(2) { insertSession(mode = "COMMANDER", playerCount = 4, localIsWinner = true) }
+        repeat(2) { insertSessionWithoutLocalSeat() }
+
+        val stats = db.gamificationStatsDao()
+        assertEquals(2, stats.totalGames())
+        assertEquals(2, stats.marathonGames(1_000L))
+        assertEquals(2, stats.multiplayerGames(4))
+    }
+
+    @Test
+    fun observeLocalSingleDeckStats_returnsNullForDeckWithoutGames() = runTest {
+        assertEquals(null, gameSessionDao.observeLocalSingleDeckStats("missing-deck").first())
+    }
+
+    @Test
+    fun drawDetection_usesWinnerIdEvenWhenWinningPlayerIsNamedDraw() = runTest {
+        val session = GameSessionEntity(
+            durationMs = 1_000L, mode = "COMMANDER", totalTurns = 5,
+            playerCount = 2, winnerId = 0, winnerName = "Draw",
+        )
+        val players = listOf(
+            PlayerSessionEntity(
+                sessionId = 0, playerId = 0, playerName = "Draw", finalLife = 20,
+                finalPoison = 0, eliminationReason = null, isWinner = true, isLocal = true,
+            ),
+            PlayerSessionEntity(
+                sessionId = 0, playerId = 1, playerName = "Opponent", finalLife = 0,
+                finalPoison = 0, eliminationReason = "LIFE", isWinner = false, isLocal = false,
+            ),
+        )
+        gameSessionDao.insertSessionWithPlayers(session, players)
+
+        assertEquals(0, gameSessionDao.observeLocalDraws().first())
+        assertEquals(false, gameSessionDao.observeLocalSessionHistory().first().single().isDraw)
+        assertEquals(listOf(true), gameSessionDao.observeLocalSessionOutcomes().first())
+    }
+
+    @Test
+    fun archetypeMatchup_countsOneGamePerArchetype() = runTest {
+        val session = GameSessionEntity(
+            durationMs = 1_000L, mode = "COMMANDER", totalTurns = 5,
+            playerCount = 3, winnerId = 0, winnerName = "Local",
+        )
+        val players = listOf(
+            PlayerSessionEntity(sessionId = 0, playerId = 0, playerName = "Local", finalLife = 20,
+                finalPoison = 0, eliminationReason = null, isWinner = true, isLocal = true),
+            PlayerSessionEntity(sessionId = 0, playerId = 1, playerName = "A", finalLife = 0,
+                finalPoison = 0, eliminationReason = "LIFE", isWinner = false, isLocal = false,
+                archetype = "Aggro"),
+            PlayerSessionEntity(sessionId = 0, playerId = 2, playerName = "B", finalLife = 0,
+                finalPoison = 0, eliminationReason = "LIFE", isWinner = false, isLocal = false,
+                archetype = "Aggro"),
+        )
+        gameSessionDao.insertSessionWithPlayers(session, players)
+
+        val matchup = gameSessionDao.observeArchetypeMatchups().first().single()
+        assertEquals(1, matchup.totalGames)
+        assertEquals(1, matchup.wins)
+    }
 }

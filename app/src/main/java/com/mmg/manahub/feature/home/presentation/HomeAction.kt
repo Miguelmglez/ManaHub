@@ -13,6 +13,8 @@ sealed interface HomeAction {
     object StartGame : HomeAction
     object ScanCard : HomeAction
     object CreateDeck : HomeAction
+
+    object OpenImportCollection : HomeAction
     object DraftGuide : HomeAction
     object DraftSimulator : HomeAction
     object SearchCard : HomeAction

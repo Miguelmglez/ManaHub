@@ -56,10 +56,21 @@ private val KEY_PREFERRED_CURRENCY = stringPreferencesKey("preferred_currency")
 private val LAST_PRICE_REFRESH_KEY = longPreferencesKey("last_price_refresh")
 private val AVATAR_URL_KEY         = stringPreferencesKey("avatar_url")
 private val KEY_PLAYER_NAME = stringPreferencesKey("player_name")
+private val KEY_PROFILE_IDENTITY_OWNER = stringPreferencesKey("profile_identity_owner_user_id")
+private val KEY_PROFILE_IDENTITY_VERIFIED_GUEST = booleanPreferencesKey("profile_identity_verified_guest")
+
+internal fun shouldClearProfileIdentity(owner: String?, incomingUserId: String, verifiedGuest: Boolean): Boolean =
+    (owner != null && owner != incomingUserId) || (owner == null && !verifiedGuest)
 private val KEY_APP_THEME   = stringPreferencesKey("app_theme")
 private val KEY_TAG_AUTO_THRESHOLD    = floatPreferencesKey("tag_auto_threshold")
 private val KEY_TAG_SUGGEST_THRESHOLD = floatPreferencesKey("tag_suggest_threshold")
 private val KEY_TAG_OVERRIDES_JSON    = stringPreferencesKey("tag_dictionary_overrides")
+private val KEY_CARD_MECHANIC_CATALOG_JSON = stringPreferencesKey("card_mechanic_catalog")
+private val KEY_CARD_MECHANIC_REFRESH_OWNER = stringPreferencesKey("card_mechanic_refresh_owner")
+private val KEY_CARD_MECHANIC_REFRESH_SIGNATURE = stringPreferencesKey("card_mechanic_refresh_signature")
+private val KEY_CARD_MECHANIC_REFRESH_CURSOR = stringPreferencesKey("card_mechanic_refresh_cursor")
+private val KEY_CARD_MECHANIC_REFRESH_COMPLETE = booleanPreferencesKey("card_mechanic_refresh_complete")
+private val KEY_CARD_MECHANIC_REFRESH_CHECKPOINTS = stringPreferencesKey("card_mechanic_refresh_checkpoints")
 private val KEY_USER_DEFINED_TAGS     = stringPreferencesKey("user_defined_tags")
 private val KEY_COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mode")
 /** Persisted "Group by" selection for the Collection "Cards" tab. */
@@ -129,6 +140,9 @@ private val KEY_EVENTS_POSTAL_CODE = stringPreferencesKey("competitive_postal_co
 private val KEY_GAMIFICATION_BACKFILL_DONE = booleanPreferencesKey("gamification_backfill_done")
 /** Account owning the local gamification store; absent = guest-owned (D3). */
 private val KEY_GAMIFICATION_OWNER_USER_ID = stringPreferencesKey("gamification_owner_user_id")
+private val KEY_GAMIFICATION_VERIFIED_GUEST = booleanPreferencesKey("gamification_verified_guest")
+/** Account the Room friends cache belongs to; absent means the cache holds no account's rows. */
+private val KEY_FRIENDS_CACHE_OWNER_USER_ID = stringPreferencesKey("friends_cache_owner_user_id")
 /** Prefixes of the per-user gamification sync watermarks written by `SyncPreferencesStore`. */
 private val GAMIFICATION_WATERMARK_PREFIXES = listOf("gam_sync_ms_", "gam_pushed_ledger_id_", "gam_cursor_")
 /** Per-install random id seeding deterministic quest generation for guests (ADR-002 §9). Not ANDROID_ID. */
@@ -164,6 +178,7 @@ internal suspend fun clearGamificationPreferences(context: Context) {
             KEY_EQUIPPED_AVATAR_FRAME,
             KEY_EQUIPPED_RING_STYLE,
             KEY_GAMIFICATION_OWNER_USER_ID,
+            KEY_GAMIFICATION_VERIFIED_GUEST,
         ).forEach { prefs.remove(it) }
         // Absent reads as the -1 sentinel, so the next observer seeds the baseline without a burst.
         prefs.remove(KEY_LAST_CELEBRATED_LEVEL)
@@ -206,6 +221,14 @@ private val KEY_TRADE_LIST_PUBLIC  = booleanPreferencesKey("trade_list_public")
 private data class UdtRecord(val k: String, val l: String, val c: String)
 private val udtListType = object : TypeToken<List<UdtRecord>>() {}.type
 private val gson = Gson()
+private val mechanicCheckpointListType = object : TypeToken<List<CardMechanicRefreshCheckpoint>>() {}.type
+
+data class CardMechanicRefreshCheckpoint(
+    val ownerUserId: String = "",
+    val signature: String = "",
+    val cursor: String = "",
+    val complete: Boolean = false,
+)
 
 /** The retired News filter selection, read once by the follow migration. */
 data class LegacyNewsFilters(
@@ -306,6 +329,7 @@ class UserPreferencesDataStore @Inject constructor(
 
     val avatarUrlFlow: Flow<String?> = safeData
         .map { it[AVATAR_URL_KEY] }
+        .distinctUntilChanged()
 
     suspend fun saveAvatarUrl(url: String?) {
         context.userPrefsDataStore.edit { preferences ->
@@ -330,8 +354,10 @@ class UserPreferencesDataStore @Inject constructor(
             emit(emptyPreferences())
         }
 
+    // distinctUntilChanged: any unrelated key write re-emits the whole DataStore (P-10).
     val playerNameFlow: Flow<String> = safeData
         .map { prefs -> prefs[KEY_PLAYER_NAME] ?: "Wizard" }
+        .distinctUntilChanged()
 
     val themeFlow: Flow<AppTheme> = safeData
         .map { prefs ->
@@ -366,7 +392,53 @@ class UserPreferencesDataStore @Inject constructor(
         }
 
     suspend fun savePlayerName(name: String) {
-        context.userPrefsDataStore.edit { it[KEY_PLAYER_NAME] = name }
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[KEY_PLAYER_NAME] = name
+        }
+    }
+
+    /** Marks identity explicitly created in a signed-out guest flow; owner absence alone is untrusted. */
+    suspend fun markProfileIdentityVerifiedGuest() {
+        context.userPrefsDataStore.edit { prefs ->
+            if (prefs[KEY_PROFILE_IDENTITY_OWNER] == null) {
+                prefs[KEY_PROFILE_IDENTITY_VERIFIED_GUEST] = true
+            }
+        }
+    }
+
+    suspend fun hasAccountProfileIdentity(): Boolean =
+        safeData.map { it[KEY_PROFILE_IDENTITY_OWNER] != null }.first()
+
+    /**
+     * Records [userId] as the account the cached nickname/avatar belong to. When a DIFFERENT account
+     * owned them, both are dropped first so the new account never inherits them (P-13). An ownerless
+     * legacy cache is untrusted; only an identity written as a verified guest survives first sign-in.
+     *
+     * @return true when a previous account's cached identity was dropped.
+     */
+    suspend fun claimProfileIdentity(userId: String): Boolean {
+        var wiped = false
+        context.userPrefsDataStore.edit { prefs ->
+            val owner = prefs[KEY_PROFILE_IDENTITY_OWNER]
+            if (shouldClearProfileIdentity(owner, userId, prefs[KEY_PROFILE_IDENTITY_VERIFIED_GUEST] == true)) {
+                prefs.remove(AVATAR_URL_KEY)
+                prefs.remove(KEY_PLAYER_NAME)
+                wiped = true
+            }
+            prefs[KEY_PROFILE_IDENTITY_OWNER] = userId
+            prefs.remove(KEY_PROFILE_IDENTITY_VERIFIED_GUEST)
+        }
+        return wiped
+    }
+
+    /** Drops the cached nickname, avatar and their owner (account deletion). */
+    suspend fun clearProfileIdentity() {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs.remove(AVATAR_URL_KEY)
+            prefs.remove(KEY_PLAYER_NAME)
+            prefs.remove(KEY_PROFILE_IDENTITY_OWNER)
+            prefs.remove(KEY_PROFILE_IDENTITY_VERIFIED_GUEST)
+        }
     }
 
     // ── Tag auto-tagger thresholds ────────────────────────────────────────────
@@ -396,6 +468,53 @@ class UserPreferencesDataStore @Inject constructor(
     suspend fun saveTagDictionaryOverrides(json: String) {
         context.userPrefsDataStore.edit { it[KEY_TAG_OVERRIDES_JSON] = json }
     }
+
+    val cardMechanicCatalogFlow: Flow<String> = context.userPrefsDataStore.data
+        .map { it[KEY_CARD_MECHANIC_CATALOG_JSON] ?: "[]" }
+
+    suspend fun saveCardMechanicCatalog(json: String) {
+        context.userPrefsDataStore.edit { it[KEY_CARD_MECHANIC_CATALOG_JSON] = json }
+    }
+
+    val cardMechanicRefreshCheckpointFlow: Flow<List<CardMechanicRefreshCheckpoint>> =
+        context.userPrefsDataStore.data.map { prefs ->
+            val legacy = CardMechanicRefreshCheckpoint(
+                ownerUserId = prefs[KEY_CARD_MECHANIC_REFRESH_OWNER].orEmpty(),
+                signature = prefs[KEY_CARD_MECHANIC_REFRESH_SIGNATURE].orEmpty(),
+                cursor = prefs[KEY_CARD_MECHANIC_REFRESH_CURSOR].orEmpty(),
+                complete = prefs[KEY_CARD_MECHANIC_REFRESH_COMPLETE] ?: false,
+            )
+            decodeMechanicCheckpoints(prefs[KEY_CARD_MECHANIC_REFRESH_CHECKPOINTS]).ifEmpty {
+                listOfNotNull(legacy.takeIf { it.ownerUserId.isNotBlank() && it.signature.isNotBlank() })
+            }
+        }
+
+    suspend fun saveCardMechanicRefreshCheckpoint(checkpoint: CardMechanicRefreshCheckpoint) {
+        context.userPrefsDataStore.edit { prefs ->
+            val saved = decodeMechanicCheckpoints(prefs[KEY_CARD_MECHANIC_REFRESH_CHECKPOINTS])
+            val legacy = CardMechanicRefreshCheckpoint(
+                ownerUserId = prefs[KEY_CARD_MECHANIC_REFRESH_OWNER].orEmpty(),
+                signature = prefs[KEY_CARD_MECHANIC_REFRESH_SIGNATURE].orEmpty(),
+                cursor = prefs[KEY_CARD_MECHANIC_REFRESH_CURSOR].orEmpty(),
+                complete = prefs[KEY_CARD_MECHANIC_REFRESH_COMPLETE] ?: false,
+            )
+            val previous = saved.ifEmpty {
+                listOfNotNull(legacy.takeIf { it.ownerUserId.isNotBlank() && it.signature.isNotBlank() })
+            }
+            prefs[KEY_CARD_MECHANIC_REFRESH_CHECKPOINTS] = gson.toJson(
+                previous.filterNot { it.ownerUserId == checkpoint.ownerUserId } + checkpoint,
+            )
+            prefs.remove(KEY_CARD_MECHANIC_REFRESH_OWNER)
+            prefs.remove(KEY_CARD_MECHANIC_REFRESH_SIGNATURE)
+            prefs.remove(KEY_CARD_MECHANIC_REFRESH_CURSOR)
+            prefs.remove(KEY_CARD_MECHANIC_REFRESH_COMPLETE)
+        }
+    }
+
+    private fun decodeMechanicCheckpoints(json: String?): List<CardMechanicRefreshCheckpoint> =
+        runCatching<List<CardMechanicRefreshCheckpoint>> {
+            gson.fromJson(json ?: "[]", mechanicCheckpointListType) ?: emptyList()
+        }.getOrDefault(emptyList())
 
     // ── User-defined tags ─────────────────────────────────────────────────────
 
@@ -589,11 +708,42 @@ class UserPreferencesDataStore @Inject constructor(
     suspend fun getGamificationOwnerUserId(): String? =
         context.userPrefsDataStore.data.map { it[KEY_GAMIFICATION_OWNER_USER_ID] }.first()
 
+    val gamificationOwnerUserIdFlow: Flow<String?> = safeData
+        .map { it[KEY_GAMIFICATION_OWNER_USER_ID] }
+        .distinctUntilChanged()
+
+    val gamificationVerifiedGuestFlow: Flow<Boolean> = safeData
+        .map { it[KEY_GAMIFICATION_VERIFIED_GUEST] == true }
+        .distinctUntilChanged()
+
+    /** True only after an explicit signed-out lifecycle has quarantined legacy ownerless rows. */
+    suspend fun isGamificationVerifiedGuest(): Boolean =
+        context.userPrefsDataStore.data.map { it[KEY_GAMIFICATION_VERIFIED_GUEST] == true }.first()
+
+    suspend fun markGamificationVerifiedGuest() {
+        context.userPrefsDataStore.edit { it[KEY_GAMIFICATION_VERIFIED_GUEST] = true }
+    }
+
+    /** The account whose rows the local friends cache holds, or null when it holds none. */
+    suspend fun getFriendsCacheOwnerUserId(): String? =
+        context.userPrefsDataStore.data.map { it[KEY_FRIENDS_CACHE_OWNER_USER_ID] }.first()
+
+    /** Records [userId] as the friends cache owner; null marks the cache as belonging to nobody. */
+    suspend fun setFriendsCacheOwnerUserId(userId: String?) {
+        context.userPrefsDataStore.edit { prefs ->
+            if (userId == null) prefs.remove(KEY_FRIENDS_CACHE_OWNER_USER_ID)
+            else prefs[KEY_FRIENDS_CACHE_OWNER_USER_ID] = userId
+        }
+    }
+
     /** Persists [userId] as the owner of the local gamification store; null marks it guest-owned. */
     suspend fun setGamificationOwnerUserId(userId: String?) {
         context.userPrefsDataStore.edit { prefs ->
             if (userId == null) prefs.remove(KEY_GAMIFICATION_OWNER_USER_ID)
-            else prefs[KEY_GAMIFICATION_OWNER_USER_ID] = userId
+            else {
+                prefs[KEY_GAMIFICATION_OWNER_USER_ID] = userId
+                prefs.remove(KEY_GAMIFICATION_VERIFIED_GUEST)
+            }
         }
     }
 

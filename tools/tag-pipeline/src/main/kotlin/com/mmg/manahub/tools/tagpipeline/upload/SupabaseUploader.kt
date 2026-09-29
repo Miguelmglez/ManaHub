@@ -2,6 +2,7 @@ package com.mmg.manahub.tools.tagpipeline.upload
 
 import com.mmg.manahub.tools.tagpipeline.io.PIPELINE_JSON
 import com.mmg.manahub.tools.tagpipeline.model.CardStrategyTagsRow
+import com.mmg.manahub.tools.tagpipeline.model.CardStrategyTagSuggestion
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -10,10 +11,12 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.URI
+import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import java.time.OffsetDateTime
 
 /**
  * Writes the pipeline's JSONL output to the live Supabase `card_strategy_tags` table (plan §5 Phase
@@ -70,11 +73,48 @@ class SupabaseUploader(
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build()
 
-            val ok = runCatchingBatch(batchCount, batch.size) { send(request) }
+            val ok = runCatchingBatch(batchCount, batch.size) {
+                val response = send(request)
+                if (response.statusCode() in 200..299 && config.verifyReadback) {
+                    check(verifyBatch(batch)) { "read-back mismatch after accepted upsert" }
+                }
+                response
+            }
             if (!ok) failedBatches++
         }
 
         return UploadSummary(rowsSubmitted = rowsSubmitted, batchCount = batchCount, failedBatches = failedBatches, dryRun = dryRun)
+    }
+
+    private fun verifyBatch(batch: List<CardStrategyTagsRow>): Boolean {
+        return batch.chunked(100).all { page ->
+            val filter = URLEncoder.encode("in.(" + page.joinToString(",") { it.oracleId } + ")", Charsets.UTF_8)
+            val request = HttpRequest.newBuilder(
+                URI.create("${config.supabaseUrl}/rest/v1/card_strategy_tags?select=oracle_id,payload,pipeline_version,generated_at&oracle_id=$filter"),
+            )
+                .header("apikey", config.serviceRoleKey)
+                .header("Authorization", "Bearer ${config.serviceRoleKey}")
+                .header("Accept", "application/json")
+                .timeout(Duration.ofSeconds(60))
+                .GET()
+                .build()
+            val response = send(request)
+            if (response.statusCode() !in 200..299) return@all false
+            val actual = PIPELINE_JSON.decodeFromString(ListSerializer(UploadRow.serializer()), response.body())
+                .associateBy { it.oracleId }
+            actual.size == page.size && page.all { row ->
+                val expected = row.toUploadRow()
+                val stored = actual[row.oracleId]
+                stored != null &&
+                    stored.oracleId == expected.oracleId &&
+                    stored.payload == expected.payload &&
+                    stored.pipelineVersion == expected.pipelineVersion &&
+                    runCatching {
+                        OffsetDateTime.parse(stored.generatedAt.replace(' ', 'T')).toInstant() ==
+                            OffsetDateTime.parse(expected.generatedAt.replace(' ', 'T')).toInstant()
+                    }.getOrDefault(false)
+            }
+        }
     }
 
     /** Inserts a `status='running'` row and returns its `id` (used by [completePipelineRun]), or
@@ -165,6 +205,7 @@ data class SupabaseUploadConfig(
     val supabaseUrl: String,
     val serviceRoleKey: String,
     val batchSize: Int = 1000,
+    val verifyReadback: Boolean = false,
 )
 
 data class UploadSummary(
@@ -190,6 +231,8 @@ private data class UploadRow(
 @Serializable
 private data class UploadPayload(
     val tags: List<String>,
+    val suggestions: List<CardStrategyTagSuggestion>,
+    @SerialName("input_fingerprint") val inputFingerprint: String,
     val tribes: List<String>,
     val themes: Map<String, Float>,
     val archetypes: Map<String, Float>,
@@ -201,6 +244,8 @@ private fun CardStrategyTagsRow.toUploadRow(): UploadRow = UploadRow(
     oracleId = oracleId,
     payload = UploadPayload(
         tags = tags,
+        suggestions = suggestions,
+        inputFingerprint = inputFingerprint,
         tribes = tribes,
         themes = themes,
         archetypes = archetypes,

@@ -72,6 +72,14 @@ Features with their own data layer (Draft, News) add `data/`, `domain/`, `di/` s
 
 ## Kotlin Multiplatform migration (IN PROGRESS — Android + Web)
 
+**Web implementation is paused by user direction (2026-09-25).** Until the user explicitly asks to
+resume it, do not edit `wasmJsMain` or `:webApp`, port Android features to web, run web builds, or
+expand this restoration with web-only changes. Record web implications in
+`docs/web-gamification-restore-debt-2026-09-25.md` and continue the Android scope. During this pause,
+the web-build clause in the definition of done below is deferred; Android compilation and affected
+tests remain required. This prevents a paused platform from repeatedly interrupting Android work
+while preserving a concrete backlog for the eventual web session.
+
 The project is migrating to **KMP, targeting Android + Web (Compose Multiplatform / `wasmJs`)**.
 iOS/Desktop are out of scope for now but the structure must not preclude them. **DI is moving Hilt →
 Koin.** Master plan (status, decisions, Android debt, web roadmap): `docs/plans/kmp-migration-plan.md`;
@@ -123,8 +131,9 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
 - **Every `RETURNS SETOF` RPC must be keyset-paginated below `db-max-rows`.** PostgREST silently
   truncates at 1000 with no signal to the client. Paginate on `(updated_at, id)` — tie-safe — keeping
   the window filter and the cursor as separate predicates, and cap the page size **server-side**.
-  Drain via `PagedSync.drainPages` (`:shared:core-data` commonMain). Still unpaginated: the five
-  gamification `*_changes_since` RPCs.
+  Drain via `PagedSync.drainPages` (`:shared:core-data` commonMain). The gamification client now
+  uses `get_*_page` RPCs; their 2026-09 migrations were deployed on 2026-09-25. Keep the release
+  flag off pending device and release-candidate verification. Legacy unpaginated RPCs remain for shipped clients.
 - **Ownership data never depends on cache metadata.** A `user_card_collection` row inserts whether or
   not its `CardEntity` is cached; unresolved ids get a `stale_reason = "pending_hydration"`
   placeholder so the row stays visible and counted. Consumers that aggregate card fields (stats,
@@ -132,17 +141,36 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
 - → memory: `feedback_sync_watermark_never_past_unapplied`, `feedback_setof_rpc_must_be_paginated`,
   `feedback_idempotency_gate_tests_own_completion`, `project_collection_sync_data_loss_2026-09`
 
-### Database (Room v57)
+### Local game statistics
+Personal game totals and derived gamification counts include only sessions with an `is_local = 1`
+seat; a nonlocal or tournament session cannot become the user's game merely because it has a
+`game_sessions` row. Detect draws by `winnerId = -1`, never `winnerName = "Draw"` (a valid player name).
+Draws count as games but not as decisive games for win percentage, and a draw
+neither extends nor breaks a win streak. Keep Stats, Profile, Home, and achievements consistent so
+one recorded session cannot produce conflicting numbers or undeserved rewards.
+
+### Account-owned local caches
+An absent owner key on an upgraded installation is not proof that persisted data belongs to a
+guest. Legacy account data may predate the owner marker and survive sign-out, so never upload or
+show it under a new account by claiming `owner == null` alone. Require verified guest provenance,
+quarantine or wipe ambiguous legacy rows, and gate cache reads as well as writes by owner. Serialize
+session transitions so an old clear or claim job cannot modify the next account's cache.
+Account-owned UI `StateFlow`s must clear their visible state on every session identity change and
+expire replay after their last observer stops. A retained ViewModel can otherwise show account A's
+last screen value for a frame when account B returns from the navigation back stack, even if the
+underlying Room query is correctly scoped to B. Cancel old account jobs before subscribing to B.
+
+### Database (Room v59)
 - DB file `mtg_collection.db`. The `UserCardEntity` → `CardEntity` FK was **removed in v53** (ADR-008);
   do not reintroduce it. It was `ON DELETE RESTRICT` from v38 to v52.
-- Migration chain 1→53, gaps at 7–10 and 15–17 covered by `fallbackToDestructiveMigration()` (dev-only;
+- Migration chain 1→59, gaps at 7–10 and 15–17 covered by `fallbackToDestructiveMigration()` (dev-only;
   not safe for production data). v39 = 6 gamification tables; v40 = additive `legality_legacy`/
   `legality_vintage`/`legality_pauper` on `cards` (Deck Doctor Phase 4 D2); v41 = Community Decks
   attribution columns on `decks` + `community_deck_cache` table; v42 = additive `produced_mana`
   (compact WUBRG string, not JSON) on `cards` (Deck Doctor Community/Archetype plan Phase 0.3, D14);
   v43–v49 = additive per-feature tables/columns (see each `Migration_x_y.kt`'s KDoc for what it
   added); v50 = `puzzle_results` table (Daily Puzzle, Batch B1); v51 = `competitive_meta_cache` +
-  `competitive_limited_ratings_cache` tables (Competitive feature, dropped again in v57);
+  `competitive_limited_ratings_cache` tables (Competitive feature, dropped again in v59);
   v52 = Deck Analysis Engine v3 taxonomy migration (`ArchetypeId`/`ThemeId` renames, defensively
   parsed so stale persisted strings degrade rather than crash);
   **v53 = table recreate of `user_card_collection` to DROP its FK to `cards`** — the one migration
@@ -152,13 +180,20 @@ Three rules, all cross-cutting. Full rationale: `docs/adr/ADR-008-collection-syn
   v1–24). Guarded by `Migration52To53Test`.
   v54 = additive `decks.posture_override`; v55 = additive `draft_sets.setImageUrl` (Draft);
   v56 = additive `trade_collection_sync.pending_apply` + nullable `owner_user_id` on
-  `local_wishlists`/`local_open_for_trade` (Trades audit H4/H8);
-  v57 = MTG Today: `news_saved_items` table + nullable `content_sources.site_url`, and DROPs the two
-  v51 Competitive cache tables (guarded by `Migration56To57Test`, `validateDroppedTables = true`).
+  `local_wishlists`/`local_open_for_trade` (Trades audit H4/H8); v57 = `trade_offer_cleanup`, a
+  durable owner-scoped outbox for remote offer deletion after local collection commits; v58 =
+  `trade_wishlist_cleanup`, an owner-scoped outbox for absolute wishlist targets committed with a
+  trade; v59 = MTG Today: `news_saved_items` table + nullable `content_sources.site_url`, and DROPs
+  the two v51 Competitive cache tables (guarded by `Migration58To59Test`, `validateDroppedTables = true`).
   Every migration since v39 follows the same pattern: a top-level `val MIGRATION_x_y` in its own file,
   `CREATE TABLE IF NOT EXISTS …` / `ADD COLUMN … TEXT NOT NULL DEFAULT '…'` guarded by a
   `columnExists` check where applicable, CardDao upsert untouched → no CASCADE risk.
   → memory: `project_card_model_produced_mana`
+- Keep Room migrations as one linear chain: register exactly one migration per `n→n+1` edge, in
+  ascending order. If parallel branches claim the same edge, preserve both changes on consecutive
+  edges and update the database version and tests together. Duplicate edges leave Room without a
+  unique upgrade path; each migration test must start from the immediately preceding exported schema.
+- → memory: `feedback_room_migration_predecessor_schema_2026-09-29`
 - Schema: `app/schemas/com.mmg.manahub.core.data.local.MtgDatabase/` (latest version json gitignored —
   regenerate locally).
 
@@ -200,6 +235,9 @@ branch color on the active theme or `isSystemInDarkTheme()`.
   `MaterialTheme.spacing`, shapes via named tokens (`CardShape`, `ChipShape`, `ButtonShape`,
   `BottomSheetShape`). **Never** use `MaterialTheme.colorScheme`/`typography` directly, and never
   hardcode a `Color`, `dp` font size, or shape.
+- Reserve `textDisabled` for genuinely disabled controls. Informational subtitles, including
+  `EmptyState` guidance, use a readable text token such as `textSecondary`; disabled styling made
+  the Stats empty-state instruction illegible on dark palettes.
 - `magicTypography` has **no `titleSmall`** (use `titleMedium` for small headers). Available:
   display{Large,Medium}, title{Large,Medium}, label{Large,Medium,Small}, body{Large,Medium,Small}.
 - New theme = a `MagicColors` + `MagicTypography` instance + a branch in `MagicTheme`'s `when(theme)`.
@@ -386,6 +424,10 @@ editorial competitive links, device-local saved items, and "paste any URL" sourc
   (schema migration, data-loss surface).
 - Unit tests: MockK (`io.mockk`) + Turbine (`app.cash.turbine`). Instrumented Room tests: in-memory DB
   on device/emulator. Test classes mirror source package paths.
+- Instrumented `androidTest` method names must be DEX-safe identifiers without spaces. Kotlin
+  backtick names with spaces compile to JVM classes but D8 rejects their generated coroutine class
+  names when the app targets DEX versions below 040. For Room Flow timing assertions, await an
+  explicit first-emission signal before mutating the DAO; `yield()` does not prove subscription.
 - **`testDebugUnitTest --tests "<pattern>"` compiles the ENTIRE `src/test` source set first** — a compile
   error in any unrelated test file fails the whole run and zero tests execute. To verify one suite in
   isolation when others are broken, temporarily move the broken files aside, run, then restore.
@@ -413,7 +455,9 @@ valuable user metrics:
   `FirebaseCrashlytics.getInstance()`. Events/keys are `snake_case` (`action_context_result`); ≤3-4
   custom keys per operation; instrumentation is **ADDITIVE**, never a substitute for existing error
   handling; **NEVER log PII** (emails, real names, tokens, raw free-text queries — log length/enum-id
-  only). The auditor's running spec lives in `.claude/agent-memory/crashlytics-ux-auditor/` (keys/events
+  only). For external errors, strip the nested cause as well as the outer message: Crashlytics records
+  the whole throwable graph, so wrapping a remote error with a safe message can still leak its response.
+  The auditor's running spec lives in `.claude/agent-memory/crashlytics-ux-auditor/` (keys/events
   already defined — consult it to avoid duplicates).
 - → memory: `feedback_telemetry_review_on_every_feature`
 
@@ -490,6 +534,9 @@ Apply to every new migration/RPC/trigger/view:
    policy expression; writes to a table whose UPDATE/DELETE policy is intentionally `false`; bootstrap
    writes before the caller is a participant; cross-user session cleanup; reading a materialized view).
 10. `enqueue_notification` is permanently REVOKE-protected (accepts arbitrary `recipient_id`).
+11. `friendships` inserts must create only `PENDING` rows, and neither participant ID may change
+    after insert. Enforce both in RLS and a database trigger: a client that can forge `ACCEPTED`
+    or rewrite a participant can read another user's friend-only collection through valid RPCs.
 
 → memory: `feedback_supabase_security_audit_2026-06-02`
 

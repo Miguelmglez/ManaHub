@@ -7,13 +7,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -44,61 +43,61 @@ import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.TimeAgoFormatter
 
 /**
- * The Achievements tab body (ADR-002, Phase 1). Renders the full static catalog supplied by
- * [achievements], grouped by [AchievementCategory] with a section header per category. Each
- * achievement is an [AchievementRow]; secret-and-still-locked achievements render masked ("???").
- *
- * Stateless: the caller (ProfileScreen) hoists the achievement list from the ViewModel. Uses a
- * [LazyColumn] keyed by achievement id (stable, never duplicated) and the shared [EmptyState] for the
- * (rare) empty case. Bottom inset is supplied by [contentPadding] so the list clears the nav bar.
- *
- * @param achievements the full catalog projection (locked + unlocked); already category-complete.
- * @param contentPadding padding applied to the list content (typically the nav-bar bottom inset).
+ * Groups [achievements] by category in the category's display order. Call it inside `remember` so the
+ * grouping does not rerun on every recomposition.
  */
-@Composable
-fun AchievementsTab(
+internal fun groupAchievementsByCategory(
     achievements: List<AchievementUiModel>,
-    modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(0.dp),
+): List<Pair<AchievementCategory, List<AchievementUiModel>>> =
+    achievements
+        .groupBy { it.category }
+        .toSortedMap(compareBy { it.order })
+        .map { (category, items) -> category to items }
+
+/**
+ * Emits the Achievements tab as items of the Profile screen's single [androidx.compose.foundation.lazy.LazyColumn]
+ * (the hero scrolls away with the list). Each category header and each achievement is its own keyed item;
+ * an empty catalog shows the shared [EmptyState].
+ *
+ * @param grouped the output of [groupAchievementsByCategory].
+ */
+fun LazyListScope.achievementsTabItems(
+    grouped: List<Pair<AchievementCategory, List<AchievementUiModel>>>,
 ) {
-    if (achievements.isEmpty()) {
-        EmptyState(
-            icon = Icons.Default.EmojiEvents,
-            title = stringResource(R.string.achievements_empty_title),
-            subtitle = stringResource(R.string.achievements_empty_desc),
-            modifier = modifier,
-        )
+    if (grouped.isEmpty()) {
+        item(key = "achievements_empty") {
+            EmptyState(
+                icon = Icons.Default.EmojiEvents,
+                title = stringResource(R.string.achievements_empty_title),
+                subtitle = stringResource(R.string.achievements_empty_desc),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = MaterialTheme.spacing.xxl),
+            )
+        }
         return
     }
 
-    // Group by category and order sections by the category's declared display order.
-    val grouped = achievements
-        .groupBy { it.category }
-        .toSortedMap(compareBy { it.order })
-
-    LazyColumn(
-        modifier = modifier.fillMaxWidth(),
-        contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
-    ) {
-        grouped.forEach { (category, items) ->
-            item(key = "header_${category.name}") {
-                CategoryHeader(
-                    titleRes = category.titleRes,
-                    modifier = Modifier.padding(
-                        start = MaterialTheme.spacing.lg,
-                        end = MaterialTheme.spacing.lg,
-                        top = MaterialTheme.spacing.md,
-                        bottom = MaterialTheme.spacing.xs,
-                    ),
-                )
-            }
-            items(items = items, key = { it.id }) { achievement ->
-                AchievementRow(
-                    achievement = achievement,
-                    modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg),
-                )
-            }
+    grouped.forEach { (category, items) ->
+        item(key = "achievement_header_${category.name}", contentType = "achievement_header") {
+            CategoryHeader(
+                titleRes = category.titleRes,
+                modifier = Modifier.padding(
+                    start = MaterialTheme.spacing.lg,
+                    end = MaterialTheme.spacing.lg,
+                    top = MaterialTheme.spacing.md,
+                    bottom = MaterialTheme.spacing.xs,
+                ),
+            )
+        }
+        items(items = items, key = { "achievement_${it.id}" }, contentType = { "achievement_row" }) { achievement ->
+            AchievementRow(
+                achievement = achievement,
+                modifier = Modifier.padding(
+                    horizontal = MaterialTheme.spacing.lg,
+                    vertical = MaterialTheme.spacing.xs,
+                ),
+            )
         }
     }
 }
@@ -181,7 +180,7 @@ fun AchievementRow(
                     .clip(ChipShape)
                     .background(
                         if (unlocked) mc.goldMtg.copy(alpha = 0.18f)
-                        else mc.surfaceVariant,
+                        else mc.textDisabled.copy(alpha = 0.25f),
                     ),
                 contentAlignment = Alignment.Center,
             ) {

@@ -108,3 +108,15 @@ sealed class FriendCardSearchException(message: String, cause: Throwable? = null
  * security hides it from the caller. The server changed nothing, so the local cache must not either.
  */
 class FriendshipGoneException : Exception("The friend request or friendship no longer exists")
+
+/** Typed failures of sending a friend request, mapped from the PostgREST error. */
+sealed class FriendRequestException(message: String) : Exception(message) {
+    /** A friendship or request already links the two users (canonical-pair or ordered unique index). */
+    class AlreadyLinked : FriendRequestException("ALREADY_LINKED")
+
+    /** The target is the caller (`friendships_check`). */
+    class SelfRequest : FriendRequestException("SELF_REQUEST")
+
+    /** Row-level security refused the insert, typically because the caller's profile is incomplete. */
+    class NotPermitted : FriendRequestException("NOT_PERMITTED")
+}

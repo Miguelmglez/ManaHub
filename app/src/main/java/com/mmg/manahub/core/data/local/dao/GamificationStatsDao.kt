@@ -87,8 +87,8 @@ interface GamificationStatsDao {
 
     // ── Games (local-seat semantics) ──────────────────────────────────────────────
 
-    /** Total games logged. */
-    @Query("SELECT COUNT(*) FROM game_sessions")
+    /** Games with a local seat; tournament-only sessions do not advance personal progress. */
+    @Query("SELECT COUNT(*) FROM game_sessions gs WHERE EXISTS (SELECT 1 FROM player_sessions ps WHERE ps.sessionId = gs.id AND ps.is_local = 1)")
     suspend fun totalGames(): Int
 
     /** Wins by the local seat. */
@@ -131,8 +131,8 @@ interface GamificationStatsDao {
     )
     suspend fun localWinsAtExactLife(life: Int): Int
 
-    /** Games lasting >= [minDurationMs]. */
-    @Query("SELECT COUNT(*) FROM game_sessions WHERE durationMs >= :minDurationMs")
+    /** Local-seat games lasting >= [minDurationMs]. */
+    @Query("SELECT COUNT(*) FROM game_sessions gs WHERE gs.durationMs >= :minDurationMs AND EXISTS (SELECT 1 FROM player_sessions ps WHERE ps.sessionId = gs.id AND ps.is_local = 1)")
     suspend fun marathonGames(minDurationMs: Long): Int
 
     /** Local wins in COMMANDER mode. */
@@ -145,8 +145,8 @@ interface GamificationStatsDao {
     )
     suspend fun commanderLocalWins(): Int
 
-    /** Games with [minPlayers] or more players. */
-    @Query("SELECT COUNT(*) FROM game_sessions WHERE playerCount >= :minPlayers")
+    /** Local-seat games with [minPlayers] or more players. */
+    @Query("SELECT COUNT(*) FROM game_sessions gs WHERE gs.playerCount >= :minPlayers AND EXISTS (SELECT 1 FROM player_sessions ps WHERE ps.sessionId = gs.id AND ps.is_local = 1)")
     suspend fun multiplayerGames(minPlayers: Int): Int
 
     // ── Decks ──────────────────────────────────────────────────────────────────────

@@ -20,7 +20,7 @@ data class CollectionImportUiState(
     val isCommitting: Boolean = false,
     val isAddingAllToWishlist: Boolean = false,
     val inFlightIds: Set<String> = emptySet(),
-    val isAutoDeleteOnAddEnabled: Boolean = false,
+    val isAutoDeleteOnAddEnabled: Boolean = true,
     val preferredCurrency: PreferredCurrency = PreferredCurrency.USD,
     val ownedCardIdentityKeys: Set<String> = emptySet(),
     val queueToast: CollectionImportToast? = null,
@@ -35,6 +35,8 @@ data class CollectionImportUiState(
     val cardVariants: List<Card> = emptyList(),
     val isLoadingVariants: Boolean = false,
     val expandedVariantImageUrl: String? = null,
+    val isListInverted : Boolean = false
+
 ) {
     /** What the screen actually shows — the flag alone can outlive an emptied queue. */
     val isQueueSheetOpen: Boolean get() = isQueueSheetVisible && queue.isNotEmpty()

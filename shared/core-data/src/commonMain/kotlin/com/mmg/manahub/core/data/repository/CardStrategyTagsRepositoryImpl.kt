@@ -7,6 +7,7 @@ import com.mmg.manahub.core.data.cache.CardStrategyTagsCache
 import com.mmg.manahub.core.data.remote.CARD_STRATEGY_TAGS_ORACLE_ID_CHUNK
 import com.mmg.manahub.core.data.remote.CardStrategyTagsRemoteDataSourceContract
 import com.mmg.manahub.core.data.remote.dto.CardStrategyTagsPayloadDto
+import com.mmg.manahub.core.data.remote.dto.CardStrategyTagSuggestionDto
 import com.mmg.manahub.core.data.remote.dto.CardStrategyTagsRowDto
 import com.mmg.manahub.core.data.tagging.TagDictionary
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
@@ -14,6 +15,7 @@ import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsSubmission
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.TagCategory
+import com.mmg.manahub.core.model.SuggestedTag
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
@@ -23,6 +25,7 @@ private val strategyTagsJson = Json { ignoreUnknownKeys = true; coerceInputValue
  *  per new-set release) — a longer TTL than [CommunityAggregateRepositoryImpl]'s 7-day window is
  *  deliberate and safe here. */
 private const val CARD_STRATEGY_TAGS_FRESH_MS = 14L * 24 * 60 * 60 * 1000
+const val CURRENT_CARD_STRATEGY_PIPELINE_VERSION = "2"
 
 /**
  * Cache-first implementation of [CardStrategyTagsRepository] (Deck Engine Unification plan, D8,
@@ -47,7 +50,7 @@ class CardStrategyTagsRepositoryImpl(
             if (oracleId.isBlank()) return@withContext CardStrategyTagsResult.NotFound
 
             val cached = cache.get(oracleId)
-            if (cached != null && isFresh(cached.fetchedAt)) {
+            if (cached != null && isFresh(cached.fetchedAt) && isCurrentPipelineVersion(cached.pipelineVersion)) {
                 markSource("cache_fresh")
                 return@withContext decode(cached, isStale = false) ?: CardStrategyTagsResult.NotFound
             }
@@ -94,7 +97,7 @@ class CardStrategyTagsRepositoryImpl(
 
             ids.forEach { oracleId ->
                 val cached = cache.get(oracleId)
-                if (cached != null && isFresh(cached.fetchedAt)) {
+                if (cached != null && isFresh(cached.fetchedAt) && isCurrentPipelineVersion(cached.pipelineVersion)) {
                     results[oracleId] = decode(cached, isStale = false) ?: CardStrategyTagsResult.NotFound
                 } else {
                     cached?.let { staleCached[oracleId] = it }
@@ -148,6 +151,7 @@ class CardStrategyTagsRepositoryImpl(
         withContext(dispatcherProvider.io) {
             val payload = CardStrategyTagsPayloadDto(
                 tags = submission.tags,
+                suggestions = submission.suggestions.map { CardStrategyTagSuggestionDto(it.tag.key, it.confidence) },
                 tribes = submission.tribes,
                 themes = submission.themes,
                 archetypes = submission.archetypes,
@@ -174,6 +178,10 @@ class CardStrategyTagsRepositoryImpl(
     }
 
     private fun isFresh(fetchedAt: Long): Boolean = now() - fetchedAt < CARD_STRATEGY_TAGS_FRESH_MS
+
+    private fun isCurrentPipelineVersion(version: String): Boolean =
+        version == CURRENT_CARD_STRATEGY_PIPELINE_VERSION || version == "device" ||
+            (version.toIntOrNull() ?: 0) > CURRENT_CARD_STRATEGY_PIPELINE_VERSION.toInt()
 
     /** Crash-time context / coarse precomputed-vs-fallback signal (RUN 7c telemetry) — O(1) custom-key
      *  overwrite, deliberately not a [crashReporter] log (this resolves on nearly every card
@@ -202,6 +210,9 @@ class CardStrategyTagsRepositoryImpl(
     private fun toFound(payload: CardStrategyTagsPayloadDto, isStale: Boolean): CardStrategyTagsResult.Found =
         CardStrategyTagsResult.Found(
             tags    = payload.tags.map { key -> CardTag(key, TagDictionary.get(key)?.category ?: TagCategory.TYPE) },
+            suggestions = payload.suggestions.filter { it.confidence.isFinite() && it.confidence >= 0.60f && it.confidence <= 1f && it.key !in payload.tags }
+                .map { SuggestedTag(CardTag(it.key, TagDictionary.get(it.key)?.category ?: TagCategory.TYPE), it.confidence) }
+                .distinctBy { it.tag.key },
             tribes  = payload.tribes,
             isStale = isStale,
         )

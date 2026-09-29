@@ -37,12 +37,20 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -127,6 +135,10 @@ class StatsViewModelTest {
 
         every { gameSessionRepository.observeTotalGames() } returns totalGamesFlow
         every { gameSessionRepository.observeLocalWins() } returns localWinsFlow
+        every { gameSessionRepository.observeLocalDraws() } returns flowOf(0)
+        every { gameSessionRepository.observeLocalSessionOutcomes() } returns localSessionHistoryFlow.map { rows ->
+            rows.map { row -> if (row.isDraw) null else row.localIsWinner }
+        }
         every { gameSessionRepository.observeAvgDurationMs() } returns avgDurationFlow
         every { gameSessionRepository.observeFavoriteMode() } returns favoriteModeFlow
         every { gameSessionRepository.observeMostFrequentElimination() } returns mostFrequentEliminationFlow
@@ -151,7 +163,7 @@ class StatsViewModelTest {
         unmockkStatic(FirebaseCrashlytics::class)
     }
 
-    private fun buildViewModel() = StatsViewModel(
+    private fun TestScope.buildViewModel(collectUi: Boolean = true) = StatsViewModel(
         getStats = getStats,
         getSetCodes = getSetCodes,
         getSetCompletionCounts = getSetCompletionCounts,
@@ -162,7 +174,9 @@ class StatsViewModelTest {
         authRepository = authRepository,
         tradesRepository = tradesRepository,
         getTradeStats = getTradeStats,
-    )
+    ).also { viewModel ->
+        if (collectUi) backgroundScope.launch { viewModel.uiState.collect { } }
+    }
 
     // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -572,6 +586,7 @@ class StatsViewModelTest {
         coVerify(exactly = 1) { gameSessionRepository.deleteSession(42L) }
 
         vm.clearDeleteSessionMessage()
+        runCurrent()
         assertNull(vm.uiState.value.deleteSessionSuccess)
     }
 
@@ -681,13 +696,14 @@ class StatsViewModelTest {
     }
 
     @Test
-    fun `given an unauthenticated session when selecting the trades tab then the state is Error synchronously`() = runTest {
+    fun `given an unauthenticated session when selecting the trades tab then the state becomes Error`() = runTest {
         sessionStateFlow.value = SessionState.Unauthenticated
 
         val vm = buildViewModel()
         advanceUntilIdle()
 
         vm.onTabSelected(StatsTab.TRADES)
+        runCurrent()
 
         assertEquals(TradeStatsUiState.Error, vm.uiState.value.tradeStats)
         coVerify(exactly = 0) { getTradeStats(any(), any()) }
@@ -725,5 +741,249 @@ class StatsViewModelTest {
         advanceUntilIdle()
 
         coVerify(exactly = 1) { getTradeStats("user-1", PreferredCurrency.EUR) }
+    }
+
+    @Test
+    fun `when the last game is deleted the selected tab falls back to Collection`() = runTest {
+        totalGamesFlow.value = 1
+        val vm = buildViewModel()
+        advanceUntilIdle()
+        vm.onTabSelected(StatsTab.GAMES)
+        advanceUntilIdle()
+
+        val callsBeforeFallback = getStatsCalls.size
+        totalGamesFlow.value = 0
+        advanceUntilIdle()
+
+        assertEquals(StatsTab.COLLECTION, vm.uiState.value.selectedTab)
+        assertTrue(getStatsCalls.size > callsBeforeFallback)
+    }
+
+    @Test
+    fun `collection query stops five seconds after screen observation stops`() = runTest {
+        var subscriptions = 0
+        every { getStats(any(), any(), any()) } returns flow {
+            subscriptions++
+            try {
+                emit(sampleCollectionStats())
+                awaitCancellation()
+            } finally {
+                subscriptions--
+            }
+        }
+        val vm = buildViewModel(collectUi = false)
+        val collector = backgroundScope.launch { vm.uiState.collect { } }
+        advanceTimeBy(350)
+        runCurrent()
+        assertEquals(1, subscriptions)
+
+        collector.cancel()
+        runCurrent()
+        advanceTimeBy(5_001)
+        runCurrent()
+        assertEquals(0, subscriptions)
+    }
+
+    @Test
+    fun `best streak uses unbounded outcomes and draws preserve streaks`() = runTest {
+        totalGamesFlow.value = 62
+        every { gameSessionRepository.observeLocalSessionOutcomes() } returns
+            flowOf(listOf(true, null, false) + List(59) { true })
+        localSessionHistoryFlow.value = listOf(historyEntry(62, localIsWinner = true))
+        val vm = buildViewModel()
+        advanceUntilIdle()
+        vm.onTabSelected(StatsTab.GAMES)
+        advanceUntilIdle()
+
+        assertEquals(1, vm.uiState.value.gameStats?.currentStreak)
+        assertEquals(59, vm.uiState.value.gameStats?.bestStreak)
+        assertEquals(1, vm.uiState.value.sessionHistory.size)
+    }
+
+    @Test
+    fun `initial collection query failure shows error instead of endless loading`() = runTest {
+        every { getStats(any(), any(), any()) } returns flow { throw IllegalStateException("database unavailable") }
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.isLoading)
+        assertTrue(vm.uiState.value.error != null)
+    }
+
+    @Test
+    fun `slow trade visibility refresh does not block collection state`() = runTest {
+        sessionStateFlow.value = SessionState.Authenticated(authUser("user-1"))
+        val refresh = CompletableDeferred<Result<Unit>>()
+        coEvery { tradesRepository.refreshProposals(any()) } coAnswers { refresh.await() }
+        val vm = buildViewModel()
+        advanceTimeBy(350)
+        runCurrent()
+
+        assertEquals(10, vm.uiState.value.stats?.totalCards)
+        assertFalse(vm.uiState.value.isLoading)
+        refresh.complete(Result.success(Unit))
+    }
+
+    @Test
+    fun `late trade result from prior account cannot replace current account stats`() = runTest {
+        sessionStateFlow.value = SessionState.Authenticated(authUser("user-A"))
+        val oldResult = CompletableDeferred<Result<TradeStats>>()
+        coEvery { getTradeStats("user-A", any()) } coAnswers { oldResult.await() }
+        coEvery { getTradeStats("user-B", any()) } returns
+            Result.success(sampleTradeStats().copy(completedTradesCount = 1))
+        val vm = buildViewModel()
+        advanceUntilIdle()
+        vm.onTabSelected(StatsTab.TRADES)
+        runCurrent()
+
+        sessionStateFlow.value = SessionState.Authenticated(authUser("user-B"))
+        runCurrent()
+        vm.onTabSelected(StatsTab.TRADES)
+        advanceUntilIdle()
+        oldResult.complete(Result.success(sampleTradeStats().copy(completedTradesCount = 99)))
+        advanceUntilIdle()
+
+        val content = vm.uiState.value.tradeStats as TradeStatsUiState.Content
+        assertEquals(1, content.stats.completedTradesCount)
+    }
+
+    @Test
+    fun `switching accounts clears collection stats filters and sets before delayed room data arrives`() = runTest {
+        sessionStateFlow.value = SessionState.Authenticated(authUser("user-A"))
+        val nextStats = CompletableDeferred<CollectionStats>()
+        val nextSets = CompletableDeferred<List<String>>()
+        val oldStats = sampleCollectionStats().copy(totalCards = 42)
+        every { getStats(any(), any(), any()) } answers {
+            if ((sessionStateFlow.value as SessionState.Authenticated).user.id == "user-A") {
+                flowOf(oldStats)
+            } else {
+                flow { emit(nextStats.await()) }
+            }
+        }
+        every { getSetCodes() } answers {
+            if ((sessionStateFlow.value as SessionState.Authenticated).user.id == "user-A") {
+                flowOf(listOf("war"))
+            } else {
+                flow { emit(nextSets.await()) }
+            }
+        }
+        every { getSetCompletionCounts() } returns flowOf(mapOf("war" to 10))
+        coEvery { scryfallDataSource.getAllSets() } returns listOf(magicSet("war"))
+
+        val vm = buildViewModel()
+        advanceUntilIdle()
+        assertEquals(42, vm.uiState.value.stats?.totalCards)
+        assertEquals(listOf("war"), vm.uiState.value.availableSets.map { it.code })
+        vm.onSetSelected(magicSet("war"))
+        vm.onColorSelected(MtgColor.R)
+        advanceUntilIdle()
+
+        sessionStateFlow.value = SessionState.Authenticated(authUser("user-B"))
+        runCurrent()
+
+        val waiting = vm.uiState.value
+        assertEquals(StatsTab.COLLECTION, waiting.selectedTab)
+        assertNull(waiting.stats)
+        assertNull(waiting.selectedSet)
+        assertNull(waiting.selectedColor)
+        assertTrue(waiting.availableSets.isEmpty())
+        assertTrue(waiting.setCompletions.isEmpty())
+        assertTrue(waiting.isLoading)
+        assertNull(waiting.error)
+
+        nextSets.complete(emptyList())
+        nextStats.complete(sampleCollectionStats().copy(totalCards = 3))
+        advanceUntilIdle()
+        assertEquals(3, vm.uiState.value.stats?.totalCards)
+        assertTrue(vm.uiState.value.availableSets.isEmpty())
+    }
+
+    @Test
+    fun `failing new account collection flow never restores previous account content`() = runTest {
+        sessionStateFlow.value = SessionState.Authenticated(authUser("user-A"))
+        val previousStats = sampleCollectionStats().copy(totalCards = 42)
+        val failureGate = CompletableDeferred<Unit>()
+        every { getStats(any(), any(), any()) } answers {
+            if ((sessionStateFlow.value as SessionState.Authenticated).user.id == "user-A") {
+                flowOf(previousStats)
+            } else {
+                flow {
+                    failureGate.await()
+                    throw IllegalStateException("database unavailable")
+                }
+            }
+        }
+
+        val vm = buildViewModel()
+        advanceUntilIdle()
+        assertEquals(42, vm.uiState.value.stats?.totalCards)
+
+        sessionStateFlow.value = SessionState.Authenticated(authUser("user-B"))
+        runCurrent()
+        assertNull(vm.uiState.value.stats)
+        assertTrue(vm.uiState.value.isLoading)
+
+        failureGate.complete(Unit)
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.stats)
+        assertFalse(vm.uiState.value.isLoading)
+        assertTrue(vm.uiState.value.error != null)
+    }
+
+    @Test
+    fun `reopening stats after subscription stops never replays the previous account`() = runTest {
+        sessionStateFlow.value = SessionState.Authenticated(authUser("user-A"))
+        val nextStats = CompletableDeferred<CollectionStats>()
+        every { getStats(any(), any(), any()) } answers {
+            if ((sessionStateFlow.value as SessionState.Authenticated).user.id == "user-A") {
+                flowOf(sampleCollectionStats().copy(totalCards = 42))
+            } else {
+                flow { emit(nextStats.await()) }
+            }
+        }
+
+        val vm = buildViewModel(collectUi = false)
+        val firstCollector = backgroundScope.launch { vm.uiState.collect { } }
+        advanceUntilIdle()
+        assertEquals(42, vm.uiState.value.stats?.totalCards)
+
+        firstCollector.cancel()
+        runCurrent()
+        advanceTimeBy(5_001)
+        runCurrent()
+
+        sessionStateFlow.value = SessionState.Authenticated(authUser("user-B"))
+        val observed = mutableListOf<StatsUiState>()
+        val nextCollector = backgroundScope.launch { vm.uiState.collect { observed.add(it) } }
+        runCurrent()
+
+        assertTrue(observed.isNotEmpty())
+        assertNull(observed.first().stats)
+        assertTrue(observed.first().isLoading)
+        assertNull(vm.uiState.value.stats)
+
+        nextStats.complete(sampleCollectionStats().copy(totalCards = 3))
+        advanceUntilIdle()
+        assertEquals(3, vm.uiState.value.stats?.totalCards)
+        nextCollector.cancel()
+    }
+
+    @Test
+    fun `currency toggle reuses both cached trade values without network refetch`() = runTest {
+        sessionStateFlow.value = SessionState.Authenticated(authUser("user-1"))
+        val stats = sampleTradeStats().copy(netValueDeltaUsd = 12.5, netValueDeltaEur = 9.0)
+        coEvery { getTradeStats("user-1", PreferredCurrency.USD) } returns Result.success(stats)
+        val vm = buildViewModel()
+        advanceUntilIdle()
+        vm.onTabSelected(StatsTab.TRADES)
+        advanceUntilIdle()
+
+        currencyFlow.value = PreferredCurrency.EUR
+        advanceUntilIdle()
+
+        val content = vm.uiState.value.tradeStats as TradeStatsUiState.Content
+        assertEquals(PreferredCurrency.EUR, content.stats.currency)
+        assertEquals(9.0, content.stats.netValueDelta, 0.0001)
+        coVerify(exactly = 0) { getTradeStats("user-1", PreferredCurrency.EUR) }
     }
 }

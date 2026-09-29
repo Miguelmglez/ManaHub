@@ -9,16 +9,16 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.data.queue.InMemoryCardQueueStore
 import com.mmg.manahub.core.data.queue.PersistentCardQueueRepository
 import com.mmg.manahub.core.data.queue.SharedPreferencesCardQueueStore
+import com.mmg.manahub.core.di.ApplicationScope
 import com.mmg.manahub.core.domain.repository.CardQueueRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.queue.AddAllToCollectionResult
 import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardAddOrigin
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.QueuedCard
-import com.mmg.manahub.core.model.CardAddOrigin
-import com.mmg.manahub.core.di.ApplicationScope
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.util.recordSafeNonFatal
@@ -205,10 +205,13 @@ class ScannerViewModel @Inject constructor(
 
     // A mutation that empties the collection queue also closes its sheet (nothing is left to act
     // on); the deck queue sheet has its own empty state and stays open.
-    private fun ScannerUiState.withQueue(cards: List<QueuedCard>) = copy(
-        scanSession = ScanSession(cards),
-        showQueueSheet = showQueueSheet && (cards.isNotEmpty() || !isCollectionTarget),
-    )
+    private fun ScannerUiState.withQueue(cards: List<QueuedCard>): ScannerUiState {
+        val effectiveCards = if (isListInverted) cards.reversed() else cards
+        return copy(
+            scanSession = ScanSession(effectiveCards),
+            showQueueSheet = showQueueSheet && (cards.isNotEmpty() || !isCollectionTarget),
+        )
+    }
 
     private fun ScannerUiState.withWriteGuards(): ScannerUiState =
         if (isCollectionTarget) {
@@ -1246,6 +1249,18 @@ class ScannerViewModel @Inject constructor(
     fun onDuplicateSessionCard(original: QueuedCard) {
         queueRepository.duplicate(original)
         syncQueueSnapshot()
+    }
+
+    fun updateSorting() {
+        _uiState.update { state ->
+            val newInverted = !state.isListInverted
+            val rawCards = queueRepository.queue.value
+            val cardsToUse = if (newInverted) rawCards.reversed() else rawCards
+            state.copy(
+                isListInverted = newInverted,
+                scanSession = ScanSession(cardsToUse)
+            )
+        }
     }
 
     // Note (WS5, `scanner-reliability-plan.md`, 2026-08-25): this ViewModel deliberately does

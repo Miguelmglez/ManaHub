@@ -202,6 +202,7 @@ class HomeViewModelTest {
 
         // Phase 2 stats flows.
         every { gameSessionRepository.observeLocalWins() } returns flowOf(0)
+        every { gameSessionRepository.observeLocalDraws() } returns flowOf(0)
         every { gameSessionRepository.observeLocalSessionHistory(any()) } returns flowOf(emptyList())
         every { gameSessionRepository.observeDeckStats() } returns flowOf(emptyList())
         every { gameSessionRepository.observeMostFrequentElimination() } returns flowOf(null)
@@ -928,7 +929,7 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             val layout = vm.state.value.layout
-            assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+            assertEquals(HomeWidgetType.GREETING_HEADER, layout.first().type)
             // The signed-out default surfaces discovery widgets, not signed-in hubs.
             assertTrue(layout.any { it.type == HomeWidgetType.LATEST_SETS })
             assertTrue(layout.any { it.type == HomeWidgetType.CARD_OF_THE_DAY })
@@ -946,7 +947,7 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             val layout = vm.state.value.layout
-            assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+            assertEquals(HomeWidgetType.GREETING_HEADER, layout.first().type)
             assertTrue(layout.any { it.type == HomeWidgetType.YOUR_DECKS_SHELF })
             assertTrue(layout.any { it.type == HomeWidgetType.COLLECTION_STATS_HUB })
         }
@@ -1075,10 +1076,10 @@ class HomeViewModelTest {
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
 
-        vm.onAction(HomeAction.RemoveWidget(HomeWidgetType.CONTEXT_HERO))
+        vm.onAction(HomeAction.RemoveWidget(HomeWidgetType.GET_STARTED))
         advanceUntilIdle()
 
-        assertTrue(vm.state.value.layout.any { it.type == HomeWidgetType.CONTEXT_HERO })
+        assertTrue(vm.state.value.layout.any { it.type == HomeWidgetType.GET_STARTED })
         assertEquals(0, layoutWriteCount)
     }
 
@@ -1128,7 +1129,8 @@ class HomeViewModelTest {
 
         assertEquals(
             listOf(
-                WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
+                WidgetInstance(HomeWidgetType.GREETING_HEADER, WidgetSize.MEDIUM),
+                WidgetInstance(HomeWidgetType.GET_STARTED, WidgetSize.MEDIUM),
                 WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM),
             ),
             vm.state.value.layout,
@@ -1145,7 +1147,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val ids = vm.state.value.layout.map { it.type }
-        assertEquals(listOf(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.GAME_STATS_HUB), ids)
+        assertEquals(listOf(HomeWidgetType.GREETING_HEADER, HomeWidgetType.GET_STARTED, HomeWidgetType.GAME_STATS_HUB), ids)
     }
 
     @Test
@@ -1170,9 +1172,12 @@ class HomeViewModelTest {
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
 
-        // The HUGE token is dropped; only game_stats_hub survives.
+        // The HUGE token is dropped; only game_stats_hub survives (plus GREETING_HEADER migration).
         assertEquals(
-            listOf(WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM)),
+            listOf(
+                WidgetInstance(HomeWidgetType.GREETING_HEADER, WidgetSize.MEDIUM),
+                WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM),
+            ),
             vm.state.value.layout,
         )
     }
@@ -1255,7 +1260,7 @@ class HomeViewModelTest {
 
         val layout = vm.state.value.layout
         assertTrue(layout.isNotEmpty())
-        assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+        assertEquals(HomeWidgetType.GREETING_HEADER, layout.first().type)
     }
 
     // ── ResetLayout produces correct auth-appropriate default ─────────────────
@@ -1274,7 +1279,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val layout = vm.state.value.layout
-        assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+        assertEquals(HomeWidgetType.GREETING_HEADER, layout.first().type)
         assertFalse(layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
         assertTrue(layout.any { it.type == HomeWidgetType.LATEST_SETS })
     }
@@ -1446,13 +1451,13 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             val types = vm.state.value.layout.map { it.type }
-            assertTrue(HomeWidgetType.CONTEXT_HERO in types)
+            assertTrue(HomeWidgetType.GET_STARTED in types)
             assertFalse(HomeWidgetType.PROGRESSION_HUB in types)
             assertFalse(HomeWidgetType.QUESTS_HUB in types)
         }
 
     @Test
-    fun `claimable quests are counted even though the hero stays pinned to Welcome`() =
+    fun `claimable quests take the hero above the welcome (D13)`() =
         runTest(testDispatcher) {
             questBoardFlow.value = QuestBoard(
                 daily = listOf(quest("d1", status = "COMPLETED"), quest("d2", status = "COMPLETED")),
@@ -1463,8 +1468,40 @@ class HomeViewModelTest {
             backgroundScope.launch { vm.state.collect {} }
             advanceUntilIdle()
 
-            assertTrue(vm.state.value.hero is HomeHeroState.Welcome)
+            assertEquals(HomeHeroState.QuestsReady(count = 2), vm.state.value.hero)
             assertEquals(2, vm.state.value.gamification?.claimableCount)
+        }
+
+    @Test
+    fun `claimable quests never take the hero while gamification is unavailable`() =
+        runTest(testDispatcher) {
+            gamificationEnabledFlow.value = false
+            questBoardFlow.value = QuestBoard(
+                daily = listOf(quest("d1", status = "COMPLETED")),
+                weekly = emptyList(),
+            )
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value.hero is HomeHeroState.Welcome)
+            assertFalse(vm.state.value.gamificationEnabled)
+        }
+
+    @Test
+    fun `the hero returns to the welcome once every quest is claimed`() =
+        runTest(testDispatcher) {
+            questBoardFlow.value = QuestBoard(daily = listOf(quest("d1", status = "COMPLETED")), weekly = emptyList())
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+            assertTrue(vm.state.value.hero is HomeHeroState.QuestsReady)
+
+            questBoardFlow.value = QuestBoard(daily = listOf(quest("d1", status = "CLAIMED")), weekly = emptyList())
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value.hero is HomeHeroState.Welcome)
         }
 
     @Test
@@ -1777,7 +1814,7 @@ class HomeViewModelTest {
         // on every process start — without an explicit warm-up call TRADES_HUB's Inbox always shows
         // "0 pending trades" on a fresh Home open, even with real pending proposals waiting.
         sessionStateFlow.value = SessionState.Authenticated(authUser())
-        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
+        seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.TRADES_HUB)
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
@@ -1789,7 +1826,7 @@ class HomeViewModelTest {
     @Test
     fun `init never calls refreshProposals when signed out`() = runTest(testDispatcher) {
         sessionStateFlow.value = SessionState.Unauthenticated
-        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
+        seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.TRADES_HUB)
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
@@ -1804,7 +1841,7 @@ class HomeViewModelTest {
     fun `tradeSuggestionPreviews resolves matched cards and counterparty names when authenticated`() =
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Authenticated(authUser())
-            seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
+            seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.TRADES_HUB)
             coEvery { tradeSuggestionsRepository.getSuggestions() } returns
                 Result.success(listOf(tradeSuggestion("c1")))
             every { friendRepository.observeFriends() } returns flowOf(
@@ -1829,7 +1866,7 @@ class HomeViewModelTest {
     fun `tradeSuggestionPreviews is an empty (not null) list when unauthenticated`() =
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Unauthenticated
-            seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
+            seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.TRADES_HUB)
 
             val vm = buildViewModel()
             backgroundScope.launch { vm.state.collect {} }
@@ -1842,7 +1879,7 @@ class HomeViewModelTest {
     @Test
     fun `tradeSuggestionPreviews defaults to empty when getSuggestions fails`() = runTest(testDispatcher) {
         sessionStateFlow.value = SessionState.Authenticated(authUser())
-        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
+        seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.TRADES_HUB)
         coEvery { tradeSuggestionsRepository.getSuggestions() } returns Result.failure(RuntimeException("network"))
 
         val vm = buildViewModel()
@@ -1856,7 +1893,7 @@ class HomeViewModelTest {
     fun `tradeSuggestionPreviews drops a suggestion whose card cannot be resolved locally`() =
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Authenticated(authUser())
-            seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
+            seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.TRADES_HUB)
             coEvery { tradeSuggestionsRepository.getSuggestions() } returns
                 Result.success(listOf(tradeSuggestion("unresolvable")))
             coEvery { cardRepository.getCardsByIds(listOf("unresolvable")) } returns emptyList()
@@ -1931,7 +1968,7 @@ class HomeViewModelTest {
             // item-only refreshItemsForThread(rootId), which skips that redundant metadata re-fetch
             // (safe here specifically because metadata was just refreshed).
             sessionStateFlow.value = SessionState.Authenticated(authUser())
-            seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
+            seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.TRADES_HUB)
             val proposal = tradeProposal(id = "p1", status = TradeStatus.PROPOSED, receiverId = "uid-1")
             every { tradesRepository.observeAllProposals() } returns flowOf(listOf(proposal))
 
@@ -1946,7 +1983,7 @@ class HomeViewModelTest {
     @Test
     fun `item-count hydration never fires when refreshProposals fails`() = runTest(testDispatcher) {
         sessionStateFlow.value = SessionState.Authenticated(authUser())
-        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
+        seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.TRADES_HUB)
         coEvery { tradesRepository.refreshProposals(any()) } returns Result.failure(RuntimeException("network"))
 
         val vm = buildViewModel()
@@ -2386,6 +2423,28 @@ class HomeViewModelTest {
         assertEquals(3, vm.state.value.lastGameRecap?.opponentCount)
     }
 
+    @Test
+    fun `win rate excludes draws from its denominator`() = runTest(testDispatcher) {
+        totalGamesFlow.value = 2
+        every { gameSessionRepository.observeLocalWins() } returns flowOf(1)
+        every { gameSessionRepository.observeLocalDraws() } returns flowOf(1)
+        every { gameSessionRepository.observeLocalSessionHistory(any()) } returns flowOf(
+            listOf(
+                com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry(
+                    sessionId = 1L, mode = "COMMANDER", totalTurns = 5, durationMs = 1_000L,
+                    playedAt = 1_000L, winnerName = "Local", surveyStatus = "COMPLETED",
+                    localIsWinner = true, localDeckId = null, localDeckName = null,
+                ),
+            ),
+        )
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(100, vm.state.value.winRate?.percentage)
+        assertEquals(1, vm.state.value.winRate?.totalGames)
+    }
+
     // ── First Steps: buildVisibleSteps condition table (Phase 2.2) ─────────────
 
     @Test
@@ -2621,7 +2680,8 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val expected = listOf(
-            HomeWidgetType.CONTEXT_HERO, HomeWidgetType.QUICK_ACTIONS,
+            HomeWidgetType.GREETING_HEADER,
+            HomeWidgetType.GET_STARTED, HomeWidgetType.QUICK_ACTIONS,
             HomeWidgetType.COLLECTION_STATS_HUB, HomeWidgetType.COMMUNITY_DECKS,
             HomeWidgetType.CARD_OF_THE_DAY, HomeWidgetType.DISCOVER_CARDS,
             HomeWidgetType.LATEST_SETS, HomeWidgetType.RULES_TIP, HomeWidgetType.MTG_NEWS,
@@ -2639,7 +2699,8 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val expected = listOf(
-            HomeWidgetType.CONTEXT_HERO, HomeWidgetType.QUICK_ACTIONS,
+            HomeWidgetType.GREETING_HEADER,
+            HomeWidgetType.GET_STARTED, HomeWidgetType.QUICK_ACTIONS,
             HomeWidgetType.COMMUNITY_DECKS,
             HomeWidgetType.YOUR_DECKS_SHELF, HomeWidgetType.COLLECTION_STATS_HUB, HomeWidgetType.RECENTLY_ADDED,
             HomeWidgetType.LATEST_SETS, HomeWidgetType.MTG_NEWS, HomeWidgetType.RULES_TIP,
@@ -2692,7 +2753,7 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             assertEquals(
-                listOf(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.RULES_TIP),
+                listOf(HomeWidgetType.GREETING_HEADER, HomeWidgetType.GET_STARTED, HomeWidgetType.RULES_TIP),
                 vm.state.value.layout.map { it.type },
             )
         }
@@ -2790,7 +2851,7 @@ class HomeViewModelTest {
     fun `a resubscribe keeps signed-in trades content and never refetches network one-shots`() =
         runTest(testDispatcher) {
             sessionStateFlow.value = SessionState.Authenticated(authUser())
-            seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB, HomeWidgetType.COMMUNITY_DECKS)
+            seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.TRADES_HUB, HomeWidgetType.COMMUNITY_DECKS)
             coEvery { searchCommunityDecksUseCase(any()) } returns DataResult.Success(
                 com.mmg.manahub.core.model.CommunityDeckSearchResult(totalCount = 0, hasMore = false, decks = emptyList()),
             )
@@ -2855,20 +2916,20 @@ class HomeViewModelTest {
     @Test
     fun `account-gated widgets are ready as placeholders when signed out`() = runTest(testDispatcher) {
         sessionStateFlow.value = SessionState.Unauthenticated
-        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB, HomeWidgetType.FRIENDS)
+        seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.TRADES_HUB, HomeWidgetType.FRIENDS)
         val vm = buildViewModel()
         backgroundScope.launch { vm.widgetReadiness.collect {} }
         advanceUntilIdle()
 
         assertEquals(true, vm.widgetReadiness.value[HomeWidgetType.TRADES_HUB])
         assertEquals(true, vm.widgetReadiness.value[HomeWidgetType.FRIENDS])
-        assertEquals(true, vm.widgetReadiness.value[HomeWidgetType.CONTEXT_HERO])
+        assertEquals(true, vm.widgetReadiness.value[HomeWidgetType.GET_STARTED])
     }
 
     @Test
     fun `a signed-in trades hub is not ready until its data lands`() = runTest(testDispatcher) {
         sessionStateFlow.value = SessionState.Authenticated(authUser())
-        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
+        seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.TRADES_HUB)
         val proposals = MutableSharedFlow<List<TradeProposal>>()
         every { tradesRepository.observeActiveProposals() } returns proposals
         val vm = buildViewModel()
@@ -2887,7 +2948,7 @@ class HomeViewModelTest {
     @Test
     fun `a later sign-in re-warms trades when the hub is on the board`() = runTest(testDispatcher) {
         sessionStateFlow.value = SessionState.Unauthenticated
-        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.TRADES_HUB)
+        seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.TRADES_HUB)
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
@@ -2902,7 +2963,7 @@ class HomeViewModelTest {
     @Test
     fun `trades warm-up and suggestions never run while the hub is off the board`() = runTest(testDispatcher) {
         sessionStateFlow.value = SessionState.Authenticated(authUser())
-        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.MTG_NEWS)
+        seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.MTG_NEWS)
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
@@ -3007,7 +3068,7 @@ class HomeViewModelTest {
     @Test
     fun `daily puzzle is never fetched while the feature flag is off`() = runTest(testDispatcher) {
         val getTodayPuzzle = mockk<com.mmg.manahub.feature.puzzle.domain.usecase.GetTodayPuzzleUseCase>()
-        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.DAILY_PUZZLE)
+        seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.DAILY_PUZZLE)
         val vm = buildViewModel(getTodayPuzzleUseCase = getTodayPuzzle, puzzleEnabled = false)
         backgroundScope.launch { vm.dailyPuzzleFlow.collect {} }
         backgroundScope.launch { vm.state.collect {} }
@@ -3027,7 +3088,7 @@ class HomeViewModelTest {
                 payloadJson = "{}",
             ),
         )
-        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.DAILY_PUZZLE)
+        seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.DAILY_PUZZLE)
         val vm = buildViewModel(getTodayPuzzleUseCase = getTodayPuzzle, puzzleEnabled = true)
         val first = backgroundScope.launch { vm.dailyPuzzleFlow.collect {} }
         advanceUntilIdle()
@@ -3075,7 +3136,7 @@ class HomeViewModelTest {
         coEvery { searchCommunityDecksUseCase(capture(filters)) } returns DataResult.Success(
             com.mmg.manahub.core.model.CommunityDeckSearchResult(totalCount = 0, hasMore = false, decks = emptyList()),
         )
-        seedLayout(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.COMMUNITY_DECKS)
+        seedLayout(HomeWidgetType.GET_STARTED, HomeWidgetType.COMMUNITY_DECKS)
         val vm = buildViewModel()
         backgroundScope.launch { vm.communityDecksFlow.collect {} }
         backgroundScope.launch { vm.communityDecksFormatFlow.collect {} }

@@ -24,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -561,5 +562,120 @@ class FriendDetailViewModelTest {
         viewModel.onSearchSubmit()
         advanceUntilIdle()
         verifyNameCalls("q0", 2)
+    }
+
+    // ── P7: F-04 / F-06 / F-18 / F-23 ────────────────────────────────────────
+
+    private val theFriend = com.mmg.manahub.core.model.Friend("fs-1", "friend-1", "Gandalf", "#XYZ123", null)
+
+    private fun TestScope.collectEvents(): MutableList<FriendDetailViewModel.UiEvent> {
+        val events = mutableListOf<FriendDetailViewModel.UiEvent>()
+        backgroundScope.launch { viewModel.events.collect { events += it } }
+        runCurrent()
+        return events
+    }
+
+    @Test
+    fun `a friend missing from a refreshed cache shows the missing state without navigating`() = runTest(dispatcher) {
+        val friends = MutableStateFlow(listOf(theFriend))
+        every { friendRepo.observeFriends() } returns friends
+        createViewModel()
+        val events = collectEvents()
+
+        friends.value = emptyList()
+        advanceUntilIdle()
+
+        assertTrue(events.isEmpty())
+        assertNull(viewModel.uiState.value.friend)
+        assertFalse(viewModel.uiState.value.isLoadingFriend)
+    }
+
+    @Test
+    fun `removing a friend navigates back exactly once even when the cache drops the row`() = runTest(dispatcher) {
+        val friends = MutableStateFlow(listOf(theFriend))
+        every { friendRepo.observeFriends() } returns friends
+        coEvery { friendRepo.removeFriend("fs-1") } coAnswers {
+            friends.value = emptyList()
+            Result.success(Unit)
+        }
+        createViewModel()
+        val events = collectEvents()
+
+        viewModel.removeFriend()
+        viewModel.removeFriend()
+        advanceUntilIdle()
+
+        assertEquals(listOf(FriendDetailViewModel.UiEvent.NavigateBack), events)
+        coVerify(exactly = 1) { friendRepo.removeFriend("fs-1") }
+    }
+
+    @Test
+    fun `a failed removal stays on screen with an error message`() = runTest(dispatcher) {
+        every { friendRepo.observeFriends() } returns MutableStateFlow(listOf(theFriend))
+        coEvery { friendRepo.removeFriend("fs-1") } returns Result.failure(RuntimeException("boom"))
+        createViewModel()
+        val events = collectEvents()
+
+        viewModel.removeFriend()
+        advanceUntilIdle()
+
+        assertTrue(events.isEmpty())
+        assertEquals(FriendDetailMessage.REMOVE_FAILED, viewModel.uiState.value.message)
+        assertFalse(viewModel.uiState.value.isRemoving)
+    }
+
+    @Test
+    fun `a friendship already gone server-side refreshes the cache and leaves once`() = runTest(dispatcher) {
+        every { authRepo.sessionState } returns MutableStateFlow<SessionState>(
+            SessionState.Authenticated(
+                com.mmg.manahub.core.domain.auth.AuthUser("me", null, null, null, null, "email")
+            )
+        )
+        every { friendRepo.observeFriends() } returns MutableStateFlow(listOf(theFriend))
+        coEvery { friendRepo.removeFriend("fs-1") } returns Result.failure(com.mmg.manahub.core.model.FriendshipGoneException())
+        coEvery { friendRepo.refreshFriends("me") } returns Result.success(Unit)
+        coEvery { tradesRepo.refreshProposals(any()) } returns Result.success(Unit)
+        createViewModel()
+        val events = collectEvents()
+
+        viewModel.removeFriend()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { friendRepo.refreshFriends("me") }
+        // The event lands on the background collector after the foreground work goes idle.
+        runCurrent()
+        assertEquals(listOf(FriendDetailViewModel.UiEvent.NavigateBack), events)
+    }
+
+    @Test
+    fun `a next page of only already-shown rows keeps paging instead of stalling`() = runTest(dispatcher) {
+        val first = FriendCardCursor("0a", "row-a")
+        val restarted = FriendCardCursor("1a", "row-a")
+        stubSearch(page("a", cursor = first))
+        coEvery { searchUseCase(any(), any(), any(), first, any()) } returns page("a", cursor = restarted)
+        coEvery { searchUseCase(any(), any(), any(), restarted, any()) } returns page("b")
+        createViewModel()
+
+        viewModel.loadMoreCards()
+        advanceUntilIdle()
+
+        assertEquals(listOf("a", "b"), viewModel.uiState.value.cards.map { it.scryfallId })
+        assertFalse(viewModel.uiState.value.hasMoreCards)
+        assertFalse(viewModel.uiState.value.isLoadingMore)
+    }
+
+    @Test
+    fun `a friend without a stats row is fetched once per screen`() = runTest(dispatcher) {
+        coEvery { friendRepo.getFriendStats("friend-1") } returns Result.success(null)
+        createViewModel()
+
+        viewModel.selectTab(FriendTab.STATS)
+        advanceUntilIdle()
+        viewModel.selectTab(FriendTab.FOLDER)
+        viewModel.selectTab(FriendTab.STATS)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { friendRepo.getFriendStats("friend-1") }
+        assertTrue(viewModel.uiState.value.statsLoaded)
     }
 }

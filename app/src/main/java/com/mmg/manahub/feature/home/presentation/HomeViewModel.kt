@@ -22,11 +22,11 @@ import com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.core.domain.usecase.home.GetAccountNudgeUseCase
+import com.mmg.manahub.core.gamification.domain.GamificationAvailability
 import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
 import com.mmg.manahub.core.gamification.domain.model.QuestBoard
 import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
-import com.mmg.manahub.core.gamification.domain.GamificationAvailability
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.model.CollectionSummary
 import com.mmg.manahub.core.model.CommunityDeckSearchFilters
@@ -62,6 +62,10 @@ import com.mmg.manahub.feature.game.domain.model.DeckStats
 import com.mmg.manahub.feature.game.domain.model.EliminationStats
 import com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
+import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.HOME_TRADE_SUGGESTION_PREVIEW_LIMIT
+import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.MAX_NEWS
+import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.MIN_DISCOVER_SET_CARDS
+import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.SUGGESTIONS_MAX_AGE_MS
 import com.mmg.manahub.feature.news.domain.feed.filterFeed
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
@@ -164,7 +168,6 @@ class HomeViewModel(
     private val crashlytics = FirebaseCrashlytics.getInstance()
 
     /** Set once after the board first resolves, so session context keys are attached lazily. */
-    private var sessionContextKeysSet = false
 
     /** Guards the First Steps completion-flag write so one app session issues it at most once. */
     private var firstStepsCompletionMarkSeenDispatched = false
@@ -224,7 +227,6 @@ class HomeViewModel(
         map<T, T?> { it }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     private fun reportFlowError(source: String, error: Throwable) {
-        crashlytics.setCustomKey("home_flow_error_source", source)
         recordSafeNonFatal("home_flow_$source", error)
         crashlytics.log("home_flow_error: $source")
     }
@@ -423,15 +425,22 @@ class HomeViewModel(
         )
     }
 
-    private val statsSnapshotState: StateFlow<StatsSnapshot?> = combine(
+    private val outcomeTotalsFlow = combine(
         gameSessionRepository.observeLocalWins().catch { emit(0) },
+        gameSessionRepository.observeTotalGames().catch { emit(0) },
+        gameSessionRepository.observeLocalDraws().catch { emit(0) },
+    ) { wins, games, draws -> wins to (games - draws).coerceAtLeast(0) }
+
+    private val statsSnapshotState: StateFlow<StatsSnapshot?> = combine(
+        outcomeTotalsFlow,
         historyState.filterNotNull(),
         gameSessionRepository.observeDeckStats().catch { emit(emptyList()) },
         gameSessionRepository.observeMostFrequentElimination().catch { emit(null) },
         performanceFlow,
-    ) { wins, history, deckStats, nemesis, performance ->
+    ) { totals, history, deckStats, nemesis, performance ->
         StatsSnapshot(
-            localWins = wins,
+            localWins = totals.first,
+            decisiveGames = totals.second,
             history = history,
             deckStats = deckStats,
             nemesis = nemesis,
@@ -1252,7 +1261,7 @@ class HomeViewModel(
 
     /** Persists the Home COMMUNITY_DECKS widget's format filter (null = every format). */
     private fun selectCommunityDecksFormat(format: CommunityDeckFormatFilter?) {
-        crashlytics.log("home_community_decks_format_selected: ${format?.name ?: "all"}")
+        crashlytics.log("home_community_decks_format_selected: ${format?.name ?: "m"}")
         persistPreference("home_community_decks_format") {
             userPrefsDataStore.saveHomeCommunityDecksFormat(format?.name)
         }
@@ -1344,16 +1353,24 @@ class HomeViewModel(
     // Every mutation is a transform applied INSIDE the DataStore edit to the currently stored
     // layout, serialized by [layoutMutex]: two fast taps can never both start from one stale snapshot.
 
-    private fun mutateLayout(transform: (List<WidgetInstance>) -> List<WidgetInstance>) {
+    private fun mutateLayout(
+        event: String? = null,
+        transform: (List<WidgetInstance>) -> List<WidgetInstance>,
+    ) {
         viewModelScope.launch {
             try {
                 layoutMutex.withLock {
                     val default = defaultLayoutFor(authGate.value is AuthGate.SignedIn)
+                    var changed = false
                     userPrefsDataStore.updateHomeLayout(default.map { it.toPersisted() }) { stored ->
-                        transform(stored.toInstancesWithMigration())
+                        val current = stored.toInstancesWithMigration()
+                        val updated = transform(current)
                             .distinctBy { it.type.persistedId }
                             .map { it.toPersisted() }
+                        changed = updated != stored
+                        updated
                     }
+                    if (changed) event?.let(crashlytics::log)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -1374,14 +1391,12 @@ class HomeViewModel(
     }
 
     private fun addWidget(type: HomeWidgetType) {
-        crashlytics.log("home_widget_added: ${type.persistedId}")
-        mutateLayout { current -> current.withWidgetAdded(type) }
+        mutateLayout(event = "home_widget_added: ${type.persistedId}") { current -> current.withWidgetAdded(type) }
     }
 
     private fun removeWidget(type: HomeWidgetType) {
-        crashlytics.log("home_widget_removed: ${type.persistedId}")
         if (type.isAlwaysPresent) return
-        mutateLayout { current -> current.filterNot { it.type == type } }
+        mutateLayout(event = "home_widget_removed: ${type.persistedId}") { current -> current.filterNot { it.type == type } }
     }
 
     private fun replaceLayout(layout: List<WidgetInstance>) {
@@ -1446,7 +1461,8 @@ class HomeViewModel(
         } else {
             null
         }
-        val hero = visibleSteps?.let { resolveHero(it) } ?: HomeHeroState.Loading
+        val claimableQuests = data.gamification?.takeIf { it.enabled }?.data?.claimableCount ?: 0
+        val hero = resolveHero(visibleSteps, claimableQuests)
 
         val activity = core.activity
         val accountPrefs = core.account.prefs
@@ -1479,10 +1495,9 @@ class HomeViewModel(
             persistPreference("first_steps_completion") { userPrefsDataStore.markFirstStepsCompletionSeen() }
         }
 
-        if (boardReady && !sessionContextKeysSet) {
+        if (boardReady) {
             crashlytics.setCustomKey("home_is_authenticated", signedIn)
             crashlytics.setCustomKey("home_hero_type", hero::class.simpleName ?: "Unknown")
-            sessionContextKeysSet = true
         }
         data.layout?.let { crashlytics.setCustomKey("home_layout_widget_count", it.size) }
 
@@ -1543,12 +1558,12 @@ class HomeViewModel(
     // ── Stats → widget model mappers ────────────────────────────────────────────
 
     private fun toWinRate(stats: StatsSnapshot): WinRateStats? {
-        val total = stats.history.size
+        val total = stats.decisiveGames
         if (total == 0) return null
         return WinRateStats(
             wins = stats.localWins,
             totalGames = total,
-            recentResults = stats.history.take(WIN_SPARK_COUNT).map { it.localIsWinner },
+            recentResults = stats.history.filterNot { it.isDraw }.take(WIN_SPARK_COUNT).map { it.localIsWinner },
         )
     }
 
@@ -1646,11 +1661,15 @@ class HomeViewModel(
     }
 
     /**
-     * The hero is pinned to the First Steps welcome (product decision: only Welcome and Loading are
-     * shown). Non-empty [visibleSteps] shows the carousel; empty shows the one-time completion card.
+     * Claimable quests (gamification available, D13) take the hero above the First Steps welcome.
+     * Otherwise non-empty [visibleSteps] shows the carousel, empty shows the one-time completion card,
+     * and null (inputs not yet certain) keeps the hero loading.
      */
-    private fun resolveHero(visibleSteps: List<FirstStepItem>): HomeHeroState =
-        HomeHeroState.Welcome(steps = visibleSteps)
+    private fun resolveHero(visibleSteps: List<FirstStepItem>?, claimableQuests: Int): HomeHeroState = when {
+        claimableQuests > 0 -> HomeHeroState.QuestsReady(count = claimableQuests)
+        visibleSteps != null -> HomeHeroState.Welcome(steps = visibleSteps)
+        else -> HomeHeroState.Loading
+    }
 
     private fun resolveNudge(
         isAuthenticated: Boolean,
@@ -1743,6 +1762,7 @@ class HomeViewModel(
 
     private data class StatsSnapshot(
         val localWins: Int,
+        val decisiveGames: Int,
         val history: List<SessionHistoryEntry>,
         val deckStats: List<DeckStats>,
         val nemesis: EliminationStats?,
@@ -1889,7 +1909,8 @@ class HomeViewModel(
          * (wishlist, gamification, trending, puzzle...) keep the board short.
          */
         private val DEFAULT_LAYOUT_SIGNED_OUT = listOf(
-            WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
+            WidgetInstance(HomeWidgetType.GREETING_HEADER, WidgetSize.MEDIUM),
+            WidgetInstance(HomeWidgetType.GET_STARTED, WidgetSize.MEDIUM),
             WidgetInstance(HomeWidgetType.QUICK_ACTIONS, WidgetSize.MEDIUM),
             WidgetInstance(HomeWidgetType.COLLECTION_STATS_HUB, WidgetSize.MEDIUM),
             WidgetInstance(HomeWidgetType.COMMUNITY_DECKS, WidgetSize.MEDIUM),
@@ -1901,7 +1922,8 @@ class HomeViewModel(
         )
 
         private val DEFAULT_LAYOUT_SIGNED_IN = listOf(
-            WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
+            WidgetInstance(HomeWidgetType.GREETING_HEADER, WidgetSize.MEDIUM),
+            WidgetInstance(HomeWidgetType.GET_STARTED, WidgetSize.MEDIUM),
             WidgetInstance(HomeWidgetType.QUICK_ACTIONS, WidgetSize.MEDIUM),
             WidgetInstance(HomeWidgetType.COMMUNITY_DECKS, WidgetSize.MEDIUM),
             WidgetInstance(HomeWidgetType.YOUR_DECKS_SHELF, WidgetSize.MEDIUM),

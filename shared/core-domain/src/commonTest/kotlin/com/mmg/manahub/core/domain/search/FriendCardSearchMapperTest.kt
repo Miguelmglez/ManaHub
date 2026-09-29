@@ -12,6 +12,18 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FriendCardSearchMapperTest {
+    @Test
+    fun `multicolor survives friend params alongside specific letters`() {
+        val result = FriendCardSearchMapper.toParams("", false, AdvancedSearchQuery(listOf(
+            SearchCriterion.Colors(setOf("M", "W", "U"), ColorMatchMode.ANY_OF),
+            SearchCriterion.ColorIdentity(setOf("M"), ColorMatchMode.EXACTLY),
+        )))
+        assertEquals(listOf("W", "U", "M"), result.colors)
+        assertEquals(listOf("M"), result.identity)
+        assertEquals(ColorMatchMode.ANY_OF, result.colorsMode)
+        assertEquals(ColorMatchMode.EXACTLY, result.identityMode)
+    }
+
 
     private fun params(vararg criteria: SearchCriterion, name: String = "", exact: Boolean = false) =
         FriendCardSearchMapper.toParams(name, exact, AdvancedSearchQuery(criteria.toList()))

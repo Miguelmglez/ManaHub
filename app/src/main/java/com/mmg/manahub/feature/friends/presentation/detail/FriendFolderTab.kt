@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.friends.presentation.detail
 
+import com.mmg.manahub.core.ui.components.MagicActiveFiltersBar
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -28,11 +30,8 @@ import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.InputChip
-import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -68,17 +67,14 @@ import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.InlineErrorState
-import com.mmg.manahub.core.ui.components.MagicCtaButton
-import com.mmg.manahub.core.ui.components.MagicCtaColor
-import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.MagicLoadingFooter
 import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicProgressBar
+import com.mmg.manahub.core.ui.components.MagicSegmentedControl
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
 import com.mmg.manahub.core.ui.components.search.displayLabel
-import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -112,21 +108,13 @@ fun FriendFolderTab(
     var showAdvancedSearch by rememberSaveable { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = spacing.lg, vertical = spacing.sm),
-            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-        ) {
-            FolderSubTab.entries.forEach { subTab ->
-                MagicFilterChip(
-                    modifier = Modifier.weight(1f),
-                    selected = uiState.folderSubTab == subTab,
-                    onClick = { actions.onSubTabSelected(subTab) },
-                    label = subTabLabel(subTab),
-                )
-            }
-        }
+        val subTabs = FolderSubTab.entries
+        MagicSegmentedControl(
+            options = subTabs.map { subTabLabel(it) },
+            selectedIndex = subTabs.indexOf(uiState.folderSubTab),
+            onOptionSelected = { index -> actions.onSubTabSelected(subTabs[index]) },
+            modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.sm),
+        )
 
         FolderSearchRow(
             text = uiState.searchText,
@@ -151,13 +139,22 @@ fun FriendFolderTab(
         }
 
         AnimatedVisibility(visible = uiState.activeCriteriaCount > 0) {
-            ActiveCriteriaRow(
-                criteria = uiState.advancedQuery.criteria,
-                showNameExact = uiState.nameExact && !uiState.showMinLengthHint && uiState.searchText.isNotBlank(),
-                onRemove = actions.onRemoveCriterion,
-                onClearNameExact = actions.onClearNameExact,
-                onClearAll = actions.onClearSearch,
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.xs),
+                verticalArrangement = Arrangement.spacedBy(spacing.xs),
+            ) {
+                MagicActiveFiltersBar(
+                    text = stringResource(R.string.collection_active_filters, uiState.activeCriteriaCount),
+                    clearLabel = stringResource(R.string.collection_clear_filters),
+                    onClear = actions.onClearSearch,
+                )
+                ActiveCriteriaRow(
+                    criteria = uiState.advancedQuery.criteria,
+                    showNameExact = uiState.nameExact && !uiState.showMinLengthHint && uiState.searchText.isNotBlank(),
+                    onRemove = actions.onRemoveCriterion,
+                    onClearNameExact = actions.onClearNameExact,
+                )
+            }
         }
 
         if (uiState.isLoadingCards && uiState.cards.isNotEmpty()) {
@@ -177,6 +174,8 @@ fun FriendFolderTab(
                 actions.onApplyAdvancedSearch(query)
                 showAdvancedSearch = false
             },
+            onClear = actions.onApplyAdvancedSearch,
+            stateKey = "friend_folder",
             appliedQuery = uiState.sheetQuery,
         )
     }
@@ -291,7 +290,8 @@ private fun FolderCardList(
                 lastVisible >= info.totalItemsCount - LOAD_MORE_THRESHOLD
         }
     }
-    LaunchedEffect(shouldLoadMore) {
+    // Keyed on the row count too: a page that adds rows while the trigger stays true must re-arm it.
+    LaunchedEffect(shouldLoadMore, uiState.cards.size) {
         if (shouldLoadMore) actions.onLoadMore()
     }
 
@@ -401,12 +401,9 @@ private fun FolderSearchRow(
                 {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (isSearching) {
-                            CircularProgressIndicator(
-                                modifier = Modifier
-                                    .size(MagicLoadingSize.XSmall.dp)
-                                    .semantics { contentDescription = searchingDescription },
-                                color = mc.primaryAccent,
-                                strokeWidth = spacing.xxs,
+                            MagicLoadingSpinner(
+                                size = MagicLoadingSize.XSmall,
+                                modifier = Modifier.semantics { contentDescription = searchingDescription },
                             )
                         }
                         if (text.isNotEmpty()) {
@@ -465,12 +462,10 @@ private fun ActiveCriteriaRow(
     showNameExact: Boolean,
     onRemove: (SearchCriterion) -> Unit,
     onClearNameExact: () -> Unit,
-    onClearAll: () -> Unit,
 ) {
     val spacing = MaterialTheme.spacing
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = spacing.lg),
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -483,39 +478,19 @@ private fun ActiveCriteriaRow(
         itemsIndexed(criteria, key = { index, criterion -> "$index:${criterion.hashCode()}" }) { _, criterion ->
             RemovableCriterionChip(criterion.displayLabel()) { onRemove(criterion) }
         }
-        item(key = "clear_all") {
-            MagicCtaButton(
-                onClick = onClearAll,
-                text = stringResource(R.string.collection_clear_filters),
-                style = MagicCtaStyle.Ghost,
-                color = MagicCtaColor.Error,
-            )
-        }
     }
 }
 
 @Composable
 private fun RemovableCriterionChip(label: String, onRemove: () -> Unit) {
-    val mc = MaterialTheme.magicColors
     val removeDescription = stringResource(R.string.friend_folder_remove_criterion, label)
-    InputChip(
+    MagicFilterChip(
         selected = true,
         onClick = onRemove,
-        label = { Text(label, style = MaterialTheme.magicTypography.labelMedium) },
-        trailingIcon = {
-            Icon(
-                Icons.Default.Close,
-                contentDescription = null,
-                modifier = Modifier.size(InputChipDefaults.IconSize),
-            )
+        label = label,
+        leadingIcon = {
+            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(MaterialTheme.spacing.lg))
         },
-        shape = ChipShape,
-        colors = InputChipDefaults.inputChipColors(
-            selectedContainerColor = mc.primaryAccent.copy(alpha = 0.15f),
-            selectedLabelColor = mc.primaryAccent,
-            selectedTrailingIconColor = mc.primaryAccent,
-        ),
-        border = null,
         modifier = Modifier.semantics { contentDescription = removeDescription },
     )
 }

@@ -5,7 +5,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -13,9 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CardGiftcard
@@ -50,96 +47,94 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.gamification.presentation.RewardPreview
 
+private const val REWARD_COLUMNS = 2
+
 /**
- * The Rewards tab body (ADR-002, Phase 3, Chunk B). Renders the full cosmetics catalog grouped by
- * [UnlockableKind] with a "N / M unlocked" header, driven entirely off [board] so locked items still
- * render with a "how to unlock" hint.
- *
- * Layout is a SINGLE [LazyVerticalGrid] (2 cols) to avoid nested same-axis scroll containers: the
- * header and each section title occupy a full-span item, and the cells flow as 2-column grid items
- * keyed by the stable [RewardUiModel.id] (ids are unique across the board, never index).
- *
- * Stateless: equip/unequip are hoisted to the ViewModel. Locked cells are not tappable to equip.
+ * Emits the Rewards tab as items of the Profile screen's single [androidx.compose.foundation.lazy.LazyColumn]:
+ * a "N / M unlocked" header, then each [UnlockableKind] section as a header plus rows of
+ * [REWARD_COLUMNS] cells. Locked items render with a "how to unlock" hint and cannot be equipped.
  *
  * @param board the full rewards board (every cosmetic, owned/locked/equipped flagged).
  * @param onEquip invoked when an owned, not-equipped cell is tapped.
  * @param onUnequip invoked when an owned, equipped cell is tapped.
- * @param contentPadding bottom inset so the grid clears the nav bar.
  */
-@Composable
-fun RewardsTab(
+fun LazyListScope.rewardsTabItems(
     board: RewardsBoard,
     onEquip: (RewardUiModel) -> Unit,
     onUnequip: (RewardUiModel) -> Unit,
-    modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(0.dp),
 ) {
     if (board.totalCount == 0) {
-        EmptyState(
-            icon = Icons.Default.CardGiftcard,
-            title = stringResource(R.string.rewards_empty_title),
-            subtitle = stringResource(R.string.rewards_empty_desc),
-            modifier = modifier,
-        )
+        item(key = "rewards_empty") {
+            EmptyState(
+                icon = Icons.Default.CardGiftcard,
+                title = stringResource(R.string.rewards_empty_title),
+                subtitle = stringResource(R.string.rewards_empty_desc),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = MaterialTheme.spacing.xxl),
+            )
+        }
         return
     }
 
-    // Fixed display order of sections: titles → badges → frames → rings.
-    val sections = listOf(
-        UnlockableKind.TITLE to R.string.reward_section_titles,
-        UnlockableKind.BADGE to R.string.reward_section_badges,
-        UnlockableKind.AVATAR_FRAME to R.string.reward_section_frames,
-        UnlockableKind.LEVEL_RING_STYLE to R.string.reward_section_rings,
-    )
+    item(key = "rewards_header") {
+        RewardsHeader(
+            ownedCount = board.ownedCount,
+            totalCount = board.totalCount,
+            modifier = Modifier.padding(
+                horizontal = MaterialTheme.spacing.lg,
+                vertical = MaterialTheme.spacing.sm,
+            ),
+        )
+    }
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = modifier.fillMaxWidth(),
-        contentPadding = contentPadding,
-        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
-    ) {
-        // Header (full span).
-        item(key = "rewards_header", span = { GridItemSpan(maxLineSpan) }) {
-            RewardsHeader(
-                ownedCount = board.ownedCount,
-                totalCount = board.totalCount,
+    REWARD_SECTIONS.forEach { (kind, sectionTitleRes) ->
+        val rewards = board.byKind[kind].orEmpty()
+        if (rewards.isEmpty()) return@forEach
+        item(key = "rewards_section_${kind.name}", contentType = "reward_section") {
+            RewardSectionTitle(
+                titleRes = sectionTitleRes,
                 modifier = Modifier.padding(
-                    horizontal = MaterialTheme.spacing.lg,
-                    vertical = MaterialTheme.spacing.sm,
+                    start = MaterialTheme.spacing.lg,
+                    end = MaterialTheme.spacing.lg,
+                    top = MaterialTheme.spacing.sm,
                 ),
             )
         }
-
-        sections.forEach { (kind, sectionTitleRes) ->
-            val items = board.byKind[kind].orEmpty()
-            if (items.isNotEmpty()) {
-                item(key = "section_${kind.name}", span = { GridItemSpan(maxLineSpan) }) {
-                    SectionHeader(
-                        titleRes = sectionTitleRes,
-                        modifier = Modifier.padding(
-                            start = MaterialTheme.spacing.lg,
-                            end = MaterialTheme.spacing.lg,
-                            top = MaterialTheme.spacing.sm,
-                        ),
-                    )
-                }
-                items(
-                    count = items.size,
-                    key = { index -> items[index].id },
-                ) { index ->
-                    val reward = items[index]
+        val rows = rewards.chunked(REWARD_COLUMNS)
+        items(
+            count = rows.size,
+            key = { index -> "rewards_row_${kind.name}_${rows[index].first().id}" },
+            contentType = { "reward_row" },
+        ) { index ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = MaterialTheme.spacing.sm, vertical = MaterialTheme.spacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+            ) {
+                val row = rows[index]
+                row.forEach { reward ->
                     RewardCell(
                         reward = reward,
                         onEquip = { onEquip(reward) },
                         onUnequip = { onUnequip(reward) },
-                        modifier = Modifier.padding(horizontal = MaterialTheme.spacing.xs),
+                        modifier = Modifier.weight(1f),
                     )
                 }
+                repeat(REWARD_COLUMNS - row.size) { Spacer(modifier = Modifier.weight(1f)) }
             }
         }
     }
 }
+
+/** Fixed display order of sections: titles → badges → frames → rings. */
+private val REWARD_SECTIONS = listOf(
+    UnlockableKind.TITLE to R.string.reward_section_titles,
+    UnlockableKind.BADGE to R.string.reward_section_badges,
+    UnlockableKind.AVATAR_FRAME to R.string.reward_section_frames,
+    UnlockableKind.LEVEL_RING_STYLE to R.string.reward_section_rings,
+)
 
 /** "N / M unlocked" header. */
 @Composable
@@ -156,9 +151,9 @@ private fun RewardsHeader(
     )
 }
 
-/** A section header (full-span row above a kind's cells). */
+/** A section title (full-width row above a kind's cells). */
 @Composable
-private fun SectionHeader(@StringRes titleRes: Int, modifier: Modifier = Modifier) {
+private fun RewardSectionTitle(@StringRes titleRes: Int, modifier: Modifier = Modifier) {
     Text(
         text = stringResource(titleRes).uppercase(),
         style = MaterialTheme.magicTypography.labelLarge,
@@ -260,9 +255,9 @@ private fun EquippedMarker(modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
     Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.18f), modifier = modifier) {
         Row(
-            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.sm, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.sm, vertical = MaterialTheme.spacing.xxs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs),
         ) {
             Icon(
                 imageVector = Icons.Default.Check,
@@ -286,7 +281,7 @@ private fun LockedMarker(hint: String, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs),
     ) {
         Icon(
             imageVector = Icons.Default.Lock,

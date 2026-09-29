@@ -253,8 +253,10 @@ object SetDraftDetailUiModelBuilder {
         if (colorFilter.isEmpty() && query.isEmpty()) return tiers
         return tiers.mapNotNull { tier ->
             val matching = tier.cards.filter { card ->
-                val matchesColor = colorFilter.isEmpty() ||
-                    card.colors.ifEmpty { listOf("C") }.any { it in colorFilter }
+                val selectedColors = colorFilter - "M"
+                val matchesColor = (selectedColors.isEmpty() ||
+                    card.colors.ifEmpty { listOf("C") }.any { it in selectedColors }) &&
+                    ("M" !in colorFilter || card.colors.distinct().size >= 2)
                 val matchesQuery = query.isEmpty() || card.name.contains(query, ignoreCase = true)
                 matchesColor && matchesQuery
             }

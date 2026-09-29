@@ -23,7 +23,7 @@ object FriendCardSearchMapper {
     /** Shorter free text is not sent: a 1-char substring matches nearly every card anyway. */
     const val MIN_NAME_LENGTH = 2
 
-    private val COLOR_LETTERS = listOf("W", "U", "B", "R", "G", "C")
+    private val COLOR_LETTERS = listOf("W", "U", "B", "R", "G", "C", "M")
     private val FORMAT_ID = Regex("^[a-z]{2,20}$")
     private val DEFAULTS = FriendCardSearchParams()
     // Mirrors the RPC's type validation; anything else is rejected server-side with INVALID_ARGUMENT.

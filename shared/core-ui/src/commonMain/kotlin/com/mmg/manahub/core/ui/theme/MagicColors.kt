@@ -602,6 +602,13 @@ val MagicColors.overlayScrim: Color get() = Color(0xFF000000).copy(alpha = 0.80f
 /** Lighter variant of [overlayScrim] for a non-blocking "eliminated" veil. */
 val MagicColors.overlayScrimSoft: Color get() = Color(0xFF000000).copy(alpha = 0.72f)
 
+/**
+ * Ink for text drawn over [overlayScrim]/[overlayScrimSoft], or over a photo darkened by them.
+ *
+ * Theme-independent for the same reason as the scrims: `textPrimary` is near-black on HallowedPrint.
+ */
+val MagicColors.onOverlayScrim: Color get() = Color(0xFFF7F5F0)
+
 /** Ink for icons/text drawn on a bright accent-filled surface (dice/coin faces, badges). */
 val MagicColors.onBrightSurface: Color get() = Color(0xFF000000).copy(alpha = 0.60f)
 

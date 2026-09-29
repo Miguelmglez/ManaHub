@@ -426,8 +426,8 @@ interface DeckDao {
     """)
     fun observeDeckSummaryRows(): Flow<List<DeckSummaryRow>>
 
-    @Query("SELECT COUNT(*) FROM decks WHERE is_deleted = 0")
-    fun observeDeckCount(): Flow<Int>
+    @Query("SELECT COUNT(*) FROM decks WHERE is_deleted = 0 AND (user_id = :userId OR user_id IS NULL)")
+    fun observeDeckCount(userId: String?): Flow<Int>
 
     @Query("""
         SELECT d.* FROM decks d

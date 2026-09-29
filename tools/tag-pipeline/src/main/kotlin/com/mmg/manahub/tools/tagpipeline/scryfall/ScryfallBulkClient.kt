@@ -13,6 +13,8 @@ import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
+import java.security.MessageDigest
+import java.nio.file.StandardCopyOption
 
 /**
  * Downloads + caches Scryfall's bulk-data files (`oracle_cards`, `oracle_tags`) and streams their
@@ -37,6 +39,10 @@ class ScryfallBulkClient(
      *  `"oracle_tags"`). Prefers `jsonl_download_uri` (the JSONL/gzip format Scryfall is
      *  standardizing on) over the legacy `download_uri` JSON-array format. */
     fun resolveDownloadUri(type: String): String {
+        return resolveBulkEntry(type).first
+    }
+
+    private fun resolveBulkEntry(type: String): Pair<String, String> {
         val request = HttpRequest.newBuilder(URI.create(BULK_DATA_INDEX_URL))
             .header("User-Agent", USER_AGENT)
             .header("Accept", "application/json")
@@ -49,9 +55,12 @@ class ScryfallBulkClient(
         val index = PIPELINE_JSON.decodeFromString(BulkDataIndexDto.serializer(), response.body())
         val entry = index.data.firstOrNull { it.type == type }
             ?: error("No bulk-data entry of type '$type' in the Scryfall bulk-data index")
-        return entry.jsonlDownloadUri
+        val uri = entry.jsonlDownloadUri
             ?: entry.downloadUri
             ?: error("Bulk-data entry '$type' has neither jsonl_download_uri nor download_uri")
+        val updatedAt = entry.updatedAt?.takeIf(String::isNotBlank)
+            ?: error("Bulk-data entry '$type' has no updated_at; refusing an unversioned cache")
+        return uri to updatedAt
     }
 
     /** Downloads [uri] to [cache]'s [cacheFileName] UNLESS it already exists — streams straight to
@@ -63,20 +72,28 @@ class ScryfallBulkClient(
             .header("User-Agent", USER_AGENT)
             .GET()
             .build()
-        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(dest))
-        if (response.statusCode() != 200) {
-            // Clean up the partial/error file so a retry doesn't mistake it for a valid cache hit.
-            Files.deleteIfExists(dest)
-            error("Download of $uri returned HTTP ${response.statusCode()}")
+        val temp = Files.createTempFile(dest.parent, "bulk-", ".tmp")
+        try {
+            val response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(temp))
+            check(response.statusCode() == 200) { "Download of $uri returned HTTP ${response.statusCode()}" }
+            Files.move(temp, dest, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        } finally {
+            Files.deleteIfExists(temp)
         }
         return dest
     }
 
+    private fun versionedCacheName(type: String, uri: String, updatedAt: String): String {
+        val bytes = MessageDigest.getInstance("SHA-256").digest("$updatedAt\n$uri".toByteArray(Charsets.UTF_8))
+        val version = bytes.take(12).joinToString("") { "%02x".format(it) }
+        return "$type-$version.jsonl.gz"
+    }
+
     /** Convenience: resolve + download-if-absent + stream-decode `oracle_cards` as [CardDto]. */
     fun streamOracleCards(): Sequence<CardDto> {
-        val uri = resolveDownloadUri("oracle_cards")
-        val file = downloadIfAbsent(uri, "oracle-cards.jsonl.gz")
-        return readJsonl(file, CardDto.serializer(), gzip = true)
+        val (uri, updatedAt) = resolveBulkEntry("oracle_cards")
+        val file = downloadIfAbsent(uri, versionedCacheName("oracle-cards", uri, updatedAt))
+        return readJsonl(file, CardDto.serializer(), gzip = true, strict = true)
     }
 
     /** Convenience: resolve + download-if-absent + stream-decode `oracle_tags` as [OracleTagDto].
@@ -85,14 +102,13 @@ class ScryfallBulkClient(
      *  formally documented grammar", same fallibility class the app's own `otag:` query fallback
      *  already treats it as), so its absence must degrade the pipeline to rule-engine-only tags,
      *  never abort the whole run. */
-    fun streamOracleTagsOrEmpty(): Sequence<OracleTagDto> = try {
-        val uri = resolveDownloadUri("oracle_tags")
-        val file = downloadIfAbsent(uri, "oracle-tags.jsonl.gz")
-        readJsonl(file, OracleTagDto.serializer(), gzip = true)
-    } catch (e: Exception) {
-        System.err.println("[tag-pipeline] oracle_tags fetch failed, continuing without Tagger data: ${e.message}")
-        emptySequence()
+    fun streamOracleTags(): Sequence<OracleTagDto> {
+        val (uri, updatedAt) = resolveBulkEntry("oracle_tags")
+        val file = downloadIfAbsent(uri, versionedCacheName("oracle-tags", uri, updatedAt))
+        return readJsonl(file, OracleTagDto.serializer(), gzip = true, strict = true)
     }
+
+    fun streamOracleTagsOrEmpty(): Sequence<OracleTagDto> = runCatching { streamOracleTags() }.getOrElse { emptySequence() }
 
     companion object {
         const val BULK_DATA_INDEX_URL = "https://api.scryfall.com/bulk-data"
@@ -108,4 +124,5 @@ private data class BulkDataEntryDto(
     @SerialName("type") val type: String,
     @SerialName("download_uri") val downloadUri: String? = null,
     @SerialName("jsonl_download_uri") val jsonlDownloadUri: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
 )

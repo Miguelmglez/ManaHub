@@ -4,9 +4,8 @@ package com.mmg.manahub.feature.decks.domain.engine
 // Single source for role<->CardTag membership; see ADR-009 for per-key citations.
 object CategoryVocabulary {
 
-    // counters_payoff/plus_counters and landfall_payoff/landfall share one detection rule (ADR-009).
+    // Counter production no longer implies a payoff; landfall keeps its keyword equivalence.
     private val WIDENED_MEMBERSHIP: Map<RoleKey, Set<String>> = mapOf(
-        "counters_payoff" to setOf("counters_payoff", "plus_counters"),
         "landfall_payoff" to setOf("landfall_payoff", "landfall"),
     )
 

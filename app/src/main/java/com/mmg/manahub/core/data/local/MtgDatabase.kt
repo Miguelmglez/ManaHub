@@ -68,6 +68,8 @@ import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
 import com.mmg.manahub.core.data.local.entity.LocalOpenForTradeEntity
 import com.mmg.manahub.core.data.local.entity.LocalWishlistEntity
 import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
+import com.mmg.manahub.core.data.local.entity.TradeOfferCleanupEntity
+import com.mmg.manahub.core.data.local.entity.TradeWishlistCleanupEntity
 
 @Database(
     entities = [
@@ -94,6 +96,8 @@ import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
         LocalWishlistEntity::class,
         LocalOpenForTradeEntity::class,
         TradeCollectionSyncEntity::class,
+        TradeOfferCleanupEntity::class,
+        TradeWishlistCleanupEntity::class,
         PlaytestSessionEntity::class,
         PlaytestCardStatEntity::class,
         PlaytestSurveyAnswerEntity::class,
@@ -116,10 +120,10 @@ import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
         CardStrategyTagsCacheEntity::class,
         // Daily Puzzle feature, Batch B1 foundation (v50)
         PuzzleResultEntity::class,
-        // MTG Today saved items (v57)
+        // MTG Today saved items (v59)
         NewsSavedItemEntity::class,
     ],
-    version = 57,
+    version = 59,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)

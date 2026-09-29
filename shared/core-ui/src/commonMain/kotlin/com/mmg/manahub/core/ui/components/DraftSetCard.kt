@@ -132,8 +132,7 @@ fun DraftSetCard(
                         style = ty.titleMedium,
                         color = mc.textPrimary,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 2
                     )
 
                     // Bottom Row: Release date on left, Set code on right

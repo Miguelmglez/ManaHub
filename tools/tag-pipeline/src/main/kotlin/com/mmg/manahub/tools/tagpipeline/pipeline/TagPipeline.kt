@@ -9,9 +9,11 @@ import com.mmg.manahub.tools.tagpipeline.edhrec.EdhrecThemeClient
 import com.mmg.manahub.tools.tagpipeline.engine.CardTagEngine
 import com.mmg.manahub.tools.tagpipeline.mapping.mapTaggerSlugsToCardTags
 import com.mmg.manahub.tools.tagpipeline.model.CardStrategyTagsRow
+import com.mmg.manahub.tools.tagpipeline.model.CardStrategyTagSuggestion
 import com.mmg.manahub.tools.tagpipeline.model.buildCardStrategyTagsRow
 import com.mmg.manahub.tools.tagpipeline.scryfall.OracleTagDto
 import com.mmg.manahub.tools.tagpipeline.scryfall.buildOracleTagIndex
+import java.security.MessageDigest
 
 /**
  * Bump whenever [com.mmg.manahub.tools.tagpipeline.engine.CardTagEngine]'s inputs change in a way
@@ -20,7 +22,7 @@ import com.mmg.manahub.tools.tagpipeline.scryfall.buildOracleTagIndex
  * meaningful: a version bump forces every card to be reprocessed on the next run, even ones already
  * present in the watermark manifest.
  */
-const val PIPELINE_VERSION: Int = 1
+const val PIPELINE_VERSION: Int = 2
 
 /**
  * Orchestrates the full pipeline (plan §5 Phase 5a steps 2, 3, 4, 5, 6): rule-engine tags + curated
@@ -64,7 +66,8 @@ class TagPipeline(private val cardTagEngine: CardTagEngine = CardTagEngine()) {
     ): Map<String, Map<String, Float>> {
         val result = HashMap<String, MutableMap<String, Float>>()
         slugToId.forEach { (slug, id) ->
-            val page = edhrecClient.fetchThemePageOrNull(slug) ?: return@forEach
+            val page = edhrecClient.fetchThemePageOrNull(slug)
+                ?: error("EDHREC source unavailable for $slug; refusing incomplete publication")
             val key = idKey(id)
             harvestCardSignals(page).forEach { signal ->
                 val byId = result.getOrPut(signal.cardName) { mutableMapOf() }
@@ -99,19 +102,16 @@ class TagPipeline(private val cardTagEngine: CardTagEngine = CardTagEngine()) {
          *  by default (added 2026-07-21 alongside [buildArchetypeIndexByCardName] — see
          *  [com.mmg.manahub.feature.decks.domain.engine.EDHREC_SLUG_TO_ARCHETYPE_ID]'s KDoc). */
         archetypeIndexByCardName: Map<String, Map<String, Float>> = emptyMap(),
+        requireOracleTags: Boolean = false,
     ): Sequence<CardStrategyTagsRow> {
         val oracleTagIndex = buildOracleTagIndex(oracleTagRows)
+        check(!requireOracleTags || oracleTagIndex.isNotEmpty()) {
+            "oracle_tags source decoded no card associations; refusing incomplete publication"
+        }
 
         return cardDtos.mapNotNull { dto ->
             val card = dto.toDomain()
             val oracleId = card.oracleId.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-
-            if (since != null && !SinceWatermark.shouldReprocess(oracleId, pipelineVersion, since.manifest)) {
-                return@mapNotNull null
-            }
-
-            val ruleEngineTags = cardTagEngine.confirmedTagKeys(card)
-            val tribes = cardTagEngine.tribeWords(card)
 
             val taggerSlugs = oracleTagIndex[oracleId].orEmpty()
             val taggerTags = mapTaggerSlugsToCardTags(taggerSlugs)
@@ -120,6 +120,28 @@ class TagPipeline(private val cardTagEngine: CardTagEngine = CardTagEngine()) {
             val archetypes = archetypeIndexByCardName[card.name].orEmpty()
 
             val archidektCategory = archidektCategoryByOracleId[oracleId]
+            val inputFingerprint = fingerprintOf(
+                card.name,
+                card.typeLine,
+                card.oracleText.orEmpty(),
+                card.keywords.sorted().joinToString(","),
+                taggerSlugs.sorted().joinToString(","),
+                themes.toSortedMap().toString(),
+                archetypes.toSortedMap().toString(),
+                archidektCategory.orEmpty(),
+                pipelineVersion.toString(),
+            )
+            if (since != null && !SinceWatermark.shouldReprocess(
+                    oracleId, pipelineVersion, since.manifest, inputFingerprint,
+                    since.fingerprints, since.requireFingerprint,
+                )) return@mapNotNull null
+
+            val analyzedTags = cardTagEngine.analyze(card)
+            val ruleEngineTags = analyzedTags.confirmed.map { it.key }.toSet()
+            val suggestions = analyzedTags.suggested.map {
+                CardStrategyTagSuggestion(it.tag.key, it.confidence)
+            }
+            val tribes = cardTagEngine.tribeWords(card)
 
             val sources = buildSet {
                 add("rule_engine")
@@ -131,6 +153,8 @@ class TagPipeline(private val cardTagEngine: CardTagEngine = CardTagEngine()) {
             buildCardStrategyTagsRow(
                 oracleId = oracleId,
                 tags = ruleEngineTags + taggerTags + setOfNotNull(archidektCategory),
+                suggestions = suggestions.filterNot { it.key in taggerTags || it.key == archidektCategory },
+                inputFingerprint = inputFingerprint,
                 tribes = tribes,
                 themes = themes,
                 archetypes = archetypes,
@@ -143,6 +167,21 @@ class TagPipeline(private val cardTagEngine: CardTagEngine = CardTagEngine()) {
     }
 }
 
+private fun fingerprintOf(vararg parts: String): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    parts.forEach { part ->
+        val bytes = part.toByteArray(Charsets.UTF_8)
+        digest.update(bytes.size.toString().toByteArray(Charsets.US_ASCII))
+        digest.update(0.toByte())
+        digest.update(bytes)
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+}
+
 /** Bundles the loaded `--since` manifest so [TagPipeline.buildRows] takes one nullable param
  *  instead of two (a manifest map + a "is --since even active" flag). */
-data class SinceFilter(val manifest: Map<String, Int>)
+data class SinceFilter(
+    val manifest: Map<String, Int>,
+    val fingerprints: Map<String, String> = emptyMap(),
+    val requireFingerprint: Boolean = false,
+)

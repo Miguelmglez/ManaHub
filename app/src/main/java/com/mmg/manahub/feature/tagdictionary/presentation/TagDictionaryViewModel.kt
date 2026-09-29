@@ -7,6 +7,7 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.tagging.TagDictionary
 import com.mmg.manahub.core.tagging.TagDictionaryRepository
+import com.mmg.manahub.core.tagging.CardMechanicCatalogRepository
 import com.mmg.manahub.core.tagging.TagDictionaryRepository.Companion.CUSTOM_KEY_PREFIX
 import com.mmg.manahub.core.tagging.TagOverride
 import com.mmg.manahub.core.util.recordNonFatal
@@ -70,6 +71,7 @@ sealed class TagDictionaryEvent {
 class TagDictionaryViewModel(
     private val dictionaryRepo: TagDictionaryRepository,
     private val prefs:          UserPreferencesDataStore,
+    private val mechanicCatalog: CardMechanicCatalogRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(TagDictionaryUiState())
@@ -85,6 +87,10 @@ class TagDictionaryViewModel(
     init {
         // One-time prime + migration (legacy-shape re-encode, D12 system-key override retirement).
         viewModelScope.launch { dictionaryRepo.loadAndApply() }
+        viewModelScope.launch {
+            mechanicCatalog.loadCached()
+            mechanicCatalog.entries.collect { _state.update { state -> state.copy(rows = buildRows()) } }
+        }
 
         // F4: the single reactive source of truth for `rows` — replaces the old imperative
         // refreshRows()-after-every-mutation chain and the dead overridesFlow.first() touch.

@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -46,10 +45,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Badge
@@ -100,32 +100,32 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.data.network.RateLimitExhaustedException
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardQueueSheet
 import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.ui.components.CardRow
+import com.mmg.manahub.core.ui.components.CardRowSelectionStyle
 import com.mmg.manahub.core.ui.components.EditQueuedCardSheet
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
 import com.mmg.manahub.core.ui.components.HexGridBackground
-import com.mmg.manahub.core.ui.components.LanguageSelectorSheet
 import com.mmg.manahub.core.ui.components.InlineErrorState
+import com.mmg.manahub.core.ui.components.LanguageSelectorSheet
+import com.mmg.manahub.core.ui.components.MagicActiveFiltersBar
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicProgressBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
-import com.mmg.manahub.core.ui.components.CardRow
-import com.mmg.manahub.core.ui.components.CardRowSelectionStyle
-import com.mmg.manahub.core.ui.components.SubtleSelectionBorderWidth
-import com.mmg.manahub.core.ui.components.subtleSelectionBorderColor
 import com.mmg.manahub.core.ui.components.SetSymbol
+import com.mmg.manahub.core.ui.components.SubtleSelectionBorderWidth
 import com.mmg.manahub.core.ui.components.VariantSelectorSheet
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
+import com.mmg.manahub.core.ui.components.subtleSelectionBorderColor
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -159,6 +159,8 @@ fun AddCardScreen(
     var showAdvancedSearch by rememberSaveable { mutableStateOf(false) }
     var showLanguageSheet by rememberSaveable { mutableStateOf(false) }
     val toastState = rememberMagicToastState()
+    val multiSelectEnabledText = stringResource(R.string.addcard_multi_select_enabled)
+    val multiSelectDisabledText = stringResource(R.string.addcard_multi_select_disabled)
 
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -249,10 +251,16 @@ fun AddCardScreen(
                     }
                     IconToggleButton(
                         checked = isMultiSelectMode,
-                        onCheckedChange = { viewModel.onToggleMultiSelectMode() },
+                        onCheckedChange = { checked ->
+                            viewModel.onToggleMultiSelectMode()
+                            toastState.show(
+                                if (checked) multiSelectEnabledText else multiSelectDisabledText,
+                                MagicToastType.INFO,
+                            )
+                        },
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Checklist,
+                            imageVector = Icons.Default.LibraryAdd,
                             contentDescription = stringResource(R.string.addcard_multi_select_toggle_cd),
                             tint = if (isMultiSelectMode) mc.primaryAccent else mc.textPrimary,
                         )
@@ -308,18 +316,24 @@ fun AddCardScreen(
                     .align(Alignment.BottomCenter)
                     .onSizeChanged { ctaHeightPx = it.height },
             ) {
-                MagicCtaButton(
-                    onClick = viewModel::onOpenQueueSheet,
-                    text = pluralStringResource(
-                        R.plurals.addcard_multi_select_proceed,
-                        uiState.queueCount,
-                        uiState.queueCount,
-                    ),
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .background(mc.backgroundSecondary)
                         .navigationBarsPadding()
-                        .padding(horizontal = MaterialTheme.spacing.lg, vertical = MaterialTheme.spacing.md),
-                )
+                        .padding(MaterialTheme.spacing.lg),
+                ) {
+                    MagicCtaButton(
+                        onClick = viewModel::onOpenQueueSheet,
+                        text = pluralStringResource(
+                            R.plurals.addcard_multi_select_proceed,
+                            uiState.queueCount,
+                            uiState.queueCount,
+                        ),
+                        icon = @Composable { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, null, modifier = Modifier.size(18.dp)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
 
             if (showAdvancedSearch) {
@@ -331,6 +345,8 @@ fun AddCardScreen(
                     },
                     // The sheet's ViewModel outlives any single open, so it must be re-seeded from
                     // the query actually driving the results right now.
+                    onClear = { viewModel.onClearFilters() },
+                    stateKey = "add_card",
                     appliedQuery = uiState.activeQuery,
                 )
             }
@@ -370,6 +386,8 @@ fun AddCardScreen(
                     onIncrementQuantity = viewModel::onIncrementQueuedCardQuantity,
                     onDecrementQuantity = viewModel::onDecrementQueuedCardQuantity,
                     listState = queueListState,
+                    isListInverted = uiState.isListInverted,
+                    updateSorting = viewModel::updateSorting
                 )
             }
             val editingQueuedCard = uiState.editingQueuedCard
@@ -401,7 +419,12 @@ fun AddCardScreen(
                     onDismiss = viewModel::onCloseExpandedImage,
                 )
             }
-            MagicToastHost(toastState)
+            MagicToastHost(
+                state = toastState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = if (uiState.showProceedCta) ctaReservedHeight + 16.dp else 16.dp)
+            )
         }
     }
 }
@@ -547,30 +570,12 @@ private fun SearchSurface(
 
         // ── Active filters indicator ─────────────────────────────────────────
         AnimatedVisibility(visible = uiState.activeFilterCount > 0) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.collection_active_filters, uiState.activeFilterCount),
-                    style = ty.bodyMedium,
-                    color = mc.primaryAccent,
-                    modifier = Modifier.weight(1f)
-                )
-                TextButton(
-                    onClick = onClearFilters,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                ) {
-                    Text(
-                        stringResource(R.string.collection_clear_filters),
-                        style = ty.labelMedium,
-                        color = mc.lifeNegative,
-                    )
-                }
-            }
+            MagicActiveFiltersBar(
+                text = stringResource(R.string.collection_active_filters, uiState.activeFilterCount),
+                clearLabel = stringResource(R.string.collection_clear_filters),
+                onClear = onClearFilters,
+                modifier = Modifier.padding(vertical = 4.dp),
+            )
         }
 
 
@@ -628,13 +633,13 @@ private fun SearchSurface(
                 }
                 uiState.error != null && uiState.results.isEmpty() -> {
                     val rateLimitRetryAfterMs = RateLimitExhaustedException.retryAfterMsOrNull(uiState.error)
-                    if (uiState.error == "SCRYFALL_404") {
+                    if (uiState.error == "SCRYFALL_404" || uiState.error?.contains("404") == true) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             EmptyState(
-                                title = stringResource(R.string.addcard_no_results),
-                                subtitle = stringResource(R.string.addcard_no_results_subtitle),
-                                actionLabel = stringResource(R.string.collection_clear_filters),
-                                onAction = onClearAll
+                                title = stringResource(R.string.addcard_server_unavailable_title),
+                                subtitle = stringResource(R.string.addcard_server_unavailable_subtitle),
+                                actionLabel = stringResource(R.string.retry),
+                                onAction = onForceSearch
                             )
                         }
                     } else if (rateLimitRetryAfterMs != null) {
@@ -664,16 +669,6 @@ private fun SearchSurface(
                         title = stringResource(R.string.addcard_index_title),
                         subtitle = stringResource(R.string.addcard_index_subtitle),
                     )
-                    /*SpotlightGrid(
-                        spotlightCards = uiState.spotlightCards,
-                        spotlightSet = uiState.spotlightSet,
-                        isSpotlightLoading = uiState.isSpotlightLoading,
-                        contentPaddingBottom = navBarBottom,
-                        onCardSelected = onCardSelected,
-                        onLoadNextSpotlight = onLoadNextSpotlight,
-                        sharedTransitionScope = sharedTransitionScope,
-                        animatedVisibilityScope = animatedVisibilityScope,
-                    )*/
                 }
                 uiState.results.isEmpty() -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -792,125 +787,6 @@ private fun SearchSurface(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Idle state — discovery grid of random cards from one Scryfall set
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-private fun SpotlightGrid(
-    spotlightCards: List<Card>,
-    spotlightSet: MagicSet?,
-    isSpotlightLoading: Boolean,
-    contentPaddingBottom: Dp,
-    onCardSelected: (Card) -> Unit,
-    onLoadNextSpotlight: () -> Unit,
-    sharedTransitionScope: SharedTransitionScope?,
-    animatedVisibilityScope: AnimatedVisibilityScope?,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val gridState = rememberLazyGridState()
-
-    LaunchedEffect(gridState.isScrollInProgress) {
-        if (gridState.isScrollInProgress) {
-            focusManager.clearFocus(force = true)
-            keyboardController?.hide()
-        }
-    }
-
-    LazyVerticalGrid(
-        state = gridState,
-        columns = GridCells.Adaptive(minSize = 100.dp),
-        verticalArrangement = Arrangement.spacedBy(spacing.sm),
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-        contentPadding = PaddingValues(top = 4.dp, bottom = 4.dp + contentPaddingBottom),
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        if (spotlightSet != null) {
-            item(span = { GridItemSpan(maxLineSpan) }, contentType = "spotlight_header") {
-                Text(
-                    text = stringResource(R.string.addcard_spotlight_header, spotlightSet.name),
-                    style = ty.labelLarge,
-                    color = mc.textSecondary,
-                    modifier = Modifier.padding(top = spacing.md, bottom = spacing.xs)
-                )
-            }
-        }
-        items(spotlightCards, key = { it.scryfallId }, contentType = { "spotlight_card" }) { card ->
-            SpotlightCardTile(
-                card = card,
-                onClick = {
-                    focusManager.clearFocus(force = true)
-                    keyboardController?.hide()
-                    onCardSelected(card)
-                },
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope,
-            )
-        }
-        if (isSpotlightLoading) {
-            item(span = { GridItemSpan(maxLineSpan) }, contentType = "spotlight_loading") {
-                Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                    MagicLoadingSpinner(
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
-        } else if (spotlightCards.isNotEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }, contentType = "spotlight_footer") {
-                LaunchedEffect(true) {
-                    onLoadNextSpotlight()
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-private fun SpotlightCardTile(
-    card: Card,
-    onClick: () -> Unit,
-    sharedTransitionScope: SharedTransitionScope?,
-    animatedVisibilityScope: AnimatedVisibilityScope?,
-) {
-    val mc = MaterialTheme.magicColors
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            // Full MTG card aspect ratio (745:1040) so the whole card is shown.
-            .aspectRatio(0.717f)
-            .clip(CardShape)
-            .then(
-                if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                    with(sharedTransitionScope) {
-                        Modifier.sharedBounds(
-                            sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
-                            animatedVisibilityScope = animatedVisibilityScope,
-                            clipInOverlayDuringTransition = OverlayClip(CardShape),
-                            renderInOverlayDuringTransition = true,
-                        )
-                    }
-                } else Modifier
-            )
-            .background(mc.surfaceVariant)
-            .clickable(onClick = onClick),
-    ) {
-        AsyncImage(
-            model = card.imageNormal,
-            contentDescription = card.name,
-            placeholder = painterResource(Res.drawable.mtg_card_back),
-            error = painterResource(Res.drawable.mtg_card_back),
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize(),
-        )
-    }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Typed-query results list

@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.collection.presentation
 
+import com.mmg.manahub.core.tagging.TagDictionary
+
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.lifecycle.SavedStateHandle
@@ -688,6 +690,7 @@ class CollectionViewModel(
         return baseListFor(_uiState.value.collectionSource)
             .flatMap { it.card.tags + it.card.userTags }
             .distinctBy { it.key }
+            .map { tag -> tag.copy(category = TagDictionary.get(tag.key)?.category ?: tag.category) }
             .toSet()
     }
 

@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Style
+import androidx.compose.material.icons.filled.VideogameAsset
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -43,8 +44,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.core.model.DeckSummary
-import com.mmg.manahub.core.ui.Res
-import com.mmg.manahub.core.ui.ic_test
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -53,7 +52,6 @@ import com.mmg.manahub.core.ui.theme.spacing
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import org.jetbrains.compose.resources.painterResource
 
 /**
  * A standard card representing a deck summary.
@@ -270,14 +268,14 @@ fun DeckItem(
                     }
                 }
 
-                if (!reduced) {
+                if (!reduced && deck.cardCount >= 7) {
                     if (onPlaytest != null) {
                         IconButton(onClick = onPlaytest) {
                             Icon(
-                                painter = painterResource(Res.drawable.ic_test),
+                                Icons.Default.VideogameAsset,
                                 contentDescription = "Start Playtest",
                                 tint = mc.secondaryAccent,
-                                modifier = Modifier.padding(end =MaterialTheme.spacing.md).size(24.dp),
+                                modifier = Modifier.padding(end =MaterialTheme.spacing.md).size(40.dp),
                             )
                         }
 
@@ -288,7 +286,7 @@ fun DeckItem(
                                 Icons.Default.Delete,
                                 contentDescription = "Delete",
                                 tint = mc.textDisabled,
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(24.dp),
                             )
                         }
                     }

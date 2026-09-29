@@ -18,7 +18,7 @@ Room, OkHttp, XmlPullParser, DataStore and Custom Tabs stay in `:app`. Must-know
 - **Seeding + site links:** newly seeded defaults start followed per `DefaultFollowPolicy` (English or
   the device language). Defaults take `siteUrl` from `DefaultSources`; custom sources learn it from the
   feed's channel `<link>`. Never let one overwrite the other, or refresh and reconcile will churn.
-- **Saved = snapshot table `news_saved_items`** (Room v57), never a flag on the news cache: the cache
+- **Saved = snapshot table `news_saved_items`** (Room v59), never a flag on the news cache: the cache
   is evicted after 7 days and sources can be deleted, so a saved row copies every displayed field.
   `insertSaved` is IGNORE (re-saving keeps the first `saved_at`). Device-local only, no Supabase sync.
 - **Add Source resolve pipeline** (`NewsRepositoryImpl.resolveSource`): `SourceInputClassifier` →
@@ -52,4 +52,4 @@ Room, OkHttp, XmlPullParser, DataStore and Custom Tabs stay in `:app`. Must-know
 - **Tests:** helpers and use cases → commonTest `feature/news/domain/**`; ViewModels →
   `app/src/test/.../feature/today/presentation/**`; data → `NewsRepositoryImplTest`,
   `NewsFeedServiceTest` (`httpsOnly = false` only there, because MockWebServer serves plain HTTP);
-  migration → `Migration56To57Test`.
+  migration → `Migration58To59Test`.

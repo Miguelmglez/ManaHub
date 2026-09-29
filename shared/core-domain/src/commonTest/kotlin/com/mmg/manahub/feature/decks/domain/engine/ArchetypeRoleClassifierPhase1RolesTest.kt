@@ -169,10 +169,12 @@ class ArchetypeRoleClassifierPhase1RolesTest {
     }
 
     @Test
-    fun `counters_source produces COUNTERS and consumes PLANESWALKERS`() {
+    fun `counters_source produces COUNTERS without claiming planeswalker support`() {
         val countersSource = specsByKey.getValue("counters_source")
         assertEquals(setOf("COUNTERS"), countersSource.produces)
-        assertEquals(setOf("PLANESWALKERS"), countersSource.consumes)
+        assertEquals(emptySet(), countersSource.consumes)
+        assertEquals(setOf("PLANESWALKERS"), specsByKey.getValue("proliferate_source").consumes)
+        assertEquals(setOf("COUNTERS"), specsByKey.getValue("proliferate_source").amplifies)
     }
 
     @Test

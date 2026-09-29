@@ -68,7 +68,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -80,6 +79,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaSize
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.SmallCardShape
@@ -673,7 +673,8 @@ private fun CatalogRow(
                     text = stringResource(R.string.home_account_gated_lock),
                     style = MagicCtaStyle.Outlined,
                     color = MagicCtaColor.Primary,
-                    contentPadding = PaddingValues(horizontal = spacing.md, vertical = spacing.md),
+                    size = MagicCtaSize.Compact,
+                    contentPadding = PaddingValues(horizontal = spacing.md, vertical = spacing.xs),
                 )
             }
         }
@@ -681,21 +682,14 @@ private fun CatalogRow(
 }
 
 /**
- * The row's Add / Remove toggle. Both labels are laid out invisibly underneath so the button keeps
- * one size when it flips, and the row's text never re-flows.
+ * The row's Add / Remove toggle. Renders the action button directly, sizing naturally to content.
  */
 @Composable
 private fun AddRemoveButton(isAdded: Boolean, onAdd: () -> Unit, onRemove: () -> Unit) {
-    val ghost = Modifier.alpha(0f).clearAndSetSemantics { }
-    Box {
-        GalleryActionButton(isAdded = true, onClick = {}, enabled = false, modifier = ghost)
-        GalleryActionButton(isAdded = false, onClick = {}, enabled = false, modifier = ghost)
-        GalleryActionButton(
-            isAdded = isAdded,
-            onClick = if (isAdded) onRemove else onAdd,
-            modifier = Modifier.matchParentSize(),
-        )
-    }
+    GalleryActionButton(
+        isAdded = isAdded,
+        onClick = if (isAdded) onRemove else onAdd,
+    )
 }
 
 @Composable
@@ -712,7 +706,8 @@ private fun GalleryActionButton(
         enabled = enabled,
         style = MagicCtaStyle.Outlined,
         color = if (isAdded) MagicCtaColor.Error else MagicCtaColor.Primary,
-        contentPadding = PaddingValues(horizontal = spacing.md, vertical = spacing.md),
+        size = MagicCtaSize.Compact,
+        contentPadding = PaddingValues(horizontal = spacing.md, vertical = spacing.xs),
         icon = {
             Icon(
                 imageVector = if (isAdded) Icons.Default.Close else Icons.Default.Add,
@@ -769,7 +764,8 @@ private val HomeWidgetType.description: String
     @Composable
     @ReadOnlyComposable
     get() = when (this) {
-        HomeWidgetType.CONTEXT_HERO -> stringResource(R.string.home_widget_desc_context_hero)
+        HomeWidgetType.GREETING_HEADER -> stringResource(R.string.home_widget_desc_greeting_header)
+        HomeWidgetType.GET_STARTED -> stringResource(R.string.home_widget_desc_context_hero)
         HomeWidgetType.QUICK_ACTIONS -> stringResource(R.string.home_widget_desc_quick_actions)
         HomeWidgetType.PROGRESSION_HUB -> stringResource(R.string.home_widget_desc_progression_hub)
         HomeWidgetType.QUESTS_HUB -> stringResource(R.string.home_widget_desc_quests_hub)

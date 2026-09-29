@@ -6,8 +6,8 @@ import kotlin.test.assertEquals
 class CategoryVocabularyTest {
 
     @Test
-    fun countersPayoff_widenedToIncludePlusCounters() {
-        assertEquals(setOf("counters_payoff", "plus_counters"), CategoryVocabulary.cardTagKeysFor("counters_payoff"))
+    fun countersPayoff_excludesCounterProductionStrategy() {
+        assertEquals(setOf("counters_payoff"), CategoryVocabulary.cardTagKeysFor("counters_payoff"))
     }
 
     @Test

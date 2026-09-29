@@ -167,10 +167,14 @@ object DatabaseModule {
                 // Trades audit H4/H8: trade_collection_sync.pending_apply and owner_user_id on
                 // local_wishlists / local_open_for_trade (all additive).
                 MIGRATION_55_56,
-                // v56 → v57 lives as a top-level `val` in Migration_56_57.kt (same reason).
+                // v56 → v57: durable outbox for remote trade-offer deletions.
+                MIGRATION_56_57,
+                // v57 → v58: durable outbox for absolute remote wishlist targets.
+                MIGRATION_57_58,
+                // v58 → v59 lives as a top-level `val` in Migration_58_59.kt (same reason).
                 // MTG Today: news_saved_items table + content_sources.site_url; drops the two
                 // Competitive cache tables.
-                MIGRATION_56_57,
+                MIGRATION_58_59,
             )
             .build()
 

@@ -68,9 +68,10 @@ class HomeBoardMotion(
 internal fun homeWidgetKey(type: HomeWidgetType): String = "widget_${type.persistedId}"
 
 /**
- * Whether [HomeWidgetType.CONTEXT_HERO] takes a board slot. The hero only ever draws the first-steps
- * welcome, so it is dropped (no empty grid gap) once the steps are done. While it is still loading it
- * reserves its slot only when the user has not finished the steps before, so a returning user never
+ * Whether [HomeWidgetType.GET_STARTED] takes a board slot. It draws the claimable-quests prompt or the
+ * first-steps welcome, and is dropped (no empty grid gap) once the steps are done and nothing is
+ * claimable. While loading it reserves its slot only when the user has not finished the steps
+ * before, so a returning user never
  * sees a hero placeholder that then vanishes.
  *
  * @param holdCompleted true while the just-emptied welcome plays its completion card.
@@ -82,6 +83,7 @@ internal fun heroTakesSlot(
 ): Boolean = when (hero) {
     HomeHeroState.Loading -> firstStepsCompletionSeen == false
     is HomeHeroState.Welcome -> hero.steps.isNotEmpty() || holdCompleted
+    is HomeHeroState.QuestsReady -> true
     else -> false
 }
 
@@ -103,7 +105,7 @@ internal fun boardWidgetsToRender(
     .distinctBy { it.type.persistedId }
     .filterNot { widget ->
         when (widget.type) {
-            HomeWidgetType.CONTEXT_HERO ->
+            HomeWidgetType.GET_STARTED ->
                 !heroTakesSlot(state.hero, state.firstStepsCompletionSeen, holdCompletedHero)
             HomeWidgetType.DAILY_PUZZLE -> !puzzleEnabled
             // Keeps its slot while loading; only a confirmed empty result removes it.

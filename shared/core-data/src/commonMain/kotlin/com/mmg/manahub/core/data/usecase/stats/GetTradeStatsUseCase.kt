@@ -7,6 +7,8 @@ import com.mmg.manahub.core.model.TradePartnerSummary
 import com.mmg.manahub.core.model.TradeStats
 import com.mmg.manahub.core.model.TradeStatus
 import kotlinx.coroutines.async
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
@@ -58,6 +60,8 @@ class GetTradeStatsUseCase(
                     netValueDelta = 0.0,
                     currency = currency,
                     topPartner = null,
+                    netValueDeltaUsd = 0.0,
+                    netValueDeltaEur = 0.0,
                 )
             )
         }
@@ -70,9 +74,10 @@ class GetTradeStatsUseCase(
         // access to the Android-only CrashlyticsHelper (commonMain), so failures are swallowed
         // defensively here — the outer Result already reports a hard (metadata-refresh) failure to
         // Crashlytics at the ViewModel layer, which is the only failure mode expected in practice.
+        val refreshSlots = Semaphore(4)
         coroutineScope {
             completedRootIds.map { rootId ->
-                async { runCatching { tradesRepository.refreshProposalThread(rootId, userId) } }
+                async { refreshSlots.withPermit { runCatching { tradesRepository.refreshProposalThread(rootId, userId) } } }
             }.awaitAll()
         }
 
@@ -85,7 +90,8 @@ class GetTradeStatsUseCase(
 
         var cardsSent = 0
         var cardsReceived = 0
-        var netValueDelta = 0.0
+        var netValueDeltaUsd = 0.0
+        var netValueDeltaEur = 0.0
         val completedTradesByPartner = mutableMapOf<String, Int>()
 
         completed.forEach { proposal ->
@@ -96,15 +102,18 @@ class GetTradeStatsUseCase(
                 // Review-collection placeholders never represent a real card transfer.
                 if (item.isReviewCollectionPlaceholder) return@forEach
                 val quantity = item.quantity ?: 1
-                val price = (if (currency == PreferredCurrency.USD) item.priceUsd else item.priceEur) ?: 0.0
+                val usd = item.priceUsd?.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0
+                val eur = item.priceEur?.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0
                 when {
                     item.fromUserId == userId -> {
                         cardsSent += quantity
-                        netValueDelta -= price * quantity
+                        netValueDeltaUsd -= usd * quantity
+                        netValueDeltaEur -= eur * quantity
                     }
                     item.toUserId == userId -> {
                         cardsReceived += quantity
-                        netValueDelta += price * quantity
+                        netValueDeltaUsd += usd * quantity
+                        netValueDeltaEur += eur * quantity
                     }
                 }
             }
@@ -124,9 +133,11 @@ class GetTradeStatsUseCase(
                 completedTradesCount = completed.size,
                 cardsSent = cardsSent,
                 cardsReceived = cardsReceived,
-                netValueDelta = netValueDelta,
+                netValueDelta = if (currency == PreferredCurrency.USD) netValueDeltaUsd else netValueDeltaEur,
                 currency = currency,
                 topPartner = topPartner,
+                netValueDeltaUsd = netValueDeltaUsd,
+                netValueDeltaEur = netValueDeltaEur,
             )
         )
     }

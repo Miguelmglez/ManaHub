@@ -105,8 +105,8 @@ class UserCardRepositoryImplTradeApplyTest {
             val id = firstArg<String>()
             rows[id]?.let { rows[id] = it.copy(isDeleted = true) }
         }
-        coEvery { localOpenForTradeDao.getByCollectionId(any()) } returns null
-        coEvery { localOpenForTradeDao.getByAttributes(any(), any(), any(), any()) } returns null
+        coEvery { localOpenForTradeDao.getByCollectionId(any(), any()) } returns null
+        coEvery { localOpenForTradeDao.getByAttributes(any(), any(), any(), any(), any()) } returns null
 
         repository = UserCardRepositoryImpl(
             userCardCollectionDao = userCardCollectionDao,
@@ -198,6 +198,18 @@ class UserCardRepositoryImplTradeApplyTest {
     }
 
     @Test
+    fun `given a legacy ownerless ref then an account trade does not consume it`() = runTest {
+        rows["row-legacy"] = row(id = "row-legacy", owner = null, quantity = 5)
+        rows["row-1"] = row(quantity = 2)
+
+        val result = apply(deductions = listOf(line(1, ref = "row-legacy")))
+
+        assertEquals(5, rows.getValue("row-legacy").quantity)
+        assertEquals(1, rows.getValue("row-1").quantity)
+        assertEquals(1, result?.refFallbackCount)
+    }
+
+    @Test
     fun `given a null ref then the row is found by attributes`() = runTest {
         rows["row-1"] = row(quantity = 2)
 
@@ -218,23 +230,33 @@ class UserCardRepositoryImplTradeApplyTest {
     @Test
     fun `given a partial trade then the offer is trimmed to the remaining copies and kept`() = runTest {
         rows["row-1"] = row(quantity = 4)
-        coEvery { localOpenForTradeDao.getByCollectionId("row-1") } returns offer("row-1", quantity = 4)
+        coEvery { localOpenForTradeDao.getByCollectionId("row-1", any()) } returns offer("row-1", quantity = 4)
 
         val result = apply(deductions = listOf(line(2)))
 
         coVerify { localOpenForTradeDao.upsert(match { it.quantity == 2 && it.localCollectionId == "row-1" }) }
-        coVerify(exactly = 0) { localOpenForTradeDao.deleteById(any()) }
+        coVerify(exactly = 0) { localOpenForTradeDao.deleteById(any(), any()) }
         assertTrue(result!!.remoteOfferRemovals.isEmpty())
+    }
+
+    @Test
+    fun `an offer linked to another collection row is never trimmed by matching attributes`() = runTest {
+        rows["row-1"] = row(quantity = 4)
+
+        apply(deductions = listOf(line(2)))
+
+        coVerify(exactly = 0) { localOpenForTradeDao.getByAttributes(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { localOpenForTradeDao.upsert(any()) }
     }
 
     @Test
     fun `given the last copy is traded then a synced offer is deleted and scheduled for remote removal`() = runTest {
         rows["row-1"] = row(quantity = 1)
-        coEvery { localOpenForTradeDao.getByCollectionId("row-1") } returns offer("row-1", quantity = 1)
+        coEvery { localOpenForTradeDao.getByCollectionId("row-1", any()) } returns offer("row-1", quantity = 1)
 
         val result = apply(deductions = listOf(line(1)))
 
-        coVerify { localOpenForTradeDao.deleteById("offer-row-1") }
+        coVerify { localOpenForTradeDao.deleteById("offer-row-1", any()) }
         assertEquals(listOf("row-1"), result?.remoteOfferRemovals)
     }
 

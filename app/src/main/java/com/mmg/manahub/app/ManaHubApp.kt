@@ -55,12 +55,16 @@ import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.core.util.recordNonFatal
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.card.ResolveCardStrategyTagsUseCase
 import com.mmg.manahub.core.gamification.di.gamificationEngineKoinModule
 import com.mmg.manahub.core.gamification.domain.GamificationBackendGate
+import com.mmg.manahub.core.gamification.domain.GamificationAccountScope
+import com.mmg.manahub.core.gamification.domain.GamificationAvailability
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.app.lifecycle.AppForegroundTracker
 import com.mmg.manahub.core.nearby.domain.repository.NearbySessionRepository
 import com.mmg.manahub.core.online.domain.usecase.AdvancePhaseUseCase
@@ -83,6 +87,8 @@ import com.mmg.manahub.core.sync.PriceRefreshWorker
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.di.syncKoinModule
 import com.mmg.manahub.core.tagging.TagDictionaryRepository
+import com.mmg.manahub.core.tagging.CardMechanicCatalogRepository
+import com.mmg.manahub.core.tagging.CardMechanicCatalogRehydrator
 import com.mmg.manahub.core.ui.components.search.di.searchWidgetsKoinModule
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceCommandRecognizer
@@ -113,6 +119,7 @@ import com.mmg.manahub.feature.survey.di.surveyKoinModule
 import com.mmg.manahub.feature.tagdictionary.di.tagDictionaryKoinModule
 import com.mmg.manahub.feature.tournament.di.tournamentKoinModule
 import com.mmg.manahub.feature.trades.di.tradesKoinModule
+import com.mmg.manahub.feature.trades.domain.usecase.TradePendingApplyCoordinator
 import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import io.github.jan.supabase.SupabaseClient
@@ -120,6 +127,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.tasks.await
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
@@ -147,6 +158,8 @@ class ManaHubApp : Application(), KoinComponent {
 
     // Lazy Koin resolution: read only after startKoin() in onCreate().
     private val gamificationBackendGate: GamificationBackendGate by inject()
+    private val gamificationAccountScope: GamificationAccountScope by inject()
+    private val gamificationAvailability: GamificationAvailability by inject()
     private val appForegroundTracker: AppForegroundTracker by inject()
 
     // ── KMP migration — Hilt→Koin cutover batch 5 ───────────────────────────────────────────────
@@ -161,6 +174,10 @@ class ManaHubApp : Application(), KoinComponent {
     private val remoteConfigRepository: RemoteConfigRepository by inject()
     private val wishlistRepository: WishlistRepository by inject()
     private val openForTradeRepository: OpenForTradeRepository by inject()
+    private val friendRepository: FriendRepository by inject()
+    private val cardMechanicCatalogRepository: CardMechanicCatalogRepository by inject()
+    private val tradePendingApplyCoordinator: TradePendingApplyCoordinator by inject()
+    private val cardMechanicCatalogRehydrator: CardMechanicCatalogRehydrator by inject()
 
     @Inject lateinit var tagDictionaryRepo: TagDictionaryRepository
     @Inject lateinit var workManager: WorkManager
@@ -573,13 +590,30 @@ class ManaHubApp : Application(), KoinComponent {
         }
 
         appScope.launch { remoteConfigRepository.refresh() }
+        tradePendingApplyCoordinator.start(appScope)
 
         appScope.launch {
             runCatching { syncManaSymbols() }
             runCatching { tagDictionaryRepo.loadAndApply() }
+            runCatching { cardMechanicCatalogRepository.loadCached() }
+            runCatching { cardMechanicCatalogRepository.refresh() }
             // Builds the Collection import review queue here so its (potentially MB-scale) restore
             // never runs on the main thread when composition first resolves the single.
             runCatching { collectionImportQueue.queue.value }
+        }
+        appScope.launch {
+            combine(authRepository.sessionState, cardMechanicCatalogRepository.entries) { session, catalog ->
+                (session as? SessionState.Authenticated)?.user?.id to catalog
+            }.collectLatest { (ownerUserId, catalog) ->
+                if (ownerUserId == null || catalog.isEmpty()) return@collectLatest
+                try {
+                    cardMechanicCatalogRehydrator.rehydrate(ownerUserId, catalog)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (e: Exception) {
+                    recordSafeNonFatal("card_mechanic_catalog_rehydration_failed", e)
+                }
+            }
         }
         // Backend & Performance Optimization plan, WS1+WS3 Part B item 8 (2026-07-28): the
         // oracle-id + strategy-tags opportunistic backfills that used to run inline here (Edge-case
@@ -597,6 +631,33 @@ class ManaHubApp : Application(), KoinComponent {
         // Gamification backend lifecycle (ADR-005 D1): engine, workers, catch-up, account scoping and
         // sync all run only while GamificationAvailability is AVAILABLE; see GamificationBackendGate.
         registerActivityLifecycleCallbacks(appForegroundTracker)
+        if (FeatureFlags.Gamification.ENABLED) {
+            appScope.launch {
+                combine(
+                    authRepository.sessionState,
+                    gamificationAvailability.settingsVisibleFlow,
+                    userPreferencesDataStore.gamificationEnabledFlow,
+                ) { session, visible, optedIn -> Triple(session, visible, optedIn) }
+                    .distinctUntilChangedBy { (session, visible, optedIn) ->
+                        Triple((session as? SessionState.Authenticated)?.user?.id, session is SessionState.Unauthenticated, visible && optedIn)
+                    }
+                    .collectLatest { (session, visible, optedIn) ->
+                        if (visible && optedIn) {
+                            try {
+                                when (session) {
+                                    is SessionState.Authenticated -> gamificationAccountScope.onSignedIn(session.user.id)
+                                    is SessionState.Unauthenticated -> gamificationAccountScope.onGuestActive()
+                                    else -> Unit
+                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                recordSafeNonFatal("gamification_guest_scope_failed", e)
+                            }
+                        }
+                    }
+            }
+        }
         gamificationBackendGate.start(appScope)
 
         PriceRefreshWorker.scheduleDailyRefresh(workManager)
@@ -620,21 +681,34 @@ class ManaHubApp : Application(), KoinComponent {
         // firing again if a DIFFERENT user signs in after a sign-out.
         var previousUserId: String? = null
         appScope.launch {
+            authRepository.sessionState.collectLatest { state ->
+                try {
+                    when (state) {
+                        is SessionState.Authenticated -> friendRepository.claimLocalCache(state.user.id)
+                        is SessionState.Unauthenticated -> friendRepository.clearLocalCache()
+                        else -> Unit
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    recordSafeNonFatal("friends_cache_account_scope_failed", e)
+                }
+            }
+        }
+        appScope.launch {
             authRepository.sessionState.collect { state ->
                 when (state) {
                     is SessionState.Authenticated -> {
                         CollectionSyncWorker.schedulePeriodicSync(workManager)
                         if (previousUserId != state.user.id) {
                             previousUserId = state.user.id
-                            CollectionSyncWorker.enqueueFirstLoginSync(workManager)
                             val userId = state.user.id
                             // Another account's wishlist/offers must not show up or migrate here.
-                            appScope.launch {
-                                wishlistRepository.evictForeignAccountRows(userId)
-                                    .onFailure { e -> recordNonFatal("trade_lists_evict_foreign_rows_failed", e) }
-                                openForTradeRepository.evictForeignAccountRows(userId)
-                                    .onFailure { e -> recordNonFatal("trade_lists_evict_foreign_rows_failed", e) }
-                            }
+                            wishlistRepository.evictForeignAccountRows(userId)
+                                .onFailure { e -> recordSafeNonFatal("trade_lists_evict_foreign_rows_failed", e) }
+                            openForTradeRepository.evictForeignAccountRows(userId)
+                                .onFailure { e -> recordSafeNonFatal("trade_lists_evict_foreign_rows_failed", e) }
+                            CollectionSyncWorker.enqueueFirstLoginSync(workManager)
                         }
                         appScope.launch {
                             runCatching {

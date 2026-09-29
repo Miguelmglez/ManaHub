@@ -81,6 +81,7 @@ data class PlayerCountWinrateItem(
 data class RecentFormEntry(
     val sessionId: Long,
     val isWin: Boolean,
+    val isDraw: Boolean = false,
 )
 
 /**
@@ -119,6 +120,7 @@ data class GameHistoryItem(
     val surveyStatus: SurveyStatus,
     val deckId: String?,
     val deckName: String?,
+    val isDraw: Boolean = false,
 )
 
 /**
@@ -181,6 +183,7 @@ data class StatsUiState(
     /** True when at least one game session exists; controls whether tabs are shown. */
     val hasGameStats:        Boolean          = false,
     val gameStats:           GameStats?       = null,
+    val gameError:           Boolean          = false,
     val sessionHistory:      List<GameHistoryItem>   = emptyList(),
     val deckPerformance:     List<DeckPerformance>   = emptyList(),
     /** Matchup win-rate grouped by opponent archetype; empty until games are classified. */

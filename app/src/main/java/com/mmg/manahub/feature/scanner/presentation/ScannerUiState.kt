@@ -165,4 +165,5 @@ data class ScannerUiState(
     val isAddingAllToWishlist: Boolean = false,
     // Mirrors CardQueueActions.inFlightIds: queue rows whose controls are locked while written.
     val inFlightQueueIds: Set<String> = emptySet(),
+    val isListInverted : Boolean = false
 )

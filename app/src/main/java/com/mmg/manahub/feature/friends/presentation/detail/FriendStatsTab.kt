@@ -8,161 +8,103 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Update
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mmg.manahub.R
-import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.model.FriendStats
+import com.mmg.manahub.core.model.PreferredCurrency
+import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.util.TimeAgoFormatter
-import com.mmg.manahub.core.model.FriendStats
-import java.util.Locale
 
-/**
- * Displays the friend's collection statistics inside the Stats tab of [FriendDetailScreen].
- *
- * Three rendering states:
- * 1. Loading — shows a centred [MagicLoadingSpinner].
- * 2. Error   — shows an error message and a retry button.
- * 3. Loaded  — shows a scrollable stats dashboard. If the server returned no row
- *              ([UiState.friendStats] is null after a successful fetch) a "no data yet"
- *              message is shown instead.
- */
+private const val MAX_COLOR_SYMBOLS = 3
+
+/** Stats tab of [FriendDetailScreen]: loading, error with retry, "no stats yet", or the dashboard. */
 @Composable
 fun FriendStatsTab(
     uiState: FriendDetailViewModel.UiState,
     onRetry: () -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        contentAlignment = Alignment.TopCenter,
-    ) {
-        when {
-            uiState.isLoadingStats -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    MagicLoadingSpinner()
-                }
-            }
-
-            uiState.statsError -> {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Text(
-                        text = stringResource(R.string.friend_stats_error),
-                        style = MaterialTheme.magicTypography.bodyMedium,
-                        color = mc.textSecondary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp),
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    MagicCtaButton(
-                        onClick = onRetry,
-                        text = stringResource(R.string.action_retry),
-                    )
-                }
-            }
-
-            uiState.friendStats == null -> {
-                val nickname = uiState.friend?.nickname ?: ""
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = stringResource(R.string.friend_stats_no_data, nickname),
-                        style = MaterialTheme.magicTypography.bodyMedium,
-                        color = mc.textSecondary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp),
-                    )
-                }
-            }
-
-            else -> StatsContent(stats = uiState.friendStats)
+    val stats = uiState.friendStats
+    when {
+        uiState.isLoadingStats -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            MagicLoadingSpinner()
         }
+
+        uiState.statsError -> FullErrorState(
+            message = stringResource(R.string.friend_stats_error),
+            retryLabel = stringResource(R.string.action_retry),
+            onRetry = onRetry,
+        )
+
+        stats == null -> EmptyState(
+            title = stringResource(R.string.friend_stats_no_data_title),
+            subtitle = stringResource(R.string.friend_stats_no_data, uiState.friend?.nickname.orEmpty()),
+            icon = Icons.Default.BarChart,
+        )
+
+        else -> StatsContent(stats = stats, currency = uiState.preferredCurrency)
     }
 }
 
 @Composable
-private fun StatsContent(stats: FriendStats) {
+private fun StatsContent(stats: FriendStats, currency: PreferredCurrency) {
+    val spacing = MaterialTheme.spacing
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(28.dp),
+            .padding(horizontal = spacing.lg, vertical = spacing.md),
+        verticalArrangement = Arrangement.spacedBy(spacing.xl),
     ) {
-        // ── Section A — Inventory & Value ─────────────────────────────────────
-        StatsSection(
-            title = stringResource(R.string.stats_section_inventory_value),
-            icon = Icons.Default.Star,
-        ) {
-            InventoryValueGrid(stats = stats)
+        StatsSection(title = stringResource(R.string.stats_section_inventory_value), icon = Icons.Default.Star) {
+            InventoryValueGrid(stats = stats, currency = currency)
         }
-
-        // ── Section B — Colour Affinity ───────────────────────────────────────
         if (stats.favouriteColor != null || stats.mostValuableColor != null) {
-            StatsSection(
-                title = stringResource(R.string.friend_stats_section_colour_affinity),
-                icon = Icons.Default.Palette,
-            ) {
+            StatsSection(title = stringResource(R.string.friend_stats_section_colour_affinity), icon = Icons.Default.Palette) {
                 ColourAffinityRow(stats = stats)
             }
         }
-
-        // ── Section C — Snapshot ──────────────────────────────────────────────
-        StatsSection(
-            title = stringResource(R.string.friend_stats_section_snapshot),
-            icon = Icons.Default.Update,
-        ) {
+        StatsSection(title = stringResource(R.string.friend_stats_section_snapshot), icon = Icons.Default.Update) {
             SnapshotCard(updatedAt = stats.updatedAt)
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Section composables
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
-private fun InventoryValueGrid(stats: FriendStats) {
+private fun InventoryValueGrid(stats: FriendStats, currency: PreferredCurrency) {
     val mc = MaterialTheme.magicColors
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    val spacing = MaterialTheme.spacing
+    val value = if (currency == PreferredCurrency.EUR) stats.totalValueEur else stats.totalValueUsd
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
             StatTile(
                 modifier = Modifier.weight(1f),
                 label = stringResource(R.string.friend_stats_total_cards),
@@ -176,195 +118,47 @@ private fun InventoryValueGrid(stats: FriendStats) {
                 valueColor = mc.textPrimary,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatTile(
-                modifier = Modifier.weight(1f),
-                label = stringResource(R.string.friend_stats_value_eur),
-                value = "€ ${"%.2f".format(stats.totalValueEur)}",
-                valueColor = mc.goldMtg,
-            )
-            StatTile(
-                modifier = Modifier.weight(1f),
-                label = stringResource(R.string.friend_stats_value_usd),
-                value = "$ ${"%.2f".format(stats.totalValueUsd)}",
-                valueColor = mc.goldMtg,
-            )
-        }
+        StatTile(
+            modifier = Modifier.fillMaxWidth(),
+            label = stringResource(R.string.friend_stats_collection_value),
+            value = PriceFormatter.format(value, currency),
+            valueColor = mc.goldMtg,
+        )
     }
 }
 
 @Composable
 private fun ColourAffinityRow(stats: FriendStats) {
-    val unknownLabel = stringResource(R.string.friend_stats_color_unknown)
+    val spacing = MaterialTheme.spacing
     val favColor = stats.favouriteColor
     val mvColor = stats.mostValuableColor
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
         if (favColor != null) {
-            ColourTile(
-                modifier = Modifier.weight(1f),
-                label = stringResource(R.string.friend_stats_favourite_color),
-                colorCode = favColor,
-                unknownLabel = unknownLabel,
-            )
+            ColourTile(Modifier.weight(1f), stringResource(R.string.friend_stats_favourite_color), favColor)
         }
         if (mvColor != null) {
-            ColourTile(
-                modifier = Modifier.weight(1f),
-                label = stringResource(R.string.friend_stats_most_valuable_color),
-                colorCode = mvColor,
-                unknownLabel = unknownLabel,
-            )
+            ColourTile(Modifier.weight(1f), stringResource(R.string.friend_stats_most_valuable_color), mvColor)
         }
-        // If only one colour field is present, fill the other half with a spacer
-        // so the single tile doesn't stretch full-width.
-        if (favColor == null || mvColor == null) {
-            Spacer(modifier = Modifier.weight(1f))
-        }
+        // A single tile keeps half the row instead of stretching full-width.
+        if (favColor == null || mvColor == null) Spacer(modifier = Modifier.weight(1f))
     }
 }
 
+/** [colorCodes] is one WUBRG/C code per character, e.g. "W" or "UB". */
 @Composable
-private fun ColourTile(
-    modifier: Modifier = Modifier,
-    label: String,
-    colorCode: String,
-    unknownLabel: String,
-) {
+private fun ColourTile(modifier: Modifier, label: String, colorCodes: String) {
     val mc = MaterialTheme.magicColors
-    val displayName = colorCode.toColorDisplayName(Locale.getDefault())
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = mc.backgroundSecondary),
-        border = BorderStroke(1.dp, mc.surfaceVariant),
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+    val spacing = MaterialTheme.spacing
+    val codes = colorCodes.map { it.toString() }.filter { it in COLOR_NAME_RES }.take(MAX_COLOR_SYMBOLS)
+    val names = codes.map { stringResource(COLOR_NAME_RES.getValue(it)) }
+    StatsCard(modifier = modifier) {
+        Text(text = label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+            codes.forEach { ManaSymbolImage(token = it, size = spacing.xl) }
             Text(
-                text = label,
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = mc.textSecondary,
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                ManaSymbolImage(token = colorCode, size = 28.dp)
-                Text(
-                    text = displayName.ifBlank { unknownLabel },
-                    style = MaterialTheme.magicTypography.bodyMedium,
-                    color = mc.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SnapshotCard(updatedAt: Long) {
-    val mc = MaterialTheme.magicColors
-    val timeAgo = TimeAgoFormatter.format(updatedAt)
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = mc.backgroundSecondary),
-        border = BorderStroke(1.dp, mc.surfaceVariant),
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Default.Update,
-                contentDescription = null,
-                tint = mc.textSecondary,
-                modifier = Modifier.size(18.dp),
-            )
-            Column {
-                Text(
-                    text = stringResource(R.string.friend_stats_last_updated),
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = mc.textSecondary,
-                )
-                Text(
-                    text = timeAgo,
-                    style = MaterialTheme.magicTypography.bodyMedium,
-                    color = mc.textPrimary,
-                )
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Section header scaffold
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun StatsSection(
-    title: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    content: @Composable () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = mc.primaryAccent,
-                modifier = Modifier.size(16.dp),
-            )
-            Text(
-                text = title.uppercase(Locale.getDefault()),
-                style = MaterialTheme.magicTypography.labelLarge,
-                color = mc.textSecondary,
-                letterSpacing = 1.5.sp,
-            )
-        }
-        content()
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Primitive tile
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun StatTile(
-    modifier: Modifier = Modifier,
-    label: String,
-    value: String,
-    valueColor: Color,
-) {
-    val mc = MaterialTheme.magicColors
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = mc.backgroundSecondary),
-        border = BorderStroke(1.dp, mc.surfaceVariant),
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = mc.textSecondary,
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.magicTypography.lifeNumberMd.copy(fontSize = 22.sp),
-                color = valueColor,
+                text = names.joinToString(" / ").ifBlank { stringResource(R.string.friend_stats_color_unknown) },
+                style = MaterialTheme.magicTypography.bodyMedium,
+                color = mc.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -372,36 +166,83 @@ private fun StatTile(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-private fun String.toColorDisplayName(locale: Locale): String = when (locale.language) {
-    "es" -> when (this) {
-        "W" -> "Blanco"
-        "U" -> "Azul"
-        "B" -> "Negro"
-        "R" -> "Rojo"
-        "G" -> "Verde"
-        "C" -> "Incoloro"
-        else -> ""
-    }
-    "de" -> when (this) {
-        "W" -> "Weiß"
-        "U" -> "Blau"
-        "B" -> "Schwarz"
-        "R" -> "Rot"
-        "G" -> "Grün"
-        "C" -> "Farblos"
-        else -> ""
-    }
-    else -> when (this) {
-        "W" -> "White"
-        "U" -> "Blue"
-        "B" -> "Black"
-        "R" -> "Red"
-        "G" -> "Green"
-        "C" -> "Colorless"
-        else -> ""
+@Composable
+private fun SnapshotCard(updatedAt: Long) {
+    val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
+    StatsCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
+            Icon(Icons.Default.Update, contentDescription = null, tint = mc.textSecondary, modifier = Modifier.size(spacing.lg))
+            Column {
+                Text(
+                    text = stringResource(R.string.friend_stats_last_updated),
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.textSecondary,
+                )
+                Text(
+                    text = TimeAgoFormatter.format(updatedAt),
+                    style = MaterialTheme.magicTypography.bodyMedium,
+                    color = mc.textPrimary,
+                )
+            }
+        }
     }
 }
+
+@Composable
+private fun StatsSection(title: String, icon: ImageVector, content: @Composable () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.md)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+            Icon(imageVector = icon, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(spacing.lg))
+            Text(
+                text = title.uppercase(),
+                style = MaterialTheme.magicTypography.labelLarge,
+                color = mc.textSecondary,
+                modifier = Modifier.semantics { heading() },
+            )
+        }
+        content()
+    }
+}
+
+@Composable
+private fun StatsCard(modifier: Modifier, content: @Composable () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
+    Surface(
+        modifier = modifier,
+        shape = CardShape,
+        color = mc.backgroundSecondary,
+        // textDisabled keeps the outline visible on HallowedPrint, where surfaceVariant nearly vanishes.
+        border = BorderStroke(spacing.xxs / 2, mc.textDisabled.copy(alpha = 0.4f)),
+    ) {
+        Column(modifier = Modifier.padding(spacing.md), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun StatTile(modifier: Modifier, label: String, value: String, valueColor: Color) {
+    StatsCard(modifier = modifier) {
+        Text(text = label, style = MaterialTheme.magicTypography.labelSmall, color = MaterialTheme.magicColors.textSecondary)
+        Text(
+            text = value,
+            style = MaterialTheme.magicTypography.titleLarge,
+            color = valueColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private val COLOR_NAME_RES = mapOf(
+    "W" to R.string.stats_color_white,
+    "U" to R.string.stats_color_blue,
+    "B" to R.string.stats_color_black,
+    "R" to R.string.stats_color_red,
+    "G" to R.string.stats_color_green,
+    "C" to R.string.stats_color_colorless,
+)

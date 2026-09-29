@@ -13,6 +13,9 @@ import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.core.model.CollectionColorAffinity
+import com.mmg.manahub.core.model.PreferredCurrency
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
@@ -41,6 +44,7 @@ class CollectionStatsSyncWorker(
     private val syncPrefs: SyncPreferencesStore,
     private val statsDao: StatsDao,
     private val friendRepo: FriendRepository,
+    private val userPreferencesRepository: UserPreferencesRepository,
 ) : CoroutineWorker(appContext, workerParams) {
 
     companion object {
@@ -81,6 +85,7 @@ class CollectionStatsSyncWorker(
             val totalValueEur = statsDao.observeTotalValueEur(null, null, userId).first()
             val totalValueUsd = statsDao.observeTotalValueUsd(null, null, userId).first()
             val favouriteColor = computeFavouriteColor(userId)
+            val mostValuableColor = computeMostValuableColor(userId)
 
             val upsertResult = friendRepo.upsertMyStats(
                 uniqueCards = totals.uniqueCards,
@@ -88,7 +93,7 @@ class CollectionStatsSyncWorker(
                 totalValueEur = totalValueEur,
                 totalValueUsd = totalValueUsd,
                 favouriteColor = favouriteColor,
-                mostValuableColor = null,
+                mostValuableColor = mostValuableColor,
             )
 
             if (upsertResult.isSuccess) {
@@ -107,24 +112,21 @@ class CollectionStatsSyncWorker(
         }
     }
 
-    /**
-     * Returns the single-letter color code of the most common color in the user's collection,
-     * or null when the collection is empty or contains only multi-color/colorless cards.
-     *
-     * color_identity is stored as a JSON array (e.g. '["W","U"]'). A card is attributed to a
-     * single color only when the array contains exactly one entry; multi-color cards are skipped.
-     */
+    // Same rules as the owner's Profile (CollectionColorAffinity), so a friend sees the same colours.
     private suspend fun computeFavouriteColor(userId: String): String? {
         val rows = statsDao.observeCountByColorIdentity(null, null, userId).first()
-        // Rows with colorIdentity like '["W"]' are mono-color. Extract the letter inside.
-        return rows
-            .mapNotNull { row ->
-                val trimmed = row.colorIdentity.trim()
-                // Match single-element JSON arrays: ["X"]
-                val match = Regex("^\\[\"([WUBRG])\"]$").find(trimmed)
-                if (match != null) match.groupValues[1] to row.count else null
-            }
-            .maxByOrNull { it.second }
-            ?.first
+        return CollectionColorAffinity.favouriteColorCode(
+            CollectionColorAffinity.countByColor(rows.map { it.colorIdentity to it.count })
+        )
+    }
+
+    /** Colour identity of the single most valuable card in the owner's currency, e.g. "UB" or "C". */
+    private suspend fun computeMostValuableColor(userId: String): String? {
+        val useEur = userPreferencesRepository.preferredCurrencyFlow.first() == PreferredCurrency.EUR
+        val top = statsDao.observeMostValuableCards(limit = 1, useEur = useEur, colorFilter = null, setFilter = null, userId = userId)
+            .first()
+            .firstOrNull()
+            ?: return null
+        return CollectionColorAffinity.identityCodes(top.colorIdentity).joinToString("")
     }
 }

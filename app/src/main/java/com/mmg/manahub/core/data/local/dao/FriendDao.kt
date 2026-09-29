@@ -4,71 +4,110 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.mmg.manahub.core.data.local.entity.FriendEntity
 import com.mmg.manahub.core.data.local.entity.FriendRequestEntity
 import com.mmg.manahub.core.data.local.entity.OutgoingFriendRequestEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface FriendDao {
+abstract class FriendDao {
 
     @Query("SELECT * FROM friends ORDER BY friend_nickname ASC")
-    fun observeFriends(): Flow<List<FriendEntity>>
+    abstract fun observeFriends(): Flow<List<FriendEntity>>
 
     @Query("SELECT * FROM friend_requests ORDER BY created_at DESC")
-    fun observePendingRequests(): Flow<List<FriendRequestEntity>>
+    abstract fun observePendingRequests(): Flow<List<FriendRequestEntity>>
 
     @Query("SELECT COUNT(*) FROM friend_requests")
-    fun observePendingCount(): Flow<Int>
+    abstract fun observePendingCount(): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM friends")
-    fun observeFriendCount(): Flow<Int>
+    abstract fun observeFriendCount(): Flow<Int>
 
     /** User ids of the cached friends (snapshot read, used to detect newly accepted friendships). */
     @Query("SELECT friend_user_id FROM friends")
-    suspend fun getFriendUserIds(): List<String>
+    abstract suspend fun getFriendUserIds(): List<String>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertFriends(friends: List<FriendEntity>)
+    abstract suspend fun upsertFriends(friends: List<FriendEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertRequests(requests: List<FriendRequestEntity>)
+    abstract suspend fun upsertRequests(requests: List<FriendRequestEntity>)
 
     @Query("DELETE FROM friends")
-    suspend fun clearFriends()
+    abstract suspend fun clearFriends()
 
     @Query("DELETE FROM friends WHERE id = :id")
-    suspend fun deleteFriend(id: String)
+    abstract suspend fun deleteFriend(id: String)
 
     @Query("DELETE FROM friend_requests WHERE id = :id")
-    suspend fun deleteRequest(id: String)
+    abstract suspend fun deleteRequest(id: String)
 
     @Query("DELETE FROM friend_requests")
-    suspend fun clearRequests()
+    abstract suspend fun clearRequests()
 
     // ── Outgoing friend requests ──────────────────────────────────────────────
 
     /** Emits the list of requests the current user has sent that are still PENDING. */
     @Query("SELECT * FROM outgoing_friend_requests ORDER BY created_at DESC")
-    fun observeOutgoingRequests(): Flow<List<OutgoingFriendRequestEntity>>
+    abstract fun observeOutgoingRequests(): Flow<List<OutgoingFriendRequestEntity>>
 
-    /** Count of pending outgoing requests — used to show badge on "Sent" tab. */
-    @Query("SELECT COUNT(*) FROM outgoing_friend_requests")
-    fun observeOutgoingCount(): Flow<Int>
-
-    /**
-     * Replaces the cached outgoing requests with the latest snapshot from Supabase.
-     * Uses REPLACE conflict strategy because [OutgoingFriendRequestEntity.id] is the
-     * Supabase row id — identical ids simply overwrite stale cached data.
-     */
+    /** Supabase row ids are stable primary keys, so REPLACE only overwrites the same request. */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertOutgoingRequests(requests: List<OutgoingFriendRequestEntity>)
+    abstract suspend fun upsertOutgoingRequests(requests: List<OutgoingFriendRequestEntity>)
 
     /** Removes a single outgoing request by its Supabase friendship id. */
     @Query("DELETE FROM outgoing_friend_requests WHERE id = :id")
-    suspend fun deleteOutgoingRequest(id: String)
+    abstract suspend fun deleteOutgoingRequest(id: String)
 
-    /** Clears all outgoing requests — called before a full re-fetch from Supabase. */
     @Query("DELETE FROM outgoing_friend_requests")
-    suspend fun clearOutgoingRequests()
+    abstract suspend fun clearOutgoingRequests()
+
+    // A request whose row id or counterpart is already a friend is stale: that id or pair was accepted.
+    @Query(
+        "DELETE FROM friend_requests WHERE id IN (SELECT id FROM friends) " +
+            "OR from_user_id IN (SELECT friend_user_id FROM friends)"
+    )
+    abstract suspend fun deleteRequestsShadowedByFriends()
+
+    @Query(
+        "DELETE FROM outgoing_friend_requests WHERE id IN (SELECT id FROM friends) " +
+            "OR to_user_id IN (SELECT friend_user_id FROM friends)"
+    )
+    abstract suspend fun deleteOutgoingShadowedByFriends()
+
+    /**
+     * Replaces whichever lists are non-null in one transaction; a null list keeps its cached rows.
+     * Requests shadowed by a friend are dropped, so no id is ever in two lists.
+     */
+    @Transaction
+    open suspend fun replaceAll(
+        friends: List<FriendEntity>?,
+        incoming: List<FriendRequestEntity>?,
+        outgoing: List<OutgoingFriendRequestEntity>?,
+    ) {
+        if (friends != null) {
+            clearFriends()
+            upsertFriends(friends)
+        }
+        if (incoming != null) {
+            clearRequests()
+            upsertRequests(incoming)
+        }
+        if (outgoing != null) {
+            clearOutgoingRequests()
+            upsertOutgoingRequests(outgoing)
+        }
+        deleteRequestsShadowedByFriends()
+        deleteOutgoingShadowedByFriends()
+    }
+
+    /** Drops every friends-feature row (sign-out, account switch, account deletion). */
+    @Transaction
+    open suspend fun clearAll() {
+        clearFriends()
+        clearRequests()
+        clearOutgoingRequests()
+    }
 }

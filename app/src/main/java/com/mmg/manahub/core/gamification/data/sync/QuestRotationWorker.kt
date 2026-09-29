@@ -9,6 +9,8 @@ import androidx.work.WorkerParameters
 import com.mmg.manahub.core.gamification.domain.GamificationAvailability
 import com.mmg.manahub.core.gamification.engine.QuestReconciler
 import com.mmg.manahub.core.util.recordNonFatal
+import com.mmg.manahub.core.util.recordSafeNonFatal
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -48,7 +50,13 @@ class QuestRotationWorker(
             onSuccess = { Result.success() },
             // Transient failure (DB locked, etc.) — retry up to 3 attempts, then give up so we don't
             // spin forever on a persistent error.
-            onFailure = { if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure() },
+            onFailure = { error ->
+                if (error is CancellationException) throw error
+                if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else {
+                    recordSafeNonFatal("quest_rotation_failed_attempt_${runAttemptCount.coerceAtMost(MAX_ATTEMPTS)}", error)
+                    Result.failure()
+                }
+            },
         )
     }
 

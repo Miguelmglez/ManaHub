@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
 import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.model.SearchCriterion
+import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -196,7 +198,7 @@ class SectionSearchQueryTest {
         val context = ctx()
         val axes = listOf(
             "LIFE", "DEATH", "TOKENS", "COUNTERS", "LANDFALL", "GRAVEYARD", "ETB", "SPELLS",
-            "ARTIFACTS", "ENCHANTMENTS", "ATTACHED", "ATTACK", "PLANESWALKERS", "GROUP", "ENGINE",
+            "ARTIFACTS", "ENCHANTMENTS", "ATTACHED", "ATTACK", "PLANESWALKERS", "GROUP", "ENGINE", "GRAVEYARD_EXIT",
         )
         val missing = axes.filter { axis ->
             SectionSearchQuery.fragmentFor("engine:$axis:producers", context) == null ||
@@ -417,7 +419,7 @@ class SectionSearchQueryTest {
         val context = ctx()
         val axes = listOf(
             "LIFE", "DEATH", "TOKENS", "COUNTERS", "LANDFALL", "GRAVEYARD", "ETB", "SPELLS",
-            "ARTIFACTS", "ENCHANTMENTS", "ATTACHED", "ATTACK", "PLANESWALKERS", "GROUP", "ENGINE",
+            "ARTIFACTS", "ENCHANTMENTS", "ATTACHED", "ATTACK", "PLANESWALKERS", "GROUP", "ENGINE", "GRAVEYARD_EXIT",
         )
         val missing = axes.filter { axis ->
             val producers = SectionSearchQuery.toAdvancedQuery("engine:$axis:producers", context)
@@ -425,6 +427,29 @@ class SectionSearchQueryTest {
             producers == null || producers.isEmpty() || payoffs == null || payoffs.isEmpty()
         }
         assertTrue(missing.isEmpty(), "engine axes with no toAdvancedQuery mapping on one side: $missing")
+    }
+
+    @Test
+    fun toAdvancedQuery_engineRetainsMixedRoleAlternatives() {
+        val query = SectionSearchQuery.toAdvancedQuery("engine:ETB:producers", ctx())
+        assertNotNull(query)
+        val alternatives = query.criteria.filterIsInstance<SearchCriterion.AnyOf>().single().alternatives
+        assertTrue(alternatives.size > 1)
+        assertTrue(alternatives.any { group -> group.any { it is SearchCriterion.CardFunction } })
+        assertTrue(alternatives.any { group -> group.any { it !is SearchCriterion.CardFunction } })
+        val rendered = BuildScryfallQueryUseCase()(query)
+        assertTrue(rendered.contains(" OR "))
+    }
+
+    @Test
+    fun verifiedCatalogTagRendersOnlyVerifiedGlobalQueries() {
+        val criterion = SearchCriterion.HasTag(
+            keys = listOf("empower_jace", "manual_only"),
+            verifiedScryfallQueries = mapOf("empower_jace" to "oracle:\"Empower Jace\""),
+        )
+        val rendered = BuildScryfallQueryUseCase()(com.mmg.manahub.core.model.AdvancedSearchQuery(listOf(criterion)))
+        assertTrue(rendered.contains("oracle:\"Empower Jace\""))
+        assertFalse(rendered.contains("manual_only"))
     }
 
     @Test

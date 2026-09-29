@@ -157,6 +157,7 @@ class TradeNegotiationViewModelTest {
         every { friendRepository.observeFriends() } returns friendsFlow
         every { getThread(any()) } returns threadFlow
         coEvery { refreshTradeThread(any(), any()) } returns Result.success(Unit)
+        coEvery { updateTradeCollection.retryPendingOfferCleanup(any()) } returns Result.success(Unit)
         every { tradeCollectionSyncDao.observeSyncedProposalIds(any()) } returns MutableStateFlow(emptyList())
         every { tradeCollectionSyncDao.observePendingApplyProposalIds(any()) } returns pendingApplyFlow
         coEvery { tradeCollectionSyncDao.markPendingApply(any()) } answers {

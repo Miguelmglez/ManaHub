@@ -23,6 +23,26 @@ interface FriendRepository {
     suspend fun refreshFriends(currentUserId: String): Result<Unit>
     suspend fun refreshRequests(currentUserId: String): Result<Unit>
     suspend fun refreshOutgoingRequests(currentUserId: String): Result<Unit>
+
+    /**
+     * Refreshes friends, incoming and outgoing requests together. An implementation with a local
+     * cache writes them atomically, so an accepted id never sits in two lists. Fails with the first
+     * failure; the lists that did load are still applied.
+     */
+    suspend fun refreshAll(currentUserId: String): Result<Unit> {
+        val results = listOf(
+            refreshFriends(currentUserId),
+            refreshRequests(currentUserId),
+            refreshOutgoingRequests(currentUserId),
+        )
+        return results.firstOrNull { it.isFailure } ?: Result.success(Unit)
+    }
+
+    /** Binds the local friends cache to [userId], dropping another account's rows first. */
+    suspend fun claimLocalCache(userId: String) {}
+
+    /** Drops the local friends cache (sign-out, account deletion). */
+    suspend fun clearLocalCache() {}
     suspend fun sendFriendRequest(fromUserId: String, toUserId: String): Result<Unit>
     suspend fun acceptRequest(friendshipId: String, currentUserId: String): Result<Unit>
     suspend fun rejectRequest(friendshipId: String): Result<Unit>

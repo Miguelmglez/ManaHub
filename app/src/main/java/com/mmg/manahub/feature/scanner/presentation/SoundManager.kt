@@ -61,8 +61,8 @@ class SoundManager @Inject constructor(
 
     // ── Audio format constants ───────────────────────────────────────────────
     private val sampleRate = 44_100
-    private val durationMs = 200
-
+    private val durationUiMs = 120    // Corto y reactivo para toques rápidos
+    private val durationTriumphMs = 500 // Suficiente para que el acorde resuene
     // ── Shared AudioAttributes/format for all tracks ─────────────────────────
     private val audioAttributes = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
@@ -76,9 +76,9 @@ class SoundManager @Inject constructor(
         .build()
 
     // ── One long-lived, pre-written AudioTrack per tone ──────────────────────
-    private val trackNeutral: AudioTrack = buildStaticTrack(generateTone(440.0))
-    private val trackHigh: AudioTrack = buildStaticTrack(generateTone(880.0))
-    private val trackTriumph: AudioTrack = buildStaticTrack(generateChord(1047.0, 784.0))
+    private val trackNeutral: AudioTrack = buildStaticTrack(generateTone(523.25))
+    private val trackHigh: AudioTrack = buildStaticTrack(generateTone(659.25))
+    private val trackTriumph: AudioTrack = buildStaticTrack(generateChord(523.25, 659.25))
 
     // ── Single bounded executor serializing playback control calls ──────────
     private val playbackExecutor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -149,7 +149,7 @@ class SoundManager @Inject constructor(
      */
     private fun generateTone(
         freqHz: Double,
-        durationMs: Int = this.durationMs,
+        durationMs: Int = this.durationUiMs,
         sampleRate: Int = this.sampleRate,
     ): ShortArray {
         val samples = sampleRate * durationMs / 1000
@@ -168,7 +168,7 @@ class SoundManager @Inject constructor(
      * @return        [ShortArray] with the blended PCM samples.
      */
     private fun generateChord(freq1Hz: Double, freq2Hz: Double): ShortArray {
-        val samples = sampleRate * durationMs / 1000
+        val samples = sampleRate * durationTriumphMs / 1000
         return ShortArray(samples) { i ->
             val angle1 = 2.0 * PI * i * freq1Hz / sampleRate
             val angle2 = 2.0 * PI * i * freq2Hz / sampleRate

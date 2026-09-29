@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -134,11 +133,7 @@ fun ShareProfileSheet(
                                 modifier = Modifier.size(40.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                    color = mc.primaryAccent,
-                                )
+                                MagicLoadingSpinner(size = MagicLoadingSize.XSmall)
                             }
                         } else {
                             ShareOptionIcon(icon = Icons.AutoMirrored.Filled.OpenInNew, accent = mc.primaryAccent)

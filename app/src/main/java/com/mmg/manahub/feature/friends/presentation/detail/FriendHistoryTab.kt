@@ -2,293 +2,65 @@ package com.mmg.manahub.feature.friends.presentation.detail
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
 import com.mmg.manahub.R
-import com.mmg.manahub.core.ui.components.MagicCtaButton
-import com.mmg.manahub.core.ui.components.MagicCtaStyle
-import com.mmg.manahub.core.ui.components.MagicLoadingSize
-import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
-import com.mmg.manahub.core.ui.theme.CardShape
-import com.mmg.manahub.core.ui.theme.SmallCardShape
-import com.mmg.manahub.core.ui.theme.magicColors
-import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.model.Friend
-import com.mmg.manahub.core.model.FriendMatchHistory
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
+import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.magicColors
+import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
-/**
- * History tab on the friend detail screen.
- *
- * Shows two sub-tabs:
- * - **Trades**: a list of past [TradeProposal]s shared with this friend.
- * - **Games**: aggregate match history from online sessions against this friend.
- *
- * @param friend              The friend whose history is being displayed.
- * @param tradeHistory        Trade proposals filtered to only include proposals between the
- *                            current user and [friend].
- * @param gameHistory         Aggregate win/loss record; null while loading or if never played.
- * @param isLoadingGameHistory True while the game history request is in flight.
- * @param gameHistoryError    True when the last game history request failed.
- * @param onRetryGameHistory  Called when the user taps Retry after a game history error.
- */
-@OptIn(ExperimentalMaterial3Api::class)
+/** History tab on the friend detail screen: the trade proposals shared with [friend]. */
 @Composable
 fun FriendHistoryTab(
     friend: Friend,
     tradeHistory: List<TradeProposal>,
     onTradeClick: (proposalId: String, rootProposalId: String) -> Unit,
-    gameHistory: FriendMatchHistory? = null,
-    isLoadingGameHistory: Boolean = false,
-    gameHistoryError: Boolean = false,
-    onRetryGameHistory: () -> Unit = {},
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        TradesHistoryContent(
-            friend = friend,
-            tradeHistory = tradeHistory,
-            onTradeClick = onTradeClick,
-        )
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Private composables
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Renders the trades sub-tab content.
- *
- * Shows a [LazyColumn] of [TradeHistoryRow]s when [tradeHistory] is non-empty,
- * or an empty-state message otherwise.
- */
-@Composable
-private fun TradesHistoryContent(
-    friend: Friend,
-    tradeHistory: List<TradeProposal>,
-    onTradeClick: (proposalId: String, rootProposalId: String) -> Unit,
-) {
+    val spacing = MaterialTheme.spacing
     if (tradeHistory.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = stringResource(R.string.friend_history_trades_empty, friend.nickname),
-                style = MaterialTheme.magicTypography.bodySmall,
-                color = MaterialTheme.magicColors.textSecondary,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(32.dp),
-            )
-        }
+        EmptyState(
+            title = stringResource(R.string.friend_history_trades_empty, friend.nickname),
+            icon = Icons.Default.SwapHoriz,
+        )
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
+            contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.md),
         ) {
             items(tradeHistory, key = { it.id }) { proposal ->
-                TradeHistoryRow(
-                    proposal = proposal,
-                    onTradeClick = onTradeClick,
-                )
+                TradeHistoryRow(proposal = proposal, onTradeClick = onTradeClick)
             }
         }
-    }
-}
-
-/**
- * Games sub-tab showing aggregate win/loss record against this friend.
- *
- * States:
- * - Loading: spinner while the RPC call is in flight.
- * - Error: message + Retry button when the call failed.
- * - No games: empty-state text when totalGames == 0.
- * - Data: a summary card showing wins, losses, and last played date.
- */
-@Composable
-private fun GamesHistoryContent(
-    friend: Friend,
-    gameHistory: FriendMatchHistory?,
-    isLoading: Boolean,
-    hasError: Boolean,
-    onRetry: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val mt = MaterialTheme.magicTypography
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        contentAlignment = Alignment.TopCenter,
-    ) {
-        when {
-            isLoading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    MagicLoadingSpinner(size = MagicLoadingSize.Small)
-                }
-            }
-
-            hasError -> {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Text(
-                        text = stringResource(R.string.friend_history_games_error),
-                        style = mt.bodySmall,
-                        color = mc.textSecondary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp),
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    MagicCtaButton(
-                        onClick = onRetry,
-                        text = stringResource(R.string.retry),
-                        style = MagicCtaStyle.Ghost,
-                    )
-                }
-            }
-
-            gameHistory == null || gameHistory.totalGames == 0 -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = stringResource(R.string.friend_history_games_empty, friend.nickname),
-                        style = mt.bodySmall,
-                        color = mc.textSecondary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(32.dp),
-                    )
-                }
-            }
-
-            else -> {
-                MatchHistoryCard(friend = friend, history = gameHistory)
-            }
-        }
-    }
-}
-
-@Composable
-private fun MatchHistoryCard(
-    friend: Friend,
-    history: FriendMatchHistory,
-) {
-    val mc = MaterialTheme.magicColors
-    val mt = MaterialTheme.magicTypography
-
-    val lastPlayedFormatted = remember(history.lastPlayedAt) {
-        if (history.lastPlayedAt == 0L) null
-        else {
-            val local = Instant.fromEpochMilliseconds(history.lastPlayedAt)
-                .toLocalDateTime(TimeZone.currentSystemDefault())
-            val month = local.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
-            val day = local.dayOfMonth.toString().padStart(2, '0')
-            "$day $month ${local.year}"
-        }
-    }
-
-    Surface(
-        shape = SmallCardShape,
-        color = mc.surface,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.friend_history_games_title, history.totalGames),
-                style = mt.titleMedium,
-                color = mc.textPrimary,
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                WinLossStat(
-                    label = stringResource(R.string.friend_history_games_wins),
-                    value = history.myWins,
-                    color = mc.lifePositive,
-                )
-                WinLossStat(
-                    label = stringResource(R.string.friend_history_games_losses),
-                    value = history.opponentWins,
-                    color = mc.lifeNegative,
-                )
-                WinLossStat(
-                    label = stringResource(R.string.friend_history_games_winrate),
-                    value = if (history.totalGames > 0)
-                        (history.myWins * 100 / history.totalGames)
-                    else 0,
-                    suffix = "%",
-                    color = mc.primaryAccent,
-                )
-            }
-
-            if (lastPlayedFormatted != null) {
-                Text(
-                    text = stringResource(R.string.friend_history_games_last_played, lastPlayedFormatted),
-                    style = mt.bodySmall,
-                    color = mc.textSecondary,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun WinLossStat(
-    label: String,
-    value: Int,
-    color: Color,
-    suffix: String = "",
-) {
-    val mt = MaterialTheme.magicTypography
-    val mc = MaterialTheme.magicColors
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = "$value$suffix",
-            style = mt.titleLarge,
-            color = color,
-        )
-        Text(
-            text = label,
-            style = mt.labelSmall,
-            color = mc.textSecondary,
-        )
     }
 }
 
@@ -310,6 +82,7 @@ private fun TradeHistoryRow(
 ) {
     val mc = MaterialTheme.magicColors
     val mt = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
 
     val statusColor: Color = when (proposal.status) {
         TradeStatus.COMPLETED -> mc.lifePositive
@@ -346,35 +119,34 @@ private fun TradeHistoryRow(
         color = mc.surface,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onTradeClick(proposal.id, proposal.rootProposalId) },
+            .clickable(role = Role.Button) { onTradeClick(proposal.id, proposal.rootProposalId) },
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md),
+            verticalArrangement = Arrangement.spacedBy(spacing.xs),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Status badge
                 Surface(
-                    shape = RoundedCornerShape(4.dp),
+                    shape = ChipShape,
                     color = statusColor.copy(alpha = 0.15f),
                 ) {
                     Text(
                         text = statusLabel,
                         style = mt.labelSmall,
                         color = statusColor,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(spacing.sm))
                 Text(
                     text = stringResource(R.string.friend_history_trade_row_updated, dateFormatted),
                     style = mt.bodySmall,
                     color = mc.textSecondary,
                 )
             }
-            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = stringResource(
                     R.string.friend_history_trade_row_cards_offered_received,

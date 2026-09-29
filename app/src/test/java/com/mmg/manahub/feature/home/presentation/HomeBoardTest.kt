@@ -111,6 +111,11 @@ class HomeBoardTest {
         assertFalse(heroTakesSlot(HomeHeroState.Summary("Jace", 3), firstStepsCompletionSeen = true, holdCompleted = true))
     }
 
+    @Test
+    fun `a claimable-quests hero always takes its slot`() {
+        assertTrue(heroTakesSlot(HomeHeroState.QuestsReady(2), firstStepsCompletionSeen = true, holdCompleted = false))
+    }
+
     // ── Readiness ──────────────────────────────────────────────────────────────
 
     private val card = DiscoverCard(id = "1", scryfallId = "s1", name = "Opt", imageUrl = null)

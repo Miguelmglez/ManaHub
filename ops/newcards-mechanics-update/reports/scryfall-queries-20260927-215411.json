@@ -1,0 +1,66 @@
+[
+  {
+    "section": "Mana Base",
+    "query": "t:land produces:B",
+    "example": "Swamp",
+    "found": true,
+    "totalCards": 1,
+    "status": "verified"
+  },
+  {
+    "section": "Mana Base",
+    "query": "function:mana-rock",
+    "example": "Sol Ring",
+    "found": true,
+    "totalCards": 1,
+    "status": "verified"
+  },
+  {
+    "section": "Plan Roles",
+    "query": "oracle:\"creature dies\"",
+    "example": "Blood Artist",
+    "found": true,
+    "totalCards": 1,
+    "status": "verified"
+  },
+  {
+    "section": "Synergy",
+    "query": "oracle:\"cards leave your graveyard\"",
+    "example": "Spirit Mascot",
+    "found": true,
+    "totalCards": 1,
+    "status": "verified"
+  },
+  {
+    "section": "Synergy",
+    "query": "keyword:harmonize",
+    "example": "Roamer's Routine",
+    "found": true,
+    "totalCards": 1,
+    "status": "verified"
+  },
+  {
+    "section": "Wizard",
+    "query": "keyword:flying",
+    "example": "Serra Angel",
+    "found": true,
+    "totalCards": 1,
+    "status": "verified"
+  },
+  {
+    "section": "Wizard",
+    "query": "keyword:trample",
+    "example": "Colossal Dreadmaw",
+    "found": true,
+    "totalCards": 1,
+    "status": "verified"
+  },
+  {
+    "section": "Remote keyword",
+    "query": "oracle:\"empower Jace\"",
+    "example": "Protege's Awakening",
+    "found": true,
+    "totalCards": 1,
+    "status": "verified"
+  }
+]

@@ -50,6 +50,7 @@ class HydrateCollectionStrategyTagsUseCaseTest {
         val batch = slot<List<CardTagsUpdate>>()
         coEvery { cardDao.updateTagsAndSuggestionsBatch(capture(batch)) } answers { written += batch.captured }
         coEvery { cardDao.getScryfallIdsWithUnwrittenStrategyTags(any()) } returns emptyList()
+        coEvery { cardDao.getScryfallIdsWithOutdatedStrategyTags(any(), any()) } returns emptyList()
     }
 
     private fun useCase() = HydrateCollectionStrategyTagsUseCase(
@@ -96,6 +97,72 @@ class HydrateCollectionStrategyTagsUseCaseTest {
         assertFalse(result.hasMoreWork)
         coVerify(exactly = 0) { repository.getStrategyTagsBatch(any()) }
         assertTrue(written.isEmpty())
+    }
+
+    @Test
+    fun `catalog page uses owner scoped keyset and local Found resolution without remote batch`() = runTest {
+        val owned = entity("card-1", "oracle-1", tags = "[\"my_custom_tag\"]")
+        coEvery { cardDao.getOwnedCardsForMechanicRefresh("owner-a", "", 1) } returns listOf(owned)
+        coEvery { resolve.resolveWithPrefetched(any(), any(), any(), any(), any()) } returns
+            ComputeCardTagsUseCase.Result(
+                confirmedTags = listOf(CardTag("my_custom_tag", TagCategory.CUSTOM), CardTag("empower_jace", TagCategory.KEYWORD)),
+                suggestedTags = emptyList(),
+            )
+
+        val page = useCase().rehydrateCatalogPage("owner-a", "", limit = 1)
+
+        assertEquals("card-1", page.lastScryfallId)
+        assertTrue(page.hasMore)
+        assertEquals(1, written.size)
+        assertTrue(written.single().tagsJson.contains("my_custom_tag"))
+        assertTrue(written.single().tagsJson.contains("empower_jace"))
+        coVerify(exactly = 0) { repository.getStrategyTagsBatch(any()) }
+    }
+
+    @Test
+    fun `given an outdated cached collection card then hydration refetches and rewrites it`() = runTest {
+        stubUnionResolve()
+        coEvery { cardDao.getScryfallIdsMissingStrategyTags(any()) } returns emptyList()
+        coEvery { cardDao.getScryfallIdsWithOutdatedStrategyTags("2", any()) } returns listOf("card-v1")
+        coEvery { cardDao.getByIds(any()) } returns listOf(entity("card-v1", "oracle-v1", tags = "[\"my_custom_tag\"]"))
+        coEvery { repository.getStrategyTagsBatch(any()) } returns mapOf("oracle-v1" to found("graveyard_enabler"))
+        coEvery { cardDao.getByOracleIds(any()) } returns listOf(entity("card-v1", "oracle-v1", tags = "[\"my_custom_tag\"]"))
+
+        val result = useCase()()
+
+        assertEquals(1, result.precomputedCount)
+        assertEquals(1, written.size)
+        assertFalse(result.hasMoreWork)
+        coVerify(exactly = 1) { cardDao.getScryfallIdsWithOutdatedStrategyTags("2", any()) }
+    }
+
+    @Test
+    fun `given a full outdated page that advances then hydration requests another run`() = runTest {
+        stubUnionResolve()
+        coEvery { cardDao.getScryfallIdsMissingStrategyTags(any()) } returns emptyList()
+        coEvery { cardDao.getScryfallIdsWithOutdatedStrategyTags("2", 1) } returnsMany listOf(
+            listOf("card-v1"), listOf("next-card-v1"),
+        )
+        coEvery { cardDao.getByIds(any()) } returns listOf(entity("card-v1", "oracle-v1"))
+        coEvery { repository.getStrategyTagsBatch(any()) } returns mapOf("oracle-v1" to found("graveyard_enabler"))
+        coEvery { cardDao.getByOracleIds(any()) } returns listOf(entity("card-v1", "oracle-v1"))
+
+        val result = useCase()(batchSize = 1)
+
+        assertTrue(result.hasMoreWork)
+        assertEquals(1, result.precomputedCount)
+    }
+
+    @Test
+    fun `given a stale remote row that leaves the outdated page unchanged then hydration stops`() = runTest {
+        stubUnionResolve()
+        coEvery { cardDao.getScryfallIdsMissingStrategyTags(any()) } returns emptyList()
+        coEvery { cardDao.getScryfallIdsWithOutdatedStrategyTags("2", 1) } returns listOf("card-v1")
+        coEvery { cardDao.getByIds(any()) } returns listOf(entity("card-v1", "oracle-v1"))
+        coEvery { repository.getStrategyTagsBatch(any()) } returns mapOf("oracle-v1" to found("graveyard_enabler"))
+        coEvery { cardDao.getByOracleIds(any()) } returns listOf(entity("card-v1", "oracle-v1"))
+
+        assertFalse(useCase()(batchSize = 1).hasMoreWork)
     }
 
     @Test

@@ -196,16 +196,84 @@ class TagDictionaryArchetypeRolesTest {
     }
 
     @Test
-    fun `counters_payoff matches a plus-one counters card but not a vanilla creature`() {
+    fun `counters_payoff excludes a counter multiplier and matches a reward trigger`() {
         val hardenedScales = createCard(
             "Enchantment",
             "If one or more +1/+1 counters would be put on a creature you control, that many plus one +1/+1 counters are put on it instead.",
             name = "Hardened Scales",
         )
         val bear = createCard("Creature — Bear", "", name = "Grizzly Bears")
+        val fathomMage = createCard(
+            "Creature — Elf Druid",
+            "Whenever one or more +1/+1 counters are put on Fathom Mage, draw a card.",
+            name = "Fathom Mage",
+        )
 
-        assertTrue("counters_payoff" in keysOf(hardenedScales))
+        assertFalse("counters_payoff" in keysOf(hardenedScales))
+        assertTrue("counters_payoff" in keysOf(fathomMage))
         assertFalse("counters_payoff" in keysOf(bear))
+    }
+
+    @Test
+    fun `graveyard exit distinguishes Spirit Mascot from recursion and harmonize`() {
+        val mascot = createCard(
+            "Creature — Spirit",
+            "Whenever one or more cards leave your graveyard, create a 1/1 white Spirit creature token.",
+            name = "Spirit Mascot",
+        )
+        val recursion = createCard("Sorcery", "Return target creature card from your graveyard to your hand.")
+        val harmonize = createCard("Sorcery", "Harmonize {2}{G}. You may cast this card from your graveyard for its harmonize cost.")
+
+        assertTrue("leave_graveyard_payoff" in keysOf(mascot))
+        assertFalse("graveyard_exit_source" in keysOf(mascot))
+        assertTrue("graveyard_exit_source" in keysOf(recursion))
+        assertTrue("graveyard_exit_source" in keysOf(harmonize))
+        assertFalse("leave_graveyard_payoff" in keysOf(recursion))
+        assertFalse("leave_graveyard_payoff" in keysOf(harmonize))
+    }
+
+    @Test
+    fun `death payoff recognizes broad death triggers but not sacrifice costs`() {
+        val bloodArtist = createCard("Creature — Vampire", "Whenever Blood Artist or another creature dies, target player loses 1 life and you gain 1 life.", name = "Blood Artist")
+        val visceraSeer = createCard("Creature — Vampire Wizard", "Sacrifice a creature: Scry 1.", name = "Viscera Seer")
+
+        assertTrue("death_payoff" in keysOf(bloodArtist))
+        assertFalse("death_payoff" in keysOf(visceraSeer))
+    }
+
+    @Test
+    fun `combat abilities distinguish own evasion from granted and pseudo evasion`() {
+        val flyer = createCard("Creature — Bird", "Flying", name = "Wind Drake")
+        val trampler = createCard("Creature — Beast", "Trample", name = "Stampeding Beast")
+        val boots = createCard("Artifact — Equipment", "Equipped creature has flying and haste.", name = "Winged Boots")
+        val blocker = createCard("Creature — Spider", "Reach, vigilance", name = "Watchful Spider")
+
+        assertTrue("evasion" in keysOf(flyer))
+        assertTrue("pseudo_evasion" in keysOf(trampler))
+        assertFalse("evasion" in keysOf(trampler))
+        assertFalse("evasion" in keysOf(boots))
+        assertFalse("pseudo_evasion" in keysOf(blocker))
+        assertFalse("evasion" in keysOf(blocker))
+    }
+
+    @Test
+    fun `Empower Jace is not a plus one counter source`() {
+        val jace = createCard("Legendary Planeswalker — Jace", "Empower Jace. Put a loyalty counter on Jace.", name = "Jace")
+
+        assertFalse("counters_source" in keysOf(jace))
+        assertFalse("counters_payoff" in keysOf(jace))
+    }
+
+    @Test
+    fun `counter sources include multiple counters and keep proliferate separate`() {
+        val hardenedScales = createCard("Enchantment", "If one or more +1/+1 counters would be put on a creature you control, that many plus one +1/+1 counters are put on it instead.", name = "Hardened Scales")
+        val bow = createCard("Artifact", "Distribute two +1/+1 counters among one or two target creatures you control.", name = "Bow of Nylea")
+        val atraxa = createCard("Creature — Angel Horror", "Flying, vigilance, deathtouch, lifelink. At the beginning of your end step, proliferate.", name = "Atraxa")
+
+        assertFalse("counters_source" in keysOf(hardenedScales))
+        assertTrue("counters_source" in keysOf(bow))
+        assertTrue("proliferate_source" in keysOf(atraxa))
+        assertFalse("counters_source" in keysOf(atraxa))
     }
 
     @Test
