@@ -19,6 +19,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emitAll
+import com.mmg.manahub.feature.trades.data.WishlistMutationCoordinator
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Instant
@@ -42,6 +45,10 @@ class WishlistRepositoryImpl(
     private val sessionUserId: Flow<String?> = flowOf(null),
     private val syncDao: TradeCollectionSyncDao? = null,
     private val tradeWishlistCleanup: TradeWishlistCleanup? = null,
+    private val mutations: WishlistMutationCoordinator? = null,
+    private val readOwnerKeys: Flow<String?>? = null,
+    private val matchesReadOwner: (String) -> Boolean = { true },
+    private val captureReadOwner: ((String)->()->Boolean)? = null,
 ) : WishlistRepository {
 
     // Serialises concurrent addLocal calls to prevent the TOCTOU race on the
@@ -51,22 +58,26 @@ class WishlistRepositoryImpl(
     // a single row with quantity = 2.
     private val addMutex = Mutex()
 
+    private fun <T> owned(empty: T, source: (String)->Flow<T>): Flow<T> = (readOwnerKeys ?: sessionUserId.map { TradeListOwner.key(it) }).flatMapLatest { owner ->
+        flow { if(readOwnerKeys!=null)emit(empty); if(owner!=null) { val current=captureReadOwner?.invoke(owner) ?: { matchesReadOwner(owner) };source(owner).collect { value -> if(current())emit(value) } } }
+    }
+
     override fun observeLocal(): Flow<List<WishlistEntry>> =
-        sessionUserId.flatMapLatest { dao.observeAllWithCard(TradeListOwner.key(it)) }
+        owned(emptyList()) { if(it.startsWith("guest:"))dao.observeProvenLocalWithCard(it) else dao.observeAllWithCard(it) }
             .map { list -> list.map { it.toDomain() } }
 
     override fun observeByScryfallId(scryfallId: String): Flow<List<WishlistEntry>> =
-        sessionUserId.flatMapLatest { dao.observeByScryfallIdWithCard(scryfallId, TradeListOwner.key(it)) }
+        owned(emptyList()) { if(it.startsWith("guest:"))dao.observeProvenLocalPrintingWithCard(it,scryfallId) else dao.observeByScryfallIdWithCard(scryfallId,it) }
             .map { list -> list.map { it.toDomain() } }
 
     override fun observeVersionsByOracle(oracleId: String, name: String): Flow<List<WishlistEntry>> =
-        sessionUserId.flatMapLatest { dao.observeVersionsByOracle(oracleId, name, TradeListOwner.key(it)) }
+        owned(emptyList()) { if(it.startsWith("guest:"))dao.observeProvenLocalVersionsWithCard(it,oracleId,name) else dao.observeVersionsByOracle(oracleId,name,it) }
             .map { list -> list.map { it.toDomain() } }
 
     override fun observeUnsyncedCount(): Flow<Int> =
-        sessionUserId.flatMapLatest { dao.observeUnsyncedCount(TradeListOwner.key(it)) }
+        owned(0) { if(it.startsWith("guest:"))dao.observeProvenLocalUnsyncedCount(it) else dao.observeUnsyncedCount(it) }
 
-    override suspend fun addLocal(entry: WishlistEntry): Result<Unit> = addMutex.withLock {
+    override suspend fun addLocal(entry: WishlistEntry): Result<Unit> = mutations?.add(listOf(entry)) ?: addMutex.withLock {
         runCatching {
             val owner = TradeListOwner.key(currentUserId())
             val existing = dao.getByAttributes(
@@ -86,7 +97,7 @@ class WishlistRepositoryImpl(
         }
     }
 
-    override suspend fun addAllLocal(entries: List<WishlistEntry>): Result<Unit> = addMutex.withLock {
+    override suspend fun addAllLocal(entries: List<WishlistEntry>): Result<Unit> = mutations?.add(entries) ?: addMutex.withLock {
         runCatching {
             val owner = TradeListOwner.key(currentUserId())
             if (syncDao?.getPendingWishlistIds(owner)?.isNotEmpty() == true) {
@@ -96,7 +107,7 @@ class WishlistRepositoryImpl(
         }
     }
 
-    override suspend fun removeLocal(id: String): Result<Unit> = runCatching {
+    override suspend fun removeLocal(id: String): Result<Unit> = mutations?.remove(id) ?: runCatching {
         // A synced row also exists server-side — deleting it locally only, with no remote
         // call, means the next syncFromRemote() re-downloads and "resurrects" the entry the
         // user just removed. Remote-first (mirrors the OpenForTrade §2.2 fix): only delete
@@ -110,7 +121,7 @@ class WishlistRepositoryImpl(
         dao.deleteById(id, owner)
     }
 
-    override suspend fun updateQuantityLocal(id: String, quantity: Int): Result<Unit> = runCatching {
+    override suspend fun updateQuantityLocal(id: String, quantity: Int): Result<Unit> = mutations?.quantity(id,quantity) ?: runCatching {
         val owner = TradeListOwner.key(currentUserId())
         val existing = dao.getById(id, owner)
         if (existing != null) drainPendingTradeEdit(owner, id)
@@ -129,8 +140,12 @@ class WishlistRepositoryImpl(
         }
     }
 
-    override suspend fun getRemote(userId: String): Result<List<WishlistEntry>> =
-        remote.getWishlist(userId).map { dtos -> dtos.map { it.toDomain() } }
+    override suspend fun getRemote(userId: String): Result<List<WishlistEntry>> {
+        if(mutations!=null && currentUserId()!=userId)return Result.failure(IllegalStateException("Wishlist owner changed"))
+        val result=remote.getWishlist(userId)
+        if(mutations!=null && currentUserId()!=userId)return Result.failure(IllegalStateException("Wishlist owner changed"))
+        return result.map { dtos -> dtos.map { it.toDomain() } }
+    }
 
     private suspend fun drainPendingTradeEdit(owner: String, wishlistId: String) {
         if (syncDao?.getPendingWishlistIds(owner)?.contains(wishlistId) == true) {
@@ -139,17 +154,17 @@ class WishlistRepositoryImpl(
     }
 
     override suspend fun addRemote(entry: WishlistEntry): Result<Unit> =
-        remote.addWishlistEntry(entry.toDto())
+        mutations?.putAbsolute(entry) ?: remote.addWishlistEntry(entry.toDto())
 
     override suspend fun removeRemote(id: String): Result<Unit> =
-        remote.removeWishlistEntry(id)
+        mutations?.removeRemote(id) ?: remote.removeWishlistEntry(id)
 
-    override suspend fun evictForeignAccountRows(userId: String): Result<Unit> = runCatching {
+    override suspend fun evictForeignAccountRows(userId: String): Result<Unit> = mutations?.evictAmbiguous(userId) ?: runCatching {
         require(currentUserId() == userId)
         dao.deleteAmbiguousRows()
     }
 
-    override suspend fun migrateLocalToRemote(userId: String): Result<Int> = runCatching {
+    override suspend fun migrateLocalToRemote(userId: String): Result<Int> = mutations?.synchronize(userId) ?: runCatching {
         require(currentUserId() == userId)
         // Owner-scoped reads exclude another account's pending rows without deleting them.
         dao.deleteAmbiguousRows()
@@ -194,7 +209,7 @@ class WishlistRepositoryImpl(
         }
         val pendingIds = syncDao?.getPendingWishlistIds(userId)?.toSet().orEmpty()
         val safeEntities = entities.filterNot { it.id in pendingIds }
-        if (safeEntities.isNotEmpty()) dao.upsertAll(safeEntities)
+        if(safeEntities.isNotEmpty())dao.upsertRemoteProtected(safeEntities,userId)
         val incomplete = drain.incompleteFailure()
         if (incomplete != null) {
             // Rows past the failed page were never seen, so nothing local may be evicted this pass.
@@ -212,7 +227,7 @@ class WishlistRepositoryImpl(
     }
 
     override suspend fun decrementByScryfallId(scryfallId: String, quantity: Int): Result<Unit> =
-        runCatching {
+        mutations?.decrement(scryfallId,quantity) ?: runCatching {
             val owner = TradeListOwner.key(currentUserId())
             val entries = dao.getByScryfallId(scryfallId, owner)
             entries.forEach { entry ->
@@ -236,7 +251,7 @@ class WishlistRepositoryImpl(
         isFoil: Boolean,
         condition: String,
         language: String,
-    ): Result<Unit> = runCatching {
+    ): Result<Unit> = mutations?.decrement(scryfallId,quantity,isFoil,condition,language) ?: runCatching {
         val owner = TradeListOwner.key(currentUserId())
         val entries = dao.getByScryfallId(scryfallId, owner)
         if (entries.isEmpty()) return@runCatching
@@ -271,6 +286,7 @@ class WishlistRepositoryImpl(
     }
 
     override suspend fun addAndSync(entry: WishlistEntry, userId: String): Result<Unit> {
+        mutations?.let { return it.addAndSynchronize(entry,userId) }
         // Only the local read-modify-write is serialised by the mutex — the remote push runs
         // outside the lock so one slow network call doesn't block every other concurrent
         // wishlist add (trades audit §2.12, 2026-07-10).
@@ -314,7 +330,7 @@ class WishlistRepositoryImpl(
         language: String?,
         quantity: Int,
         userId: String?,
-    ): Result<UpdateEntryOutcome> = addMutex.withLock {
+    ): Result<UpdateEntryOutcome> = mutations?.edit(entryId,newCardId,isFoil,condition,language,quantity,userId) ?: addMutex.withLock {
         runCatching {
             val owner = TradeListOwner.key(currentUserId())
             if (userId != null) require(userId == owner)

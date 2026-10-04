@@ -5,10 +5,13 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
@@ -619,7 +622,7 @@ fun HomeWidgetHost(
                 HomeWidgetType.LATEST_SETS -> LatestSetsWidget(uiState.latestSets, metrics.draftSetTileHeight, onAction)
                 HomeWidgetType.MTG_NEWS ->
                     NewsWidget(uiState.recentNews, metrics.newsCardHeight, onAction)
-                HomeWidgetType.RULES_TIP -> RulesTipWidget(rulesTipIndex)
+                HomeWidgetType.RULES_TIP -> RulesTipWidget(rulesTipIndex, onAction)
                 HomeWidgetType.FRIENDS -> FriendsWidget(
                     friends = uiState.friends,
                     friendCount = uiState.friendCount,
@@ -663,9 +666,9 @@ private fun widgetHeaderTitleClickAction(type: HomeWidgetType): HomeAction? = wh
     HomeWidgetType.PROGRESSION_HUB -> HomeAction.OpenProfile
     HomeWidgetType.QUESTS_HUB -> HomeAction.OpenProfileQuests
     HomeWidgetType.DAILY_PUZZLE -> HomeAction.OpenDailyPuzzle
+    HomeWidgetType.RULES_TIP -> HomeAction.OpenRulesTipIndex
     HomeWidgetType.QUICK_ACTIONS,
     HomeWidgetType.CARD_OF_THE_DAY,
-    HomeWidgetType.RULES_TIP,
     HomeWidgetType.GET_STARTED,
     HomeWidgetType.GREETING_HEADER,
     HomeWidgetType.COMPETITIVE,
@@ -3058,14 +3061,14 @@ private fun rememberRulesTipCardHeight(width: Dp): Dp {
 }
 
 @Composable
-private fun RulesTipWidget(tipIndex: Int) {
+private fun RulesTipWidget(tipIndex: Int, onAction: (HomeAction) -> Unit) {
     val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
     val tips = RULES_TIPS_DAILY_ORDER
     val tip = tips[tipIndex.coerceIn(0, tips.lastIndex)]
     val reducedMotion = isReducedMotionEnabled()
 
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xxs)) {
+    Box(modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xxs)) {
         Surface(
             color = mc.surface.copy(alpha = 0.6f),
             shape = SmallCardShape,
@@ -3080,9 +3083,11 @@ private fun RulesTipWidget(tipIndex: Int) {
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(rememberRulesTipCardHeight(maxWidth)),
+                .animateContentSize(
+                    animationSpec = if (reducedMotion) snap() else spring(stiffness = Spring.StiffnessMediumLow)
+                ),
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxWidth()) {
                 // Decorative background icon
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.MenuBook,
@@ -3099,10 +3104,10 @@ private fun RulesTipWidget(tipIndex: Int) {
                     animationSpec = tween(if (reducedMotion) 0 else RULES_TIP_CROSSFADE_MS),
                     label = "rules-tip",
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
                         .semantics { liveRegion = LiveRegionMode.Polite },
                 ) { shown ->
-                    RulesTipContent(shown)
+                    Box(Modifier.fillMaxWidth().clickable(onClickLabel = stringResource(R.string.rules_tip_read, shown.title)) { onAction(HomeAction.OpenRulesTip(shown.stableId)) }) { RulesTipContent(shown) }
                 }
             }
         }
@@ -3951,6 +3956,7 @@ private val QuickStartAction.navIcon: ImageVector
         QuickStartAction.TRADES -> Icons.Default.SwapHoriz
         QuickStartAction.COMMUNITY_DECKS -> Icons.Default.Style
         QuickStartAction.SETTINGS -> Icons.Default.Settings
+        QuickStartAction.RULES -> Icons.AutoMirrored.Filled.MenuBook
         QuickStartAction.MULTI_ADD_CARD -> Icons.Default.CollectionsBookmark
     }
 
@@ -3971,6 +3977,7 @@ private val QuickStartAction.navLabel: String
         QuickStartAction.TRADES -> stringResourceSafe(R.string.quick_start_trades)
         QuickStartAction.COMMUNITY_DECKS -> stringResourceSafe(R.string.quick_start_community)
         QuickStartAction.SETTINGS -> stringResourceSafe(R.string.quick_start_settings)
+        QuickStartAction.RULES -> stringResourceSafe(R.string.rules_title)
         QuickStartAction.MULTI_ADD_CARD -> stringResourceSafe(R.string.quick_start_sheet_multi_add)
     }
 
@@ -3987,6 +3994,7 @@ private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
     QuickStartAction.TRADES -> HomeAction.OpenTrades
     QuickStartAction.COMMUNITY_DECKS -> HomeAction.OpenCommunityDecks
     QuickStartAction.SETTINGS -> HomeAction.OpenSettings
+    QuickStartAction.RULES -> HomeAction.OpenRules
     QuickStartAction.MULTI_ADD_CARD -> HomeAction.OpenMultiAdd
     QuickStartAction.CREATE_DECK -> HomeAction.CreateDeck
 }

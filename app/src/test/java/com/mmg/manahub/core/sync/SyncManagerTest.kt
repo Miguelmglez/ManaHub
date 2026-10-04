@@ -1,5 +1,7 @@
 package com.mmg.manahub.core.sync
 
+import com.mmg.manahub.core.domain.sync.SyncSessionLease
+
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.CardDao
@@ -32,6 +34,9 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 
@@ -202,7 +207,7 @@ class SyncManagerTest {
             syncPrefs        = syncPrefs,
             ioDispatcher     = testDispatcher,
             crashReporter    = crashReporter,
-        )
+        ).also { it.configureSessions { SyncSessionLease({}, { operation -> operation() }) } }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -920,4 +925,91 @@ class SyncManagerTest {
             }
             assertNotNull("A CancellationException must propagate out of sync()", thrown)
         }
+    @Test fun importedAbsolutePayloadRetainsAttributesAndFailureNeverAdvancesWatermark()=runTest(testDispatcher) {
+        val imported=buildCollectionEntity().copy(quantity=12345,isFoil=true,condition="LP",language="ja")
+        every { collectionDao.getAllSince(USER_ID,LAST_SYNC) } returns listOf(imported)
+        coEvery { collectionRemote.batchUpsert(any()) } coAnswers {
+            val payload=firstArg<List<UserCardCollectionDto>>().single()
+            assertEquals(USER_ID,payload.userId);assertEquals(12345,payload.quantity)
+            assertEquals(true,payload.isFoil);assertEquals("LP",payload.condition);assertEquals("ja",payload.language)
+            Result.failure(IllegalStateException("timeout"))
+        }
+        assertEquals(SyncState.ERROR,syncManager.sync(USER_ID).state)
+        coVerify(exactly=0) { syncPrefs.saveLastSyncMillis(any(),any()) }
+        verify(exactly=0) { collectionDao.upsert(any()) }
+    }
+    @Test fun oldCollectionPullAfterAccountAbaCannotWriteRowsOrWatermark()=runTest(testDispatcher) {
+        val (_,errors)=captureTelemetry()
+        val gate=com.mmg.manahub.core.domain.collection.transfer.TransferSessionGate()
+        val owner=com.mmg.manahub.core.domain.collection.transfer.TransferOwner.Account(USER_ID)
+        gate.changeOwner(owner)
+        var rawOwner=USER_ID
+        syncManager.configureSessions { key ->
+            val captured=gate.currentSession
+            SyncSessionLease({ if(rawOwner!=key || gate.currentSession!=captured)throw CancellationException("Sync session changed") },{ operation -> operation() })
+        }
+        coEvery { collectionRemote.getChangesPage(any(),any(),any(),any()) } coAnswers {
+            rawOwner="b";gate.changeOwner(com.mmg.manahub.core.domain.collection.transfer.TransferOwner.Account("b"))
+            rawOwner=USER_ID;gate.changeOwner(owner)
+            Result.success(listOf(buildCollectionDto()))
+        }
+        try { syncManager.sync(USER_ID);org.junit.Assert.fail("Expected stale-session cancellation") } catch(_: CancellationException) { }
+        verify(exactly=0) { collectionDao.upsert(any()) }
+        coVerify(exactly=0) { syncPrefs.saveLastSyncMillis(any(),any()) }
+        assertTrue(errors.isEmpty())
+    }
+    @Test fun rawAccountChangeBeforePushResponseCannotContinuePullOrAcknowledge()=runTest(testDispatcher) {
+        var rawOwner=USER_ID
+        syncManager.configureSessions { key -> SyncSessionLease({ if(rawOwner!=key)throw CancellationException("Sync session changed") },{ operation -> operation() }) }
+        every { collectionDao.getAllSince(USER_ID,LAST_SYNC) } returns listOf(buildCollectionEntity())
+        coEvery { collectionRemote.batchUpsert(any()) } coAnswers { rawOwner="b";Result.success(Unit) }
+        try { syncManager.sync(USER_ID);org.junit.Assert.fail("Expected stale-session cancellation") } catch(_: CancellationException) { }
+        coVerify(exactly=0) { collectionRemote.getChangesPage(any(),any(),any(),any()) }
+        coVerify(exactly=0) { syncPrefs.saveLastSyncMillis(any(),any()) }
+    }
+
+    private fun captureTelemetry(): Pair<MutableList<String>,MutableList<Throwable>> {
+        val payload=mutableListOf<String>();val errors=mutableListOf<Throwable>()
+        every { crashReporter.log(any()) } answers { payload+=firstArg<String>();Unit }
+        every { crashReporter.setCustomKey(any(),any()) } answers { payload+="${firstArg<String>()}=${secondArg<String>()}";Unit }
+        every { crashReporter.recordException(any()) } answers { errors+=firstArg<Throwable>();payload+=firstArg<Throwable>().stackTraceToString();Unit }
+        return payload to errors
+    }
+    @Test fun failedSyncTelemetryNeverIncludesOwnerSqlUriOrThrowableCauses()=runTest(testDispatcher) {
+        val (payload,errors)=captureTelemetry();val marker="PRIVATE_SQL_URI_ROW_TOKEN_MARKER"
+        val external=java.io.IOException("$marker content://private/$USER_ID",IllegalStateException(marker)).also { it.addSuppressed(IllegalArgumentException(marker)) }
+        every { collectionDao.getAllSince(USER_ID,LAST_SYNC) } returns listOf(buildCollectionEntity())
+        coEvery { collectionRemote.batchUpsert(any()) } returns Result.failure(external)
+        assertEquals(SyncState.ERROR,syncManager.sync(USER_ID).state)
+        assertEquals(1,errors.size);assertNull(errors.single().cause);assertTrue(errors.single().suppressed.isEmpty())
+        assertTrue(payload.any { it=="sync_failure_category=network" });assertFalse(payload.joinToString().contains(marker));assertFalse(payload.joinToString().contains(USER_ID))
+    }
+    @Test fun severalPrivateRowFailuresProduceOneSafePageDiagnostic()=runTest(testDispatcher) {
+        val (payload,errors)=captureTelemetry();val marker="PRIVATE_ROW_SQL_MARKER"
+        val page=(1..3).map { buildCollectionDto(id="$marker-$it",scryfallId=CARD_ID_A,updatedAt=LAST_SYNC+it) }
+        every { collectionDao.getByIdIncludingDeleted(any()) } returns null
+        every { collectionDao.getByCompositeKey(any(),any(),any(),any(),any()) } returns null
+        coEvery { cardDao.getByIds(any()) } returns listOf(buildPendingHydrationPlaceholder(CARD_ID_A))
+        coEvery { collectionRemote.getChangesPage(any(),any(),any(),any()) } returns Result.success(page)
+        every { collectionDao.upsert(any()) } throws IllegalStateException("$marker content://secret",IllegalArgumentException(marker))
+        assertEquals(SyncState.SUCCESS,syncManager.sync(USER_ID).state)
+        verify(exactly=3) { collectionDao.upsert(any()) }
+        assertEquals(1,errors.size);assertNull(errors.single().cause);assertTrue(errors.single().suppressed.isEmpty())
+        assertEquals(1,payload.count { it=="collection_pull_page_apply_failed" });assertTrue(payload.any { it=="sync_rows_bucket=1-10" });assertFalse(payload.joinToString().contains(marker))
+    }
+    @Test fun expectedCancellationRecordsNoNonfatal()=runTest(testDispatcher) {
+        val (_,errors)=captureTelemetry()
+        every { collectionDao.getAllSince(any(),any()) } throws CancellationException("PRIVATE_CANCEL_MARKER")
+        try { syncManager.sync(USER_ID);fail("Expected cancellation") } catch(_: CancellationException) { }
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test fun unavailableSessionBeforeStartupCannotDispatchOrWriteWatermark()=runTest(testDispatcher) {
+        syncManager.configureSessions { throw IllegalStateException("Sync session is not ready") }
+        try { syncManager.sync(USER_ID);org.junit.Assert.fail("Expected unavailable session") } catch(_: IllegalStateException) { }
+        coVerify(exactly=0) { collectionRemote.batchUpsert(any()) }
+        coVerify(exactly=0) { collectionRemote.getChangesPage(any(),any(),any(),any()) }
+        coVerify(exactly=0) { syncPrefs.saveLastSyncMillis(any(),any()) }
+    }
+
 }

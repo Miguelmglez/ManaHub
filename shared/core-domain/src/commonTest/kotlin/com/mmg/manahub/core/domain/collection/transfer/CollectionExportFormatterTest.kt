@@ -81,6 +81,25 @@ class CollectionExportFormatterTest {
         assertEquals(listOf("\"Ach! Hans, Run!\"", "Borrowing 100,000 Arrows", "Fire // Ice", "Lightning Bolt"), sorted.map { it.name })
     }
 
+    @Test fun streamingRecordsMatchLegacyOutputWithoutFormulaMutation() {
+        val rows=entries+entries[0].copy(name="+2 Mace",scryfallId="mace-printing")+entries[1].copy(name="Unicode Ω, \"quoted\"\nsecond line",scryfallId="unicode-printing")
+        for(format in CollectionFileFormat.entries) {
+            val streamed=CollectionExportFormatter.header(format,"fixture")+rows.joinToString("") { CollectionExportFormatter.record(it,format) }
+            assertEquals(CollectionExportFormatter.format(rows,format,"fixture"),streamed)
+            assertTrue(streamed.contains("+2 Mace"))
+        }
+        val csv=CollectionExportFormatter.header(CollectionFileFormat.MANABOX_CSV)+rows.joinToString("") { CollectionExportFormatter.record(it,CollectionFileFormat.MANABOX_CSV) }
+        val parsed=CollectionImportParser.parse(csv)
+        assertEquals(rows.map { it.roundTripKey() },parsed.lines.map { it.roundTripKey() })
+    }
+    @Test fun durableQuerySerializationRetainsNestedCriteriaAndMembership() {
+        val advanced=com.mmg.manahub.core.model.AdvancedSearchQuery(listOf(
+            com.mmg.manahub.core.model.SearchCriterion.AnyOf(listOf(listOf(com.mmg.manahub.core.model.SearchCriterion.Name("Ω",true)),listOf(com.mmg.manahub.core.model.SearchCriterion.HasTag(listOf("tagA"),mapOf("tagA" to "o:draw"))))),
+            com.mmg.manahub.core.model.SearchCriterion.CollectionStatus(com.mmg.manahub.core.model.CollectionSource.WISHLIST)))
+        val json=kotlinx.serialization.json.Json
+        val stored=json.encodeToString(com.mmg.manahub.core.model.AdvancedSearchQuery.serializer(),advanced)
+        assertEquals(advanced,json.decodeFromString(com.mmg.manahub.core.model.AdvancedSearchQuery.serializer(),stored))
+    }
     private fun CollectionExportEntry.roundTripKey() =
         listOf(quantity, name, setCode, collectorNumber, isFoil, condition, language)
 
@@ -108,3 +127,5 @@ class CollectionExportFormatterTest {
         language = language,
     )
 }
+
+

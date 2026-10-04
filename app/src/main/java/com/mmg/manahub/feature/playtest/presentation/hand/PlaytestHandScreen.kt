@@ -1,6 +1,5 @@
 package com.mmg.manahub.feature.playtest.presentation.hand
 
-import android.R.attr.contentDescription
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -25,22 +24,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Style
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -52,9 +46,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import com.mmg.manahub.core.ui.components.MagicCtaButton
-import com.mmg.manahub.core.ui.components.MagicCtaColor
-import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,7 +57,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -75,32 +65,31 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.ui.components.FullErrorState
-import com.mmg.manahub.core.ui.components.MagicAlertDialog
-import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
-import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
-import com.mmg.manahub.core.ui.components.MagicToastHost
-import com.mmg.manahub.core.ui.components.MagicToastType
-import com.mmg.manahub.core.ui.components.rememberMagicToastState
-import com.mmg.manahub.core.ui.theme.ButtonShape
-import com.mmg.manahub.core.ui.theme.ChipShape
-import com.mmg.manahub.core.ui.theme.CardShape
-import com.mmg.manahub.core.ui.theme.magicColors
-import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.model.HandSnapshot
 import com.mmg.manahub.core.model.PlaytestPhase
 import com.mmg.manahub.core.model.PlaytestSetup
 import com.mmg.manahub.core.model.computeProtectedIndices
 import com.mmg.manahub.core.model.computeRequiredBottomCount
+import com.mmg.manahub.core.ui.components.FullErrorState
+import com.mmg.manahub.core.ui.components.HexGridBackground
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.magicColors
+import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.playtest.presentation.battle.BattlefieldContent
 import com.mmg.manahub.feature.playtest.presentation.components.BottomNSelector
 import com.mmg.manahub.feature.playtest.presentation.components.CommandZoneArea
@@ -108,6 +97,8 @@ import com.mmg.manahub.feature.playtest.presentation.components.CustomHandSheet
 import com.mmg.manahub.feature.playtest.presentation.components.PlaytestHandCard
 import com.mmg.manahub.feature.playtest.presentation.components.PlaytestSaveSheet
 import com.mmg.manahub.feature.playtest.presentation.components.PlaytestSurveySheet
+import org.koin.androidx.compose.koinViewModel
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 
 private data class InspectionSession(
     val card: Card,
@@ -271,6 +262,10 @@ fun PlaytestHandScreen(
                 )
             },
         ) { padding ->
+            HexGridBackground(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.magicColors.primaryAccent.copy(alpha = 0.05f)
+            )
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -666,6 +661,7 @@ private fun HandGrid(
 
     val sp = MaterialTheme.spacing
     val haptic = LocalHapticFeedback.current
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     // Tracks each grid item's current on-screen rect (relative to boxCoords), keyed by index —
     // mirrors the position-tracking drop-resolution approach used for the PLAY-phase hand fan
@@ -678,7 +674,7 @@ private fun HandGrid(
     var dragDelta by remember(snapshotId) { mutableStateOf(Offset.Zero) }
 
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 110.dp),
+        columns = GridCells.Fixed(if (isLandscape) 4 else 3),
         contentPadding = PaddingValues(sp.md),
         horizontalArrangement = Arrangement.spacedBy(sp.sm),
         verticalArrangement = Arrangement.spacedBy(sp.sm),
@@ -869,28 +865,31 @@ private fun SideActionBar(
             IconButton(onClick = onRedraw) {
                 Icon(
                     Icons.Default.Replay,
-
                     tint = mc.primaryAccent,
-                    contentDescription = stringResource(R.string.playtest_action_new_hand)
+                    contentDescription = stringResource(R.string.playtest_action_new_hand),
+                )
+            }
+
+            // Keep
+            MagicCtaButton(
+                text = stringResource(R.string.playtest_action_start),
+                onClick = onKeep,
+                color = MagicCtaColor.Primary,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            // Mulligan
+            IconButton(
+                onClick = onMulligan,
+                enabled = canMulligan,
+            ) {
+                Icon(
+                    Icons.Default.History,
+                    tint = if (canMulligan) mc.secondaryAccent else mc.textDisabled,
+                    contentDescription = stringResource(R.string.playtest_action_mulligan),
                 )
             }
         }
-        // Keep
-        MagicCtaButton(
-            text = "START",
-            onClick = onKeep,
-            color = MagicCtaColor.Primary,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        IconButton(onClick = onMulligan) {
-            Icon(
-                Icons.Default.History,
-                tint = mc.secondaryAccent,
-                contentDescription = stringResource(R.string.playtest_action_new_hand)
-            )
-        }
-
     }
 }
 

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Clear
@@ -29,8 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -47,6 +44,8 @@ import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.MovementAction
+import com.mmg.manahub.core.ui.components.MovementRow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -100,7 +99,7 @@ fun DeckScannerQueueSheet(
         isBusy = isCommitting,
         onDismiss = onDismiss,
         onIncrement = { item -> entriesById[item.id]?.let(onIncrementQuantity) },
-        onDecrement = { item -> entriesById[item.id]?.let(onDecrementQuantity) },
+        onDecrement = { item -> if (item.quantity > 1) entriesById[item.id]?.let(onDecrementQuantity) },
         onRemove = { item -> entriesById[item.id]?.let(onRemoveEntry) },
         emptyTitle = stringResource(R.string.scanner_deck_queue_empty_title),
         emptySubtitle = stringResource(R.string.scanner_deck_queue_empty_subtitle),
@@ -155,7 +154,7 @@ fun DeckScannerQueueSheet(
     )
 }
 
-/** The Mainboard / Sideboard / Discard action row below each scanned card (unchanged from before the extraction). */
+/** The Mainboard / Sideboard / Discard action row below each scanned card (using shared MovementRow). */
 @Composable
 private fun DeckScannerQueueRowActions(
     entry: QueuedCard,
@@ -177,80 +176,34 @@ private fun DeckScannerQueueRowActions(
         R.string.scanner_deck_action_discard_a11y,
         entry.card.name,
     )
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.SpaceAround,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        QueueActionButton(
-            icon = Icons.Default.Add,
-            label = stringResource(R.string.scanner_deck_action_mainboard),
-            tint = if (isCommitting) mc.textDisabled else mc.primaryAccent,
-            onClick = onMainboard,
-            enabled = !isCommitting,
-            modifier = Modifier
-                .weight(1f)
-                .semantics {
-                    contentDescription = mainboardActionDescription
-                },
+    MovementRow(
+        actions = listOf(
+            MovementAction(
+                icon = Icons.Default.Add,
+                label = stringResource(R.string.scanner_deck_action_mainboard),
+                tint = if (isCommitting) mc.textDisabled else mc.primaryAccent,
+                onClick = onMainboard,
+                enabled = !isCommitting,
+                contentDescription = mainboardActionDescription,
+            ),
+            MovementAction(
+                icon = Icons.Default.Add,
+                label = stringResource(R.string.scanner_deck_action_sideboard),
+                tint = if (isCommitting) mc.textDisabled else mc.secondaryAccent,
+                onClick = onSideboard,
+                enabled = !isCommitting,
+                contentDescription = sideboardActionDescription,
+            ),
+            MovementAction(
+                icon = Icons.Rounded.Clear,
+                label = stringResource(R.string.scanner_deck_action_discard),
+                tint = if (isCommitting) mc.textDisabled else mc.lifeNegative,
+                onClick = onDiscard,
+                enabled = !isCommitting,
+                contentDescription = discardActionDescription,
+            ),
         )
-        QueueActionButton(
-            icon = Icons.Default.Add,
-            label = stringResource(R.string.scanner_deck_action_sideboard),
-            tint = if (isCommitting) mc.textDisabled else mc.secondaryAccent,
-            onClick = onSideboard,
-            enabled = !isCommitting,
-            modifier = Modifier
-                .weight(1f)
-                .semantics {
-                    contentDescription = sideboardActionDescription
-                },
-            )
-        QueueActionButton(
-            icon = Icons.Rounded.Clear,
-            label = stringResource(R.string.scanner_deck_action_discard),
-            tint = if (isCommitting) mc.textDisabled else mc.lifeNegative,
-            onClick = onDiscard,
-            enabled = !isCommitting,
-            modifier = Modifier
-                .weight(1f)
-                .semantics {
-                    contentDescription = discardActionDescription
-                },
-        )
-    }
-}
-
-@Composable
-private fun QueueActionButton(
-    icon: ImageVector,
-    label: String,
-    tint: Color,
-    onClick: () -> Unit,
-    enabled: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val ty = MaterialTheme.magicTypography
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 8.dp, horizontal = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
-        Text(
-            text = label,
-            style = ty.labelSmall.copy(fontSize = 9.sp),
-            color = tint,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            softWrap = false,
-        )
-    }
+    )
 }
 
 @Composable
@@ -258,8 +211,8 @@ private fun DeckScannerSettingsToggleRow(
     checked: Boolean,
     enabled: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    updateSorting:()->Unit,
-    isListInverted:Boolean,
+    updateSorting: () -> Unit,
+    isListInverted: Boolean,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography

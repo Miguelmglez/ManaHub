@@ -58,6 +58,8 @@ fun CardGridItem(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     sharedTransitionKey: Any? = null,
+    quantity: Long = item.totalQuantity.toLong(),
+    variants: Long = item.distinctCopies.toLong(),
 ) {
     val card = item.card
     val mc = MaterialTheme.magicColors
@@ -116,12 +118,12 @@ fun CardGridItem(
                     Row(
                         verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "×${item.totalQuantity}${if (item.hasFoil) "✦" else ""}",
+                        text = "×${quantity}${if (item.hasFoil) "✦" else ""}",
                         style = MaterialTheme.magicTypography.labelSmall,
                         color = if (item.hasFoil) mc.goldMtg else mc.textPrimary,
                         modifier = Modifier.padding(horizontal = 2.dp, vertical = 1.dp),
                     )
-                    if (item.distinctCopies > 1) {
+                      if (variants > 1) {
                             Icon(
                                 imageVector = Icons.Default.Style,
                                 contentDescription = null,

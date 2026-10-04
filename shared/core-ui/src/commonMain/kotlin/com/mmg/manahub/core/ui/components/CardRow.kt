@@ -362,8 +362,11 @@ fun CardRow(
                     Column(
                         modifier = Modifier.weight(1f).height(62.dp),
                     ) {
-                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.TopStart) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopStart) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 CardName(
                                     name = displayName ?: card.name,
                                     showFrontOnly = true,
@@ -385,20 +388,96 @@ fun CardRow(
                             }
                         }
 
-                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                            Text(
-                                displayTypeLine ?: card.typeLine,
-                                style = ty.bodySmall,
-                                color = if (isCommander) mc.textPrimary else mc.textSecondary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.BottomStart) {
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.CenterStart) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = displayTypeLine ?: card.typeLine,
+                                    style = ty.bodySmall,
+                                    color = if (isCommander) mc.textPrimary else mc.textSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                if (onAdd != null || quantity > 1 || onRemove != null) {
+                                    Spacer(Modifier.width(spacing.sm))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                                    ) {
+                                        if (onAdd != null) {
+                                            if (quantity > 0 && onRemove != null) {
+                                                IconButton(
+                                                    onClick = onRemove,
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Remove,
+                                                        contentDescription = "Decrease quantity",
+                                                        tint = mc.textSecondary,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                                Text(
+                                                    text = "$quantity",
+                                                    style = ty.labelMedium,
+                                                    color = if (isCommander) mc.goldMtg else mc.primaryAccent
+                                                )
+                                            }
+
+                                            IconButton(
+                                                onClick = onAdd,
+                                                enabled = addEnabled,
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Add,
+                                                    contentDescription = "Increase quantity",
+                                                    tint = when {
+                                                        !addEnabled -> mc.textDisabled
+                                                        isCommander -> mc.goldMtg
+                                                        else -> mc.primaryAccent
+                                                    },
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        } else {
+                                            if (quantity > 1) {
+                                                Surface(
+                                                    shape = ChipShape,
+                                                    color = (if (isCommander) mc.goldMtg else mc.secondaryAccent).copy(alpha = 0.15f)
+                                                ) {
+                                                    Text(
+                                                        "×$quantity",
+                                                        style = ty.labelMedium,
+                                                        color = if (isCommander) mc.goldMtg else mc.secondaryAccent,
+                                                        modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs)
+                                                    )
+                                                }
+                                            }
+                                            if (onRemove != null) {
+                                                IconButton(
+                                                    onClick = onRemove,
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Close,
+                                                        contentDescription = "Remove card",
+                                                        tint = if (isCommander) mc.goldMtg else mc.textDisabled,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.BottomStart) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(
                                     modifier = Modifier.weight(1f),
@@ -440,73 +519,6 @@ fun CardRow(
                                         style = ty.labelMedium,
                                         color = mc.goldMtg,
                                         maxLines = 1,
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(spacing.xs)
-                    ) {
-                        if (onAdd != null) {
-                            if (quantity > 0 && onRemove != null) {
-                                IconButton(
-                                    onClick = onRemove,
-                                ) {
-                                    Icon(
-                                        Icons.Default.Remove,
-                                        contentDescription = "Decrease quantity",
-                                        tint = mc.textSecondary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Text(
-                                    text = "$quantity",
-                                    style = ty.labelMedium,
-                                    color = if (isCommander) mc.goldMtg else mc.primaryAccent
-                                )
-                            }
-
-                            IconButton(
-                                onClick = onAdd,
-                                enabled = addEnabled,
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = "Increase quantity",
-                                    tint = when {
-                                        !addEnabled -> mc.textDisabled
-                                        isCommander -> mc.goldMtg
-                                        else -> mc.primaryAccent
-                                    },
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        } else {
-                            if (quantity > 1) {
-                                Surface(
-                                    shape = ChipShape,
-                                    color = (if (isCommander) mc.goldMtg else mc.secondaryAccent).copy(alpha = 0.15f)
-                                ) {
-                                    Text(
-                                        "×$quantity",
-                                        style = ty.labelMedium,
-                                        color = if (isCommander) mc.goldMtg else mc.secondaryAccent,
-                                        modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs)
-                                    )
-                                }
-                            }
-                            if (onRemove != null) {
-                                IconButton(
-                                    onClick = onRemove,
-                                ) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Remove card",
-                                        tint = if (isCommander) mc.goldMtg else mc.textDisabled,
-                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }

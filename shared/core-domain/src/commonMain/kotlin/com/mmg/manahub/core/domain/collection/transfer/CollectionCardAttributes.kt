@@ -44,20 +44,30 @@ object CollectionCardAttributes {
 
     /** App condition code for [raw], or [DEFAULT_CONDITION]. */
     fun conditionCode(raw: String?): String {
+        return conditionCodeOrNull(raw) ?: DEFAULT_CONDITION
+    }
+
+    /** Recognized condition code; missing input defaults, unknown input remains invalid. */
+    fun conditionCodeOrNull(raw: String?): String? {
         val value = raw?.trim().orEmpty()
         if (value.isEmpty()) return DEFAULT_CONDITION
         val upper = value.uppercase()
         if (upper in conditionCodes) return upper
-        return conditionAliases[normalizeKey(value)] ?: DEFAULT_CONDITION
+        return conditionAliases[normalizeKey(value)]
     }
 
     /** App language code for [raw] (a code or an English name), or [DEFAULT_LANGUAGE]. */
     fun languageCode(raw: String?): String {
+        return languageCodeOrNull(raw) ?: DEFAULT_LANGUAGE
+    }
+
+    /** Recognized language code; missing input defaults, unknown input remains invalid. */
+    fun languageCodeOrNull(raw: String?): String? {
         val value = raw?.trim().orEmpty()
         if (value.isEmpty()) return DEFAULT_LANGUAGE
         val lower = value.lowercase()
         if (lower in languageCodes) return lower
-        return languageAliases[normalizeKey(value)] ?: DEFAULT_LANGUAGE
+        return languageAliases[normalizeKey(value)]
     }
 
     // Moxfield's scale is TCGplayer-style: EX and GD have no own step and collapse to Lightly Played.

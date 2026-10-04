@@ -1,5 +1,7 @@
 package com.mmg.manahub.core.model
 
+import kotlinx.serialization.Serializable
+
 // COMMENTS_REVIEWED: 2026-09-08
 
 /**
@@ -44,13 +46,16 @@ enum class ComparisonOperator(val symbol: String) {
 }
 
 /** An individual search criterion contributed to a Scryfall query. */
+@Serializable
 sealed class SearchCriterion {
 
+    @Serializable
     data class Name(
         val value: String,
         val exact: Boolean = false,
     ) : SearchCriterion()
 
+    @Serializable
     data class OracleText(val value: String) : SearchCriterion()
 
     // Suggestions Tab UI Polish plan (W11, 2026-08-25): [exclude] renders every listed type
@@ -58,18 +63,22 @@ sealed class SearchCriterion {
     // Deck Analysis's Curve sections ("mv:N" -> "mv=N -t:land", excluding basic lands which always
     // carry cmc 0 and would otherwise pollute the "0 mana value" bucket). Appended last, defaulted
     // false so every existing construction site is unaffected.
+    @Serializable
     data class CardType(val types: Set<String>, val matchAll: Boolean = true, val exclude: Boolean = false) : SearchCriterion()
 
     /** Scryfall "function" oracle-tag facet (see [CardFunctionOption]). */
+    @Serializable
     data class CardFunction(val functions: Set<String>, val matchAll: Boolean = false) : SearchCriterion()
 
     /** Any complete alternative may match; criteria inside one alternative are combined with AND. */
+    @Serializable
     data class AnyOf(val alternatives: List<List<SearchCriterion>>) : SearchCriterion()
 
     /**
      * A card's printed colors (Scryfall `c`). [ColorMatchMode.AT_LEAST] is the default because it
      * is what the Advanced Search color picker means by "these colors".
      */
+    @Serializable
     data class Colors(
         val colors: Set<String>,
         val mode: ColorMatchMode = ColorMatchMode.AT_LEAST,
@@ -81,52 +90,64 @@ sealed class SearchCriterion {
      * what almost every caller wants, and because a superset test here is a semantic inversion that
      * silently returns the wrong cards (see [ColorMatchMode]).
      */
+    @Serializable
     data class ColorIdentity(
         val colors: Set<String>,
         val mode: ColorMatchMode = ColorMatchMode.AT_MOST,
     ) : SearchCriterion()
 
+    @Serializable
     data class ManaCost(
         val value: Int,
         val operator: ComparisonOperator = ComparisonOperator.EQUAL,
     ) : SearchCriterion()
 
+    @Serializable
     data class Rarity(
         val rarity: List<String>) : SearchCriterion()
 
+    @Serializable
     data class CardSet(val setCodes: Set<String>) : SearchCriterion()
 
+    @Serializable
     data class Power(
         val value: Int,
         val operator: ComparisonOperator = ComparisonOperator.EQUAL,
     ) : SearchCriterion()
 
+    @Serializable
     data class Toughness(
         val value: Int,
         val operator: ComparisonOperator = ComparisonOperator.EQUAL,
     ) : SearchCriterion()
 
+    @Serializable
     data class Loyalty(
         val value: Int,
         val operator: ComparisonOperator = ComparisonOperator.EQUAL,
     ) : SearchCriterion()
 
+    @Serializable
     data class Price(
         val value: Double,
         val currency: String,
         val operator: ComparisonOperator = ComparisonOperator.LESS_OR_EQUAL,
     ) : SearchCriterion()
 
+    @Serializable
     data class Format(
         val format: List<String>,
         val legal: Boolean = true,
     ) : SearchCriterion()
 
 
+    @Serializable
     data class Language(val langCode: String) : SearchCriterion()
 
+    @Serializable
     data class Artist(val value: String) : SearchCriterion()
 
+    @Serializable
     data class FlavorText(val value: String) : SearchCriterion()
 
     // ── Suggestions Tab UI Polish plan (W11, 2026-08-25) — new criteria extending this model for
@@ -143,6 +164,7 @@ sealed class SearchCriterion {
      * that at the type level. [requireLand] additionally ANDs `t:land` — Mana Base's per-color
      * sections are land-only; the general mana-fixing role is not.
      */
+    @Serializable
     data class ManaProduction(
         val colors: Set<String> = emptySet(),
         val minDistinctColors: Int? = null,
@@ -164,6 +186,7 @@ sealed class SearchCriterion {
      * @property typeLineAnyOf type-line terms OR'd together as `t:x` clauses (e.g. `aura_buff`'s
      *   "must be enchanting an Aura").
      */
+    @Serializable
     data class OracleTerms(
         val allOf: List<String> = emptyList(),
         val anyOfGroups: List<List<String>> = emptyList(),
@@ -179,9 +202,11 @@ sealed class SearchCriterion {
      * `CollectionStatus(wishlist, forTrade)` was AND'ed against the OWNED collection, so a
      * wishlisted card the user does not own could never match and the filter looked dead.
      */
+    @Serializable
     data class CollectionStatus(val source: CollectionSource) : SearchCriterion()
 
     /** Matches cards that have ANY of the given tag keys (in auto-tags OR user-tags). */
+    @Serializable
     data class HasTag(
         val keys: List<String>,
         val verifiedScryfallQueries: Map<String, String> = emptyMap(),
@@ -199,6 +224,7 @@ sealed class SearchCriterion {
      * A singleton object, not a data class: it carries no parameters (unlike [Format], which needs
      * one for the format list).
      */
+    @Serializable
     data object CommanderEligible : SearchCriterion()
 }
 
@@ -210,6 +236,7 @@ sealed class SearchCriterion {
  */
 enum class CollectionSource { COLLECTION, WISHLIST, FOR_TRADE }
 
+@Serializable
 data class AdvancedSearchQuery(
     val criteria: List<SearchCriterion> = emptyList(),
     val orderBy: SearchOrder = SearchOrder.NAME,

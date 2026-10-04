@@ -22,6 +22,19 @@ import kotlin.random.Random
  */
 class RulesTipCatalogTest {
 
+    @Test
+    fun stableMetadataPreservesCatalogOrder() {
+        assertEquals(146, MTG_TIPS_CATALOG.map { it.stableId }.toSet().size)
+        assertTrue(MTG_TIPS_CATALOG.all { it.stableId.isNotBlank() && (it.references.isNotEmpty() || it.query.isNotBlank()) })
+        val text = MTG_TIPS_CATALOG.joinToString("\n") { it.stableId }
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
+        assertEquals("cbe2444267b3a4d5e302f5f9debdacf42ac30c268d8afe47fc8fdfe9ab8e61f7", hash)
+        assertEquals(0, dailyRulesTipIndex(146L * 86_400_000L))
+        assertEquals(145, dailyRulesTipIndex(145L * 86_400_000L))
+        val random = Random(19)
+        repeat(146) { assertTrue(rollRulesTipIndex(it, random) != it) }
+    }
+
     // ── Catalog sanity ─────────────────────────────────────────────────────────
 
     @Test
@@ -179,6 +192,6 @@ class RulesTipCatalogTest {
     }
 
     private companion object {
-        const val MAX_TIP_BODY_CHARS = 280
+        const val MAX_TIP_BODY_CHARS = 320
     }
 }

@@ -36,11 +36,12 @@ class TradeWishlistCleanupTest {
     fun drainConfirmsRemoteQuantityBeforeClearingOwnerScopedOutbox() = runTest {
         coEvery { syncDao.getPendingWishlistCleanups("owner") } returns
             listOf(TradeWishlistCleanupEntity("owner", "foil", 1))
-        coEvery { remote.updateWishlistQuantity("foil", 1) } returns Result.success(Unit)
+        coEvery { remote.updateWishlistQuantityForOwner("foil", "owner", 1) } returns Result.success(Unit)
+        coEvery { wishlistDao.managed("foil") } returns null
 
         assertTrue(cleanup.drain("owner").isSuccess)
 
-        coVerify(exactly = 1) { remote.updateWishlistQuantity("foil", 1) }
+        coVerify(exactly = 1) { remote.updateWishlistQuantityForOwner("foil", "owner", 1) }
         coVerify(exactly = 1) { syncDao.clearWishlistCleanup("owner", "foil", 1) }
     }
 }

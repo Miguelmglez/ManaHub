@@ -2,6 +2,7 @@ package com.mmg.manahub.core.di
 // COMMENTS_REVIEWED: 2026-09-16
 
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.collection.transfer.CollectionOwnershipRepository
 import com.mmg.manahub.core.domain.repository.CardQueueRepository
 import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.feature.decks.domain.usecase.AddScannedCardsToDeckUseCase
@@ -73,6 +74,11 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object KoinToHiltBridgeModule {
+
+    /** Scanner resolves the existing Koin singleton after application startup. */
+    @Provides
+    @Singleton
+    fun provideCollectionOwnershipRepository(): CollectionOwnershipRepository = GlobalContext.get().get()
 
     @Provides
     @Singleton

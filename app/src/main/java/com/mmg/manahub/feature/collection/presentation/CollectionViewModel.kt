@@ -63,6 +63,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -94,6 +95,7 @@ class CollectionViewModel(
     private val crashReporter: CrashReporter,
     private val exportDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val nowMillis: () -> Long = { System.currentTimeMillis() },
+    private val selectionRuntime: CollectionSelectionRuntime? = null,
 ) : ViewModel() {
 
     val gridState = LazyGridState()
@@ -101,6 +103,10 @@ class CollectionViewModel(
 
     private val _uiState = MutableStateFlow(CollectionUiState())
     val uiState: StateFlow<CollectionUiState> = _uiState.asStateFlow()
+    val pagedCards get()=selectionRuntime?.paging
+
+    /** Activates snapshot refresh only while the Cards destination is resumed. */
+    fun setCardsActive(active: Boolean) { selectionRuntime?.setActive(active) }
 
     // Raw unfiltered collection from Room (non-deleted entries)
     private val _allCards = MutableStateFlow<List<UserCardWithCard>>(emptyList())
@@ -155,9 +161,20 @@ class CollectionViewModel(
         }
         _uiState.update { it.copy(selectedTab = initialTab) }
 
-        observeCollection()
-        observeWishlist()
-        observeOpenForTrade()
+        if(selectionRuntime==null) {
+            observeCollection()
+            observeWishlist()
+            observeOpenForTrade()
+        } else {
+            selectionRuntime.start(viewModelScope,_uiState.map { state ->
+                com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionQuery(state.collectionSource,state.searchQuery,state.activeQuery,com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionSort.valueOf(state.sortOrder.name),state.sortDirection==SortDirection.ASC,state.groupingMode)
+            }.distinctUntilChanged())
+            viewModelScope.launch {
+                kotlinx.coroutines.flow.combine(selectionRuntime.summary,selectionRuntime.loading,selectionRuntime.error) { summary,loading,error -> Triple(summary,loading,error) }.collect { (summary,loading,error) ->
+                    _uiState.update { it.copy(selectionSummary=summary,isLoading=loading,error=error,uncachedSourceRows=(summary?.missingMetadataRows ?: 0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()) }
+                }
+            }
+        }
         observeTradeListUnsyncedCounts()
         // Backend & Performance Optimization plan, WS1+WS3 Part B item 7a (2026-07-28): the
         // per-screen-entry price refresh that used to run here was removed — it duplicated
@@ -687,6 +704,7 @@ class CollectionViewModel(
      * hides one only a wishlist card does).
      */
     fun getAllCollectionTags(): Set<com.mmg.manahub.core.model.CardTag> {
+        selectionRuntime?.let { return it.tags.map { tag -> tag.copy(category=TagDictionary.get(tag.key)?.category ?: tag.category) }.toSet() }
         return baseListFor(_uiState.value.collectionSource)
             .flatMap { it.card.tags + it.card.userTags }
             .distinctBy { it.key }
@@ -697,6 +715,7 @@ class CollectionViewModel(
     // ── Filtering & sorting ───────────────────────────────────────────────────
 
     private fun applyFilters() {
+        if(selectionRuntime!=null)return
         val state = _uiState.value
         val result = filterRows(baseListFor(state.collectionSource), state)
         visibleRows = result

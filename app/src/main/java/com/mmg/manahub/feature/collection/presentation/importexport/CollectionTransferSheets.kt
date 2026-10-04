@@ -2,14 +2,14 @@ package com.mmg.manahub.feature.collection.presentation.importexport
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
@@ -19,34 +19,28 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.collection.transfer.CollectionFileFormat
+import com.mmg.manahub.core.ui.components.MagicActionRow
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicSelectionItem
 import com.mmg.manahub.core.ui.theme.BottomSheetShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 
-// Material's minimum touch target and the cap that keeps a long list from filling the dialog;
-// neither is a spacing-grid value, so they are named here rather than pushed into Spacing.
-private val RowTouchTarget = 56.dp
+// Cap that keeps a long list from filling the dialog.
 private val DialogListMaxHeight = 280.dp
 
 /** Overflow sheet of the Cards tab: "Export collection" and "Import to collection". */
@@ -66,14 +60,19 @@ fun CollectionTransferActionsSheet(
         containerColor = mc.backgroundSecondary,
         shape = BottomSheetShape,
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(bottom = sp.xl)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = sp.lg, vertical = sp.sm)
+                .padding(bottom = sp.xl),
+            verticalArrangement = Arrangement.spacedBy(sp.sm),
+        ) {
             Text(
                 text = stringResource(R.string.collection_transfer_sheet_title),
-                style = MaterialTheme.magicTypography.titleMedium,
+                style = MaterialTheme.magicTypography.titleLarge,
                 color = mc.textPrimary,
-                modifier = Modifier.padding(horizontal = sp.lg, vertical = sp.sm),
             )
-            TransferActionRow(
+            MagicActionRow(
                 icon = Icons.Default.FileUpload,
                 title = stringResource(R.string.collection_export_option),
                 subtitle = stringResource(
@@ -82,46 +81,13 @@ fun CollectionTransferActionsSheet(
                 enabled = canExport,
                 onClick = onExport,
             )
-            TransferActionRow(
+            MagicActionRow(
                 icon = Icons.Default.FileDownload,
                 title = stringResource(R.string.collection_import_option),
                 subtitle = stringResource(R.string.collection_import_option_desc),
                 enabled = true,
                 onClick = onImport,
             )
-        }
-    }
-}
-
-@Composable
-private fun TransferActionRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val sp = MaterialTheme.spacing
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        // Deliberately not a MagicColors token: this Surface is a click target, and the sheet
-        // behind it supplies the colour.
-        color = Color.Transparent,
-        modifier = Modifier.fillMaxWidth().heightIn(min = RowTouchTarget),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = sp.lg, vertical = sp.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(sp.md),
-        ) {
-            Icon(icon, contentDescription = null, tint = if (enabled) mc.primaryAccent else mc.textDisabled)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = ty.titleMedium, color = if (enabled) mc.textPrimary else mc.textDisabled)
-                Text(subtitle, style = ty.bodySmall, color = if (enabled) mc.textSecondary else mc.textDisabled)
-            }
         }
     }
 }
@@ -135,6 +101,7 @@ fun CollectionExportSheet(
     onSave: () -> Unit,
     onShare: () -> Unit,
     onDismiss: () -> Unit,
+    additionalContent: @Composable ()->Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -146,43 +113,35 @@ fun CollectionExportSheet(
         shape = BottomSheetShape,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = sp.lg).padding(bottom = sp.xl),
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = sp.lg)
+                .padding(bottom = sp.xl),
             verticalArrangement = Arrangement.spacedBy(sp.sm),
         ) {
             Text(stringResource(R.string.collection_export_title), style = ty.titleLarge, color = mc.textPrimary)
             Text(stringResource(R.string.collection_export_format_label), style = ty.labelLarge, color = mc.textSecondary)
-            Column(modifier = Modifier.selectableGroup()) {
+            Column(
+                modifier = Modifier.selectableGroup(),
+                verticalArrangement = Arrangement.spacedBy(sp.xs),
+            ) {
                 CollectionFileFormat.entries.forEach { format ->
                     val (title, desc) = format.labels()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = RowTouchTarget)
-                            .selectable(
-                                selected = state.format == format,
-                                enabled = !state.isExporting,
-                                role = Role.RadioButton,
-                                onClick = { onFormatSelected(format) },
-                            ),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(sp.sm),
-                    ) {
-                        RadioButton(
-                            selected = state.format == format,
-                            onClick = null,
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = mc.primaryAccent,
-                                unselectedColor = mc.textSecondary,
-                            ),
-                        )
-                        Column {
-                            Text(title, style = ty.bodyLarge, color = mc.textPrimary)
-                            Text(desc, style = ty.bodySmall, color = mc.textSecondary)
-                        }
-                    }
+                    MagicSelectionItem(
+                        title = title,
+                        description = desc,
+                        isSelected = state.format == format,
+                        onClick = { if (!state.isExporting) onFormatSelected(format) },
+                        accentColor = mc.primaryAccent,
+                        selectionEnabled = !state.isExporting,
+                        selectionRole = Role.RadioButton,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(sp.md), modifier = Modifier.fillMaxWidth()) {
+            additionalContent()
+            Column(verticalArrangement = Arrangement.spacedBy(sp.sm), modifier = Modifier.fillMaxWidth()) {
                 MagicCtaButton(
                     onClick = onShare,
                     enabled = !state.isExporting,
@@ -190,7 +149,7 @@ fun CollectionExportSheet(
                     text = stringResource(R.string.collection_export_share),
                     style = MagicCtaStyle.Outlined,
                     icon = { Icon(Icons.Default.Share, contentDescription = null) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = sp.xxl + sp.lg),
                 )
                 MagicCtaButton(
                     onClick = onSave,
@@ -199,7 +158,7 @@ fun CollectionExportSheet(
                     text = stringResource(R.string.collection_export_save),
                     color = MagicCtaColor.Primary,
                     icon = { Icon(Icons.Default.Save, contentDescription = null) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = sp.xxl + sp.lg),
                 )
             }
         }
@@ -236,13 +195,13 @@ fun CollectionImportResumeDialog(
                 MagicCtaButton(
                     onClick = onReview,
                     text = stringResource(R.string.collection_import_resume_review),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = sp.xxl + sp.lg),
                 )
                 MagicCtaButton(
                     onClick = onImportMore,
                     text = stringResource(R.string.collection_import_resume_import_more),
                     style = MagicCtaStyle.Outlined,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = sp.xxl + sp.lg),
                 )
                 if (unresolvedCount > 0) {
                     MagicCtaButton(
@@ -250,7 +209,7 @@ fun CollectionImportResumeDialog(
                         text = pluralStringResource(R.plurals.collection_import_show_unresolved, unresolvedCount, unresolvedCount),
                         style = MagicCtaStyle.Ghost,
                         color = MagicCtaColor.Warning,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = sp.xxl + sp.lg),
                     )
                 }
                 MagicCtaButton(
@@ -258,10 +217,11 @@ fun CollectionImportResumeDialog(
                     text = stringResource(R.string.action_cancel),
                     style = MagicCtaStyle.Ghost,
                     color = MagicCtaColor.Neutral,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = sp.xxl + sp.lg),
                 )
             }
         },
+        scrollableBodyAndActions = true,
     )
 }
 
@@ -280,43 +240,47 @@ fun UnresolvedLinesDialog(
         onDismissRequest = onDismiss,
         title = stringResource(R.string.collection_import_unresolved_title),
         content = {
-            Text(
-                // The list is capped, the count is not: say so instead of reporting the cap.
-                if (totalCount > lines.size) {
-                    pluralStringResource(
-                        R.plurals.collection_import_unresolved_text_capped,
-                        totalCount,
-                        lines.size,
-                        totalCount,
-                    )
-                } else {
-                    pluralStringResource(R.plurals.collection_import_unresolved_text, lines.size, lines.size)
-                },
-                style = ty.bodyMedium,
-                color = mc.textSecondary,
-            )
             LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = DialogListMaxHeight).padding(vertical = sp.sm),
+                modifier = Modifier.fillMaxWidth().heightIn(max = DialogListMaxHeight),
                 verticalArrangement = Arrangement.spacedBy(sp.xs),
             ) {
+                item {
+                    Text(
+                        // The list is capped, the count is not: say so instead of reporting the cap.
+                        if (totalCount > lines.size) {
+                            pluralStringResource(
+                                R.plurals.collection_import_unresolved_text_capped,
+                                totalCount,
+                                lines.size,
+                                totalCount,
+                            )
+                        } else {
+                            pluralStringResource(R.plurals.collection_import_unresolved_text, lines.size, lines.size)
+                        },
+                        style = ty.bodyMedium,
+                        color = mc.textSecondary,
+                        modifier = Modifier.padding(bottom = sp.sm),
+                    )
+                }
                 itemsIndexed(lines, key = { index, _ -> index }) { _, line ->
                     Text(line, style = ty.bodySmall, color = mc.textPrimary)
                 }
             }
         },
+        scrollableContent = true,
         buttons = {
             Column(verticalArrangement = Arrangement.spacedBy(sp.sm), modifier = Modifier.fillMaxWidth()) {
                 MagicCtaButton(
                     onClick = onCopy,
                     text = stringResource(R.string.collection_import_unresolved_copy),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = sp.xxl + sp.lg),
                 )
                 MagicCtaButton(
                     onClick = onDismiss,
                     text = stringResource(R.string.action_close),
                     style = MagicCtaStyle.Ghost,
                     color = MagicCtaColor.Neutral,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = sp.xxl + sp.lg),
                 )
             }
         },

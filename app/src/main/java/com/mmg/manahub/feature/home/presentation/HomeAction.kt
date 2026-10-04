@@ -47,6 +47,9 @@ sealed interface HomeAction {
     ) : HomeAction
 
     /** Shows a different, randomly chosen Rules Tip (in-memory only). Handled in [HomeViewModel]. */
+    object OpenRules : HomeAction
+    object OpenRulesTipIndex : HomeAction
+    data class OpenRulesTip(val tipId: String) : HomeAction
     object RollRulesTip : HomeAction
     object OpenTournaments : HomeAction
     object OpenSettings : HomeAction

@@ -30,6 +30,16 @@ abstract class PrepareCmpAssetsTask : Copy() {
     }
 }
 
+val prepareRulesAssets = tasks.register("prepareRulesAssets", PrepareCmpAssetsTask::class.java) {
+    dependsOn(":shared:feature-rules:prepareComposeResourcesTaskForCommonMain")
+    from(project(":shared:feature-rules").layout.buildDirectory.dir("generated/compose/resourceGenerator/preparedResources/commonMain"))
+    outputDir.set(layout.buildDirectory.dir("generated/rules-assets"))
+    eachFile {
+        if (path.startsWith("composeResources/") && !path.contains("com.mmg.manahub.feature.rules.resources")) path = path.replaceFirst("composeResources/", "composeResources/com.mmg.manahub.feature.rules.resources/")
+    }
+    includeEmptyDirs = false
+}
+
 val prepareCmpAssets = tasks.register("prepareCmpAssets", PrepareCmpAssetsTask::class.java) {
     // KMP migration — Phase 3: Explicitly depend on the resource generation task in :shared:core-ui
     // to fix the "uses output without declaring dependency" build error.
@@ -44,8 +54,15 @@ val prepareCmpAssets = tasks.register("prepareCmpAssets", PrepareCmpAssetsTask::
     includeEmptyDirs = false
 }
 
+// Room exports during main KSP; migration-test assets must package the resulting schema.
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("AndroidTestAssets") }.configureEach {
+    val testedVariant = name.removePrefix("merge").removeSuffix("AndroidTestAssets")
+    dependsOn("ksp${testedVariant}Kotlin")
+}
+
 androidComponents {
     onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(prepareRulesAssets, PrepareCmpAssetsTask::outputDir)
         variant.sources.assets?.addGeneratedSourceDirectory(
             prepareCmpAssets,
             PrepareCmpAssetsTask::outputDir
@@ -74,6 +91,11 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0"
+        testInstrumentationRunner = if (providers.gradleProperty("tagPickerUiAcceptance").orNull == "true")
+            "com.mmg.manahub.feature.carddetail.presentation.TagPickerAcceptanceRunner"
+        else if (providers.gradleProperty("transferUiAcceptance").orNull == "true")
+            "com.mmg.manahub.feature.collection.CollectionTransferAcceptanceRunner"
+        else "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField(
             "String",
@@ -246,6 +268,7 @@ dependencies {
     // KMP migration — Phase 3 / Slice 1: shared design system (MagicTheme tokens, colors,
     // spacing, shapes, Material 3 bridge). Typography/font-loading remain in :app.
     implementation(project(":shared:core-ui"))
+    implementation(project(":shared:feature-rules"))
     implementation(compose.components.resources)
 
     // Supabase Auth & DB
@@ -268,6 +291,8 @@ dependencies {
     implementation(libs.firebase.crashlytics)
     implementation(libs.splashscreen)
     implementation(compose.foundation)
+    // CardDetail needs Foundation 1.12's public SelectionState API for exact selection actions.
+    implementation(libs.foundation)
     implementation(compose.material3)
     // tv.material removed — no usages found in the codebase (verified 2026-06-10)
     implementation(libs.emojis)
@@ -328,8 +353,14 @@ dependencies {
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.room.testing)
+    androidTestImplementation(libs.work.testing)
     androidTestImplementation(libs.coroutines.test)
     androidTestImplementation(libs.turbine)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:${libs.versions.compose.multiplatform.get()}")
+    debugImplementation("androidx.compose.ui:ui-test-manifest:${libs.versions.compose.multiplatform.get()}")
+    // AGP aligns instrumentation to the tested runtime; AndroidX Test requires concurrent 1.2.0.
+    debugImplementation("androidx.concurrent:concurrent-futures:1.2.0")
+    debugImplementation("androidx.concurrent:concurrent-futures-ktx:1.2.0")
 
     // Gson — needed directly by RoomConverters and CardEntityMapper
     implementation(libs.gson)

@@ -1103,7 +1103,7 @@ class UserPreferencesDataStore @Inject constructor(
                     ?.distinct()
                     ?: emptyList()
                 if (parsed.size >= 4) {
-                    parsed
+                    parsed.take(4)
                 } else {
                     val result = parsed.toMutableList()
                     for (default in QuickStartAction.defaults) {
@@ -1117,7 +1117,7 @@ class UserPreferencesDataStore @Inject constructor(
     /** Persists the chosen Quick Start actions as an ordered persistedId string. */
     suspend fun saveQuickStartActions(actions: List<QuickStartAction>) {
         context.userPrefsDataStore.edit { prefs ->
-            prefs[KEY_QUICK_START_ORDER] = actions.joinToString(",") { it.persistedId }
+            prefs[KEY_QUICK_START_ORDER] = (actions.distinct().take(4) + QuickStartAction.defaults.filter { it !in actions }).take(4).joinToString(",") { it.persistedId }
         }
     }
 

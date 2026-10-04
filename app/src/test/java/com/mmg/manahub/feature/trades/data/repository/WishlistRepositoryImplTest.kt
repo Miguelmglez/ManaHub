@@ -616,7 +616,7 @@ class WishlistRepositoryImplTest {
         val result = repository.syncFromRemote("user-1")
 
         assertTrue(result.isFailure)
-        coVerify { dao.upsertAll(match { rows -> rows.map { it.id } == listOf("w1") }) }
+        coVerify { dao.upsertRemoteProtected(match { rows -> rows.map { it.id } == listOf("w1") },"user-1") }
         coVerify(exactly = 0) { dao.deleteSyncedByIds(any(), any()) }
         coVerify(exactly = 0) { dao.deleteSyncedNotIn(any(), any()) }
         coVerify(exactly = 0) { dao.clearSynced(any()) }

@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -89,7 +90,7 @@ private fun contrastRatio(a: Color, b: Color): Float {
     return (lighter + 0.05f) / (darker + 0.05f)
 }
 
-private data class ChipTonalColors(val container: Color, val content: Color)
+data class ChipTonalColors(val container: Color, val content: Color)
 
 /**
  * Resolves a category's tonal chip colors against [containerBase] (the surface the chip is
@@ -104,7 +105,10 @@ private data class ChipTonalColors(val container: Color, val content: Color)
  * tags), which is why it is exempt from the same AA guard (WCAG 1.4.11 does not require contrast
  * for inactive/de-emphasized UI).
  */
-private fun TagCategory.chipTonalColors(mc: MagicColors, containerBase: Color): ChipTonalColors {
+fun TagCategory.chipTonalColors(
+    mc: MagicColors,
+    containerBase: Color = mc.surface
+): ChipTonalColors {
     val accent = accentToken(mc)
         ?: return ChipTonalColors(container = mc.surfaceVariant, content = mc.textDisabled)
     val container = accent.copy(alpha = CHIP_CONTAINER_ALPHA)
@@ -137,6 +141,8 @@ private fun TagCategory.chipTonalColors(mc: MagicColors, containerBase: Color): 
  * @param removeContentDescription Content description for the remove icon (Android call sites
  *                                 should pass a localized `stringResource`; this component cannot
  *                                 reference Android resources itself).
+    @param leading                  Optional leading content (e.g. an add/close icon) rendered
+ *                                 before the label.
  * @param trailing                 Optional extra trailing content (e.g. an "applied" checkmark,
  *                                 edit/delete icon buttons) rendered after the remove icon, if any.
  */
@@ -148,6 +154,7 @@ fun CardTagChip(
     onClick: (() -> Unit)? = null,
     onRemove: (() -> Unit)? = null,
     removeContentDescription: String? = null,
+    leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
@@ -169,7 +176,12 @@ fun CardTagChip(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
         ) {
-            Text(text = label, style = ty.labelSmall, color = colors.content, maxLines = 1)
+            if (leading != null) {
+                leading()
+                Spacer(Modifier.width(4.dp))
+            }
+            Text(text = label, style = ty.labelSmall, color = colors.content, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
             if (onRemove != null) {
                 Spacer(Modifier.width(4.dp))
                 Icon(

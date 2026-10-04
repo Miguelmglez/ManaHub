@@ -383,6 +383,12 @@ graphify-out/
 # Architecture Decision Records are committed (see comment near docs/*_TODO.md rules).
 !/docs/adr/
 !/docs/adr/**
+# Rules source verification and editorial mappings must accompany the packaged edition.
+!/docs/rules/
+!/docs/rules/**
+# Rules source verification and editorial mappings must accompany the packaged edition.
+!/docs/rules/
+!/docs/rules/**
 # Suggestions Tab UI Polish plan (W12/W13, 2026-08-25): the plan-selection and SYNERGY-pillar
 # investigation docs are durable engineering references (file:line-cited code investigations), not
 # throwaway planning artifacts — committed like the ADRs above, not gitignored.

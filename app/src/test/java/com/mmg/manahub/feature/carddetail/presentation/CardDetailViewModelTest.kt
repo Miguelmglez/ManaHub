@@ -18,6 +18,9 @@ import com.mmg.manahub.core.domain.usecase.collection.UpdateCollectionEntryUseCa
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.Deck
+import com.mmg.manahub.core.model.DeckSummary
+import com.mmg.manahub.core.tagging.CardMechanicCatalogRepository
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.UpdateWishlistEntryUseCase
@@ -30,10 +33,13 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -73,16 +79,24 @@ class CardDetailViewModelTest {
     private val updateWishlistEntry       = mockk<UpdateWishlistEntryUseCase>()
     private val refreshCardStrategyTags   = mockk<RefreshCardStrategyTagsUseCase>(relaxed = true)
 
+    private val mechanicCatalog = mockk<CardMechanicCatalogRepository>(relaxed = true)
+
     private lateinit var viewModel: CardDetailViewModel
 
     private val initialScryfallId = "card-initial"
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private fun buildViewModel(card: com.mmg.manahub.core.model.Card = TestFixtures.buildCard(scryfallId = initialScryfallId, setCode = "lea")): CardDetailViewModel {
+    private fun buildViewModel(
+        card: com.mmg.manahub.core.model.Card = TestFixtures.buildCard(scryfallId = initialScryfallId, setCode = "lea"),
+        deckMembership: Flow<List<Deck>> = flowOf(emptyList()),
+        deckSummaries: Flow<List<DeckSummary>> = flowOf(emptyList()),
+    ): CardDetailViewModel {
+        every { mechanicCatalog.entries } returns MutableStateFlow(emptyList())
         coEvery { cardRepo.getCardById(initialScryfallId) } returns DataResult.Success(card)
         every { cardRepo.observeCard(any()) } returns flowOf(null)
-        every { deckRepo.observeDecksContainingCard(any()) } returns flowOf(emptyList())
+        every { deckRepo.observeDecksContainingCard(any()) } returns deckMembership
+        every { deckRepo.observeAllDeckSummaries() } returns deckSummaries
         every { userCardRepo.observeVersionsByOracle(any(), any(), any()) } returns flowOf(emptyList())
         every { wishlistRepo.observeVersionsByOracle(any(), any()) } returns flowOf(emptyList())
         every { openForTradeRepo.observeVersionsByOracle(any(), any()) } returns flowOf(emptyList())
@@ -104,6 +118,7 @@ class CardDetailViewModelTest {
             updateCollectionEntry     = updateCollectionEntry,
             updateWishlistEntry       = updateWishlistEntry,
             refreshCardStrategyTags   = refreshCardStrategyTags,
+            mechanicCatalog           = mechanicCatalog,
         )
     }
 
@@ -121,6 +136,48 @@ class CardDetailViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
         unmockkStatic(FirebaseCrashlytics::class)
+    }
+
+    @Test
+    fun `found decks retain real summary data and react to summary and membership changes`() = runTest {
+        val matchingDeck = Deck(id = "matching", name = "Matching deck")
+        val secondDeck = Deck(id = "second", name = "Second deck")
+        val matchingSummary = DeckSummary(
+            id = matchingDeck.id,
+            name = matchingDeck.name,
+            description = "Deck description",
+            format = "commander",
+            coverCardId = "cover-card",
+            createdAt = 1L,
+            updatedAt = 2L,
+            cardCount = 100,
+            colorIdentity = setOf("W", "U"),
+            coverImageUrl = "https://example.com/deck-art.jpg",
+        )
+        val secondSummary = matchingSummary.copy(id = secondDeck.id, name = secondDeck.name)
+        val membership = MutableStateFlow(listOf(matchingDeck, secondDeck, matchingDeck))
+        val summaries = MutableStateFlow(listOf(secondSummary, matchingSummary, matchingSummary.copy(id = "unrelated")))
+        viewModel = buildViewModel(deckMembership = membership, deckSummaries = summaries)
+        advanceUntilIdle()
+
+        assertEquals(listOf(matchingSummary, secondSummary), viewModel.uiState.value.decksContainingCard)
+
+        val updatedSummary = matchingSummary.copy(
+            cardCount = 99,
+            colorIdentity = setOf("B", "G"),
+            coverImageUrl = "https://example.com/new-art.jpg",
+        )
+        summaries.value = listOf(secondSummary, updatedSummary)
+        advanceUntilIdle()
+        assertEquals(listOf(updatedSummary, secondSummary), viewModel.uiState.value.decksContainingCard)
+
+        membership.value = listOf(secondDeck)
+        advanceUntilIdle()
+        assertEquals(listOf(secondSummary), viewModel.uiState.value.decksContainingCard)
+
+        membership.value = emptyList()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.decksContainingCard.isEmpty())
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -332,12 +389,21 @@ class CardDetailViewModelTest {
         val card = TestFixtures.buildCard(scryfallId = initialScryfallId, setCode = "lea")
             .copy(oracleId = "oracle-123", tags = emptyList())
         val enriched = card.copy(tags = listOf(CardTag.REMOVAL))
+        val cachedCard = MutableStateFlow(card)
+        val completeRefresh = CompletableDeferred<Unit>()
+        coEvery { refreshCardStrategyTags(initialScryfallId, card.oracleId, card.tags) } coAnswers {
+            completeRefresh.await()
+            cachedCard.value = enriched
+        }
 
         viewModel = buildViewModel(card = card)
-        // Override AFTER buildViewModel() so this specific-id stub isn't shadowed by its blanket
-        // `observeCard(any()) -> flowOf(null)` default — nothing collects yet under
-        // StandardTestDispatcher until advanceUntilIdle() below.
-        every { cardRepo.observeCard(initialScryfallId) } returns flowOf(enriched)
+        every { cardRepo.observeCard(initialScryfallId) } returns cachedCard
+        advanceUntilIdle()
+
+        assertEquals(emptyList<CardTag>(), viewModel.uiState.value.card?.tags)
+        coVerify(exactly = 1) { refreshCardStrategyTags(initialScryfallId, card.oracleId, card.tags) }
+
+        completeRefresh.complete(Unit)
         advanceUntilIdle()
 
         assertEquals(listOf(CardTag.REMOVAL), viewModel.uiState.value.card?.tags)
@@ -431,17 +497,6 @@ class CardDetailViewModelTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given a custom tag created under a built-in category then the card gets it under that category`() = runTest {
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-
-        viewModel.onSaveAndAddCustomTag("My Ramp", TagCategory.STRATEGY.name)
-        advanceUntilIdle()
-
-        assertEquals(listOf(CardTag("my_ramp", TagCategory.STRATEGY)), viewModel.uiState.value.card?.userTags)
-    }
-
-    @Test
     fun `given a user tag already on the card when the same key is added under another category then it is not duplicated`() = runTest {
         val card = TestFixtures.buildCard(
             scryfallId = initialScryfallId,
@@ -458,14 +513,146 @@ class CardDetailViewModelTest {
     }
 
     @Test
-    fun `given a custom tag is saved then analytics receive only the label length, never the free text`() = runTest {
+    fun `cache read failure keeps base catalog and exposes retry without throwing`() = runTest {
+        viewModel = buildViewModel()
+        coEvery { mechanicCatalog.loadCached() } throws java.io.IOException("cache read failed")
+        advanceUntilIdle()
+        viewModel.onShowTagPicker()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.tagCatalogError)
+        assertTrue(!viewModel.uiState.value.isTagCatalogLoading)
+        assertTrue(viewModel.uiState.value.tagCatalog.any { it.key == CardTag.REMOVAL.key })
+    }
+
+    @Test
+    fun `matching Room acknowledgement releases projection for later external edits`() = runTest {
+        val card = TestFixtures.buildCard(scryfallId = initialScryfallId)
+        val observed = MutableStateFlow<com.mmg.manahub.core.model.Card?>(null)
+        viewModel = buildViewModel(card)
+        every { cardRepo.observeCard(any()) } returns observed
+        runCurrent()
+        viewModel.onAddUserTag(CardTag.REMOVAL)
+        advanceUntilIdle()
+        observed.value = card.copy(userTags = listOf(CardTag.REMOVAL))
+        runCurrent()
+        observed.value = card.copy(userTags = listOf(CardTag.DRAW_ENGINE))
+        runCurrent()
+
+        assertEquals(listOf(CardTag.DRAW_ENGINE), viewModel.uiState.value.card?.userTags)
+        viewModel.onAddUserTag(CardTag.TUTOR)
+        advanceUntilIdle()
+        coVerify { cardRepo.updateUserTags(initialScryfallId, listOf(CardTag.DRAW_ENGINE, CardTag.TUTOR)) }
+    }
+
+    @Test
+    fun `remote catalog tag is saved under its registered key and category`() = runTest {
+        val remote = com.mmg.manahub.core.model.TagDictionaryEntry(
+            "registered_test_mechanic", TagCategory.KEYWORD, mapOf("en" to "Registered Test Mechanic"), rules = emptyList())
+        try {
+            com.mmg.manahub.core.tagging.TagDictionary.applyRemoteEntries(listOf(remote))
+            viewModel = buildViewModel()
+            advanceUntilIdle()
+            viewModel.onAddUserTag(CardTag(remote.key, TagCategory.CUSTOM))
+            advanceUntilIdle()
+
+            assertEquals(listOf(CardTag(remote.key, remote.category)), viewModel.uiState.value.card?.userTags)
+            coVerify { cardRepo.updateUserTags(initialScryfallId, listOf(CardTag(remote.key, remote.category))) }
+        } finally {
+            com.mmg.manahub.core.tagging.TagDictionary.applyRemoteEntries(emptyList())
+        }
+    }
+
+    @Test
+    fun `catalog additions reject unknown keys and protected auto tags`() = runTest {
+        val card = TestFixtures.buildCard(scryfallId = initialScryfallId).copy(tags = listOf(CardTag.REMOVAL))
+        viewModel = buildViewModel(card)
+        advanceUntilIdle()
+
+        viewModel.onAddUserTag(CardTag("private_tag", TagCategory.CUSTOM))
+        viewModel.onAddUserTag(CardTag.REMOVAL)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.card?.userTags.orEmpty().isEmpty())
+        assertEquals(listOf(CardTag.REMOVAL), viewModel.uiState.value.card?.tags)
+        coVerify(exactly = 0) { cardRepo.updateUserTags(any(), any()) }
+    }
+
+    @Test
+    fun `rapid selections persist in order and delayed Room emissions cannot drop selections`() = runTest {
+        val card = TestFixtures.buildCard(scryfallId = initialScryfallId)
+        val observed = MutableStateFlow<com.mmg.manahub.core.model.Card?>(null)
+        viewModel = buildViewModel(card)
+        every { cardRepo.observeCard(any()) } returns observed
+        val releaseFirstWrite = CompletableDeferred<Unit>()
+        val writes = mutableListOf<List<CardTag>>()
+        coEvery { cardRepo.updateUserTags(initialScryfallId, any()) } coAnswers {
+            val tags = secondArg<List<CardTag>>()
+            writes += tags
+            if (writes.size == 1) releaseFirstWrite.await()
+        }
+        runCurrent()
+
+        viewModel.onAddUserTag(CardTag.REMOVAL)
+        viewModel.onAddUserTag(CardTag.DRAW_ENGINE)
+        runCurrent()
+        assertEquals(1, writes.size)
+        releaseFirstWrite.complete(Unit)
+        advanceUntilIdle()
+        observed.value = card.copy(userTags = listOf(CardTag.REMOVAL))
+        runCurrent()
+        viewModel.onRemoveUserTag(CardTag.REMOVAL)
+        advanceUntilIdle()
+
+        assertEquals(listOf(CardTag.REMOVAL), writes[0])
+        assertEquals(listOf(CardTag.REMOVAL, CardTag.DRAW_ENGINE), writes[1])
+        assertEquals(listOf(CardTag.DRAW_ENGINE), writes[2])
+        assertEquals(listOf(CardTag.DRAW_ENGINE), viewModel.uiState.value.card?.userTags)
+    }
+
+    @Test
+    fun `failed first selection does not roll back a later successful selection`() = runTest {
         viewModel = buildViewModel()
         advanceUntilIdle()
+        coEvery { cardRepo.updateUserTags(initialScryfallId, listOf(CardTag.REMOVAL)) } throws IllegalStateException("write failed")
 
-        viewModel.onSaveAndAddCustomTag("Secret Tech", "My Private Category")
+        viewModel.onAddUserTag(CardTag.REMOVAL)
+        viewModel.onAddUserTag(CardTag.DRAW_ENGINE)
         advanceUntilIdle()
 
-        verify { helper.logEvent("save_custom_tag", mapOf("label_length" to 11, "category" to "custom")) }
+        assertEquals(listOf(CardTag.DRAW_ENGINE), viewModel.uiState.value.card?.userTags)
+        coVerify { cardRepo.updateUserTags(initialScryfallId, listOf(CardTag.DRAW_ENGINE)) }
+    }
+
+    @Test
+    fun `suggestion selection remains removable and does not promote an automatic tag`() = runTest {
+        val suggestion = com.mmg.manahub.core.model.SuggestedTag(CardTag.REMOVAL, 0.7f)
+        val card = TestFixtures.buildCard(scryfallId = initialScryfallId).copy(suggestedTags = listOf(suggestion))
+        viewModel = buildViewModel(card)
+        advanceUntilIdle()
+        viewModel.onAddUserTag(suggestion.tag)
+        advanceUntilIdle()
+        assertEquals(listOf(CardTag.REMOVAL), viewModel.uiState.value.card?.userTags)
+        assertEquals(card.tags, viewModel.uiState.value.card?.tags)
+        viewModel.onRemoveUserTag(suggestion.tag)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.card?.userTags.orEmpty().isEmpty())
+        assertEquals(listOf(suggestion), viewModel.uiState.value.card?.suggestedTags)
+        coVerify(exactly = 0) { cardRepo.confirmSuggestedTag(any(), any()) }
+    }
+
+    @Test
+    fun `legacy free text tags can be removed but cannot be added again`() = runTest {
+        val legacy = CardTag("private_legacy", TagCategory.CUSTOM)
+        viewModel = buildViewModel(TestFixtures.buildCard(scryfallId = initialScryfallId, userTags = listOf(legacy)))
+        advanceUntilIdle()
+        viewModel.onRemoveUserTag(legacy)
+        viewModel.onAddUserTag(legacy)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.card?.userTags.orEmpty().isEmpty())
+        coVerify(exactly = 1) { cardRepo.updateUserTags(initialScryfallId, emptyList()) }
     }
 
     @Test

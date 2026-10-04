@@ -17,6 +17,7 @@
             <option value="$PROJECT_DIR$/shared/core-domain" />
             <option value="$PROJECT_DIR$/shared/core-model" />
             <option value="$PROJECT_DIR$/shared/core-ui" />
+            <option value="$PROJECT_DIR$/shared/feature-rules" />
             <option value="$PROJECT_DIR$/tools" />
             <option value="$PROJECT_DIR$/tools/tag-pipeline" />
             <option value="$PROJECT_DIR$/webApp" />

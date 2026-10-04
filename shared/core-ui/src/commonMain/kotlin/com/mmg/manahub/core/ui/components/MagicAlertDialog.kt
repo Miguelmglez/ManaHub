@@ -1,10 +1,14 @@
 package com.mmg.manahub.core.ui.components
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,73 +48,138 @@ fun MagicAlertDialog(
     properties: DialogProperties = DialogProperties(),
     buttons: (@Composable ColumnScope.() -> Unit)? = null,
     content: (@Composable ColumnScope.() -> Unit)? = null,
+    scrollableBodyAndActions: Boolean = false,
+    scrollableContent: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val sp = MaterialTheme.spacing
 
-    BasicAlertDialog(
-        onDismissRequest = onDismissRequest,
-        properties = properties,
-    ) {
-        Surface(
-            shape = CardShape,
-            color = mc.surface,
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, mc.surfaceVariant, CardShape)
-        ) {
-            Column(
-                modifier = Modifier.padding(sp.xl),
-                horizontalAlignment = Alignment.CenterHorizontally,
+    BasicAlertDialog(onDismissRequest = onDismissRequest, properties = properties) {
+        BoxWithConstraints {
+            val hasScrollableContent = scrollableContent && content != null
+            val hasScrollableBodyAndActions = scrollableBodyAndActions
+            val hasAdaptiveContent = hasScrollableContent || hasScrollableBodyAndActions
+            Surface(
+                shape = CardShape,
+                color = mc.surface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (hasAdaptiveContent) Modifier.heightIn(max = maxHeight * 0.9f) else Modifier)
+                    .border(1.dp, mc.surfaceVariant, CardShape),
             ) {
-                Text(
-                    text = title,
-                    style = ty.titleLarge,
-                    color = mc.textPrimary,
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Black,
-                    modifier = Modifier.padding(bottom = sp.md)
-                )
-
-                if (content != null) {
-                    content()
-                } else if (text != null) {
-                    Text(
-                        text = text,
-                        style = ty.bodyMedium,
-                        color = mc.textSecondary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(bottom = sp.xl)
-                    )
-                }
-
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(sp.sm)
+                    modifier = Modifier.padding(sp.xl),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    if (buttons != null) {
-                        buttons()
-                    } else {
-                        if (confirmLabel != null && onConfirm != null) {
-                            MagicCtaButton(
-                                onClick = onConfirm,
-                                text = confirmLabel,
-                                color = confirmColor,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
+                    Text(
+                        text = title,
+                        style = ty.titleLarge,
+                        color = mc.textPrimary,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Black,
+                        modifier = Modifier.padding(bottom = sp.md),
+                    )
 
-                        if (dismissLabel != null && onDismiss != null) {
-                            MagicCtaButton(
-                                onClick = onDismiss,
-                                text = dismissLabel,
-                                style = dismissStyle,
-                                modifier = Modifier.fillMaxWidth()
+                    if (hasScrollableBodyAndActions) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f, fill = false)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(sp.xl),
+                        ) {
+                            DialogBody(text, content, ty, mc)
+                            DialogActions(
+                                buttons = buttons,
+                                confirmLabel = confirmLabel,
+                                onConfirm = onConfirm,
+                                confirmColor = confirmColor,
+                                dismissLabel = dismissLabel,
+                                onDismiss = onDismiss,
+                                dismissStyle = dismissStyle,
+                                spacing = sp,
                             )
                         }
+                    } else {
+                        if (hasScrollableContent) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
+                                content = content,
+                            )
+                        } else {
+                            DialogBody(text, content, ty, mc)
+                        }
+                        DialogActions(
+                            buttons = buttons,
+                            confirmLabel = confirmLabel,
+                            onConfirm = onConfirm,
+                            confirmColor = confirmColor,
+                            dismissLabel = dismissLabel,
+                            onDismiss = onDismiss,
+                            dismissStyle = dismissStyle,
+                            spacing = sp,
+                        )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.DialogBody(
+    text: String?,
+    content: (@Composable ColumnScope.() -> Unit)?,
+    typography: com.mmg.manahub.core.ui.theme.MagicTypography,
+    colors: com.mmg.manahub.core.ui.theme.MagicColors,
+) {
+    if (content != null) {
+        content()
+    } else if (text != null) {
+        Text(
+            text = text,
+            style = typography.bodyMedium,
+            color = colors.textSecondary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = MaterialTheme.spacing.xl),
+        )
+    }
+}
+
+@Composable
+private fun ColumnScope.DialogActions(
+    buttons: (@Composable ColumnScope.() -> Unit)?,
+    confirmLabel: String?,
+    onConfirm: (() -> Unit)?,
+    confirmColor: MagicCtaColor,
+    dismissLabel: String?,
+    onDismiss: (() -> Unit)?,
+    dismissStyle: MagicCtaStyle,
+    spacing: com.mmg.manahub.core.ui.theme.Spacing,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(spacing.sm),
+    ) {
+        if (buttons != null) {
+            buttons()
+        } else {
+            if (confirmLabel != null && onConfirm != null) {
+                MagicCtaButton(
+                    onClick = onConfirm,
+                    text = confirmLabel,
+                    color = confirmColor,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (dismissLabel != null && onDismiss != null) {
+                MagicCtaButton(
+                    onClick = onDismiss,
+                    text = dismissLabel,
+                    style = dismissStyle,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }

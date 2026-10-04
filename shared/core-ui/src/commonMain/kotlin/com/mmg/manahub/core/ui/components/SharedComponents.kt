@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -206,6 +207,29 @@ fun rememberFabVisibility(gridState: LazyGridState): Boolean {
                 }
             }
             previousIndex = currentIndex
+            previousOffset = currentOffset
+        }
+    }
+
+    return isFabVisible
+}
+
+@Composable
+fun rememberFabVisibility(scrollState: ScrollState): Boolean {
+    var isFabVisible by remember { mutableStateOf(true) }
+    var previousOffset by remember { mutableIntStateOf(scrollState.value) }
+
+    LaunchedEffect(scrollState) {
+        snapshotFlow {
+            Triple(scrollState.maxValue > 0, scrollState.value, scrollState.maxValue)
+        }.collect { (isScrollable, currentOffset, _) ->
+            if (!isScrollable) {
+                isFabVisible = true
+            } else if (currentOffset > previousOffset + 10) {
+                isFabVisible = false
+            } else if (currentOffset < previousOffset - 10) {
+                isFabVisible = true
+            }
             previousOffset = currentOffset
         }
     }
