@@ -31,7 +31,8 @@ enum class QuickStartAction(val persistedId: String) {
     TRADES("trades"),
     COMMUNITY_DECKS("community_decks"),
     SETTINGS("settings"),
-    MULTI_ADD_CARD("multi_add_card");
+    MULTI_ADD_CARD("multi_add_card"),
+    RULES("rules");
 
     companion object {
         /**

@@ -1,0 +1,1856 @@
+{
+  "schemaVersion": 1,
+  "reviewedEdition": {
+    "effectiveDate": "2026-09-25",
+    "sha256": "8d860e451f20f38865b725b42d82feb714c725373dd8f3b32b8652b3eeb070ca",
+    "sourcePath": "app/src/main/assets/rules/baseline.txt"
+  },
+  "catalogContract": {
+    "expectedCount": 146,
+    "shuffleSeed": 20260713,
+    "preserveOrder": true,
+    "stableIdPolicy": "IDs below are frozen editorial literals. Never recompute them from display text, queries, positions, or translations.",
+    "reviewScope": "Scoped editorial check of high-risk rules claims. Exact references are provided only for checked mappings; other entries use curated topic search without implying official quotation.",
+    "titlePolicy": "Original titles are retained for the review inventory. An explicitly corrected displayTitle may change independently of stable ID, catalog position and shuffle seed."
+  },
+  "tips": [
+    {
+      "stableId": "rules_tip_fundamentals_playing_lands",
+      "originalTitle": "One land per turn",
+      "category": "FUNDAMENTALS",
+      "originalLine": 53,
+      "body": "You may play one land per turn, only during one of your main phases, only when the stack is empty. Playing a land doesn't use the stack, so it can't be responded to.",
+      "references": [],
+      "query": "playing lands",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_fundamentals_unspent_mana",
+      "originalTitle": "Mana doesn't carry over",
+      "category": "FUNDAMENTALS",
+      "originalLine": 54,
+      "body": "Your mana pool empties at the end of every step and phase, not just at the end of the turn. Floating mana from your upkeep is gone by your draw step.",
+      "references": [
+        "106.4",
+        "500.5"
+      ],
+      "query": "unspent mana",
+      "reviewStatus": "reference_verified",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_fundamentals_main_phase",
+      "originalTitle": "Two main phases",
+      "category": "FUNDAMENTALS",
+      "originalLine": 55,
+      "body": "You have a main phase before and after combat. Casting sorceries after combat often gives you more information about how the turn went.",
+      "references": [],
+      "query": "main phase",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_fundamentals_untap_step",
+      "originalTitle": "The untap step is silent",
+      "category": "FUNDAMENTALS",
+      "originalLine": 56,
+      "body": "No player receives priority during the untap step. Abilities that trigger \"at the beginning of your untap step\" actually wait and go on the stack during upkeep.",
+      "references": [],
+      "query": "untap step",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_fundamentals_302_6",
+      "originalTitle": "Summoning sickness, precisely",
+      "category": "FUNDAMENTALS",
+      "originalLine": 57,
+      "body": "A creature you haven't controlled since your turn began can't attack or use abilities with {T} or {Q} in the cost. It can still block and use all its other abilities.",
+      "references": [],
+      "query": "302.6",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_fundamentals_tapped_attacking_blocking",
+      "originalTitle": "Tapped creatures still bite",
+      "category": "FUNDAMENTALS",
+      "originalLine": 58,
+      "body": "A tapped creature can't block, but it deals and receives combat damage normally, and its static abilities keep working.",
+      "references": [],
+      "query": "tapped attacking blocking",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_fundamentals_starting_player_draw_step",
+      "originalTitle": "First player skips a draw — sometimes",
+      "category": "FUNDAMENTALS",
+      "originalLine": 59,
+      "body": "In a two-player game, the starting player skips their first draw step. In Two-Headed Giant, the starting team skips it. In other multiplayer games, including multiplayer Commander, no player skips that first draw step.",
+      "references": [
+        "103.8a",
+        "103.8b",
+        "103.8c"
+      ],
+      "query": "starting player draw step",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "In a two-player game the starting player skips their first draw step. In multiplayer games like Commander, everyone draws on turn one.",
+        "reason": "Two-Headed Giant is an exception to the broad multiplayer claim."
+      }
+    },
+    {
+      "stableId": "rules_tip_fundamentals_mulligan",
+      "originalTitle": "The London mulligan",
+      "category": "FUNDAMENTALS",
+      "originalLine": 60,
+      "body": "For each mulligan, shuffle your hand into your library, draw your starting hand size, then bottom one card per counted mulligan. In multiplayer games and all Brawl games, the first mulligan does not count toward the cards put on the bottom.",
+      "references": [
+        "103.5",
+        "103.5c"
+      ],
+      "query": "mulligan",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Each mulligan, you shuffle and draw seven again, then put one card on the bottom of your library for each mulligan you've taken. In multiplayer Commander, the first mulligan is customarily free.",
+        "reason": "The first free mulligan is a rule, not merely a Commander custom."
+      }
+    },
+    {
+      "stableId": "rules_tip_fundamentals_maximum_hand_size",
+      "originalTitle": "Maximum hand size",
+      "category": "FUNDAMENTALS",
+      "originalLine": 61,
+      "body": "You only discard down to seven during your own cleanup step. During the turn you can hold any number of cards.",
+      "references": [],
+      "query": "maximum hand size",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_fundamentals_casting_spells_playing_lands",
+      "originalTitle": "Cast vs. play",
+      "category": "FUNDAMENTALS",
+      "originalLine": 62,
+      "body": "You \"cast\" spells and \"play\" lands. Effects that care about casting (like storm or magecraft) never trigger from playing a land.",
+      "references": [],
+      "query": "casting spells playing lands",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_fundamentals_beginning_of_combat_step",
+      "originalTitle": "Beginning of combat matters",
+      "category": "FUNDAMENTALS",
+      "originalLine": 63,
+      "body": "\"Beginning of combat\" is a step before attackers are declared. It's your last window to tap down a creature you fear will attack.",
+      "references": [],
+      "query": "beginning of combat step",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_fundamentals_stateminusbased_actions_losing",
+      "originalTitle": "Three ways to lose",
+      "category": "FUNDAMENTALS",
+      "originalLine": 64,
+      "body": "As state-based actions, you normally lose at 0 or less life, after attempting to draw from an empty library, or with ten poison counters. Two-Headed Giant instead uses a team poison total of fifteen. Cards and variant rules can create exceptions.",
+      "references": [
+        "704.5a",
+        "704.5b",
+        "704.5c",
+        "810.8d"
+      ],
+      "query": "state-based actions losing",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "You lose the game if your life is 0 or less, you try to draw from an empty library, or you have ten or more poison counters — in any format, including Commander.",
+        "reason": "Ten poison is not universal across formats."
+      }
+    },
+    {
+      "stableId": "rules_tip_fundamentals_mana_burn_absent",
+      "originalTitle": "Mana Burn is gone",
+      "category": "FUNDAMENTALS",
+      "originalLine": 65,
+      "body": "Mana burn was removed in Magic 2010. Unused mana in your mana pool at end of step or phase simply disappears — it doesn't cause damage.",
+      "references": [],
+      "query": "unspent mana",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_fundamentals_colorless_generic_mana",
+      "originalTitle": "Colorless vs. Generic",
+      "category": "FUNDAMENTALS",
+      "originalLine": 66,
+      "body": "Generic mana ({1}, {2}) can be paid by any mana. Colorless mana ({C}) can ONLY be paid by colorless sources — they're different!",
+      "references": [],
+      "query": "colorless generic mana",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_stack_timing_stack_resolving",
+      "originalTitle": "Last in, first out",
+      "category": "STACK_TIMING",
+      "originalLine": 71,
+      "body": "The stack resolves top-down: the most recently cast spell resolves first. \"In response\" always means going on top.",
+      "references": [],
+      "query": "stack resolving",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_stack_timing_priority",
+      "originalTitle": "Priority passes for everything",
+      "category": "STACK_TIMING",
+      "originalLine": 72,
+      "body": "Every spell and every non-mana ability waits on the stack while each player gets a chance to respond before it resolves.",
+      "references": [],
+      "query": "priority",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_stack_timing_mana_abilities",
+      "originalTitle": "Mana abilities are instant-instant",
+      "category": "STACK_TIMING",
+      "originalLine": 73,
+      "body": "Tapping a land or creature for mana doesn't use the stack and can't be responded to or countered.",
+      "references": [],
+      "query": "mana abilities",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_stack_timing_optional_triggered_abilities",
+      "originalTitle": "Triggers are mandatory",
+      "category": "STACK_TIMING",
+      "originalLine": 74,
+      "body": "A triggered ability triggers when its condition is met, even if its effect says \"you may.\" The ability goes on the stack normally; you choose whether to perform the optional action when it resolves.",
+      "references": [
+        "603.5"
+      ],
+      "query": "optional triggered abilities",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Triggered abilities trigger whether you want them to or not (unless they say \"you may\"). Forgetting your own detrimental trigger isn't an option in tournament play.",
+        "reason": "Optional effects still trigger; tournament missed-trigger policy is a separate dataset."
+      }
+    },
+    {
+      "stableId": "rules_tip_stack_timing_illegal_targets",
+      "originalTitle": "Targets lock at cast time",
+      "category": "STACK_TIMING",
+      "originalLine": 75,
+      "body": "You choose targets when you cast a spell, not when it resolves. If every target is illegal by resolution, the spell \"fizzles\" — it does nothing at all, not even its untargeted parts.",
+      "references": [],
+      "query": "illegal targets",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_stack_timing_counter_spells",
+      "originalTitle": "Counter wars",
+      "category": "STACK_TIMING",
+      "originalLine": 76,
+      "body": "A counterspell on the stack is itself a spell: it can be countered in response.",
+      "references": [],
+      "query": "counter spells",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_stack_timing_source_ability_independent",
+      "originalTitle": "Kill the ability's source? Too late",
+      "category": "STACK_TIMING",
+      "originalLine": 77,
+      "body": "Once an ability is on the stack, it resolves even if its source leaves the battlefield. Sacrificing a creature in response to removal still gets you its activated ability.",
+      "references": [],
+      "query": "source ability independent",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_stack_timing_priority_casting",
+      "originalTitle": "You can respond to yourself",
+      "category": "STACK_TIMING",
+      "originalLine": 78,
+      "body": "After casting a spell you may hold priority and cast another one in response to your own spell — useful to sneak a pump spell under expected removal.",
+      "references": [],
+      "query": "priority casting",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_stack_timing_active_player_nonactive_player_order",
+      "originalTitle": "APNAP order",
+      "category": "STACK_TIMING",
+      "originalLine": 79,
+      "body": "When several players must act or put triggers on the stack simultaneously, the Active Player acts first, then Non-Active Players in turn order. Later triggers resolve first.",
+      "references": [],
+      "query": "active player nonactive player order",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_stack_timing_simultaneous_triggered_abilities",
+      "originalTitle": "You order your own triggers",
+      "category": "STACK_TIMING",
+      "originalLine": 80,
+      "body": "If several of your abilities trigger at the same time, you choose the order they go on the stack — so you choose the order they resolve, last-added first.",
+      "references": [],
+      "query": "simultaneous triggered abilities",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_stack_timing_uncounterable_illegal_targets",
+      "originalTitle": "\"Can't be countered\" isn't \"can't be answered\"",
+      "category": "STACK_TIMING",
+      "originalLine": 81,
+      "body": "You can still respond to an uncounterable spell: remove its target and it fizzles anyway.",
+      "references": [],
+      "query": "illegal targets",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_stack_timing_flash",
+      "originalTitle": "Flash means anytime",
+      "category": "STACK_TIMING",
+      "originalLine": 82,
+      "body": "Flash lets you cast a spell whenever you could cast an instant — during combat, on an opponent's turn, or in response to another spell.",
+      "references": [],
+      "query": "flash",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_stack_timing_split_second",
+      "originalTitle": "Split second freezes the game",
+      "category": "STACK_TIMING",
+      "originalLine": 83,
+      "body": "While a split-second spell is on the stack, players can't cast spells or activate non-mana abilities. Triggered abilities and mana abilities still work.",
+      "references": [],
+      "query": "split second",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_stack_timing_copy_spell",
+      "originalTitle": "Copies aren't cast",
+      "category": "STACK_TIMING",
+      "originalLine": 84,
+      "body": "A copy of a spell is put onto the stack, not cast, so cast-triggers like prowess or storm don't see it. Magecraft is the exception: it counts copies too.",
+      "references": [],
+      "query": "copy spell",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_combat_declare_attackers",
+      "originalTitle": "Attack players, not creatures",
+      "category": "COMBAT",
+      "originalLine": 89,
+      "body": "You declare attacks against a player, a planeswalker, or a battle — never against a creature. Blocking is how creatures meet.",
+      "references": [],
+      "query": "declare attackers",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_combat_declaring_attackers_vigilance",
+      "originalTitle": "Attackers tap on declaration",
+      "category": "COMBAT",
+      "originalLine": 90,
+      "body": "Declaring a creature as an attacker normally taps it unless it has vigilance. After it attacks, you can still activate its abilities if you can pay their costs; vigilance can let an attacking creature use a {T} ability before damage.",
+      "references": [
+        "508.1f",
+        "117.1b",
+        "702.20b"
+      ],
+      "query": "declaring attackers vigilance",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Attacking taps the creature (unless it has vigilance). If you want to tap it for an ability instead, do it before attackers are declared.",
+        "reason": "Attackers may still activate abilities after declaration."
+      }
+    },
+    {
+      "stableId": "rules_tip_combat_declare_blockers",
+      "originalTitle": "Blocking is free",
+      "category": "COMBAT",
+      "originalLine": 91,
+      "body": "Blockers don't tap to block. A tapped creature simply can't be declared as a blocker.",
+      "references": [],
+      "query": "declare blockers",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_combat_blocked_creature",
+      "originalTitle": "Blocked stays blocked",
+      "category": "COMBAT",
+      "originalLine": 92,
+      "body": "If the only blocker is destroyed before damage, the attacker is still blocked and deals no combat damage — unless it has trample.",
+      "references": [],
+      "query": "blocked creature",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_combat_trample_deathtouch",
+      "originalTitle": "Trample math",
+      "category": "COMBAT",
+      "originalLine": 93,
+      "body": "A trampler only needs to assign lethal damage to its blockers; the rest hits the player. With deathtouch, \"lethal\" is just 1 per blocker — the rest tramples through.",
+      "references": [],
+      "query": "trample deathtouch",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_combat_first_strike_combat_damage",
+      "originalTitle": "First strike is a whole extra step",
+      "category": "COMBAT",
+      "originalLine": 94,
+      "body": "First-strike and double-strike damage happens in its own combat damage step. A creature killed by first strike never gets to deal its damage.",
+      "references": [],
+      "query": "first strike combat damage",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_combat_double_strike",
+      "originalTitle": "Double strike hits twice",
+      "category": "COMBAT",
+      "originalLine": 95,
+      "body": "A creature with double strike can deal damage in both combat damage steps. A pump spell before the first step can boost both hits; a pump between steps boosts only the second. A blocked double striker still needs a blocker to damage, unless it has trample.",
+      "references": [
+        "702.4b",
+        "510.1c",
+        "702.19b"
+      ],
+      "query": "double strike",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "A double striker deals damage in the first-strike step AND the regular step. Killing it after the first hit prevents the second — but combined with a pump spell, that first hit already doubles the bonus.",
+        "reason": "The first hit does not itself double a pump bonus."
+      }
+    },
+    {
+      "stableId": "rules_tip_combat_510_1c",
+      "originalTitle": "Multiple blockers, ordered",
+      "category": "COMBAT",
+      "originalLine": 96,
+      "body": "When multiple creatures block one attacker, its controller divides combat damage among them as they choose. There is no damage-assignment order. Trample still requires lethal damage assigned to every blocker before damage can reach the attacked player, planeswalker, or battle.",
+      "references": [
+        "510.1c",
+        "702.19b"
+      ],
+      "query": "510.1c",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "When several creatures block one attacker, the attacker's controller orders them and must assign lethal damage to each before moving to the next.",
+        "reason": "The former damage-assignment order no longer exists.",
+        "titleOriginal": "Multiple blockers, ordered",
+        "titleReason": "The old heading implied a damage-assignment order that no longer exists; the literal stable ID and catalog position stay unchanged."
+      },
+      "displayTitle": "Multiple blockers, flexible damage"
+    },
+    {
+      "stableId": "rules_tip_combat_vigilance",
+      "originalTitle": "Vigilance keeps options open",
+      "category": "COMBAT",
+      "originalLine": 97,
+      "body": "A vigilant attacker stays untapped, so it can still block on the way back or use its {T} abilities after combat.",
+      "references": [],
+      "query": "vigilance",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_combat_menace",
+      "originalTitle": "Menace needs a crowd",
+      "category": "COMBAT",
+      "originalLine": 98,
+      "body": "A creature with menace can't be blocked by exactly one creature — it's two blockers or none.",
+      "references": [],
+      "query": "menace",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_combat_declare_blockers_priority",
+      "originalTitle": "The best trick window",
+      "category": "COMBAT",
+      "originalLine": 99,
+      "body": "The strongest moment for a combat trick is after blockers are declared but before damage: your opponent has committed and can no longer change blocks.",
+      "references": [],
+      "query": "declare blockers priority",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_combat_attacks_triggered_ability",
+      "originalTitle": "Attack triggers stick",
+      "category": "COMBAT",
+      "originalLine": 100,
+      "body": "\"Whenever this creature attacks\" triggers the moment attackers are declared. Removing the attacker afterward doesn't undo the trigger.",
+      "references": [],
+      "query": "attacks triggered ability",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_combat_indestructible",
+      "originalTitle": "Indestructible isn't invincible",
+      "category": "COMBAT",
+      "originalLine": 101,
+      "body": "Indestructible creatures still take damage, can be blocked, and die to sacrifice effects or -X/-X. Only \"destroy\" and lethal damage bounce off.",
+      "references": [],
+      "query": "indestructible",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_combat_fight",
+      "originalTitle": "Fight isn't combat",
+      "category": "COMBAT",
+      "originalLine": 102,
+      "body": "Fight and \"bite\" effects deal damage outside combat: first strike does nothing there, but deathtouch and lifelink apply in full.",
+      "references": [],
+      "query": "fight",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_combat_removed_from_combat",
+      "originalTitle": "Removing an attacker mid-combat",
+      "category": "COMBAT",
+      "originalLine": 103,
+      "body": "Killing an attacking creature before the damage step prevents all its combat damage — even if it has already triggered its attack abilities.",
+      "references": [],
+      "query": "removed from combat",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_combat_blocking_restrictions",
+      "originalTitle": "Blocking legality has no size limit",
+      "category": "COMBAT",
+      "originalLine": 104,
+      "body": "Power and toughness alone do not restrict blocking: a 0/1 can block a 10/10. The blocker must be untapped, and flying, menace, protection, or other restrictions may still make the block illegal.",
+      "references": [
+        "509.1a",
+        "509.1b"
+      ],
+      "query": "blocking restrictions",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Any untapped creature can legally block any attacker, regardless of power or toughness — a 0/1 can block a 10/10 all day; it just won't survive.",
+        "reason": "An untapped creature cannot universally block every attacker."
+      }
+    },
+    {
+      "stableId": "rules_tip_keywords_hexproof_shroud",
+      "originalTitle": "Hexproof vs. shroud",
+      "category": "KEYWORDS",
+      "originalLine": 109,
+      "body": "Hexproof: your opponents can't target it, but you still can. Shroud: nobody can target it, including you.",
+      "references": [],
+      "query": "hexproof shroud",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_ward",
+      "originalTitle": "Ward is a toll, not a wall",
+      "category": "KEYWORDS",
+      "originalLine": 110,
+      "body": "Ward does not stop targeting. When a permanent with ward becomes the target of an opponent's spell or ability, ward triggers and counters that spell or ability unless that opponent pays the ward cost. Players may respond to the ward trigger.",
+      "references": [
+        "702.21a"
+      ],
+      "query": "ward",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Ward doesn't stop targeting. When an opponent targets the creature, a triggered ability counters their spell unless they pay — and that trigger can itself be responded to.",
+        "reason": "Ward also applies to abilities and is not limited to creatures."
+      }
+    },
+    {
+      "stableId": "rules_tip_keywords_protection",
+      "originalTitle": "Protection = DEBT",
+      "category": "KEYWORDS",
+      "originalLine": 111,
+      "body": "Protection from a quality prevents matching damage, targeting, enchanting/equipping, and blocking. A nontargeting destroy-all effect can still destroy the permanent, but protection can prevent damage from a matching damage-based board wipe.",
+      "references": [
+        "702.16b",
+        "702.16c",
+        "702.16d",
+        "702.16e",
+        "702.16f"
+      ],
+      "query": "protection",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "\"Protection from X\" means it can't be Damaged, Enchanted or equipped, Blocked, or Targeted by X. A board wipe that doesn't target still destroys it.",
+        "reason": "Damage-based board wipes may be stopped by protection."
+      }
+    },
+    {
+      "stableId": "rules_tip_keywords_lifelink",
+      "originalTitle": "Lifelink has no gap",
+      "category": "KEYWORDS",
+      "originalLine": 112,
+      "body": "Lifelink life gain happens at the same time as the damage — there's no window to kill a player \"before the lifelink resolves\", since it isn't a separate trigger. It does matter for effects that trigger specifically on life gain, though.",
+      "references": [],
+      "query": "lifelink",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_haste",
+      "originalTitle": "Haste, fully",
+      "category": "KEYWORDS",
+      "originalLine": 113,
+      "body": "Haste removes summoning sickness entirely: the creature can attack AND use its {T} abilities the turn it arrives.",
+      "references": [],
+      "query": "haste",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_flying_reach",
+      "originalTitle": "Flying meets Reach",
+      "category": "KEYWORDS",
+      "originalLine": 114,
+      "body": "Flying creatures can only be blocked by creatures with flying or reach — don't forget your reach creatures can block fliers too, even though they can't fly themselves.",
+      "references": [],
+      "query": "flying reach",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_deathtouch",
+      "originalTitle": "Deathtouch scales down",
+      "category": "KEYWORDS",
+      "originalLine": 115,
+      "body": "Any nonzero damage from a source with deathtouch causes a creature with positive toughness to be destroyed at the next state-based-action check. Indestructible, regeneration, or prevention can save it. Deathtouch also makes one assigned combat damage count as lethal for trample.",
+      "references": [
+        "702.2b",
+        "702.2c",
+        "702.12b"
+      ],
+      "query": "deathtouch",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Any nonzero damage from a deathtouch source is lethal — combat or not. A 1/1 deathtoucher trades with anything it blocks or fights.",
+        "reason": "Deathtouch does not guarantee a trade against every creature."
+      }
+    },
+    {
+      "stableId": "rules_tip_keywords_prowess",
+      "originalTitle": "Prowess counts casts",
+      "category": "KEYWORDS",
+      "originalLine": 116,
+      "body": "Prowess triggers when you cast a noncreature spell — copies put on the stack by other effects don't trigger it.",
+      "references": [],
+      "query": "prowess",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_equip",
+      "originalTitle": "Equip at sorcery speed",
+      "category": "KEYWORDS",
+      "originalLine": 117,
+      "body": "Equip abilities can only be activated during your main phase with an empty stack. If the equipped creature dies, the Equipment survives, unattached.",
+      "references": [],
+      "query": "equip",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_aura_target",
+      "originalTitle": "Auras target on the way in",
+      "category": "KEYWORDS",
+      "originalLine": 118,
+      "body": "Casting an Aura targets, so hexproof stops it. But an Aura put onto the battlefield by an effect doesn't target and can land on anything legal.",
+      "references": [],
+      "query": "Aura target",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_defender",
+      "originalTitle": "Defender still defends",
+      "category": "KEYWORDS",
+      "originalLine": 119,
+      "body": "A creature with defender can't attack, but it blocks, triggers, and uses abilities like any other creature.",
+      "references": [],
+      "query": "defender",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_kicker",
+      "originalTitle": "Kicker is part of casting",
+      "category": "KEYWORDS",
+      "originalLine": 120,
+      "body": "Kicker costs are paid as you cast the spell. It's still one spell — countering it counters the kicked version too.",
+      "references": [],
+      "query": "kicker",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_cycling",
+      "originalTitle": "Cycling dodges counterspells",
+      "category": "KEYWORDS",
+      "originalLine": 121,
+      "body": "Cycling is an activated ability, not a spell. A counterspell can't stop it; only effects that counter abilities can. It can also be activated at instant speed — you discard first, then draw, which can feed graveyard synergies.",
+      "references": [],
+      "query": "cycling",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_land_enters_triggered_abilities",
+      "originalTitle": "Landfall counts every land",
+      "category": "KEYWORDS",
+      "originalLine": 122,
+      "body": "Landfall abilities trigger when a land enters under your control, whether played or put there by an effect. A fetch land can produce one trigger when it enters and another when its fetched land enters, even during the same turn.",
+      "references": [
+        "603.2",
+        "603.6a"
+      ],
+      "query": "land enters triggered abilities",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Landfall triggers whenever a land enters the battlefield under your control — played, fetched, or put there by a spell. Fetch lands trigger it twice across two turns of value.",
+        "reason": "The two land entries need not happen on separate turns."
+      }
+    },
+    {
+      "stableId": "rules_tip_keywords_regenerate",
+      "originalTitle": "Regenerate is a pre-paid shield",
+      "category": "KEYWORDS",
+      "originalLine": 123,
+      "body": "A regeneration shield must exist before destruction happens. When it replaces destruction, remove all damage marked on the permanent, tap it, and remove it from combat if it is attacking or blocking. Some static abilities provide regeneration without an activation.",
+      "references": [
+        "701.19a",
+        "701.19b"
+      ],
+      "query": "regenerate",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Regeneration must be activated before the destruction happens. When it saves the creature: tap it, remove it from combat, remove all damage.",
+        "reason": "Regeneration is not exclusively an activated ability."
+      }
+    },
+    {
+      "stableId": "rules_tip_keywords_phasing",
+      "originalTitle": "Phasing",
+      "category": "KEYWORDS",
+      "originalLine": 124,
+      "body": "Phased-out permanents are treated as if they don't exist. Auras and Equipment attached to them phase out too, and phase back in together.",
+      "references": [],
+      "query": "phasing",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_cascade",
+      "originalTitle": "Cascade",
+      "category": "KEYWORDS",
+      "originalLine": 125,
+      "body": "Cascade triggers when you cast the spell. Exile cards until you find a nonland card with lower mana value, then you may cast it without paying its mana cost if the resulting spell also has lower mana value. Casting happens during the trigger's resolution, regardless of normal sorcery timing.",
+      "references": [
+        "702.85a"
+      ],
+      "query": "cascade",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Cascade triggers when you cast the spell. You reveal cards until you find one with lesser mana value, then cast it for free — at instant speed if it's an instant.",
+        "reason": "Cascade exiles rather than reveals and casts during resolution rather than using instant timing."
+      }
+    },
+    {
+      "stableId": "rules_tip_keywords_morph",
+      "originalTitle": "Morph",
+      "category": "KEYWORDS",
+      "originalLine": 126,
+      "body": "A morphed card is normally a face-down 2/2 colorless creature with no name, subtypes, abilities, or mana cost. With priority, you may pay its morph cost to turn it face up as a special action; opponents cannot respond to that action.",
+      "references": [
+        "702.37a",
+        "702.37e"
+      ],
+      "query": "morph",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Face-down morphed creatures are 2/2 colorless creatures with no name, type, or abilities. Opponents must allow you to turn them face-up for the morph cost — a related-but-different mechanic, Manifest, is put face-down by effects instead of being cast that way.",
+        "reason": "Face-down morph objects have the Creature card type, and turning face up is a special action."
+      }
+    },
+    {
+      "stableId": "rules_tip_keywords_storm",
+      "originalTitle": "Storm",
+      "category": "KEYWORDS",
+      "originalLine": 127,
+      "body": "Storm copies the spell for each spell cast before it this turn. Rituals and cantrips earlier in the turn all count!",
+      "references": [],
+      "query": "storm",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_flashback",
+      "originalTitle": "Flashback",
+      "category": "KEYWORDS",
+      "originalLine": 128,
+      "body": "Flashback lets you cast a spell from the graveyard by paying its flashback cost. The spell is then exiled, not returned to the graveyard.",
+      "references": [],
+      "query": "flashback",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_dredge",
+      "originalTitle": "Dredge",
+      "category": "KEYWORDS",
+      "originalLine": 129,
+      "body": "If you have at least N cards in your library, dredge N can replace a draw: mill N cards and return the card with dredge from your graveyard to your hand. You cannot choose dredge N with fewer than N cards remaining.",
+      "references": [
+        "702.52a"
+      ],
+      "query": "dredge",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Dredge is a replacement effect — when you would draw a card, you may instead mill yourself equal to the dredge value and return the dredge card to hand.",
+        "reason": "Dredge needs enough cards to mill the full specified number."
+      }
+    },
+    {
+      "stableId": "rules_tip_keywords_delve",
+      "originalTitle": "Delve",
+      "category": "KEYWORDS",
+      "originalLine": 130,
+      "body": "You can exile any number of cards from your graveyard when paying for Delve — each exiled card pays for {1} of generic mana.",
+      "references": [],
+      "query": "delve",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_convoke",
+      "originalTitle": "Convoke",
+      "category": "KEYWORDS",
+      "originalLine": 131,
+      "body": "Convoke lets you tap untapped creatures you control to pay for a spell: each pays for one generic mana or one mana of its color. This does not produce mana, and summoning-sick creatures can convoke. An ability having {T} in its cost does not automatically make it a mana ability.",
+      "references": [
+        "702.51a",
+        "605.1a",
+        "302.6"
+      ],
+      "query": "convoke",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Tapping a creature for Convoke can pay for one generic mana or one mana of the creature's color. All tap abilities are mana abilities.",
+        "reason": "Convoke is a payment mechanism; a tap cost does not establish a mana ability."
+      }
+    },
+    {
+      "stableId": "rules_tip_keywords_suspend",
+      "originalTitle": "Suspend",
+      "category": "KEYWORDS",
+      "originalLine": 132,
+      "body": "Suspending a card means paying its suspend cost to exile it from your hand with time counters; this special action is not casting a spell. Remove a counter at the beginning of your upkeep. When the last is removed, you may play the card without paying its mana cost if able.",
+      "references": [
+        "702.62a"
+      ],
+      "query": "suspend",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Suspending is casting without paying the mana cost. The spell sits in exile with time counters, one removed each upkeep, then cast for free when the last is removed.",
+        "reason": "Suspending and later playing are distinct actions; the current final trigger is optional."
+      }
+    },
+    {
+      "stableId": "rules_tip_keywords_escape",
+      "originalTitle": "Escape",
+      "category": "KEYWORDS",
+      "originalLine": 133,
+      "body": "Escape lets you recast cards from the graveyard by paying the escape cost and exiling a set number of other graveyard cards.",
+      "references": [],
+      "query": "escape",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_foretell",
+      "originalTitle": "Foretell",
+      "category": "KEYWORDS",
+      "originalLine": 134,
+      "body": "During your own turn, whenever you have priority, you may pay {2} to exile a card with foretell from your hand face down. On a later turn, you may cast it for its foretell cost, following its normal timing restrictions.",
+      "references": [
+        "702.143a",
+        "702.143b"
+      ],
+      "query": "foretell",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Cards can be foretold face-down in exile for {2} on any turn. The reduced foretell cost can be paid on later turns at sorcery speed (or instant speed if it's an instant).",
+        "reason": "The special action is limited to the player's own turn."
+      }
+    },
+    {
+      "stableId": "rules_tip_keywords_boast",
+      "originalTitle": "Boast",
+      "category": "KEYWORDS",
+      "originalLine": 135,
+      "body": "Boast abilities can only be activated once per turn, and only if the creature attacked this turn. They're not tap abilities.",
+      "references": [],
+      "query": "boast",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_sagas",
+      "originalTitle": "Sagas",
+      "category": "KEYWORDS",
+      "originalLine": 136,
+      "body": "Sagas trigger on your precombat main phase. Chapter I triggers when it enters, subsequent chapters on later turns. The saga sacrifices itself after the final chapter.",
+      "references": [],
+      "query": "sagas",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_keywords_modal_doubleminusfaced_cards",
+      "originalTitle": "MDFCs",
+      "category": "KEYWORDS",
+      "originalLine": 137,
+      "body": "When playing a modal double-faced card, choose the face you will use. A land face is played as a land; a spell face can be cast, including a back face. Apply the timing and permissions for the chosen face.",
+      "references": [
+        "712.11b",
+        "712.12"
+      ],
+      "query": "modal double-faced cards",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Modal Double-Faced Cards can be played as either face. The back face can only be played as a land (or whatever its type is), not cast normally from hand.",
+        "reason": "Back faces that are spells can be cast normally when permissions allow."
+      }
+    },
+    {
+      "stableId": "rules_tip_keywords_split_cards",
+      "originalTitle": "Split Cards",
+      "category": "KEYWORDS",
+      "originalLine": 138,
+      "body": "Outside the stack, a split card has the combined characteristics of both halves, including their combined mana value. On the stack, only the chosen half counts, unless both halves were cast using fuse.",
+      "references": [
+        "709.3b",
+        "709.4",
+        "709.4d"
+      ],
+      "query": "split cards",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "A split card in hand or on the stack has the combined characteristics of both halves. Its mana value is the sum of both sides.",
+        "reason": "The stack evaluates the cast half; fuse is the combined exception."
+      }
+    },
+    {
+      "stableId": "rules_tip_keywords_adventures",
+      "originalTitle": "Adventures",
+      "category": "KEYWORDS",
+      "originalLine": 139,
+      "body": "Adventure cards can be cast as the Adventure (exile it), then cast the creature later from exile. While in exile, it's still a card you own.",
+      "references": [],
+      "query": "adventures",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_game_state_stateminusbased_actions",
+      "originalTitle": "The invisible referee",
+      "category": "GAME_STATE",
+      "originalLine": 144,
+      "body": "State-based actions (creatures dying to damage or 0 toughness, players losing at 0 life, legends clashing) are checked automatically whenever a player would get priority. Nobody can respond to them.",
+      "references": [],
+      "query": "state-based actions",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_game_state_toughness_zero",
+      "originalTitle": "Zero toughness can't be saved",
+      "category": "GAME_STATE",
+      "originalLine": 145,
+      "body": "A creature with toughness 0 or less is put into the graveyard by the rules, not destroyed — regeneration and indestructible don't help.",
+      "references": [],
+      "query": "toughness zero",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_game_state_indestructible_toughness",
+      "originalTitle": "-X/-X beats indestructible",
+      "category": "GAME_STATE",
+      "originalLine": 146,
+      "body": "Reducing toughness to 0 isn't destruction, so it kills indestructible creatures. Damage never can.",
+      "references": [],
+      "query": "indestructible toughness",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_game_state_legend_rule",
+      "originalTitle": "The legend rule, per player",
+      "category": "GAME_STATE",
+      "originalLine": 147,
+      "body": "If you control two or more legendary permanents with the same name, choose one and put the rest into their owners' graveyards. Opponents' copies do not count. This is not destruction; a creature put into a graveyard this way dies.",
+      "references": [
+        "704.5j",
+        "700.4"
+      ],
+      "query": "legend rule",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "If YOU control two legendary permanents with the same name, you choose one and put the other into the graveyard. Opponents' copies don't clash with yours. It's not destruction — but it does count as dying.",
+        "reason": "Only creatures going from battlefield to graveyard die."
+      }
+    },
+    {
+      "stableId": "rules_tip_game_state_plus1_plus1_minus1_minus1_counters",
+      "originalTitle": "Counters cancel out",
+      "category": "GAME_STATE",
+      "originalLine": 148,
+      "body": "+1/+1 and -1/-1 counters on the same permanent are removed in pairs automatically.",
+      "references": [],
+      "query": "+1/+1 -1/-1 counters",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_game_state_token_leaves_battlefield",
+      "originalTitle": "Tokens vanish, but they die first",
+      "category": "GAME_STATE",
+      "originalLine": 149,
+      "body": "A creature token going from the battlefield to a graveyard triggers dies abilities, then ceases to exist when state-based actions are checked. A token moved to exile or hand does not die, and a token that leaves the battlefield cannot return.",
+      "references": [
+        "704.5d",
+        "111.8",
+        "700.4"
+      ],
+      "query": "token leaves battlefield",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "A token that leaves the battlefield triggers \"dies\" abilities normally, then ceases to exist. It can never come back from the graveyard — \"returning it to hand\" just makes it disappear.",
+        "reason": "Leaving the battlefield is not necessarily dying."
+      }
+    },
+    {
+      "stableId": "rules_tip_game_state_copiable_values",
+      "originalTitle": "Clones copy the print",
+      "category": "GAME_STATE",
+      "originalLine": 150,
+      "body": "A copy effect copies the printed characteristics (plus other copy effects) — not counters, damage, Auras, or Equipment on the original.",
+      "references": [],
+      "query": "copiable values",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_game_state_empty_library_draw",
+      "originalTitle": "Empty library isn't loss — drawing is",
+      "category": "GAME_STATE",
+      "originalLine": 151,
+      "body": "You only lose when you attempt to draw from an empty library. Sitting at zero cards is safe until someone makes you draw.",
+      "references": [],
+      "query": "empty library draw",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_game_state_stateminusbased_actions_resolving",
+      "originalTitle": "Spells finish resolving first",
+      "category": "GAME_STATE",
+      "originalLine": 152,
+      "body": "State-based actions wait until a spell has fully resolved. Your life can dip to 0 mid-resolution and come back up before the game ever checks.",
+      "references": [],
+      "query": "state-based actions resolving",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_game_state_sacrifice",
+      "originalTitle": "Sacrifice pierces everything",
+      "category": "GAME_STATE",
+      "originalLine": 153,
+      "body": "Sacrificing is neither destruction nor targeting: indestructible, hexproof, and protection are all useless against \"each player sacrifices a creature.\"",
+      "references": [],
+      "query": "sacrifice",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_game_state_dies_exile",
+      "originalTitle": "Exile isn't dying",
+      "category": "GAME_STATE",
+      "originalLine": 154,
+      "body": "\"Dies\" means going to the graveyard from the battlefield. Exiling a creature triggers no death triggers — which is exactly why exile removal is prized.",
+      "references": [],
+      "query": "dies exile",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_game_state_spell_copy_cast",
+      "originalTitle": "Copying a spell isn't casting it",
+      "category": "GAME_STATE",
+      "originalLine": 155,
+      "body": "A copy of a spell is put directly onto the stack — it was never cast. Effects that trigger \"whenever you cast a spell\" won't see it.",
+      "references": [],
+      "query": "spell copy cast",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_commander_commander_tax",
+      "originalTitle": "Commander tax",
+      "category": "COMMANDER",
+      "originalLine": 160,
+      "body": "Casting your commander from the command zone costs {2} more for each previous time you've cast it from there. The tax never resets during the game.",
+      "references": [
+        "903.8"
+      ],
+      "query": "commander tax",
+      "reviewStatus": "reference_verified",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_commander_903_10a",
+      "originalTitle": "21 means dead",
+      "category": "COMMANDER",
+      "originalLine": 161,
+      "body": "A player who has taken 21 or more combat damage from the same commander over the course of the game loses. It's tracked per commander, and only combat damage counts.",
+      "references": [
+        "903.10a"
+      ],
+      "query": "903.10a",
+      "reviewStatus": "reference_verified",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_commander_903_9a",
+      "originalTitle": "Your commander can still \"die\"",
+      "category": "COMMANDER",
+      "originalLine": 162,
+      "body": "If your commander goes to the graveyard or exile, death and exile triggers see it there first; then, when state-based actions are checked, you may move it to the command zone.",
+      "references": [
+        "903.9a"
+      ],
+      "query": "903.9a",
+      "reviewStatus": "reference_verified",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_commander_903_9b",
+      "originalTitle": "Hand and library are different",
+      "category": "COMMANDER",
+      "originalLine": 163,
+      "body": "If your commander would go to your hand or library, you choose to send it to the command zone as a replacement — it never reaches that zone at all.",
+      "references": [
+        "903.9b"
+      ],
+      "query": "903.9b",
+      "reviewStatus": "reference_verified",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_commander_color_identity",
+      "originalTitle": "Color identity is strict",
+      "category": "COMMANDER",
+      "originalLine": 164,
+      "body": "Color identity includes colored mana symbols in a card's mana cost and rules text, its color indicator, and characteristic-defining color abilities. Ignore reminder text, but include the back face and alternative characteristics. Hybrid {W/U} counts as both white and blue.",
+      "references": [
+        "903.4",
+        "903.4c",
+        "903.4d",
+        "903.4e"
+      ],
+      "query": "color identity",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "A card's color identity includes every colored mana symbol anywhere on it — cost, rules text, even the back face. A hybrid {W/U} symbol makes it both white and blue. Every card in your 99 must fit inside your commander's identity.",
+        "reason": "Reminder text is excluded; color indicators and characteristic-defining abilities are included."
+      }
+    },
+    {
+      "stableId": "rules_tip_commander_commander_deck_construction",
+      "originalTitle": "Singleton, with exceptions",
+      "category": "COMMANDER",
+      "originalLine": 165,
+      "body": "One copy of each card except basic lands — and cards whose own text says \"a deck can have any number,\" which override the rule.",
+      "references": [],
+      "query": "Commander deck construction",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_commander_partner_commander",
+      "originalTitle": "Partners split the seat",
+      "category": "COMMANDER",
+      "originalLine": 166,
+      "body": "Two partner commanders start in the command zone together, the deck drops to 98, color identity is their union, and each one tracks its own tax and its own 21 commander damage.",
+      "references": [],
+      "query": "partner commander",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_commander_commander_combat_damage",
+      "originalTitle": "Stolen commanders still count",
+      "category": "COMMANDER",
+      "originalLine": 167,
+      "body": "Your commander is yours even while an opponent controls it — its combat damage still counts toward that commander's 21 against whoever it hits.",
+      "references": [
+        "903.3",
+        "903.10a"
+      ],
+      "query": "commander combat damage",
+      "reviewStatus": "reference_verified",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_commander_commander_command_zone_cast",
+      "originalTitle": "Command-zone casts are normal casts",
+      "category": "COMMANDER",
+      "originalLine": 168,
+      "body": "Casting a commander from the command zone follows normal timing and can be countered. If it is, you can send it back to the command zone and try again later — with more tax.",
+      "references": [],
+      "query": "commander command zone cast",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_commander_monarch",
+      "originalTitle": "The monarch",
+      "category": "COMMANDER",
+      "originalLine": 169,
+      "body": "The monarch draws an extra card at the beginning of their end step. Deal combat damage to the monarch and you steal the crown.",
+      "references": [],
+      "query": "monarch",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_commander_goad",
+      "originalTitle": "Goad forces the issue",
+      "category": "COMMANDER",
+      "originalLine": 170,
+      "body": "A goaded creature must attack each combat if able, and must attack someone other than the player who goaded it if possible.",
+      "references": [],
+      "query": "goad",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_commander_player_leaves_game",
+      "originalTitle": "When a player leaves",
+      "category": "COMMANDER",
+      "originalLine": 171,
+      "body": "When a player leaves a multiplayer game, objects they own leave with them and effects giving them control end. Their remaining spells and abilities on the stack that are not represented by cards cease to exist; objects still controlled by them are exiled.",
+      "references": [
+        "800.4a"
+      ],
+      "query": "player leaves game",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "When a player loses a multiplayer game, all cards they own leave the game with them, and all spells and abilities they controlled cease to exist.",
+        "reason": "Owned objects, control effects, card-represented spells, and other stack objects have distinct treatment."
+      }
+    },
+    {
+      "stableId": "rules_tip_commander_poison_commander",
+      "originalTitle": "Poison ignores the 40",
+      "category": "COMMANDER",
+      "originalLine": 172,
+      "body": "Ten poison counters kill a Commander player just like anyone else — the 40 starting life doesn't help against infect or toxic.",
+      "references": [],
+      "query": "poison Commander",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_commander_multiplayer",
+      "originalTitle": "Politics is a resource",
+      "category": "COMMANDER",
+      "originalLine": 173,
+      "body": "In multiplayer, threat assessment beats raw power: the player who looks the scariest eats the removal. Table talk, deals, and timing are part of the game.",
+      "references": [],
+      "query": "multiplayer",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_treasure_token",
+      "originalTitle": "Treasure is more than mana",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 178,
+      "body": "A Treasure is \"{T}, Sacrifice this artifact: Add one mana of any color.\" It's also an artifact sitting on the battlefield: it counts for affinity and metalcraft, and it can be stolen or destroyed like any other permanent.",
+      "references": [],
+      "query": "Treasure token",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_predefined_tokens",
+      "originalTitle": "Food, Clue, Blood, Map",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 179,
+      "body": "Food: {2}, {T}, sacrifice to gain 3 life. Clue: {2}, sacrifice to draw. Blood: {1}, {T}, discard a card, sacrifice to draw. Map: {1}, {T}, sacrifice to make a target creature you control explore; activate only as a sorcery.",
+      "references": [
+        "111.10b",
+        "111.10f",
+        "111.10g",
+        "111.10s"
+      ],
+      "query": "predefined tokens",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Food: {2}, {T}, sacrifice to gain 3 life. Clue: {2}, sacrifice to draw. Blood: {1}, discard a card, sacrifice to draw. Map: {1}, {T}, sacrifice to make one of your creatures explore.",
+        "reason": "Blood needs a tap cost; Map targets and has sorcery timing."
+      }
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_powerstone_token",
+      "originalTitle": "Powerstones are picky",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 180,
+      "body": "A Powerstone taps for {C}, but that mana can't be spent to cast a nonartifact spell. Activating abilities is fine.",
+      "references": [],
+      "query": "Powerstone token",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_legend_rule_token",
+      "originalTitle": "Token copies are the real thing",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 181,
+      "body": "A token copy of a legendary creature is still legendary — make a copy of your own legend and the legend rule bites immediately.",
+      "references": [],
+      "query": "legend rule token",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_stun_counters",
+      "originalTitle": "Stun counters",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 182,
+      "body": "A permanent with a stun counter doesn't untap as normal; instead, one stun counter is removed. Vigilance sidesteps them entirely on the attack.",
+      "references": [],
+      "query": "stun counters",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_shield_counters",
+      "originalTitle": "Shield counters",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 183,
+      "body": "A shield counter replaces destruction from an effect or prevents damage by removing a shield counter. Exile, sacrifice, and reducing toughness to 0 still work. Unpreventable damage can still be dealt despite the shield's prevention effect.",
+      "references": [
+        "122.1c",
+        "615.12"
+      ],
+      "query": "shield counters",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "If a permanent with a shield counter would be destroyed or dealt damage, remove a shield counter instead. Exile, sacrifice, and -X/-X still work.",
+        "reason": "Shield counters use distinct destruction-replacement and damage-prevention effects."
+      }
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_keyword_counters",
+      "originalTitle": "Keyword counters are permanent",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 184,
+      "body": "Flying, first strike, or deathtouch counters grant the ability for as long as the counter stays — they survive end of turn, unlike most pump spells.",
+      "references": [],
+      "query": "keyword counters",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_infect_toxic",
+      "originalTitle": "Infect vs. toxic",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 185,
+      "body": "Infect replaces its damage: -1/-1 counters on creatures, poison on players. Toxic deals normal damage AND gives poison counters on top.",
+      "references": [],
+      "query": "infect toxic",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_loyalty_ability",
+      "originalTitle": "Loyalty is sorcery-paced",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 186,
+      "body": "Normally, activate a loyalty ability only with priority during your main phase while the stack is empty. Each permanent can have only one loyalty ability activated per turn, even if control changes; card effects can modify these restrictions.",
+      "references": [
+        "606.3"
+      ],
+      "query": "loyalty ability",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "You may activate one loyalty ability of each planeswalker you control per turn, only during your main phases with an empty stack — plus or minus, it's one activation per walker.",
+        "reason": "The activation limit is per permanent per turn rather than per controller."
+      }
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_planeswalker_damage_loyalty",
+      "originalTitle": "Attacking planeswalkers",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 187,
+      "body": "Combat damage dealt to a planeswalker removes that many loyalty counters. At zero loyalty it's gone — state-based, no response.",
+      "references": [],
+      "query": "planeswalker damage loyalty",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_new_object_zone",
+      "originalTitle": "Counters survive blinking? No.",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 188,
+      "body": "Exiling a permanent and returning it makes it a new object: all counters, damage, and attachments are gone, and summoning sickness is back.",
+      "references": [],
+      "query": "new object zone",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_proliferate",
+      "originalTitle": "Proliferate picks per permanent",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 189,
+      "body": "Proliferate lets you add one counter of each kind already on any number of chosen permanents and players — poison, loyalty, +1/+1, charge, all of them.",
+      "references": [],
+      "query": "proliferate",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_creature_card_token",
+      "originalTitle": "Undergrowth counts cards, not tokens",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 190,
+      "body": "Undergrowth counts creature CARDS in your graveyard — not tokens (they cease to exist when they leave the battlefield, so they never sit in the graveyard to be counted).",
+      "references": [],
+      "query": "creature card token",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_afterlife",
+      "originalTitle": "Afterlife",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 191,
+      "body": "Afterlife X creates X 1/1 white and black flying Spirit tokens when the creature dies. Each token has flying.",
+      "references": [],
+      "query": "afterlife",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_tokens_counters_amass",
+      "originalTitle": "Amass",
+      "category": "TOKENS_COUNTERS",
+      "originalLine": 192,
+      "body": "To amass a subtype, create a 0/0 black Army token of that subtype if you control no Army creature. Choose an Army you control, put the specified +1/+1 counters on it, and add that subtype. You can control multiple Armies.",
+      "references": [
+        "701.47a"
+      ],
+      "query": "amass",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Amass creates a Zombie Army token if you don't have one, then puts +1/+1 counters on it. You can only have one Army at a time.",
+        "reason": "Army creatures are not limited to one, and amass includes a specified subtype."
+      }
+    },
+    {
+      "stableId": "rules_tip_deckbuilding_deck_construction",
+      "originalTitle": "Play the minimum",
+      "category": "DECKBUILDING",
+      "originalLine": 197,
+      "body": "60 cards in constructed, 100 in Commander — exactly. Every card above the minimum lowers the odds of drawing your best cards.",
+      "references": [],
+      "query": "deck construction",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_deckbuilding_mana_cost",
+      "originalTitle": "Respect the curve",
+      "category": "DECKBUILDING",
+      "originalLine": 198,
+      "body": "Count your deck's mana costs. If you can't reliably play something meaningful on turns two and three, the deck will lose games before its top-end matters.",
+      "references": [],
+      "query": "mana cost",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_deckbuilding_lands_deck",
+      "originalTitle": "Land counts, rough guide",
+      "category": "DECKBUILDING",
+      "originalLine": 199,
+      "body": "About 17 lands in a 40-card limited deck, 22-26 in a 60-card deck depending on curve, and 36-38 (plus ramp) in Commander.",
+      "references": [],
+      "query": "lands deck",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_deckbuilding_commander_deck",
+      "originalTitle": "The Commander trinity",
+      "category": "DECKBUILDING",
+      "originalLine": 200,
+      "body": "A rough baseline for a functional Commander deck: ~10 ramp pieces, ~10 card-draw effects, ~10 pieces of interaction/removal. Adjust, but never to zero.",
+      "references": [],
+      "query": "Commander deck",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_deckbuilding_drawing_cards",
+      "originalTitle": "Card advantage wins long games",
+      "category": "DECKBUILDING",
+      "originalLine": 201,
+      "body": "Every effect that trades one of your cards for two of your opponent's — or draws you two — compounds. The player with more cards usually wins the attrition war.",
+      "references": [],
+      "query": "drawing cards",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_deckbuilding_redundant_effects",
+      "originalTitle": "Redundancy beats brilliance",
+      "category": "DECKBUILDING",
+      "originalLine": 202,
+      "body": "If your deck needs an effect to function, play functional duplicates of it. One copy of a combo piece is a prayer, not a plan.",
+      "references": [],
+      "query": "deck construction",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_deckbuilding_mulligan",
+      "originalTitle": "Mulligan for function, not land count",
+      "category": "DECKBUILDING",
+      "originalLine": 203,
+      "body": "Keep hands that DO something in the first three turns. Four lands and three uncastable cards is a mulligan too.",
+      "references": [],
+      "query": "mulligan",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_deckbuilding_priority",
+      "originalTitle": "Tempo vs. value",
+      "category": "DECKBUILDING",
+      "originalLine": 204,
+      "body": "Cheap interaction that stalls the opponent buys time (tempo); two-for-ones grind ahead (value). Know which one your deck wants and mulligan for it.",
+      "references": [],
+      "query": "priority",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_deckbuilding_sideboard",
+      "originalTitle": "Sideboards answer, mainboards ask",
+      "category": "DECKBUILDING",
+      "originalLine": 205,
+      "body": "In best-of-three, the 15-card sideboard is for answers too narrow for game one. Build it against the decks you actually expect to face.",
+      "references": [],
+      "query": "sideboard",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_deckbuilding_destroy_exile",
+      "originalTitle": "Removal isn't optional",
+      "category": "DECKBUILDING",
+      "originalLine": 206,
+      "body": "A deck that can't interact loses to the first strategy faster than its own. Even the most proactive deck wants a few cheap answers.",
+      "references": [],
+      "query": "destroy exile",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_deckbuilding_search_library",
+      "originalTitle": "Tutors still shuffle",
+      "category": "DECKBUILDING",
+      "originalLine": 207,
+      "body": "When searching your library, follow the effect's instructions, including shuffling if instructed. You still shuffle after failing to find a card if the effect tells you to shuffle; searching itself does not automatically require a shuffle.",
+      "references": [
+        "701.23"
+      ],
+      "query": "search library",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Cards that \"search your library\" are called tutors. Remember to shuffle your library after searching, even if you didn't find anything.",
+        "reason": "A search action does not inherently include shuffling."
+      }
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_battles",
+      "originalTitle": "Battles",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 212,
+      "body": "A Siege enters with defense counters and is protected by an opponent. Attack it and deal it damage to remove counters; when the last one is removed, its controller exiles it and casts the transformed back face for free.",
+      "references": [],
+      "query": "battles",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_ring_tempts",
+      "originalTitle": "The Ring tempts you",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 213,
+      "body": "Each time the Ring tempts you, choose one of your creatures as Ring-bearer; the Ring's abilities are cumulative (up to four) but only one creature bears it at a time.",
+      "references": [],
+      "query": "Ring tempts",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_discover",
+      "originalTitle": "Discover",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 214,
+      "body": "Discover N exiles cards from the top of your library until a nonland card with mana value N or less appears — cast it for free or put it into your hand. Unlike cascade, the hand is always an option.",
+      "references": [],
+      "query": "discover",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_disguise_cloak",
+      "originalTitle": "Disguise & cloak",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 215,
+      "body": "Both put a card face down as a colorless 2/2 with ward {2}. Disguise lets you turn it face up any time for its disguise cost; cloaked cards flip for their mana cost if they're creatures.",
+      "references": [],
+      "query": "disguise cloak",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_plot",
+      "originalTitle": "Plot",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 216,
+      "body": "Pay a card's plot cost to exile it from your hand at sorcery speed; on any later turn, cast it from exile for free — also at sorcery speed. Pre-pay this turn, deploy next.",
+      "references": [],
+      "query": "plot",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_committing_crime",
+      "originalTitle": "Committing a crime",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 217,
+      "body": "You commit a crime when a spell or ability you put on the stack targets an opponent; a permanent, spell, or ability an opponent controls; or a card in an opponent's graveyard. Targeting a card in exile alone is not a crime. The crime still occurred if the spell or ability is countered.",
+      "references": [
+        "700.13"
+      ],
+      "query": "committing crime",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "You commit a crime whenever a spell or ability you control targets an opponent or anything they control or own in the graveyard, on the stack, or exiled. Yes, targeting counts even if the spell is countered.",
+        "reason": "Exile is not one of the qualifying target categories."
+      }
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_saddle",
+      "originalTitle": "Saddle",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 218,
+      "body": "Tap any number of your other creatures with total power N or more to saddle a Mount; the Mount gets its saddled bonus for the turn. Saddling happens at sorcery speed.",
+      "references": [],
+      "query": "saddle",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_room_unlock",
+      "originalTitle": "Rooms",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 219,
+      "body": "A Room is a split enchantment: cast it by unlocking one door, and later pay the other door's cost during your main phase to unlock that half too. Each unlocked door's abilities are active.",
+      "references": [],
+      "query": "Room unlock",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_impending",
+      "originalTitle": "Impending",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 220,
+      "body": "Cast a spell for its impending cost and it enters with time counters and isn't a creature yet; remove one each of your end steps, and when the last leaves, it wakes up. Cheaper now, scarier later.",
+      "references": [],
+      "query": "impending",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_offspring",
+      "originalTitle": "Offspring",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 221,
+      "body": "Pay offspring as an additional cost while casting the spell. When the permanent enters, a triggered ability creates a 1/1 copy. The copy has its own enters abilities, but offspring does not double every ability or create the copy before the original enters.",
+      "references": [
+        "702.175a"
+      ],
+      "query": "offspring",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Pay the extra offspring cost when casting the creature and, as it enters, you create a 1/1 token copy of it. All its triggered abilities now come in duplicate.",
+        "reason": "Creating the copy is a triggered ability, and not every trigger is automatically doubled."
+      }
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_omen_cards",
+      "originalTitle": "Omens",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 222,
+      "body": "An Omen is the spell half of a creature card: when the Omen resolves, the card is shuffled into its owner's library instead of going to the graveyard — the creature comes back later.",
+      "references": [],
+      "query": "Omen cards",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_mobilize",
+      "originalTitle": "Mobilize",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 223,
+      "body": "When a creature with mobilize N attacks, you create N tapped and attacking 1/1 red Warrior tokens; sacrifice them at the beginning of the next end step. Free attackers, temporary bodies.",
+      "references": [],
+      "query": "mobilize",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_harmonize",
+      "originalTitle": "Harmonize",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 224,
+      "body": "Harmonize lets you cast a card from your graveyard for its harmonize cost and tap up to one untapped creature you control to reduce the generic part of the total cost by that creature's power. A spell cast this way is exiled whenever it would leave the stack.",
+      "references": [
+        "702.180a"
+      ],
+      "query": "harmonize",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Cast the card from your graveyard for its harmonize cost; you may also tap an untapped creature as an additional cost to reduce the generic mana by that creature's power. Big creatures make graveyard spells cheap.",
+        "reason": "Harmonize includes mandatory exile when the spell leaves the stack."
+      }
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_station",
+      "originalTitle": "Station",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 225,
+      "body": "At sorcery timing, station lets you tap another untapped creature you control to put charge counters equal to its power on the station permanent. Printed thresholds unlock abilities; some thresholds also make a Spacecraft a creature.",
+      "references": [
+        "702.184a",
+        "721.2"
+      ],
+      "query": "station",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "Tap an untapped creature you control to put charge counters equal to its power on a Spacecraft; at each STATION threshold it powers up new abilities — enough counters and it becomes a creature itself.",
+        "reason": "Station requires another creature and sorcery timing."
+      }
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_warp",
+      "originalTitle": "Warp",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 226,
+      "body": "Cast a card from your hand for its warp cost to get it now at a discount; it's exiled at the next end step, and you may cast it again from exile on a later turn for its real cost.",
+      "references": [],
+      "query": "warp",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_void",
+      "originalTitle": "Void",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 227,
+      "body": "Void abilities give a bonus if a nonland permanent left the battlefield this turn or a spell was warped this turn. Sacrifice fodder suddenly pays double.",
+      "references": [],
+      "query": "void",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_lander_token",
+      "originalTitle": "Lander tokens",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 228,
+      "body": "A Lander is a colorless artifact token with \"{2}, {T}, Sacrifice this token: search your library for a basic land card, put it onto the battlefield tapped, then shuffle.\" Slow ramp you can bank for later.",
+      "references": [],
+      "query": "Lander token",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_start_your_engines",
+      "originalTitle": "Start your engines & max speed",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 229,
+      "body": "If you control start your engines! and have no speed, your speed becomes 1. Once during each of your own turns, an opponent losing life can trigger a speed increase, up to 4. At speed 4, max speed abilities are active.",
+      "references": [
+        "702.179a",
+        "702.179d",
+        "702.178a"
+      ],
+      "query": "start your engines",
+      "reviewStatus": "corrected",
+      "correction": {
+        "originalBody": "If you have no speed, \"start your engines!\" sets it to 1. Your speed increases the first time each turn an opponent loses life, up to 4 — where max speed abilities switch on.",
+        "reason": "The inherent speed increase trigger is limited to the player's own turn."
+      }
+    },
+    {
+      "stableId": "rules_tip_modern_mechanics_exhaust",
+      "originalTitle": "Exhaust abilities",
+      "category": "MODERN_MECHANICS",
+      "originalLine": 230,
+      "body": "An exhaust ability can be activated only once per game. Spend it at the moment of maximum impact — there is no second chance.",
+      "references": [],
+      "query": "exhaust",
+      "reviewStatus": "curated_search_fallback",
+      "correction": null
+    }
+  ]
+}

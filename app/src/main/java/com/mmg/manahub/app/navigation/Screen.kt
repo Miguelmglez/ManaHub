@@ -8,6 +8,22 @@ sealed class Screen(val route: String) {
     // ── Root ─────────────────────────────────────────────────────────────────
     object Splash : Screen("splash")
 
+    object Rules : Screen("rules?query={query}&reference={reference}&edition={edition}&entry={entry}") {
+        fun createRoute(destination: com.mmg.manahub.core.model.rules.RulesDestination = com.mmg.manahub.core.model.rules.RulesDestination.Index(), entry: String = "navigation"): String {
+            val query: String
+            val reference: String
+            val edition: String
+            when (destination) {
+                is com.mmg.manahub.core.model.rules.RulesDestination.Index -> { query = destination.query.take(200); reference = ""; edition = "" }
+                is com.mmg.manahub.core.model.rules.RulesDestination.Reference -> { query = ""; reference = destination.referenceId.take(256); edition = destination.edition.orEmpty() }
+                is com.mmg.manahub.core.model.rules.RulesDestination.References -> { query = ""; require(destination.referenceIds.size in 1..10 && destination.referenceIds.all { it.length in 1..128 }); reference = "related:" + destination.referenceIds.joinToString(","); edition = destination.edition.orEmpty() }
+            }
+            require(reference.length <= 256 && entry in setOf("profile", "home_shortcut", "home_tip", "navigation"))
+            require(edition.isEmpty() || edition.matches(Regex("[a-f0-9]{64}")))
+            return "rules?query=${Uri.encode(query)}&reference=${Uri.encode(reference)}&edition=${Uri.encode(edition)}&entry=$entry"
+        }
+    }
+
     /** Free-first dashboard — the app start destination and left bottom-bar tab. */
     object Home : Screen("home")
 
@@ -45,7 +61,12 @@ sealed class Screen(val route: String) {
 
     object CollectionScanner  : Screen("collection/scanner")
 
-    object ImportCards  : Screen("collection/import")
+    object ImportCards : Screen("collection/import?jobId={jobId}") {
+        fun createRoute(jobId: String?=null): String = jobId?.let {
+            com.mmg.manahub.core.domain.collection.transfer.TransferJobId(it)
+            "collection/import?jobId=$it"
+        } ?: "collection/import"
+    }
     object DeckScanner : Screen("deck/{deckId}/scanner") {
         fun createRoute(deckId: String): String {
             require(deckId.isNotBlank()) { "deckId must not be blank" }

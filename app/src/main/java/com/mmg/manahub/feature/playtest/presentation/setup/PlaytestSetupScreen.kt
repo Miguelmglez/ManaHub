@@ -37,7 +37,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import com.mmg.manahub.core.ui.components.MagicCtaButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -61,26 +60,28 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
-import com.mmg.manahub.core.ui.theme.spacing
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import com.mmg.manahub.core.ui.Res
-import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.R
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.PlaytestEligibility
+import com.mmg.manahub.core.model.PlaytestSetup
+import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.FullErrorState
+import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
+import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.model.PlaytestEligibility
-import com.mmg.manahub.core.model.PlaytestSetup
+import com.mmg.manahub.core.ui.theme.spacing
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -144,6 +145,10 @@ fun PlaytestSetupScreen(
                 )
             },
         ) { padding ->
+            HexGridBackground(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.magicColors.primaryAccent.copy(alpha = 0.05f)
+            )
             Box(
                 modifier = Modifier
                     .fillMaxSize()

@@ -11,6 +11,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.await
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.mmg.manahub.core.domain.auth.AuthRepository
@@ -97,6 +98,11 @@ class CollectionSyncWorker(
                 ExistingWorkPolicy.KEEP,
                 oneTimeWorkRequest(),
             )
+        }
+
+        /** Durable transfer commits retain a follow-up even while a normal sync is running. */
+        suspend fun enqueueTransferSync(workManager: WorkManager) {
+            workManager.enqueueUniqueWork(WORK_NAME_ONE_TIME,ExistingWorkPolicy.APPEND_OR_REPLACE,oneTimeWorkRequest()).await()
         }
 
         /**

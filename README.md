@@ -96,6 +96,18 @@ Collection value (USD/EUR), mana-curve and colour charts, win rate, average life
 ### 👤 Profile
 Player name and avatar, auto-detected play style, collection insights, recent game history with W/L badges, and best deck by win rate.
 
+### 📖 Rules Reference
+Browse and search the official English Comprehensive Rules offline, with selectable native text,
+numbered references and a glossary. Open Rules from Profile, a customizable Home shortcut or the
+Rules Tip widget. Document information shows the loaded edition and offers an explicit update check;
+failed updates preserve the readable edition.
+
+### 📖 Rules Reference
+Browse and search the official English Comprehensive Rules offline, with selectable native text,
+numbered references and a glossary. Open Rules from Profile, a customizable Home shortcut or the
+Rules Tip widget. Document information shows the loaded edition and offers an explicit update check;
+failed updates preserve the readable edition.
+
 ### 🏠 Home Dashboard
 A customizable widget board (the app's start screen).
 

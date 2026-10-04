@@ -2,16 +2,11 @@ package com.mmg.manahub.feature.decks.presentation.wizard
 
 // COMMENTS_REVIEWED: 2026-09-21
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -376,7 +371,7 @@ internal fun SeedPickStepContent(
             isBusy = false,
             onDismiss = onToggleSeedQueue,
             onIncrement = { item -> onAddSeed(item.card) },
-            onDecrement = { item -> onRemoveSeedCopy(item.card) },
+            onDecrement = { item -> if (item.quantity > 1) onRemoveSeedCopy(item.card) },
             onRemove = { item -> onRemoveSeed(item.card) },
             // The queue is a window-level sheet, so the step's overlay only becomes visible once it closes.
             onImageClick = { item ->
@@ -398,41 +393,23 @@ internal fun SeedsAddedPill(
     label: @Composable (Int) -> String = { stringResource(R.string.deck_wizard_seeds_added_pill, it) },
     contentDescription: @Composable (Int) -> String = { stringResource(R.string.deck_wizard_seeds_added_pill_a11y, it) },
 ) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     AnimatedVisibility(
         visible = seedCopies > 0,
         enter = expandVertically() + fadeIn(),
         exit = shrinkVertically() + fadeOut(),
     ) {
-        // The visible text alone does not tell TalkBack that tapping opens the seed queue list.
         val pillDescription = contentDescription(seedCopies)
-        Surface(
+        MagicCtaButton(
+            text = label(seedCopies),
             onClick = onClick,
-            shape = ChipShape,
-            color = mc.primaryAccent.copy(alpha = 0.14f),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.xs).heightIn(min = 48.dp)
+            style = MagicCtaStyle.Outlined,
+            color = MagicCtaColor.Primary,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = spacing.lg, vertical = spacing.xs)
                 .semantics { this.contentDescription = pillDescription },
-        ) {
-            Box(Modifier.fillMaxWidth().padding(spacing.sm), contentAlignment = Alignment.Center) {
-                AnimatedContent(
-                    targetState = seedCopies,
-                    transitionSpec = {
-                        val up = targetState >= initialState
-                        (slideInVertically(tween(200)) { if (up) it else -it } + fadeIn(tween(200))) togetherWith
-                            (slideOutVertically(tween(200)) { if (up) -it else it } + fadeOut(tween(150)))
-                    },
-                    label = "SeedsAddedCount",
-                ) { count ->
-                    Text(
-                        text = label(count),
-                        style = ty.labelLarge,
-                        color = mc.primaryAccent,
-                    )
-                }
-            }
-        }
+        )
     }
 }
 

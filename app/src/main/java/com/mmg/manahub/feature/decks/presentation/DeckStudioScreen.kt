@@ -162,7 +162,7 @@ import com.mmg.manahub.feature.decks.presentation.components.FindingsList
 import com.mmg.manahub.feature.decks.presentation.components.GroupHeader
 import com.mmg.manahub.feature.decks.presentation.components.HealthScoreRing
 import com.mmg.manahub.feature.decks.presentation.components.MagicLandSuggestionStatic
-import com.mmg.manahub.feature.decks.presentation.components.MovementRow
+import com.mmg.manahub.core.ui.components.MovementRow
 import com.mmg.manahub.feature.decks.presentation.components.PillarTile
 import com.mmg.manahub.feature.decks.presentation.components.ScoreLimiterHint
 import com.mmg.manahub.feature.decks.presentation.components.StrategyPlanChip
@@ -2089,9 +2089,8 @@ private fun AnalysisTab(
         )
         return
     }
-    // Defensive fallback for the (should-be-impossible-in-practice) window before the FIRST
-    // loadAnalysis has ever set a stage.
-    if (uiState.isSuggestionsLoading && uiState.health == null) {
+    // Hide stale analysis while suggestions are being refreshed or before the first load completes.
+    if (!uiState.suggestionsLoaded || uiState.isSuggestionsLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             MagicLoadingSpinner()
         }

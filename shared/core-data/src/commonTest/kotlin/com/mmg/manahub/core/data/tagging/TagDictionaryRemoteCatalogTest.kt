@@ -5,8 +5,31 @@ import com.mmg.manahub.core.model.TagDictionaryEntry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class TagDictionaryRemoteCatalogTest {
+    @Test
+    fun systemCatalogPreservesBaseAndRemoteMetadataWithoutUserCreatedEntries() {
+        val baseKeys = TagDictionary.systemCatalogEntries().map { it.key }.toSet()
+        val remote = TagDictionaryEntry("registered_mechanic", TagCategory.KEYWORD, mapOf("en" to "Registered Mechanic"), rules = emptyList())
+        try {
+            TagDictionary.applyRemoteEntries(listOf(remote))
+            TagDictionary.applyOverrides(listOf(
+                TagOverride("private_unprefixed", labels = mapOf("en" to "Private tag"), category = TagCategory.ROLE),
+                TagOverride("custom_sample", labels = mapOf("en" to "Private custom tag"), category = TagCategory.CUSTOM),
+            ))
+            val entries = TagDictionary.systemCatalogEntries().associateBy { it.key }
+            assertTrue(entries.keys.containsAll(baseKeys))
+            assertEquals(remote, entries[remote.key])
+            assertFalse("private_unprefixed" in entries)
+            assertFalse("custom_sample" in entries)
+        } finally {
+            TagDictionary.applyRemoteEntries(emptyList())
+            TagDictionary.applyOverrides(emptyList())
+        }
+    }
+
     @Test
     fun metadataOnlyRemoteEntryKeepsBaseRulesAndUserOverrides() {
         val original = assertNotNull(TagDictionary.get("plus_counters"))

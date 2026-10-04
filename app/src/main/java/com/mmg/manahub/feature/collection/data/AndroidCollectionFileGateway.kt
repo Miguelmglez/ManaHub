@@ -127,10 +127,10 @@ class AndroidCollectionFileGateway(
     }
 
     private fun prune(root: File) {
-        val existing = root.listFiles()?.sortedByDescending { it.lastModified() } ?: return
+        val existing = root.listFiles() ?: return
         val cutoff = System.currentTimeMillis() - MAX_EXPORT_AGE_MS
-        existing.forEachIndexed { index, entry ->
-            if (index >= MAX_EXPORTS_KEPT - 1 || entry.lastModified() < cutoff) entry.deleteRecursively()
+        existing.forEach { entry ->
+            if (entry.lastModified() < cutoff) entry.deleteRecursively()
         }
     }
 
@@ -138,7 +138,6 @@ class AndroidCollectionFileGateway(
         const val EXPORT_DIR = "exports"
         const val BUFFER_SIZE = 16 * 1024
         const val DEFAULT_TEXT_CAPACITY = 64 * 1024
-        const val MAX_EXPORTS_KEPT = 5
         const val MAX_EXPORT_AGE_MS = 24L * 60 * 60 * 1000
 
         /** Generous for the 5 MB ceiling; a provider that has not delivered by then is stalled. */

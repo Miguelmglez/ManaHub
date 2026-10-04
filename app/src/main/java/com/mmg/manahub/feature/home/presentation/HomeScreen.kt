@@ -877,6 +877,7 @@ private val QuickStartAction.label: String
         QuickStartAction.TRADES -> stringResource(R.string.quick_start_sheet_trades)
         QuickStartAction.COMMUNITY_DECKS -> stringResource(R.string.quick_start_sheet_community)
         QuickStartAction.SETTINGS -> stringResource(R.string.quick_start_sheet_settings)
+        QuickStartAction.RULES -> stringResource(R.string.rules_title)
         QuickStartAction.MULTI_ADD_CARD -> stringResource(R.string.quick_start_sheet_multi_add)
     }
 
@@ -895,5 +896,6 @@ private val QuickStartAction.icon: androidx.compose.ui.graphics.vector.ImageVect
         QuickStartAction.TRADES -> Icons.Default.SwapHoriz
         QuickStartAction.COMMUNITY_DECKS -> Icons.Default.Style
         QuickStartAction.SETTINGS -> Icons.Default.Settings
+        QuickStartAction.RULES -> Icons.AutoMirrored.Filled.MenuBook
         QuickStartAction.MULTI_ADD_CARD -> Icons.Default.LibraryAdd
     }

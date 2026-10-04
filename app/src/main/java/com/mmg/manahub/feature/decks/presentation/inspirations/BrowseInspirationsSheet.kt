@@ -27,6 +27,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
@@ -99,6 +103,15 @@ internal fun BrowseInspirationsSheet(
         },
     )
     val inspection = rememberWizardCardInspectionState()
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset = available
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = actions.onDismiss,
@@ -109,7 +122,9 @@ internal fun BrowseInspirationsSheet(
     ) {
         WizardCardInspectionHost(
             state = inspection,
-            modifier = Modifier.fillMaxHeight(0.92f),
+            modifier = Modifier
+                .fillMaxHeight(0.92f)
+                .nestedScroll(nestedScrollConnection),
             actions = { card ->
                 val quantity = state.quantityOf(card)
                 val atCap = format != null && quantity >= CopyPolicy.maxSeedCopies(card, format)
@@ -254,7 +269,7 @@ internal fun BrowseInspirationsSheet(
             isBusy = false,
             onDismiss = actions.onToggleQueue,
             onIncrement = { item -> actions.onAddCard(item.card, InspirationSelectionSource.QUEUE) },
-            onDecrement = { item -> actions.onDecrementCard(item.card) },
+            onDecrement = { item -> if (item.quantity > 1) actions.onDecrementCard(item.card) },
             onRemove = { item -> actions.onRemoveCard(item.card) },
             // The queue is its own window, so the sheet's overlay only shows once the queue closes.
             onImageClick = { item ->

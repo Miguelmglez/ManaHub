@@ -337,7 +337,7 @@ class PlaytestHandViewModel(
      * sheet and triggers the same instant re-apply as an explicit confirm.
      */
     fun onDismissCustomHandSheet() {
-        onConfirmCustomHandSheet()
+        _uiState.update { it.copy(showCustomHandSheet = false) }
     }
 
     fun onConfirmCustomHandSheet() {

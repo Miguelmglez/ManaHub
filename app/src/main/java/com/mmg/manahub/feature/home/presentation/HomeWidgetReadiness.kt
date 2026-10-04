@@ -32,7 +32,7 @@ fun HomeWidgetType.isReady(state: HomeUiState, extras: HomeWidgetExtras): Boolea
     if (!state.boardReady) return false
     if (audience == WidgetAudience.ACCOUNT_GATED && state.auth !is AuthGate.SignedIn) return true
     return when (this) {
-        HomeWidgetType.CONTEXT_HERO -> state.hero !is HomeHeroState.Loading
+        HomeWidgetType.GET_STARTED -> state.hero !is HomeHeroState.Loading
         HomeWidgetType.QUICK_ACTIONS -> state.quickStartLoaded
         HomeWidgetType.PROGRESSION_HUB,
         HomeWidgetType.QUESTS_HUB -> state.gamificationLoaded

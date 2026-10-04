@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
+        <exclude domain="file" path="collection-transfers/" />
         <exclude domain="file" path="datastore/" />
         <exclude domain="database" path="." />
         <!-- Exclude all SharedPreferences — includes Supabase session tokens -->
@@ -16,6 +17,7 @@
         <exclude domain="file" path="draft/" />
     </cloud-backup>
     <device-transfer>
+        <exclude domain="file" path="collection-transfers/" />
         <exclude domain="file" path="datastore/" />
         <exclude domain="database" path="." />
         <!-- Exclude all SharedPreferences — includes Supabase session tokens -->

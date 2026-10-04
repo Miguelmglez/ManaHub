@@ -68,6 +68,7 @@ import kotlinx.datetime.toLocalDateTime
  * @param onPlaytest      Optional callback to start a playtest session.
  * @param reduced         If true, renders a more compact version suitable for widgets/grids.
  * @param ownerName       Optional owner name for community decks.
+ * @param showCardCount   If false, hides the aggregated count when the caller has no summary data.
  */
 @Composable
 fun DeckItem(
@@ -79,6 +80,7 @@ fun DeckItem(
     onPlaytest: (() -> Unit)? = null,
     reduced: Boolean = false,
     ownerName: String? = null,
+    showCardCount: Boolean = true,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -232,36 +234,37 @@ fun DeckItem(
                         } else {
                             Spacer(Modifier.height(18.dp))
                         }
-                    } else {
+                    } else if (showCardCount || deck.colorIdentity.isNotEmpty()) {
                         Spacer(Modifier.height(MaterialTheme.spacing.xs))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            // Card count with icon
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Style,
-                                    contentDescription = null,
-                                    tint = mc.textSecondary,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Text(
-                                    text = deck.cardCount.toString(),
-                                    style = ty.labelSmall,
-                                    color = mc.textSecondary,
-                                    maxLines = 1
-                                )
+                            if (showCardCount) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Style,
+                                        contentDescription = null,
+                                        tint = mc.textSecondary,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        text = deck.cardCount.toString(),
+                                        style = ty.labelSmall,
+                                        color = mc.textSecondary,
+                                        maxLines = 1
+                                    )
+                                }
                             }
 
                             // Mana identity symbols
                             if (deck.colorIdentity.isNotEmpty()) {
                                 ColorIdentityRow(colorIdentity = deck.colorIdentity, size = 14.dp)
-                            } else {
+                            } else if (showCardCount) {
                                 Spacer(Modifier.height(14.dp))
                             }
                         }

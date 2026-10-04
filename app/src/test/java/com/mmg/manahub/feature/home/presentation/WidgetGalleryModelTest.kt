@@ -4,7 +4,7 @@ import com.mmg.manahub.core.model.WidgetSize
 import com.mmg.manahub.feature.home.presentation.GalleryMoveDirection.DOWN
 import com.mmg.manahub.feature.home.presentation.GalleryMoveDirection.UP
 import com.mmg.manahub.feature.home.presentation.HomeWidgetType.CARD_OF_THE_DAY
-import com.mmg.manahub.feature.home.presentation.HomeWidgetType.CONTEXT_HERO
+import com.mmg.manahub.feature.home.presentation.HomeWidgetType.GET_STARTED
 import com.mmg.manahub.feature.home.presentation.HomeWidgetType.DAILY_PUZZLE
 import com.mmg.manahub.feature.home.presentation.HomeWidgetType.DISCOVER_CARDS
 import com.mmg.manahub.feature.home.presentation.HomeWidgetType.FRIENDS
@@ -43,11 +43,11 @@ class WidgetGalleryModelTest {
 
     @Test
     fun `stepping down skips hidden widgets and keeps the category contiguous`() {
-        val layout = layoutOf(CONTEXT_HERO, MTG_NEWS, DAILY_PUZZLE, DISCOVER_CARDS, FRIENDS)
+        val layout = layoutOf(GET_STARTED, MTG_NEWS, DAILY_PUZZLE, DISCOVER_CARDS, FRIENDS)
 
         val moved = layout.withWidgetStepped(MTG_NEWS, DOWN, isVisible = { it != DAILY_PUZZLE })
 
-        assertEquals(layoutOf(CONTEXT_HERO, DAILY_PUZZLE, DISCOVER_CARDS, MTG_NEWS, FRIENDS), moved)
+        assertEquals(layoutOf(GET_STARTED, DAILY_PUZZLE, DISCOVER_CARDS, MTG_NEWS, FRIENDS), moved)
     }
 
     @Test
@@ -71,7 +71,7 @@ class WidgetGalleryModelTest {
             WidgetCategory.ACTIVITY, WidgetCategory.SOCIAL, WidgetCategory.STATS,
             WidgetCategory.COLLECTION, WidgetCategory.DISCOVER, WidgetCategory.TOURNAMENT, WidgetCategory.COMMUNITY,
         )
-        val layout = layoutOf(CONTEXT_HERO, GAME_STATS_HUB, RECENTLY_ADDED).withWidgetAdded(FRIENDS)
+        val layout = layoutOf(GET_STARTED, GAME_STATS_HUB, RECENTLY_ADDED).withWidgetAdded(FRIENDS)
 
         val order = reconcileGalleryCategoryOrder(previous, layout)
 
@@ -91,7 +91,7 @@ class WidgetGalleryModelTest {
             WidgetCategory.DISCOVER, WidgetCategory.SOCIAL, WidgetCategory.TOURNAMENT, WidgetCategory.COMMUNITY,
         )
 
-        val order = reconcileGalleryCategoryOrder(previous, layoutOf(CONTEXT_HERO, GAME_STATS_HUB))
+        val order = reconcileGalleryCategoryOrder(previous, layoutOf(GET_STARTED, GAME_STATS_HUB))
 
         assertEquals(previous, order)
     }
@@ -111,11 +111,11 @@ class WidgetGalleryModelTest {
 
     @Test
     fun `regrouping by category order keeps each category's internal order`() {
-        val layout = layoutOf(CONTEXT_HERO, RECENTLY_ADDED, YOUR_DECKS_SHELF, GAME_STATS_HUB)
+        val layout = layoutOf(GET_STARTED, RECENTLY_ADDED, YOUR_DECKS_SHELF, GAME_STATS_HUB)
         val order = listOf(WidgetCategory.ACTIVITY, WidgetCategory.STATS, WidgetCategory.COLLECTION)
 
         assertEquals(
-            layoutOf(CONTEXT_HERO, GAME_STATS_HUB, RECENTLY_ADDED, YOUR_DECKS_SHELF),
+            layoutOf(GET_STARTED, GAME_STATS_HUB, RECENTLY_ADDED, YOUR_DECKS_SHELF),
             layout.sortedByCategoryOrder(order),
         )
     }

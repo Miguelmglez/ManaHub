@@ -6,24 +6,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -45,8 +40,11 @@ import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.theme.BottomSheetShape
+import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import kotlinx.coroutines.launch
 
 /**
@@ -76,6 +74,7 @@ fun DeckImportSheet(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
     var pastedText by remember { mutableStateOf("") }
     var isClosingProgrammatically by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -101,36 +100,33 @@ fun DeckImportSheet(
         onDismissRequest = onDismiss,
         containerColor   = mc.backgroundSecondary,
         sheetState       = sheetState,
-        dragHandle = null,
+        shape            = BottomSheetShape,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 32.dp)
+                .padding(horizontal = spacing.lg)
+                .padding(bottom = spacing.xxl)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
-            // Header Row
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth().padding(top = spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                IconButton(
-                    onClick = closeSheet,
-                    modifier = Modifier.offset(x = (-12).dp)
-                ) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = stringResource(R.string.action_cancel),
-                        tint = mc.textSecondary
-                    )
-                }
                 Text(
                     text  = title,
-                    style = ty.titleMedium,
+                    style = ty.titleLarge,
                     color = mc.textPrimary,
                 )
+                IconButton(onClick = closeSheet) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel),
+                        tint = mc.textSecondary,
+                    )
+                }
             }
 
             Text(
@@ -159,7 +155,7 @@ fun DeckImportSheet(
                     unfocusedTextColor   = mc.textPrimary,
                     cursorColor          = mc.primaryAccent,
                 ),
-                textStyle = ty.bodySmall,
+                textStyle = ty.bodyMedium,
                 maxLines  = 30,
             )
 
@@ -171,21 +167,21 @@ fun DeckImportSheet(
                     style = MagicCtaStyle.Outlined,
                     color = MagicCtaColor.Primary,
                     icon = { Icon(Icons.Default.FileOpen, contentDescription = null) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = spacing.xxl + spacing.lg),
                 )
             }
 
             // Error / warning banner
             error?.let { msg ->
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = CardShape,
                     color = mc.lifeNegative.copy(alpha = 0.12f),
                 ) {
                     Text(
                         text     = msg,
                         style    = ty.bodySmall,
                         color    = mc.lifeNegative,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.sm),
                     )
                 }
             }
@@ -199,7 +195,7 @@ fun DeckImportSheet(
                     MagicLoadingSpinner(
                         modifier = Modifier.size(20.dp),
                     )
-                    Spacer(Modifier.width(10.dp))
+                    Spacer(Modifier.width(spacing.sm))
                     Text(
                         text  = loadingText ?: stringResource(R.string.deck_import_loading),
                         style = ty.bodySmall,
@@ -208,36 +204,23 @@ fun DeckImportSheet(
                 }
             } else {
                 Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                 ) {
-                    OutlinedButton(
-                        onClick  = closeSheet,
-                        modifier = Modifier.weight(1f),
-                        shape    = RoundedCornerShape(8.dp),
-                    ) {
-                        Text(
-                            text  = stringResource(R.string.action_cancel),
-                            color = mc.textSecondary,
-                            style = ty.labelLarge,
-                        )
-                    }
-                    Button(
-                        onClick  = { onImport(pastedText) },
-                        enabled  = pastedText.isNotBlank(),
-                        modifier = Modifier.weight(1f),
-                        colors   = ButtonDefaults.buttonColors(
-                            containerColor         = mc.primaryAccent,
-                            disabledContainerColor = mc.surfaceVariant,
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                    ) {
-                        Text(
-                            text  = stringResource(R.string.deck_import_button),
-                            color = if (pastedText.isNotBlank()) mc.background else mc.textDisabled,
-                            style = ty.labelLarge,
-                        )
-                    }
+                    MagicCtaButton(
+                        onClick = closeSheet,
+                        text = stringResource(R.string.action_cancel),
+                        style = MagicCtaStyle.Ghost,
+                        color = MagicCtaColor.Neutral,
+                        modifier = Modifier.weight(1f).heightIn(min = spacing.xxl + spacing.lg),
+                    )
+                    MagicCtaButton(
+                        onClick = { onImport(pastedText) },
+                        text = stringResource(R.string.deck_import_button),
+                        enabled = pastedText.isNotBlank(),
+                        color = MagicCtaColor.Primary,
+                        modifier = Modifier.weight(1f).heightIn(min = spacing.xxl + spacing.lg),
+                    )
                 }
             }
         }

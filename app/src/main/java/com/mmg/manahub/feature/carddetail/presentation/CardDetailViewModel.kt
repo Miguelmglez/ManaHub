@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.tagging.CardMechanicCatalogRepository
+import com.mmg.manahub.core.tagging.TagDictionary
 import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.TagCategory
@@ -31,6 +33,9 @@ import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.UpdateWishlistEntryUseCase
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,6 +71,7 @@ class CardDetailViewModel(
     private val updateCollectionEntry: UpdateCollectionEntryUseCase,
     private val updateWishlistEntry: UpdateWishlistEntryUseCase,
     private val refreshCardStrategyTags: RefreshCardStrategyTagsUseCase,
+    private val mechanicCatalog: CardMechanicCatalogRepository,
 ) : ViewModel() {
 
     private val initialScryfallId: String = checkNotNull(savedStateHandle["scryfallId"])
@@ -79,6 +85,10 @@ class CardDetailViewModel(
     private var englishRedirectSourceId: String? = null
 
     private var tradeJob: Job? = null
+    private val userTagMutex = Mutex()
+    private val committedUserTags = mutableMapOf<String, List<CardTag>>()
+    private val observedUserTags = mutableMapOf<String, List<CardTag>>()
+    private var tagCatalogJob: Job? = null
 
     // The currently-loaded [Card], mirrored from every point [_uiState.card] is written. Used to
     // derive the oracle-wide identity (oracleId, name) that the Collection/Wishlist/Trade sections
@@ -115,6 +125,11 @@ class CardDetailViewModel(
     private var appliedInitialEnglishRedirect = false
 
     init {
+        viewModelScope.launch {
+            mechanicCatalog.entries.collect {
+                _uiState.update { state -> state.copy(tagCatalog = TagDictionary.systemCatalogEntries().toList()) }
+            }
+        }
         loadCard()
         observeUserCards()
         observeWishlistEntries()
@@ -132,8 +147,17 @@ class CardDetailViewModel(
     private fun observeDecks() {
         viewModelScope.launch {
             scryfallIdFlow.flatMapLatest { id ->
-                deckRepo.observeDecksContainingCard(id)
-            }.catch { /* decks section is non-critical */ }
+                combine(
+                    deckRepo.observeDecksContainingCard(id),
+                    deckRepo.observeAllDeckSummaries(),
+                ) { decks, summaries ->
+                    val summariesById = summaries.associateBy { it.id }
+                    decks.distinctBy { it.id }.mapNotNull { summariesById[it.id] }
+                }
+            }.catch { error ->
+                FirebaseCrashlytics.getInstance().log("card_detail_decks_observe_failed")
+                recordSafeNonFatal("carddetail_decks_observe_failed", error)
+            }
                 .collect { decks -> _uiState.update { it.copy(decksContainingCard = decks) } }
         }
     }
@@ -215,9 +239,11 @@ class CardDetailViewModel(
                 cardRepo.observeCard(id)
             }.filterNotNull()
                 .collect { card ->
+                    observedUserTags[card.scryfallId] = card.userTags
+                    if (committedUserTags[card.scryfallId] == card.userTags) committedUserTags.remove(card.scryfallId)
                     _uiState.update {
                         it.copy(
-                            card = card,
+                            card = card.copy(userTags = committedUserTags[card.scryfallId] ?: card.userTags),
                             isStale = card.isStale
                         )
                     }
@@ -353,7 +379,28 @@ class CardDetailViewModel(
 
     fun onShowTradeSheet() = _uiState.update { it.copy(showTradeSheet = true) }
     fun onDismissTradeSheet() = _uiState.update { it.copy(showTradeSheet = false) }
-    fun onShowTagPicker() = _uiState.update { it.copy(showTagPicker = true) }
+    fun onShowTagPicker() {
+        _uiState.update { it.copy(showTagPicker = true) }
+        if (mechanicCatalog.entries.value.isEmpty()) onRetryTagCatalog()
+    }
+
+    fun onRetryTagCatalog() {
+        if (tagCatalogJob?.isActive == true) return
+        tagCatalogJob = viewModelScope.launch {
+            _uiState.update { it.copy(isTagCatalogLoading = true, tagCatalogError = false) }
+            try {
+                mechanicCatalog.loadCached()
+                val refreshed = mechanicCatalog.refresh()
+                _uiState.update { it.copy(tagCatalogError = !refreshed) }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                _uiState.update { it.copy(tagCatalogError = true) }
+            } finally {
+                _uiState.update { it.copy(isTagCatalogLoading = false) }
+            }
+        }
+    }
     fun onDismissTagPicker() = _uiState.update { it.copy(showTagPicker = false) }
     fun onRequestDelete(uc: UserCard) = _uiState.update { it.copy(cardToDelete = uc) }
     fun onDismissDeleteConfirm() = _uiState.update { it.copy(cardToDelete = null) }
@@ -840,114 +887,38 @@ class CardDetailViewModel(
 
     // ── User-tag mutations ────────────────────────────────────────────────────
 
-    fun onAddUserTag(tag: CardTag) {
-        val current = _uiState.value.card?.userTags ?: return
-        // Dedupe by key, not equality: one user-defined tag can arrive under different categories.
-        if (current.any { it.key == tag.key }) return
-        val updated = current + tag
-        // Optimistic update so the UI refreshes immediately
-        _uiState.update { it.copy(card = it.card?.copy(userTags = updated)) }
-        viewModelScope.launch {
-            runCatching { cardRepo.updateUserTags(scryfallId, updated) }
-                .onSuccess {
-                    helper.logEvent("add_user_tag", mapOf("tag" to tag.analyticsLabel()))
-                    _events.emit(CardDetailEvent.ShowToast("Tag '${tag.label()}' added")) }
-                .onFailure { _ ->
-                    // Roll back on failure
-                    helper.logEvent("error_add_user_tag", mapOf("tag" to tag.analyticsLabel()))
-                    _uiState.update { it.copy(card = it.card?.copy(userTags = current)) }
-                    showError("Could not add tag")
-                }
-        }
-    }
+    fun onAddUserTag(tag: CardTag) = updateUserTagSelection(tag, selected = true)
 
-    fun onRemoveUserTag(tag: CardTag) {
-        val current = _uiState.value.card?.userTags ?: return
-        val updated = current - tag
-        _uiState.update { it.copy(card = it.card?.copy(userTags = updated)) }
-        viewModelScope.launch {
-            runCatching { cardRepo.updateUserTags(scryfallId, updated) }
-                .onSuccess {
-                    helper.logEvent("remove_user_tag", mapOf("tag" to tag.analyticsLabel()))
-                }
-                .onFailure { _ ->
-                    helper.logEvent("error_remove_user_tag", mapOf("tag" to tag.analyticsLabel()))
-                    _uiState.update { it.copy(card = it.card?.copy(userTags = current)) }
-                    showError("Could not remove tag")
-                }
-        }
-    }
+    fun onRemoveUserTag(tag: CardTag) = updateUserTagSelection(tag, selected = false)
 
-    fun onSaveAndAddCustomTag(label: String, categoryKey: String) {
-        val trimmed = label.trim()
-        if (trimmed.isEmpty()) return
-        val key = trimmed.lowercase()
-            .replace(' ', '_')
-            .replace(Regex("[^a-z0-9_]"), "")
-            .take(50)
-        if (key.isEmpty()) return
-        // Same category the tag picker uses when re-applying this tag, so one key never yields two chips.
-        val category = TagCategory.entries.firstOrNull { it != TagCategory.CUSTOM && it.name == categoryKey }
-            ?: TagCategory.CUSTOM
-        val current = _uiState.value.card?.userTags ?: emptyList()
-        val updatedUserTags = if (current.any { it.key == key }) current else current + CardTag(key, category)
-        // Optimistic update
-        _uiState.update { it.copy(card = it.card?.copy(userTags = updatedUserTags)) }
-        val userDefinedTag = UserDefinedTag(key = key, label = trimmed, categoryKey = categoryKey)
-        // Label and user-created category names are free text — analytics only get length / enum id.
-        val analyticsParams = mapOf(
-            "label_length" to trimmed.length,
-            "category" to if (category == TagCategory.CUSTOM) "custom" else category.name,
-        )
+    private fun updateUserTagSelection(tag: CardTag, selected: Boolean) {
+        val targetId = _uiState.value.card?.scryfallId ?: return
         viewModelScope.launch {
-            runCatching {
-                userPrefs.saveUserDefinedTag(userDefinedTag)
-                cardRepo.updateUserTags(scryfallId, updatedUserTags)
-            }.onSuccess {
-                helper.logEvent("save_custom_tag", analyticsParams)
-                _events.emit(CardDetailEvent.ShowToast("'$trimmed' tag created and added"))
-            }.onFailure { _ ->
-                helper.logEvent("error_save_custom_tag", analyticsParams)
-                _uiState.update { it.copy(card = it.card?.copy(userTags = current)) }
-                showError("Could not create tag")
+            userTagMutex.withLock {
+                val card = _uiState.value.card?.takeIf { it.scryfallId == targetId } ?: return@withLock
+                val catalogTag = TagDictionary.systemCatalogEntries().firstOrNull { it.key == tag.key }
+                    ?.let { CardTag(it.key, it.category) }
+                if (selected && (catalogTag == null || card.tags.any { it.key == tag.key })) return@withLock
+                val current = committedUserTags[targetId] ?: card.userTags
+                if (selected == current.any { it.key == tag.key }) return@withLock
+                val updated = if (selected) current + checkNotNull(catalogTag) else current.filterNot { it.key == tag.key }
+                try {
+                    cardRepo.updateUserTags(targetId, updated)
+                    if (observedUserTags[targetId] != updated) committedUserTags[targetId] = updated
+                    else committedUserTags.remove(targetId)
+                    _uiState.update { state ->
+                        state.copy(card = state.card?.let { displayed ->
+                            if (displayed.scryfallId == targetId) displayed.copy(userTags = updated) else displayed
+                        })
+                    }
+                    helper.logEvent(if (selected) "add_user_tag" else "remove_user_tag", mapOf("tag" to tag.analyticsLabel()))
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    helper.logEvent(if (selected) "error_add_user_tag" else "error_remove_user_tag", mapOf("tag" to tag.analyticsLabel()))
+                    showError(if (selected) "Could not add tag" else "Could not remove tag")
+                }
             }
-        }
-    }
-
-    // ── User-defined tag management ───────────────────────────────────────────
-
-    fun onDeleteUserDefinedTag(key: String) {
-        viewModelScope.launch {
-            runCatching { userPrefs.deleteUserDefinedTag(key) }
-                .onSuccess {
-                    helper.logEvent("delete_custom_tag", mapOf("key_length" to key.length))
-                    _events.emit(
-                        CardDetailEvent.ShowToast(
-                            "Custom tag deleted",
-                            ToastSeverity.INFO
-                        )
-                    )
-                }
-                .onFailure {
-                    helper.logEvent("error_delete_custom_tag", mapOf("key_length" to key.length))
-                    showError("Could not delete tag")
-                }
-        }
-    }
-
-    fun onUpdateUserDefinedTag(key: String, newLabel: String) {
-        val trimmed = newLabel.trim()
-        if (trimmed.isEmpty()) return
-        viewModelScope.launch {
-            val existing = _uiState.value.userDefinedTags.find { it.key == key } ?: return@launch
-            runCatching { userPrefs.saveUserDefinedTag(existing.copy(label = trimmed)) }
-                .onSuccess {
-                    helper.logEvent("update_custom_tag", mapOf("label_length" to trimmed.length))
-                    _events.emit(CardDetailEvent.ShowToast("Tag renamed to '$trimmed'")) }
-                .onFailure {
-                    helper.logEvent("error_update_custom_tag", mapOf("label_length" to trimmed.length))
-                    showError("Could not rename tag")
-                }
         }
     }
 

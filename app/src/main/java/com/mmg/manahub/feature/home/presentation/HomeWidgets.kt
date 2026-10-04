@@ -5,10 +5,13 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
@@ -150,6 +153,7 @@ import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicFilterChip
+import com.mmg.manahub.core.ui.components.MagicGlowCard
 import com.mmg.manahub.core.ui.components.MagicSelectionItem
 import com.mmg.manahub.core.ui.components.MagicSkeletonBlock
 import com.mmg.manahub.core.ui.components.MagicSkeletonPulse
@@ -549,7 +553,7 @@ fun HomeWidgetHost(
     val spacing = MaterialTheme.spacing
     val type = widget.type
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-        if (type != HomeWidgetType.CONTEXT_HERO && type != HomeWidgetType.GREETING_HEADER) {
+        if (type != HomeWidgetType.GET_STARTED && type != HomeWidgetType.GREETING_HEADER) {
             val titleText = stringResourceSafe(type.defaultTitleRes)
             val titleClickAction = widgetHeaderTitleClickAction(type)
             WidgetSectionHeader(
@@ -576,7 +580,7 @@ fun HomeWidgetHost(
         ) {
             when (type) {
                 HomeWidgetType.GREETING_HEADER -> HomeTopBar(uiState, onAvatarClick = { onAction(HomeAction.OpenProfile) })
-                HomeWidgetType.CONTEXT_HERO -> ContextHeroWidget(uiState.hero, onAction)
+                HomeWidgetType.GET_STARTED -> ContextHeroWidget(uiState.hero, onAction)
                 HomeWidgetType.QUICK_ACTIONS -> QuickActionsWidget(
                     actions = uiState.quickStartActions,
                     onAction = onAction,
@@ -618,7 +622,7 @@ fun HomeWidgetHost(
                 HomeWidgetType.LATEST_SETS -> LatestSetsWidget(uiState.latestSets, metrics.draftSetTileHeight, onAction)
                 HomeWidgetType.MTG_NEWS ->
                     NewsWidget(uiState.recentNews, metrics.newsCardHeight, onAction)
-                HomeWidgetType.RULES_TIP -> RulesTipWidget(rulesTipIndex)
+                HomeWidgetType.RULES_TIP -> RulesTipWidget(rulesTipIndex, onAction)
                 HomeWidgetType.FRIENDS -> FriendsWidget(
                     friends = uiState.friends,
                     friendCount = uiState.friendCount,
@@ -662,10 +666,10 @@ private fun widgetHeaderTitleClickAction(type: HomeWidgetType): HomeAction? = wh
     HomeWidgetType.PROGRESSION_HUB -> HomeAction.OpenProfile
     HomeWidgetType.QUESTS_HUB -> HomeAction.OpenProfileQuests
     HomeWidgetType.DAILY_PUZZLE -> HomeAction.OpenDailyPuzzle
+    HomeWidgetType.RULES_TIP -> HomeAction.OpenRulesTipIndex
     HomeWidgetType.QUICK_ACTIONS,
     HomeWidgetType.CARD_OF_THE_DAY,
-    HomeWidgetType.RULES_TIP,
-    HomeWidgetType.CONTEXT_HERO,
+    HomeWidgetType.GET_STARTED,
     HomeWidgetType.GREETING_HEADER,
     HomeWidgetType.COMPETITIVE,
     -> null
@@ -1282,19 +1286,10 @@ internal fun FirstStepsCarousel(
             ) { page ->
                 val step = steps.getOrNull(page) ?: steps.first()
 
-                Surface(
-                    color = Color.Transparent,
-                    shape = CardShape,
-                    border = BorderStroke(
-                        1.dp,
-                        Brush.horizontalGradient(
-                            listOf(
-                                mc.primaryAccent.copy(alpha = 0.5f),
-                                mc.primaryAccent.copy(alpha = 0.15f),
-                                mc.primaryAccent.copy(alpha = 0.5f),
-                            )
-                        )
-                    ),
+                MagicGlowCard(
+                    onClick = { onAction(step.action) },
+                    onClickLabel = stringResourceSafe(step.titleRes),
+                    role = Role.Button,
                     modifier = Modifier
                         .fillMaxWidth()
                         .graphicsLayer {
@@ -1304,128 +1299,106 @@ internal fun FirstStepsCarousel(
                             alpha = alphaValue
                             scaleX = scaleValue
                             scaleY = scaleValue
-                        }
-                        .coloredShadow(
-                            color = mc.primaryAccent.copy(alpha = 0.18f),
-                            borderRadius = 18.dp,
-                            blurRadius = 24.dp
-                        )
-                        .clip(CardShape)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    mc.surfaceVariant.copy(alpha = 0.95f),
-                                    mc.surface.copy(alpha = 0.98f)
-                                )
-                            )
-                        )
+                        },
                 ) {
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(
-                                    onClickLabel = stringResourceSafe(step.titleRes),
-                                    role = Role.Button,
-                                ) { onAction(step.action) }
-                                .padding(horizontal = spacing.lg, vertical = spacing.md),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(spacing.sm)
-                        ) {
-
-
-                            Box(contentAlignment = Alignment.Center) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(80.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            Brush.radialGradient(
-                                                colors = listOf(
-                                                    mc.primaryAccent.copy(alpha = 0.15f),
-                                                    Color.Transparent
-                                                )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = spacing.lg, vertical = spacing.md),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(spacing.sm)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Box(
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.radialGradient(
+                                            colors = listOf(
+                                                mc.primaryAccent.copy(alpha = 0.15f),
+                                                Color.Transparent
                                             )
                                         )
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .size(56.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            Brush.radialGradient(
-                                                colors = listOf(
-                                                    mc.primaryAccent.copy(alpha = 0.22f),
-                                                    mc.primaryAccent.copy(alpha = 0.08f)
-                                                )
+                                    )
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.radialGradient(
+                                            colors = listOf(
+                                                mc.primaryAccent.copy(alpha = 0.22f),
+                                                mc.primaryAccent.copy(alpha = 0.08f)
                                             )
                                         )
-                                        .border(
-                                            1.dp,
-                                            mc.primaryAccent.copy(alpha = 0.35f),
-                                            CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    when (val icon = step.icon) {
-                                        is StepIcon.Vector -> Icon(
-                                            imageVector = icon.imageVector,
-                                            contentDescription = null,
-                                            tint = mc.primaryAccent,
-                                            modifier = Modifier.size(28.dp)
-                                        )
-                                        is StepIcon.Drawable -> Icon(
-                                            painter = painterResource(id = icon.resId),
-                                            contentDescription = null,
-                                            tint = mc.primaryAccent,
-                                            modifier = Modifier.size(28.dp)
-                                        )
-                                    }
+                                    )
+                                    .border(
+                                        1.dp,
+                                        mc.primaryAccent.copy(alpha = 0.35f),
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                when (val icon = step.icon) {
+                                    is StepIcon.Vector -> Icon(
+                                        imageVector = icon.imageVector,
+                                        contentDescription = null,
+                                        tint = mc.primaryAccent,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                    is StepIcon.Drawable -> Icon(
+                                        painter = painterResource(id = icon.resId),
+                                        contentDescription = null,
+                                        tint = mc.primaryAccent,
+                                        modifier = Modifier.size(28.dp)
+                                    )
                                 }
                             }
-
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(spacing.xs)
-                            ) {
-                                Text(
-                                    text = stringResourceSafe(step.titleRes),
-                                    style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = mc.textPrimary,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = stringResourceSafe(step.subtitleRes),
-                                    style = ty.bodySmall,
-                                    color = mc.textSecondary,
-                                    textAlign = TextAlign.Center,
-                                    minLines = 2,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
                         }
 
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .minimumInteractiveComponentSize()
-                                .clip(CircleShape)
-                                .clickable(
-                                    onClickLabel = stringResourceSafe(R.string.first_step_dismiss),
-                                    role = Role.Button,
-                                ) { onDismiss(step.id) },
-                            contentAlignment = Alignment.Center,
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(spacing.xs)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = stringResourceSafe(R.string.first_step_dismiss),
-                                tint = mc.textSecondary,
-                                modifier = Modifier.size(16.dp),
+                            Text(
+                                text = stringResourceSafe(step.titleRes),
+                                style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = mc.textPrimary,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = stringResourceSafe(step.subtitleRes),
+                                style = ty.bodySmall,
+                                color = mc.textSecondary,
+                                textAlign = TextAlign.Center,
+                                minLines = 2,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .minimumInteractiveComponentSize()
+                            .clip(CircleShape)
+                            .clickable(
+                                onClickLabel = stringResourceSafe(R.string.first_step_dismiss),
+                                role = Role.Button,
+                            ) { onDismiss(step.id) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResourceSafe(R.string.first_step_dismiss),
+                            tint = mc.textSecondary,
+                            modifier = Modifier.size(16.dp),
+                        )
                     }
                 }
             }
@@ -3088,14 +3061,14 @@ private fun rememberRulesTipCardHeight(width: Dp): Dp {
 }
 
 @Composable
-private fun RulesTipWidget(tipIndex: Int) {
+private fun RulesTipWidget(tipIndex: Int, onAction: (HomeAction) -> Unit) {
     val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
     val tips = RULES_TIPS_DAILY_ORDER
     val tip = tips[tipIndex.coerceIn(0, tips.lastIndex)]
     val reducedMotion = isReducedMotionEnabled()
 
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xxs)) {
+    Box(modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xxs)) {
         Surface(
             color = mc.surface.copy(alpha = 0.6f),
             shape = SmallCardShape,
@@ -3110,9 +3083,11 @@ private fun RulesTipWidget(tipIndex: Int) {
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(rememberRulesTipCardHeight(maxWidth)),
+                .animateContentSize(
+                    animationSpec = if (reducedMotion) snap() else spring(stiffness = Spring.StiffnessMediumLow)
+                ),
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxWidth()) {
                 // Decorative background icon
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.MenuBook,
@@ -3129,10 +3104,10 @@ private fun RulesTipWidget(tipIndex: Int) {
                     animationSpec = tween(if (reducedMotion) 0 else RULES_TIP_CROSSFADE_MS),
                     label = "rules-tip",
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
                         .semantics { liveRegion = LiveRegionMode.Polite },
                 ) { shown ->
-                    RulesTipContent(shown)
+                    Box(Modifier.fillMaxWidth().clickable(onClickLabel = stringResource(R.string.rules_tip_read, shown.title)) { onAction(HomeAction.OpenRulesTip(shown.stableId)) }) { RulesTipContent(shown) }
                 }
             }
         }
@@ -3981,6 +3956,7 @@ private val QuickStartAction.navIcon: ImageVector
         QuickStartAction.TRADES -> Icons.Default.SwapHoriz
         QuickStartAction.COMMUNITY_DECKS -> Icons.Default.Style
         QuickStartAction.SETTINGS -> Icons.Default.Settings
+        QuickStartAction.RULES -> Icons.AutoMirrored.Filled.MenuBook
         QuickStartAction.MULTI_ADD_CARD -> Icons.Default.CollectionsBookmark
     }
 
@@ -4001,6 +3977,7 @@ private val QuickStartAction.navLabel: String
         QuickStartAction.TRADES -> stringResourceSafe(R.string.quick_start_trades)
         QuickStartAction.COMMUNITY_DECKS -> stringResourceSafe(R.string.quick_start_community)
         QuickStartAction.SETTINGS -> stringResourceSafe(R.string.quick_start_settings)
+        QuickStartAction.RULES -> stringResourceSafe(R.string.rules_title)
         QuickStartAction.MULTI_ADD_CARD -> stringResourceSafe(R.string.quick_start_sheet_multi_add)
     }
 
@@ -4017,6 +3994,7 @@ private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
     QuickStartAction.TRADES -> HomeAction.OpenTrades
     QuickStartAction.COMMUNITY_DECKS -> HomeAction.OpenCommunityDecks
     QuickStartAction.SETTINGS -> HomeAction.OpenSettings
+    QuickStartAction.RULES -> HomeAction.OpenRules
     QuickStartAction.MULTI_ADD_CARD -> HomeAction.OpenMultiAdd
     QuickStartAction.CREATE_DECK -> HomeAction.CreateDeck
 }

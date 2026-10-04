@@ -58,13 +58,15 @@ fun CardListItem(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     sharedTransitionKey: Any? = null,
+    quantity: Long = item.totalQuantity.toLong(),
+    variants: Long = item.distinctCopies.toLong(),
 ) {
     CardListItem(
         name = item.card.name,
         imageUrl = item.card.imageNormal,
         priceUsd = if (item.hasFoil) item.card.priceUsdFoil else item.card.priceUsd,
         priceEur = if (item.hasFoil) item.card.priceEurFoil else item.card.priceEur,
-        quantityText = "×${item.totalQuantity}",
+        quantityText = "×${quantity}",
         hasFoil = item.hasFoil,
         isStale = item.card.isStale,
         setCode = item.card.setCode,
@@ -79,9 +81,9 @@ fun CardListItem(
         scryfallId = item.card.scryfallId,
         sharedTransitionKey = sharedTransitionKey,
         extraSupportingContent = {
-            if (item.distinctCopies > 1) {
+            if (variants > 1) {
                 Text(
-                    text  = "${item.distinctCopies} variants",
+                    text  = "${variants} variants",
                     style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 12.sp),
                     color = MaterialTheme.magicColors.primaryAccent,
                 )

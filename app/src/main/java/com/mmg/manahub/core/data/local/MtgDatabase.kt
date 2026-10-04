@@ -73,9 +73,26 @@ import com.mmg.manahub.core.data.local.entity.LocalWishlistEntity
 import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
 import com.mmg.manahub.core.data.local.entity.TradeOfferCleanupEntity
 import com.mmg.manahub.core.data.local.entity.TradeWishlistCleanupEntity
+import com.mmg.manahub.core.data.local.entity.CollectionTransferReceiptEntity
+import com.mmg.manahub.core.data.local.entity.CollectionTransferJobEntity
+import com.mmg.manahub.core.data.local.entity.CollectionTransferFileEntity
+import com.mmg.manahub.core.data.local.entity.CollectionImportRowEntity
+import com.mmg.manahub.core.data.local.entity.CollectionImportEntryEntity
+import com.mmg.manahub.core.data.local.entity.CollectionImportProvenanceEntity
+import com.mmg.manahub.core.data.local.entity.CollectionTransferFileHistoryEntity
+import com.mmg.manahub.core.data.local.entity.CollectionTransferNameClaimEntity
+import com.mmg.manahub.core.data.local.entity.CollectionTransferSnapshotQueryEntity
+import com.mmg.manahub.core.data.local.entity.CollectionTransferSnapshotRowEntity
+import com.mmg.manahub.core.data.local.dao.CollectionTransferDao
+import com.mmg.manahub.core.data.local.entity.CollectionTransferActionEntity
+import com.mmg.manahub.core.data.local.entity.CollectionTransferActionEntryEntity
+import com.mmg.manahub.core.data.local.entity.CollectionTransferReviewDecisionEntity
+import com.mmg.manahub.core.data.local.entity.CollectionTransferGuestRowEntity
+import com.mmg.manahub.core.data.local.entity.CollectionTransferWishlistDirtyEntity
 
 @Database(
     entities = [
+        com.mmg.manahub.core.data.local.entity.CollectionExportEntity::class,
         CardEntity::class,
         UserCardCollectionEntity::class,
         DeckEntity::class,
@@ -127,12 +144,34 @@ import com.mmg.manahub.core.data.local.entity.TradeWishlistCleanupEntity
         // ratings caches, backed by the manahub-competitive Cloudflare Worker (v51)
         CompetitiveMetaCacheEntity::class,
         CompetitiveLimitedRatingsCacheEntity::class,
+        CollectionTransferReceiptEntity::class,
+        CollectionTransferJobEntity::class,
+        CollectionTransferFileEntity::class,
+        CollectionImportRowEntity::class,
+        CollectionImportEntryEntity::class,
+        CollectionImportProvenanceEntity::class,
+        CollectionTransferFileHistoryEntity::class,
+        CollectionTransferNameClaimEntity::class,
+        CollectionTransferSnapshotQueryEntity::class,
+        CollectionTransferSnapshotRowEntity::class,
+        CollectionTransferActionEntity::class,
+        CollectionTransferActionEntryEntity::class,
+        CollectionTransferReviewDecisionEntity::class,
+        CollectionTransferGuestRowEntity::class,
+        CollectionTransferWishlistDirtyEntity::class,
+        com.mmg.manahub.core.data.local.entity.CollectionTransferDeliveryEntity::class,
+        com.mmg.manahub.core.data.local.entity.CollectionSelectionQueryEntity::class,
+        com.mmg.manahub.core.data.local.entity.CollectionSelectionRowEntity::class,
+        com.mmg.manahub.core.data.local.entity.CollectionSelectionGroupEntity::class,
     ],
-    version = 58,
+    version = 66,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
 abstract class MtgDatabase : RoomDatabase() {
+    abstract fun collectionExportDao(): com.mmg.manahub.core.data.local.dao.CollectionExportDao
+    abstract fun collectionSelectionDao(): com.mmg.manahub.core.data.local.dao.CollectionSelectionDao
+    abstract fun collectionTransferDao(): CollectionTransferDao
     abstract fun cardDao(): CardDao
     abstract fun userCardCollectionDao(): UserCardCollectionDao
     abstract fun deckDao(): DeckDao
@@ -195,3 +234,5 @@ abstract class MtgDatabase : RoomDatabase() {
      */
     abstract fun competitiveLimitedRatingsCacheDao(): CompetitiveLimitedRatingsCacheDao
 }
+
+

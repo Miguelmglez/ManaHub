@@ -2,6 +2,7 @@ package com.mmg.manahub.core.data.repository
 
 import androidx.room.withTransaction
 import com.mmg.manahub.core.data.local.MtgDatabase
+import com.mmg.manahub.core.data.local.writeCollectionRow
 import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.dao.UserCardWithCard
@@ -245,62 +246,8 @@ class UserCardRepositoryImpl @Inject constructor(
             )
         }
 
-        return when {
-            existing == null -> {
-                userCardCollectionDao.upsert(
-                    UserCardCollectionEntity(
-                        id               = UUID.randomUUID().toString(),
-                        userId           = resolvedUserId,
-                        scryfallId       = scryfallId,
-                        quantity         = quantity,
-                        isFoil           = isFoil,
-                        condition        = normalizedCondition,
-                        language         = normalizedLanguage,
-                        isForTrade       = isForTrade,
-                        isDeleted        = false,
-                        updatedAt        = now,
-                        createdAt        = now,
-                    )
-                )
-                AddOutcome.CREATED_NEW
-            }
-            existing.isDeleted -> {
-                userCardCollectionDao.upsert(
-                    // Restore the same row (same UUID) so no duplicate is created.
-                    // Quantity resets to the incoming value — the card was gone before.
-                    // createdAt is bumped to `now` too: this branch reports AddOutcome.CREATED_NEW
-                    // (a "new" add from the caller's perspective), but RECENTLY_ADDED orders strictly
-                    // by created_at DESC, so leaving the stale original acquisition date meant a card
-                    // the user just finished re-adding never surfaced at the top (Home dashboard audit,
-                    // HIGH). No other logic in this codebase keys off createdAt staying stable across
-                    // a delete/restore cycle — grep confirms achievements/stats never reference it.
-                    existing.copy(
-                        quantity   = quantity,
-                        isDeleted  = false,
-                        isForTrade = isForTrade,
-                        updatedAt  = now,
-                        createdAt  = now,
-                    )
-                )
-                // A previously soft-deleted card returning counts as a new unique add.
-                AddOutcome.CREATED_NEW
-            }
-            else -> {
-                userCardCollectionDao.upsert(
-                    existing.copy(
-                        // Summed as Long first: an Int overflow here would write a NEGATIVE owned
-                        // quantity, which every consumer reads as real ownership data.
-                        quantity   = (existing.quantity.toLong() + quantity)
-                            .coerceIn(0L, Int.MAX_VALUE.toLong()).toInt(),
-                        isForTrade = isForTrade || existing.isForTrade,
-                        updatedAt  = now,
-                    )
-                )
-                AddOutcome.INCREMENTED_EXISTING
-            }
-        }
+        return writeCollectionRow(userCardCollectionDao,existing,resolvedUserId,scryfallId,isFoil,normalizedCondition,normalizedLanguage,quantity,isForTrade,now,strictOverflow=false).first
     }
-
     override suspend fun updateAttributes(
         id: String,
         isForTrade: Boolean,

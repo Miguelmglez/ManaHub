@@ -1,21 +1,28 @@
 package com.mmg.manahub.core.ui.components
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -32,19 +39,21 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.util.CardConstants
 
 /**
  * Bottom sheet for managing trade offers on a single card's copies.
  *
  * Shows two sections:
- * 1. "Offered for Trade" — copies currently marked for trade, with steppers to reduce
- * 2. "Available Copies" — copies not yet offered, with steppers to increase
+ * 1. "Available in Collection" — copies not yet offered, with steppers to increase
+ * 2. "Offered for Trade" — copies currently marked for trade, with steppers to reduce
  *
  * All changes are local until the user taps "Save".
  *
@@ -87,54 +96,135 @@ fun TradeSelectionSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
                 .padding(bottom = 24.dp),
         ) {
-            // Header Row
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // Drag Handle Indicator Pill
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp, bottom = 4.dp),
+                contentAlignment = Alignment.Center
             ) {
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.padding(start = 4.dp)
+                Surface(
+                    modifier = Modifier.size(width = 36.dp, height = 4.dp),
+                    shape = CircleShape,
+                    color = mc.textDisabled.copy(alpha = 0.4f)
+                ) {}
+            }
+
+            // Header Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f),
                 ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = mc.secondaryAccent.copy(alpha = 0.15f),
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.Default.SwapHoriz,
+                                contentDescription = null,
+                                tint = mc.secondaryAccent,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                    Column {
+                        Text(
+                            text = "Select copies to mark for trade",
+                            style = ty.titleMedium,
+                            color = mc.textPrimary,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = "Choose which copies you want to mark for trade.",
+                            style = ty.bodySmall,
+                            color = mc.textSecondary,
+                        )
+                    }
+                }
+                IconButton(onClick = onDismiss) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Cancel",
+                        contentDescription = "Close",
                         tint = mc.textSecondary
                     )
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            // Summary Card
+            if (userCards.isNotEmpty()) {
+                val totalOwned = userCards.sumOf { it.quantity }
+                val totalOffered = editQty.values.sum()
+                val totalAvailable = (totalOwned - totalOffered).coerceAtLeast(0)
 
-            // Title
-            Text(
-                text = "Select copies to mark for trade",
-                style = ty.titleMedium,
-                color = mc.textPrimary,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = "Choose which copies you want to mark for trade. They will remain in your collection.",
-                style = ty.bodySmall,
-                color = mc.textSecondary,
-            )
-            Spacer(Modifier.height(16.dp))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = mc.surface,
+                    border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.6f)),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SummaryStatItem(
+                            label = "In Collection",
+                            value = "$totalOwned",
+                            color = mc.textPrimary
+                        )
+                        Box(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .height(24.dp)
+                                .background(mc.surfaceVariant.copy(alpha = 0.6f))
+                        )
+                        SummaryStatItem(
+                            label = "Offered for Trade",
+                            value = "$totalOffered",
+                            color = mc.secondaryAccent
+                        )
+                        Box(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .height(24.dp)
+                                .background(mc.surfaceVariant.copy(alpha = 0.6f))
+                        )
+                        SummaryStatItem(
+                            label = "Remaining",
+                            value = "$totalAvailable",
+                            color = if (totalAvailable > 0) mc.primaryAccent else mc.textDisabled
+                        )
+                    }
+                }
+            }
 
             if (userCards.isEmpty()) {
                 Text(
                     text = "You have no collection copies to mark for trade.",
                     style = ty.bodySmall,
                     color = mc.textDisabled,
-                    modifier = Modifier.padding(vertical = 24.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp),
                 )
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(bottom = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     // ── Section 1: Available in Collection ──────────────────
                     val availableCards = userCards.filter { (editQty[it.id] ?: 0) < it.quantity }
@@ -145,21 +235,18 @@ fun TradeSelectionSheet(
                         SectionHeader(
                             title = "Available in Collection",
                             count = availableCount,
+                            accentColor = mc.primaryAccent,
                         )
                     }
                     items(availableCards, key = { "available_${it.id}" }) { uc ->
                         val tradeQty = editQty[uc.id] ?: 0
-                        val availableQty = uc.quantity - tradeQty
                         CopyRow(
                             userCard = uc,
-                            displayQty = availableQty,
                             offeredQty = tradeQty,
-                            actionIcon = Icons.Default.Add,
-                            actionColor = mc.primaryAccent,
-                            onAction = { editQty[uc.id] = (tradeQty + 1).coerceAtMost(uc.quantity) }
+                            onDecrement = { editQty[uc.id] = (tradeQty - 1).coerceAtLeast(0) },
+                            onIncrement = { editQty[uc.id] = (tradeQty + 1).coerceAtMost(uc.quantity) },
                         )
                     }
-
 
                     // ── Section 2: Offered for Trade ────────────────────────
                     val offeredCards = userCards.filter { (editQty[it.id] ?: 0) > 0 }
@@ -168,67 +255,99 @@ fun TradeSelectionSheet(
                         SectionHeader(
                             title = "Offered for Trade",
                             count = offeredCards.sumOf { editQty[it.id] ?: 0 },
+                            accentColor = mc.secondaryAccent,
                         )
                     }
                     items(offeredCards, key = { "offered_${it.id}" }) { uc ->
                         val tradeQty = editQty[uc.id] ?: 0
                         CopyRow(
                             userCard = uc,
-                            displayQty = tradeQty,
                             offeredQty = tradeQty,
-                            actionIcon = Icons.Default.Remove,
-                            actionColor = mc.lifeNegative,
-                            onAction = { editQty[uc.id] = (tradeQty - 1).coerceAtLeast(0) }
+                            onDecrement = { editQty[uc.id] = (tradeQty - 1).coerceAtLeast(0) },
+                            onIncrement = { editQty[uc.id] = (tradeQty + 1).coerceAtMost(uc.quantity) },
                         )
                     }
+
                     item(key = "divider") {
                         HorizontalDivider(
                             modifier = Modifier.padding(vertical = 8.dp),
-                            color = mc.textDisabled.copy(alpha = 0.2f),
+                            color = mc.surfaceVariant.copy(alpha = 0.4f),
                         )
                     }
-
                 }
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(8.dp))
 
                 // Save button
-                MagicCtaButton(
-                    onClick = { onConfirm(editQty.toMap()) },
-                    text = "Save",
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    MagicCtaButton(
+                        onClick = { onConfirm(editQty.toMap()) },
+                        text = "Save",
+                        color = MagicCtaColor.Primary,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SectionHeader(title: String, count: Int) {
+private fun SummaryStatItem(
+    label: String,
+    value: String,
+    color: Color,
+) {
+    val ty = MaterialTheme.magicTypography
     val mc = MaterialTheme.magicColors
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = color,
+        )
+        Text(
+            text = label,
+            style = ty.labelSmall,
+            color = mc.textSecondary,
+        )
+    }
+}
+
+@Composable
+private fun SectionHeader(
+    title: String,
+    count: Int,
+    accentColor: Color,
+) {
     val ty = MaterialTheme.magicTypography
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
             text = title,
-            style = ty.labelMedium,
-            color = mc.primaryAccent,
+            style = ty.labelLarge,
+            color = accentColor,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f),
         )
         Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = mc.primaryAccent.copy(alpha = 0.15f),
+            shape = RoundedCornerShape(12.dp),
+            color = accentColor.copy(alpha = 0.15f),
         ) {
             Text(
                 text = count.toString(),
-                style = ty.labelSmall,
-                color = mc.primaryAccent,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                style = ty.labelMedium,
+                color = accentColor,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
             )
         }
     }
@@ -237,11 +356,9 @@ private fun SectionHeader(title: String, count: Int) {
 @Composable
 private fun CopyRow(
     userCard: UserCard,
-    displayQty: Int,
     offeredQty: Int,
-    actionIcon: androidx.compose.ui.graphics.vector.ImageVector,
-    actionColor: androidx.compose.ui.graphics.Color,
-    onAction: () -> Unit,
+    onDecrement: () -> Unit,
+    onIncrement: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -249,70 +366,122 @@ private fun CopyRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 3.dp),
-        shape = RoundedCornerShape(10.dp),
+            .padding(vertical = 2.dp),
+        shape = RoundedCornerShape(12.dp),
         color = mc.surface,
+        border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.6f)),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             // Attribute badges
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Quantity badge
-                    AttributeBadge(
-                        "×$displayQty",
-                        mc.textPrimary,
-                        mc.textPrimary.copy(alpha = 0.1f)
-                    )
-
-                    // Language
+                    // Language Flag
                     Text(
-                        text = com.mmg.manahub.core.util.CardConstants.getFlag(userCard.language),
+                        text = CardConstants.getFlag(userCard.language),
                         style = ty.labelLarge.copy(fontSize = 14.sp)
                     )
 
-                    // Condition
+                    // Condition Badge
                     AttributeBadge(
-                        userCard.condition,
-                        mc.textSecondary,
-                        mc.textSecondary.copy(alpha = 0.1f),
+                        text = userCard.condition,
+                        textColor = mc.textSecondary,
+                        backgroundColor = mc.surfaceVariant.copy(alpha = 0.6f),
                     )
 
-                    // Foil
+                    // Foil Badge
                     if (userCard.isFoil) FoilBadge()
                 }
 
-                // Trade status line
-                if (offeredQty > 0) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = "$offeredQty of ${userCard.quantity} offered",
-                        style = ty.labelSmall,
-                        color = mc.goldMtg,
-                    )
-                }
+                // Subtitle showing offered ratio
+                Text(
+                    text = if (offeredQty > 0) "$offeredQty of ${userCard.quantity} offered for trade"
+                    else "Total owned: ${userCard.quantity}",
+                    style = ty.labelSmall,
+                    color = if (offeredQty > 0) mc.secondaryAccent else mc.textSecondary,
+                )
             }
 
-            // Action button
+            // Interactive Stepper Controller
+            StepperControl(
+                qty = offeredQty,
+                maxQty = userCard.quantity,
+                onDecrement = onDecrement,
+                onIncrement = onIncrement,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StepperControl(
+    qty: Int,
+    maxQty: Int,
+    onDecrement: () -> Unit,
+    onIncrement: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = mc.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(1.dp, mc.surfaceVariant),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.padding(2.dp),
+        ) {
             IconButton(
-                onClick = onAction,
-                modifier = Modifier.size(40.dp),
+                onClick = onDecrement,
+                enabled = qty > 0,
+                modifier = Modifier.size(28.dp),
                 colors = IconButtonDefaults.iconButtonColors(
-                    containerColor = actionColor.copy(alpha = 0.12f),
-                    contentColor = actionColor,
-                ),
+                    containerColor = if (qty > 0) mc.lifeNegative.copy(alpha = 0.15f) else Color.Transparent,
+                    contentColor = mc.lifeNegative,
+                    disabledContentColor = mc.textDisabled.copy(alpha = 0.3f),
+                )
             ) {
                 Icon(
-                    imageVector = actionIcon,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    imageVector = Icons.Default.Remove,
+                    contentDescription = "Decrease trade quantity",
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+
+            Text(
+                text = "$qty",
+                style = ty.labelLarge.copy(fontWeight = FontWeight.Bold),
+                color = if (qty > 0) mc.secondaryAccent else mc.textPrimary,
+                modifier = Modifier.padding(horizontal = 6.dp)
+            )
+
+            IconButton(
+                onClick = onIncrement,
+                enabled = qty < maxQty,
+                modifier = Modifier.size(28.dp),
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = if (qty < maxQty) mc.primaryAccent.copy(alpha = 0.15f) else Color.Transparent,
+                    contentColor = mc.primaryAccent,
+                    disabledContentColor = mc.textDisabled.copy(alpha = 0.3f),
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Increase trade quantity",
+                    modifier = Modifier.size(14.dp)
                 )
             }
         }
@@ -322,8 +491,8 @@ private fun CopyRow(
 @Composable
 private fun AttributeBadge(
     text: String,
-    textColor: androidx.compose.ui.graphics.Color,
-    backgroundColor: androidx.compose.ui.graphics.Color,
+    textColor: Color,
+    backgroundColor: Color,
 ) {
     val ty = MaterialTheme.magicTypography
     Surface(
@@ -334,7 +503,7 @@ private fun AttributeBadge(
             text = text,
             style = ty.labelSmall,
             color = textColor,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
         )
     }
 }

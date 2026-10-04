@@ -101,7 +101,7 @@ class TradeListsAccountOwnershipTest {
             listOf(WishlistEntryDto(id = "w1", userId = "user-b", cardId = "card-1", matchAnyVariant = true, createdAt = "2024-01-01T00:00:00Z")),
         )
         val saved = slot<List<LocalWishlistEntity>>()
-        coEvery { wishlistDao.upsertAll(capture(saved)) } returns Unit
+        coEvery { wishlistDao.upsertRemoteProtected(capture(saved),"user-b") } returns Unit
 
         wishlistRepository.syncFromRemote("user-b")
 

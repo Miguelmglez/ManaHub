@@ -6,11 +6,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -58,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -305,6 +309,7 @@ fun EditQueuedCardSheet(
     onDismiss: () -> Unit,
     onConfirm: (QueuedCard) -> Unit,
     onOpenVariantSelector: () -> Unit,
+    maxQty: Int = 99,
 ) {
     AddCardSheet(
         cardName = queuedCard.card.name,
@@ -324,6 +329,7 @@ fun EditQueuedCardSheet(
         initialCondition = queuedCard.condition,
         initialLanguage = queuedCard.language,
         initialQty = queuedCard.quantity,
+        maxQty = maxQty,
         confirmButtonText = stringResource(R.string.scanner_edit_save),
         setCode = queuedCard.card.setCode,
         setName = queuedCard.card.setName,
@@ -335,7 +341,8 @@ fun EditQueuedCardSheet(
 }
 
 @Composable
-private fun QueueCardItem(
+@OptIn(ExperimentalLayoutApi::class)
+internal fun QueueCardItem(
     entry: QueuedCard,
     preferredCurrency: PreferredCurrency,
     isInCollection: Boolean,
@@ -348,10 +355,15 @@ private fun QueueCardItem(
     onDuplicate: () -> Unit,
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
+    displayQuantity: Long = entry.quantity.toLong(),
+    largeQuantityTargets: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
+    val priceContrast = (maxOf(mc.goldMtg.luminance(), mc.background.luminance()) + 0.05f) /
+        (minOf(mc.goldMtg.luminance(), mc.background.luminance()) + 0.05f)
+    val priceInk = if (priceContrast >= 4.5f) mc.goldMtg else mc.textSecondary
 
     Column(
         modifier = Modifier
@@ -396,7 +408,7 @@ private fun QueueCardItem(
                     Text(
                         text = stringResource(R.string.card_queue_set_and_number, entry.card.setName, entry.card.collectorNumber),
                         style = ty.labelMedium,
-                        color = mc.secondaryAccent,
+                        color = mc.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -404,16 +416,11 @@ private fun QueueCardItem(
 
                 Spacer(Modifier.height(spacing.sm))
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(spacing.sm),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(spacing.sm)
-                    ) {
                         LanguageBadge(langCode = entry.language)
                         AttrTag(entry.condition)
 
@@ -430,10 +437,9 @@ private fun QueueCardItem(
                                 modifier = Modifier.size(16.dp),
                             )
                         }
-                    }
-
                     QuantitySelector(
-                        quantity = entry.quantity,
+                        quantity = displayQuantity,
+                        largeTargets = largeQuantityTargets,
                         enabled = !isWriteInFlight,
                         onIncrement = onIncrement,
                         onDecrement = onDecrement
@@ -448,19 +454,19 @@ private fun QueueCardItem(
                         if (entry.isFoil) entry.card.priceEurFoil else entry.card.priceEur,
                         preferredCurrency,
                     ),
-                    style = ty.labelLarge.copy(fontWeight = FontWeight.Bold, color = mc.goldMtg),
+                    style = ty.labelLarge.copy(fontWeight = FontWeight.Bold, color = priceInk),
                 )
             }
         }
 
         Spacer(Modifier.height(spacing.md))
 
-        Row(
+        FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = spacing.sm),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm)
         ) {
             QueueActionButton(
                 icon = Icons.Rounded.Style,
@@ -468,7 +474,7 @@ private fun QueueCardItem(
                 tint = mc.primaryAccent,
                 onClick = onAddToCollection,
                 enabled = !isWriteInFlight,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.widthIn(min = 48.dp)
             )
             QueueActionButton(
                 icon = Icons.Rounded.FavoriteBorder,
@@ -476,7 +482,7 @@ private fun QueueCardItem(
                 tint = mc.secondaryAccent,
                 onClick = onAddToWishlist,
                 enabled = !isWriteInFlight,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.widthIn(min = 48.dp)
             )
             QueueActionButton(
                 icon = Icons.Rounded.Clear,
@@ -484,7 +490,7 @@ private fun QueueCardItem(
                 tint = mc.lifeNegative,
                 onClick = onDelete,
                 enabled = !isWriteInFlight,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.widthIn(min = 48.dp)
             )
             QueueActionButton(
                 icon = Icons.Rounded.Edit,
@@ -492,14 +498,14 @@ private fun QueueCardItem(
                 tint = mc.textSecondary,
                 onClick = onEdit,
                 enabled = !isWriteInFlight,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.widthIn(min = 48.dp)
             )
             QueueActionButton(
                 icon = Icons.Rounded.ContentCopy,
                 label = stringResource(R.string.scanner_duplicate_entry),
                 tint = mc.textSecondary,
                 onClick = onDuplicate,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.widthIn(min = 48.dp)
             )
         }
 
@@ -512,11 +518,12 @@ private fun QueueCardItem(
 
 @Composable
 private fun QuantitySelector(
-    quantity: Int,
+    quantity: Long,
     enabled: Boolean,
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    largeTargets: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -528,7 +535,7 @@ private fun QuantitySelector(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.xs)
     ) {
-        IconButton(onClick = onDecrement, enabled = enabled, modifier = Modifier.size(28.dp)) {
+        IconButton(onClick = onDecrement, enabled = enabled, modifier = Modifier.size(if(largeTargets)48.dp else 28.dp)) {
             Icon(Icons.Default.Remove, stringResource(R.string.card_queue_decrease_quantity_cd), tint = if (enabled) mc.textPrimary else mc.textDisabled, modifier = Modifier.size(16.dp))
         }
         Text(
@@ -538,7 +545,7 @@ private fun QuantitySelector(
             modifier = Modifier.widthIn(min = 20.dp),
             textAlign = TextAlign.Center
         )
-        IconButton(onClick = onIncrement, enabled = enabled, modifier = Modifier.size(28.dp)) {
+        IconButton(onClick = onIncrement, enabled = enabled, modifier = Modifier.size(if(largeTargets)48.dp else 28.dp)) {
             Icon(Icons.Default.Add, stringResource(R.string.card_queue_increase_quantity_cd), tint = if (enabled) mc.textPrimary else mc.textDisabled, modifier = Modifier.size(16.dp))
         }
     }
@@ -560,6 +567,7 @@ private fun QueueActionButton(
         modifier = modifier
             .clip(ChipShape)
             .clickable(enabled = enabled, onClick = onClick)
+            .heightIn(min = 48.dp)
             .padding(vertical = spacing.sm, horizontal = spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(spacing.xs)
@@ -568,7 +576,7 @@ private fun QueueActionButton(
         Text(
             text = label,
             style = ty.labelSmall.copy(fontSize = 9.sp),
-            color = effectiveTint,
+            color = if (enabled) MaterialTheme.magicColors.textSecondary else MaterialTheme.magicColors.textDisabled,
             textAlign = TextAlign.Center,
             maxLines = 1,
             softWrap = false
@@ -589,6 +597,8 @@ private fun AttrTag(text: String) {
             text = text,
             style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 10.sp, letterSpacing = 0.sp),
             color = mc.textPrimary,
+            maxLines = 1,
+            softWrap = false,
             modifier = Modifier.padding(horizontal = spacing.xs, vertical = 1.dp)
         )
     }

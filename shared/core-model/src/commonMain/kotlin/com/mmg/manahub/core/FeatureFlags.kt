@@ -20,13 +20,13 @@ object FeatureFlags {
          * Phase 8: flipped on after the full verify gauntlet passed (harness v2 all 3 segments,
          * golden/calibration/corpus/skeleton suites byte-identical, persist() atomicity closed) --
          * see `docs/deck-wizard-state.md` for the durable record. */
-        const val DECK_BUILDER_V2_ENABLED = false
+        const val DECK_BUILDER_V2_ENABLED = true
 
         /** Deck Studio "Browse inspirations" (60-card formats, empty decks only): collection synergies + per-card combos. */
-        const val DISCOVERIES_V2_ENABLED = false
+        const val DISCOVERIES_V2_ENABLED = true
 
         /** Browse inspirations "Start building the deck" hand-off into the wizard's Pick a strategy step. */
-        const val DISCOVERY_BUILD_HANDOFF_ENABLED = false
+        const val DISCOVERY_BUILD_HANDOFF_ENABLED = true
     }
 
     /** Flags for the Draft Simulator and Guides. */

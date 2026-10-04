@@ -1,0 +1,28 @@
+<resources>
+    <string name="rules_title">Rules</string>
+    <string name="rules_search">Search rules</string>
+    <string name="rules_hint">Rule number, keyword, or topic</string>
+    <string name="rules_back">Back</string>
+    <string name="rules_info">Document information</string>
+    <string name="rules_clear">Clear search</string>
+    <string name="rules_loading">Loading rules…</string>
+    <string name="rules_error">Rules could not be loaded.</string>
+    <string name="rules_retry">Retry</string>
+    <string name="rules_no_results">No matching rules</string>
+    <string name="rules_missing">Rule unavailable in this edition</string>
+    <string name="rules_missing_body">This reference does not exist in the selected edition. Browse or search the official rules.</string>
+    <string name="rules_browse">Browse rules</string>
+    <string name="rules_open_reference">Open reference %1$s</string>
+    <string name="rules_document">Comprehensive Rules</string>
+    <string name="rules_effective">Effective %1$s</string>
+    <string name="rules_source">Source: Wizards of the Coast</string>
+    <string name="rules_official">View official rules</string>
+    <string name="rules_update">Check for updates</string>
+    <string name="rules_checking">Checking for updates…</string>
+    <string name="rules_updated">A new edition is available</string>
+    <string name="rules_up_to_date">Rules are up to date</string>
+    <string name="rules_update_error">Could not update rules. Your current edition is still available.</string>
+    <string name="rules_reload">Reload edition</string>
+    <string name="rules_previous">Previous results</string>
+    <string name="rules_next">More results</string>
+</resources>

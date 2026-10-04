@@ -194,9 +194,9 @@ fun SetDraftDetailScreen(
 
     val activeListState = if (state.selectedTab == 1) tierListState else guideListState
 
-    var isFabVisible by remember { mutableStateOf(true) }
-    var previousIndex by remember { mutableIntStateOf(0) }
-    var previousOffset by remember { mutableIntStateOf(0) }
+    var isFabVisible by remember {mutableStateOf(true)}
+    var previousIndex by remember {mutableIntStateOf(0)}
+    var previousOffset by remember {mutableIntStateOf(0)}
 
     LaunchedEffect(activeListState.isScrollInProgress) {
         if (!activeListState.isScrollInProgress) {
@@ -205,8 +205,7 @@ fun SetDraftDetailScreen(
     }
 
     LaunchedEffect(activeListState) {
-        snapshotFlow { activeListState.firstVisibleItemIndex to activeListState.firstVisibleItemScrollOffset }
-            .collect { (currentIndex, currentOffset) ->
+        snapshotFlow {activeListState.firstVisibleItemIndex to activeListState.firstVisibleItemScrollOffset}.collect {(currentIndex, currentOffset)->
                 if (currentIndex > previousIndex || (currentIndex == previousIndex && currentOffset > previousOffset + 10)) {
                     isFabVisible = false
                 } else if (currentIndex < previousIndex || currentOffset < previousOffset - 10) {
@@ -219,9 +218,11 @@ fun SetDraftDetailScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         ThemeBackground(modifier = Modifier.fillMaxSize())
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -229,25 +230,39 @@ fun SetDraftDetailScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back), tint = colors.textPrimary)
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        stringResource(R.string.action_back),
+                        tint = colors.textPrimary
+                    )
                 }
                 AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(state.setIconUri).decoderFactory(SvgDecoder.Factory()).crossfade(true).build(),
+                    model = ImageRequest.Builder(LocalContext.current).data(state.setIconUri)
+                        .decoderFactory(SvgDecoder.Factory()).crossfade(true).build(),
                     contentDescription = state.setName,
                     modifier = Modifier.size(28.dp),
                     colorFilter = ColorFilter.tint(colors.textPrimary),
                 )
                 Spacer(Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(state.setName, style = typography.titleMedium, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        state.setName,
+                        style = typography.titleMedium,
+                        color = colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                     if (state.setReleasedAt.isNotBlank()) {
-                        Text(formatDate(state.setReleasedAt), style = typography.labelSmall, color = colors.textSecondary)
+                        Text(
+                            formatDate(state.setReleasedAt),
+                            style = typography.labelSmall,
+                            color = colors.textSecondary
+                        )
                     }
                 }
                 if (FeatureFlags.Draft.SIMULATOR_ENABLED && state.boosterVersion != null) {
                     Surface(
-                        onClick = { onSimulateDraft(state.setCode) },
+                        onClick = {onSimulateDraft(state.setCode)},
                         shape = RoundedCornerShape(10.dp),
                         color = colors.primaryAccent.copy(alpha = 0.15f),
                     ) {
@@ -277,7 +292,7 @@ fun SetDraftDetailScreen(
                 selectedTabIndex = state.selectedTab,
                 containerColor = Color.Transparent,
                 contentColor = colors.primaryAccent,
-                indicator = { tabPositions ->
+                indicator = {tabPositions->
                     if (state.selectedTab < tabPositions.size) {
                         TabRowDefaults.SecondaryIndicator(
                             modifier = Modifier.tabIndicatorOffset(tabPositions[state.selectedTab]),
@@ -287,12 +302,15 @@ fun SetDraftDetailScreen(
                 },
                 divider = {},
             ) {
-                tabs.forEachIndexed { index, title ->
+                tabs.forEachIndexed {index, title->
                     Tab(
                         selected = state.selectedTab == index,
-                        onClick = { viewModel.onTabSelected(index) },
+                        onClick = {viewModel.onTabSelected(index)},
                         text = {
-                            Text(title.uppercase(), color = if (state.selectedTab == index) colors.primaryAccent else colors.textDisabled)
+                            Text(
+                                title.uppercase(),
+                                color = if (state.selectedTab == index) colors.primaryAccent else colors.textDisabled
+                            )
                         },
                     )
                 }
@@ -323,15 +341,15 @@ fun SetDraftDetailScreen(
 
         AnimatedVisibility(
             visible = isFabVisible && FeatureFlags.Draft.SIMULATOR_ENABLED && state.boosterVersion != null,
-            enter = slideInVertically { it } + fadeIn(),
-            exit = slideOutVertically { it } + fadeOut(),
+            enter = slideInVertically {it} + fadeIn(),
+            exit = slideOutVertically {it} + fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 16.dp)
                 .navigationBarsPadding(),
         ) {
             MagicCtaButton(
-                onClick = { onSimulateDraft(state.setCode) },
+                onClick = {onSimulateDraft(state.setCode)},
                 text = stringResource(R.string.draft_sim_simulate_button),
                 icon = {
                     Icon(
@@ -372,6 +390,7 @@ private fun GuideTab(
             sharedTransitionScope = sharedTransitionScope,
             animatedVisibilityScope = animatedVisibilityScope,
         )
+
         state.guideError != null -> PlaceholderMessage(stringResource(R.string.draft_guide_not_available))
         else -> GuideSkeleton()
     }
@@ -450,28 +469,38 @@ private fun GuideList(
             bottom = 80.dp,
         ),
     ) {
-        sectionHeader(GuideSection.OVERVIEW, titles.overview, Icons.AutoMirrored.Filled.MenuBook, context)
+        sectionHeader(
+            GuideSection.OVERVIEW,
+            titles.overview,
+            Icons.AutoMirrored.Filled.MenuBook,
+            context
+        )
         if (context.isExpanded(GuideSection.OVERVIEW.id)) overviewItems(guide, context)
 
         if (guide.mechanics.isNotEmpty()) {
             sectionHeader(GuideSection.MECHANICS, titles.mechanics, Icons.Default.Bolt, context)
             if (context.isExpanded(GuideSection.MECHANICS.id)) {
-                guide.mechanics.forEach { mechanicItems(it, context) }
+                guide.mechanics.forEach {mechanicItems(it, context)}
             }
         }
 
         if (guide.archetypes.isNotEmpty()) {
             sectionHeader(GuideSection.ARCHETYPES, titles.archetypes, Icons.Default.Layers, context)
             if (context.isExpanded(GuideSection.ARCHETYPES.id)) {
-                guide.archetypes.forEach { archetypeItems(it, context) }
+                guide.archetypes.forEach {archetypeItems(it, context)}
             }
         }
 
         if (guide.colorRanking.isNotEmpty() || guide.unrankedKeyCardGroups.isNotEmpty()) {
-            sectionHeader(GuideSection.COLOR_RANKING, titles.colorRanking, Icons.Default.BarChart, context)
+            sectionHeader(
+                GuideSection.COLOR_RANKING,
+                titles.colorRanking,
+                Icons.Default.BarChart,
+                context
+            )
             if (context.isExpanded(GuideSection.COLOR_RANKING.id)) {
-                guide.colorRanking.forEach { colorRankingItems(it, context) }
-                guide.unrankedKeyCardGroups.forEach { unrankedKeyCardsItems(it, context) }
+                guide.colorRanking.forEach {colorRankingItems(it, context)}
+                guide.unrankedKeyCardGroups.forEach {unrankedKeyCardsItems(it, context)}
             }
         }
     }
@@ -490,7 +519,7 @@ private fun LazyListScope.sectionHeader(
             title = title,
             icon = icon,
             expanded = context.isExpanded(section.id),
-            onToggle = { context.onToggle(section.id) },
+            onToggle = {context.onToggle(section.id)},
             modifier = Modifier
                 .animateItem()
                 .padding(top = MaterialTheme.spacing.md),
@@ -501,19 +530,19 @@ private fun LazyListScope.sectionHeader(
 private fun LazyListScope.overviewItems(guide: SetDraftGuideUiModel, context: GuideListContext) {
     val overview = guide.overview
     val prefix = GuideSection.OVERVIEW.id
-    overview.summary?.let { summary ->
+    overview.summary?.let {summary->
         richTextItem("$prefix-summary", summary, context, emphasis = true)
     }
-    overview.formatSpeed?.let { speed ->
+    overview.formatSpeed?.let {speed->
         richTextItem("$prefix-speed", speed, context)
     }
     if (overview.keyNotes.isNotEmpty()) {
         labelItem("$prefix-notes-label", context.titles.keyNotes, LabelTone.SECONDARY)
         itemsIndexed(
             items = overview.keyNotes,
-            key = { index, _ -> "$prefix-note-$index" },
-            contentType = { _, _ -> CONTENT_TYPE_RICH_TEXT },
-        ) { index, note ->
+            key = {index, _-> "$prefix-note-$index"},
+            contentType = {_, _-> CONTENT_TYPE_RICH_TEXT},
+        ) {index, note->
             val colors = MaterialTheme.magicColors
             val typography = MaterialTheme.magicTypography
             val spacing = MaterialTheme.spacing
@@ -546,7 +575,8 @@ private fun LazyListScope.overviewItems(guide: SetDraftGuideUiModel, context: Gu
 }
 
 private fun LazyListScope.colorRankingItems(entry: ColorRankingUi, context: GuideListContext) {
-    val expandable = entry.note != null || entry.keyCommons.isNotEmpty() || entry.keyUncommons.isNotEmpty()
+    val expandable =
+        entry.note != null || entry.keyCommons.isNotEmpty() || entry.keyUncommons.isNotEmpty()
     val expanded = context.isExpanded(entry.id)
     item(key = entry.id, contentType = CONTENT_TYPE_SUB_HEADER) {
         val colors = MaterialTheme.magicColors
@@ -554,7 +584,7 @@ private fun LazyListScope.colorRankingItems(entry: ColorRankingUi, context: Guid
         GuideSubSectionHeader(
             expanded = expanded,
             expandable = expandable,
-            onToggle = { context.onToggle(entry.id) },
+            onToggle = {context.onToggle(entry.id)},
             modifier = subHeaderModifier(),
         ) {
             Box(
@@ -567,7 +597,12 @@ private fun LazyListScope.colorRankingItems(entry: ColorRankingUi, context: Guid
                 if (entry.manaToken != null) {
                     ManaSymbolImage(token = entry.manaToken, size = 18.dp)
                 } else {
-                    Text("#${entry.rank}", style = typography.labelSmall, color = colors.primaryAccent, fontWeight = FontWeight.Bold)
+                    Text(
+                        "#${entry.rank}",
+                        style = typography.labelSmall,
+                        color = colors.primaryAccent,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
             DraftGuideRichText(
@@ -578,12 +613,17 @@ private fun LazyListScope.colorRankingItems(entry: ColorRankingUi, context: Guid
                 modifier = Modifier.weight(1f),
             )
             if (entry.manaToken != null) {
-                Text("#${entry.rank}", style = typography.titleMedium, color = colors.goldMtg, fontWeight = FontWeight.ExtraBold)
+                Text(
+                    "#${entry.rank}",
+                    style = typography.titleMedium,
+                    color = colors.goldMtg,
+                    fontWeight = FontWeight.ExtraBold
+                )
             }
         }
     }
     if (expanded) {
-        entry.note?.let { richTextItem("${entry.id}-note", it, context, muted = true) }
+        entry.note?.let {richTextItem("${entry.id}-note", it, context, muted = true)}
         if (entry.keyCommons.isNotEmpty()) {
             labelItem("${entry.id}-commons-label", context.titles.commons, LabelTone.SECONDARY)
             cardItems(entry.keyCommons, context)
@@ -601,7 +641,7 @@ private fun LazyListScope.mechanicItems(mechanic: MechanicUi, context: GuideList
         GuideSubSectionHeader(
             expanded = expanded,
             expandable = true,
-            onToggle = { context.onToggle(mechanic.id) },
+            onToggle = {context.onToggle(mechanic.id)},
             modifier = subHeaderModifier(),
         ) {
             Text(
@@ -615,8 +655,8 @@ private fun LazyListScope.mechanicItems(mechanic: MechanicUi, context: GuideList
     }
     if (!expanded) return
 
-    mechanic.summary?.let { richTextItem("${mechanic.id}-summary", it, context) }
-    mechanic.performance?.let { performance ->
+    mechanic.summary?.let {richTextItem("${mechanic.id}-summary", it, context)}
+    mechanic.performance?.let {performance->
         item(key = "${mechanic.id}-performance", contentType = CONTENT_TYPE_CALLOUT) {
             val colors = MaterialTheme.magicColors
             val spacing = MaterialTheme.spacing
@@ -648,9 +688,17 @@ private fun LazyListScope.mechanicItems(mechanic: MechanicUi, context: GuideList
     }
     if (mechanic.overperformers.isNotEmpty()) {
         if (mechanic.isFlatExamples) {
-            labelItem("${mechanic.id}-over-label", context.titles.mechanicKeyCards, LabelTone.SECONDARY)
+            labelItem(
+                "${mechanic.id}-over-label",
+                context.titles.mechanicKeyCards,
+                LabelTone.SECONDARY
+            )
         } else {
-            labelItem("${mechanic.id}-over-label", context.titles.overperformers, LabelTone.POSITIVE)
+            labelItem(
+                "${mechanic.id}-over-label",
+                context.titles.overperformers,
+                LabelTone.POSITIVE
+            )
         }
         cardItems(mechanic.overperformers, context)
     }
@@ -670,12 +718,12 @@ private fun LazyListScope.archetypeItems(archetype: ArchetypeUi, context: GuideL
         GuideSubSectionHeader(
             expanded = expanded,
             expandable = true,
-            onToggle = { context.onToggle(archetype.id) },
+            onToggle = {context.onToggle(archetype.id)},
             modifier = subHeaderModifier(),
         ) {
             if (archetype.manaTokens.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(spacing.xxs)) {
-                    archetype.manaTokens.forEach { ManaSymbolImage(token = it, size = 20.dp) }
+                    archetype.manaTokens.forEach {ManaSymbolImage(token = it, size = 20.dp)}
                 }
             }
             Text(
@@ -686,8 +734,7 @@ private fun LazyListScope.archetypeItems(archetype: ArchetypeUi, context: GuideL
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
-            )
-            /*if (archetype.tier.isNotBlank()) {
+            )/*if (archetype.tier.isNotBlank()) {
                 Surface(
                     shape = ChipShape,
                     color = tierColor.copy(alpha = 0.2f),
@@ -727,7 +774,7 @@ private fun LazyListScope.archetypeItems(archetype: ArchetypeUi, context: GuideL
                 if (archetype.difficulty.isNotBlank() || archetype.winRate != null) {
                     ArchetypeMetaRow(archetype)
                 }
-                archetype.strategy?.let { strategy ->
+                archetype.strategy?.let {strategy->
                     val base = MaterialTheme.magicTypography.bodyLarge
                     DraftGuideRichText(
                         text = strategy,
@@ -736,7 +783,7 @@ private fun LazyListScope.archetypeItems(archetype: ArchetypeUi, context: GuideL
                         onCardClick = context.onCardClick,
                     )
                 }
-                archetype.notes?.let { notes ->
+                archetype.notes?.let {notes->
                     val base = MaterialTheme.magicTypography.bodyMedium
                     DraftGuideRichText(
                         text = notes,
@@ -749,7 +796,7 @@ private fun LazyListScope.archetypeItems(archetype: ArchetypeUi, context: GuideL
                 if (archetype.keyCards.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         LabelRow(context.titles.archetypeKeyCards, LabelTone.SECONDARY)
-                        archetype.keyCards.forEach { cardUi ->
+                        archetype.keyCards.forEach {cardUi->
                             CardRow(
                                 card = cardUi.card,
                                 isInCollection = false,
@@ -770,7 +817,7 @@ private fun LazyListScope.archetypeItems(archetype: ArchetypeUi, context: GuideL
                 if (archetype.cardsToAvoid.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         LabelRow(context.titles.cardsToAvoid, LabelTone.NEGATIVE)
-                        archetype.cardsToAvoid.forEach { cardUi ->
+                        archetype.cardsToAvoid.forEach {cardUi->
                             CardRow(
                                 card = cardUi.card,
                                 isInCollection = false,
@@ -793,16 +840,19 @@ private fun LazyListScope.archetypeItems(archetype: ArchetypeUi, context: GuideL
     }
 }
 
-private fun LazyListScope.unrankedKeyCardsItems(group: KeyColorCardGroupUi, context: GuideListContext) {
+private fun LazyListScope.unrankedKeyCardsItems(
+    group: KeyColorCardGroupUi,
+    context: GuideListContext
+) {
     val expanded = context.isExpanded(group.id)
     item(key = group.id, contentType = CONTENT_TYPE_SUB_HEADER) {
         GuideSubSectionHeader(
             expanded = expanded,
             expandable = true,
-            onToggle = { context.onToggle(group.id) },
+            onToggle = {context.onToggle(group.id)},
             modifier = subHeaderModifier(),
         ) {
-            group.manaToken?.let { ManaSymbolImage(token = it, size = 20.dp) }
+            group.manaToken?.let {ManaSymbolImage(token = it, size = 20.dp)}
             Text(
                 group.label,
                 style = MaterialTheme.magicTypography.labelLarge,
@@ -814,14 +864,18 @@ private fun LazyListScope.unrankedKeyCardsItems(group: KeyColorCardGroupUi, cont
         }
     }
     if (expanded) {
-        labelItem("${group.id}-rarity-label", if (group.isUncommon) context.titles.uncommons else context.titles.commons, LabelTone.SECONDARY)
+        labelItem(
+            "${group.id}-rarity-label",
+            if (group.isUncommon) context.titles.uncommons else context.titles.commons,
+            LabelTone.SECONDARY
+        )
         cardItems(group.cards, context)
     }
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 private fun LazyListScope.cardItems(cards: List<GuideCardUi>, context: GuideListContext) {
-    items(items = cards, key = { it.key }, contentType = { CONTENT_TYPE_CARD }) { cardUi ->
+    items(items = cards, key = {it.key}, contentType = {CONTENT_TYPE_CARD}) {cardUi->
         CardRow(
             card = cardUi.card,
             isInCollection = false,
@@ -888,7 +942,7 @@ private fun LabelRow(text: String, tone: LabelTone) {
             style = MaterialTheme.magicTypography.labelLarge,
             color = color,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.semantics { heading() },
+            modifier = Modifier.semantics {heading()},
         )
     }
 }
@@ -902,9 +956,10 @@ private fun LazyListScope.labelItem(key: String, text: String, tone: LabelTone) 
 }
 
 @Composable
-private fun LazyItemScope.subHeaderModifier(): Modifier = Modifier
-    .animateItem()
-    .padding(top = MaterialTheme.spacing.sm)
+private fun LazyItemScope.subHeaderModifier(): Modifier =
+    Modifier
+        .animateItem()
+        .padding(top = MaterialTheme.spacing.sm)
 
 @Composable
 private fun LazyItemScope.contentModifier(): Modifier = Modifier
@@ -925,7 +980,10 @@ private fun GuideSectionHeader(
     val colors = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
     val stateText = expansionStateText(expanded)
-    val chevronRotation by animateFloatAsState(if (expanded) 180f else 0f, label = "section_chevron")
+    val chevronRotation by animateFloatAsState(
+        if (expanded) 180f else 0f,
+        label = "section_chevron"
+    )
 
     Row(
         modifier = modifier
@@ -950,7 +1008,12 @@ private fun GuideSectionHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.md),
     ) {
-        Icon(icon, contentDescription = null, tint = colors.goldMtg, modifier = Modifier.size(22.dp))
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = colors.goldMtg,
+            modifier = Modifier.size(22.dp)
+        )
         Text(
             title,
             style = MaterialTheme.magicTypography.titleMedium,
@@ -982,10 +1045,13 @@ private fun GuideSubSectionHeader(
     val colors = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
     val stateText = expansionStateText(expanded)
-    val chevronRotation by animateFloatAsState(if (expanded) 180f else 0f, label = "sub_section_chevron")
+    val chevronRotation by animateFloatAsState(
+        if (expanded) 180f else 0f,
+        label = "sub_section_chevron"
+    )
     val interaction = if (expandable) {
         Modifier
-            .semantics(mergeDescendants = true) { stateDescription = stateText }
+            .semantics(mergeDescendants = true) {stateDescription = stateText}
             .clickable(role = Role.Button, onClick = onToggle)
     } else {
         Modifier
@@ -1027,8 +1093,10 @@ private fun CountBadge(count: Int) {
             color = colors.primaryAccent,
             fontWeight = FontWeight.Bold,
             modifier = Modifier
-                .padding(horizontal = MaterialTheme.spacing.sm, vertical = MaterialTheme.spacing.xxs)
-                .semantics { contentDescription = description },
+                .padding(
+                    horizontal = MaterialTheme.spacing.sm, vertical = MaterialTheme.spacing.xxs
+                )
+                .semantics {contentDescription = description},
         )
     }
 }
@@ -1038,33 +1106,41 @@ private fun ArchetypeMetaRow(archetype: ArchetypeUi, modifier: Modifier = Modifi
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        if (archetype.difficulty.isNotBlank()) {
-            Text(
-                stringResource(R.string.draft_archetype_difficulty, ""),
-                style = typography.labelLarge,
-                color = colors.primaryAccent,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.width(spacing.xs))
-            Text(archetype.difficulty, style = typography.labelLarge, color = colors.secondaryAccent)
+    Column(modifier = modifier, horizontalAlignment = Alignment.Start) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (archetype.difficulty.isNotBlank()) {
+                Text(
+                    stringResource(R.string.draft_archetype_difficulty, ""),
+                    style = typography.labelLarge,
+                    color = colors.primaryAccent,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.width(spacing.xs))
+                Text(
+                    archetype.difficulty,
+                    style = typography.labelLarge,
+                    color = colors.secondaryAccent
+                )
+            }
         }
-        Spacer(Modifier.weight(1f))
         val winRate = archetype.winRate
         if (winRate != null) {
-            Icon(
-                Icons.AutoMirrored.Filled.TrendingUp,
-                contentDescription = null,
-                tint = colors.goldMtg,
-                modifier = Modifier.size(16.dp),
-            )
-            Spacer(Modifier.width(spacing.sm))
-            Text(
-                stringResource(R.string.draft_archetype_win_rate, winRate * 100),
-                style = typography.labelMedium,
-                color = colors.goldMtg,
-                fontWeight = FontWeight.Bold,
-            )
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.AutoMirrored.Filled.TrendingUp,
+                    contentDescription = null,
+                    tint = colors.goldMtg,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(spacing.sm))
+                Text(
+                    stringResource(R.string.draft_archetype_win_rate, winRate * 100),
+                    style = typography.labelMedium,
+                    color = colors.goldMtg,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
     }
 }
@@ -1091,26 +1167,26 @@ private fun GuideSkeleton() {
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = spacing.lg, vertical = spacing.sm)
-            .semantics(mergeDescendants = true) { contentDescription = loadingDescription },
+            .semantics(mergeDescendants = true) {contentDescription = loadingDescription},
         verticalArrangement = Arrangement.spacedBy(spacing.md),
     ) {
-        repeat(SKELETON_SECTION_COUNT) { index ->
+        repeat(SKELETON_SECTION_COUNT) {index->
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .graphicsLayer { alpha = pulse }
+                    .graphicsLayer {alpha = pulse}
                     .clip(CardShape)
                     .background(colors.surface),
             )
             if (index == 0) {
-                listOf(1f, 0.92f, 0.6f).forEach { fraction ->
+                listOf(1f, 0.92f, 0.6f).forEach {fraction->
                     Box(
                         modifier = Modifier
                             .padding(start = spacing.lg)
                             .fillMaxWidth(fraction)
                             .height(14.dp)
-                            .graphicsLayer { alpha = pulse }
+                            .graphicsLayer {alpha = pulse}
                             .clip(ChipShape)
                             .background(colors.surfaceVariant),
                     )
@@ -1133,7 +1209,8 @@ private fun DraftGuideRichText(
     val typography = MaterialTheme.magicTypography
     val density = LocalDensity.current
     val segments = text.segments
-    val fontSize = if (style.fontSize == TextUnit.Unspecified) typography.bodyMedium.fontSize else style.fontSize
+    val fontSize =
+        if (style.fontSize == TextUnit.Unspecified) typography.bodyMedium.fontSize else style.fontSize
     val computedLineHeight = if (style.lineHeight == TextUnit.Unspecified) {
         fontSize * 1.35f
     } else {
@@ -1141,12 +1218,9 @@ private fun DraftGuideRichText(
     }
     val inlineSize = fontSize * 1.15f
     val inlineContent = remember(segments, inlineSize, density) {
-        val symbolSize = with(density) { inlineSize.toDp() }
-        segments
-            .filterIsInstance<DraftGuideRichTextSegment.Mana>()
-            .map { it.token }
-            .distinct()
-            .associate { token ->
+        val symbolSize = with(density) {inlineSize.toDp()}
+        segments.filterIsInstance<DraftGuideRichTextSegment.Mana>().map {it.token}.distinct()
+            .associate {token->
                 manaInlineContentId(token) to InlineTextContent(
                     placeholder = Placeholder(
                         width = inlineSize,
@@ -1160,7 +1234,7 @@ private fun DraftGuideRichText(
     }
     val annotatedText = remember(segments, linkKeyPrefix, colors, baseColor, onCardClick) {
         buildAnnotatedString {
-            segments.forEachIndexed { index, segment ->
+            segments.forEachIndexed {index, segment->
                 when (segment) {
                     is DraftGuideRichTextSegment.Text -> {
                         withStyle(segment.style.toSpanStyle(colors, baseColor)) {
@@ -1270,7 +1344,7 @@ private fun TierListSubTab(
                         title = filterTitle,
                         icon = Icons.Default.FilterList,
                         expanded = filtersExpanded,
-                        onToggle = { onToggleFilters(TIER_FILTERS_ID) },
+                        onToggle = {onToggleFilters(TIER_FILTERS_ID)},
                         modifier = Modifier
                             .animateItem()
                             .fillMaxWidth()
@@ -1292,8 +1366,11 @@ private fun TierListSubTab(
                     }
                 }
 
-                state.filteredTiers.forEachIndexed { tierIndex, tier ->
-                    stickyHeader(key = "tier-header-$tierIndex-${tier.tier}", contentType = "tier_header") {
+                state.filteredTiers.forEachIndexed {tierIndex, tier->
+                    stickyHeader(
+                        key = "tier-header-$tierIndex-${tier.tier}",
+                        contentType = "tier_header"
+                    ) {
                         TierBanner(
                             tier = tier.tier,
                             label = tier.label,
@@ -1302,11 +1379,11 @@ private fun TierListSubTab(
                         )
                     }
 
-                    items(tier.cards, key = { it.key }, contentType = { CONTENT_TYPE_CARD }) { cardUi ->
+                    items(tier.cards, key = {it.key}, contentType = {CONTENT_TYPE_CARD}) {cardUi->
                         CardRow(
                             card = cardUi.card,
                             isInCollection = false,
-                            onClick = { onCardClick(cardUi.card.scryfallId, cardUi.key) },
+                            onClick = {onCardClick(cardUi.card.scryfallId, cardUi.key)},
                             onRemove = null,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                             sharedTransitionScope = sharedTransitionScope,
@@ -1321,6 +1398,7 @@ private fun TierListSubTab(
                 }
             }
         }
+
         state.tierListError != null -> PlaceholderMessage(stringResource(R.string.draft_tier_list_not_available))
         else -> LoadingIndicator()
     }
@@ -1363,7 +1441,7 @@ private fun TierFilterPanel(
             },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { onSearchQueryChanged("") }) {
+                    IconButton(onClick = {onSearchQueryChanged("")}) {
                         Icon(
                             Icons.Default.Clear,
                             contentDescription = stringResource(R.string.draft_search_clear),
@@ -1416,8 +1494,7 @@ private fun TierBanner(
                 .background(mc.background)
         ) {
             Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = tierColor.copy(alpha = 0.25f)
+                shape = RoundedCornerShape(8.dp), color = tierColor.copy(alpha = 0.25f)
             ) {
                 Row(
                     modifier = Modifier
@@ -1478,9 +1555,11 @@ private fun LoadingIndicator() {
 
 @Composable
 private fun PlaceholderMessage(message: String) {
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .padding(32.dp), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp), contentAlignment = Alignment.Center
+    ) {
         Text(
             message,
             style = MaterialTheme.magicTypography.bodyMedium,
@@ -1492,6 +1571,8 @@ private fun PlaceholderMessage(message: String) {
 
 private fun formatDate(dateStr: String): String = try {
     val date = LocalDate.parse(dateStr)
-    val month = date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+    val month = date.month.name.take(3).lowercase().replaceFirstChar {it.uppercase()}
     "$month ${date.year}"
-} catch (_: Exception) { dateStr }
+} catch (_: Exception) {
+    dateStr
+}

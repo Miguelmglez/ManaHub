@@ -1400,4 +1400,22 @@ class PlaytestHandViewModelTest {
         assertFalse(state.isLoading)
         assertEquals("Failed to load deck cards", state.errorMessage)
     }
+
+    @Test
+    fun `given custom hand sheet open when onDismissCustomHandSheet called then sheet closes without redealing`() = runTest {
+        val slots = (1..20).map { DeckSlot(scryfallId = "card-$it", quantity = 1) }
+        stubDeckWithSlots(slots)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+
+        viewModel.onOpenCustomHandSheet()
+        assertTrue(viewModel.uiState.value.showCustomHandSheet)
+
+        val snapshotBefore = viewModel.uiState.value.snapshot!!
+        viewModel.onDismissCustomHandSheet()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.showCustomHandSheet)
+        assertEquals(snapshotBefore.id, state.snapshot!!.id)
+    }
 }

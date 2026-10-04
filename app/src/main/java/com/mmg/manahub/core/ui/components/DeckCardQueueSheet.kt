@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.ui.components
 // COMMENTS_REVIEWED: 2026-09-17
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -50,6 +51,7 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.theme.BottomSheetShape
 import com.mmg.manahub.core.ui.theme.ButtonShape
+import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -280,37 +282,48 @@ private fun DeckCardQueueRow(
 ) {
     val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(spacing.xs),
+    Surface(
+        shape = CardShape,
+        color = mc.backgroundSecondary,
+        border = BorderStroke(0.5.dp, mc.surfaceVariant),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = spacing.lg),
     ) {
-        CardRow(
-            card = item.card,
-            isInCollection = item.isInCollection,
-            onClick = { onRowClick?.invoke(item) },
-            onRemove = { onDecrement(item) },
-            quantity = item.quantity,
-            onAdd = { onIncrement(item) },
-            addEnabled = item.maxQuantity?.let { item.quantity < it } ?: true,
-            preferredCurrency = preferredCurrency,
-            onImageClick = onImageClick?.let { callback -> { callback(item) } },
-            extraSupportingContent = item.supportingLabel?.let { label ->
-                {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.goldMtg,
+        Column {
+            CardRow(
+                card = item.card,
+                isInCollection = item.isInCollection,
+                onClick = { onRowClick?.invoke(item) },
+                onRemove = { if (item.quantity > 1) onDecrement(item) },
+                quantity = item.quantity,
+                onAdd = { onIncrement(item) },
+                addEnabled = item.maxQuantity?.let { item.quantity < it } ?: true,
+                preferredCurrency = preferredCurrency,
+                onImageClick = onImageClick?.let { callback -> { callback(item) } },
+                extraSupportingContent = item.supportingLabel?.let { label ->
+                    {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.magicTypography.labelSmall,
+                            color = mc.goldMtg,
+                        )
+                    }
+                },
+            )
+            if (rowActions != null) {
+                rowActions(item)
+            } else {
+                MovementRow(
+                    actions = listOf(
+                        MovementAction(
+                            icon = Icons.Rounded.Delete,
+                            label = stringResource(R.string.action_delete),
+                            tint = mc.lifeNegative,
+                            onClick = { onRemove(item) },
+                        )
                     )
-                }
-            },
-        )
-        if (rowActions != null) {
-            rowActions(item)
-        } else {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                IconButton(onClick = { onRemove(item) }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_remove), tint = mc.textDisabled)
-                }
+                )
             }
         }
     }

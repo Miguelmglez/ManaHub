@@ -47,6 +47,17 @@ abstract class CardDao {
         if (toUpdate.isNotEmpty()) updateAllCards(toUpdate)
     }
 
+    /** Transfer hydration preserves user/confirmed/suggested tags without spawning per-card enrichment. */
+    @Transaction
+    open suspend fun cacheTransferCards(cards: List<CardEntity>) {
+        require(cards.size<=75)
+        val previous=getByIds(cards.map { it.scryfallId }).associateBy { it.scryfallId }
+        upsertAll(cards.map { card ->
+            val stored=previous[card.scryfallId]
+            card.copy(tags=stored?.tags ?: "[]",userTags=stored?.userTags ?: "[]",suggestedTags=stored?.suggestedTags ?: "[]")
+        })
+    }
+
     @Query("SELECT * FROM cards WHERE scryfall_id = :id")
     abstract suspend fun getById(id: String): CardEntity?
 
@@ -55,6 +66,12 @@ abstract class CardDao {
 
     @Query("SELECT * FROM cards WHERE scryfall_id IN (:ids)")
     abstract suspend fun getByIds(ids: List<String>): List<CardEntity>
+
+    @Query("SELECT * FROM cards WHERE LOWER(set_code)=LOWER(:setCode) AND LOWER(collector_number)=LOWER(:collector) ORDER BY (lang='en') DESC,cached_at DESC,scryfall_id LIMIT 1")
+    abstract suspend fun findTransferPrinting(setCode: String, collector: String): CardEntity?
+
+    @Query("SELECT * FROM cards WHERE (:setCode IS NULL OR LOWER(set_code)=LOWER(:setCode)) AND (LOWER(name)=LOWER(:name) OR (INSTR(name,' // ')>0 AND (LOWER(SUBSTR(name,1,INSTR(name,' // ')-1))=LOWER(:name) OR LOWER(SUBSTR(name,INSTR(name,' // ')+4))=LOWER(:name)))) ORDER BY (lang='en') DESC,cached_at DESC,scryfall_id LIMIT 1")
+    abstract suspend fun findTransferName(name: String, setCode: String?): CardEntity?
 
     @Query("SELECT * FROM cards WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
     abstract fun searchByName(query: String): Flow<List<CardEntity>>

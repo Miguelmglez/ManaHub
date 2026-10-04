@@ -88,7 +88,7 @@ data class ScanSession(
  * @property ownedCardIdentityKeys  Live set of identity keys (`oracleId.ifBlank { name }`) already
  *                                  present in the user's collection — feeds the "already in
  *                                  collection" badge in `CardQueueSheet`. Kept up to date by a
- *                                  [ScannerViewModel] collector on `UserCardRepository.observeCollection()`.
+ *                                  [ScannerViewModel] collector scoped to queue/detected card candidates.
  * @property rateLimitedUntilMs     W2.10 (scanner-reliability-plan.md, 2026-08-24). Wall-clock
  *                                  epoch millis until which [CardRecognizer] is suspending every
  *                                  Scryfall lookup after the shared rate limiter exhausted its

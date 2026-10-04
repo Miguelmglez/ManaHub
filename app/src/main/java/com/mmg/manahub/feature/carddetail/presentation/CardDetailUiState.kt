@@ -1,7 +1,8 @@
 package com.mmg.manahub.feature.carddetail.presentation
 
+import com.mmg.manahub.core.model.TagDictionaryEntry
 import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.model.Deck
+import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.UserDefinedTag
@@ -22,8 +23,11 @@ data class CardDetailUiState(
     val card:             Card?          = null,
     val userCards:        List<UserCardWithCard> = emptyList(),
     val wishlistEntries:  List<WishlistEntry> = emptyList(),
+    val tagCatalog: List<TagDictionaryEntry> = emptyList(),
+    val isTagCatalogLoading: Boolean = false,
+    val tagCatalogError: Boolean = false,
     val userDefinedTags:  List<UserDefinedTag> = emptyList(),
-    val decksContainingCard: List<Deck>  = emptyList(),
+    val decksContainingCard: List<DeckSummary> = emptyList(),
     val isLoading:        Boolean        = true,
     val error:            String?        = null,
     val isStale:          Boolean        = false,
