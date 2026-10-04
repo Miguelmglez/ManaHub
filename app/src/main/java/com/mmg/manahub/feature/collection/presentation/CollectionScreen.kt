@@ -734,7 +734,7 @@ private fun CollectionTopBar(
                     Icon(
                         imageVector = Icons.Default.ImportExport,
                         contentDescription = stringResource(R.string.action_more_options),
-                        tint = mc.textSecondary,
+                        tint = mc.textPrimary,
                     )
                 }
             }

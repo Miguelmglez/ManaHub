@@ -30,6 +30,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,10 +40,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.HexGridBackground
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.rememberFabVisibility
 import com.mmg.manahub.core.ui.mtg_card_back
@@ -62,7 +67,8 @@ fun DeckListScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
 
-    var showCreateSheet by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var showCreateSheet by remember { mutableStateOf(false) }
+    var deckPendingDeletion by remember { mutableStateOf<DeckSummary?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -124,7 +130,7 @@ fun DeckListScreen(
                                 DeckItem(
                                     deck             = deck,
                                     onClick          = { onDeckClick(deck.id) },
-                                    onDelete         = { viewModel.deleteDeck(deck.id) },
+                                    onDelete         = { deckPendingDeletion = deck },
                                     onPlaytest       = if (deck.cardCount > 0) ({ onPlaytestClick(deck.id) }) else null,
                                     cardBackPainter  = painterResource(Res.drawable.mtg_card_back),
                                 )
@@ -142,6 +148,22 @@ fun DeckListScreen(
             onCreate = { name, format ->
                 viewModel.createDeck(name, format)
             }
+        )
+    }
+
+    deckPendingDeletion?.let { deck ->
+        MagicAlertDialog(
+            onDismissRequest = { deckPendingDeletion = null },
+            title = "Delete deck",
+            text = "Delete \"${deck.name}\"? This cannot be undone.",
+            confirmLabel = "Delete",
+            onConfirm = {
+                deckPendingDeletion = null
+                viewModel.deleteDeck(deck.id)
+            },
+            dismissLabel = "Cancel",
+            onDismiss = { deckPendingDeletion = null },
+            confirmColor = MagicCtaColor.Error,
         )
     }
 

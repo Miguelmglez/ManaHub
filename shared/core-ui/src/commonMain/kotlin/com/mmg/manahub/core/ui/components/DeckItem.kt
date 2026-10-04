@@ -29,10 +29,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -64,7 +60,7 @@ import kotlinx.datetime.toLocalDateTime
  *                        [DeckSummary.coverImageUrl] is null. Pass `painterResource(R.drawable.mtg_card_back)`
  *                        from the Android call site. When null, a solid [magicColors.surfaceVariant]
  *                        box is shown instead.
- * @param onDelete        Optional callback for deletion (shows a confirmation dialog).
+ * @param onDelete        Optional callback when deletion is requested.
  * @param onPlaytest      Optional callback to start a playtest session.
  * @param reduced         If true, renders a more compact version suitable for widgets/grids.
  * @param ownerName       Optional owner name for community decks.
@@ -84,8 +80,6 @@ fun DeckItem(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    var showDeleteDialog by remember { mutableStateOf(false) }
-
     Card(
         onClick = onClick,
         modifier = modifier
@@ -284,7 +278,7 @@ fun DeckItem(
 
                     }
                     if (onDelete != null) {
-                        IconButton(onClick = { showDeleteDialog = true }) {
+                        IconButton(onClick = onDelete) {
                             Icon(
                                 Icons.Default.Delete,
                                 contentDescription = "Delete",
@@ -296,22 +290,6 @@ fun DeckItem(
                 }
             }
         }
-    }
-
-    if (showDeleteDialog && onDelete != null) {
-        MagicAlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = "Delete deck",
-            text = "Delete \"${deck.name}\"? This cannot be undone.",
-            confirmLabel = "Delete",
-            onConfirm = {
-                onDelete()
-                showDeleteDialog = false
-            },
-            dismissLabel = "Cancel",
-            onDismiss = { showDeleteDialog = false },
-            confirmColor = MagicCtaColor.Error
-        )
     }
 }
 
