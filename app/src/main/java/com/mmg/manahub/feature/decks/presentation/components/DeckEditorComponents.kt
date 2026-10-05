@@ -8,21 +8,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Remove
@@ -67,6 +63,7 @@ import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardRow
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.core.ui.components.MovementRow
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.ChipShape
@@ -192,72 +189,7 @@ internal fun GroupHeader(
     }
 }
 
-/**
- * The "move to / move from" action row shown below a [CardRow], used to shuffle a
- * card between the mainboard and sideboard.
- */
-@Composable
-internal fun MovementRow(
-    labelTo: String,
-    onMoveTo: () -> Unit,
-    labelFrom: String? = null,
-    onMoveFrom: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(start = spacing.md, end = spacing.md, top = spacing.xxs, bottom = spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        // Left Action: Move To [Other]
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .heightIn(min = 48.dp)
-                .clip(ChipShape)
-                .clickable(onClick = onMoveTo)
-                .padding(vertical = spacing.xs, horizontal = spacing.xs)
-        ) {
-            Icon(
-                Icons.AutoMirrored.Filled.CompareArrows,
-                null,
-                tint = mc.primaryAccent,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(Modifier.width(spacing.xs))
-            Text(labelTo, style = ty.labelMedium, color = mc.primaryAccent)
-        }
-
-        // Right Action: Move From [Other] (if applicable)
-        if (labelFrom != null && onMoveFrom != null) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .heightIn(min = 48.dp)
-                    .clip(ChipShape)
-                    .clickable(onClick = onMoveFrom)
-                    .padding(vertical = spacing.xs, horizontal = spacing.xs)
-            ) {
-                Text(labelFrom, style = ty.labelMedium, color = mc.secondaryAccent)
-                Spacer(Modifier.width(spacing.xs))
-                Icon(
-                    Icons.AutoMirrored.Filled.CompareArrows,
-                    null,
-                    tint = mc.secondaryAccent,
-                    modifier = Modifier
-                        .size(16.dp)
-                        .graphicsLayer { rotationY = 180f }
-                )
-            }
-        }
-    }
-}
 
 /**
  * A generic container row for extra supporting content (badges, warnings, metadata)

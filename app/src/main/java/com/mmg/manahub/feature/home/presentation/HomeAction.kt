@@ -13,6 +13,8 @@ sealed interface HomeAction {
     object StartGame : HomeAction
     object ScanCard : HomeAction
     object CreateDeck : HomeAction
+    /** Opens the user-configurable deck creation sheet from Quick Start. */
+    object OpenDeckCreationSheet : HomeAction
 
     object OpenImportCollection : HomeAction
     object DraftGuide : HomeAction
@@ -47,6 +49,9 @@ sealed interface HomeAction {
     ) : HomeAction
 
     /** Shows a different, randomly chosen Rules Tip (in-memory only). Handled in [HomeViewModel]. */
+    object OpenRules : HomeAction
+    object OpenRulesTipIndex : HomeAction
+    data class OpenRulesTip(val tipId: String) : HomeAction
     object RollRulesTip : HomeAction
     object OpenTournaments : HomeAction
     object OpenSettings : HomeAction

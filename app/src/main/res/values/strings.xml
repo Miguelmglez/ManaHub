@@ -19,6 +19,7 @@
     <string name="action_remove_all">Remove all</string>
     <string name="retry">Retry</string>
     <string name="action_search">Search</string>
+    <string name="action_search_web">Search web</string>
     <string name="action_close">Close</string>
     <string name="action_dismiss">Dismiss</string>
     <string name="action_back">Back</string>
@@ -242,6 +243,13 @@
     <string name="collection_total_copies">copies</string>
     <string name="collection_copy_types">types</string>
     <string name="carddetail_add_copy">Add to collection</string>
+    <string name="carddetail_action_sheet_title">Card actions</string>
+    <string name="carddetail_add_copy_action_subtitle">Add a copy to your collection</string>
+    <string name="carddetail_wishlist_action_subtitle">Add this card to your wishlist</string>
+    <string name="carddetail_collection_copy_count">%1$d in your collection</string>
+    <string name="carddetail_your_folder">Your folder</string>
+    <string name="carddetail_legality_section_title">Legality</string>
+    <string name="carddetail_external_links_section_title">External Links</string>
     <string name="carddetail_no_copies">You don\'t have this card in your collection</string>
     <string name="carddetail_no_wishlist_copies">This card is not in your wishlist</string>
     <string name="carddetail_other_prints">Other prints</string>
@@ -290,15 +298,15 @@
     <string name="carddetail_tags_remove_description">Remove %1$s</string>
     <string name="carddetail_tags_user_label">My tags</string>
     <string name="carddetail_tags_user_empty">No personal tags — tap + to add</string>
-    <string name="carddetail_tags_add_button">Add tag</string>
+    <string name="carddetail_tags_add_button">Manage tags</string>
     <string name="carddetail_tags_auto_empty">No auto-generated tags</string>
     <string name="carddetail_tags_suggested_label">Suggested tags</string>
     <string name="carddetail_tags_suggested_desc">Confirm those that apply or discard them. They won\'t be added until you approve them.</string>
     <string name="carddetail_tags_confidence_value">%1$d%% confidence</string>
     <string name="carddetail_tags_suggested_confirm">Add tag</string>
-    <string name="carddetail_tags_picker_title">Add tag</string>
-    <string name="carddetail_tags_picker_auto">Auto-generated for this card</string>
-    <string name="carddetail_tags_picker_suggested">Suggested for this card</string>
+    <string name="carddetail_tags_picker_title">Manage tags</string>
+    <string name="carddetail_tags_picker_auto">Auto-generated tags</string>
+    <string name="carddetail_tags_picker_suggested">Suggested tags</string>
     <string name="action_discard">Discard</string>
 
     <!-- ══════════════════════════════════════════
@@ -2785,8 +2793,8 @@
     <string name="draft_pick_order_rank">Pick #%1$d</string>
     <string name="draft_cards_to_avoid_label">Cards to Avoid</string>
     <string name="draft_archetype_win_rate">%1$.1f%% Win Rate</string>
-    <string name="draft_key_commons_label">Commons</string>
-    <string name="draft_key_uncommons_label">Uncommons</string>
+    <string name="draft_key_commons_label">Best Commons</string>
+    <string name="draft_key_uncommons_label">Best Uncommons</string>
     <string name="draft_guide_color_ranking">Color Ranking</string>
     <string name="draft_guide_state_expanded">Expanded</string>
     <string name="draft_guide_state_collapsed">Collapsed</string>
@@ -4235,7 +4243,7 @@
     <string name="community_deck_sort_recent">Most Recent</string>
     <string name="community_deck_sort_updated">Recently Updated</string>
     <string name="community_deck_filter_all_formats">All Formats</string>
-    <string name="community_deck_find_decks">Find Community Decks</string>
+    <string name="community_deck_find_decks">Find Decks with it</string>
     <string name="community_deck_search_title">Community Decks</string>
     <string name="community_deck_sort_label">Sort: %1$s</string>
     <string name="community_deck_sort_label_base">Sort by:</string>
@@ -4354,7 +4362,7 @@
     <!-- Collection import / export -->
     <string name="collection_transfer_sheet_title">Collection file tools</string>
     <string name="collection_export_option">Export collection</string>
-    <string name="collection_export_option_desc">Save or share the cards currently shown</string>
+    <string name="collection_export_option_desc">Save or share the full filtered selection</string>
     <string name="collection_export_option_disabled">Nothing is shown to export</string>
     <string name="collection_import_option">Import to collection</string>
     <string name="collection_import_option_desc">Paste a list or pick a Moxfield, ManaBox or text file</string>
@@ -4430,4 +4438,20 @@
     </plurals>
     <string name="collection_export_nothing">Nothing to export</string>
     <string name="collection_export_failed">Export failed. Try again.</string>
+    <string name="rules_title">Rules</string>
+    <string name="rules_tip_read">Read rules for %1$s</string>
+    <string name="carddetail_tags_picker_subtitle">Find the right tags for this card.</string>
+    <string name="carddetail_tags_picker_search">Search catalog tags</string>
+    <string name="carddetail_tags_picker_clear_search">Clear search</string>
+    <string name="carddetail_tags_picker_selected">Selected tags · %1$d</string>
+    <string name="carddetail_tags_picker_selected_hint">Tap × to remove a tag. Changes are saved automatically.</string>
+    <string name="carddetail_tags_picker_selected_empty">Choose tags from the suggestions or catalog below.</string>
+    <string name="carddetail_tags_picker_suggested_hint">Recommended for this card. Select any that fit.</string>
+    <string name="carddetail_tags_picker_suggested_empty">No suggestions for this card yet.</string>
+    <string name="carddetail_tags_picker_auto_hint">Detected automatically. These tags stay on the card.</string>
+    <string name="carddetail_tags_picker_catalog">Tag catalog</string>
+    <string name="carddetail_tags_picker_results">%1$d tags available · select more than one</string>
+    <string name="carddetail_tags_picker_no_matches">No matching tags. Try a different search.</string>
+    <string name="carddetail_tags_picker_error">The full catalog could not be loaded. Try again to get the latest tags.</string>
+    <string name="carddetail_tags_picker_add_description">Add %1$s tag</string>
 </resources>

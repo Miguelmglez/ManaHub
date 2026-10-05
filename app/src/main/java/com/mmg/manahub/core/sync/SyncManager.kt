@@ -1,5 +1,8 @@
 package com.mmg.manahub.core.sync
 
+import com.mmg.manahub.core.domain.sync.SyncSessionLease
+import com.mmg.manahub.core.domain.collection.transfer.*
+
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.CardDao
@@ -103,7 +106,26 @@ class SyncManager @Inject constructor(
     private val crashReporter: CrashReporter,
 ) {
 
+    @Volatile private var captureSession: ((String) -> SyncSessionLease)?=null
+
+    /** Installed after Koin starts so the Hilt bridge never resolves auth during app injection. */
+    fun configureSessions(capture: (String) -> SyncSessionLease) { captureSession=capture }
+
     private val syncMutex = Mutex()
+
+    private fun telemetry(phase: String,rows: Long=0L,pages: Long=0L,category: TransferFailureCategory=TransferFailureCategory.UNKNOWN,failure: Boolean=false) {
+        crashReporter.setCustomKey("sync_phase",phase)
+        crashReporter.setCustomKey("sync_rows_bucket",transferCountBucket(rows))
+        crashReporter.setCustomKey("sync_pages_bucket",transferCountBucket(pages))
+        crashReporter.setCustomKey("sync_failure_category",category.value)
+        crashReporter.log(phase)
+        if(failure)crashReporter.recordException(IllegalStateException("collection_sync_operation_failed"))
+    }
+    private fun category(error: Throwable,fallback: TransferFailureCategory=TransferFailureCategory.UNKNOWN)=when(error) {
+        is android.database.sqlite.SQLiteException -> TransferFailureCategory.STORAGE
+        is java.io.IOException -> TransferFailureCategory.NETWORK
+        else -> transferFailureCategory(error,fallback)
+    }
 
     private val _syncState = MutableStateFlow(SyncState.IDLE)
 
@@ -157,7 +179,9 @@ class SyncManager @Inject constructor(
         syncMutex.withLock {
             _syncState.value = SyncState.SYNCING
             try {
+                val lease=requireNotNull(captureSession) { "Sync session is not ready" }(userId)
                 runCatching {
+                    lease.ensureCurrent()
                     val lastSync = syncPrefs.getLastSyncMillis(userId)
 
                     // ── PUSH: collection ─────────────────────────────────────────────
@@ -165,7 +189,7 @@ class SyncManager @Inject constructor(
                     val localCollection = collectionDao.getAllSince(userId, lastSync)
                     var collectionPushed = 0
                     localCollection.chunked(PUSH_CHUNK_SIZE).forEach { chunk ->
-                        collectionRemote.batchUpsert(chunk.map { it.toDto() }).getOrThrow()
+                        lease.remote { collectionRemote.batchUpsert(chunk.map { it.toDto() }) }.getOrThrow()
                         collectionPushed += chunk.size
                     }
 
@@ -177,12 +201,12 @@ class SyncManager @Inject constructor(
                         .filter { it.userId?.isNotEmpty() == true }
                     var decksPushed = 0
                     if (localDecks.isNotEmpty()) {
-                        deckRemote.batchUpsertDecks(localDecks.map { it.toDto() }).getOrThrow()
+                        lease.remote { deckRemote.batchUpsertDecks(localDecks.map { it.toDto() }) }.getOrThrow()
                         for (deck in localDecks) {
                             // Deck Engine Unification (D4): .toSyncDto() carries provenance
                             // (source) through the push -- see DeckSyncDto.kt.
                             val cards = deckDao.getDeckCards(deck.id).map { card -> card.toSyncDto() }
-                            deckRemote.upsertDeckCards(deck.id, cards).getOrThrow()
+                            lease.remote { deckRemote.upsertDeckCards(deck.id, cards) }.getOrThrow()
                         }
                         decksPushed = localDecks.size
                     }
@@ -204,31 +228,20 @@ class SyncManager @Inject constructor(
                         limit = PAGE_SIZE,
                         fetchPage = { after, afterId, limit ->
                             collectionPagesAttempted++
-                            collectionRemote.getChangesPage(lastSync, after, afterId, limit)
+                            lease.remote { collectionRemote.getChangesPage(lastSync, after, afterId, limit) }
                                 .onFailure { e ->
                                     if (e !is CancellationException) {
-                                        crashReporter.apply {
-                                            log("collection_pull_page_failed")
-                                            setCustomKey("sync_pages", collectionPagesAttempted.toString())
-                                            setCustomKey("sync_error_type", e::class.simpleName ?: "Unknown")
-                                        }
+                                        if(!isExpectedTransferInterruption(e))telemetry("collection_pull_page_failed",pages=collectionPagesAttempted.toLong(),category=category(e,TransferFailureCategory.NETWORK),failure=true)
                                     }
                                 }
                         },
                         onPage = { page ->
-                            applyCollectionPage(page, { collectionPulled++ }, { collectionUnappliedRows++ })
+                            applyCollectionPage(page, lease, userId, { collectionPulled++ }, { collectionUnappliedRows++ })
                         },
                     )
-                    crashReporter.apply {
-                        log("collection_pull_paged_completed")
-                        setCustomKey("sync_pages", collectionDrain.pagesDrained.toString())
-                        setCustomKey("sync_rows", collectionPulled.toString())
-                    }
+                    telemetry("collection_pull_paged_completed",collectionPulled.toLong(),collectionDrain.pagesDrained.toLong())
                     if (collectionUnappliedRows > 0) {
-                        crashReporter.apply {
-                            log("collection_pull_rows_unapplied")
-                            setCustomKey("sync_unapplied_count", collectionUnappliedRows.toString())
-                        }
+                        telemetry("collection_pull_rows_unapplied",collectionUnappliedRows.toLong())
                     }
 
                     var decksPulled = 0
@@ -236,9 +249,9 @@ class SyncManager @Inject constructor(
                         since = lastSync,
                         limit = PAGE_SIZE,
                         fetchPage = { after, afterId, limit ->
-                            deckRemote.getDeckChangesPage(lastSync, after, afterId, limit)
+                            lease.remote { deckRemote.getDeckChangesPage(lastSync, after, afterId, limit) }
                         },
-                        onPage = { page -> applyDeckPage(page) { decksPulled++ } },
+                        onPage = { page -> applyDeckPage(page,lease,userId) { decksPulled++ } },
                     )
 
                     // ── COMMIT: save the SAFE watermark ──────────────────────────────
@@ -248,7 +261,7 @@ class SyncManager @Inject constructor(
                         deckDrain.minUnappliedUpdatedAt,
                     )
                     val newWatermark = minOf(syncStartTime, minUnapplied - 1).coerceAtLeast(lastSync)
-                    syncPrefs.saveLastSyncMillis(userId, newWatermark)
+                    lease.local { syncPrefs.saveLastSyncMillis(userId, newWatermark) }
 
                     SyncResult(
                         state = SyncState.SUCCESS,
@@ -259,18 +272,14 @@ class SyncManager @Inject constructor(
                     )
                 }.getOrElse { error ->
                     if (error is CancellationException) throw error
-                    crashReporter.apply {
-                        log("sync_failed: userId=$userId")
-                        setCustomKey("sync_error_type", error::class.simpleName ?: "Unknown")
-                        recordException(error)
-                    }
+                    if(!isExpectedTransferInterruption(error))telemetry("sync_failed",category=category(error),failure=true)
                     SyncResult(state = SyncState.ERROR, error = error.message)
                 }.also { result ->
                     _syncState.value = result.state
                     if (result.state == SyncState.SUCCESS) {
                         // Best-effort integrity self-check (Phase 6) -- never lets a transient
                         // RPC failure here downgrade an already-successful sync to ERROR.
-                        runCatching { checkCollectionIntegrity(userId) }
+                        runCatching { checkCollectionIntegrity(userId,lease) }
                             .onFailure { e -> if (e is CancellationException) throw e }
                     }
                 }
@@ -303,7 +312,9 @@ class SyncManager @Inject constructor(
         syncMutex.withLock {
             _syncState.value = SyncState.SYNCING
             try {
+                val lease=requireNotNull(captureSession) { "Sync session is not ready" }(newUserId)
                 runCatching {
+                    lease.ensureCurrent()
                     val now = System.currentTimeMillis()
 
                     // assignUserId's own NOT EXISTS guard (UserCardDao) parks a colliding guest
@@ -313,8 +324,12 @@ class SyncManager @Inject constructor(
                     // to SYNCING, so any unexpected constraint failure here escaped uncaught to
                     // CollectionSyncWorker, leaving _syncState stuck at IDLE with no ERROR ever
                     // surfaced to the UI.
-                    val collectionMigrated = collectionDao.assignUserId(newUserId, now)
-                    val decksMigrated = deckDao.assignDeckUserId(newUserId, now)
+                    var collectionMigrated=0
+                    var decksMigrated=0
+                    lease.local {
+                        collectionMigrated=collectionDao.assignUserId(newUserId, now)
+                        decksMigrated=deckDao.assignDeckUserId(newUserId, now)
+                    }
 
                     val localCollectionCount = collectionDao.getCountForUser(newUserId)
                     val localDeckCount = deckDao.getDeckCountForUser(newUserId)
@@ -327,7 +342,7 @@ class SyncManager @Inject constructor(
                     if (collectionMigrated > 0 || decksMigrated > 0 ||
                         (localCollectionCount == 0 && localDeckCount == 0)
                     ) {
-                        syncPrefs.clearLastSyncMillis(newUserId)
+                        lease.local { syncPrefs.clearLastSyncMillis(newUserId) }
                     }
 
                     val lastSync = syncPrefs.getLastSyncMillis(newUserId)
@@ -338,7 +353,7 @@ class SyncManager @Inject constructor(
                         .filter { it.userId?.isNotEmpty() == true }
                     var collectionPushed = 0
                     localCollection.chunked(PUSH_CHUNK_SIZE).forEach { chunk ->
-                        collectionRemote.batchUpsert(chunk.map { it.toDto() }).getOrThrow()
+                        lease.remote { collectionRemote.batchUpsert(chunk.map { it.toDto() }) }.getOrThrow()
                         collectionPushed += chunk.size
                     }
 
@@ -348,12 +363,12 @@ class SyncManager @Inject constructor(
                         .filter { it.userId?.isNotEmpty() == true }
                     var decksPushed = 0
                     if (localDecks.isNotEmpty()) {
-                        deckRemote.batchUpsertDecks(localDecks.map { it.toDto() }).getOrThrow()
+                        lease.remote { deckRemote.batchUpsertDecks(localDecks.map { it.toDto() }) }.getOrThrow()
                         for (deck in localDecks) {
                             // Deck Engine Unification (D4): .toSyncDto() carries provenance
                             // (source) through the push -- see DeckSyncDto.kt.
                             val cards = deckDao.getDeckCards(deck.id).map { card -> card.toSyncDto() }
-                            deckRemote.upsertDeckCards(deck.id, cards).getOrThrow()
+                            lease.remote { deckRemote.upsertDeckCards(deck.id, cards) }.getOrThrow()
                         }
                         decksPushed = localDecks.size
                     }
@@ -369,10 +384,10 @@ class SyncManager @Inject constructor(
                         since = lastSync,
                         limit = PAGE_SIZE,
                         fetchPage = { after, afterId, limit ->
-                            collectionRemote.getChangesPage(lastSync, after, afterId, limit)
+                            lease.remote { collectionRemote.getChangesPage(lastSync, after, afterId, limit) }
                         },
                         onPage = { page ->
-                            applyCollectionPage(page, onInserted = { collectionPulled++ }, onRowFailed = {})
+                            applyCollectionPage(page, lease, newUserId, onInserted = { collectionPulled++ }, onRowFailed = {})
                         },
                     )
 
@@ -381,9 +396,9 @@ class SyncManager @Inject constructor(
                         since = lastSync,
                         limit = PAGE_SIZE,
                         fetchPage = { after, afterId, limit ->
-                            deckRemote.getDeckChangesPage(lastSync, after, afterId, limit)
+                            lease.remote { deckRemote.getDeckChangesPage(lastSync, after, afterId, limit) }
                         },
-                        onPage = { page -> applyDeckPage(page) { decksPulled++ } },
+                        onPage = { page -> applyDeckPage(page,lease,newUserId) { decksPulled++ } },
                     )
 
                     // ── COMMIT: save the SAFE watermark ──────────────────────────────
@@ -393,7 +408,7 @@ class SyncManager @Inject constructor(
                         deckDrain.minUnappliedUpdatedAt,
                     )
                     val newWatermark = minOf(syncStartTime, minUnapplied - 1).coerceAtLeast(lastSync)
-                    syncPrefs.saveLastSyncMillis(newUserId, newWatermark)
+                    lease.local { syncPrefs.saveLastSyncMillis(newUserId, newWatermark) }
 
                     SyncResult(
                         state = SyncState.SUCCESS,
@@ -404,11 +419,7 @@ class SyncManager @Inject constructor(
                     )
                 }.getOrElse { error ->
                     if (error is CancellationException) throw error
-                    crashReporter.apply {
-                        log("assign_user_sync_failed: userId=$newUserId")
-                        setCustomKey("sync_error_type", error::class.simpleName ?: "Unknown")
-                        recordException(error)
-                    }
+                    if(!isExpectedTransferInterruption(error))telemetry("sync_login_failed",category=category(error),failure=true)
                     SyncResult(state = SyncState.ERROR, error = error.message)
                 }.also { result ->
                     _syncState.value = result.state
@@ -431,6 +442,8 @@ class SyncManager @Inject constructor(
      */
     private suspend fun applyCollectionPage(
         page: List<UserCardCollectionDto>,
+        lease: SyncSessionLease,
+        userId: String,
         onInserted: () -> Unit,
         onRowFailed: () -> Unit,
     ): Boolean {
@@ -440,17 +453,19 @@ class SyncManager @Inject constructor(
         ensureCardsExist(page.map { it.scryfallId }.distinct())
 
         var allApplied = true
+        val failures=mutableSetOf<TransferFailureCategory>()
+        var collisions=0L
         for (dto in page) {
-            runCatching { pullCollectionRow(dto, onInserted) }
+            runCatching { lease.local { require(dto.userId==userId); pullCollectionRow(dto, onInserted) { collisions++ } } }
                 .onFailure { e ->
+                    if(e is CancellationException)throw e
                     allApplied = false
                     onRowFailed()
-                    crashReporter.apply {
-                        setCustomKey("sync_error_type", e::class.simpleName ?: "Unknown")
-                        recordException(RuntimeException("[sync] pullCollectionRow failed, id=${dto.id}", e))
-                    }
+                    if(!isExpectedTransferInterruption(e))failures+=category(e,TransferFailureCategory.STORAGE)
                 }
         }
+        failures.forEach { telemetry("collection_pull_page_apply_failed",page.size.toLong(),category=it,failure=true) }
+        if(collisions>0L)telemetry("collection_pull_tuple_collisions_resolved",collisions)
         return allApplied
     }
 
@@ -462,19 +477,21 @@ class SyncManager @Inject constructor(
      */
     private suspend fun applyDeckPage(
         page: List<DeckSyncDto>,
+        lease: SyncSessionLease,
+        userId: String,
         onInserted: () -> Unit,
     ): Boolean {
         var allApplied = true
+        val failures=mutableSetOf<TransferFailureCategory>()
         for (dto in page) {
-            runCatching { pullDeckRow(dto, onInserted) }
+            runCatching { lease.ensureCurrent(); require(dto.userId==userId); pullDeckRow(dto,lease,onInserted) }
                 .onFailure { e ->
+                    if(e is CancellationException)throw e
                     allApplied = false
-                    crashReporter.apply {
-                        setCustomKey("sync_error_type", e::class.simpleName ?: "Unknown")
-                        recordException(RuntimeException("[sync] pullDeckRow failed, id=${dto.id}", e))
-                    }
+                    if(!isExpectedTransferInterruption(e))failures+=category(e,TransferFailureCategory.STORAGE)
                 }
         }
+        failures.forEach { telemetry("deck_pull_page_apply_failed",page.size.toLong(),category=it,failure=true) }
         return allApplied
     }
 
@@ -516,6 +533,7 @@ class SyncManager @Inject constructor(
     private fun pullCollectionRow(
         dto: UserCardCollectionDto,
         onInserted: () -> Unit,
+        onCollision: () -> Unit,
     ) {
         val byId = collectionDao.getByIdIncludingDeleted(dto.id)
         val tupleOwner = collectionDao.getByCompositeKey(
@@ -533,7 +551,7 @@ class SyncManager @Inject constructor(
         if (local != null && dto.updatedAt <= local.updatedAt) return
 
         if (staleId != null) {
-            crashReporter.log("collection_pull_tuple_collision_resolved")
+            onCollision()
             // Use the atomic reconcileAndUpsert when a stale row must be replaced so a
             // process-kill between the delete and the insert never orphans the collection entry.
             collectionDao.reconcileAndUpsert(staleId, dto.toEntity())
@@ -551,6 +569,7 @@ class SyncManager @Inject constructor(
      */
     private suspend fun pullDeckRow(
         dto: DeckSyncDto,
+        lease: SyncSessionLease,
         onInserted: () -> Unit,
     ) {
         // getDeckByIdForSync includes soft-deleted rows (same tombstone fix as the collection
@@ -558,10 +577,10 @@ class SyncManager @Inject constructor(
         val local = deckDao.getDeckByIdForSync(dto.id)
         // LWW: skip if local row is strictly newer.
         if (local != null && dto.updatedAt <= local.updatedAt) return
-        deckDao.upsertDeck(dto.toEntity())
+
         // Also replace card slots so the pulled deck is fully usable on this device.
         if (!dto.isDeleted) {
-            val remoteCards = deckRemote.getDeckCardsForDeck(dto.id).getOrThrow()
+            val remoteCards = lease.remote { deckRemote.getDeckCardsForDeck(dto.id) }.getOrThrow()
             // Pre-fetch any cards missing from Room so deck images resolve correctly. deck_cards
             // still has a FK to cards (unchanged by the Phase 2 collection FK drop), and
             // coverImageUrl is derived from a JOIN — missing card rows silently produce null
@@ -570,6 +589,10 @@ class SyncManager @Inject constructor(
             // gate that can strand data.
             val deckCardIds = remoteCards.map { it.scryfallId }.distinct()
             val cachedDeckIds = ensureCardsExist(deckCardIds)
+            lease.local {
+            val latest=deckDao.getDeckByIdForSync(dto.id)
+            if(latest!=null && dto.updatedAt<=latest.updatedAt)return@local
+            deckDao.upsertDeck(dto.toEntity())
             deckDao.replaceAllCards(
                 dto.id,
                 remoteCards
@@ -587,6 +610,10 @@ class SyncManager @Inject constructor(
                         )
                     }
             )
+            }
+        } else lease.local {
+            val latest=deckDao.getDeckByIdForSync(dto.id)
+            if(latest==null || dto.updatedAt>latest.updatedAt)deckDao.upsertDeck(dto.toEntity())
         }
         onInserted()
     }
@@ -623,6 +650,7 @@ class SyncManager @Inject constructor(
         val existingIds = cardDao.getByIds(scryfallIds).map { it.scryfallId }.toMutableSet()
         val missingIds = scryfallIds.filterNot { it in existingIds }
         if (missingIds.isEmpty()) return existingIds
+        val failures=mutableSetOf<TransferFailureCategory>()
 
         // Fetch in chunks of 75 (Scryfall /cards/collection hard limit). This `forEach` is
         // sequential (not `async`/`awaitAll`), so chunks are never fired concurrently from this
@@ -646,21 +674,13 @@ class SyncManager @Inject constructor(
                             // rare (malformed data would already have failed to parse upstream) —
                             // the chunk's ids simply stay "missing" and get a placeholder below,
                             // then retried by CardHydrationWorker.
-                            crashReporter.apply {
-                                setCustomKey("scryfall_batch_chunk_size", chunk.size.toString())
-                                setCustomKey("sync_error_type", e::class.simpleName ?: "Unknown")
-                                recordException(RuntimeException("[ensureCardsExist] Room upsertAll failed", e))
-                            }
+                            if(!isExpectedTransferInterruption(e))failures+=category(e,TransferFailureCategory.STORAGE)
                         }
                 }
                 .onFailure { e ->
                     // Non-fatal: entries for this chunk get a placeholder below and are retried by
                     // CardHydrationWorker.
-                    crashReporter.apply {
-                        setCustomKey("scryfall_batch_chunk_size", chunk.size.toString())
-                        setCustomKey("sync_error_type", e::class.simpleName ?: "Unknown")
-                        recordException(RuntimeException("[ensureCardsExist] Scryfall batch fetch failed", e))
-                    }
+                    if(!isExpectedTransferInterruption(e))failures+=category(e,TransferFailureCategory.NETWORK)
                 }
         }
 
@@ -675,18 +695,13 @@ class SyncManager @Inject constructor(
             runCatching {
                 cardDao.insertAllIgnore(stillMissing.map { buildPendingHydrationPlaceholder(it) })
             }.onSuccess {
-                crashReporter.apply {
-                    log("collection_rows_awaiting_card_metadata")
-                    setCustomKey("sync_unhydrated_count", stillMissing.size.toString())
-                }
+                telemetry("collection_rows_awaiting_card_metadata",stillMissing.size.toLong())
             }.onFailure { e ->
-                crashReporter.apply {
-                    setCustomKey("sync_error_type", e::class.simpleName ?: "Unknown")
-                    recordException(RuntimeException("[ensureCardsExist] placeholder insertAllIgnore failed", e))
-                }
+                if(!isExpectedTransferInterruption(e))failures+=category(e,TransferFailureCategory.STORAGE)
             }
         }
 
+        failures.forEach { telemetry("collection_metadata_attempt_failed",missingIds.size.toLong(),category=it,failure=true) }
         return existingIds
     }
 
@@ -712,8 +727,8 @@ class SyncManager @Inject constructor(
      * sync, never a gate on it. A [CancellationException] still propagates (the caller's
      * `runCatching` wrapper rethrows it).
      */
-    private suspend fun checkCollectionIntegrity(userId: String) {
-        val integrity = collectionRemote.getIntegrity().getOrElse { error ->
+    private suspend fun checkCollectionIntegrity(userId: String,lease: SyncSessionLease) {
+        val integrity = lease.remote { collectionRemote.getIntegrity() }.getOrElse { error ->
             if (error is CancellationException) throw error
             return
         }
@@ -722,23 +737,21 @@ class SyncManager @Inject constructor(
         // remote SURPLUS is the data-loss shape this check exists to catch.
         if (integrity.totalRows <= localTotal) return
 
-        crashReporter.apply {
-            log("collection_integrity_mismatch")
-            setCustomKey("sync_local_rows", localTotal.toString())
-            setCustomKey("sync_remote_rows", integrity.totalRows.toString())
-        }
+        telemetry("collection_integrity_local_mismatch",localTotal.toLong())
+        telemetry("collection_integrity_remote_mismatch",integrity.totalRows.toLong())
 
         val now = System.currentTimeMillis()
         val lastRepair = syncPrefs.getLastCollectionRepairMillis(userId)
         if (lastRepair != null && now - lastRepair < REPAIR_RATE_LIMIT_MS) {
-            crashReporter.log("collection_repair_skipped_ratelimited")
-            crashReporter.recordException(RuntimeException("collection_integrity_unresolved"))
+            telemetry("collection_repair_skipped_ratelimited",category=TransferFailureCategory.UNKNOWN,failure=true)
             return
         }
 
-        crashReporter.log("collection_repair_started")
-        syncPrefs.saveLastCollectionRepairMillis(userId, now)
-        syncPrefs.clearLastSyncMillis(userId)
+        telemetry("collection_repair_started")
+        lease.local {
+            syncPrefs.saveLastCollectionRepairMillis(userId, now)
+            syncPrefs.clearLastSyncMillis(userId)
+        }
     }
 
     companion object {

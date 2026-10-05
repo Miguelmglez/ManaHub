@@ -7,15 +7,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,7 +21,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -35,15 +30,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.CardRow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -58,7 +49,7 @@ import com.mmg.manahub.core.ui.theme.spacing
  * Every `+`/`-` tap is already committed to [selection] immediately via [onCountChange] (same
  * pattern as [com.mmg.manahub.feature.playtest.presentation.setup.PlaytestSetupScreen]'s
  * steppers) — there is no separate "discard" path. [onDismiss] (tap outside, system back,
- * drag-to-close) simply closes the sheet; the caller is responsible for the instant re-apply.
+ * drag-to-close) simply closes the sheet.
  *
  * @param availableCards The deck's mainboard, grouped by card with its in-deck quantity
  *   (commander excluded).
@@ -165,15 +156,25 @@ fun CustomHandSheet(
             ) {
                 items(filteredCards, key = { it.first.scryfallId }) { (card, quantityInDeck) ->
                     val selectedCount = selection[card.scryfallId] ?: 0
-                    // Total, not "others": at the cap the VM clamps every + to a no-op, including this row's.
                     val capReached = totalSelected >= drawCount
-                    CustomHandRow(
+                    val incrementEnabled = selectedCount < quantityInDeck && !capReached
+                    CardRow(
                         card = card,
-                        quantityInDeck = quantityInDeck,
-                        selectedCount = selectedCount,
-                        incrementEnabled = selectedCount < quantityInDeck && !capReached,
-                        onIncrement = { onCountChange(card.scryfallId, selectedCount + 1) },
-                        onDecrement = { onCountChange(card.scryfallId, selectedCount - 1) },
+                        isInCollection = false,
+                        onClick = {},
+                        quantity = selectedCount,
+                        onAdd = { onCountChange(card.scryfallId, selectedCount + 1) },
+                        onRemove = if (selectedCount > 0) {
+                            { onCountChange(card.scryfallId, selectedCount - 1) }
+                        } else null,
+                        addEnabled = incrementEnabled,
+                        extraSupportingContent = {
+                            Text(
+                                text = stringResource(R.string.playtest_custom_hand_owned, quantityInDeck),
+                                style = ty.labelSmall,
+                                color = mc.textSecondary,
+                            )
+                        },
                     )
                 }
 
@@ -190,71 +191,6 @@ fun CustomHandSheet(
                             )
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CustomHandRow(
-    card: Card,
-    quantityInDeck: Int,
-    selectedCount: Int,
-    incrementEnabled: Boolean,
-    onIncrement: () -> Unit,
-    onDecrement: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = if (selectedCount > 0) mc.primaryAccent.copy(alpha = 0.08f) else mc.surface,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            AsyncImage(
-                model = card.imageArtCrop,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(width = 52.dp, height = 38.dp).clip(RoundedCornerShape(4.dp)),
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                CardName(
-                    name = card.name,
-                    showFrontOnly = true,
-                    style = ty.bodyMedium,
-                    color = mc.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = stringResource(R.string.playtest_custom_hand_owned, quantityInDeck),
-                    style = ty.labelSmall,
-                    color = mc.textSecondary,
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                IconButton(onClick = onDecrement, enabled = selectedCount > 0, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.Default.Remove,
-                        contentDescription = null,
-                        tint = if (selectedCount > 0) mc.textSecondary else mc.textDisabled,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-                Text(text = "$selectedCount", style = ty.labelMedium, color = mc.primaryAccent)
-                IconButton(onClick = onIncrement, enabled = incrementEnabled, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = null,
-                        tint = if (incrementEnabled) mc.primaryAccent else mc.textDisabled,
-                        modifier = Modifier.size(16.dp),
-                    )
                 }
             }
         }

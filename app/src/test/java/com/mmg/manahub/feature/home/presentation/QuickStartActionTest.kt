@@ -9,6 +9,12 @@ import org.junit.Test
 class QuickStartActionTest {
 
     @Test
+    fun rulesShortcutHasStablePersistedId() {
+        assertEquals("rules", QuickStartAction.RULES.persistedId)
+        assertEquals(QuickStartAction.RULES, QuickStartAction.fromPersistedId("rules"))
+    }
+
+    @Test
     fun `fromPersistedId returns SCAN_CARD for scan_card`() {
         assertEquals(QuickStartAction.SCAN_CARD, QuickStartAction.fromPersistedId("scan_card"))
     }
@@ -84,13 +90,13 @@ class QuickStartActionTest {
     }
 
     @Test
-    fun `defaults contains SCAN_CARD CREATE_DECK SEARCH_CARD STATS in order`() {
+    fun `defaults preserves SCAN_CARD DECKS SEARCH_CARD IMPORT_COLLECTION in order`() {
         assertEquals(
             listOf(
                 QuickStartAction.SCAN_CARD,
                 QuickStartAction.DECKS,
                 QuickStartAction.SEARCH_CARD,
-                QuickStartAction.STATS,
+                QuickStartAction.IMPORT_COLLECTION,
             ),
             QuickStartAction.defaults,
         )

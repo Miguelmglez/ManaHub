@@ -1,5 +1,7 @@
 package com.mmg.manahub.core.sync
 
+import com.mmg.manahub.core.domain.sync.SyncSessionLease
+
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.CardDao
@@ -154,7 +156,7 @@ class CollectionSyncTest {
             syncPrefs        = syncPrefs,
             ioDispatcher     = testDispatcher,
             crashReporter    = crashReporter,
-        )
+        ).also { it.configureSessions { SyncSessionLease({}, { operation -> operation() }) } }
     }
 
     // ══════════════════════════════════════════════════════════════════════════

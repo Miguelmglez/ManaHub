@@ -60,6 +60,25 @@ class WishlistRemoteDataSource(
             Unit
         }
 
+    /** Captured owner is explicit even if authentication changes while dispatching. */
+    suspend fun removeWishlistEntryForOwner(id: String, userId: String): Result<Unit> =
+        dispatcherProvider.remoteResult {
+            supabaseClient.postgrest["wishlists"].delete { filter { eq("id",id); eq("user_id",userId) } }
+            Unit
+        }
+    /** A bounded deletion batch always filters the captured account. */
+    suspend fun removeWishlistEntriesForOwner(ids: List<String>, userId: String): Result<Unit> =
+        dispatcherProvider.remoteResult {
+            require(ids.size<=200)
+            if(ids.isNotEmpty())supabaseClient.postgrest["wishlists"].delete { filter { isIn("id",ids); eq("user_id",userId) } }
+            Unit
+        }
+    suspend fun updateWishlistQuantityForOwner(id: String, userId: String, quantity: Int): Result<Unit> =
+        dispatcherProvider.remoteResult {
+            supabaseClient.postgrest["wishlists"].update(buildJsonObject { put("quantity",quantity) }) { filter { eq("id",id); eq("user_id",userId) } }
+            Unit
+        }
+
     /**
      * Partial update of a synced wishlist row's quantity only (no full [WishlistEntryDto]
      * needed — the row already exists server-side and `user_id` never changes). Used to

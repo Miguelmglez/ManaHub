@@ -29,7 +29,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * Top-level `val` (mirroring [MIGRATION_49_50]) so the instrumented MigrationTestHelper test can
  * reference it directly. Column names/types mirror what Room generated for the (since deleted)
  * `CompetitiveMetaCacheEntity`/`CompetitiveLimitedRatingsCacheEntity`; both tables are dropped
- * again by [MIGRATION_58_59].
+ * again by [MIGRATION_66_67].
  */
 val MIGRATION_50_51 = object : Migration(50, 51) {
     override fun migrate(db: SupportSQLiteDatabase) {

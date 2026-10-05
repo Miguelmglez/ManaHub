@@ -10,7 +10,7 @@ import androidx.room.PrimaryKey
     // Card Versions & Languages, Phase 1A: supports the oracle-wide lookups used to relate every
     // printing/language of a card (CardDao is queried by oracle_id from UserCardCollectionDao,
     // LocalWishlistDao and LocalOpenForTradeDao's observeVersionsByOracle joins).
-    indices = [Index("oracle_id")],
+    indices = [Index("oracle_id"),Index("set_code","collector_number","lang"),Index("name")],
 )
 data class CardEntity(
 

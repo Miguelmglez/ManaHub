@@ -20,6 +20,7 @@ import com.mmg.manahub.feature.collection.presentation.importexport.CollectionEx
  */
 data class CollectionUiState(
     val cards:               List<CollectionCardGroup> = emptyList(),
+    val selectionSummary: com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionSummary? = null,
     val isLoading:           Boolean                   = false,
     val error:               String?                   = null,
     val searchQuery:         String                    = "",
@@ -82,7 +83,7 @@ val CollectionUiState.activeFilterCount: Int
 
 /** Export needs something visible (or unrendered rows it can hydrate) in the Cards tab. */
 val CollectionUiState.canExport: Boolean
-    get() = cards.isNotEmpty() || uncachedSourceRows > 0
+    get() = selectionSummary!=null || cards.isNotEmpty() || uncachedSourceRows > 0
 
 enum class SortOrder { DATE_ADDED, NAME, PRICE, RARITY }
 enum class SortDirection { ASC, DESC }

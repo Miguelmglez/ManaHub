@@ -21,6 +21,9 @@ import kotlinx.datetime.toLocalDateTime
  */
 object CollectionExportFormatter {
 
+    /** Escapes one bounded CSV record without retaining the complete output. */
+    fun csvRecord(fields: List<String>): String = CsvCodec.row(fields)
+
     val MOXFIELD_HEADER = listOf(
         "Count", "Tradelist Count", "Name", "Edition", "Condition", "Language", "Foil", "Tags",
         "Last Modified", "Collector Number", "Alter", "Proxy", "Purchase Price",
@@ -40,10 +43,9 @@ object CollectionExportFormatter {
         entries: List<CollectionExportEntry>,
         format: CollectionFileFormat,
         headerComment: String? = null,
-    ): String = when (format) {
-        CollectionFileFormat.TEXT -> formatText(entries, headerComment)
-        CollectionFileFormat.MOXFIELD_CSV -> formatMoxfieldCsv(entries)
-        CollectionFileFormat.MANABOX_CSV -> formatManaBoxCsv(entries)
+    ): String = buildString {
+        append(header(format,headerComment))
+        entries.forEach { append(record(it,format)) }
     }
 
     /** The local date an export is stamped with, for both the file name and the header comment. */
@@ -76,71 +78,16 @@ object CollectionExportFormatter {
             compareBy<CollectionExportEntry>({ it.name.lowercase() }, { it.setCode.lowercase() }, { it.collectorNumber })
         )
 
-    private fun formatText(entries: List<CollectionExportEntry>, headerComment: String?): String = buildString {
-        headerComment?.let { appendLine("// ${it.replace('\n', ' ')}") }
-        entries.forEach { entry ->
-            appendLine(
-                DeckImportExportHelper.formatLine(
-                    qty = entry.quantity,
-                    name = entry.name,
-                    setCode = entry.setCode,
-                    collectorNumber = entry.collectorNumber,
-                    includeSet = true,
-                    isFoil = entry.isFoil,
-                )
-            )
-        }
+    /** Header emitted once by bounded export writers. */
+    fun header(format: CollectionFileFormat,comment: String?=null): String=when(format) {
+        CollectionFileFormat.TEXT -> comment?.let { "// ${it.replace('\n',' ')}\n" }.orEmpty()
+        CollectionFileFormat.MOXFIELD_CSV -> CsvCodec.row(MOXFIELD_HEADER)+"\n"
+        CollectionFileFormat.MANABOX_CSV -> CsvCodec.row(MANABOX_HEADER)+"\n"
     }
-
-    private fun formatMoxfieldCsv(entries: List<CollectionExportEntry>): String = buildString {
-        appendLine(CsvCodec.row(MOXFIELD_HEADER))
-        entries.forEach { entry ->
-            appendLine(
-                CsvCodec.row(
-                    listOf(
-                        entry.quantity.toString(),
-                        "0",
-                        entry.name,
-                        entry.setCode.lowercase(),
-                        CollectionCardAttributes.moxfieldCondition(entry.condition),
-                        CollectionCardAttributes.moxfieldLanguage(entry.language),
-                        if (entry.isFoil) "foil" else "",
-                        "",
-                        "",
-                        entry.collectorNumber,
-                        "False",
-                        "False",
-                        "",
-                    )
-                )
-            )
-        }
-    }
-
-    private fun formatManaBoxCsv(entries: List<CollectionExportEntry>): String = buildString {
-        appendLine(CsvCodec.row(MANABOX_HEADER))
-        entries.forEach { entry ->
-            appendLine(
-                CsvCodec.row(
-                    listOf(
-                        entry.name,
-                        entry.setCode.uppercase(),
-                        entry.setName,
-                        entry.collectorNumber,
-                        if (entry.isFoil) "foil" else "normal",
-                        entry.rarity.lowercase(),
-                        entry.quantity.toString(),
-                        "",
-                        entry.scryfallId,
-                        "",
-                        "false",
-                        "false",
-                        CollectionCardAttributes.manaBoxCondition(entry.condition),
-                        entry.language.lowercase(),
-                        "",
-                    )
-                )
-            )
-        }
+    /** One source row, retaining every represented attribute and the original card name. */
+    fun record(entry: CollectionExportEntry,format: CollectionFileFormat): String=when(format) {
+        CollectionFileFormat.TEXT -> DeckImportExportHelper.formatLine(entry.quantity,entry.name,entry.setCode,entry.collectorNumber,true,entry.isFoil)+"\n"
+        CollectionFileFormat.MOXFIELD_CSV -> CsvCodec.row(listOf(entry.quantity.toString(),"0",entry.name,entry.setCode.lowercase(),CollectionCardAttributes.moxfieldCondition(entry.condition),CollectionCardAttributes.moxfieldLanguage(entry.language),if(entry.isFoil)"foil" else "","","",entry.collectorNumber,"False","False",""))+"\n"
+        CollectionFileFormat.MANABOX_CSV -> CsvCodec.row(listOf(entry.name,entry.setCode.uppercase(),entry.setName,entry.collectorNumber,if(entry.isFoil)"foil" else "normal",entry.rarity.lowercase(),entry.quantity.toString(),"",entry.scryfallId,"","false","false",CollectionCardAttributes.manaBoxCondition(entry.condition),entry.language.lowercase(),""))+"\n"
     }
 }

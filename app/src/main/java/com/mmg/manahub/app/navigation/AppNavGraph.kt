@@ -1,6 +1,7 @@
 package com.mmg.manahub.app.navigation
 // COMMENTS_REVIEWED: 2026-09-16
 
+import com.mmg.manahub.feature.home.presentation.rulesDestination
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
@@ -170,6 +171,8 @@ internal fun shouldRouteToRecoveryScreen(
 fun AppNavGraph(
     modifier: Modifier = Modifier,
     isInPiP: Boolean = false,
+    transferIntake: com.mmg.manahub.feature.collection.presentation.importexport.TransferIntakeViewModel,
+    transferRoutingAllowed: Boolean = true,
 ) {
     val activity = LocalContext.current as ComponentActivity
     val context = LocalContext.current
@@ -295,6 +298,24 @@ fun AppNavGraph(
     }
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
+    val receivedTransfers by transferIntake.pending.collectAsStateWithLifecycle()
+    val transferIntakeError by transferIntake.error.collectAsStateWithLifecycle()
+    LaunchedEffect(transferIntakeError) {
+        transferIntakeError?.let { inviteToastState.show(it,MagicToastType.ERROR);transferIntake.clearError() }
+    }
+    LaunchedEffect(receivedTransfers,recoverySessionState,pendingRecoveryMarker,currentRoute,transferRoutingAllowed) {
+        if(!transferRoutingAllowed || currentRoute==null || recoverySessionState==com.mmg.manahub.core.domain.auth.SessionState.Loading ||
+            isActiveRecoveryFlow(recoverySessionState,pendingRecoveryMarker,System.currentTimeMillis()) || currentRoute==Screen.ResetPasswordConfirm.route)return@LaunchedEffect
+          receivedTransfers.firstOrNull()?.let { id ->
+              val shown=backStack?.arguments?.getString("jobId")
+              if(currentRoute==Screen.ImportCards.route && shown!=null) {
+                  if(shown==id)transferIntake.routed(id)
+                  return@LaunchedEffect
+              }
+              navController.navigate(Screen.ImportCards.createRoute(id)) { launchSingleTop=true }
+            transferIntake.routed(id)
+        }
+    }
 
     // Composed before the NavHost so screen/sheet/overlay back handlers registered later win.
     val exitGuard = remember { AppExitBackGuard(clock = android.os.SystemClock::elapsedRealtime) }
@@ -404,7 +425,14 @@ fun AppNavGraph(
                                             navController.navigate(Screen.GameSetup.baseRoute)
                                         }
                                     }
-                                    HomeAction.OpenImportCollection -> navController.navigate(Screen.ImportCards.route)
+                                    HomeAction.OpenRules -> navController.navigateRules(com.mmg.manahub.core.model.rules.RulesDestination.Index(), "home_shortcut")
+                                    HomeAction.OpenRulesTipIndex -> navController.navigateRules(com.mmg.manahub.core.model.rules.RulesDestination.Index(), "home_tip")
+                                    is HomeAction.OpenRulesTip -> {
+                                        val tip = com.mmg.manahub.feature.home.presentation.MTG_TIPS_CATALOG.firstOrNull { it.stableId == action.tipId }
+                                        val destination = tip?.rulesDestination() ?: com.mmg.manahub.core.model.rules.RulesDestination.Index()
+                                        navController.navigateRules(destination, "home_tip")
+                                    }
+                                    HomeAction.OpenImportCollection -> navController.navigate(Screen.ImportCards.createRoute())
                                     HomeAction.ScanCard -> navController.navigate(Screen.CollectionScanner.route)
                                     HomeAction.SearchCard -> navController.navigate(Screen.CollectionAddCard.createRoute())
                                     HomeAction.CreateDeck -> navController.navigate(Screen.DeckStudio.createRoute(null))
@@ -497,6 +525,7 @@ fun AppNavGraph(
                                     is HomeAction.OpenMultiAdd -> navController.navigate(Screen.CollectionAddCard.createRoute(multi = true))
                                     // ── Widget board: handled in HomeScreen/VM ───────────
                                     HomeAction.OpenWidgetGallery,
+                                    HomeAction.OpenDeckCreationSheet,
                                     HomeAction.ResetLayout,
                                     HomeAction.RetryDiscover,
                                     HomeAction.RefreshDiscover,
@@ -530,6 +559,7 @@ fun AppNavGraph(
                         ),
                     ) { backStackEntry ->
                         CollectionScreen(
+                            onImportCards={navController.navigate(Screen.ImportCards.createRoute())},
                             // G.1 fix: read the "tab" arg directly off THIS backStackEntry (always
                             // reflects the current navigate() call, e.g. "decks" from the Draft
                             // Simulator hand-off) rather than relying on CollectionViewModel's
@@ -612,46 +642,15 @@ fun AppNavGraph(
                             }
                         )
                     }
-                    composable(Screen.ImportCards.route){
-                            backStackEntry ->
-                        CollectionScreen(
-                            // G.1 fix: read the "tab" arg directly off THIS backStackEntry (always
-                            // reflects the current navigate() call, e.g. "decks" from the Draft
-                            // Simulator hand-off) rather than relying on CollectionViewModel's
-                            // SavedStateHandle-read-at-init (which freezes on the value seen the
-                            // FIRST time this destination's ViewModel was constructed — a restored
-                            // instance, per navigateTab's restoreState=true contract, keeps that
-                            // frozen value and never re-reads a fresh arg). See CollectionScreen's
-                            // initialTabArg LaunchedEffect for how this is applied.
-                            initialTabArg = backStackEntry.arguments?.getString("tab"),
-                            onCardClick = { id, key ->
-                                navController.navigate(Screen.CollectionCardDetail.createRoute(id, key))
-                            },
-                            onAddCardClick = { navController.navigate(Screen.CollectionAddCard.createRoute()) },
-                            onDeckClick = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
-                            onPlaytestClick = { id ->
-                                navController.navigate(Screen.PlaytestSetup.createRoute(id))
-                            },
-                            onNavigateToTradeProposal = { receiverId ->
-                                navController.navigate(Screen.CreateTradeProposal.createRoute(receiverId))
-                            },
-                            onNavigateToTradeThread = { proposalId, rootProposalId ->
-                                navController.navigate(
-                                    Screen.TradeNegotiationDetail.createRoute(proposalId, rootProposalId)
-                                )
-                            },
-                            onNavigateToAddFriends = {
-                                navController.navigate(Screen.FriendsList.route)
-                            },
-                            onBrowseCommunityDecks = {
-                                navController.navigate(Screen.CommunityDecks.route)
-                            },
-                            sharedTransitionScope = this@SharedTransitionLayout,
-                            animatedVisibilityScope = this@composable,
-                            openImport = true
+                    composable(
+                        Screen.ImportCards.route,
+                        arguments=listOf(navArgument("jobId") { type=NavType.StringType; nullable=true; defaultValue=null }),
+                    ) { entry ->
+                        com.mmg.manahub.feature.collection.presentation.importexport.DurableTransferScreen(
+                            entry.arguments?.getString("jobId"),transferIntake,{navController.popBackStack()},
+                            { id -> navController.navigate(Screen.ImportCards.createRoute(id)) { popUpTo(Screen.ImportCards.route){inclusive=true};launchSingleTop=true } },
                         )
                     }
-
                     composable(
                         route = Screen.DeckScanner.route,
                         arguments = listOf(
@@ -1113,12 +1112,24 @@ fun AppNavGraph(
                 // A gamification tab only opens once gamification is known to be available.
                 val initialTab = ProfileTab.fromRouteArg(backStackEntry.arguments?.getString("tab"))
                 ProfileScreen(
+                    onRulesClick = { navController.navigateRules(com.mmg.manahub.core.model.rules.RulesDestination.Index(), "profile") },
                     onSettingsClick = { navController.navigate(Screen.Settings.route) },
                     onStatsClick = { navController.navigate(Screen.Stats.route) },
                     onFriendsClick = { navController.navigate(Screen.FriendsList.route) },
                     onManageAccountClick = { navController.navigate(Screen.AccountManagement.route) },
                     initialTab = initialTab,
                     onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                Screen.Rules.route,
+                arguments = listOf(navArgument("query") { type = NavType.StringType; defaultValue = "" }, navArgument("reference") { type = NavType.StringType; defaultValue = "" }, navArgument("edition") { type = NavType.StringType; defaultValue = "" }, navArgument("entry") { type = NavType.StringType; defaultValue = "navigation" }),
+            ) {
+                com.mmg.manahub.feature.rules.presentation.AndroidRulesScreen(
+                    onBack = { navController.popBackStack() },
+                    onReference = { destination -> navController.navigateRules(destination) },
+                    onBrowse = { navController.navigateRules(com.mmg.manahub.core.model.rules.RulesDestination.Index()) },
                 )
             }
 
@@ -1809,4 +1820,12 @@ private fun NavController.navigateTab(route: String) {
         launchSingleTop = true
         restoreState = true
     }
+}
+
+private fun androidx.navigation.NavHostController.navigateRules(destination: com.mmg.manahub.core.model.rules.RulesDestination, entry: String = "navigation") {
+    val route = Screen.Rules.createRoute(destination, entry)
+    val args = currentBackStackEntry?.arguments
+    val current = "rules?query=${android.net.Uri.encode(args?.getString("query").orEmpty())}&reference=${android.net.Uri.encode(args?.getString("reference").orEmpty())}&edition=${android.net.Uri.encode(args?.getString("edition").orEmpty())}&entry=${args?.getString("entry") ?: "navigation"}"
+    if (currentBackStackEntry?.destination?.route == Screen.Rules.route && current == route) return
+    navigate(route)
 }

@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -148,6 +149,7 @@ private const val MAX_TOP_VALUE_SYMBOLS = 3
 fun ProfileScreen(
     viewModel: ProfileViewModel = koinViewModel(),
     authViewModel: AuthViewModel = koinViewModel(),
+    onRulesClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onStatsClick: () -> Unit,
     onFriendsClick: () -> Unit,
@@ -324,6 +326,7 @@ fun ProfileScreen(
                         onStatsClick = onStatsClick,
                         onRetryStats = viewModel::retryStats,
                         onUpdateClick = viewModel::onUpdateClick,
+                        onRulesClick = onRulesClick,
                         onRateClick = {
                             if (!openStoreListing(context)) {
                                 toastState.show(message = storeUnavailableMessage, type = MagicToastType.ERROR)
@@ -455,6 +458,7 @@ private fun LazyListScope.overviewItems(
     onStatsClick: () -> Unit,
     onRetryStats: () -> Unit,
     onUpdateClick: () -> Unit,
+    onRulesClick: () -> Unit,
     onRateClick: () -> Unit,
     onFeedbackClick: () -> Unit,
     onLoginClick: () -> Unit,
@@ -524,6 +528,11 @@ private fun LazyListScope.overviewItems(
                 modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg, vertical = MaterialTheme.spacing.xs),
             )
         }
+    }
+
+    item(key = "overview_rules") {
+        ProfileLinkRow(icon = Icons.AutoMirrored.Filled.MenuBook, iconTint = MaterialTheme.magicColors.primaryAccent, label = stringResource(R.string.rules_title), onClick = onRulesClick,
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg, vertical = MaterialTheme.spacing.xs))
     }
 
     item(key = "overview_rate") {

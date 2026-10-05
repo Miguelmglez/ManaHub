@@ -5,10 +5,10 @@ kotlinx-collections-immutable = "0.3.8"
 paging = "3.3.6"
 work = "2.10.1"
 hilt-work = "1.2.0"
-firebase-bom = "34.12.0"
+firebase-bom = "34.19.0"
 gson = "2.13.2"
 kotlin               = "2.3.20"
-agp                  = "9.1.0"
+agp                  = "9.2.1"
 compose-bom          = "2026.03.01"
 hilt                 = "2.59.2"
 room                 = "2.8.4"
@@ -18,12 +18,12 @@ coil                 = "3.3.0"
 navigation           = "2.9.7"
 lifecycle            = "2.10.0"
 coroutines           = "1.10.2"
-camerax              = "1.6.1"
+camerax              = "1.6.2"
 google-services      = "4.4.4"
 mockk                = "1.14.9"
 turbine              = "1.2.1"
-firebase-crashlytics = "19.4.0"
-foundation = "1.10.6"
+firebase-crashlytics = "19.4.4"
+foundation = "1.12.1"
 material3 = "1.4.0"
 datastore  = "1.2.1"
 tv-material    = "1.0.1"
@@ -37,8 +37,8 @@ androidx-test-ext-junit = "1.3.0"
 espresso-core  = "3.7.0"
 supabase-bom         = "3.5.0"
 ktor                 = "3.2.2"
-credentials          = "1.5.0"
-googleid             = "1.1.1"
+credentials          = "1.6.0"
+googleid             = "1.2.1"
 
 youtube-player       = "13.0.0"
 play-app-update      = "2.1.0"
@@ -49,7 +49,7 @@ lottie              = "6.7.1"
 # Kotlin Multiplatform (KMP) migration — Phase 0, Spike A.
 # compose-multiplatform: JetBrains Compose Multiplatform plugin (wasmJs-capable UI). Added now so
 # later phases can reuse the alias; NOT applied to :shared:core-model (it has no UI yet).
-compose-multiplatform = "1.11.0"
+compose-multiplatform = "1.12.1"
 
 # Koin — KMP-native DI, added in Phase 0 Spike D to run ALONGSIDE Hilt during the per-feature
 # Hilt→Koin cutover (coexistence). Hilt aliases are intentionally kept; Koin is additive.
@@ -207,7 +207,7 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization",     v
 hilt                 = { id = "com.google.dagger.hilt.android",                version.ref = "hilt" }
 ksp                  = { id = "com.google.devtools.ksp",                       version = "2.3.6" }
 google-services      = { id = "com.google.gms.google-services",                version.ref = "google-services" }
-firebase-crashlytics = { id = "com.google.firebase.crashlytics",               version = "3.0.4" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics",               version = "3.0.8" }
 
 # ── Kotlin Multiplatform (KMP) migration — Phase 0, Spike A ──────────────────────────────────────
 # kotlin-multiplatform: the KMP Kotlin plugin (commonMain + per-target source sets).

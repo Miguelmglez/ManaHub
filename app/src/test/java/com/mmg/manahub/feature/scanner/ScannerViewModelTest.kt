@@ -9,7 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.queue.InMemoryCardQueueStore
 import com.mmg.manahub.core.data.queue.PersistentCardQueueRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.collection.transfer.CollectionOwnershipRepository
 import com.mmg.manahub.core.domain.usecase.collection.CommitScanResult
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
@@ -93,7 +93,7 @@ class ScannerViewModelTest {
     // ── Mocks ──────────────────────────────────────────────────────────────────
 
     private val cardRepository: CardRepository = mockk(relaxed = true)
-    private val userCardRepository: UserCardRepository = mockk(relaxed = true)
+    private val ownershipRepository: CollectionOwnershipRepository = mockk(relaxed = true)
     private val commitScannedCards: CommitScannedCardsUseCase = mockk(relaxed = true)
     private val addToWishlist: AddToWishlistUseCase = mockk()
     private val analyticsHelper: AnalyticsHelper = mockk(relaxed = true)
@@ -150,17 +150,14 @@ class ScannerViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        // Empty collection by default: the "already in collection" badge collector (init block)
-        // needs a real Flow — a relaxed mock alone would return Unit for `collect` without ever
-        // touching FlowCollector, which happens to be harmless here but this stub keeps intent explicit.
-        every { userCardRepository.observeCollection() } returns emptyFlow()
+        every { ownershipRepository.observe(any()) } returns emptyFlow()
         // Real shared queue over an in-memory store: the VM's queue behaviour is exercised end to end.
         appScope = CoroutineScope(SupervisorJob())
         queueRepository = PersistentCardQueueRepository(store = InMemoryCardQueueStore())
         viewModel = ScannerViewModel(
             savedStateHandle = SavedStateHandle(),
             cardRepository = cardRepository,
-            userCardRepository = userCardRepository,
+            ownershipRepository = ownershipRepository,
             sharedQueueRepository = queueRepository,
             queueActions = CardQueueActions.forScannedCards(
                 queueRepository = queueRepository,
@@ -1000,7 +997,7 @@ class ScannerViewModelTest {
     private fun deckViewModel(deckId: String = "deck-1") = ScannerViewModel(
         savedStateHandle = SavedStateHandle(mapOf(ScannerTarget.DECK_ID_ARGUMENT to deckId)),
         cardRepository = cardRepository,
-        userCardRepository = userCardRepository,
+        ownershipRepository = ownershipRepository,
         sharedQueueRepository = queueRepository,
         queueActions = CardQueueActions.forScannedCards(
             queueRepository = queueRepository,

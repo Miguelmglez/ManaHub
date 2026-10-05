@@ -296,6 +296,9 @@ class RateLimitedQueue(
         crashReporter?.setCustomKey("${queueName}_cooldown_ms", cooldownMs.toString())
     }
 
+    /** Read-only observation allows durable work to persist a wait without dispatching another request. */
+    suspend fun cooldownRemainingMillis(): Long = remainingCooldownMs()
+
     /** Milliseconds remaining until [cooldownUntilMs], never negative. */
     private suspend fun remainingCooldownMs(): Long =
         mutex.withLock { (cooldownUntilMs - nowMs()).coerceAtLeast(0L) }

@@ -15,14 +15,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.app.navigation.AppNavGraph
@@ -41,6 +45,7 @@ import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.MagicThemeAndroid
+import com.mmg.manahub.core.ui.theme.colors
 import com.mmg.manahub.feature.gamification.presentation.GamificationCelebrationHost
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.jan.supabase.SupabaseClient
@@ -54,6 +59,8 @@ import kotlinx.coroutines.withTimeout
 import java.util.Locale
 import javax.inject.Inject
 import org.koin.android.ext.android.inject
+import org.koin.androidx.viewmodel.ext.android.viewModel
+import com.mmg.manahub.feature.collection.presentation.importexport.TransferIntakeViewModel
 
 /**
  * Bound on the blocking pending-recovery-marker write in [MainActivity.handleSupabaseAuthDeepLink]
@@ -68,6 +75,8 @@ private const val UPDATE_PROMPT_DURATION_MS = 10_000L
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private val transferIntake: TransferIntakeViewModel by viewModel()
+    private var receivedTransferId: String?=null
 
     var videoPlayerActive by mutableStateOf(false)
         private set
@@ -446,6 +455,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
+        receivedTransferId=null
+        if(transferIntake.receiveIntent(intent,onIdentity={receivedTransferId=it}))return
         handleSupabaseAuthDeepLink(intent)
         handlePushDeeplink(intent)
     }
@@ -457,9 +469,11 @@ class MainActivity : ComponentActivity() {
         splashScreen.setKeepOnScreenCondition { false }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        handleSupabaseAuthDeepLink(intent)
+        receivedTransferId=savedInstanceState?.getString("received_transfer_id")
+        val isTransfer=transferIntake.receiveIntent(intent,receivedTransferId) { receivedTransferId=it }
+        if(!isTransfer)handleSupabaseAuthDeepLink(intent)
         // Cold-start from a notification tap: buffered until AppNavGraph registers its navigator.
-        handlePushDeeplink(intent)
+        if(!isTransfer)handlePushDeeplink(intent)
 
         appUpdateController.bind(this)
 
@@ -507,6 +521,16 @@ class MainActivity : ComponentActivity() {
 
             val theme by userPreferencesDataStore.themeFlow
                 .collectAsStateWithLifecycle(initialValue = AppTheme.Default)
+            val view = LocalView.current
+            val darkSystemBarIcons = theme.colors().background.luminance() > 0.5f
+            if (!view.isInEditMode) {
+                SideEffect {
+                    WindowCompat.getInsetsController(window, view).apply {
+                        isAppearanceLightStatusBars = darkSystemBarIcons
+                        isAppearanceLightNavigationBars = darkSystemBarIcons
+                    }
+                }
+            }
 
             val userPrefs by userPreferencesRepository.preferencesFlow
                 .collectAsStateWithLifecycle(initialValue = null)
@@ -522,7 +546,7 @@ class MainActivity : ComponentActivity() {
                                 .fillMaxSize()
                                 .then(if (forcedUpdate != null) Modifier.clearAndSetSemantics { } else Modifier),
                         ) {
-                            AppNavGraph(isInPiP = isInPiP)
+                            AppNavGraph(isInPiP = isInPiP,transferIntake=transferIntake,transferRoutingAllowed=forcedUpdate==null)
                         }
                         // Global achievement-unlock celebration overlay (ADR-002, Phase 1). Hosted
                         // here so a celebration plays above any screen; suppressed when the master
@@ -550,6 +574,11 @@ class MainActivity : ComponentActivity() {
     private companion object {
         /** The app ships English-only (CLAUDE.md language rules); no locale picker exists. */
         const val APP_LOCALE = "en"
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        receivedTransferId?.let { outState.putString("received_transfer_id",it) }
+        super.onSaveInstanceState(outState)
     }
 
 }

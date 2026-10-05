@@ -1,6 +1,26 @@
 package com.mmg.manahub.feature.collection.di
 
 import androidx.work.WorkManager
+import com.mmg.manahub.core.domain.collection.transfer.*
+import com.mmg.manahub.feature.collection.data.*
+import com.mmg.manahub.feature.collection.data.RoomTransferCollectionExecutor
+import com.mmg.manahub.feature.collection.data.RoomTransferWishlistExecutor
+import com.mmg.manahub.feature.trades.data.WishlistMutationCoordinator
+import com.mmg.manahub.feature.collection.data.RoomTransferWishlistDeliveryStore
+import com.mmg.manahub.feature.collection.data.AndroidTransferWishlistDeliveryGateway
+import com.mmg.manahub.core.domain.collection.transfer.TransferWishlistSync
+import com.mmg.manahub.core.domain.collection.transfer.TransferWishlistDeliveryStore
+import com.mmg.manahub.core.domain.collection.transfer.TransferWishlistDeliveryGateway
+import com.mmg.manahub.feature.collection.data.TransferAuthSessionObserver
+import com.mmg.manahub.feature.collection.data.VerifiedTransferGuestIdentity
+import com.mmg.manahub.core.domain.collection.transfer.TransferSessionGate
+import com.mmg.manahub.core.domain.collection.transfer.TransferWishlistExecutor
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import kotlinx.datetime.Clock
+import com.mmg.manahub.core.data.local.MtgDatabase
+import com.mmg.manahub.core.data.local.dao.CollectionTransferDao
 import com.mmg.manahub.core.sync.CollectionMergeConflictResolver
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.SyncManager
@@ -13,7 +33,13 @@ import com.mmg.manahub.core.domain.repository.CardQueueRepository
 import com.mmg.manahub.core.domain.usecase.collection.CommitImportedCardsUseCase
 import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.feature.collection.data.AndroidCollectionFileGateway
+import com.mmg.manahub.feature.collection.data.LegacyCollectionImportQuarantine
+import com.mmg.manahub.feature.collection.data.RoomCollectionTransferRepository
+import com.mmg.manahub.core.domain.collection.transfer.CollectionTransferRepository
 import com.mmg.manahub.feature.collection.data.SharedPreferencesImportUnresolvedStore
+import com.mmg.manahub.feature.collection.data.AndroidTransferResolutionGateway
+import com.mmg.manahub.feature.collection.data.TransferNetworkAvailability
+import com.mmg.manahub.core.domain.collection.transfer.TransferResolutionGateway
 import com.mmg.manahub.feature.collection.presentation.importexport.CollectionImportViewModel
 import com.mmg.manahub.feature.trades.domain.usecase.AddAllToWishlistUseCase
 import org.koin.android.ext.koin.androidContext
@@ -87,7 +113,55 @@ import org.koin.dsl.module
  */
 fun collectionKoinModule(
     workManager: WorkManager,
+    transferDatabase: MtgDatabase,
 ): Module = module {
+    single<MtgDatabase> { transferDatabase }
+    single<CollectionTransferDao> { get<MtgDatabase>().collectionTransferDao() }
+    single { TransferSessionGate() }
+    single { VerifiedTransferGuestIdentity(androidContext()) }
+    single { TransferAuthSessionObserver(get<AuthRepository>().sessionState,get(),get(),get()) }
+    single<CollectionTransferRepository> { RoomCollectionTransferRepository(get(),get(),get<TransferAuthSessionObserver>()::matchesObserved,scheduler=get()) }
+    single { RoomCollectionSelectionRepository(get(),get(),get()) }
+    single<CollectionSelectionRepository> { get<RoomCollectionSelectionRepository>() }
+    single<CollectionOwnershipRepository> { RoomCollectionOwnershipRepository(get(),get(),get()) }
+    single<CollectionExportRepository> { RoomCollectionExportRepository(androidContext(),get(),get(),get(),get(),get(),get()) }
+    viewModel { com.mmg.manahub.feature.collection.presentation.importexport.DurableExportViewModel(get(),get(),get(),get(),get()) }
+    factory { com.mmg.manahub.feature.collection.presentation.CollectionSelectionRuntime(get(),get(),get(),get()) }
+    viewModel { com.mmg.manahub.feature.collection.presentation.importexport.TransferIntakeViewModel(get(),androidContext().contentResolver,get(),get(),get(),get(),get()) }
+    single { com.mmg.manahub.feature.collection.data.AndroidTransferReportWriter(get(),get(),get(),androidContext().contentResolver,androidContext().filesDir) }
+    viewModel { parameters -> com.mmg.manahub.feature.collection.presentation.importexport.DurableTransferViewModel(parameters.get(),get(),get(),get(),get(),get(),get(),get(),androidContext().contentResolver,get()) }
+    single { RoomTransferCollectionExecutor(get(),get(),System::currentTimeMillis,{
+        get<ProgressionEventBus>().emit(ProgressionEvent.CollectionChanged(Clock.System.now()))
+        if((get<TransferSessionGate>().currentSession as? com.mmg.manahub.core.domain.collection.transfer.TransferSession.Available)?.owner is com.mmg.manahub.core.domain.collection.transfer.TransferOwner.Account)
+            CollectionSyncWorker.enqueueTransferSync(get())
+    },matchesObservedOwner=get<TransferAuthSessionObserver>()::matchesObserved) }
+    single<TransferWishlistExecutor> { RoomTransferWishlistExecutor(get(),get(),System::currentTimeMillis,get<TransferAuthSessionObserver>()::matchesObserved) }
+    single<TransferWishlistDeliveryStore> { RoomTransferWishlistDeliveryStore(get(),get(),get<TransferAuthSessionObserver>()::matchesObserved) }
+    single<TransferWishlistDeliveryGateway> { AndroidTransferWishlistDeliveryGateway(get(),get<TransferAuthSessionObserver>()::matchesObserved) }
+    single { TransferWishlistSync(get(),get(),get(),get<TransferAuthSessionObserver>()::matchesObserved,get()) }
+    single { WishlistMutationCoordinator(get(),get(),get<AuthRepository>().sessionState,get(),get(),get()) }
+    single { TransferNetworkAvailability(androidContext()) }
+    single<TransferWorkScheduler> { AndroidTransferWorkScheduler(get()) }
+    single {
+        val gate=get<TransferSessionGate>(); val observer=get<TransferAuthSessionObserver>()
+        AndroidCollectionTransferFileStore(androidContext().filesDir,get(),{ observer.observedSession(gate) })
+    }
+    single<CollectionTransferFileStore> { get<AndroidCollectionTransferFileStore>() }
+    single<TransferResolutionStore> {
+        val gate=get<TransferSessionGate>(); val observer=get<TransferAuthSessionObserver>()
+        RoomTransferResolutionStore(get(),{ observer.observedSession(gate) })
+    }
+    single { DurableTransferResolver(get(),get(),System::currentTimeMillis) }
+    single {
+        val gate=get<TransferSessionGate>(); val observer=get<TransferAuthSessionObserver>()
+        RoomTransferReviewBuilder(get(),{ observer.observedSession(gate) },System::currentTimeMillis)
+    }
+    single { RoomCollectionTransferCoordinator(get(),get(),get<TransferAuthSessionObserver>()::matchesObserved,get(),get(),get(),get(),get(),get(),get()) }
+    single<CollectionTransferCoordinator> { get<RoomCollectionTransferCoordinator>() }
+    single { RunTransferWork(get()) }
+    worker { CollectionTransferWorker(androidContext(),it.get(),{ get() }) }
+    worker { TransferWishlistDeliveryWorker(androidContext(),it.get(),{ get() }) }
+    single<TransferResolutionGateway> { AndroidTransferResolutionGateway(get<MtgDatabase>().cardDao(),get(),get(),get<TransferNetworkAvailability>()::isOnline) }
     // ── Hilt → Koin bridge: re-expose the Collection-only Hilt-owned singletons to Koin. ──
     // (CardRepository, AuthRepository, UserPreferencesRepository, AnalyticsHelper, WishlistRepository and
     //  OpenForTradeRepository are shared → bridged in coreBridgeKoinModule; GetLocalWishlistUseCase and
@@ -130,22 +204,19 @@ fun collectionKoinModule(
             collectionMergeConflictResolver = get(),
             fileGateway = get(),
             crashReporter = get(),
+            selectionRuntime = get(),
         )
     }
 
     // ── Collection import / export. ──
+    single { LegacyCollectionImportQuarantine(androidContext()) }
     single<CollectionFileGateway> { AndroidCollectionFileGateway(androidContext(), get(named("io"))) }
     // Private review queue: must stay a single instance over its store, and never the shared queue.
     // Its own preference file + off-main persistence: this queue holds thousands of rows, so both
     // the re-encode and the SharedPreferences write have to stay off the caller's thread.
     single<CardQueueRepository>(named(COLLECTION_IMPORT_QUEUE)) {
         PersistentCardQueueRepository(
-            store = SharedPreferencesCardQueueStore(
-                androidContext(),
-                key = SharedPreferencesCardQueueStore.COLLECTION_IMPORT_QUEUE_KEY,
-                fileName = SharedPreferencesCardQueueStore.COLLECTION_IMPORT_PREF_FILE,
-                blockingWrite = true,
-            ),
+            store = get<LegacyCollectionImportQuarantine>().queueStore(),
             crashReporter = get(),
             persistenceScope = get(),
         )
@@ -158,7 +229,7 @@ fun collectionKoinModule(
             wishlistBatchWriter = get<AddAllToWishlistUseCase>(),
         )
     }
-    single<CollectionImportUnresolvedStore> { SharedPreferencesImportUnresolvedStore(androidContext()) }
+    single<CollectionImportUnresolvedStore> { get<LegacyCollectionImportQuarantine>().unresolvedStore() }
     viewModel {
         CollectionImportViewModel(
             resolveImport = get(),
@@ -178,3 +249,5 @@ fun collectionKoinModule(
 
 /** Koin qualifier of the Collection import review queue and its actions. */
 const val COLLECTION_IMPORT_QUEUE = "collectionImportQueue"
+
+

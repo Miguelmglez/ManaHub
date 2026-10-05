@@ -105,9 +105,8 @@ object DeckIdentitySeedTags {
      * caller. RAMP/TEMPO reuse their old macro-archetype tag lists verbatim; ATTRITION/TOOLBOX/
      * VOLTRON/GROUP_HUG/GROUP_SLUG reuse their old theme tag lists verbatim (both moves are pure
      * relabeling, per spec §3/§4.1 -- zero new tag-matching logic). ATTRITION is genuinely new (no
-     * prior macro/theme owned this identity) and gets an inline STRATEGY tag that has no
-     * TagDictionary registration yet -- same documented "honest no-op until Phase 5" limitation
-     * [THEME_TAGS]'s own KDoc already accepts for VEHICLES. */
+     * prior macro/theme owned this identity). Its STRATEGY tag has manual dictionary metadata
+     * without automatic detection rules; registration does not introduce new matching logic. */
     private val POSTURE_TAGS: Map<PostureId, List<CardTag>> = mapOf(
         PostureId.RAMP to SeedStrategy.RAMP.primaryTags,
         PostureId.TEMPO to listOf(CardTag.TEMPO, CardTag.COUNTERSPELL, CardTag.PROTECTION),

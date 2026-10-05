@@ -52,6 +52,9 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
+import com.mmg.manahub.core.domain.collection.transfer.*
+import com.mmg.manahub.feature.collection.data.TransferAuthSessionObserver
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
@@ -212,6 +215,9 @@ fun coreBridgeKoinModule(
     }
     single<WishlistRepository> {
         val authRepository = get<AuthRepository>()
+        val sessions=get<TransferSessionGate>()
+        val observer=get<TransferAuthSessionObserver>()
+        fun readKey(owner: TransferOwner)=when(owner) { is TransferOwner.Account -> owner.id; is TransferOwner.VerifiedGuest -> "guest:${owner.installationToken}" }
         WishlistRepositoryImpl(
             dao = get(),
             remote = get(),
@@ -219,6 +225,15 @@ fun coreBridgeKoinModule(
             sessionUserId = authRepository.sessionState.map { (it as? SessionState.Authenticated)?.user?.id },
             syncDao = get(),
             tradeWishlistCleanup = get(),
+            mutations = get(),
+            readOwnerKeys = combine(authRepository.sessionState,sessions.sessions) { _,session ->
+                (session as? TransferSession.Available)?.owner?.takeIf(observer::matchesObserved)?.let(::readKey)
+            },
+            captureReadOwner = { key ->
+                val captured=sessions.currentSession as? TransferSession.Available
+                val current: ()->Boolean={ captured!=null && sessions.currentSession==captured && readKey(captured.owner)==key && observer.matchesObserved(captured.owner) }
+                current
+            },
         )
     }
     single<OpenForTradeRepository> {

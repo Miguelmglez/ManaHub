@@ -80,7 +80,7 @@ enum class DoctorAnalysisStage {
 data class DeckDoctorState(
     /** Read-only Health evaluation from the scoring engine. Null until first computed. */
     val health: DeckHealth? = null,
-    /** True while the full analysis (Health) is being computed. */
+    /** True while a full or incremental analysis (Health) is being computed. */
     val isSuggestionsLoading: Boolean = false,
     /** True once at least one full [DeckDoctorOrchestrator.loadAnalysis] has completed. */
     val isLoaded: Boolean = false,
@@ -524,6 +524,7 @@ class DeckDoctorOrchestrator(
         val context = analysisCache ?: return
         recomputeDirty = true
         val generation = ++mutationGeneration
+        _state.update { it.copy(isSuggestionsLoading = true) }
         // Coalesce rapid taps into one recompute -- cancel-and-relaunch keeps only the last call.
         recomputeJob?.cancel()
         recomputeJob = scope.launch {
@@ -556,7 +557,10 @@ class DeckDoctorOrchestrator(
             return
         }
         _state.update {
-            it.copy(health = withUnresolvedWarning(health, context.unresolvedCount))
+            it.copy(
+                health = withUnresolvedWarning(health, context.unresolvedCount),
+                isSuggestionsLoading = false,
+            )
         }
         recomputeDirty = false
     }

@@ -12,16 +12,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Instrumented test for the v58 → v59 migration ([MIGRATION_58_59], MTG Today): `news_saved_items`
- * is created with Room's exact schema, `content_sources.site_url` is added as NULL without touching
- * existing rows, and both Competitive cache tables are dropped (`validateDroppedTables = true`).
- *
- * Schemas are loaded from androidTest assets (see `sourceSets.androidTest.assets` in
- * app/build.gradle.kts). Requires a connected device/emulator (`./gradlew connectedAndroidTest`).
- */
+// MTG Today migration must preserve master transfer data and validate the exact Room schema.
 @RunWith(AndroidJUnit4::class)
-class Migration58To59Test {
+class Migration66To67Test {
     @get:Rule
     val helper = MigrationTestHelper(
         InstrumentationRegistry.getInstrumentation(),
@@ -31,8 +24,8 @@ class Migration58To59Test {
     )
 
     @Test
-    fun migrate58To59_preservesSources_addsNullSiteUrl_andDropsCompetitiveCaches() {
-        helper.createDatabase(TEST_DB, 58).apply {
+    fun migrate66To67_preservesSources_addsNullSiteUrl_andDropsCompetitiveCaches() {
+        helper.createDatabase(TEST_DB, 66).apply {
             execSQL(
                 """
                 INSERT INTO content_sources
@@ -50,10 +43,14 @@ class Migration58To59Test {
                 "INSERT INTO competitive_limited_ratings_cache (set_code, format, response_json, cached_at) " +
                     "VALUES ('fin', 'PremierDraft', '{}', 1)"
             )
+            execSQL(
+                "INSERT INTO collection_transfer_receipts (id, auth_generation, captured_owner, phase, received_bytes, created_at, consumed_at, error) " +
+                    "VALUES ('receipt_1', 7, 'account:fixture', 'RECEIVED', 456, 123, NULL, NULL)"
+            )
             close()
         }
 
-        val db = helper.runMigrationsAndValidate(TEST_DB, 59, true, MIGRATION_58_59)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 67, true, MIGRATION_66_67)
 
         db.query(
             "SELECT name, feed_url, is_enabled, language, last_fetched_at, etag, last_modified, site_url " +
@@ -69,6 +66,12 @@ class Migration58To59Test {
             assertEquals("lm-1", cursor.getString(6))
             assertTrue("site_url must be NULL for existing rows", cursor.isNull(7))
         }
+        db.query("SELECT auth_generation, captured_owner, received_bytes FROM collection_transfer_receipts WHERE id = 'receipt_1'").use { cursor ->
+            assertTrue("the transfer receipt must survive", cursor.moveToFirst())
+            assertEquals(7L, cursor.getLong(0))
+            assertEquals("account:fixture", cursor.getString(1))
+            assertEquals(456L, cursor.getLong(2))
+        }
         assertFalse(tableExists(db, "competitive_meta_cache"))
         assertFalse(tableExists(db, "competitive_limited_ratings_cache"))
         assertTrue(tableExists(db, "news_saved_items"))
@@ -76,10 +79,10 @@ class Migration58To59Test {
     }
 
     @Test
-    fun migrate58To59_savedItemsTableAcceptsASnapshot() {
-        helper.createDatabase(TEST_DB, 58).close()
+    fun migrate66To67_savedItemsTableAcceptsASnapshot() {
+        helper.createDatabase(TEST_DB, 66).close()
 
-        val db = helper.runMigrationsAndValidate(TEST_DB, 59, true, MIGRATION_58_59)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 67, true, MIGRATION_66_67)
         db.execSQL(
             """
             INSERT INTO news_saved_items
@@ -100,11 +103,11 @@ class Migration58To59Test {
     }
 
     @Test
-    fun migrate58To59_isIdempotent_onRetryAfterCrash() {
-        helper.createDatabase(TEST_DB, 58).close()
+    fun migrate66To67_isIdempotent_onRetryAfterCrash() {
+        helper.createDatabase(TEST_DB, 66).close()
 
-        val db = helper.runMigrationsAndValidate(TEST_DB, 59, true, MIGRATION_58_59)
-        MIGRATION_58_59.migrate(db)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 67, true, MIGRATION_66_67)
+        MIGRATION_66_67.migrate(db)
         db.close()
     }
 

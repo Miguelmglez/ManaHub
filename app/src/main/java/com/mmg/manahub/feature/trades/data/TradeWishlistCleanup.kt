@@ -51,8 +51,10 @@ class TradeWishlistCleanup(
             require(activeUserId() == userId)
             syncDao.getPendingWishlistCleanups(userId).forEach { entry ->
                 require(activeUserId() == userId)
-                if (entry.targetQuantity == 0) remote.removeWishlistEntry(entry.wishlistId).getOrThrow()
-                else remote.updateWishlistQuantity(entry.wishlistId, entry.targetQuantity).getOrThrow()
+                if(wishlistDao.managed(entry.wishlistId)==null) {
+                    if (entry.targetQuantity == 0) remote.removeWishlistEntryForOwner(entry.wishlistId,userId).getOrThrow()
+                    else remote.updateWishlistQuantityForOwner(entry.wishlistId,userId,entry.targetQuantity).getOrThrow()
+                }
                 require(activeUserId() == userId)
                 syncDao.clearWishlistCleanup(userId, entry.wishlistId, entry.targetQuantity)
             }

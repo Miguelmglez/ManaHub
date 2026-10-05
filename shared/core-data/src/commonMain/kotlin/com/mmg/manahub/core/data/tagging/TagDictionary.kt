@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.data.tagging
 
 import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.CardTypeOption
 import com.mmg.manahub.core.model.DetectionRule
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.model.TagDictionaryEntry
@@ -95,7 +96,16 @@ object TagDictionary {
         rebuildEntries()
     }
 
-    private fun rebuildEntries() {
+    /** Manual system choices include type-line vocabulary without adding automatic detection rules. */
+    fun systemCatalogEntries(): Collection<TagDictionaryEntry> {
+        val merged = buildSystemEntries()
+        manualTypeEntries.forEach { entry ->
+            if (entry.key !in merged) merged[entry.key] = entry
+        }
+        return merged.values
+    }
+
+    private fun buildSystemEntries(): MutableMap<String, TagDictionaryEntry> {
         val merged = baseEntries.associateBy { it.key }.toMutableMap()
         remoteEntries.forEach { remote ->
             val base = merged[remote.key]
@@ -105,6 +115,11 @@ object TagDictionary {
                 rules = remote.rules.ifEmpty { base.rules },
             )
         }
+        return merged
+    }
+
+    private fun rebuildEntries() {
+        val merged = buildSystemEntries()
         customOverrides.forEach { ov ->
             val parsedRules = ov.patterns.mapNotNull { parseRuleLine(it) }
             val base = merged[ov.key]
@@ -194,6 +209,26 @@ data class TagOverride(
 //  When adding compound-phrase detection, prefer allOf over loosely OR'd word
 //  fragments to avoid false positives.
 // ═══════════════════════════════════════════════════════════════════════════════
+
+private val manualTypeEntries: List<TagDictionaryEntry> by lazy {
+    val canonical = CardTag.canonical.associateBy { it.key }
+    buildList {
+        CardTypeOption.allTypes.forEach { option ->
+            val tokens = option.scryfallValue.replace("—", " ").replace("-", " ").replace("//", " ")
+                .split(' ').map { it.trim().lowercase() }.filter { it.length > 1 }
+            tokens.forEach { key ->
+                val tag = canonical[key] ?: CardTag(key, TagCategory.TYPE)
+                add(TagDictionaryEntry(
+                    key = key,
+                    category = tag.category,
+                    labels = mapOf("en" to if (tokens.size == 1) option.label else tag.displayLabel),
+                    rules = emptyList(),
+                ))
+            }
+        }
+        add(TagDictionaryEntry("basic_land", TagCategory.TYPE, mapOf("en" to "Basic Land"), emptyList()))
+    }.distinctBy { it.key }
+}
 
 private val baseEntries: List<TagDictionaryEntry> = buildList {
 
@@ -843,6 +878,7 @@ private val baseEntries: List<TagDictionaryEntry> = buildList {
     add(plain("tempo",          TagCategory.ARCHETYPE, "Tempo"))
     add(plain("tribal",         TagCategory.STRATEGY,  "Tribal"))
     add(plain("infinite_combo", TagCategory.STRATEGY,  "Infinite Combo"))
+    add(plain("attrition",      TagCategory.STRATEGY,  "Attrition"))
     add(plain("game_changer",   TagCategory.ROLE,      "Game Changer"))
     add(plain("voltron",        TagCategory.ARCHETYPE, "Voltron"))
 

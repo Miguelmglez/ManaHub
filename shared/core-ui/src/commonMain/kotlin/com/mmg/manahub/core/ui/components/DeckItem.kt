@@ -29,10 +29,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -64,10 +60,11 @@ import kotlinx.datetime.toLocalDateTime
  *                        [DeckSummary.coverImageUrl] is null. Pass `painterResource(R.drawable.mtg_card_back)`
  *                        from the Android call site. When null, a solid [magicColors.surfaceVariant]
  *                        box is shown instead.
- * @param onDelete        Optional callback for deletion (shows a confirmation dialog).
+ * @param onDelete        Optional callback when deletion is requested.
  * @param onPlaytest      Optional callback to start a playtest session.
  * @param reduced         If true, renders a more compact version suitable for widgets/grids.
  * @param ownerName       Optional owner name for community decks.
+ * @param showCardCount   If false, hides the aggregated count when the caller has no summary data.
  */
 @Composable
 fun DeckItem(
@@ -79,11 +76,10 @@ fun DeckItem(
     onPlaytest: (() -> Unit)? = null,
     reduced: Boolean = false,
     ownerName: String? = null,
+    showCardCount: Boolean = true,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    var showDeleteDialog by remember { mutableStateOf(false) }
-
     Card(
         onClick = onClick,
         modifier = modifier
@@ -232,83 +228,65 @@ fun DeckItem(
                         } else {
                             Spacer(Modifier.height(18.dp))
                         }
-                    } else {
+                    } else if (showCardCount || deck.colorIdentity.isNotEmpty()) {
                         Spacer(Modifier.height(MaterialTheme.spacing.xs))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            // Card count with icon
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Style,
-                                    contentDescription = null,
-                                    tint = mc.textSecondary,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Text(
-                                    text = deck.cardCount.toString(),
-                                    style = ty.labelSmall,
-                                    color = mc.textSecondary,
-                                    maxLines = 1
-                                )
+                            if (showCardCount) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Style,
+                                        contentDescription = null,
+                                        tint = mc.textSecondary,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        text = deck.cardCount.toString(),
+                                        style = ty.labelSmall,
+                                        color = mc.textSecondary,
+                                        maxLines = 1
+                                    )
+                                }
                             }
 
                             // Mana identity symbols
                             if (deck.colorIdentity.isNotEmpty()) {
                                 ColorIdentityRow(colorIdentity = deck.colorIdentity, size = 14.dp)
-                            } else {
+                            } else if (showCardCount) {
                                 Spacer(Modifier.height(14.dp))
                             }
                         }
                     }
                 }
 
-                if (!reduced && deck.cardCount >= 7) {
-                    if (onPlaytest != null) {
-                        IconButton(onClick = onPlaytest) {
-                            Icon(
-                                Icons.Default.VideogameAsset,
-                                contentDescription = "Start Playtest",
-                                tint = mc.secondaryAccent,
-                                modifier = Modifier.padding(end =MaterialTheme.spacing.md).size(40.dp),
-                            )
-                        }
-
+                if (!reduced && deck.cardCount >= 7 && onPlaytest != null) {
+                    IconButton(onClick = onPlaytest) {
+                        Icon(
+                            Icons.Default.VideogameAsset,
+                            contentDescription = "Start Playtest",
+                            tint = mc.secondaryAccent,
+                            modifier = Modifier.padding(end = MaterialTheme.spacing.md).size(40.dp),
+                        )
                     }
-                    if (onDelete != null) {
-                        IconButton(onClick = { showDeleteDialog = true }) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = "Delete",
-                                tint = mc.textDisabled,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
+                }
+                if (!reduced && onDelete != null) {
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = mc.textDisabled,
+                            modifier = Modifier.size(24.dp),
+                        )
                     }
                 }
             }
         }
-    }
-
-    if (showDeleteDialog && onDelete != null) {
-        MagicAlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = "Delete deck",
-            text = "Delete \"${deck.name}\"? This cannot be undone.",
-            confirmLabel = "Delete",
-            onConfirm = {
-                onDelete()
-                showDeleteDialog = false
-            },
-            dismissLabel = "Cancel",
-            onDismiss = { showDeleteDialog = false },
-            confirmColor = MagicCtaColor.Error
-        )
     }
 }
 

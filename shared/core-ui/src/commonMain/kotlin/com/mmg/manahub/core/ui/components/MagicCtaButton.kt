@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mmg.manahub.core.ui.theme.ButtonShape
@@ -100,6 +101,7 @@ fun MagicCtaButton(
     style: MagicCtaStyle = MagicCtaStyle.Filled,
     color: MagicCtaColor = MagicCtaColor.Primary,
     size: MagicCtaSize = MagicCtaSize.Normal,
+    fontSize: TextUnit? = null,
     tintIcon: Boolean = true,
     icon: (@Composable () -> Unit)? = null,
     contentPadding: PaddingValues? = null,
@@ -182,7 +184,7 @@ fun MagicCtaButton(
                     .padding(finalPadding),
                 contentAlignment = Alignment.Center
             ) {
-                CenteredButtonContent(text, isLoading, icon, if (enabled && !isLoading) contentColor else disabledContent, null, tintIcon, size)
+                CenteredButtonContent(text, isLoading, icon, if (enabled && !isLoading) contentColor else disabledContent, null, tintIcon, size, fontSize)
             }
         }
         MagicCtaStyle.Outlined -> {
@@ -204,7 +206,7 @@ fun MagicCtaButton(
                     .padding(finalPadding),
                 contentAlignment = Alignment.Center
             ) {
-                CenteredButtonContent(text, isLoading, icon, if (enabled && !isLoading) baseColor else disabledContent, if (enabled && !isLoading) gradientBrush else null, tintIcon, size)
+                CenteredButtonContent(text, isLoading, icon, if (enabled && !isLoading) baseColor else disabledContent, if (enabled && !isLoading) gradientBrush else null, tintIcon, size, fontSize)
             }
         }
         MagicCtaStyle.Ghost -> {
@@ -221,7 +223,7 @@ fun MagicCtaButton(
                     .padding(finalPadding),
                 contentAlignment = Alignment.Center
             ) {
-                CenteredButtonContent(text, isLoading, icon, if (enabled && !isLoading) baseColor else disabledContent, if (enabled && !isLoading) gradientBrush else null, tintIcon, size)
+                CenteredButtonContent(text, isLoading, icon, if (enabled && !isLoading) baseColor else disabledContent, if (enabled && !isLoading) gradientBrush else null, tintIcon, size, fontSize)
             }
         }
     }
@@ -235,7 +237,8 @@ private fun CenteredButtonContent(
     tintColor: Color,
     gradientBrush: Brush?,
     tintIcon: Boolean = true,
-    size: MagicCtaSize = MagicCtaSize.Normal
+    size: MagicCtaSize = MagicCtaSize.Normal,
+    fontSize: TextUnit? = null
 ) {
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
@@ -292,7 +295,7 @@ private fun CenteredButtonContent(
                 contentAlignment = Alignment.Center
             ) {
                 val textModifier = if (gradientBrush != null) Modifier.gradientTint(gradientBrush) else Modifier
-                val textStyle = if (size == MagicCtaSize.Compact) {
+                val baseTextStyle = if (size == MagicCtaSize.Compact) {
                     ty.labelSmall.copy(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.5.sp
@@ -302,6 +305,11 @@ private fun CenteredButtonContent(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.5.sp
                     )
+                }
+                val textStyle = if (fontSize != null) {
+                    baseTextStyle.copy(fontSize = fontSize)
+                } else {
+                    baseTextStyle
                 }
                 AutoResizeText(
                     text = text.uppercase(),
@@ -321,7 +329,7 @@ private fun AutoResizeText(
     color: Color,
     modifier: Modifier = Modifier
 ) {
-    var textSize by remember(text) { mutableStateOf(style.fontSize) }
+    var textSize by remember(text, style.fontSize) { mutableStateOf(style.fontSize) }
     
     Text(
         text = text,

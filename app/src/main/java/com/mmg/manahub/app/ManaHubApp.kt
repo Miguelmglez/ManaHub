@@ -1,5 +1,6 @@
 package com.mmg.manahub.app
 
+import androidx.room.withTransaction
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -97,8 +98,11 @@ import com.mmg.manahub.feature.addcard.di.addCardKoinModule
 import com.mmg.manahub.feature.auth.di.authKoinModule
 import com.mmg.manahub.feature.carddetail.di.cardDetailKoinModule
 import com.mmg.manahub.core.domain.repository.CardQueueRepository
+import com.mmg.manahub.feature.collection.data.TransferAuthSessionObserver
+import com.mmg.manahub.feature.collection.data.LegacyCollectionImportQuarantine
 import com.mmg.manahub.feature.collection.di.COLLECTION_IMPORT_QUEUE
 import com.mmg.manahub.feature.collection.di.collectionKoinModule
+import com.mmg.manahub.core.data.local.MtgDatabase
 import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
 import com.mmg.manahub.feature.decks.di.commanderSpellbookKoinModule
 import com.mmg.manahub.feature.decks.di.communityAggregateKoinModule
@@ -177,6 +181,9 @@ class ManaHubApp : Application(), KoinComponent {
     private val friendRepository: FriendRepository by inject()
     private val cardMechanicCatalogRepository: CardMechanicCatalogRepository by inject()
     private val tradePendingApplyCoordinator: TradePendingApplyCoordinator by inject()
+    private val transferAuthSessionObserver: TransferAuthSessionObserver by inject()
+    private val collectionTransferCoordinator: com.mmg.manahub.feature.collection.data.RoomCollectionTransferCoordinator by inject()
+    private val legacyCollectionImportQuarantine: LegacyCollectionImportQuarantine by inject()
     private val cardMechanicCatalogRehydrator: CardMechanicCatalogRehydrator by inject()
 
     @Inject lateinit var tagDictionaryRepo: TagDictionaryRepository
@@ -313,6 +320,7 @@ class ManaHubApp : Application(), KoinComponent {
     // Only the Survey-only singletons are here.
     @Inject lateinit var surveyCardImpactDao: SurveyCardImpactDao
     @Inject lateinit var cardDao: CardDao
+    @Inject lateinit var transferDatabase: MtgDatabase
     // CompleteSurveyUseCase moved to SharedDomainKoinModule (batch 2) — surveyKoinModule now resolves
     // it via get().
 
@@ -486,6 +494,8 @@ class ManaHubApp : Application(), KoinComponent {
                     surveyAnswerDao = surveyAnswerDao,
                 ),
                 homeKoinModule(),
+                com.mmg.manahub.feature.rules.rulesFeatureModule,
+                com.mmg.manahub.feature.rules.di.rulesAndroidModule,
                 tagDictionaryKoinModule(
                     tagDictionaryRepository = tagDictionaryRepo,
                 ),
@@ -535,6 +545,7 @@ class ManaHubApp : Application(), KoinComponent {
                 ),
                 collectionKoinModule(
                     workManager = workManager,
+                    transferDatabase = transferDatabase,
                 ),
                 // KMP migration — Hilt→Koin cutover batch 6 (WorkManager subsystem): the two remaining
                 // core/sync workers (CollectionStatsSyncWorker, PriceRefreshWorker — CollectionSyncWorker's
@@ -591,6 +602,24 @@ class ManaHubApp : Application(), KoinComponent {
 
         appScope.launch { remoteConfigRepository.refresh() }
         tradePendingApplyCoordinator.start(appScope)
+        syncManager.configureSessions { userId ->
+            val gate=org.koin.core.context.GlobalContext.get().get<com.mmg.manahub.core.domain.collection.transfer.TransferSessionGate>()
+            val database=org.koin.core.context.GlobalContext.get().get<com.mmg.manahub.core.data.local.MtgDatabase>()
+            val captured=gate.currentSession as? com.mmg.manahub.core.domain.collection.transfer.TransferSession.Available
+                ?: throw IllegalStateException("Sync session is not ready")
+            val owner=com.mmg.manahub.core.domain.collection.transfer.TransferOwner.Account(userId)
+            val ensure={
+                if(captured.owner!=owner || gate.currentSession!=captured || !transferAuthSessionObserver.matchesObserved(owner))
+                    throw kotlinx.coroutines.CancellationException("Sync session changed")
+            }
+            com.mmg.manahub.core.domain.sync.SyncSessionLease(ensure) { operation ->
+                gate.withOwner(owner) { _,guard ->
+                    database.withTransaction { guard(); ensure(); operation(); ensure(); guard() }
+                } ?: throw kotlinx.coroutines.CancellationException("Sync session changed")
+            }
+        }
+        transferAuthSessionObserver.start(appScope)
+        collectionTransferCoordinator.start(appScope)
 
         appScope.launch {
             runCatching { syncManaSymbols() }
@@ -599,6 +628,7 @@ class ManaHubApp : Application(), KoinComponent {
             runCatching { cardMechanicCatalogRepository.refresh() }
             // Builds the Collection import review queue here so its (potentially MB-scale) restore
             // never runs on the main thread when composition first resolves the single.
+            runCatching { legacyCollectionImportQuarantine.run() }
             runCatching { collectionImportQueue.queue.value }
         }
         appScope.launch {
@@ -709,6 +739,8 @@ class ManaHubApp : Application(), KoinComponent {
                             openForTradeRepository.evictForeignAccountRows(userId)
                                 .onFailure { e -> recordSafeNonFatal("trade_lists_evict_foreign_rows_failed", e) }
                             CollectionSyncWorker.enqueueFirstLoginSync(workManager)
+                            wishlistRepository.migrateLocalToRemote(userId)
+                                .onFailure { e -> recordSafeNonFatal("wishlist_login_sync_failed", e) }
                         }
                         appScope.launch {
                             runCatching {
@@ -754,3 +786,4 @@ class ManaHubApp : Application(), KoinComponent {
         ).forEach { nm.createNotificationChannel(it) }
     }
 }
+

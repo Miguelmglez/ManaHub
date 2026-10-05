@@ -64,7 +64,9 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -118,7 +120,9 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.collection.presentation.components.CollectionMergeConflictSheet
-import com.mmg.manahub.feature.collection.presentation.importexport.CollectionExportHost
+import com.mmg.manahub.feature.collection.presentation.importexport.DurableExportHost
+import com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionQuery
+import com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionSort
 import com.mmg.manahub.feature.collection.presentation.importexport.CollectionImportHost
 import com.mmg.manahub.feature.collection.presentation.importexport.CollectionImportViewModel
 import com.mmg.manahub.feature.collection.presentation.importexport.CollectionTransferActionsSheet
@@ -140,10 +144,10 @@ fun CollectionScreen(
     onNavigateToAddFriends:    () -> Unit = {},
     viewModel:                CollectionViewModel = koinViewModel(),
     advancedSearchViewModel:  AdvancedSearchViewModel = koinViewModel(),
-    importViewModel:          CollectionImportViewModel = koinViewModel(),
+    onImportCards:            () -> Unit,
     sharedTransitionScope:    SharedTransitionScope? = null,
     animatedVisibilityScope:  AnimatedVisibilityScope? = null,
-    openImport: Boolean = false,
+
     /**
      * The route's raw `tab` query arg ("decks"/"trades"/"cards"/null), read fresh off the current
      * [androidx.navigation.NavBackStackEntry] by the caller (see `AppNavGraph`'s Collection
@@ -160,13 +164,20 @@ fun CollectionScreen(
     initialTabArg:            String? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val importState by importViewModel.uiState.collectAsStateWithLifecycle()
+    val pagedCards = viewModel.pagedCards?.collectAsLazyPagingItems()
     var showAdvancedSearch by remember { mutableStateOf(false) }
     var showTransferActions by remember { mutableStateOf(false) }
     val toastState = rememberMagicToastState()
     // Sheets render in their own window above the NavHost: unmount them while navigating away.
     val isResumed = LocalLifecycleOwner.current.lifecycle
         .currentStateAsState().value.isAtLeast(Lifecycle.State.RESUMED)
+
+    LaunchedEffect(isResumed, uiState.selectedTab) {
+        viewModel.setCardsActive(isResumed && uiState.selectedTab == CollectionTab.CARDS)
+    }
+    DisposableEffect(viewModel) {
+        onDispose { viewModel.setCardsActive(false) }
+    }
 
     LaunchedEffect(initialTabArg) {
         val forcedTab = when (initialTabArg?.lowercase()) {
@@ -177,14 +188,9 @@ fun CollectionScreen(
         }
         if (forcedTab != null) viewModel.onTabSelected(forcedTab)
     }
-    LaunchedEffect(openImport) {
-        if (openImport) {
-            importViewModel.onImportRequested()
-        }
-    }
-
     CollectionContent(
         uiState               = uiState,
+        pagedCards            = pagedCards,
         toastState            = toastState,
         onOverflowClick       = { showTransferActions = true },
         onCardClick           = onCardClick,
@@ -225,32 +231,19 @@ fun CollectionScreen(
             },
             onImport = {
                 showTransferActions = false
-                importViewModel.onImportRequested()
+                onImportCards()
             },
             onDismiss = { showTransferActions = false },
         )
     }
 
-    CollectionImportHost(
-        state = importState,
-        viewModel = importViewModel,
-        isResumed = isResumed,
-        toastState = toastState,
-        onCardClick = { entry -> onCardClick(entry.card.scryfallId, null) },
-    )
-
-    CollectionExportHost(
-        state = uiState.export,
-        isResumed = isResumed,
-        toastState = toastState,
-        fileName = viewModel::exportFileName,
-        onFormatSelected = viewModel::onExportFormatSelected,
-        onSaveTo = viewModel::onExportSave,
-        onShare = viewModel::onExportShare,
-        onShareLaunched = viewModel::onExportShareLaunched,
-        onShareFailed = viewModel::onExportShareFailed,
-        onMessageShown = viewModel::onExportMessageShown,
-        onDismiss = viewModel::onExportSheetDismissed,
+    DurableExportHost(
+        state=uiState.export,
+        query=CollectionSelectionQuery(uiState.collectionSource,uiState.searchQuery,uiState.activeQuery,CollectionSelectionSort.valueOf(uiState.sortOrder.name),uiState.sortDirection==SortDirection.ASC,uiState.groupingMode),
+        isResumed=isResumed,
+        toast=toastState,
+        onFormat=viewModel::onExportFormatSelected,
+        onDismiss=viewModel::onExportSheetDismissed,
     )
 
     if (showAdvancedSearch) {
@@ -293,6 +286,7 @@ fun CollectionScreen(
 @Composable
 private fun CollectionContent(
     uiState:              CollectionUiState,
+    pagedCards: androidx.paging.compose.LazyPagingItems<com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionGroup>?,
     toastState:           MagicToastState,
     onOverflowClick:      () -> Unit,
     onCardClick:          (String, String?) -> Unit,
@@ -414,6 +408,7 @@ private fun CollectionContent(
                 when (uiState.selectedTab) {
                     CollectionTab.CARDS -> CardsTabContent(
                         uiState               = uiState,
+        pagedCards            = pagedCards,
                         onCardClick           = onCardClick,
                         onAddCardClick        = onAddCardClick,
                         onSearchQueryChange   = onSearchQueryChange,
@@ -457,6 +452,7 @@ private fun CollectionContent(
 @Composable
 private fun CardsTabContent(
     uiState:              CollectionUiState,
+    pagedCards: androidx.paging.compose.LazyPagingItems<com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionGroup>?,
     onCardClick:          (String, String?) -> Unit,
     onAddCardClick:       () -> Unit,
     onSearchQueryChange:  (String) -> Unit,
@@ -488,7 +484,8 @@ private fun CardsTabContent(
 
     // Genuinely empty collection (nothing added yet, nothing to filter) — full-screen state,
     // no header needed since there's no search/filter UI to offer yet.
-    if (uiState.cards.isEmpty() && !hasActiveSearchOrFilter) {
+    val emptyCards = if(pagedCards==null)uiState.cards.isEmpty() else (uiState.selectionSummary?.groups ?: 0L)==0L
+    if (emptyCards && !hasActiveSearchOrFilter) {
         EmptyState(
             icon        = Icons.Default.CollectionsBookmark,
             title       = stringResource(R.string.collection_empty_title),
@@ -505,7 +502,7 @@ private fun CardsTabContent(
         // header below (search bar + advanced-search filters are the only way back) — only the
         // content area swaps to a scoped empty message, keyed off the SAME headerHeightDp offset
         // CardGrid/CardList already use.
-        if (uiState.cards.isEmpty()) {
+        if (emptyCards) {
             // Rows whose card is not cached yet are skipped by the projection, so "empty" would be
             // a lie while any of them are outstanding — the list is INCOMPLETE, not empty
             // (ADR-008: ownership data never depends on cache metadata).
@@ -553,7 +550,7 @@ private fun CardsTabContent(
                     .padding(top = headerHeightDp),
             )
         } else {
-            when (uiState.viewMode) {
+            if(pagedCards!=null)PagedCollectionCards(pagedCards,uiState.selectionSummary,uiState.viewMode,uiState.groupingMode,gridState,listState,headerHeightDp,onCardClick,sharedTransitionScope,animatedVisibilityScope) else when (uiState.viewMode) {
                 CollectionViewMode.GRID -> CardGrid(
                     cards        = uiState.cards,
                     sections     = uiState.sections,
@@ -644,7 +641,7 @@ private fun CardsTabContent(
 
             // Same honesty rule as the empty state: a rendered list that silently drops uncached
             // rows must say the count is still growing, never present itself as complete.
-            AnimatedVisibility(visible = uiState.uncachedSourceRows > 0 && uiState.cards.isNotEmpty()) {
+            AnimatedVisibility(visible = uiState.uncachedSourceRows > 0 && !emptyCards) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -671,7 +668,7 @@ private fun CardsTabContent(
             }
 
             // Card count + Sort/View controls
-            val totalCopies = uiState.cards.sumOf { it.totalQuantity }
+            val totalCopies = uiState.selectionSummary?.copies ?: uiState.cards.sumOf { it.totalQuantity.toLong() }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -684,7 +681,7 @@ private fun CardsTabContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "${uiState.cards.size} ${stringResource(R.string.collection_unique_cards)} · $totalCopies ${stringResource(R.string.collection_total_copies)}",
+                        text = "${uiState.selectionSummary?.groups ?: uiState.cards.size.toLong()} ${stringResource(R.string.collection_unique_cards)} · $totalCopies ${stringResource(R.string.collection_total_copies)}",
                         style = MaterialTheme.magicTypography.labelLarge,
                         color = mc.textSecondary,
                         modifier = Modifier.weight(1f)
@@ -737,7 +734,7 @@ private fun CollectionTopBar(
                     Icon(
                         imageVector = Icons.Default.ImportExport,
                         contentDescription = stringResource(R.string.action_more_options),
-                        tint = mc.textSecondary,
+                        tint = mc.textPrimary,
                     )
                 }
             }

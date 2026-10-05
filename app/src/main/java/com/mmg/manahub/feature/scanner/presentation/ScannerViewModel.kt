@@ -12,7 +12,8 @@ import com.mmg.manahub.core.data.queue.SharedPreferencesCardQueueStore
 import com.mmg.manahub.core.di.ApplicationScope
 import com.mmg.manahub.core.domain.repository.CardQueueRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.collection.transfer.CollectionOwnershipCandidates
+import com.mmg.manahub.core.domain.collection.transfer.CollectionOwnershipRepository
 import com.mmg.manahub.core.domain.usecase.queue.AddAllToCollectionResult
 import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.core.model.Card
@@ -38,6 +39,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -105,7 +108,7 @@ private fun ScannerUiState.clearedForOverlay(): ScannerUiState =
 class ScannerViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val cardRepository: CardRepository,
-    private val userCardRepository: UserCardRepository,
+    private val ownershipRepository: CollectionOwnershipRepository,
     sharedQueueRepository: CardQueueRepository,
     private val queueActions: CardQueueActions,
     private val addScannedCardsToDeck: AddScannedCardsToDeckUseCase,
@@ -230,22 +233,12 @@ class ScannerViewModel @Inject constructor(
         _uiState.update { it.withQueue(queueRepository.queue.value).withWriteGuards() }
     }
 
-    /**
-     * Continuously tracks the set of "already owned" card identity keys — the same convention
-     * used across Card Versions & Languages: every owned [com.mmg.manahub.core.model.Card.oracleId]
-     * plus every owned exact [com.mmg.manahub.core.model.Card.name] (some cached rows predate the
-     * oracleId backfill, so a card matches on either key). Feeds the "already in collection" badge
-     * in `CardQueueSheet`. This is a LIVE collector (not a one-shot fetch) so the badge appears
-     * immediately after the user adds a card from the queue while the sheet is still open.
-     */
+    /** Live badges query only queue/detected identities, including sibling printings and legacy names. */
     private fun observeOwnedCardIdentityKeys() {
         viewModelScope.launch {
-            userCardRepository.observeCollection().collect { rows ->
-                val keys = HashSet<String>(rows.size * 2)
-                rows.forEach { row ->
-                    row.card.oracleId.takeIf { it.isNotBlank() }?.let(keys::add)
-                    keys.add(row.card.name)
-                }
+            ownershipRepository.observe(_uiState.map { state ->
+                CollectionOwnershipCandidates(state.scanSession.cards,state.lastDetectedCard)
+            }.distinctUntilChanged()).collect { keys ->
                 _uiState.update { it.copy(ownedCardIdentityKeys = keys) }
             }
         }

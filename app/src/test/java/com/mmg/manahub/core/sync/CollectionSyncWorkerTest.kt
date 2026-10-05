@@ -155,4 +155,11 @@ class CollectionSyncWorkerTest {
         coVerify(exactly = 1) { syncManager.sync(user.id) }
         coVerify(exactly = 0) { syncManager.assignUserIdAndSync(any()) }
     }
+    @Test fun unavailableStartupSessionRetriesWithoutAcknowledgementOrHydration()=runBlocking<Unit> {
+        coEvery { authRepository.getCurrentUser() } returns user
+        coEvery { syncManager.sync(user.id) } throws IllegalStateException("Sync session is not ready")
+        assertEquals(ListenableWorker.Result.retry(),buildWorker().doWork())
+        verify(exactly=0) { workManager.enqueueUniqueWork(any(),any<ExistingWorkPolicy>(),any<OneTimeWorkRequest>()) }
+    }
+
 }

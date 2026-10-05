@@ -77,4 +77,6 @@ class ScryfallRequestQueue(
      * @throws Throwable for any other exception thrown by [block].
      */
     suspend fun <T> execute(block: suspend () -> T): T = delegate.execute(block)
+    /** Returns this shared queue's current wait without creating a second limiter. */
+    suspend fun cooldownRemainingMillis(): Long = delegate.cooldownRemainingMillis()
 }
