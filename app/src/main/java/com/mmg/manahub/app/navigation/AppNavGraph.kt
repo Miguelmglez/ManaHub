@@ -529,6 +529,7 @@ fun AppNavGraph(
                                     is HomeAction.OpenMultiAdd -> navController.navigate(Screen.CollectionAddCard.createRoute(multi = true))
                                     // ── Widget board: handled in HomeScreen/VM ───────────
                                     HomeAction.OpenWidgetGallery,
+                                    HomeAction.OpenDeckCreationSheet,
                                     HomeAction.ResetLayout,
                                     HomeAction.RetryDiscover,
                                     HomeAction.RefreshDiscover,

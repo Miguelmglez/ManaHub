@@ -557,23 +557,24 @@ fun DeckStudioScreen(
                 )
             },
             bottomBar = {
-                val playtestEnabled = !uiState.isEmptyDeck && uiState.deck?.id != null
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(mc.background)
-                        .navigationBarsPadding()
-                        .padding(horizontal = spacing.lg, vertical = spacing.md)
-                ) {
-                    MagicCtaButton(
-                        text = stringResource(R.string.deck_studio_playtest),
-                        onClick = {uiState.deck?.id?.let(onPlaytest)},
-                        enabled = playtestEnabled,
+                if (!uiState.isLoading && uiState.deck?.id != null && uiState.totalCards >= 7) {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = spacing.md)
-                            .height(56.dp)
-                    )
+                            .background(mc.background)
+                            .navigationBarsPadding()
+                            .padding(horizontal = spacing.lg, vertical = spacing.md)
+                    ) {
+                        MagicCtaButton(
+                            text = stringResource(R.string.deck_studio_playtest),
+                            onClick = {uiState.deck?.id?.let(onPlaytest)},
+                            enabled = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = spacing.md)
+                                .height(56.dp)
+                        )
+                    }
                 }
             },
             floatingActionButton = {

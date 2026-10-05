@@ -13,6 +13,8 @@ sealed interface HomeAction {
     object StartGame : HomeAction
     object ScanCard : HomeAction
     object CreateDeck : HomeAction
+    /** Opens the user-configurable deck creation sheet from Quick Start. */
+    object OpenDeckCreationSheet : HomeAction
 
     object OpenImportCollection : HomeAction
     object DraftGuide : HomeAction

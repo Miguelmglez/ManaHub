@@ -3996,7 +3996,7 @@ private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
     QuickStartAction.SETTINGS -> HomeAction.OpenSettings
     QuickStartAction.RULES -> HomeAction.OpenRules
     QuickStartAction.MULTI_ADD_CARD -> HomeAction.OpenMultiAdd
-    QuickStartAction.CREATE_DECK -> HomeAction.CreateDeck
+    QuickStartAction.CREATE_DECK -> HomeAction.OpenDeckCreationSheet
 }
 
 

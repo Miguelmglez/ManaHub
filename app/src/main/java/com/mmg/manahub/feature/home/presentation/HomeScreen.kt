@@ -98,6 +98,9 @@ import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.decks.presentation.DeckListEvent
+import com.mmg.manahub.feature.decks.presentation.DeckViewModel
+import com.mmg.manahub.feature.decks.presentation.components.DeckCreationSheet
 import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 
@@ -118,6 +121,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    deckViewModel: DeckViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     // Deck Doctor Community/Archetype plan, Phase 5 — kept OUTSIDE HomeUiState on purpose, see
@@ -139,6 +143,28 @@ fun HomeScreen(
     val rulesTipIndex by viewModel.rulesTipIndexFlow.collectAsStateWithLifecycle()
     var showCustomizeSheet by remember {mutableStateOf(false)}
     var showGallerySheet by remember {mutableStateOf(false)}
+    var showDeckCreationSheet by remember {mutableStateOf(false)}
+    var pendingCreatedDeckId by remember {mutableStateOf<String?>(null)}
+
+    LaunchedEffect(deckViewModel) {
+        deckViewModel.events.collect { event ->
+            when (event) {
+                is DeckListEvent.NavigateToDeck -> {
+                    pendingCreatedDeckId = event.deckId
+                    showDeckCreationSheet = false
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(showDeckCreationSheet, pendingCreatedDeckId, onAction) {
+        if (!showDeckCreationSheet) {
+            pendingCreatedDeckId?.let { deckId ->
+                pendingCreatedDeckId = null
+                onAction(HomeAction.OpenDeck(deckId))
+            }
+        }
+    }
 
     // Additive telemetry: leave a breadcrumb when the Home screen is first composed so crash reports
     // can show that the user was on Home. Fires once per entry (keyed on Unit).
@@ -182,6 +208,7 @@ fun HomeScreen(
                 }
 
                 HomeAction.DismissAccountNudge -> viewModel.dismissAccountNudge()
+                HomeAction.OpenDeckCreationSheet -> showDeckCreationSheet = true
                 is HomeAction.SkipFirstStep -> viewModel.onAction(action)
                 HomeAction.OpenWidgetGallery -> showGallerySheet = true
                 // Resolve the "most recent deck" here — this is the only layer with access to
@@ -227,6 +254,13 @@ fun HomeScreen(
                 showCustomizeSheet = false
             },
             onDismiss = {showCustomizeSheet = false},
+        )
+    }
+
+    if (showDeckCreationSheet) {
+        DeckCreationSheet(
+            onDismiss = {showDeckCreationSheet = false},
+            onCreate = deckViewModel::createDeck,
         )
     }
 
