@@ -13,7 +13,7 @@ compose.resources {
 kotlin {
     androidLibrary {
         namespace = "com.mmg.manahub.feature.rules"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 29
         withHostTestBuilder {}
     }
