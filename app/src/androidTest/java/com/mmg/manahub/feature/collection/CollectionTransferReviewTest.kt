@@ -11,6 +11,7 @@ import com.mmg.manahub.core.data.local.entity.*
 import com.mmg.manahub.core.domain.collection.transfer.*
 import com.mmg.manahub.feature.collection.data.RoomTransferReviewBuilder
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -77,6 +78,101 @@ class CollectionTransferReviewTest {
             edit(100L,true,true);assertEquals(7L,dao.getJob(fixture.job,key)!!.acceptedCopies)
             edit(100L,false,true);assertEquals(107L,dao.getJob(fixture.job,key)!!.acceptedCopies)
         } finally { db.close();context.deleteDatabase(name) }
+    }
+    @Test fun independentCopiesKeepQuantityLineageAndEditableAttributes()=runBlocking {
+        val db=Room.inMemoryDatabaseBuilder(context,MtgDatabase::class.java).build()
+        try {
+            val fixture=source(db,listOf(listOf(3L)));finish(db,fixture.job)
+            val dao=db.collectionTransferDao();val original=entries(db,fixture.job).single();val first=id();val second=id()
+            suspend fun duplicate(entry: CollectionImportEntryEntity,newId: String) {
+                val job=dao.getJob(fixture.job,key)!!
+                assertTrue(dao.duplicatePendingEntry(fixture.job,key,job.generation,job.payloadVersion,entry.id,entry.entryVersion,newId,2L))
+            }
+            duplicate(original,first);duplicate(dao.reviewEntry(fixture.job,key,first)!!,second)
+            val copies=entries(db,fixture.job)
+            assertEquals(3,copies.size);assertTrue(copies.all { it.quantity==3L })
+            assertEquals(setOf(original.id),copies.filter { it.duplicateOriginId!=null }.map { it.duplicateOriginId }.toSet())
+            assertEquals(0L,dao.reviewEntry(fixture.job,key,first)!!.sourceQuantity)
+            assertEquals(dao.provenance(fixture.job,key,original.id),dao.provenance(fixture.job,key,first))
+            assertEquals(9L,dao.getJob(fixture.job,key)!!.acceptedCopies)
+            assertTrue(dao.editPendingEntry(fixture.job,key,first,0L,original.scryfallId,false,"NM","en",7L,TransferDestination.NONE))
+            assertEquals(3L,dao.reviewEntry(fixture.job,key,original.id)!!.quantity)
+            assertEquals(3L,dao.reviewEntry(fixture.job,key,second)!!.quantity)
+            assertTrue(dao.editPendingEntry(fixture.job,key,second,0L,original.scryfallId,false,"NM","en",3L,TransferDestination.NONE,true))
+            assertEquals(10L,dao.getJob(fixture.job,key)!!.acceptedCopies)
+            withContext(kotlinx.coroutines.Dispatchers.IO) {
+                db.openHelper.writableDatabase.query("SELECT SUM(source_records),SUM(source_copies) FROM collection_import_provenance WHERE job_id='${fixture.job}'").use { assertTrue(it.moveToFirst());assertEquals(1L,it.getLong(0));assertEquals(3L,it.getLong(1)) }
+            }
+        } finally { db.close() }
+    }
+    @Test fun duplicateConsentRejectsWrongOwnerStalePayloadAndRepeatedUuid()=runBlocking {
+        val db=Room.inMemoryDatabaseBuilder(context,MtgDatabase::class.java).build()
+        try {
+            val fixture=source(db,listOf(listOf(2L)));finish(db,fixture.job)
+            val dao=db.collectionTransferDao();val original=entries(db,fixture.job).single();val job=dao.getJob(fixture.job,key)!!;val copy=id()
+            assertFalse(dao.duplicatePendingEntry(fixture.job,other,job.generation,job.payloadVersion,original.id,0L,copy,2L))
+            assertTrue(dao.duplicatePendingEntry(fixture.job,key,job.generation,job.payloadVersion,original.id,0L,copy,2L))
+            assertFalse(dao.duplicatePendingEntry(fixture.job,key,job.generation,job.payloadVersion,original.id,0L,id(),2L))
+            val fresh=dao.getJob(fixture.job,key)!!
+            assertFalse(dao.duplicatePendingEntry(fixture.job,key,fresh.generation,fresh.payloadVersion,original.id,0L,copy,2L))
+            assertEquals(2,entries(db,fixture.job).size)
+        } finally { db.close() }
+    }
+    @Test fun duplicateSurvivesReopenAndRebuildWithoutExtraCopies()=runBlocking {
+        val name="duplicate-reopen-${id()}";var db=open(name)
+        try {
+            val fixture=source(db,listOf(listOf(2L)));finish(db,fixture.job)
+            val dao=db.collectionTransferDao();val original=entries(db,fixture.job).single();val job=dao.getJob(fixture.job,key)!!;val copy=id()
+            assertTrue(dao.duplicatePendingEntry(fixture.job,key,job.generation,job.payloadVersion,original.id,0L,copy,2L))
+            db.close();db=open(name)
+            assertNotNull(db.collectionTransferDao().beginReviewRebuild(fixture.job,key));finish(db,fixture.job)
+            assertEquals(setOf(original.id,copy),entries(db,fixture.job).map { it.id }.toSet())
+            assertEquals(4L,db.collectionTransferDao().getJob(fixture.job,key)!!.acceptedCopies)
+            assertNull(db.collectionTransferDao().reviewEntry(fixture.job,key,copy)!!.error)
+            assertTrue(db.collectionTransferDao().reviewDecisionPage(fixture.job,key,"").isEmpty())
+        } finally { db.close();context.deleteDatabase(name) }
+    }
+    @Test fun changedSourceRequiresExplicitCloneDecision()=runBlocking {
+        val db=Room.inMemoryDatabaseBuilder(context,MtgDatabase::class.java).build()
+        try {
+            val fixture=source(db,listOf(listOf(2L),listOf(3L)));finish(db,fixture.job)
+            val dao=db.collectionTransferDao();val original=entries(db,fixture.job).single();val job=dao.getJob(fixture.job,key)!!;val copy=id()
+            assertTrue(dao.duplicatePendingEntry(fixture.job,key,job.generation,job.payloadVersion,original.id,0L,copy,2L))
+            assertTrue(dao.selectFile(fixture.job,key,fixture.files[1],job.generation,false));finish(db,fixture.job)
+            val changed=dao.getJob(fixture.job,key)!!
+            assertEquals(5L,dao.reviewEntry(fixture.job,key,copy)!!.quantity)
+            assertEquals("SOURCE_MEMBERSHIP_CHANGED",dao.reviewEntry(fixture.job,key,copy)!!.error)
+            assertFalse(dao.duplicatePendingEntry(fixture.job,key,changed.generation,changed.payloadVersion,copy,0L,id(),3L))
+            assertTrue(dao.decideReviewEdit(fixture.job,key,copy,changed.generation,TransferReviewDecision.KEEP_EDIT))
+            assertEquals(7L,dao.getJob(fixture.job,key)!!.acceptedCopies)
+            assertNull(dao.reviewEntry(fixture.job,key,copy)!!.error)
+            assertEquals(2L,dao.provenance(fixture.job,key,copy).single().sourceCopies)
+        } finally { db.close() }
+    }
+    @Test fun migration67to68PreservesOriginalIdentityAndEnablesIndependentCopies() {
+        val name="duplicate-migration-${id()}";val before=helper.createDatabase(name,67)
+        before.execSQL("INSERT INTO collection_import_entries(id,job_id,generation,scryfall_id,is_foil,condition,language,quantity,applied_quantity,state,excluded,error,destination,entry_version,active_action_id,source_key,source_signature,source_quantity,payload_edited) VALUES ('entry','job',3,'printing',0,'NM','en',7,0,'PENDING',0,NULL,'WISHLIST',2,NULL,'source','signature',7,1)")
+        before.close();val after=helper.runMigrationsAndValidate(name,68,true,MIGRATION_67_68)
+        after.query("SELECT quantity,destination,entry_version,duplicate_key,duplicate_origin_id,review_order_key FROM collection_import_entries").use { assertTrue(it.moveToFirst());assertEquals(7L,it.getLong(0));assertEquals("WISHLIST",it.getString(1));assertEquals(2L,it.getLong(2));assertEquals("",it.getString(3));assertTrue(it.isNull(4));assertEquals("entry",it.getString(5)) }
+        after.execSQL("INSERT INTO collection_import_entries(id,job_id,generation,scryfall_id,is_foil,condition,language,quantity,applied_quantity,state,excluded,error,destination,entry_version,active_action_id,duplicate_key,duplicate_origin_id,review_order_key) VALUES ('copy','job',3,'printing',0,'NM','en',7,0,'PENDING',0,NULL,'NONE',0,NULL,'copy','entry','entry~copy')")
+        assertTrue(runCatching { after.execSQL("INSERT INTO collection_import_entries(id,job_id,generation,scryfall_id,is_foil,condition,language,quantity,applied_quantity,state,excluded,error,destination,entry_version,active_action_id) VALUES ('collision','job',3,'printing',0,'NM','en',7,0,'PENDING',0,NULL,'NONE',0,NULL)") }.isFailure)
+        after.query("SELECT COUNT(*) FROM collection_import_entries").use { it.moveToFirst();assertEquals(2,it.getInt(0)) }
+        after.close();context.deleteDatabase(name)
+    }
+    @Test fun duplicateRemainsAdjacentAcrossForwardAndBackwardPageBoundary()=runBlocking {
+        val db=Room.inMemoryDatabaseBuilder(context,MtgDatabase::class.java).build()
+        try {
+            val fixture=source(db,listOf(List(60) { 1L }),distinct=true);finish(db,fixture.job)
+            val dao=db.collectionTransferDao();val original=entries(db,fixture.job)[49];val job=dao.getJob(fixture.job,key)!!;val copy=id()
+            assertTrue(dao.duplicatePendingEntry(fixture.job,key,job.generation,job.payloadVersion,original.id,0L,copy,2L))
+            val first=dao.scopedReviewAfter(job.id,key,job.generation,"QUEUE","")
+            assertEquals(50,first.size);assertEquals(original.id,first.last().id)
+            val next=dao.scopedReviewAfter(job.id,key,job.generation,"QUEUE",first.last().id)
+            assertEquals(copy,next.first().id);assertEquals(11,next.size)
+            assertEquals(first.map { it.id },dao.scopedReviewBefore(job.id,key,job.generation,"QUEUE",copy).asReversed().map { it.id })
+            assertTrue(dao.scopedReviewHasNext(job.id,key,job.generation,"QUEUE",original.id))
+            assertTrue(dao.scopedReviewHasPrevious(job.id,key,job.generation,"QUEUE",copy))
+        } finally { db.close() }
     }
     @Test fun migration60to61PreservesDestinationsCommandsAndOutboxes() {
         val name="review-migration-${id()}"; val before=helper.createDatabase(name,60)

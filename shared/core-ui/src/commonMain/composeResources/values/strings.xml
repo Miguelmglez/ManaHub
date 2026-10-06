@@ -16,4 +16,6 @@
     <string name="news_item_save_a11y">Save for later</string>
     <string name="news_item_unsave_a11y">Remove from saved</string>
     <string name="news_item_more_a11y">More options</string>
+    <string name="news_content_article">ARTICLE</string>
+    <string name="news_content_video">VIDEO</string>
 </resources>

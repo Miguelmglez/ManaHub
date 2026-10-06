@@ -1160,7 +1160,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertTrue(HomeWidgetType.entries.none { it.persistedId == "competitive" })
-        assertEquals(listOf(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.MTG_NEWS), vm.state.value.layout.map { it.type })
+        assertEquals(listOf(HomeWidgetType.GET_STARTED, HomeWidgetType.MTG_NEWS), vm.state.value.layout.map { it.type })
     }
 
     @Test

@@ -8,7 +8,9 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.model.news.UpcomingRelease
+import com.mmg.manahub.feature.news.domain.source.CuratedTwitchChannelPages
 import com.mmg.manahub.feature.news.domain.usecase.GetProTourContentUseCase
+import com.mmg.manahub.feature.news.domain.usecase.GetTrendStreamAvatarUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetUpcomingReleasesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import kotlinx.coroutines.Job
@@ -28,6 +30,8 @@ data class EventsUiState(
     val postalCode: String = "",
     /** Null until the first emission; empty means no followed source covers a Pro Tour right now. */
     val proTourItems: List<NewsItem>? = null,
+    /** Resolved channel avatar URLs keyed by curated Twitch channel id. */
+    val streamImageUrls: Map<String, String> = emptyMap(),
     val selectedFormat: MetagameFormat = MetagameFormat.STANDARD,
 )
 
@@ -35,6 +39,7 @@ data class EventsUiState(
 class EventsViewModel(
     private val getUpcomingReleases: GetUpcomingReleasesUseCase,
     getProTourContent: GetProTourContentUseCase,
+    private val getTrendStreamAvatar: GetTrendStreamAvatarUseCase,
     manageSources: ManageSourcesUseCase,
     private val userPrefsDataStore: UserPreferencesDataStore,
     private val crashReporter: CrashReporter,
@@ -47,6 +52,7 @@ class EventsViewModel(
     val uiState: StateFlow<EventsUiState> = _uiState.asStateFlow()
 
     private var releasesJob: Job? = null
+    private var streamImagesJob: Job? = null
 
     init {
         loadReleases()
@@ -59,13 +65,32 @@ class EventsViewModel(
         viewModelScope.launch {
             combine(getProTourContent(), manageSources.observeSources()) { items, sources ->
                 val followedIds = sources.filter { it.isEnabled }.map { it.id }.toSet()
-                items.filter { it.sourceId in followedIds }.distinctBy { it.id }.take(PRO_TOUR_LIMIT)
+                items.filter { it.sourceId in followedIds }
+                    .distinctBy { it.id }
+                    .sortedByDescending { it.publishedAt }
+                    .take(PRO_TOUR_LIMIT)
             }
                 .catch {
                     crashReporter.log("events_pro_tour_feed_failed")
                     emit(emptyList())
                 }
                 .collect { items -> _uiState.update { it.copy(proTourItems = items) } }
+        }
+    }
+
+    /** Loads optional channel avatars when the Trends tab is opened. */
+    fun loadStreamImages() {
+        if (streamImagesJob?.isActive == true) return
+        streamImagesJob = viewModelScope.launch {
+            CuratedTwitchChannelPages.channelIds.forEach { channelId ->
+                launch {
+                    getTrendStreamAvatar(channelId)?.let { imageUrl ->
+                        _uiState.update { state ->
+                            state.copy(streamImageUrls = state.streamImageUrls + (channelId to imageUrl))
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -101,7 +126,12 @@ class EventsViewModel(
         viewModelScope.launch { userPrefsDataStore.setEventsPostalCode(trimmed) }
     }
 
-    fun onReleaseOpened() = crashReporter.log("events_release_opened")
+    fun onReleaseOpened() {
+        crashReporter.setCustomKey("events_release_destination", "add_card")
+        crashReporter.log("events_release_opened")
+    }
+
+    fun onTrendLinkOpened(linkId: String) = crashReporter.log("today_trends_link_opened:$linkId")
 
     fun onLocatorOpened() = crashReporter.log("events_locator_opened")
 
@@ -109,7 +139,7 @@ class EventsViewModel(
 
     private companion object {
         const val KEY_FORMAT = "events_format"
-        const val PRO_TOUR_LIMIT = 5
+        const val PRO_TOUR_LIMIT = 12
         const val MAX_POSTAL_CODE_LENGTH = 16
     }
 }

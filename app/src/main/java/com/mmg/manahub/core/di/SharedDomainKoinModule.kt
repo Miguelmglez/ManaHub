@@ -40,6 +40,7 @@ import com.mmg.manahub.feature.decks.domain.usecase.AddScannedCardsToDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.CalculateDeckValueSummaryUseCase
 import com.mmg.manahub.feature.news.domain.usecase.FollowSourceUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
+import com.mmg.manahub.feature.news.domain.usecase.GetTrendStreamAvatarUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetProTourContentUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetUpcomingReleasesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
@@ -181,6 +182,7 @@ fun sharedDomainKoinModule(
 
     // ── News use cases. ──
     single { GetNewsFeedUseCase(repository = get()) }
+    single { GetTrendStreamAvatarUseCase(repository = get()) }
     single { ManageSourcesUseCase(repository = get()) }
     single { RefreshNewsFeedUseCase(repository = get()) }
     single { ObserveSavedItemsUseCase(repository = get()) }

@@ -2,13 +2,43 @@ package com.mmg.manahub.core.data.rules
 
 import com.mmg.manahub.core.model.rules.*
 import java.io.File
+import java.security.MessageDigest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.*
 
 class RulesCorpusTest {
-    private fun snapshot(): Pair<String, RulesManifest> {
+    private fun assets(): File {
         val root = generateSequence(File(System.getProperty("user.dir"))) { it.parentFile }.first { File(it, "app/src/main/assets/rules/baseline.txt").exists() }
-        val file = File(root, "app/src/main/assets/rules/baseline.txt")
-        return file.readText() to RulesManifest("https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.txt", "2026-09-25", "8d860e451f20f38865b725b42d82feb714c725373dd8f3b32b8652b3eeb070ca", 1, 4066, file.length().toInt())
+        return File(root, "app/src/main/assets/rules")
+    }
+
+    private fun manifest(directory: File): RulesManifest {
+        val json = Json.parseToJsonElement(File(directory, "baseline-manifest.json").readText()).jsonObject
+        return RulesManifest(
+            sourceUrl = json.getValue("sourceUrl").jsonPrimitive.content,
+            effectiveDate = json.getValue("effectiveDate").jsonPrimitive.content,
+            sha256 = json.getValue("sha256").jsonPrimitive.content,
+            schemaVersion = json.getValue("schemaVersion").jsonPrimitive.int,
+            nodeCount = json.getValue("nodeCount").jsonPrimitive.int,
+            byteCount = json.getValue("byteCount").jsonPrimitive.int,
+        )
+    }
+
+    private fun snapshot(): Pair<String, RulesManifest> {
+        val directory = assets()
+        return File(directory, "baseline.txt").readText() to manifest(directory)
+    }
+
+    @Test fun packagedBaselineBytesMatchManifest() {
+        val directory = assets()
+        val manifest = manifest(directory)
+        val bytes = File(directory, "baseline.txt").readBytes()
+        val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        assertEquals(manifest.byteCount, bytes.size, "Packaged baseline byte count must match its manifest")
+        assertEquals(manifest.sha256, hash, "Packaged baseline SHA-256 must match its manifest")
     }
     @Test fun fullOfficialCorpusAndExactSearch() {
         val (text, manifest) = snapshot()

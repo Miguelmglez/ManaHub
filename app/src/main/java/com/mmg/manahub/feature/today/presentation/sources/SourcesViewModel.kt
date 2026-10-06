@@ -81,7 +81,7 @@ class SourcesViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                crashReporter.recordException(RuntimeException("[SourcesViewModel] $name failed", e))
+                crashReporter.recordException(RuntimeException("[SourcesViewModel] Source action failed"))
                 _events.send(SourcesEvent.ActionFailed)
             }
         }

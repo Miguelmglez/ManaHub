@@ -7,8 +7,7 @@ import com.mmg.manahub.R
 enum class TodayTab(val routeId: String, @StringRes val labelRes: Int) {
     FEED("feed", R.string.today_tab_feed),
     EVENTS("events", R.string.today_tab_events),
-    SAVED("saved", R.string.today_tab_saved),
-    SOURCES("sources", R.string.today_tab_sources),
+    TRENDS("trends", R.string.today_tab_trends),
     ;
 
     companion object {

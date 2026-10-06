@@ -158,7 +158,7 @@ import com.mmg.manahub.core.data.local.entity.CollectionTransferWishlistDirtyEnt
         com.mmg.manahub.core.data.local.entity.CollectionSelectionRowEntity::class,
         com.mmg.manahub.core.data.local.entity.CollectionSelectionGroupEntity::class,
     ],
-    version = 67,
+    version = 68,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)

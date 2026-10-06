@@ -127,6 +127,204 @@ class CollectionTransferCoordinatorTest {
             block(vm)
         } finally { store.clear();Dispatchers.resetMain() }
     }
+    @Test fun reviewWindowIsBoundedReloadsEarlierPagesAndKeepsBoundaryAfterEditingAndDetails()=runBlocking<Unit> { fixture { h ->
+        val names=(0 until 260).map { "Card $it" }
+        h.db.cardDao().upsertAll(names.map { metadata().copy(scryfallId="printing-$it",name=it) })
+        val job=h.ready(names.joinToString("\n",postfix="\n") { "1 $it" })
+        withReview(h,job) { vm ->
+            repeat(5) {
+                val last=vm.state.value.entries.last().id
+                vm.nextPage()
+                withTimeout(10_000L) { vm.state.first { !it.paging && it.entries.last().id!=last } }
+                assertTrue(vm.state.value.entries.size<=200)
+            }
+            assertNull(vm.state.value.next)
+            val lastWindowFirst=vm.state.value.entries.first().id
+            val card=vm.state.value.cards[100]
+            vm.adjust(card,1)
+            withTimeout(10_000L) { vm.state.first { it.entries.firstOrNull()?.id==lastWindowFirst && it.entries.firstOrNull { entry -> entry.id==card.id }?.quantity==2L } }
+            vm.changeScope(TransferReviewScope.WISHLIST)
+            withTimeout(10_000L) { vm.state.first { !it.loading && it.scope==TransferReviewScope.WISHLIST } }
+            assertTrue(vm.state.value.entries.isEmpty())
+            vm.changeScope(TransferReviewScope.PENDING)
+            withTimeout(10_000L) { vm.state.first { !it.loading && it.entries.firstOrNull()?.id==lastWindowFirst } }
+            vm.previousPage()
+            withTimeout(10_000L) { vm.state.first { !it.paging && it.entries.firstOrNull()?.id!=lastWindowFirst } }
+            assertTrue(vm.state.value.entries.size<=200)
+            assertTrue(vm.state.value.entries.any {it.id==lastWindowFirst})
+        }
+    } }
+    @Test fun invertedReviewTraversesWholeQueueAndReloadsBoundedWindows()=runBlocking<Unit> { fixture { h ->
+        val names=(0 until 260).map { "Card $it" }
+        h.db.cardDao().upsertAll(names.map { metadata().copy(scryfallId="printing-$it",name=it) })
+        val job=h.ready(names.joinToString("\n",postfix="\n") { "1 $it" })
+        withReview(h,job) { vm ->
+            val first=vm.state.value.entries.first().id
+            val last=h.repository.readReviewPage(job,owner,null,direction=TransferPageDirection.BACKWARD).entries.last().id
+            vm.toggleInversion()
+            assertTrue(vm.state.value.cards.isNotEmpty())
+            assertFalse(vm.state.value.loading)
+            withTimeout(10_000L) { vm.state.first { !it.paging && it.publishedInverted && it.entries.firstOrNull()?.id==last } }
+            assertNull(vm.state.value.previous)
+            repeat(5) {
+                val boundary=vm.state.value.entries.last().id
+                vm.nextPage()
+                withTimeout(10_000L) { vm.state.first { !it.paging && it.entries.lastOrNull()?.id!=boundary } }
+                assertTrue(vm.state.value.entries.size<=200)
+                assertEquals(vm.state.value.entries.map { it.id }.sortedDescending(),vm.state.value.entries.map { it.id })
+            }
+            assertNull(vm.state.value.next)
+            assertEquals(first,vm.state.value.entries.last().id)
+            val boundary=vm.state.value.entries.first().id
+            vm.previousPage()
+            withTimeout(10_000L) { vm.state.first { !it.paging && it.entries.firstOrNull()?.id!=boundary } }
+            assertTrue(vm.state.value.entries.size<=200)
+            vm.toggleInversion()
+            withTimeout(10_000L) { vm.state.first { !it.loading && it.entries.firstOrNull()?.id==first } }
+        }
+    } }
+    @Test fun deleteOnAddOffRetainsSuccessfulCardsWithoutReaddingAndClearPreservesOutcomes()=runBlocking<Unit> { fixture { h ->
+        val job=h.ready("2 Fixture\n")
+        withReview(h,job) { vm ->
+            vm.setDeleteOnAdd(false)
+            withTimeout(10_000L) { vm.state.first { !it.loading && it.scope==TransferReviewScope.QUEUE } }
+            fun add(destination: TransferDestination) {
+                val state=vm.state.value;val summary=state.summary!!;val entry=state.entries.single()
+                vm.action(destination,entry.id,summary.generation,summary.payloadVersion,entry.version,false,false,vm.captureSession())
+            }
+            add(TransferDestination.WISHLIST)
+            withTimeout(10_000L) { while(h.db.collectionTransferDao().executableAction(job.value,key)==null)delay(10L) }
+            assertNull(vm.state.value.completionNotice)
+            assertEquals(TransferWorkResult.SUCCESS,RunTransferWork(h.coordinator).run(job))
+            withTimeout(10_000L) { vm.state.first { it.entries.singleOrNull()?.state=="WISHLIST_APPLIED" && it.completionNotice?.destination==TransferDestination.WISHLIST } }
+            assertEquals(2L,vm.state.value.completionNotice!!.copies)
+            assertFalse(vm.state.value.completionNotice!!.partial)
+            vm.clearCompletionNotice()
+            val history=h.repository.readReviewPage(job,owner,null,TransferReviewScope.WISHLIST)
+            assertEquals(2L,history.entries.single().quantity)
+            add(TransferDestination.WISHLIST)
+            withTimeout(10_000L) { vm.state.first { it.error!=null } }
+            assertNull(h.db.collectionTransferDao().executableAction(job.value,key))
+            assertEquals(history,h.repository.readReviewPage(job,owner,null,TransferReviewScope.WISHLIST))
+            vm.clearError();add(TransferDestination.COLLECTION)
+            withTimeout(10_000L) { while(h.db.collectionTransferDao().executableAction(job.value,key)==null)delay(10L) }
+            assertEquals(TransferWorkResult.SUCCESS,RunTransferWork(h.coordinator).run(job))
+            withTimeout(10_000L) { vm.state.first { it.entries.singleOrNull()?.state=="APPLIED" && it.completionNotice?.destination==TransferDestination.COLLECTION } }
+            assertEquals(2L,vm.state.value.completionNotice!!.copies)
+            vm.clearCompletionNotice()
+            val collection=h.repository.readReviewPage(job,owner,null,TransferReviewScope.COLLECTION)
+            vm.discard(vm.captureDiscard()!!)
+            withTimeout(10_000L) { vm.state.first { it.summary?.phase==TransferPhase.DISCARDED && it.entries.isEmpty() } }
+            vm.setDeleteOnAdd(false)
+            withTimeout(10_000L) { vm.state.first { !it.loading && it.scope==TransferReviewScope.QUEUE } }
+            assertTrue(vm.state.value.entries.isEmpty())
+            assertEquals(history,h.repository.readReviewPage(job,owner,null,TransferReviewScope.WISHLIST))
+            assertEquals(collection,h.repository.readReviewPage(job,owner,null,TransferReviewScope.COLLECTION))
+        }
+    } }
+    @Test fun duplicateCreatesIndependentAdjacentEditableCardWithoutChangingOriginalQuantity()=runBlocking<Unit> { fixture { h ->
+        val job=h.ready("3 Fixture\n")
+        withReview(h,job) { vm ->
+            val original=vm.state.value.entries.single()
+            val originalProvenance=h.repository.readProvenance(job,owner,original.id)
+            assertEquals(1,originalProvenance.size)
+            assertEquals(1L,originalProvenance.single().records)
+            assertEquals(3L,originalProvenance.single().copies)
+            vm.duplicate(vm.state.value.cards.single())
+            withTimeout(10_000L) { vm.state.first { it.entries.size==2 && it.summary?.pendingCopies==6L } }
+            val entries=vm.state.value.entries
+            assertEquals(original.id,entries.first().id)
+            assertTrue(entries.all { it.quantity==3L })
+            val clone=vm.state.value.cards.last()
+            assertNotEquals(original.id,clone.id)
+            vm.update(clone.copy(language="es",quantity=2))
+            withTimeout(10_000L) { vm.state.first { it.entries.lastOrNull()?.language=="es" && it.summary?.pendingCopies==5L } }
+            assertEquals(original.id,vm.state.value.entries.first().id)
+            assertEquals("en",vm.state.value.entries.first().language)
+            assertEquals(3L,vm.state.value.entries.first().quantity)
+            assertEquals(2L,vm.state.value.entries.last().quantity)
+            assertEquals(originalProvenance,h.repository.readProvenance(job,owner,original.id))
+            assertEquals(originalProvenance,h.repository.readProvenance(job,owner,clone.id))
+        }
+    } }
+    @Test fun partialCommittedCommandNotifiesOnlyActualCopiesAndNeverReplaysOnReturnedOwner()=runBlocking<Unit> { fixture { h ->
+        val names=(0 until 501).map { "Partial $it" }
+        h.db.cardDao().upsertAll(names.map { metadata().copy(scryfallId="printing-$it",name=it) })
+        val job=h.ready(names.joinToString("\n",postfix="\n") { "1 $it" })
+        val last=h.repository.readReviewPage(job,owner,null,direction=TransferPageDirection.BACKWARD).entries.last()
+        withContext(Dispatchers.IO) { h.db.userCardCollectionDao().upsert(UserCardCollectionEntity(uuid(),owner.id,last.scryfallId,Int.MAX_VALUE)) }
+        withReview(h,job) { vm ->
+            val summary=vm.state.value.summary!!
+            vm.action(TransferDestination.COLLECTION,null,summary.generation,summary.payloadVersion,null,false,false,vm.captureSession())
+            withTimeout(10_000L) { while(h.db.collectionTransferDao().executableAction(job.value,key)==null)delay(10L) }
+            assertNull(vm.state.value.completionNotice)
+            assertEquals(TransferWorkResult.SUCCESS,RunTransferWork(h.coordinator).run(job))
+            withTimeout(10_000L) { vm.state.first { it.completionNotice?.partial==true } }
+            assertEquals(500L,vm.state.value.completionNotice!!.entries)
+            assertEquals(500L,vm.state.value.completionNotice!!.copies)
+            vm.clearCompletionNotice()
+            val generation=vm.state.value.presentationSession!!.generation
+            h.gate.changeOwner(TransferOwner.Account("other"))
+            withTimeout(10_000L) { vm.state.first { it.presentationSession==null } }
+            h.gate.changeOwner(owner)
+            withTimeout(10_000L) { vm.state.first { it.presentationSession?.generation!=generation && it.entries.isNotEmpty() } }
+            assertNull(vm.state.value.completionNotice)
+        }
+    } }
+    @Test fun clearQueueDiscardsAllPendingBeyondVisiblePage()=runBlocking<Unit> { fixture { h ->
+        val names=(0 until 260).map { "Card $it" }
+        h.db.cardDao().upsertAll(names.map { metadata().copy(scryfallId="printing-$it",name=it) })
+        val job=h.ready(names.joinToString("\n",postfix="\n") { "1 $it" })
+        withReview(h,job) { vm ->
+            assertEquals(50,vm.state.value.entries.size)
+            vm.discard(vm.captureDiscard()!!)
+            withTimeout(10_000L) { vm.state.first { it.summary?.phase==TransferPhase.DISCARDED && it.entries.isEmpty() } }
+            assertTrue(h.repository.readReviewPage(job,owner,null).entries.isEmpty())
+            assertTrue(h.repository.readReviewPage(job,owner,null,TransferReviewScope.QUEUE).entries.isEmpty())
+            assertEquals(260L,vm.state.value.summary!!.excludedEntries)
+        }
+    } }
+    @Test fun rapidQuantityTapsReadTheDurableValueInsideSerializedMutations()=runBlocking<Unit> { fixture { h ->
+        val job=h.ready("2 Fixture\n")
+        withReview(h,job) { vm ->
+            val card=vm.state.value.cards.single()
+            repeat(8) { vm.adjust(card,1) }
+            withTimeout(10_000L) { vm.state.first { it.entries.singleOrNull()?.quantity==10L } }
+            repeat(5) { vm.adjust(card,-1) }
+            withTimeout(10_000L) { vm.state.first { it.entries.singleOrNull()?.quantity==5L } }
+            assertEquals(5L,h.repository.readPage(job,owner,null).entries.single().quantity)
+        }
+    } }
+    @Test fun queuedEditInvalidatesAlreadyDisplayedBulkConsentBeforeRoomSummaryPublication()=runBlocking<Unit> { fixture { h ->
+        val job=h.ready("2 Fixture\n")
+        withReview(h,job) { vm ->
+            val summary=vm.state.value.summary!!
+            val session=vm.captureSession()!!
+            vm.update(vm.state.value.cards.single().copy(isFoil=true))
+            vm.action(TransferDestination.COLLECTION,null,summary.generation,summary.payloadVersion,null,false,false,session)
+            withTimeout(10_000L) { vm.state.first { it.error!=null } }
+            assertNull(h.db.collectionTransferDao().executableAction(job.value,key))
+            assertTrue(h.repository.readPage(job,owner,null).entries.single().isFoil)
+        }
+    } }
+    @Test fun actionAndQuantityConsentRejectReturnedOwnerGeneration()=runBlocking<Unit> { fixture { h ->
+        val job=h.ready("2 Fixture\n")
+        withReview(h,job) { vm ->
+            val session=vm.captureSession()!!
+            val summary=vm.state.value.summary!!
+            val entry=vm.state.value.entries.single()
+            h.gate.changeOwner(TransferOwner.Account("other"))
+            withTimeout(10_000L) { vm.state.first { it.summary==null && it.entries.isEmpty() } }
+            h.gate.changeOwner(owner)
+            withTimeout(10_000L) { vm.state.first { it.summary!=null && it.entries.isNotEmpty() } }
+            vm.action(TransferDestination.COLLECTION,entry.id,summary.generation,summary.payloadVersion,entry.version,false,false,session)
+            withTimeout(10_000L) { vm.state.first { it.error!=null } }
+            assertNull(h.db.collectionTransferDao().executableAction(job.value,key))
+            vm.clearError();vm.correctQuantity(entry.id,entry.version,3L,session)
+            withTimeout(10_000L) { vm.state.first { it.error!=null } }
+            assertEquals(2L,h.repository.readPage(job,owner,null).entries.single().quantity)
+        }
+    } }
     @Test fun durableReviewAttributeEditPreservesTenThousandAndRejectsOldDialogVersion()=runBlocking<Unit> { fixture { h ->
         val job=h.ready("10000 Fixture\n")
         withReview(h,job) { vm ->
@@ -155,7 +353,7 @@ class CollectionTransferCoordinatorTest {
         val excluded=h.ready("2147483647 Fixture\n1 Fixture\n\n","REVIEW_REQUIRED")
         withReview(h,excluded) { vm ->
             vm.exclude(vm.state.value.cards.single())
-            withTimeout(10_000L) { vm.state.first { it.entries.singleOrNull()?.excluded==true } }
+            withTimeout(10_000L) { vm.state.first { it.entries.isEmpty() && it.summary?.excludedEntries==1L } }
             assertEquals(2147483648L,h.repository.readPage(excluded,owner,null).entries.single().quantity)
         }
     } }

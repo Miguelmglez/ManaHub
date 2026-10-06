@@ -31,6 +31,7 @@ fun addCardKoinModule(): Module = module {
             communityDecksRepository = get(),
             appScope = get(),
             launchArgs = AddCardLaunchArgs.from(
+                setCode = savedStateHandle.get<String>(AddCardLaunchArgs.ARG_SET_CODE),
                 multi = savedStateHandle.get<Boolean>(AddCardLaunchArgs.ARG_MULTI) ?: false,
                 source = savedStateHandle.get<String>(AddCardLaunchArgs.ARG_SOURCE),
                 sourceId = savedStateHandle.get<String>(AddCardLaunchArgs.ARG_SOURCE_ID),

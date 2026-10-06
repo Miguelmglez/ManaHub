@@ -2954,9 +2954,12 @@ private fun NewsWidget(
             items(news.take(MAX_NEWS_PREVIEW), key = { it.id }) { item ->
                 NewsItemCard(
                     item = item,
-                    orientation = NewsItemOrientation.VERTICAL,
+                    orientation = NewsItemOrientation.HORIZONTAL,
                     placeholderPainter = painterResource(Res.drawable.mtg_card_back),
+                    showDescription = false,
+                    showContentType = false,
                     titleMinLines = NEWS_TITLE_LINES,
+                    compact = true,
                     modifier = Modifier.width(HomeNewsCardWidth).height(cardHeight),
                     onClick = { onAction(HomeAction.OpenNewsUrl(item.url)) },
                 )

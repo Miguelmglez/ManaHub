@@ -68,6 +68,7 @@ fun newsKoinModule(
         EventsViewModel(
             getUpcomingReleases = get(),
             getProTourContent = get(),
+            getTrendStreamAvatar = get(),
             manageSources = get(),
             userPrefsDataStore = get(),
             crashReporter = get(),

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,9 +22,27 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.filled.DynamicFeed
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.RssFeed
@@ -39,6 +58,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -49,6 +71,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.news.ContentSource
@@ -65,7 +88,7 @@ import com.mmg.manahub.core.ui.components.MagicSegmentedControl
 import com.mmg.manahub.core.ui.components.MagicToastState
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.NewsItemCard
-import com.mmg.manahub.core.ui.components.PullRefreshHeader
+import com.mmg.manahub.core.ui.components.PullRefreshState
 import com.mmg.manahub.core.ui.components.rememberPullRefreshState
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
@@ -90,6 +113,7 @@ fun FeedTab(
     onDiscoverSources: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var showFilters by rememberSaveable { mutableStateOf(false) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val mc = MaterialTheme.magicColors
@@ -137,57 +161,51 @@ fun FeedTab(
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val placeholder = painterResource(Res.drawable.mtg_card_back)
 
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .nestedScroll(pullState.nestedScrollConnection),
-        contentPadding = PaddingValues(top = spacing.md, bottom = spacing.lg + bottomInset),
-        verticalArrangement = Arrangement.spacedBy(spacing.md),
-    ) {
-        if (pullState.headerHeightDp > 0.dp) {
-            item(key = "pull_header") {
-                PullRefreshHeader(
-                    height = pullState.headerHeightDp,
-                    isRefreshing = state.isRefreshing,
-                    dragFraction = pullState.dragFraction,
-                    refreshingText = stringResource(R.string.today_refreshing),
-                    pullIcon = Icons.Default.KeyboardArrowDown,
-                    pullHintDescription = stringResource(R.string.today_pull_to_refresh),
+    Box(modifier = modifier.fillMaxSize().clipToBounds()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(pullState.nestedScrollConnection)
+                .graphicsLayer { translationY = pullState.headerHeightPx.value },
+            contentPadding = PaddingValues(top = spacing.md, bottom = spacing.lg + bottomInset),
+            verticalArrangement = Arrangement.spacedBy(spacing.md),
+        ) {
+
+        item(key = "feed_search") {
+            val filterCount = (if (state.contentFilter != FeedContentFilter.ALL) 1 else 0) +
+                state.selectedSourceIds.size + (if (state.savedOnly) 1 else 0)
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                OutlinedTextField(
+                    value = state.searchQuery, onValueChange = viewModel::onSearchQueryChanged,
+                    placeholder = { Text(stringResource(if (state.savedOnly) R.string.today_saved_search_hint else R.string.today_search_hint), color = mc.textDisabled, style = MaterialTheme.magicTypography.bodyLarge) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = mc.textSecondary) },
+                    trailingIcon = if (state.searchQuery.isNotEmpty()) {{
+                        IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                            Icon(Icons.Default.Clear, stringResource(R.string.action_close), tint = mc.textSecondary)
+                        }
+                    }} else null,
+                    singleLine = true, shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.weight(1f),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = mc.textPrimary,
+                        unfocusedTextColor = mc.textPrimary, focusedBorderColor = mc.primaryAccent,
+                        unfocusedBorderColor = mc.surfaceVariant, cursorColor = mc.primaryAccent),
                 )
-            }
-        }
-
-        item(key = "content_filter") {
-            MagicSegmentedControl(
-                options = listOf(
-                    stringResource(R.string.today_filter_all),
-                    stringResource(R.string.today_filter_articles),
-                    stringResource(R.string.today_filter_videos),
-                ),
-                selectedIndex = state.contentFilter.ordinal,
-                onOptionSelected = { viewModel.onContentFilterSelected(FeedContentFilter.entries[it]) },
-                modifier = Modifier.padding(horizontal = spacing.lg),
-            )
-        }
-
-        item(key = "sources_rail") {
-            SourcesRail(
-                sources = state.followedSources,
-                selectedSourceId = state.selectedSource?.id,
-                onSelectAll = { viewModel.selectSource(null) },
-                onSelectSource = viewModel::onSourceChipClicked,
-                onAddSource = onAddSource,
-            )
-        }
-
-        state.selectedSource?.let { source ->
-            item(key = "source_header_${source.id}") {
-                SourceHeaderCard(
-                    source = source,
-                    onOpenSite = { openSite(source) },
-                    onUnfollow = { viewModel.unfollow(source) },
-                    modifier = Modifier.padding(horizontal = spacing.lg),
-                )
+                BadgedBox(badge = {
+                    if (filterCount > 0) {
+                        Badge(containerColor = mc.primaryAccent, contentColor = mc.background) {
+                            Text("$filterCount")
+                        }
+                    }
+                }) {
+                    IconButton(
+                        onClick = { viewModel.onFiltersOpened(); showFilters = true },
+                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp))
+                            .background(mc.primaryAccent.copy(alpha = if (filterCount > 0) 0.15f else 0.1f)),
+                    ) {
+                        Icon(Icons.Default.Tune, stringResource(R.string.today_filters), tint = mc.primaryAccent)
+                    }
+                }
             }
         }
 
@@ -197,7 +215,7 @@ fun FeedTab(
                     ShimmerNewsItem(modifier = Modifier.padding(horizontal = spacing.lg))
                 }
             }
-            state.followedSources.isEmpty() -> item(key = "empty_follow") {
+            state.followedSources.isEmpty() && !state.savedOnly -> item(key = "empty_follow") {
                 EmptyState(
                     title = stringResource(R.string.today_feed_empty_follow_title),
                     subtitle = stringResource(R.string.today_feed_empty_follow_subtitle),
@@ -226,8 +244,8 @@ fun FeedTab(
             }
             state.items.isEmpty() -> item(key = "empty_feed") {
                 EmptyState(
-                    title = stringResource(R.string.today_feed_empty_title),
-                    subtitle = stringResource(R.string.today_feed_empty_subtitle),
+                    title = stringResource(if (state.savedOnly) R.string.today_saved_empty_title else R.string.today_feed_empty_title),
+                    subtitle = stringResource(if (state.savedOnly) R.string.today_saved_empty_subtitle else R.string.today_feed_empty_subtitle),
                     icon = Icons.Default.DynamicFeed,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -267,13 +285,88 @@ fun FeedTab(
                             .animateItem(),
                     )
                 }
-                item(key = "caught_up") {
+                if (!state.savedOnly) item(key = "caught_up") {
                     CaughtUpFooter(
                         selectedSource = state.selectedSource,
                         onOpenSite = { state.selectedSource?.let(openSite) },
                     )
                 }
             }
+        }
+        }
+        FeedRefreshOverlay(
+            pullState = pullState,
+            isRefreshing = state.isRefreshing,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+    }
+    if (showFilters) FeedFiltersSheet(state, viewModel::onContentFilterSelected, viewModel::selectSource,
+        viewModel::onSavedOnlyChanged, onDismiss = { showFilters = false })
+
+}
+
+@Composable
+private fun FeedRefreshOverlay(
+    pullState: PullRefreshState,
+    isRefreshing: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val height = pullState.headerHeightDp
+    if (height > 0.dp) {
+        FeedRefreshBanner(
+            height = height,
+            isRefreshing = isRefreshing,
+            dragFraction = pullState.dragFraction,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun FeedRefreshBanner(
+    height: Dp,
+    isRefreshing: Boolean,
+    dragFraction: Float,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    val infiniteTransition = rememberInfiniteTransition(label = "feed_refresh_spin")
+    val angle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "angle",
+    )
+    Box(
+        modifier = modifier.fillMaxWidth().height(height).clipToBounds()
+            .background(mc.primaryAccent.copy(alpha = 0.12f)),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Sync,
+                contentDescription = null,
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(18.dp).graphicsLayer {
+                    rotationZ = if (isRefreshing) angle else dragFraction.coerceIn(0f, 1f) * 180f
+                },
+            )
+            Text(
+                text = stringResource(
+                    if (isRefreshing || dragFraction >= 1f) R.string.today_refreshing
+                    else R.string.today_pull_to_refresh,
+                ),
+                style = MaterialTheme.magicTypography.labelLarge,
+                color = mc.primaryAccent,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
@@ -284,145 +377,6 @@ internal fun MenuItem(label: String, onClick: () -> Unit) {
         text = { Text(label, style = MaterialTheme.magicTypography.bodyMedium, color = MaterialTheme.magicColors.textPrimary) },
         onClick = onClick,
     )
-}
-
-@Composable
-private fun SourcesRail(
-    sources: List<ContentSource>,
-    selectedSourceId: String?,
-    onSelectAll: () -> Unit,
-    onSelectSource: (String) -> Unit,
-    onAddSource: () -> Unit,
-) {
-    val spacing = MaterialTheme.spacing
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-        contentPadding = PaddingValues(horizontal = spacing.lg),
-    ) {
-        item(key = "rail_all") {
-            RailItem(
-                label = stringResource(R.string.today_rail_all),
-                selected = selectedSourceId == null,
-                onClick = onSelectAll,
-            ) { RailIcon(Icons.Default.DynamicFeed) }
-        }
-        items(sources, key = { it.id }) { source ->
-            RailItem(
-                label = source.name,
-                selected = source.id == selectedSourceId,
-                onClick = { onSelectSource(source.id) },
-            ) { AvatarImage(avatarUrl = source.iconUrl, initials = sourceInitials(source.name), size = RAIL_AVATAR_SIZE) }
-        }
-        item(key = "rail_add") {
-            val addLabel = stringResource(R.string.today_rail_add_a11y)
-            RailItem(
-                label = stringResource(R.string.today_rail_add),
-                selected = false,
-                onClick = onAddSource,
-                modifier = Modifier.semantics { contentDescription = addLabel },
-            ) { RailIcon(Icons.Default.Add) }
-        }
-    }
-}
-
-@Composable
-private fun RailItem(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    avatar: @Composable () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val spacing = MaterialTheme.spacing
-    Column(
-        modifier = modifier
-            .width(RailItemWidth)
-            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
-            .padding(vertical = spacing.xs),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(spacing.xs),
-    ) {
-        Box(
-            modifier = Modifier
-                .then(if (selected) Modifier.border(RailRingWidth, mc.primaryAccent, CircleShape) else Modifier)
-                .padding(RailRingWidth),
-        ) { avatar() }
-        Text(
-            text = label,
-            style = MaterialTheme.magicTypography.labelSmall,
-            color = if (selected) mc.primaryAccent else mc.textSecondary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-private fun RailIcon(icon: ImageVector) {
-    val mc = MaterialTheme.magicColors
-    Box(
-        modifier = Modifier
-            .size(RAIL_AVATAR_SIZE.dp)
-            .background(mc.primaryAccent.copy(alpha = 0.2f), CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, contentDescription = null, tint = mc.primaryAccent)
-    }
-}
-
-@Composable
-private fun SourceHeaderCard(
-    source: ContentSource,
-    onOpenSite: () -> Unit,
-    onUnfollow: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    Surface(
-        color = mc.surface,
-        shape = CardShape,
-        border = BorderStroke(1.dp, mc.surfaceVariant),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier.padding(spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(spacing.md),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                AvatarImage(avatarUrl = source.iconUrl, initials = sourceInitials(source.name), size = HEADER_AVATAR_SIZE)
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(source.name, style = ty.titleMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(sourceKindAndLanguage(source), style = ty.bodySmall, color = mc.textSecondary)
-                }
-            }
-            Text(
-                text = stringResource(R.string.today_source_recent_only, source.name),
-                style = ty.bodySmall,
-                color = mc.textSecondary,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                if (source.siteUrl != null) {
-                    MagicCtaButton(
-                        onClick = onOpenSite,
-                        text = stringResource(openSiteLabelRes(source.type)),
-                        style = MagicCtaStyle.Outlined,
-                        color = MagicCtaColor.Primary,
-                        icon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) },
-                    )
-                }
-                MagicCtaButton(
-                    onClick = onUnfollow,
-                    text = stringResource(R.string.today_source_unfollow),
-                    style = MagicCtaStyle.Ghost,
-                    color = MagicCtaColor.Neutral,
-                )
-            }
-        }
-    }
 }
 
 @Composable

@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -38,9 +39,12 @@ sealed interface FeedEvent {
 }
 
 data class FeedUiState(
+    val savedOnly: Boolean = false,
+    val filterSources: List<ContentSource> = emptyList(),
     val items: List<NewsItem> = emptyList(),
     val followedSources: List<ContentSource> = emptyList(),
     val selectedSource: ContentSource? = null,
+    val selectedSourceIds: Set<String> = emptySet(),
     val contentFilter: FeedContentFilter = FeedContentFilter.ALL,
     val searchActive: Boolean = false,
     val searchQuery: String = "",
@@ -66,6 +70,11 @@ class FeedViewModel(
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
+    private val savedOnly = savedStateHandle.getStateFlow("feed_saved_only", false)
+    private val savedItems = observeSavedItems().map { rows -> rows.map { it.item } }.catch {
+        crashReporter.recordException(RuntimeException("Today saved items observation failed"))
+        emit(emptyList())
+    }
     private val contentFilter = savedStateHandle.getStateFlow(KEY_CONTENT_FILTER, FeedContentFilter.ALL.name)
     private val selectedSourceId = savedStateHandle.getStateFlow<String?>(KEY_SELECTED_SOURCE, null)
     private val searchActive = savedStateHandle.getStateFlow(KEY_SEARCH_ACTIVE, false)
@@ -86,17 +95,22 @@ class FeedViewModel(
         .onEach { list -> crashReporter.setCustomKey(KEY_FOLLOWED_COUNT, list.count { it.isEnabled }.toString()) }
         .catch {
             crashReporter.log("today_feed_sources_load_failed")
+            crashReporter.recordException(RuntimeException("Today sources observation failed"))
             emit(emptyList())
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     private val savedIds: StateFlow<Set<String>> = observeSavedItems.savedIds()
-        .catch { emit(emptySet()) }
+        .catch {
+            crashReporter.log("today_saved_ids_load_failed")
+            crashReporter.recordException(RuntimeException("Today saved IDs observation failed"))
+            emit(emptySet())
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptySet())
 
     private data class FilterInputs(
         val contentFilter: FeedContentFilter,
-        val selectedSourceId: String?,
+        val selectedSourceIds: Set<String>,
         val searchActive: Boolean,
         val rawQuery: String,
         val query: String,
@@ -106,7 +120,7 @@ class FeedViewModel(
         combine(contentFilter, selectedSourceId, searchActive, searchQuery, debouncedQuery) { filter, selected, active, raw, query ->
             FilterInputs(
                 contentFilter = FeedContentFilter.entries.firstOrNull { it.name == filter } ?: FeedContentFilter.ALL,
-                selectedSourceId = selected,
+                selectedSourceIds = selected?.split(',')?.filter { it.isNotBlank() }?.toSet().orEmpty(),
                 searchActive = active,
                 rawQuery = raw,
                 query = query,
@@ -119,29 +133,43 @@ class FeedViewModel(
         combine(isRefreshing, isInitialLoad, totalFailure) { refreshing, initialLoad, failure -> Status(refreshing, initialLoad, failure) }
 
     val uiState: StateFlow<FeedUiState> = combine(
-        getNewsFeed().catch {
+        combine(getNewsFeed(), savedItems, savedOnly) { live, saved, onlySaved -> onlySaved to if (onlySaved) saved else live }.catch {
             crashReporter.log("today_feed_load_failed")
-            emit(emptyList())
+            crashReporter.recordException(RuntimeException("Today feed observation failed"))
+            emit(false to emptyList())
         },
         sources,
         savedIds,
         filterInputs,
         status,
-    ) { items, sources, savedIds, filters, status ->
+    ) { feed, sources, savedIds, filters, status ->
+        val (onlySaved, items) = feed
+        crashReporter.setCustomKey("today_feed_mode", if (onlySaved) "saved" else "live")
+        crashReporter.setCustomKey("today_feed_content_filter", filters.contentFilter.name)
         val followed = sources.orEmpty().filter { it.isEnabled }
-        val selected = followed.firstOrNull { it.id == filters.selectedSourceId }
+        val filterSources = if (onlySaved) items.distinctBy { it.sourceId }.map { item ->
+            sources.orEmpty().firstOrNull { it.id == item.sourceId } ?: ContentSource(
+                id = item.sourceId, name = item.sourceName, feedUrl = "", type = if (item is NewsItem.Video)
+                    com.mmg.manahub.core.model.news.SourceType.VIDEO else com.mmg.manahub.core.model.news.SourceType.ARTICLE,
+            )
+        } else followed
+        val selectedIds = filterSources.map { it.id }.toSet().intersect(filters.selectedSourceIds)
+        val selected = if (selectedIds.size == 1) filterSources.firstOrNull { it.id == selectedIds.first() } else null
         val visible = filterFeed(
             items = items,
-            followedIds = followed.map { it.id }.toSet(),
+            followedIds = if (onlySaved) items.map { it.sourceId }.toSet() else followed.map { it.id }.toSet(),
             contentFilter = filters.contentFilter,
-            selectedSourceId = selected?.id,
+            selectedSourceIds = selectedIds,
             query = filters.query,
             sourceNames = followed.associate { it.id to it.name },
         )
         FeedUiState(
+            savedOnly = onlySaved,
+            filterSources = filterSources,
             items = visible,
             followedSources = followed,
             selectedSource = selected,
+            selectedSourceIds = selectedIds,
             contentFilter = filters.contentFilter,
             searchActive = filters.searchActive,
             searchQuery = filters.rawQuery,
@@ -149,10 +177,10 @@ class FeedViewModel(
             sourceLanguages = followed.associate { it.id to it.language },
             showLanguageBadge = followed.map { it.language }.distinct().size > 1,
             sourcesLoaded = sources != null,
-            isLoading = status.initialLoad && visible.isEmpty(),
+            isLoading = !onlySaved && status.initialLoad && visible.isEmpty(),
             isRefreshing = status.refreshing && !status.initialLoad,
-            showTotalFailure = status.totalFailure && visible.isEmpty(),
-            isFiltered = filters.contentFilter != FeedContentFilter.ALL || selected != null || filters.query.isNotBlank(),
+            showTotalFailure = !onlySaved && status.totalFailure && visible.isEmpty(),
+            isFiltered = filters.contentFilter != FeedContentFilter.ALL || selectedIds.isNotEmpty() || filters.query.isNotBlank(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), FeedUiState())
 
@@ -174,7 +202,7 @@ class FeedViewModel(
                 }
                 .onFailure { e ->
                     crashReporter.log("news_refresh_failed: ${e::class.simpleName}")
-                    crashReporter.recordException(RuntimeException("[FeedViewModel] Feed refresh failed", e))
+                    crashReporter.recordException(RuntimeException("[FeedViewModel] Feed refresh failed"))
                     totalFailure.value = true
                 }
             isRefreshing.value = false
@@ -182,8 +210,14 @@ class FeedViewModel(
         }
     }
 
+    fun onSavedOnlyChanged(saved: Boolean) {
+        savedStateHandle["feed_saved_only"] = saved
+        crashReporter.log("today_feed_mode_changed")
+    }
+
     fun onContentFilterSelected(filter: FeedContentFilter) {
         savedStateHandle[KEY_CONTENT_FILTER] = filter.name
+        crashReporter.log("today_feed_filter_changed")
     }
 
     fun onSearchActiveChanged(active: Boolean) {
@@ -195,14 +229,28 @@ class FeedViewModel(
         savedStateHandle[KEY_SEARCH_QUERY] = query
     }
 
-    /** Filters the feed to one source; null shows every followed source. */
+    /** Filters the feed by source IDs; null clears specific source selections. */
     fun selectSource(sourceId: String?) {
-        savedStateHandle[KEY_SELECTED_SOURCE] = sourceId
+        if (sourceId == null) {
+            savedStateHandle[KEY_SELECTED_SOURCE] = null
+            crashReporter.setCustomKey("today_feed_source_filter_active", "false")
+        } else {
+            val currentRaw = savedStateHandle.get<String?>(KEY_SELECTED_SOURCE)
+            val currentSet = currentRaw?.split(',')?.filter { it.isNotBlank() }?.toSet().orEmpty()
+            val newSet = if (sourceId in currentSet) {
+                currentSet - sourceId
+            } else {
+                currentSet + sourceId
+            }
+            val newRaw = if (newSet.isEmpty()) null else newSet.joinToString(",")
+            savedStateHandle[KEY_SELECTED_SOURCE] = newRaw
+            crashReporter.setCustomKey("today_feed_source_filter_active", (newRaw != null).toString())
+        }
     }
 
-    /** Rail chip tap: selects the source, or clears the selection when it is already selected. */
+    /** Rail chip tap: toggles the source selection. */
     fun onSourceChipClicked(sourceId: String) {
-        selectSource(if (selectedSourceId.value == sourceId) null else sourceId)
+        selectSource(sourceId)
     }
 
     fun toggleSaved(item: NewsItem) {
@@ -214,7 +262,7 @@ class FeedViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                crashReporter.recordException(RuntimeException("[FeedViewModel] Save toggle failed", e))
+                crashReporter.recordException(RuntimeException("[FeedViewModel] Save toggle failed"))
                 _events.send(FeedEvent.ActionFailed)
             }
         }
@@ -224,17 +272,24 @@ class FeedViewModel(
         viewModelScope.launch {
             try {
                 manageSources.setFollowed(source.id, followed = false)
-                if (selectedSourceId.value == source.id) selectSource(null)
+                val currentSet = selectedSourceId.value?.split(',')?.filter { it.isNotBlank() }?.toSet().orEmpty()
+                if (source.id in currentSet) {
+                    selectSource(source.id)
+                }
                 crashReporter.log("news_source_unfollowed")
                 _events.send(FeedEvent.Unfollowed(source.name))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                crashReporter.recordException(RuntimeException("[FeedViewModel] Unfollow failed", e))
+                crashReporter.recordException(RuntimeException("[FeedViewModel] Unfollow failed"))
                 _events.send(FeedEvent.ActionFailed)
             }
         }
     }
+
+    fun onSourcesOpened() = crashReporter.log("today_sources_sheet_opened")
+
+    fun onFiltersOpened() = crashReporter.log("today_feed_filters_opened")
 
     fun onSourceSiteOpened() {
         crashReporter.log("news_source_site_opened")

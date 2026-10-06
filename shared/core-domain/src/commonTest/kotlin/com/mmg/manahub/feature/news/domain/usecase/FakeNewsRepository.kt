@@ -69,6 +69,8 @@ class FakeNewsRepository : NewsRepository {
         lastDeleteSourceId = sourceId
     }
 
+    override suspend fun getTrendStreamAvatar(channelId: String): String? = null
+
     override suspend fun save(item: NewsItem) {
         savedItems += item
     }

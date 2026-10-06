@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.today.presentation.sources
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -86,6 +88,7 @@ fun AddSourceSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = spacing.lg)
                 .padding(bottom = spacing.xl)
                 .navigationBarsPadding()

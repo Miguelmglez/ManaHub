@@ -100,6 +100,34 @@ class NewsRepositoryImplTest {
         every { ytParser.parse(any(), any(), any()) } returns emptyList()
     }
 
+    @Test
+    fun `public branding persists independently after fetched and unchanged content`() = runTest {
+        val source = articleSource().copy(siteUrl = "https://example.com/news/")
+        coEvery { newsDao.getEnabledSources() } returns listOf(source)
+        coEvery { feedService.fetchFeed(any(), any(), any()) } returns fetched()
+        coEvery { feedService.fetchPage(any()) } returns Result.success(
+            FetchedPage("<link rel='icon' href='/brand.png'>", "https://example.com/news/", "text/html"))
+        assertEquals(1, repository.refreshAll(force = true).getOrThrow().fetched)
+        coVerify { newsDao.updateIconUrl(source.id, "https://example.com/brand.png") }
+
+        repository = NewsRepositoryImpl(newsDao, feedService, rssParser, ytParser, userPrefsDataStore)
+        coEvery { feedService.fetchFeed(any(), any(), any()) } returns Result.success(FeedFetchResult.NotModified)
+        assertEquals(1, repository.refreshAll(force = true).getOrThrow().notModified)
+        coVerify(exactly = 2) { newsDao.updateIconUrl(source.id, "https://example.com/brand.png") }
+    }
+
+    @Test
+    fun `optional branding failure never changes successful content outcome`() = runTest {
+        val source = articleSource().copy(siteUrl = "https://example.com/news/")
+        coEvery { newsDao.getEnabledSources() } returns listOf(source)
+        coEvery { feedService.fetchFeed(any(), any(), any()) } returns fetched()
+        coEvery { feedService.fetchPage(any()) } returns Result.failure(java.io.IOException("Private source URL"))
+        val result = repository.refreshAll(force = true).getOrThrow()
+        assertEquals(1, result.fetched)
+        assertEquals(0, result.failed)
+        coVerify(exactly = 0) { newsDao.updateIconUrl(any(), any()) }
+    }
+
     @After
     fun tearDown() {
         unmockkStatic(FirebaseCrashlytics::class)

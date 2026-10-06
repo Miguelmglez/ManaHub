@@ -207,7 +207,7 @@ class HomeBoardTest {
     fun `news cards reserve a two-line title`() {
         val metrics = computeHomeWidgetMetrics(lineHeights(1f), Spacing())
         val thumbnail = HomeNewsCardWidth * 9f / 16f
-        val twoLineCard: Dp = thumbnail + 12.dp * 2 + 24.dp * 2 + 6.dp + 14.dp
+        val twoLineCard: Dp = thumbnail + 8.dp * 2 + 20.dp * 2 + 6.dp + 14.dp
 
         assertTrue(metrics.newsCardHeight >= twoLineCard)
     }

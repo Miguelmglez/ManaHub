@@ -53,7 +53,8 @@ class RoomCollectionTransferRepository(
                     val job=dao.getJob(id.value,owner.storageKey()) ?: return@read SummaryResult(null)
                     val totals=dao.repositoryTotals(id.value,owner.storageKey())
                     val wishlist=dao.repositoryWishlistTotals(id.value,owner.storageKey())
-                    SummaryResult(TransferSummary(id,owner,phase(job.phase),job.generation,job.payloadVersion,dao.currentFiles(id.value,owner.storageKey()).map(::file),job.acceptedCopies,job.appliedCopies,totals.pendingCopies,job.appliedEntries,totals.pendingEntries,error(job.error),totals.excludedEntries,job.intentRevision,wishlist.completedEntries,wishlist.completedCopies,job.filesFrozen))
+                    val retained=dao.repositoryRetainedWishlistTotals(id.value,owner.storageKey())
+                    SummaryResult(TransferSummary(id,owner,phase(job.phase),job.generation,job.payloadVersion,dao.currentFiles(id.value,owner.storageKey()).map(::file),job.acceptedCopies,job.appliedCopies,totals.pendingCopies,job.appliedEntries,totals.pendingEntries,error(job.error),totals.excludedEntries,job.intentRevision,wishlist.completedEntries,wishlist.completedCopies,job.filesFrozen,totals.invalidPendingEntries,retained.entries,retained.copies))
                 }.summary
                 if(sessions.currentSession==captured && matchesObservedOwner(owner))emit(summary) else emit(null)
             }
@@ -69,17 +70,47 @@ class RoomCollectionTransferRepository(
         if(!available(owner))return TransferMutationResult.Rejected(TransferError.OWNER_UNAVAILABLE)
         return try {
             val result=read(owner) {
-                if((sessions.currentSession as? TransferSession.Available)?.generation!=authGeneration)null else dao.bindReceiptOrExisting(id.value,owner.storageKey(),authGeneration,origin.name,nowMillis(),destinationChosen)
+                if((sessions.currentSession as? TransferSession.Available)?.generation!=authGeneration)throw TransferReadException(TransferError.OWNER_CHANGED)
+                if(dao.getJob(id.value,owner.storageKey())==null) {
+                    val receipt=dao.getReceipt(id.value) ?: throw TransferReadException(TransferError.NOT_FOUND)
+                    if(receipt.capturedOwner!=null && receipt.capturedOwner!=owner.storageKey())throw TransferReadException(TransferError.OWNER_CHANGED)
+                    if(receipt.authGeneration!=authGeneration && !destinationChosen)throw TransferReadException(TransferError.OWNER_CHANGED)
+                    if(receipt.phase=="RECEIVING")throw TransferReadException(TransferError.INVALID_SOURCE)
+                }
+                dao.bindReceiptOrExisting(id.value,owner.storageKey(),authGeneration,origin.name,nowMillis(),destinationChosen)
             } ?: return TransferMutationResult.Rejected(TransferError.REVIEW_CHANGED)
             if(result!=id.value)TransferMutationResult.AlreadyReceived(TransferJobId(result)) else scheduled(id,TransferMutationResult.Accepted)
         } catch(cancelled: CancellationException) { throw cancelled }
-        catch(_: Exception) { TransferMutationResult.Rejected(TransferError.OWNER_CHANGED) }
+        catch(_: TransferSessionChangedException) { TransferMutationResult.Rejected(TransferError.OWNER_CHANGED) }
+        catch(error: TransferReadException) { TransferMutationResult.Rejected(error.error) }
+        catch(_: Exception) { TransferMutationResult.Rejected(TransferError.STORAGE_FAILURE) }
     }
     override suspend fun readPage(id: TransferJobId, owner: TransferOwner, cursor: TransferPageCursor?): TransferPage = read(owner) {
         val job=dao.getJob(id.value,owner.storageKey()) ?: throw TransferReadException(TransferError.NOT_FOUND)
         if(cursor!=null && cursor.generation!=job.generation)throw TransferReadException(TransferError.REVIEW_CHANGED)
         val rows=dao.reviewPage(id.value,owner.storageKey(),job.generation,cursor?.afterId ?: "")
         TransferPage(rows.map(::entry),rows.lastOrNull()?.takeIf { rows.size==50 }?.let { TransferPageCursor(job.generation,it.id) })
+    }
+    override suspend fun readReviewPage(id: TransferJobId, owner: TransferOwner, cursor: TransferReviewCursor?, scope: TransferReviewScope, direction: TransferPageDirection): TransferReviewPage = read(owner) {
+        val job=dao.getJob(id.value,owner.storageKey()) ?: throw TransferReadException(TransferError.NOT_FOUND)
+        if(cursor!=null && (cursor.jobId!=id || cursor.generation!=job.generation || cursor.scope!=scope))throw TransferReadException(TransferError.REVIEW_CHANGED)
+        if(scope==TransferReviewScope.COLLECTION || scope==TransferReviewScope.WISHLIST) {
+            val snapshots=when(direction) {
+                TransferPageDirection.FORWARD -> dao.completedReviewAfter(id.value,owner.storageKey(),scope.name,cursor?.anchorId ?: "")
+                TransferPageDirection.BACKWARD -> dao.completedReviewBefore(id.value,owner.storageKey(),scope.name,cursor?.anchorId).asReversed()
+            }
+            fun snapshotId(value: CollectionTransferActionEntryEntity)="${value.actionId}:${value.entryId}"
+            val previous=snapshots.firstOrNull()?.takeIf { dao.completedReviewHasPrevious(id.value,owner.storageKey(),scope.name,snapshotId(it)) }?.let { TransferReviewCursor(id,job.generation,scope,snapshotId(it)) }
+            val next=snapshots.lastOrNull()?.takeIf { dao.completedReviewHasNext(id.value,owner.storageKey(),scope.name,snapshotId(it)) }?.let { TransferReviewCursor(id,job.generation,scope,snapshotId(it)) }
+            return@read TransferReviewPage(snapshots.map { value -> TransferReviewEntry(snapshotId(value),value.scryfallId,value.isFoil,value.condition,value.language,value.completedQuantity,if(scope==TransferReviewScope.COLLECTION)value.completedQuantity else 0L,false,null,TransferDestination.valueOf(scope.name),value.entryVersion,TransferActionId(value.actionId),"COMPLETED",value.entryId) },previous,next)
+        }
+        val rows=when(direction) {
+            TransferPageDirection.FORWARD -> dao.scopedReviewAfter(id.value,owner.storageKey(),job.generation,scope.name,cursor?.anchorId ?: "")
+            TransferPageDirection.BACKWARD -> dao.scopedReviewBefore(id.value,owner.storageKey(),job.generation,scope.name,cursor?.anchorId).asReversed()
+        }
+        val previous=rows.firstOrNull()?.takeIf { dao.scopedReviewHasPrevious(id.value,owner.storageKey(),job.generation,scope.name,it.id) }?.let { TransferReviewCursor(id,job.generation,scope,it.id) }
+        val next=rows.lastOrNull()?.takeIf { dao.scopedReviewHasNext(id.value,owner.storageKey(),job.generation,scope.name,it.id) }?.let { TransferReviewCursor(id,job.generation,scope,it.id) }
+        TransferReviewPage(rows.map(::entry),previous,next)
     }
     override suspend fun selectFile(id: TransferJobId, owner: TransferOwner, file: TransferFileId, generation: Long, selected: Boolean)=scheduled(id,mutate(owner) { dao.selectFile(id.value,owner.storageKey(),file.value,generation,selected) })
     override suspend fun includeRepeatedFile(id: TransferJobId, owner: TransferOwner, file: TransferFileId, generation: Long)=scheduled(id,mutate(owner) { dao.selectFile(id.value,owner.storageKey(),file.value,generation,true,true) })
@@ -89,6 +120,7 @@ class RoomCollectionTransferRepository(
         job?.generation==generation && dao.editPendingEntry(id.value,owner.storageKey(),entry.id,entry.version,entry.scryfallId,entry.isFoil,entry.condition,entry.language,entry.quantity,entry.destination,entry.excluded)
     }
     override suspend fun acknowledgeReview(id: TransferJobId, owner: TransferOwner, confirmation: TransferConfirmation)=mutate(owner) { dao.acknowledgeReview(id.value,owner.storageKey(),confirmation) }
+    override suspend fun duplicatePendingEntry(id: TransferJobId, owner: TransferOwner, generation: Long, payloadVersion: Long, entryId: String, entryVersion: Long, newEntryId: String)=mutate(owner) { dao.duplicatePendingEntry(id.value,owner.storageKey(),generation,payloadVersion,entryId,entryVersion,newEntryId,nowMillis()) }
     override suspend fun pause(id: TransferJobId, owner: TransferOwner)=scheduled(id,mutate(owner) { dao.pauseTransfer(id.value,owner.storageKey(),nowMillis()) },true)
     override suspend fun resume(id: TransferJobId, owner: TransferOwner)=scheduled(id,mutate(owner) { dao.resumeTransfer(id.value,owner.storageKey(),nowMillis()) })
     override suspend fun discardPending(id: TransferJobId, owner: TransferOwner, generation: Long, payloadVersion: Long)=scheduled(id,mutate(owner) { dao.discardTransferPending(id.value,owner.storageKey(),generation,payloadVersion,nowMillis()) },true)

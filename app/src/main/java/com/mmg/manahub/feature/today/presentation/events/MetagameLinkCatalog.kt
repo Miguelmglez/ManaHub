@@ -30,7 +30,14 @@ data class MetagameLink(
 /** Editorial catalog opened in the browser, never fetched: no runtime liveness checks, fix URLs here if a site moves. */
 object MetagameLinkCatalog {
 
+    val limitedLinks: List<MetagameLink> = listOf(
+        MetagameLink("aetherhub_limited_ratings", R.string.today_link_aether_limited, R.string.today_link_aether_limited_desc, false, { "https://aetherhub.com/Limited/Ratings/" }),
+        MetagameLink("aetherhub_draft_sensei", R.string.today_link_draft_sensei, R.string.today_link_draft_sensei_desc, false, { "https://aetherhub.com/Limited/DraftSensei/" }),
+        MetagameLink("draftsim", R.string.today_link_draftsim, R.string.today_link_draftsim_desc, false, { "https://draftsim.com/" }),
+    )
+
     val links: List<MetagameLink> = listOf(
+        MetagameLink("aetherhub_arena_metagame", R.string.today_link_aether_meta, R.string.today_link_aether_meta_desc, false, { "https://aetherhub.com/Metagame/" }),
         MetagameLink(
             id = "mtgo_decklists",
             titleRes = R.string.today_link_mtgo_title,

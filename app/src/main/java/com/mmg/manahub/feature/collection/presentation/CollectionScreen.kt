@@ -472,20 +472,12 @@ private fun CardsTabContent(
     var headerHeightPx by remember { mutableFloatStateOf(0f) }
     val headerHeightDp: Dp = with(density) { headerHeightPx.toDp() }
 
-    // Loading
-    if (uiState.isLoading) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            MagicLoadingSpinner()
-        }
-        return
-    }
-
     val hasActiveSearchOrFilter = uiState.searchQuery.isNotBlank() || filterCount > 0
 
     // Genuinely empty collection (nothing added yet, nothing to filter) — full-screen state,
     // no header needed since there's no search/filter UI to offer yet.
     val emptyCards = if(pagedCards==null)uiState.cards.isEmpty() else (uiState.selectionSummary?.groups ?: 0L)==0L
-    if (emptyCards && !hasActiveSearchOrFilter) {
+    if (emptyCards && !hasActiveSearchOrFilter && !uiState.isLoading) {
         EmptyState(
             icon        = Icons.Default.CollectionsBookmark,
             title       = stringResource(R.string.collection_empty_title),
@@ -502,7 +494,16 @@ private fun CardsTabContent(
         // header below (search bar + advanced-search filters are the only way back) — only the
         // content area swaps to a scoped empty message, keyed off the SAME headerHeightDp offset
         // CardGrid/CardList already use.
-        if (emptyCards) {
+        if (uiState.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = headerHeightDp),
+                contentAlignment = Alignment.Center,
+            ) {
+                MagicLoadingSpinner()
+            }
+        } else if (emptyCards) {
             // Rows whose card is not cached yet are skipped by the projection, so "empty" would be
             // a lie while any of them are outstanding — the list is INCOMPLETE, not empty
             // (ADR-008: ownership data never depends on cache metadata).
@@ -680,12 +681,16 @@ private fun CardsTabContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = "${uiState.selectionSummary?.groups ?: uiState.cards.size.toLong()} ${stringResource(R.string.collection_unique_cards)} · $totalCopies ${stringResource(R.string.collection_total_copies)}",
-                        style = MaterialTheme.magicTypography.labelLarge,
-                        color = mc.textSecondary,
-                        modifier = Modifier.weight(1f)
-                    )
+                    if (!uiState.isLoading) {
+                        Text(
+                            text = "${uiState.selectionSummary?.groups ?: uiState.cards.size.toLong()} ${stringResource(R.string.collection_unique_cards)} · $totalCopies ${stringResource(R.string.collection_total_copies)}",
+                            style = MaterialTheme.magicTypography.labelLarge,
+                            color = mc.textSecondary,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
 
                     IconButton(onClick = onViewModeToggle, modifier = Modifier.size(24.dp)) {
                         Icon(

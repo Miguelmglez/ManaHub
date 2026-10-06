@@ -36,7 +36,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
-import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.core.FeatureFlags
@@ -45,6 +44,7 @@ import com.mmg.manahub.core.ui.theme.CardCornerRadius
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.ui.theme.magicTypography
 import kotlinx.datetime.LocalDate
 
@@ -61,6 +61,8 @@ fun DraftSetCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isCompact: Boolean = false,
+    adaptiveCompact: Boolean = false,
+    releaseDateLabel: String? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -72,12 +74,12 @@ fun DraftSetCard(
             shape = CardShape,
             color = mc.surface,
             modifier = modifier
-                .width(160.dp)
-                .height(110.dp)
+                .then(if (adaptiveCompact) Modifier.fillMaxWidth().heightIn(min = 110.dp)
+                    else Modifier.width(160.dp).height(110.dp))
                 .border(1.dp, mc.surfaceVariant.copy(alpha = 0.5f), CardShape),
         ) {
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = if (adaptiveCompact) Modifier.fillMaxWidth() else Modifier.fillMaxSize(),
             ) {
                 // Background: Set symbol SVG watermark
                 AsyncImage(
@@ -97,9 +99,9 @@ fun DraftSetCard(
                 // Content Layout
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(10.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
+                        .then(if (adaptiveCompact) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
+                        .padding(MaterialTheme.spacing.md),
+                    verticalArrangement = if (adaptiveCompact) Arrangement.spacedBy(MaterialTheme.spacing.sm) else Arrangement.SpaceBetween,
                 ) {
                     // Top Row: Left small set symbol (24.dp), Right draft star icon
                     Row(
@@ -132,28 +134,21 @@ fun DraftSetCard(
                         style = ty.titleMedium,
                         color = mc.textPrimary,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 2
+                        maxLines = if (adaptiveCompact) Int.MAX_VALUE else 2
                     )
 
-                    // Bottom Row: Release date on left, Set code on right
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = formatReleaseDate(set.releasedAt),
-                            style = ty.labelSmall,
-                            color = mc.textSecondary,
-                            maxLines = 1,
-                        )
-                        Text(
-                            text = set.code.uppercase(),
-                            style = ty.labelSmall,
-                            color = mc.primaryAccent,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                        )
+                    if (adaptiveCompact) {
+                        Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)) {
+                            Text(releaseDateLabel ?: formatReleaseDate(set.releasedAt), style = ty.labelSmall, color = mc.textSecondary)
+                            Text(set.code.uppercase(), style = ty.labelSmall, color = mc.primaryAccent, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Text(releaseDateLabel ?: formatReleaseDate(set.releasedAt), style = ty.labelSmall, color = mc.textSecondary, maxLines = 1)
+                            Text(set.code.uppercase(), style = ty.labelSmall, color = mc.primaryAccent,
+                                fontWeight = FontWeight.Bold, maxLines = 1)
+                        }
                     }
                 }
             }
@@ -172,12 +167,6 @@ fun DraftSetCard(
                     .fillMaxWidth()
                     .heightIn(min = 72.dp),
             ) {
-                val setIconPainter = rememberAsyncImagePainter(
-                    model = set.iconSvgUri,
-                    error = fallbackPainter,
-                    fallback = fallbackPainter,
-                )
-
                 if (!set.setImageUrl.isNullOrBlank()) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalPlatformContext.current)
@@ -189,8 +178,8 @@ fun DraftSetCard(
                             .matchParentSize()
                             .alpha(0.35f),
                         contentScale = ContentScale.Crop,
-                        error = setIconPainter,
-                        fallback = setIconPainter,
+                        error = fallbackPainter,
+                        fallback = fallbackPainter,
                     )
                 } else {
                     // Background set symbol backdrop (watermark fallback)
@@ -282,7 +271,7 @@ fun DraftSetCard(
                         ) {
                             // Left: Release Date
                             Text(
-                                text = formatReleaseDate(set.releasedAt),
+                                text = releaseDateLabel ?: formatReleaseDate(set.releasedAt),
                                 style = ty.bodySmall,
                                 color = mc.textSecondary,
                             )

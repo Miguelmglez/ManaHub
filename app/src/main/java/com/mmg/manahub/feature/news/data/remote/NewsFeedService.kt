@@ -43,6 +43,12 @@ class NewsFeedService(
     private val client: OkHttpClient,
     private val httpsOnly: Boolean = true,
 ) {
+    private val pageClient = client.newBuilder().apply {
+        followSslRedirects(false)
+        interceptors().removeAll { it is okhttp3.logging.HttpLoggingInterceptor }
+        networkInterceptors().removeAll { it is okhttp3.logging.HttpLoggingInterceptor }
+    }.build()
+
     /**
      * Fetches [url], sending conditional-GET headers when [etag]/[lastModified] are supplied so
      * an unchanged feed short-circuits to a cheap 304 instead of re-downloading + re-parsing the
@@ -116,7 +122,7 @@ class NewsFeedService(
                 // Without the consent cookie EU users get the consent interstitial instead of the channel page.
                 .apply { if (isYouTubeHost(httpUrl.host)) header("Cookie", YOUTUBE_CONSENT_COOKIE) }
                 .build()
-            client.newCall(request).execute().use { response ->
+            pageClient.newCall(request).execute().use { response ->
                 val finalUrl = response.request.url
                 when {
                     httpsOnly && !finalUrl.isHttps ->

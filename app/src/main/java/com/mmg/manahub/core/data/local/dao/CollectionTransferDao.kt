@@ -35,8 +35,11 @@ data class TransferReviewSourceContribution(val fileId: String, val records: Lon
 data class TransferCollectionAppliedTotals(val entries: Long, val copies: Long)
 
 /** Summary accounting keeps wishlist completions separate from pending and collection quantities. */
-data class TransferRepositoryTotals(val pendingCopies: Long,val pendingEntries: Long,val excludedEntries: Long)
+data class TransferRepositoryTotals(val pendingCopies: Long,val pendingEntries: Long,val excludedEntries: Long,val invalidPendingEntries: Long)
 data class TransferRepositoryActionTotals(val entries: Long,val copies: Long,val completedEntries: Long,val completedCopies: Long)
+
+/** Follow-up eligibility follows retained aggregates independently from immutable Wishlist history. */
+data class TransferRetainedWishlistTotals(val entries: Long,val copies: Long)
 
 /** Owner-scoped persistence primitives; active-session serialization belongs to the coordinator. */
 @Dao
@@ -51,7 +54,7 @@ abstract class CollectionTransferDao {
     open suspend fun bindReceiptOrExisting(receiptId: String,ownerKey: String,authGeneration: Long,origin: String,now: Long,destinationChosen: Boolean): String? {
         deliveryJob(receiptId,ownerKey)?.let { return it }
         val receipt=getReceipt(receiptId) ?: return null
-        if(receipt.phase=="RECEIVING" || receipt.consumedAt!=null || (receipt.capturedOwner!=null && receipt.capturedOwner!=ownerKey) || (receipt.capturedOwner==null && receipt.authGeneration!=authGeneration && !destinationChosen))return null
+        if(receipt.phase=="RECEIVING" || receipt.consumedAt!=null || (receipt.capturedOwner!=null && receipt.capturedOwner!=ownerKey) || (receipt.authGeneration!=authGeneration && !destinationChosen))return null
         val members=getReceiptFiles(receiptId).filterNot { it.retired }
         val fingerprint=members.takeIf { it.isNotEmpty() && it.all { file -> file.sha256!=null && file.phase in setOf("PARSING","RESOLVING","REVIEW_READY") } }?.let {
             java.security.MessageDigest.getInstance("SHA-256").digest(transferFingerprintInput(it.map { file -> file.sha256!! }).toByteArray(Charsets.UTF_8)).joinToString("") { byte -> "%02x".format(byte) }
@@ -142,7 +145,7 @@ abstract class CollectionTransferDao {
     abstract suspend fun currentFiles(jobId: String, ownerKey: String): List<CollectionTransferFileEntity>
     @Query("SELECT f.* FROM collection_transfer_files f JOIN collection_transfer_jobs j ON j.id=f.job_id WHERE j.id=:jobId AND j.owner_key=:ownerKey AND f.retired=0 ORDER BY f.file_order,f.id LIMIT 10")
     abstract fun observeCurrentFiles(jobId: String, ownerKey: String): Flow<List<CollectionTransferFileEntity>>
-    @Query("SELECT COALESCE(SUM(CASE WHEN e.state='PENDING' AND e.excluded=0 THEN e.quantity ELSE 0 END),0) AS pendingCopies,COALESCE(SUM(e.state='PENDING' AND e.excluded=0),0) AS pendingEntries,COALESCE(SUM(e.excluded=1),0) AS excludedEntries FROM collection_import_entries e JOIN collection_transfer_jobs j ON j.id=e.job_id WHERE j.id=:jobId AND j.owner_key=:ownerKey AND e.generation=j.generation")
+    @Query("SELECT COALESCE(SUM(CASE WHEN e.state='PENDING' AND e.excluded=0 THEN e.quantity ELSE 0 END),0) AS pendingCopies,COALESCE(SUM(e.state='PENDING' AND e.excluded=0),0) AS pendingEntries,COALESCE(SUM(e.excluded=1),0) AS excludedEntries,COALESCE(SUM(e.state='PENDING' AND e.excluded=0 AND (e.error IS NOT NULL OR e.quantity<1 OR e.quantity>2147483647)),0) AS invalidPendingEntries FROM collection_import_entries e JOIN collection_transfer_jobs j ON j.id=e.job_id WHERE j.id=:jobId AND j.owner_key=:ownerKey AND e.generation=j.generation")
     abstract suspend fun repositoryTotals(jobId: String, ownerKey: String): TransferRepositoryTotals
     @Query("SELECT COUNT(*) AS entries,COALESCE(SUM(x.quantity),0) AS copies,COALESCE(SUM(x.state='COMPLETED'),0) AS completedEntries,COALESCE(SUM(x.completed_quantity),0) AS completedCopies FROM collection_transfer_action_entries x JOIN collection_transfer_actions a ON a.id=x.action_id WHERE a.id=:actionId AND a.owner_key=:ownerKey")
     abstract suspend fun repositoryActionTotals(actionId: String, ownerKey: String): TransferRepositoryActionTotals
@@ -200,7 +203,7 @@ abstract class CollectionTransferDao {
         val receipt = getReceipt(receiptId) ?: return false
         if (receipt.consumedAt != null || unfinishedCount(ownerKey) >= 3L) return false
         if (receipt.capturedOwner != null && receipt.capturedOwner != ownerKey) return false
-        if (receipt.capturedOwner == null && receipt.authGeneration != authGeneration && !destinationChosen) return false
+        if (receipt.authGeneration != authGeneration && !destinationChosen) return false
         insertJob(CollectionTransferJobEntity(receiptId, ownerKey, authGeneration, origin = origin, createdAt = now, updatedAt = now))
         linkFiles(receiptId, receiptId)
         updateReceipt(receipt.copy(consumedAt = now))
@@ -327,7 +330,7 @@ abstract class CollectionTransferDao {
         return true
     }
 
-    @Query("DELETE FROM collection_import_entries WHERE job_id = :jobId AND applied_quantity = 0")
+    @Query("DELETE FROM collection_import_entries WHERE job_id = :jobId AND applied_quantity = 0 AND duplicate_origin_id IS NULL")
     protected abstract suspend fun deleteUnappliedEntries(jobId: String)
     @Query("DELETE FROM collection_import_provenance WHERE job_id = :jobId AND participated = 0")
     protected abstract suspend fun deleteUnappliedProvenance(jobId: String)
@@ -341,6 +344,7 @@ abstract class CollectionTransferDao {
         advanceReviewDecisions(job.id,job.generation+1L)
         deleteUnappliedProvenance(job.id)
         deleteUnappliedEntries(job.id)
+        advanceDuplicateGeneration(job.id,job.generation+1L)
         clearEntryLinks(job.id)
         invalidateAllReviewActions(job.id)
         updateJob(job.copy(generation = job.generation + 1L, payloadVersion = job.payloadVersion + 1L, phase = "RESOLVING", confirmedGeneration = null, confirmedPayloadVersion = null, acceptExclusions = false, acceptRepeats = false, fingerprint = null, workCursor = null))
@@ -362,7 +366,23 @@ abstract class CollectionTransferDao {
 
     @Query("SELECT e.* FROM collection_import_entries e INNER JOIN collection_transfer_jobs j ON j.id = e.job_id WHERE j.id = :jobId AND j.owner_key = :ownerKey AND j.generation = :generation AND e.generation = :generation AND e.id > :afterId ORDER BY e.id LIMIT 50")
     abstract suspend fun reviewPage(jobId: String, ownerKey: String, generation: Long, afterId: String): List<CollectionImportEntryEntity>
-    @Query("SELECT p.* FROM collection_import_provenance p INNER JOIN collection_transfer_jobs j ON j.id = p.job_id WHERE j.id = :jobId AND j.owner_key = :ownerKey AND p.entry_id = :entryId ORDER BY p.file_id LIMIT 10")
+    @Query("SELECT e.* FROM collection_import_entries e JOIN collection_transfer_jobs j ON j.id=e.job_id WHERE j.id=:jobId AND j.owner_key=:ownerKey AND j.generation=:generation AND e.generation=:generation AND ((:scope='PENDING' AND e.state='PENDING' AND e.excluded=0) OR (:scope='QUEUE' AND j.phase!='DISCARDED' AND e.excluded=0 AND e.state IN ('PENDING','APPLIED','WISHLIST_APPLIED')) OR (:scope='COLLECTION' AND e.applied_quantity>0) OR (:scope='WISHLIST' AND e.state='WISHLIST_APPLIED') OR (:scope='EXCLUDED' AND e.excluded=1)) AND e.review_order_key>COALESCE((SELECT review_order_key FROM collection_import_entries WHERE job_id=:jobId AND id=:anchorId),:anchorId) ORDER BY e.review_order_key LIMIT 50")
+    abstract suspend fun scopedReviewAfter(jobId: String, ownerKey: String, generation: Long, scope: String, anchorId: String): List<CollectionImportEntryEntity>
+    @Query("SELECT e.* FROM collection_import_entries e JOIN collection_transfer_jobs j ON j.id=e.job_id WHERE j.id=:jobId AND j.owner_key=:ownerKey AND j.generation=:generation AND e.generation=:generation AND ((:scope='PENDING' AND e.state='PENDING' AND e.excluded=0) OR (:scope='QUEUE' AND j.phase!='DISCARDED' AND e.excluded=0 AND e.state IN ('PENDING','APPLIED','WISHLIST_APPLIED')) OR (:scope='COLLECTION' AND e.applied_quantity>0) OR (:scope='WISHLIST' AND e.state='WISHLIST_APPLIED') OR (:scope='EXCLUDED' AND e.excluded=1)) AND (:anchorId IS NULL OR e.review_order_key<(SELECT review_order_key FROM collection_import_entries WHERE job_id=:jobId AND id=:anchorId)) ORDER BY e.review_order_key DESC LIMIT 50")
+    abstract suspend fun scopedReviewBefore(jobId: String, ownerKey: String, generation: Long, scope: String, anchorId: String?): List<CollectionImportEntryEntity>
+    @Query("SELECT EXISTS(SELECT 1 FROM collection_import_entries e JOIN collection_transfer_jobs j ON j.id=e.job_id WHERE j.id=:jobId AND j.owner_key=:ownerKey AND j.generation=:generation AND e.generation=:generation AND ((:scope='PENDING' AND e.state='PENDING' AND e.excluded=0) OR (:scope='QUEUE' AND j.phase!='DISCARDED' AND e.excluded=0 AND e.state IN ('PENDING','APPLIED','WISHLIST_APPLIED')) OR (:scope='COLLECTION' AND e.applied_quantity>0) OR (:scope='WISHLIST' AND e.state='WISHLIST_APPLIED') OR (:scope='EXCLUDED' AND e.excluded=1)) AND e.review_order_key<(SELECT review_order_key FROM collection_import_entries WHERE job_id=:jobId AND id=:anchorId))")
+    abstract suspend fun scopedReviewHasPrevious(jobId: String, ownerKey: String, generation: Long, scope: String, anchorId: String): Boolean
+    @Query("SELECT EXISTS(SELECT 1 FROM collection_import_entries e JOIN collection_transfer_jobs j ON j.id=e.job_id WHERE j.id=:jobId AND j.owner_key=:ownerKey AND j.generation=:generation AND e.generation=:generation AND ((:scope='PENDING' AND e.state='PENDING' AND e.excluded=0) OR (:scope='QUEUE' AND j.phase!='DISCARDED' AND e.excluded=0 AND e.state IN ('PENDING','APPLIED','WISHLIST_APPLIED')) OR (:scope='COLLECTION' AND e.applied_quantity>0) OR (:scope='WISHLIST' AND e.state='WISHLIST_APPLIED') OR (:scope='EXCLUDED' AND e.excluded=1)) AND e.review_order_key>(SELECT review_order_key FROM collection_import_entries WHERE job_id=:jobId AND id=:anchorId))")
+    abstract suspend fun scopedReviewHasNext(jobId: String, ownerKey: String, generation: Long, scope: String, anchorId: String): Boolean
+    @Query("SELECT x.* FROM collection_transfer_action_entries x JOIN collection_transfer_actions a ON a.id=x.action_id JOIN collection_transfer_jobs j ON j.id=a.job_id WHERE j.id=:jobId AND j.owner_key=:ownerKey AND a.owner_key=:ownerKey AND a.destination=:destination AND x.state='COMPLETED' AND (x.action_id || ':' || x.entry_id)>:anchorId ORDER BY x.action_id,x.entry_id LIMIT 50")
+    abstract suspend fun completedReviewAfter(jobId: String, ownerKey: String, destination: String, anchorId: String): List<CollectionTransferActionEntryEntity>
+    @Query("SELECT x.* FROM collection_transfer_action_entries x JOIN collection_transfer_actions a ON a.id=x.action_id JOIN collection_transfer_jobs j ON j.id=a.job_id WHERE j.id=:jobId AND j.owner_key=:ownerKey AND a.owner_key=:ownerKey AND a.destination=:destination AND x.state='COMPLETED' AND (:anchorId IS NULL OR (x.action_id || ':' || x.entry_id)<:anchorId) ORDER BY x.action_id DESC,x.entry_id DESC LIMIT 50")
+    abstract suspend fun completedReviewBefore(jobId: String, ownerKey: String, destination: String, anchorId: String?): List<CollectionTransferActionEntryEntity>
+    @Query("SELECT EXISTS(SELECT 1 FROM collection_transfer_action_entries x JOIN collection_transfer_actions a ON a.id=x.action_id JOIN collection_transfer_jobs j ON j.id=a.job_id WHERE j.id=:jobId AND j.owner_key=:ownerKey AND a.owner_key=:ownerKey AND a.destination=:destination AND x.state='COMPLETED' AND (x.action_id || ':' || x.entry_id)<:anchorId)")
+    abstract suspend fun completedReviewHasPrevious(jobId: String, ownerKey: String, destination: String, anchorId: String): Boolean
+    @Query("SELECT EXISTS(SELECT 1 FROM collection_transfer_action_entries x JOIN collection_transfer_actions a ON a.id=x.action_id JOIN collection_transfer_jobs j ON j.id=a.job_id WHERE j.id=:jobId AND j.owner_key=:ownerKey AND a.owner_key=:ownerKey AND a.destination=:destination AND x.state='COMPLETED' AND (x.action_id || ':' || x.entry_id)>:anchorId)")
+    abstract suspend fun completedReviewHasNext(jobId: String, ownerKey: String, destination: String, anchorId: String): Boolean
+    @Query("SELECT p.* FROM collection_import_provenance p INNER JOIN collection_transfer_jobs j ON j.id = p.job_id WHERE j.id = :jobId AND j.owner_key = :ownerKey AND p.entry_id = COALESCE((SELECT duplicate_origin_id FROM collection_import_entries WHERE job_id=:jobId AND id=:entryId),:entryId) ORDER BY p.file_id LIMIT 10")
     abstract suspend fun provenance(jobId: String, ownerKey: String, entryId: String): List<CollectionImportProvenanceEntity>
     @Query("SELECT * FROM collection_transfer_file_history WHERE owner_key = :ownerKey AND sha256 = :sha256")
     abstract suspend fun history(ownerKey: String, sha256: String): CollectionTransferFileHistoryEntity?
@@ -391,6 +411,8 @@ abstract class CollectionTransferDao {
             updateJob(job.copy(phase = "WAITING_FILE_DECISION", error = "SELECTION_LIMIT", updatedAt = now))
             return false
         }
+        reconcileDuplicateDecisions(jobId,generation)
+        reconcileDuplicateErrors(jobId,generation)
         val counts = entryCounts(jobId, generation)
         require(provenanceCounts(jobId, generation) == selectedResolvedCounts(jobId))
         updateJob(job.copy(phase = if (counts.invalidEntries > 0L || pendingReviewDecisions(jobId)>0L) "REVIEW_REQUIRED" else "REVIEW_READY", fingerprint = fingerprint, dataRecords = selected.sumOf { it.dataRecords }, preambleRecords = selected.sumOf { it.preambleRecords }, validRecords = selected.sumOf { it.validRecords }, invalidRecords = selected.sumOf { it.invalidRecords }, resolvedRecords = selected.sumOf { it.resolvedRecords }, unresolvedRecords = selected.sumOf { it.unresolvedRecords }, acceptedCopies = counts.acceptedCopies, updatedAt = now, error = if (pendingReviewDecisions(jobId)>0L) "SOURCE_MEMBERSHIP_CHANGED" else if (counts.invalidEntries > 0L) "QUANTITY_OVERFLOW" else null))
@@ -423,10 +445,36 @@ abstract class CollectionTransferDao {
     protected abstract suspend fun updateEntry(entry: CollectionImportEntryEntity)
     @Query("UPDATE collection_transfer_actions SET phase='INVALIDATED' WHERE job_id=:jobId AND phase='CONFIRMED' AND id IN (SELECT action_id FROM collection_transfer_action_entries WHERE entry_id=:entryId)")
     protected abstract suspend fun invalidateEntryActions(jobId: String, entryId: String)
-    @Query("SELECT EXISTS(SELECT 1 FROM collection_import_entries WHERE job_id=:jobId AND id!=:entryId AND scryfall_id=:printing AND is_foil=:foil AND condition=:condition AND language=:language)")
+    @Query("SELECT EXISTS(SELECT 1 FROM collection_import_entries WHERE job_id=:jobId AND id!=:entryId AND scryfall_id=:printing AND is_foil=:foil AND condition=:condition AND language=:language AND duplicate_key=COALESCE((SELECT duplicate_key FROM collection_import_entries WHERE id=:entryId AND job_id=:jobId),''))")
     protected abstract suspend fun variantCollision(jobId: String, entryId: String, printing: String, foil: Boolean, condition: String, language: String): Boolean
-    @Query("SELECT e.id FROM collection_import_entries e JOIN collection_transfer_jobs j ON j.id=e.job_id WHERE e.job_id=:jobId AND j.owner_key=:ownerKey AND e.id!=:entryId AND e.scryfall_id=:printing AND e.is_foil=:foil AND e.condition=:condition AND e.language=:language LIMIT 1")
+    @Query("SELECT e.id FROM collection_import_entries e JOIN collection_transfer_jobs j ON j.id=e.job_id WHERE e.job_id=:jobId AND j.owner_key=:ownerKey AND e.id!=:entryId AND e.scryfall_id=:printing AND e.is_foil=:foil AND e.condition=:condition AND e.language=:language AND e.duplicate_key=COALESCE((SELECT duplicate_key FROM collection_import_entries WHERE id=:entryId AND job_id=:jobId),'') LIMIT 1")
     abstract suspend fun collidingReviewEntry(jobId: String,ownerKey: String,entryId: String,printing: String,foil: Boolean,condition: String,language: String): String?
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    protected abstract suspend fun insertDuplicate(entry: CollectionImportEntryEntity)
+    @Query("UPDATE collection_import_entries SET generation=:generation,active_action_id=NULL WHERE job_id=:jobId AND duplicate_origin_id IS NOT NULL AND applied_quantity=0")
+    protected abstract suspend fun advanceDuplicateGeneration(jobId: String,generation: Long)
+    @Query("SELECT COUNT(*) FROM collection_import_entries WHERE job_id=:jobId")
+    protected abstract suspend fun reviewEntryCount(jobId: String): Long
+    @Query("UPDATE collection_transfer_review_decisions SET status=CASE WHEN status='PENDING' OR NOT EXISTS(SELECT 1 FROM collection_import_entries c JOIN collection_import_entries o ON o.job_id=c.job_id AND o.id=c.duplicate_origin_id WHERE c.job_id=:jobId AND c.id=collection_transfer_review_decisions.entry_id AND o.source_signature=c.source_signature) THEN 'PENDING' ELSE 'RESTORED' END,reason='SOURCE_MEMBERSHIP_CHANGED' WHERE job_id=:jobId AND generation=:generation AND entry_id IN (SELECT id FROM collection_import_entries WHERE job_id=:jobId AND duplicate_origin_id IS NOT NULL)")
+    protected abstract suspend fun reconcileDuplicateDecisions(jobId: String,generation: Long)
+    @Query("UPDATE collection_import_entries SET error=CASE WHEN EXISTS(SELECT 1 FROM collection_transfer_review_decisions d WHERE d.job_id=:jobId AND d.entry_id=collection_import_entries.id AND d.status='PENDING') THEN 'SOURCE_MEMBERSHIP_CHANGED' ELSE NULL END WHERE job_id=:jobId AND generation=:generation AND duplicate_origin_id IS NOT NULL AND state='PENDING'")
+    protected abstract suspend fun reconcileDuplicateErrors(jobId: String,generation: Long)
+    @Transaction
+    open suspend fun duplicatePendingEntry(jobId: String,ownerKey: String,generation: Long,payloadVersion: Long,entryId: String,entryVersion: Long,newEntryId: String,now: Long): Boolean {
+        val job=getJob(jobId,ownerKey) ?: return false
+        val entry=reviewEntry(jobId,ownerKey,entryId) ?: return false
+        if(job.generation!=generation || job.payloadVersion!=payloadVersion || job.phase !in setOf("REVIEW_READY","REVIEW_REQUIRED") || payloadVersion==Long.MAX_VALUE || job.intentRevision==Long.MAX_VALUE || entry.entryVersion!=entryVersion || entry.activeActionId!=null || entry.state!="PENDING" || entry.appliedQuantity!=0L || entry.excluded || entry.error!=null || reviewDecision(jobId,ownerKey,entryId)?.status=="PENDING")return false
+        if(entry.quantity !in 1L..Int.MAX_VALUE.toLong() || job.acceptedCopies>Long.MAX_VALUE-entry.quantity || reviewEntryCount(jobId)>=TransferLimits.MAX_DATA_RECORDS)throw TransferReadException(TransferError.QUANTITY_OVERFLOW)
+        TransferJobId(newEntryId)
+        if(storedEntry(newEntryId)!=null)return false
+        val origin=entry.duplicateOriginId ?: entry.id
+        val originEntry=reviewEntry(jobId,ownerKey,origin) ?: return false
+        insertDuplicate(entry.copy(id=newEntryId,entryVersion=0L,activeActionId=null,duplicateOriginId=origin,duplicateKey=newEntryId,reviewOrderKey="${originEntry.reviewOrderKey}~$newEntryId",sourceKey="duplicate:$origin:$newEntryId",sourceSignature=originEntry.sourceSignature,sourceQuantity=0L,payloadEdited=true))
+        invalidatePendingActions(jobId)
+        updateJob(job.copy(payloadVersion=payloadVersion+1L,intentRevision=job.intentRevision+1L,acceptedCopies=job.acceptedCopies+entry.quantity,confirmedGeneration=null,confirmedPayloadVersion=null,acceptExclusions=false,updatedAt=now))
+        return true
+    }
 
     /** Editing one pending entry invalidates only commands that captured that entry. */
     @Transaction
@@ -478,6 +526,7 @@ abstract class CollectionTransferDao {
     @Transaction
     open suspend fun confirmAction(ownerKey: String, request: TransferActionRequest, now: Long): Boolean {
         val job=getJob(request.jobId.value,ownerKey) ?: return false
+        if(request.expectedPayloadVersion!=null && request.expectedPayloadVersion!=job.payloadVersion)return false
         if (request.destination==TransferDestination.NONE || job.generation!=request.generation || job.phase !in setOf("REVIEW_READY","REVIEW_REQUIRED")) return false
         val scope=request.scope
         val scopeId=if(scope is TransferActionScope.Entry) scope.id else "*"
@@ -732,6 +781,17 @@ abstract class CollectionTransferDao {
             updateJob(job.copy(intentRevision=job.intentRevision+1L,payloadVersion=job.payloadVersion+1L,acceptedCopies=entryCounts(jobId,job.generation).acceptedCopies,confirmedGeneration=null,confirmedPayloadVersion=null,acceptExclusions=false)); return true
         }
         if(entry.activeActionId!=null || entry.appliedQuantity!=0L || choice==TransferReviewDecision.DISMISS_REMOVED) return false
+        if(entry.duplicateOriginId!=null) {
+            val origin=reviewEntry(jobId,ownerKey,entry.duplicateOriginId)
+            if(choice==TransferReviewDecision.USE_SOURCE && origin==null)return false
+            val restored=if(choice==TransferReviewDecision.KEEP_EDIT) entry.copy(error=null,sourceSignature=origin?.sourceSignature ?: "",entryVersion=entry.entryVersion+1L) else entry.copy(scryfallId=origin!!.scryfallId,isFoil=origin.isFoil,condition=origin.condition,language=origin.language,quantity=origin.quantity,error=null,sourceSignature=origin.sourceSignature,entryVersion=entry.entryVersion+1L)
+            if(restored.quantity !in 1L..Int.MAX_VALUE.toLong())return false
+            updateEntry(restored)
+            invalidateEntryActions(jobId,entryId)
+            updateReviewDecision(decision.copy(status="DECIDED"))
+            updateJob(job.copy(intentRevision=job.intentRevision+1L,payloadVersion=job.payloadVersion+1L,acceptedCopies=entryCounts(jobId,job.generation).acceptedCopies,confirmedGeneration=null,confirmedPayloadVersion=null,acceptExclusions=false))
+            return true
+        }
         if(choice==TransferReviewDecision.KEEP_EDIT) {
             if(variantCollision(jobId,entryId,decision.scryfallId,decision.isFoil,decision.condition,decision.language) || decision.quantity !in 1L..Int.MAX_VALUE.toLong()) return false
             updateEntry(entry.copy(scryfallId=decision.scryfallId,isFoil=decision.isFoil,condition=decision.condition,language=decision.language,quantity=decision.quantity,destination=decision.destination,excluded=decision.excluded,payloadEdited=true,error=null,entryVersion=entry.entryVersion+1L))
@@ -751,7 +811,7 @@ abstract class CollectionTransferDao {
     abstract suspend fun markCollectionEntryApplied(jobId: String, ownerKey: String, actionId: String, entryId: String, quantity: Long): Int
     @Query("UPDATE collection_transfer_action_entries SET state='COMPLETED',completed_quantity=quantity WHERE action_id=:actionId AND entry_id=:entryId AND state='PENDING' AND completed_quantity=0 AND EXISTS(SELECT 1 FROM collection_transfer_actions WHERE id=:actionId AND owner_key=:ownerKey AND destination='COLLECTION' AND phase='FROZEN')")
     abstract suspend fun markCollectionActionEntryApplied(actionId: String, ownerKey: String, entryId: String): Int
-    @Query("UPDATE collection_import_provenance SET participated=1 WHERE job_id=:jobId AND entry_id=:entryId AND EXISTS(SELECT 1 FROM collection_transfer_jobs WHERE id=:jobId AND owner_key=:ownerKey)")
+    @Query("UPDATE collection_import_provenance SET participated=1 WHERE job_id=:jobId AND entry_id=COALESCE((SELECT duplicate_origin_id FROM collection_import_entries WHERE job_id=:jobId AND id=:entryId),:entryId) AND EXISTS(SELECT 1 FROM collection_transfer_jobs WHERE id=:jobId AND owner_key=:ownerKey)")
     protected abstract suspend fun markAppliedProvenance(jobId: String, ownerKey: String, entryId: String)
     @Upsert
     protected abstract suspend fun upsertFileHistory(history: List<CollectionTransferFileHistoryEntity>)
@@ -769,7 +829,7 @@ abstract class CollectionTransferDao {
         val entry=reviewEntry(jobId,ownerKey,entryId) ?: error("Missing applied entry")
         require(entry.state=="APPLIED" && entry.appliedQuantity>0L && entry.destination=="COLLECTION")
         val sources=provenance(jobId,ownerKey,entryId)
-        require(sources.isNotEmpty())
+        require(sources.isNotEmpty() || (entry.duplicateOriginId!=null && entry.sourceSignature.isEmpty()))
         val history=sources.map { source ->
             val file=getFile(jobId,ownerKey,source.fileId) ?: error("Missing source")
             require(file.selected && !file.retired && file.phase=="REVIEW_READY" && file.sha256?.matches(Regex("[0-9a-f]{64}"))==true)
@@ -864,13 +924,13 @@ abstract class CollectionTransferDao {
     abstract suspend fun markWishlistEntryApplied(jobId: String, ownerKey: String, actionId: String, entryId: String): Int
     @Query("UPDATE collection_transfer_action_entries SET state='COMPLETED',completed_quantity=quantity WHERE action_id=:actionId AND entry_id=:entryId AND state='PENDING' AND completed_quantity=0 AND EXISTS(SELECT 1 FROM collection_transfer_actions WHERE id=:actionId AND owner_key=:ownerKey AND destination='WISHLIST' AND phase='FROZEN')")
     abstract suspend fun markWishlistActionEntryApplied(actionId: String, ownerKey: String, entryId: String): Int
-    @Query("UPDATE collection_import_provenance SET wishlist_participated=1 WHERE job_id=:jobId AND entry_id=:entryId AND EXISTS(SELECT 1 FROM collection_transfer_jobs WHERE id=:jobId AND owner_key=:ownerKey)")
+    @Query("UPDATE collection_import_provenance SET wishlist_participated=1 WHERE job_id=:jobId AND entry_id=COALESCE((SELECT duplicate_origin_id FROM collection_import_entries WHERE job_id=:jobId AND id=:entryId),:entryId) AND EXISTS(SELECT 1 FROM collection_transfer_jobs WHERE id=:jobId AND owner_key=:ownerKey)")
     protected abstract suspend fun markWishlistProvenance(jobId: String, ownerKey: String, entryId: String)
     open suspend fun recordWishlistParticipation(jobId: String, ownerKey: String, entryId: String, now: Long) {
         val entry=reviewEntry(jobId,ownerKey,entryId) ?: error("Missing wishlist entry")
         require(entry.state=="WISHLIST_APPLIED" && entry.destination=="WISHLIST" && entry.appliedQuantity==0L)
         val sources=provenance(jobId,ownerKey,entryId)
-        require(sources.isNotEmpty())
+        require(sources.isNotEmpty() || (entry.duplicateOriginId!=null && entry.sourceSignature.isEmpty()))
         val history=sources.map { source ->
             val file=getFile(jobId,ownerKey,source.fileId) ?: error("Missing source")
             require(file.selected && !file.retired && file.phase=="REVIEW_READY" && file.sha256?.matches(Regex("[0-9a-f]{64}"))==true)
@@ -944,12 +1004,14 @@ abstract class CollectionTransferDao {
     /** Explicit follow-up retains completed action snapshots without duplicating source aggregates. */
     @Query("SELECT COUNT(*) FROM collection_import_entries e JOIN collection_transfer_actions a ON a.id=e.active_action_id AND a.owner_key=:ownerKey WHERE e.job_id=:jobId AND e.generation=:generation AND e.state='WISHLIST_APPLIED' AND e.destination='WISHLIST' AND e.applied_quantity=0 AND e.entry_version<9223372036854775807 AND a.destination='WISHLIST' AND a.phase='COMPLETED'")
     protected abstract suspend fun retainedWishlistCount(jobId: String,ownerKey: String,generation: Long): Long
+    @Query("SELECT COUNT(*) AS entries,COALESCE(SUM(e.quantity),0) AS copies FROM collection_import_entries e JOIN collection_transfer_actions a ON a.id=e.active_action_id AND a.owner_key=:ownerKey JOIN collection_transfer_jobs j ON j.id=e.job_id AND j.owner_key=:ownerKey WHERE e.job_id=:jobId AND e.generation=j.generation AND e.state='WISHLIST_APPLIED' AND e.destination='WISHLIST' AND e.applied_quantity=0 AND e.entry_version<9223372036854775807 AND a.destination='WISHLIST' AND a.phase='COMPLETED'")
+    abstract suspend fun repositoryRetainedWishlistTotals(jobId: String,ownerKey: String): TransferRetainedWishlistTotals
     @Query("UPDATE collection_import_entries SET state='PENDING',destination='NONE',active_action_id=NULL,entry_version=entry_version+1 WHERE job_id=:jobId AND generation=:generation AND state='WISHLIST_APPLIED' AND destination='WISHLIST' AND applied_quantity=0 AND entry_version<9223372036854775807 AND active_action_id IN (SELECT id FROM collection_transfer_actions WHERE owner_key=:ownerKey AND destination='WISHLIST' AND phase='COMPLETED')")
     protected abstract suspend fun reopenRetainedWishlist(jobId: String,ownerKey: String,generation: Long)
     @Transaction
     open suspend fun reopenWishlistSelection(jobId: String,ownerKey: String,generation: Long,payloadVersion: Long): Boolean {
         val job=getJob(jobId,ownerKey) ?: return false
-        if(job.generation!=generation || job.payloadVersion!=payloadVersion || job.payloadVersion==Long.MAX_VALUE || job.intentRevision==Long.MAX_VALUE || job.phase !in setOf("REVIEW_READY","REVIEW_REQUIRED"))return false
+        if(job.generation!=generation || job.payloadVersion!=payloadVersion || job.payloadVersion==Long.MAX_VALUE || job.intentRevision==Long.MAX_VALUE || job.phase !in setOf("REVIEW_READY","REVIEW_REQUIRED","COMPLETED","COMPLETED_WITH_EXCLUSIONS"))return false
         if(retainedWishlistCount(jobId,ownerKey,generation)==0L)return true
         reopenRetainedWishlist(jobId,ownerKey,generation)
         updateJob(job.copy(phase="REVIEW_READY",completedAt=null,payloadVersion=payloadVersion+1L,intentRevision=job.intentRevision+1L,confirmedGeneration=null,confirmedPayloadVersion=null))

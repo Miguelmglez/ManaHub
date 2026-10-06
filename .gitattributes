@@ -1,0 +1,2 @@
+# Preserve the byte identity verified by the packaged rules manifest.
+app/src/main/assets/rules/baseline.txt text eol=lf

@@ -13,6 +13,7 @@ import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.model.news.ReleaseStatus
 import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.feature.news.domain.usecase.GetProTourContentUseCase
+import com.mmg.manahub.feature.news.domain.usecase.GetTrendStreamAvatarUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetUpcomingReleasesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import io.mockk.Runs
@@ -67,6 +68,7 @@ class EventsViewModelTest {
         coEvery { cardRepository.getPlayableSets() } returns DataResult.Success(sets)
         every { newsRepository.observeNews() } returns newsFlow
         every { newsRepository.observeSources() } returns sourcesFlow
+        coEvery { newsRepository.getTrendStreamAvatar(any()) } returns null
         every { userPrefsDataStore.eventsPostalCodeFlow } returns postalCodeFlow
         coEvery { userPrefsDataStore.setEventsPostalCode(any()) } just Runs
     }
@@ -79,6 +81,7 @@ class EventsViewModelTest {
     private fun createViewModel(handle: SavedStateHandle = SavedStateHandle()) = EventsViewModel(
         getUpcomingReleases = GetUpcomingReleasesUseCase(cardRepository, today = { today }),
         getProTourContent = GetProTourContentUseCase(newsRepository),
+        getTrendStreamAvatar = GetTrendStreamAvatarUseCase(newsRepository),
         manageSources = ManageSourcesUseCase(newsRepository),
         userPrefsDataStore = userPrefsDataStore,
         crashReporter = crashReporter,
@@ -93,8 +96,8 @@ class EventsViewModelTest {
         id = id, name = id, feedUrl = "https://example.com/$id.xml", type = SourceType.ARTICLE, isEnabled = followed,
     )
 
-    private fun article(id: String, sourceId: String, title: String) = NewsItem.Article(
-        id = id, title = title, description = "", imageUrl = null, publishedAt = 0L,
+    private fun article(id: String, sourceId: String, title: String, publishedAt: Long = 0L) = NewsItem.Article(
+        id = id, title = title, description = "", imageUrl = null, publishedAt = publishedAt,
         sourceName = sourceId, sourceId = sourceId, url = "https://example.com/$id", author = null,
     )
 
@@ -163,16 +166,16 @@ class EventsViewModelTest {
     // ── Pro Tour strip ────────────────────────────────────────────────────────
 
     @Test
-    fun `given Pro Tour coverage then only followed sources are shown, capped at five`() = runTest(testDispatcher) {
+    fun `given Pro Tour coverage then newest items from followed sources are capped at twelve`() = runTest(testDispatcher) {
         sourcesFlow.value = listOf(source("a"), source("b", followed = false))
-        newsFlow.value = (1..7).map { article("a$it", "a", "Pro Tour day $it") } +
-            article("b1", "b", "Pro Tour from an unfollowed site") +
-            article("a_other", "a", "Set review")
+        newsFlow.value = (1..15).map { article("a$it", "a", "Pro Tour day $it", it.toLong()) } +
+            article("b1", "b", "Pro Tour from an unfollowed site", 20L) +
+            article("a_other", "a", "Set review", 21L)
         val vm = createViewModel()
         advanceUntilIdle()
 
         val items = vm.uiState.value.proTourItems
-        assertEquals(listOf("a1", "a2", "a3", "a4", "a5"), items?.map { it.id })
+        assertEquals((15 downTo 4).map { "a$it" }, items?.map { it.id })
     }
 
     @Test

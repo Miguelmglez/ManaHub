@@ -1,5 +1,12 @@
 package com.mmg.manahub.feature.collection
 
+import androidx.core.content.FileProvider
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModelStore
+import com.mmg.manahub.feature.collection.presentation.importexport.TransferIntakeViewModel
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.test.resetMain
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.room.Room
@@ -42,7 +49,7 @@ class TransferResolvedAuthTest {
             val identity=VerifiedTransferGuestIdentity(isolated); val gate=TransferSessionGate(); val state=MutableStateFlow<SessionState>(SessionState.Loading)
             val observer=TransferAuthSessionObserver(state,identity,gate,db.collectionTransferDao());observer.start(scope)
             block(db,identity,gate,state,observer)
-        } finally { scope.cancel();db.close();context.deleteSharedPreferences("$name-collection_transfer_identity") }
+        } finally { scope.coroutineContext[Job]!!.cancelAndJoin();db.close();context.deleteSharedPreferences("$name-collection_transfer_identity") }
     }
     private suspend fun resolved(gate: TransferSessionGate,owner: TransferOwner?=null)=withTimeout(5000L) {
         gate.sessions.filterIsInstance<TransferSession.Available>().first { owner==null || it.owner==owner }
@@ -80,6 +87,57 @@ class TransferResolvedAuthTest {
         state.value=auth("b");resolved(gate,TransferOwner.Account("b"));assertFalse(observer.canBindInitialReceipt(fresh,0L,a))
         state.value=auth("a");val returned=resolved(gate,TransferOwner.Account("a"))
         assertTrue(returned.generation>a.generation);assertFalse(observer.canBindInitialReceipt(fresh,0L,returned));assertFalse(observer.canBindInitialReceipt(later,0L,returned))
+    } }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun withIntake(db: MtgDatabase,gate: TransferSessionGate,observer: TransferAuthSessionObserver,saved: SavedStateHandle=SavedStateHandle(),block: suspend (TransferIntakeViewModel,android.net.Uri)->Unit) {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val directory=File(context.cacheDir,"picker-intake-${id()}").apply { mkdirs() }
+        val payload=File(context.cacheDir,"exports/picker-${id()}.txt").apply { parentFile!!.mkdirs();writeText("2 Fixture\n") }
+        val store=ViewModelStore()
+        val isolated=object: ContextWrapper(context) { override fun getSharedPreferences(key: String,mode: Int)=context.getSharedPreferences("${directory.name}-$key",mode) }
+        try {
+            val files=AndroidCollectionTransferFileStore(directory,db.collectionTransferDao(),{observer.observedSession(gate)})
+            val vm=TransferIntakeViewModel(saved,context.contentResolver,files,gate,observer,LegacyCollectionImportQuarantine(isolated,File(directory,"legacy")),db)
+            store.put("intake",vm)
+            block(vm,FileProvider.getUriForFile(context,"${context.packageName}.fileprovider",payload))
+        } finally { store.clear();payload.delete();directory.deleteRecursively();Dispatchers.resetMain() }
+    }
+    private suspend fun received(db: MtgDatabase,vm: TransferIntakeViewModel)=withTimeout(10_000L) {
+        val receipt=vm.pending.value.single()
+        db.collectionTransferDao().observeReceipt(receipt).filterNotNull().first { it.phase!="RECEIVING" }
+    }
+    @Test fun pickerStableAccountAndVerifiedSignedOutBindWithoutOwnerChoiceAndCancelCreatesNothing()=runBlocking<Unit> { fixture { db,_,gate,state,observer ->
+        state.value=auth("picker-account");val account=resolved(gate,TransferOwner.Account("picker-account"))
+        withIntake(db,gate,observer) { vm,uri ->
+            assertTrue(vm.capturePicker());vm.receivePickerResult(emptyList());assertTrue(vm.pending.value.isEmpty())
+            assertTrue(vm.capturePicker());vm.receivePickerResult(listOf(uri));val receipt=received(db,vm)
+            assertEquals("account:picker-account",receipt.capturedOwner)
+            assertEquals(TransferMutationResult.Accepted,RoomCollectionTransferRepository(db,gate,observer::matchesObserved).bindReceipt(TransferJobId(receipt.id),account.owner,account.generation,TransferOrigin.SAF))
+        }
+        state.value=SessionState.Unauthenticated
+        val guest=withTimeout(5000L) { gate.sessions.filterIsInstance<TransferSession.Available>().first { it.owner is TransferOwner.VerifiedGuest } }
+        withIntake(db,gate,observer) { vm,uri ->
+            assertTrue(vm.capturePicker());vm.receivePickerResult(listOf(uri));val receipt=received(db,vm)
+            assertTrue(receipt.capturedOwner!!.startsWith("guest:"))
+            assertEquals(TransferMutationResult.Accepted,RoomCollectionTransferRepository(db,gate,observer::matchesObserved).bindReceipt(TransferJobId(receipt.id),guest.owner,guest.generation,TransferOrigin.SAF))
+        }
+    } }
+    @Test fun pickerOldAbaAndRestoredRequestRetainReceiptWithoutAutomaticAuthorization()=runBlocking<Unit> { fixture { db,_,gate,state,observer ->
+        state.value=auth("picker-account");val first=resolved(gate,TransferOwner.Account("picker-account"))
+        withIntake(db,gate,observer) { vm,uri ->
+            assertTrue(vm.capturePicker())
+            state.value=auth("picker-other");resolved(gate,TransferOwner.Account("picker-other"))
+            state.value=auth("picker-account");val returned=resolved(gate,first.owner)
+            vm.receivePickerResult(listOf(uri));val receipt=received(db,vm)
+            assertEquals(first.generation,receipt.authGeneration)
+            assertEquals(TransferMutationResult.Rejected(TransferError.OWNER_CHANGED),RoomCollectionTransferRepository(db,gate,observer::matchesObserved).bindReceipt(TransferJobId(receipt.id),returned.owner,returned.generation,TransferOrigin.SAF))
+        }
+        val restored=SavedStateHandle(mapOf("picker_owner" to "account:picker-account","picker_generation" to gate.currentGeneration))
+        withIntake(db,gate,observer,restored) { vm,uri ->
+            vm.receivePickerResult(listOf(uri));val receipt=received(db,vm)
+            assertNull(receipt.capturedOwner)
+            assertFalse(observer.canBindInitialReceipt(TransferJobId(receipt.id),receipt.authGeneration,gate.currentSession as TransferSession.Available))
+        }
     } }
     private fun local(id: String=id(),quantity: Int=3,condition: String="LP")=LocalWishlistEntity(id,"printing",quantity,false,true,condition,"ja",ownerUserId=TradeListOwner.GUEST)
     @Test fun loginAdoptsOnlyProvenLocalWishlistPagesAndRemoteFailureRetainsAbsoluteTarget()=runBlocking<Unit> { fixture { db,identity,gate,state,observer ->

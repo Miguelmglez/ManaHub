@@ -85,6 +85,20 @@ record; see `docs/adr/ADR-011-native-rules-editions.md`.
 
 ## Source pointers
 
+- The 2026-10-06 Import UX adds shared `TransferReviewScope`, `TransferPageDirection` and
+  `TransferReviewCursor` contracts for bounded pending/history pages. Android performs scope
+  filtering in Room before hydrating at most 50 entries and validates job/generation/scope cursor
+  identity. A future web implementation needs equivalent owner-checked forward/backward paging,
+  pending-only ordinary bulk actions and an explicit retained-Wishlist follow-up. Completed
+  Collection/Wishlist pages use immutable action-entry snapshots keyed by action/entry, with
+  `sourceEntryId` identifying the original aggregate; web must preserve those outcomes after
+  later edits or follow-up. Confirmation requests also carry an optional expected payload version
+  that Android validates transactionally; retained-Wishlist and invalid-pending counts are distinct
+  from immutable history totals. Web needs equivalent authoritative consent/capability checks.
+  The shared API default is not a working web implementation.
+  Android picker launch proof, lifecycle and modal
+  host remain platform adapters. Web implementation/builds remain paused by user direction.
+
 - Legacy import preference quarantine now has a pure verification/removal decision contract and an
   Android opaque private recovery adapter. Web restoration must also treat unowned old queues as
   unknown previous application and cannot automatically claim/import them. Do not port Java framed
@@ -120,3 +134,11 @@ record; see `docs/adr/ADR-011-native-rules-editions.md`.
   never a visible page or group representatives. New shared defaults reject unavailable mutations;
   their existence does not implement a web destination. Android phase2 functional checks do not
   certify wasm storage or cross-platform behavior.
+- Today now uses Feed/Events/Trends on Android, with source management and live/saved filters in
+  separate sheets. Web navigation, saved-feed integration and the initial AddCard set argument
+  remain deferred. Shared news cards require caller-provided image fallbacks and text-bound
+  contrast scrims; adaptive compact set cards preserve readable names at larger font scales.
+  Common source-icon extraction does not implement web HTTP discovery or icon persistence;
+  Android's bounded HTTPS client and targeted Room updates remain platform adapters.
+- Import card/page refinement adds QUEUE presentation scope, global reverse paging and explicit per-entry retained Wishlist follow-up. Future web adapters must preserve owner/version guards, readonly completion and bounded pages; Android direct-add controls do not implement wasm storage or sync.
+- Canonical Import Duplicate now requires independently editable durable rows with original-source lineage and an identity discriminator. Future web persistence must implement equivalent clone/rebuild/application semantics; shared repository fallback rejects unsupported duplication. Completion toast and retained inversion presentation are Android integration only during the pause.

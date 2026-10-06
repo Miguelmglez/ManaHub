@@ -28,17 +28,24 @@ import com.mmg.manahub.feature.news.domain.source.DefaultFollowPolicy
 import com.mmg.manahub.feature.news.domain.source.FeedAutodiscovery
 import com.mmg.manahub.feature.news.domain.source.FeedDocument
 import com.mmg.manahub.feature.news.domain.source.FeedIdentity
+import com.mmg.manahub.feature.news.domain.source.CuratedTwitchChannelPages
 import com.mmg.manahub.feature.news.domain.source.LegacyFollowMigration
 import com.mmg.manahub.feature.news.domain.source.SiteUrlDerivation
+import com.mmg.manahub.feature.news.domain.source.SourceIconExtractor
 import com.mmg.manahub.feature.news.domain.source.SourceInput
 import com.mmg.manahub.feature.news.domain.source.SourceInputClassifier
 import com.mmg.manahub.feature.news.domain.source.SourceUrl
 import com.mmg.manahub.feature.news.domain.source.YouTubeChannelIdExtractor
 import com.mmg.manahub.feature.news.domain.source.YouTubeUrls
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -66,6 +73,11 @@ class NewsRepositoryImpl(
     private val nowMs: () -> Long = { System.currentTimeMillis() },
 ) : NewsRepository {
 
+    private val iconSemaphore = Semaphore(2)
+    private val queuedIcons = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val attemptedIcons = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val pageImageRequests = java.util.concurrent.ConcurrentHashMap<String, CompletableDeferred<String?>>()
+
     // Both streams wait for the one-time follow migration so a previously hidden language never flashes in.
     override fun observeNews(): Flow<List<NewsItem>> =
         combine(newsDao.observeArticles(), newsDao.observeVideos()) { articles, videos ->
@@ -74,16 +86,52 @@ class NewsRepositoryImpl(
             (articleItems + videoItems).sortedByDescending { it.publishedAt }
         }.onStart { ensureFollowMigration() }
 
-    override fun observeSources(): Flow<List<ContentSource>> =
-        newsDao.observeSources()
-            .onStart { ensureFollowMigration() }
-            .map { sources -> sources.map { it.toDomain() } }
+    override fun observeSources(): Flow<List<ContentSource>> = channelFlow {
+        ensureFollowMigration()
+        newsDao.observeSources().collect { sources ->
+            send(sources.map { it.toDomain() })
+            sources.filter { it.iconUrl == null && it.id !in attemptedIcons && queuedIcons.add(it.id) }.forEach { source ->
+                launch(Dispatchers.IO) {
+                    try { iconSemaphore.withPermit { refreshSourceIcon(source) } }
+                    finally { queuedIcons.remove(source.id) }
+                }.invokeOnCompletion { failure ->
+                    queuedIcons.remove(source.id)
+                    if (failure is CancellationException) attemptedIcons.remove(source.id)
+                }
+            }
+        }
+    }
 
     override fun observeSaved(): Flow<List<SavedNewsItem>> =
         newsDao.observeSaved().map { saved -> saved.map { it.toDomain() } }
 
     override fun observeSavedIds(): Flow<Set<String>> =
         newsDao.observeSavedIds().map { it.toSet() }
+
+    override suspend fun getTrendStreamAvatar(channelId: String): String? {
+        val pageUrl = CuratedTwitchChannelPages.urlFor(channelId) ?: return null
+        val request = CompletableDeferred<String?>()
+        val activeRequest = pageImageRequests.putIfAbsent(pageUrl, request)
+        if (activeRequest != null) return activeRequest.await()
+
+        try {
+            val imageUrl = withContext(Dispatchers.IO) {
+                iconSemaphore.withPermit {
+                    val page = feedService.fetchPage(pageUrl).getOrNull() ?: return@withPermit null
+                    SourceIconExtractor.pageImage(page.body, page.finalUrl)
+                }
+            }
+            request.complete(imageUrl)
+            return imageUrl
+        } catch (e: CancellationException) {
+            request.complete(null)
+            pageImageRequests.remove(pageUrl, request)
+            throw e
+        } catch (_: Exception) {
+            request.complete(null)
+            return null
+        }
+    }
 
     override suspend fun save(item: NewsItem) {
         newsDao.insertSaved(item.toSavedEntity(savedAt = nowMs()))
@@ -201,6 +249,7 @@ class NewsRepositoryImpl(
                 // Unchanged since last fetch — keep the existing etag/last_modified, only the
                 // watermark timestamp advances so this source isn't re-attempted until stale again.
                 newsDao.updateFetchWatermark(source.id, now, source.etag, source.lastModified)
+                refreshSourceIconIfIdle(source)
                 SourceFetchOutcome.NOT_MODIFIED
             }
             is FeedFetchResult.Fetched -> {
@@ -216,6 +265,7 @@ class NewsRepositoryImpl(
                     }
                 }
                 newsDao.updateFetchWatermark(source.id, now, fetchResult.etag, fetchResult.lastModified)
+                refreshSourceIconIfIdle(source)
                 SourceFetchOutcome.FETCHED
             }
         }
@@ -225,6 +275,30 @@ class NewsRepositoryImpl(
         if (BuildConfig.DEBUG) Log.w(TAG, "Failed to fetch source ${source.id}: ${e::class.simpleName}")
         recordSafeNonFatal("news_source_fetch:${source.id}", e)
         SourceFetchOutcome.FAILED
+    }
+
+    private suspend fun refreshSourceIconIfIdle(source: ContentSourceEntity) {
+        if (!iconSemaphore.tryAcquire()) return
+        try { refreshSourceIcon(source) } finally { iconSemaphore.release() }
+    }
+
+    private suspend fun refreshSourceIcon(source: ContentSourceEntity): Unit = withContext(Dispatchers.IO) {
+        if (source.iconUrl != null) return@withContext
+        try {
+            val youtube = source.type == "VIDEO"
+            val pageUrl = if (youtube) YouTubeUrls.channelIdFromFeedUrl(source.feedUrl)?.let(YouTubeUrls::channelUrl)
+                else source.siteUrl ?: newsDao.getSourceById(source.id)?.siteUrl
+            if (pageUrl == null || !attemptedIcons.add(source.id)) return@withContext
+            val page = feedService.fetchPage(pageUrl).getOrThrow()
+            val icon = SourceIconExtractor.extract(page.body, page.finalUrl, youtube)
+                ?: if (!youtube) SourceIconExtractor.favicon(page.finalUrl) else null
+            if (icon != null) newsDao.updateIconUrl(source.id, icon)
+        } catch (e: CancellationException) {
+            attemptedIcons.remove(source.id)
+            throw e
+        } catch (_: Exception) {
+            // Branding is optional and cannot turn a successful content refresh into a failure.
+        }
     }
 
     // Defaults take their site from the catalog (reconcileDefaultSources); only custom sources learn it from the feed.

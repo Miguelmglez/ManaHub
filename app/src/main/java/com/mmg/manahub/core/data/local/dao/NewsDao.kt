@@ -91,6 +91,9 @@ interface NewsDao {
     @Query("UPDATE content_sources SET site_url = :siteUrl WHERE id = :id")
     suspend fun updateSiteUrl(id: String, siteUrl: String?)
 
+    @Query("UPDATE content_sources SET icon_url = :iconUrl WHERE id = :id AND icon_url IS NULL")
+    suspend fun updateIconUrl(id: String, iconUrl: String)
+
     // ── Saved items ──────────────────────────────────────────────────────────
 
     @Query("SELECT * FROM news_saved_items ORDER BY saved_at DESC")

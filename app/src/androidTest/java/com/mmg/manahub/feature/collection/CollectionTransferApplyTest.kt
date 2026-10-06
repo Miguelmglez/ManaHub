@@ -74,6 +74,31 @@ class CollectionTransferApplyTest {
         after.query("SELECT COUNT(*) FROM collection_transfer_guest_rows").use { it.moveToFirst(); assertEquals(0,it.getInt(0)) }
         after.query("PRAGMA foreign_key_list(user_card_collection)").use { assertEquals(0,it.count) }; after.close(); context.deleteDatabase(name)
     }
+    @Test fun independentlyEditedAndRemovedClonesApplyOnlyChosenCopies()=runBlocking {
+        val db=Room.inMemoryDatabaseBuilder(context,MtgDatabase::class.java).build()
+        try {
+            val fixture=source(db,count=1,quantity=3L);val dao=db.collectionTransferDao();val original=fixture.entries.single();val first=id();val second=id()
+            for(copy in listOf(first,second)) {
+                val job=dao.getJob(fixture.job,key)!!
+                assertTrue(dao.duplicatePendingEntry(fixture.job,key,job.generation,job.payloadVersion,original.id,original.entryVersion,copy,2L))
+            }
+            assertTrue(dao.editPendingEntry(fixture.job,key,first,0L,original.scryfallId,false,"NM","en",5L,TransferDestination.NONE))
+            assertTrue(dao.editPendingEntry(fixture.job,key,second,0L,original.scryfallId,false,"NM","en",3L,TransferDestination.NONE,true))
+            var job=dao.getJob(fixture.job,key)!!
+            assertEquals(2L,dao.chooseAllDestination(job.id,key,job.generation,job.intentRevision,TransferDestination.COLLECTION))
+            job=dao.getJob(job.id,key)!!;val action=TransferActionId(id())
+            assertTrue(dao.confirmAction(key,TransferActionRequest(action,TransferJobId(job.id),job.generation,TransferDestination.COLLECTION,TransferActionScope.DestinationSelection(job.intentRevision),acceptExclusions=true),3L))
+            assertTrue(dao.freezeAction(action.value,key))
+            assertEquals(TransferCollectionApplyResult.FINISHED,RoomTransferCollectionExecutor(db,gate(),{ 4L },{}).runSlice(action,owner))
+            assertEquals(1L to 8L,totals(db))
+            assertEquals(3L,dao.reviewEntry(job.id,key,original.id)!!.appliedQuantity)
+            assertEquals(5L,dao.reviewEntry(job.id,key,first)!!.appliedQuantity)
+            assertEquals(0L,dao.reviewEntry(job.id,key,second)!!.appliedQuantity)
+            assertEquals(2L,dao.getJob(job.id,key)!!.appliedEntries)
+            assertEquals(3L,dao.provenance(job.id,key,first).single().sourceCopies)
+            assertTrue(dao.provenance(job.id,key,original.id).single().participated)
+        } finally { db.close() }
+    }
     @Test fun realTransactionRollsBackIncrementMarkerCountersAndParticipation()=runBlocking {
         for(point in listOf(TransferApplyCheckpoint.AFTER_INCREMENT,TransferApplyCheckpoint.AFTER_MARKER,TransferApplyCheckpoint.AFTER_PROVENANCE)) {
             val db=Room.inMemoryDatabaseBuilder(context,MtgDatabase::class.java).build()
@@ -248,7 +273,7 @@ class CollectionTransferApplyTest {
             withTimeout(5000L) { loaded.await() }; gate.changeOwner(b); withTimeout(5000L) { cleared.await() }; assertNull(visible.value)
             val next=dao.beginReviewRebuild(fixture.job,key)!!; withTimeout(5000L) { dao.observeJob(fixture.job,key).first { it?.generation==next } }; assertNull(visible.value)
             gate.changeOwner(owner); withTimeout(5000L) { visible.first { it?.generation==next } }; assertEquals(key,visible.value!!.ownerKey)
-        } finally { scope.cancel(); db.close() }
+        } finally { withContext(NonCancellable) { scope.coroutineContext[Job]!!.cancelAndJoin(); db.close() } }
     }
     @Test fun authObserverPersistsExplicitGuestButLoadingNeverClaimsIt()=runBlocking<Unit> {
         val prefix="transfer-identity-test-${id()}"; val isolated=object : ContextWrapper(context) { override fun getSharedPreferences(name: String,mode: Int)=context.getSharedPreferences("$prefix-$name",mode) }
@@ -263,7 +288,7 @@ class CollectionTransferApplyTest {
             assertTrue(observer.matchesObserved(account)); assertFalse(observer.matchesObserved(explicit))
             auth.value=SessionState.Loading; assertFalse(observer.matchesObserved(account))
             withTimeout(5000L) { gate.sessions.first { it==TransferSession.Loading } }
-        } finally { scope.cancel(); db.close(); context.deleteSharedPreferences("$prefix-collection_transfer_identity") }
+        } finally { withContext(NonCancellable) { scope.coroutineContext[Job]!!.cancelAndJoin(); db.close(); context.deleteSharedPreferences("$prefix-collection_transfer_identity") } }
     }
 }
 

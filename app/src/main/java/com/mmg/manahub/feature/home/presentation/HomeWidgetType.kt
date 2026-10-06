@@ -243,14 +243,6 @@ enum class HomeWidgetType(
         icon = Icons.Default.Extension,
     );
 
-   /* MULTI_CARD_ADD(
-    persistedId = "multi_card_add",
-    defaultTitleRes = R.string.widget_title_multi_card_add,
-    supportedSizes = setOf(WidgetSize.MEDIUM),
-    category = WidgetCategory.COLLECTION,
-    audience = WidgetAudience.ALL,
-    icon = Icons.Default.CollectionsBookmark,
-    );*/
 
     /** True for widgets that belong to the gamification system (hidden when the toggle is off). */
     val isGamification: Boolean

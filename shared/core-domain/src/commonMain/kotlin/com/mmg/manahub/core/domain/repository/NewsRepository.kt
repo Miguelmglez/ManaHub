@@ -36,6 +36,9 @@ interface NewsRepository {
     /** Deletes a custom source; default sources can only be unfollowed. */
     suspend fun deleteSource(sourceId: String)
 
+    /** Retrieves an optional profile image for a curated Trends stream. */
+    suspend fun getTrendStreamAvatar(channelId: String): String?
+
     suspend fun save(item: NewsItem)
     suspend fun unsave(itemId: String)
 

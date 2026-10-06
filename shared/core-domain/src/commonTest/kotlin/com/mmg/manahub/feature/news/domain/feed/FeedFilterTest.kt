@@ -50,6 +50,11 @@ class FeedFilterTest {
     }
 
     @Test
+    fun given_selectedSourceIds_then_onlyItemsFromSelectedSourcesAreShown() {
+        assertEquals(listOf("a1", "a2", "v1"), ids(selected = "s1,s2"))
+    }
+
+    @Test
     fun given_query_then_titleDescriptionAndSourceNameAreSearchedIgnoringCase() {
         assertEquals(listOf("a1"), ids(query = "  BANLIST "))
         assertEquals(listOf("a2"), ids(query = "modern"))

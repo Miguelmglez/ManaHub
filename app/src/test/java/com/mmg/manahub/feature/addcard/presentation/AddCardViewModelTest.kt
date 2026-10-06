@@ -165,6 +165,35 @@ class AddCardViewModelTest {
         timestamp = 1L,
     )
 
+    @Test
+    fun `release launch searches its set and clearing does not restore the launch filter`() = runTest(dispatcher) {
+        val query = AdvancedSearchQuery(criteria = listOf(SearchCriterion.CardSet(setOf("tst"))))
+        every { buildScryfallQuery(query) } returns "set:tst"
+        coEvery { searchCards("set:tst", 1) } returns DataResult.Success(PaginatedCards(listOf(bolt), false, 1))
+        val vm = buildViewModel(AddCardLaunchArgs.from(false, null, null, "TST"))
+        advanceUntilIdle()
+        assertEquals(query, vm.uiState.value.activeQuery)
+        assertEquals(listOf(bolt), vm.uiState.value.results)
+        assertFalse(vm.uiState.value.isMultiSelectMode)
+        coVerify(exactly = 1) { searchCards("set:tst", 1) }
+        vm.onClearFilters()
+        advanceUntilIdle()
+        assertEquals(null, vm.uiState.value.activeQuery)
+        coVerify(exactly = 1) { searchCards("set:tst", 1) }
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `set nav validation preserves plain and deck launch semantics`() {
+        assertEquals(null, AddCardLaunchArgs.from(false, null, null, null).setCode)
+        assertEquals(null, AddCardLaunchArgs.from(false, null, null, "tst OR name:secret").setCode)
+        assertEquals(null, AddCardLaunchArgs.from(false, null, null, " ").setCode)
+        val args = AddCardLaunchArgs.from(true, AddCardLaunchArgs.SOURCE_DECK, "deck-1", "TST")
+        assertEquals("tst", args.setCode)
+        assertEquals(AddCardDeckSource.Local("deck-1"), args.deckSource)
+        assertTrue(args.multi)
+    }
+
     @After
     fun tearDown() {
         appScope.cancel()

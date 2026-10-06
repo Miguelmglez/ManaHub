@@ -24,6 +24,7 @@ data class TransferActionRequest(
     val scope: TransferActionScope,
     val acceptExclusions: Boolean = false,
     val acceptRepeatedFiles: Boolean = false,
+    val expectedPayloadVersion: Long? = null,
 )
 
 /** Frozen command snapshots survive edits to unrelated pending entries. */

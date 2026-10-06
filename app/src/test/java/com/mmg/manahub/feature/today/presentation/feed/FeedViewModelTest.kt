@@ -49,11 +49,13 @@ class FeedViewModelTest {
 
     private val newsFlow = MutableStateFlow<List<NewsItem>>(emptyList())
     private val sourcesFlow = MutableStateFlow<List<ContentSource>>(emptyList())
+    private val savedFlow = MutableStateFlow<List<com.mmg.manahub.core.model.news.SavedNewsItem>>(emptyList())
     private val savedIdsFlow = MutableStateFlow<Set<String>>(emptySet())
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        every { repository.observeSaved() } returns savedFlow
         every { repository.observeNews() } returns newsFlow
         every { repository.observeSources() } returns sourcesFlow
         every { repository.observeSavedIds() } returns savedIdsFlow
@@ -61,6 +63,24 @@ class FeedViewModelTest {
         coEvery { repository.save(any()) } just Runs
         coEvery { repository.unsave(any()) } just Runs
         coEvery { repository.setSourceFollowed(any(), any()) } just Runs
+    }
+
+    @Test
+    fun `saved mode retains deleted source snapshots and restored filters`() = runTest(testDispatcher) {
+        savedFlow.value = listOf(com.mmg.manahub.core.model.news.SavedNewsItem(article("saved", "deleted", "Saved headline"), 1L))
+        val vm = collecting(createViewModel(SavedStateHandle(mapOf("feed_saved_only" to true,
+            "feed_selected_source" to "deleted", "feed_content_filter" to "ARTICLES", "feed_search_query" to "headline"))))
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.savedOnly)
+        assertEquals(listOf("saved"), vm.uiState.value.items.map { it.id })
+        assertEquals("deleted", vm.uiState.value.filterSources.single().id)
+        assertEquals("deleted", vm.uiState.value.selectedSource?.id)
+        vm.onSavedOnlyChanged(false)
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.items.isEmpty())
+        vm.onSavedOnlyChanged(true)
+        advanceUntilIdle()
+        assertEquals("saved", vm.uiState.value.items.single().id)
     }
 
     @After
@@ -194,12 +214,37 @@ class FeedViewModelTest {
         vm.onSourceChipClicked("b")
         advanceUntilIdle()
         assertEquals("b", vm.uiState.value.selectedSource?.id)
+        assertEquals(setOf("b"), vm.uiState.value.selectedSourceIds)
         assertEquals(listOf("2"), vm.uiState.value.items.map { it.id })
 
         vm.onSourceChipClicked("b")
         advanceUntilIdle()
         assertNull(vm.uiState.value.selectedSource)
+        assertTrue(vm.uiState.value.selectedSourceIds.isEmpty())
         assertEquals(listOf("1", "2"), vm.uiState.value.items.map { it.id })
+    }
+
+    @Test
+    fun `given multiple source chips are tapped then both sources are selected and filtered`() = runTest(testDispatcher) {
+        sourcesFlow.value = listOf(source("a"), source("b"), source("c"))
+        newsFlow.value = listOf(article("1", "a"), article("2", "b"), article("3", "c"))
+        val vm = collecting(createViewModel())
+        advanceUntilIdle()
+
+        vm.onSourceChipClicked("a")
+        vm.onSourceChipClicked("b")
+        advanceUntilIdle()
+
+        assertEquals(setOf("a", "b"), vm.uiState.value.selectedSourceIds)
+        assertNull(vm.uiState.value.selectedSource)
+        assertEquals(listOf("1", "2"), vm.uiState.value.items.map { it.id })
+        assertTrue(vm.uiState.value.isFiltered)
+
+        vm.selectSource(null)
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.selectedSourceIds.isEmpty())
+        assertNull(vm.uiState.value.selectedSource)
+        assertEquals(listOf("1", "2", "3"), vm.uiState.value.items.map { it.id })
     }
 
     @Test

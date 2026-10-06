@@ -53,3 +53,5 @@ bottom `MagicCtaButton` ("Proceed with N selected") opens the shared `CardQueueS
 - Telemetry: `AddCardTelemetry` (`addcard_multiselect_*` breadcrumbs, count buckets only; deck-source load
   failure → `recordSafeNonFatal`). Tests need `mockkStatic(FirebaseCrashlytics::class)`.
 → memory: `project_addcard_multi_select_2026-09`
+
+- Today releases pass the optional `setCode` nav argument through AddCardLaunchArgs/Koin into a CardSet criterion when the ViewModel starts. It is not a composition callback, so ordinary recomposition never overwrites a user's edited search. Validate nav values as bounded alphanumeric set codes and skip spotlight while the launch filter is active.

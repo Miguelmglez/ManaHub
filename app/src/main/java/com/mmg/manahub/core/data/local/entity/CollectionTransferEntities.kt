@@ -141,7 +141,7 @@ data class CollectionImportRowEntity(
 )
 
 /** Stable entry IDs and applied quantities are never recreated when resuming a frozen payload. */
-@Entity(tableName = "collection_import_entries", indices = [Index("job_id", "scryfall_id", "is_foil", "condition", "language", unique = true), Index("job_id", "generation", "id"), Index("job_id", "state", "id"), Index("job_id", "source_key")])
+@Entity(tableName = "collection_import_entries", indices = [Index("job_id", "scryfall_id", "is_foil", "condition", "language", "duplicate_key", unique = true), Index("job_id", "generation", "id"), Index("job_id", "state", "id"), Index("job_id", "source_key"), Index("job_id", "generation", "review_order_key"), Index("job_id", "duplicate_origin_id")])
 data class CollectionImportEntryEntity(
     @PrimaryKey val id: String,
     @ColumnInfo(name = "job_id") val jobId: String,
@@ -162,6 +162,9 @@ data class CollectionImportEntryEntity(
     @ColumnInfo(name = "source_signature", defaultValue = "''") val sourceSignature: String = "",
     @ColumnInfo(name = "source_quantity", defaultValue = "0") val sourceQuantity: Long = 0L,
     @ColumnInfo(name = "payload_edited", defaultValue = "0") val payloadEdited: Boolean = false,
+    @ColumnInfo(name = "duplicate_origin_id") val duplicateOriginId: String? = null,
+    @ColumnInfo(name = "duplicate_key", defaultValue = "''") val duplicateKey: String = "",
+    @ColumnInfo(name = "review_order_key", defaultValue = "''") val reviewOrderKey: String = id,
 )
 
 /** An invalidated edit remains visible after its original source contribution changes or disappears. */
