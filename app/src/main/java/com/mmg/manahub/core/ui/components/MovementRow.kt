@@ -2,10 +2,14 @@ package com.mmg.manahub.core.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,11 +26,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -56,50 +60,62 @@ fun MovementRow(
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
 
-    Row(
+    val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = spacing.sm),
-        horizontalArrangement = Arrangement.SpaceAround,
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        actions.forEach { action ->
-            val effectiveTint = if (action.enabled) {
-                action.tint ?: mc.primaryAccent
-            } else {
-                mc.textDisabled
-            }
-            val cd = action.contentDescription
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(ChipShape)
-                    .clickable(enabled = action.enabled, onClick = action.onClick)
-                    .then(
-                        if (cd != null) {
-                            Modifier.semantics {
-                                contentDescription = cd
-                            }
-                        } else Modifier
-                    )
-                    .padding(vertical = spacing.sm, horizontal = spacing.xs),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(spacing.xs),
-            ) {
-                Icon(
-                    imageVector = action.icon,
-                    contentDescription = null,
-                    tint = effectiveTint,
-                    modifier = Modifier.size(22.dp)
-                )
-                Text(
-                    text = action.label,
-                    style = ty.labelSmall.copy(fontSize = 9.sp),
-                    color = effectiveTint,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    softWrap = false
-                )
+        val capacity = (maxWidth / (64.dp * fontScale)).toInt().coerceAtLeast(1)
+        val rowCount = (actions.size + capacity - 1) / capacity
+        val actionsPerRow = if (rowCount == 0) 1 else (actions.size + rowCount - 1) / rowCount
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+            actions.chunked(actionsPerRow).forEach { rowActions ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                ) {
+                    rowActions.forEach { action ->
+                        val effectiveTint = if (action.enabled) {
+                            action.tint ?: mc.primaryAccent
+                        } else {
+                            mc.textDisabled
+                        }
+                        val cd = action.contentDescription
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .heightIn(min = 48.dp)
+                                .clip(ChipShape)
+                                .clickable(enabled = action.enabled, onClick = action.onClick)
+                                .then(
+                                    if (cd != null) {
+                                        Modifier.semantics {
+                                            contentDescription = cd
+                                        }
+                                    } else Modifier
+                                )
+                                .padding(vertical = spacing.sm, horizontal = spacing.xs),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(spacing.xs, Alignment.CenterVertically),
+                        ) {
+                            Icon(
+                                imageVector = action.icon,
+                                contentDescription = null,
+                                tint = effectiveTint,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Text(
+                                text = action.label,
+                                style = ty.labelSmall,
+                                color = effectiveTint,
+                                textAlign = TextAlign.Center,
+                                softWrap = true
+                            )
+                        }
+                    }
+                }
             }
         }
     }

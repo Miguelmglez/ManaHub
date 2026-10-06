@@ -3,7 +3,8 @@ package com.mmg.manahub.core.domain.repository
 import com.mmg.manahub.core.model.news.ContentSource
 import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.model.news.RefreshResult
-import com.mmg.manahub.core.model.news.SourceType
+import com.mmg.manahub.core.model.news.ResolvedSource
+import com.mmg.manahub.core.model.news.SavedNewsItem
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -13,6 +14,10 @@ import kotlinx.coroutines.flow.Flow
 interface NewsRepository {
     fun observeNews(): Flow<List<NewsItem>>
     fun observeSources(): Flow<List<ContentSource>>
+
+    /** Saved snapshots, newest save first. */
+    fun observeSaved(): Flow<List<SavedNewsItem>>
+    fun observeSavedIds(): Flow<Set<String>>
 
     /**
      * Refreshes every stale enabled source (per-source watermark, ~1h TTL), or every enabled
@@ -25,20 +30,21 @@ interface NewsRepository {
     /** Refreshes a single source immediately, bypassing the staleness check (F9 — new source). */
     suspend fun refreshSource(sourceId: String): Result<Unit>
 
-    suspend fun toggleSource(sourceId: String, enabled: Boolean)
-    suspend fun addCustomSource(
-        name: String,
-        feedUrl: String,
-        type: SourceType,
-        language: String = "en",
-    ): Result<ContentSource>
-    suspend fun deleteSource(sourceId: String)
-    suspend fun validateFeed(feedUrl: String, type: SourceType): Result<Int>
+    /** Follows or unfollows a source (the `is_enabled` flag); only followed sources feed the Feed. */
+    suspend fun setSourceFollowed(sourceId: String, followed: Boolean)
 
-    /**
-     * Best-effort detection of the feed's channel-level language (RSS 2.0 `<channel><language>`),
-     * used to pre-select the add-source form's language chip. Returns null on failure, a feed
-     * format with no such element, or an unmapped language code — never throws.
-     */
-    suspend fun detectFeedLanguage(feedUrl: String): String?
+    /** Deletes a custom source; default sources can only be unfollowed. */
+    suspend fun deleteSource(sourceId: String)
+
+    /** Retrieves an optional profile image for a curated Trends stream. */
+    suspend fun getTrendStreamAvatar(channelId: String): String?
+
+    suspend fun save(item: NewsItem)
+    suspend fun unsave(itemId: String)
+
+    /** Finds a feed behind a website, feed URL, YouTube channel link, `@handle` or channel id. */
+    suspend fun resolveSource(input: String): Result<ResolvedSource>
+
+    /** Follows [source] (reusing a matching unfollowed default), then refreshes it right away. */
+    suspend fun followResolvedSource(source: ResolvedSource, name: String, language: String): Result<ContentSource>
 }

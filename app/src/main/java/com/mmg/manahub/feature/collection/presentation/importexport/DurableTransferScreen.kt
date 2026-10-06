@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.collection.presentation.importexport
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +22,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.NavigateBefore
+import androidx.compose.material.icons.filled.NavigateNext
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material3.*
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.Alignment
+import com.mmg.manahub.R
+import kotlinx.coroutines.flow.distinctUntilChanged
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -32,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -57,202 +74,11 @@ fun DurableTransferScreen(
     onBack: () -> Unit,
     onRedirect: (String) -> Unit,
 ) {
-    val receiving by intake.receiving.collectAsStateWithLifecycle()
-    val pending by intake.unfinished.collectAsStateWithLifecycle()
-    val received by intake.pending.collectAsStateWithLifecycle()
-    val recovery by intake.recoveryNotice.collectAsStateWithLifecycle()
-    val spacing = MaterialTheme.spacing
-    var paste by remember { mutableStateOf(false) }
-    var deferredDelivery by rememberSaveable(jobId) { mutableStateOf<String?>(null) }
-    var recover by remember { mutableStateOf(false) }
-    val recoveryPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream"),
-    ) { uri -> uri?.let(intake::saveRecovery) }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        if (uris.isNotEmpty()) intake.receiveUris(uris)
-    }
-
-    if (jobId == null) {
-        TransferIntakeScreen(
-            receiving = receiving,
-            pending = pending,
-            recovery = recovery,
-            onOpenFiles = { picker.launch(AndroidTransferDelivery.mimeTypes) },
-            onPaste = { paste = true },
-            onBack = onBack,
-            onResume = { onRedirect(it) },
-            onRecover = { recover = true },
-        )
-    } else {
-        val viewModel: DurableTransferViewModel = koinViewModel(key = "transfer:$jobId") {
-            parametersOf(TransferJobId(jobId))
-        }
-        val state by viewModel.state.collectAsStateWithLifecycle()
-        LaunchedEffect(state.redirectId) { state.redirectId?.let(onRedirect) }
-        DurableTransferReview(viewModel, onBack)
-        received.firstOrNull { it != jobId && it != deferredDelivery }?.let { next ->
-            MagicAlertDialog(
-                onDismissRequest = { deferredDelivery = next },
-                title = "Another transfer is waiting",
-                text = "This delivery is stored separately. Your current review is retained.",
-                buttons = {
-                    MagicCtaButton(
-                        onClick = { intake.routed(next); onRedirect(next) },
-                        text = "Review next transfer",
-                        modifier = Modifier.fillMaxWidth().heightIn(min = spacing.xxl + spacing.lg),
-                    )
-                    MagicCtaButton(
-                        onClick = { deferredDelivery = next },
-                        text = "Keep reviewing",
-                        style = MagicCtaStyle.Ghost,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = spacing.xxl + spacing.lg),
-                    )
-                },
-            )
-        }
-    }
-
-    if (paste) {
-        DeckImportSheet(
-            isLoading = receiving,
-            error = null,
-            onImport = { intake.receiveText(it); paste = false },
-            onDismiss = { paste = false },
-            title = "Import cards",
-            hint = "Paste a TXT card list. Choose where each card belongs after review.",
-            placeholder = "1 Lightning Bolt",
-        )
-    }
-    if (recover) {
-        MagicAlertDialog(
-            onDismissRequest = { recover = false },
-            title = "Save legacy recovery?",
-            text = "This saves an opaque recovery archive outside the app. Its owner and previous application cannot be verified. Saving it does not add any cards.",
-            buttons = {
-                MagicCtaButton(
-                    onClick = { recover = false; recoveryPicker.launch("legacy-import-recovery.mhrecovery") },
-                    text = "Save recovery",
-                    modifier = Modifier.fillMaxWidth().heightIn(min = spacing.xxl + spacing.lg),
-                )
-                MagicCtaButton(
-                    onClick = { recover = false },
-                    text = "Cancel",
-                    style = MagicCtaStyle.Ghost,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = spacing.xxl + spacing.lg),
-                )
-            },
-        )
-    }
-}
-
-@Composable
-private fun TransferIntakeScreen(
-    receiving: Boolean,
-    pending: List<PendingTransfer>,
-    recovery: LegacyImportRecoveryNotice,
-    onOpenFiles: () -> Unit,
-    onPaste: () -> Unit,
-    onBack: () -> Unit,
-    onResume: (String) -> Unit,
-    onRecover: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    val actionHeight = spacing.xxl + spacing.lg
-    Box(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.md),
-            verticalArrangement = Arrangement.spacedBy(spacing.md),
-        ) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.md)) {
-                    MagicCtaButton(
-                        onClick = onBack,
-                        text = "Back",
-                        style = MagicCtaStyle.Ghost,
-                        color = MagicCtaColor.Neutral,
-                        modifier = Modifier.heightIn(min = actionHeight),
-                    )
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                        Text("Import cards", style = ty.titleLarge, color = mc.textPrimary)
-                        Text(
-                            "Open CSV or TXT files, then choose collection or wishlist for each card.",
-                            style = ty.bodyMedium,
-                            color = mc.textSecondary,
-                        )
-                    }
-                }
-            }
-            item {
-                TransferPanel {
-                    TransferSectionTitle("Choose a source", "Add a file or paste a list to begin.")
-                    MagicCtaButton(
-                        onClick = onOpenFiles,
-                        text = "Open files",
-                        enabled = !receiving,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                    )
-                    MagicCtaButton(
-                        onClick = onPaste,
-                        text = "Paste card list",
-                        style = MagicCtaStyle.Outlined,
-                        enabled = !receiving,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                    )
-                    if (receiving) {
-                        MagicProgressBar()
-                        Text("Receiving files…", style = ty.bodySmall, color = mc.textSecondary)
-                    }
-                }
-            }
-            if (pending.isNotEmpty()) {
-                item {
-                    TransferSectionTitle(
-                        title = "Unfinished transfers",
-                        subtitle = "Continue a saved import where you left off.",
-                    )
-                }
-                itemsIndexed(pending, key = { _, job -> job.id }) { index, job ->
-                    TransferPanel {
-                        Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                            Text(
-                                "Transfer ${index + 1}",
-                                style = ty.titleMedium,
-                                color = mc.textPrimary,
-                                modifier = Modifier.weight(1f),
-                            )
-                            TransferStatusPill(job.phase.displayName())
-                        }
-                        MagicCtaButton(
-                            onClick = { onResume(job.id) },
-                            text = "Resume transfer",
-                            style = MagicCtaStyle.Outlined,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                        )
-                    }
-                }
-            }
-            if (recovery.state != LegacyImportRecoveryState.NONE && recovery.state != LegacyImportRecoveryState.PENDING) {
-                item {
-                    TransferPanel {
-                        TransferSectionTitle(
-                            title = "Legacy recovery",
-                            subtitle = "Its owner and previous application are unknown. It is never imported automatically.",
-                        )
-                        MagicCtaButton(
-                            onClick = onRecover,
-                            text = "Save legacy recovery",
-                            enabled = recovery.state == LegacyImportRecoveryState.RECOVERY_AVAILABLE,
-                            style = MagicCtaStyle.Outlined,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                        )
-                    }
-                }
-            }
-        }
-    }
+    if(jobId.isNullOrBlank()) return
+    val viewModel: DurableTransferViewModel = koinViewModel(key = "transfer:$jobId") { parametersOf(TransferJobId(jobId)) }
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(state.redirectId) { state.redirectId?.let(onRedirect) }
+    DurableTransferReview(viewModel, onBack, intake, onRedirect)
 }
 
 private data class PendingTransferConfirmation(
@@ -261,250 +87,254 @@ private data class PendingTransferConfirmation(
     val generation: Long,
     val payloadVersion: Long,
     val entryVersion: Long?,
+    val session: TransferSession.Available,
+    val followWishlist: Boolean=false,
+    val cards: Long,
+    val copies: Long,
+    val retainedCards: Long,
+    val retainedCopies: Long,
+    val omittedRecords: Long,
+    val excludedCards: Long,
+    val repeatedFiles: Int,
 )
 
 @Composable
-@OptIn(ExperimentalLayoutApi::class)
-private fun DurableTransferReview(viewModel: DurableTransferViewModel, onBack: () -> Unit) {
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+private fun DurableTransferReview(viewModel: DurableTransferViewModel, onBack: () -> Unit, intake: TransferIntakeViewModel, onRedirect: (String) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val summary = state.summary
+    val received by intake.pending.collectAsStateWithLifecycle()
+    var details by rememberSaveable { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val detailsListState = rememberLazyListState()
+    fun openDetails() { details=true;viewModel.details() }
+    fun closeDetails() { details=false }
+    LaunchedEffect(state.publishedInverted) { listState.scrollToItem(0) }
+    BackHandler(details) { closeDetails() }
+    val activeList=if(details)detailsListState else listState
+    LaunchedEffect(activeList,state.scope,details,state.entries.firstOrNull()?.id,state.entries.lastOrNull()?.id) {
+        snapshotFlow { activeList.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? String } }.distinctUntilChanged().collect { keys ->
+            val first=state.entries.firstOrNull()?.id
+            val last=state.entries.lastOrNull()?.id
+            if(last!=null && last in keys)viewModel.nextPage()
+            if(first!=null && first in keys)viewModel.previousPage()
+        }
+    }
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     val actionHeight = spacing.xxl + spacing.lg
-    val toast = rememberMagicToastState()
+    val toast = key(state.presentationSession) { rememberMagicToastState() }
     var unavailableError by remember { mutableStateOf<String?>(null) }
     var confirm by remember { mutableStateOf<PendingTransferConfirmation?>(null) }
     var discard by remember { mutableStateOf<TransferDiscardConsent?>(null) }
     var correcting by remember { mutableStateOf<TransferReviewEntry?>(null) }
+    var quantityConsent by remember { mutableStateOf<TransferSession.Available?>(null) }
+    var replacementFile by remember { mutableStateOf<TransferFileSummary?>(null) }
+    var replacementConsent by remember { mutableStateOf<TransferSession.Available?>(null) }
     var correctedQuantity by remember { mutableStateOf("") }
     var acceptLosses by remember(summary?.generation, summary?.payloadVersion) { mutableStateOf(false) }
     var acceptRepeats by remember(summary?.generation, summary?.payloadVersion) { mutableStateOf(false) }
     var replacementId by rememberSaveable { mutableStateOf<String?>(null) }
     var replacementGeneration by rememberSaveable { mutableLongStateOf(-1L) }
     val replacementPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val file = state.summary?.files?.firstOrNull { it.id.value == replacementId }
-        if (uri != null && file != null) viewModel.replace(file, replacementGeneration, uri)
+        val file = replacementFile
+        if (uri != null && file != null) replacementConsent?.let { viewModel.replace(file, replacementGeneration, uri, it) }
+        replacementConsent=null
+        replacementFile=null
         replacementId = null
     }
-    val reportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
-        uri?.let(viewModel::writeReport)
-    }
 
-    fun request(destination: TransferDestination, entryId: String?) {
+    fun request(destination: TransferDestination, entryId: String?, followWishlist: Boolean=false) {
         val current = summary ?: return
-        confirm = PendingTransferConfirmation(
+        acceptLosses=false
+        acceptRepeats=false
+        val action = PendingTransferConfirmation(
             destination = destination,
             entryId = entryId,
             generation = current.generation,
             payloadVersion = current.payloadVersion,
             entryVersion = state.entries.firstOrNull { it.id == entryId }?.version,
+            session = viewModel.captureSession() ?: return,
+            followWishlist = followWishlist,
+            cards = if(entryId==null)current.pendingEntries else 1L,
+            copies = if(entryId==null)current.pendingCopies else state.entries.firstOrNull {it.id==entryId}?.quantity ?: return,
+            retainedCards = current.retainedWishlistEntries,
+            retainedCopies = current.retainedWishlistCopies,
+            omittedRecords = current.files.filter {it.selected}.sumOf {it.invalidRecords+it.unresolvedRecords},
+            excludedCards = current.excludedEntries,
+            repeatedFiles = current.files.count {it.selected && (it.duplicate || it.previouslyParticipated)},
         )
-    }
-
-    LaunchedEffect(state.error, summary, state.loading, state.needsOwnerChoice) {
-        state.error?.let { error ->
-            toast.show(error, MagicToastType.ERROR)
-            if (summary == null && !state.loading && !state.needsOwnerChoice) {
-                unavailableError = error
-            }
-            viewModel.clearError()
-        } ?: run {
-            if (summary != null || state.loading || state.needsOwnerChoice) {
-                unavailableError = null
-            }
+        if((entryId==null && (action.omittedRecords>0L || action.excludedCards>0L)) || action.repeatedFiles>0) {
+            confirm=action
+        } else {
+            viewModel.action(action.destination,action.entryId,action.generation,action.payloadVersion,action.entryVersion,false,false,action.session,action.followWishlist)
         }
     }
-    LaunchedEffect(state.notice) { state.notice?.let { toast.show(it, MagicToastType.SUCCESS); viewModel.clearNotice() } }
 
-    Box(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.md),
-            verticalArrangement = Arrangement.spacedBy(spacing.md),
-        ) {
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                    MagicCtaButton(
-                        onClick = onBack,
-                        text = "Back",
-                        style = MagicCtaStyle.Ghost,
-                        color = MagicCtaColor.Neutral,
-                        modifier = Modifier.heightIn(min = actionHeight),
-                    )
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.xs), modifier = Modifier.weight(1f)) {
-                        Text("Review import", style = ty.titleLarge, color = mc.textPrimary)
-                        if (summary != null) {
-                            Text(summary.phase.name.displayName(), style = ty.bodySmall, color = mc.textSecondary)
+    LaunchedEffect(confirm) { if(confirm!=null) { details=false;listState.animateScrollToItem(0) } }
+    LaunchedEffect(state.ownerConsent) { confirm=null;discard=null;correcting=null }
+    LaunchedEffect(summary?.owner) { confirm=null;discard=null;correcting=null }
+    val completionMessage=state.completionNotice?.let { notice -> stringResource(when { notice.partial && notice.destination==TransferDestination.COLLECTION->R.string.import_partial_collection_message;notice.partial->R.string.import_partial_wishlist_message;notice.destination==TransferDestination.COLLECTION->R.string.import_added_collection_message;else->R.string.import_added_wishlist_message },notice.entries,notice.copies) }
+    LaunchedEffect(state.completionNotice?.id,state.presentationSession) {
+        completionMessage?.let { toast.show(it,MagicToastType.SUCCESS);viewModel.clearCompletionNotice() }
+    }
+    val errorMessage=state.error?.let { transferFailureLabel(it) }
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let { error ->
+            toast.show(error, MagicToastType.ERROR)
+            if(summary==null && !state.loading && !state.needsOwnerChoice)unavailableError=error
+            viewModel.clearError()
+        }
+    }
+    Box(Modifier.fillMaxSize()) {
+        ThemeBackground(Modifier.fillMaxSize())
+        Scaffold(
+            containerColor=Color.Transparent,
+            contentWindowInsets=WindowInsets.safeDrawing,
+            topBar={
+                Column {
+                TopAppBar(
+                    title={Text(stringResource(if(details)R.string.import_card_issues else R.string.import_review),style=ty.titleLarge,color=mc.textPrimary)},
+                    navigationIcon={IconButton(onClick={if(details)closeDetails()else onBack()}) {Icon(Icons.AutoMirrored.Filled.ArrowBack,stringResource(R.string.action_back),tint=mc.textPrimary)}},
+                    actions={if(!details)IconButton(onClick={openDetails()}) {Icon(Icons.Default.Info,stringResource(R.string.import_card_issues),tint=mc.textPrimary)}},
+                    colors=TopAppBarDefaults.topAppBarColors(containerColor=mc.backgroundSecondary),
+                )
+                if(!details && summary!=null) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal=spacing.lg),verticalAlignment=Alignment.CenterVertically) {
+                        Text(stringResource(R.string.import_remaining_counts,summary.pendingEntries,summary.pendingCopies),style=ty.bodyMedium,color=mc.textSecondary,modifier=Modifier.weight(1f))
+                        IconButton(onClick={discard=viewModel.captureDiscard()},enabled=summary.phase!=TransferPhase.DISCARDED && (summary.pendingEntries>0L || summary.retainedWishlistEntries>0L || state.cards.isNotEmpty())) {Icon(Icons.Rounded.Delete,stringResource(R.string.card_queue_clear_cd),tint=mc.lifeNegative)}
+                    }
+                    Box(Modifier.fillMaxWidth().padding(horizontal=spacing.lg,vertical=spacing.xs)) {
+                        QueueToggleRow(title=stringResource(R.string.scanner_queue_auto_delete_title),subtitle=stringResource(R.string.scanner_queue_auto_delete_desc),checked=state.deleteOnAdd,onCheckedChange=viewModel::setDeleteOnAdd,isListInverted=state.inverted,updateSorting=viewModel::toggleInversion)
+                    }
+                    if(state.cards.isNotEmpty() || state.previous!=null || state.next!=null)Row(Modifier.fillMaxWidth().padding(horizontal=spacing.lg),verticalAlignment=Alignment.CenterVertically) {
+                        Text(stringResource(R.string.import_loaded_count,state.entries.size),style=ty.bodySmall,color=mc.textSecondary,modifier=Modifier.weight(1f))
+                        IconButton(onClick=viewModel::previousPage,enabled=state.previous!=null && !state.paging && !state.loading) {Icon(Icons.Default.NavigateBefore,stringResource(R.string.import_previous_cards),tint=if(state.previous!=null)mc.textPrimary else mc.textDisabled)}
+                        IconButton(onClick=viewModel::nextPage,enabled=state.next!=null && !state.paging && !state.loading) {Icon(Icons.Default.NavigateNext,stringResource(R.string.import_next_cards),tint=if(state.next!=null)mc.textPrimary else mc.textDisabled)}
+                    }
+                    if(state.paging)MagicProgressBar()
+                }
+                }
+            },
+            bottomBar={
+                if(!details && summary!=null)Column(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(spacing.lg),verticalArrangement=Arrangement.spacedBy(spacing.sm)) {
+                    if(summary.pendingEntries>0L) {
+                        val enabled=summary.phase in setOf(TransferPhase.REVIEW_READY,TransferPhase.REVIEW_REQUIRED) && state.decisions.isEmpty() && summary.invalidPendingEntries==0L
+                        MagicCtaButton(onClick={request(TransferDestination.COLLECTION,null)},text=stringResource(R.string.import_add_all_collection),enabled=enabled,modifier=Modifier.fillMaxWidth())
+                        MagicCtaButton(onClick={request(TransferDestination.WISHLIST,null)},text=stringResource(R.string.import_add_all_wishlist),enabled=enabled,style=MagicCtaStyle.Outlined,modifier=Modifier.fillMaxWidth())
+                    } else if(summary.phase in setOf(TransferPhase.COMPLETED,TransferPhase.COMPLETED_WITH_EXCLUSIONS,TransferPhase.DISCARDED))MagicCtaButton(onClick=onBack,text=stringResource(R.string.import_done),modifier=Modifier.fillMaxWidth())
+                }
+            },
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding)) {
+            LazyColumn(
+                state=activeList,
+                modifier=Modifier.fillMaxSize(),
+                contentPadding=PaddingValues(vertical=spacing.md),
+                verticalArrangement=Arrangement.Top,
+            ) {
+                confirm?.let { action -> item {
+                    TransferPanel {
+                        Text(stringResource(R.string.import_review_issues),style=ty.titleMedium,color=mc.textPrimary)
+                        Text(if(action.entryId==null)stringResource(R.string.import_bulk_confirmation,action.cards,action.copies,action.destination.name.lowercase())else stringResource(R.string.import_single_confirmation,action.copies,action.destination.name.lowercase()),style=ty.bodyMedium,color=mc.textSecondary)
+                        if(action.entryId==null && (action.excludedCards>0L || action.omittedRecords>0L))Row(Modifier.toggleable(value=acceptLosses,role=androidx.compose.ui.semantics.Role.Checkbox,onValueChange={acceptLosses=it}).heightIn(min=48.dp),verticalAlignment=Alignment.CenterVertically) {
+                            Checkbox(checked=acceptLosses,onCheckedChange=null)
+                            Text(stringResource(R.string.import_accept_omissions,action.omittedRecords,action.excludedCards),color=mc.textPrimary,modifier=Modifier.weight(1f))
                         }
+                        if(action.repeatedFiles>0)Row(Modifier.toggleable(value=acceptRepeats,role=androidx.compose.ui.semantics.Role.Checkbox,onValueChange={acceptRepeats=it}).heightIn(min=48.dp),verticalAlignment=Alignment.CenterVertically) {
+                            Checkbox(checked=acceptRepeats,onCheckedChange=null)
+                            Text(stringResource(R.string.import_accept_repeated,action.repeatedFiles),color=mc.textPrimary,modifier=Modifier.weight(1f))
+                        }
+                        MagicCtaButton(text=stringResource(R.string.import_copy_23),enabled=(action.entryId!=null || action.excludedCards+action.omittedRecords==0L || acceptLosses) && (action.repeatedFiles==0 || acceptRepeats),onClick={viewModel.action(action.destination,action.entryId,action.generation,action.payloadVersion,action.entryVersion,acceptLosses,acceptRepeats,action.session,action.followWishlist);confirm=null},modifier=Modifier.fillMaxWidth())
+                        MagicCtaButton(text=stringResource(R.string.action_cancel),style=MagicCtaStyle.Ghost,onClick={confirm=null},modifier=Modifier.fillMaxWidth())
                     }
+                } }
+                if(!details && received.any { it!=viewModel.id.value })item {
+                    MagicCtaButton(text=stringResource(R.string.import_next_receipt),style=MagicCtaStyle.Outlined,onClick={received.firstOrNull {it!=viewModel.id.value}?.let {intake.routed(it);onRedirect(it)}},modifier=Modifier.fillMaxWidth())
                 }
-            }
-            if (state.loading) {
-                item {
+                if(!details && summary!=null)item {
+                    val preparing=summary.phase in setOf(TransferPhase.RECEIVING,TransferPhase.PARSING,TransferPhase.RESOLVING,TransferPhase.APPLYING)
+                    if(preparing){MagicProgressBar();Text(transferPhaseLabel(summary.phase),color=mc.textSecondary,modifier=Modifier.padding(horizontal=spacing.lg))}
+                    else if(summary.pendingEntries==0L && state.cards.isEmpty())EmptyState(title=stringResource(if(summary.phase in setOf(TransferPhase.COMPLETED,TransferPhase.COMPLETED_WITH_EXCLUSIONS))R.string.import_completed else R.string.import_no_cards),actionLabel=stringResource(R.string.import_details),onAction={openDetails()},compact=true,modifier=Modifier.fillMaxWidth())
+                    if(state.decisions.isNotEmpty() || summary.invalidPendingEntries>0L)MagicCtaButton(text=stringResource(R.string.import_review_issues),style=MagicCtaStyle.Outlined,onClick={openDetails()},modifier=Modifier.padding(horizontal=spacing.lg))
+                }
+                if(state.loading)item {MagicProgressBar();Text(stringResource(R.string.import_preparing),color=mc.textSecondary,modifier=Modifier.padding(spacing.lg))}
+                if(state.needsOwnerChoice)item {
                     TransferPanel {
-                        MagicProgressBar()
-                        Text(
-                            "Preparing files. Android may delay background work.",
-                            style = ty.bodyMedium,
-                            color = mc.textSecondary,
-                        )
+                        TransferSectionTitle(stringResource(R.string.import_owner_title),stringResource(if(state.ownerChoice==TransferOwnerChoice.OTHER_ACCOUNT)R.string.import_other_owner else R.string.import_owner_confirm))
+                        if(state.ownerChoice!=TransferOwnerChoice.OTHER_ACCOUNT)MagicCtaButton(onClick={state.ownerConsent?.let(viewModel::bindExplicitly)},text=stringResource(R.string.import_review),modifier=Modifier.fillMaxWidth())
                     }
                 }
-            }
-            if (state.needsOwnerChoice) {
-                item {
-                    TransferPanel {
-                        TransferSectionTitle(
-                            title = "Choose where to review",
-                            subtitle = "These files are not assigned to an account yet. Confirm this destination before continuing.",
-                        )
-                        MagicCtaButton(
-                            onClick = viewModel::bindExplicitly,
-                            text = "Review these files here",
-                            modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                        )
-                    }
+                if(summary==null && !state.loading && !state.needsOwnerChoice)item {
+                    FullErrorState(message=unavailableError ?: stringResource(R.string.import_unavailable),retryLabel=stringResource(R.string.action_back),onRetry=onBack,modifier=Modifier.fillMaxWidth())
                 }
-            }
-            if (summary == null && !state.loading && !state.needsOwnerChoice) {
-                item {
-                    TransferPanel {
-                        TransferSectionTitle(
-                            title = "Transfer unavailable",
-                            subtitle = unavailableError
-                                ?: "The review could not be loaded. Return to transfers and reopen this import.",
-                        )
-                        MagicCtaButton(
-                            onClick = onBack,
-                            text = "Back to transfers",
-                            modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                        )
-                    }
-                }
-            }
             if (summary != null) {
+                if(details) {
                 item {
                     TransferPanel {
-                        TransferSectionTitle("Transfer overview", "Review counts and choose the next action.")
-                        Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                            TransferMetric(
-                                label = "Pending",
-                                value = summary.pendingCopies.toString(),
-                                modifier = Modifier.weight(1f),
-                            )
-                            TransferMetric(
-                                label = "Collection",
-                                value = summary.appliedCopies.toString(),
-                                modifier = Modifier.weight(1f),
-                            )
-                            TransferMetric(
-                                label = "Wishlist",
-                                value = summary.wishlistCompletedCopies.toString(),
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        Text(
-                            "${summary.pendingEntries} pending entries. Unchosen cards remain available for review.",
-                            style = ty.bodySmall,
-                            color = mc.textSecondary,
-                        )
+                        TransferSectionTitle(stringResource(R.string.import_card_issues), transferPhaseLabel(summary.phase))
+                        Text(stringResource(R.string.import_pages_help),style=ty.bodyMedium,color=mc.textSecondary)
+                        if(state.decisions.isEmpty() && summary.invalidPendingEntries==0L && summary.files.none { it.invalidRecords>0L || it.unresolvedRecords>0L || it.phase in setOf(TransferPhase.REJECTED,TransferPhase.FAILED_RETRYABLE) })Text(stringResource(R.string.import_no_issues),style=ty.bodyMedium,color=mc.lifePositive)
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                             verticalArrangement = Arrangement.spacedBy(spacing.sm),
                         ) {
-                            MagicCtaButton(
+                            if(summary.phase in setOf(TransferPhase.PARSING,TransferPhase.RESOLVING,TransferPhase.REVIEW_READY,TransferPhase.REVIEW_REQUIRED)) MagicCtaButton(
                                 onClick = viewModel::pause,
-                                text = "Pause",
+                                text = stringResource(R.string.import_copy_7),
                                 style = MagicCtaStyle.Outlined,
                                 modifier = Modifier.heightIn(min = actionHeight),
                             )
-                            MagicCtaButton(
+                            if(summary.phase in setOf(TransferPhase.PAUSED_BY_USER,TransferPhase.FAILED_RETRYABLE)) MagicCtaButton(
                                 onClick = viewModel::resume,
-                                text = "Resume",
+                                text = stringResource(R.string.import_copy_8),
                                 style = MagicCtaStyle.Outlined,
-                                modifier = Modifier.heightIn(min = actionHeight),
-                            )
-                            MagicCtaButton(
-                                onClick = { discard = viewModel.captureDiscard() },
-                                text = "Discard pending",
-                                color = MagicCtaColor.Error,
-                                style = MagicCtaStyle.Ghost,
                                 modifier = Modifier.heightIn(min = actionHeight),
                             )
                         }
                     }
                 }
 
-                val displayedFiles = state.inventory.ifEmpty { summary.files }
-                item {
-                    TransferSectionTitle(
-                        title = "Source files",
-                        subtitle = if (summary.filesFrozen) "The source set is frozen because a transfer action has started." else "Choose which source files participate in this review.",
-                    )
-                }
+                val displayedFiles=summary.files.filter { !it.retired && (it.phase in setOf(TransferPhase.REJECTED,TransferPhase.FAILED_RETRYABLE) || (!it.selected && (it.duplicate || it.previouslyParticipated))) }
+                if(displayedFiles.isNotEmpty()) {
                 items(displayedFiles, key = { it.id.value }) { file ->
                     TransferPanel {
                         Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
                             Text(
-                                "File ${file.order + 1}",
+                                stringResource(R.string.import_file_number,file.order+1),
                                 style = ty.titleMedium,
                                 color = mc.textPrimary,
                                 modifier = Modifier.weight(1f),
                             )
-                            TransferStatusPill(file.phase.name.displayName())
+                            TransferStatusPill(transferPhaseLabel(file.phase))
                         }
-                        Text(
-                            "${file.format?.name ?: "Unrecognized"} source",
-                            style = ty.bodySmall,
-                            color = mc.textSecondary,
-                        )
-                        Text(
-                            "${file.dataRecords} records · ${file.originalCopies} original copies · ${file.bytes} bytes",
-                            style = ty.bodySmall,
-                            color = mc.textSecondary,
-                        )
-                        Text(
-                            "${file.invalidRecords} errors · ${file.unresolvedRecords} unresolved",
-                            style = ty.bodySmall,
-                            color = if (file.invalidRecords > 0 || file.unresolvedRecords > 0) mc.lifeNegative else mc.textSecondary,
-                        )
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                             verticalArrangement = Arrangement.spacedBy(spacing.sm),
                         ) {
-                            MagicCtaButton(
-                                onClick = { viewModel.selectFile(file) },
-                                text = if (file.retired) "Retired source" else if (file.selected) "Exclude file" else "Include file",
-                                enabled = !file.retired && !summary.filesFrozen,
-                                style = MagicCtaStyle.Ghost,
-                                modifier = Modifier.heightIn(min = actionHeight),
-                            )
                             if (file.duplicate || file.previouslyParticipated) {
                                 MagicCtaButton(
                                     onClick = { viewModel.includeRepeated(file) },
-                                    text = "Include this repeated copy",
+                                    text = stringResource(R.string.import_copy_11),
                                     enabled = !file.retired && !summary.filesFrozen,
                                     style = MagicCtaStyle.Outlined,
                                     modifier = Modifier.heightIn(min = actionHeight),
                                 )
                             }
                         }
-                        if (file.unrepresentedColumns.isNotEmpty()) {
-                            Text(
-                                "Fields not preserved: ${file.unrepresentedColumns.joinToString()}",
-                                style = ty.bodySmall,
-                                color = mc.textSecondary,
-                            )
-                        }
                         if (file.phase in setOf(TransferPhase.REJECTED, TransferPhase.FAILED_RETRYABLE)) {
+                            Text(stringResource(R.string.import_recovery_help),style=ty.bodyMedium,color=mc.textSecondary)
+                            MagicCtaButton(text=stringResource(R.string.import_skip_unreadable),style=MagicCtaStyle.Outlined,onClick={viewModel.selectFile(file)},enabled=file.selected && !summary.filesFrozen,modifier=Modifier.fillMaxWidth())
                             MagicCtaButton(
                                 onClick = {
+                                    replacementFile=file
+                                    replacementConsent=viewModel.captureSession()
                                     replacementId = file.id.value
                                     replacementGeneration = summary.generation
                                     replacementPicker.launch(AndroidTransferDelivery.mimeTypes)
                                 },
-                                text = "Choose this source again",
+                                text = stringResource(R.string.import_copy_12),
                                 enabled = !file.retired && !summary.filesFrozen,
                                 style = MagicCtaStyle.Outlined,
                                 modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
@@ -513,11 +343,14 @@ private fun DurableTransferReview(viewModel: DurableTransferViewModel, onBack: (
                     }
                 }
 
+                }
                 items(state.decisions, key = { "decision:${it.entryId}" }) { decision ->
                     TransferPanel {
+                        Text(state.decisionNames[decision.entryId] ?: stringResource(R.string.import_card_decision),color=mc.textPrimary,style=ty.titleMedium)
+                        Text(stringResource(R.string.import_decision_attributes,decision.entry.quantity,decision.entry.language,decision.entry.condition),color=mc.textSecondary,style=ty.bodySmall)
                         TransferSectionTitle(
-                            title = "Resolve a review change",
-                            subtitle = "A source changed or an edited variant conflicts. Choose how to rebuild this entry.",
+                            title = stringResource(R.string.import_copy_13),
+                            subtitle = stringResource(R.string.import_copy_14),
                         )
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(spacing.sm),
@@ -525,51 +358,40 @@ private fun DurableTransferReview(viewModel: DurableTransferViewModel, onBack: (
                         ) {
                             MagicCtaButton(
                                 onClick = { viewModel.decision(decision, TransferReviewDecision.KEEP_EDIT) },
-                                text = "Keep my edit",
+                                text = stringResource(R.string.import_copy_15),
                                 style = MagicCtaStyle.Outlined,
                                 modifier = Modifier.heightIn(min = actionHeight),
                             )
                             MagicCtaButton(
                                 onClick = { viewModel.decision(decision, TransferReviewDecision.USE_SOURCE) },
-                                text = "Use source",
+                                text = stringResource(R.string.import_copy_16),
                                 style = MagicCtaStyle.Outlined,
                                 modifier = Modifier.heightIn(min = actionHeight),
                             )
                             MagicCtaButton(
                                 onClick = { viewModel.decision(decision, TransferReviewDecision.DISMISS_REMOVED) },
-                                text = "Dismiss removed",
-                                style = MagicCtaStyle.Ghost,
+                                text = stringResource(R.string.import_copy_17),
+                                style = MagicCtaStyle.Outlined,
                                 modifier = Modifier.heightIn(min = actionHeight),
                             )
                         }
                     }
                 }
 
-                item {
-                    TransferSectionTitle(
-                        title = "Cards to review",
-                        subtitle = "Choose a destination per card, or apply one explicit choice to all eligible entries.",
-                    )
                 }
+                if(!details) {
                 items(state.cards, key = { it.id }) { card ->
                     val entry = state.entries.first { it.id == card.id }
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                            verticalArrangement = Arrangement.spacedBy(spacing.xs),
-                        ) {
-                            TransferStatusPill("${entry.quantity} copies")
-                            TransferStatusPill(entry.destination.name.displayName(), mc.secondaryAccent)
-                            TransferStatusPill(entry.state.displayName(), mc.textSecondary)
-                        }
+                    Column(Modifier.animateItem()) {
                         QueueCardItem(
                             card,
                             LocalPreferredCurrency.current,
                             card.card.scryfallId in state.ownedPrintings,
-                            (entry.state == "PENDING" && entry.activeActionId != null) || entry.appliedQuantity > 0L,
+                            entry.state != "PENDING" || entry.activeActionId != null || entry.appliedQuantity > 0L || summary.phase !in setOf(TransferPhase.REVIEW_READY,TransferPhase.REVIEW_REQUIRED),
                             onEdit = {
                                 if (entry.quantity > Int.MAX_VALUE.toLong()) {
                                     correcting = entry
+                                    quantityConsent=viewModel.captureSession()
                                     correctedQuantity = ""
                                 } else {
                                     viewModel.edit(card)
@@ -578,188 +400,73 @@ private fun DurableTransferReview(viewModel: DurableTransferViewModel, onBack: (
                             onDelete = { viewModel.exclude(card) },
                             onAddToCollection = { request(TransferDestination.COLLECTION, card.id) },
                             onAddToWishlist = { request(TransferDestination.WISHLIST, card.id) },
-                            onClick = { viewModel.inspect(card.id) },
-                            onDuplicate = {
-                                if (card.quantity.toLong() * 2L <= Int.MAX_VALUE) {
-                                    viewModel.update(card.copy(quantity = card.quantity * 2))
-                                }
-                            },
+                            onClick = { viewModel.expandImage(card.card.imageNormal ?: card.card.imageArtCrop.orEmpty()) },
+                            onDuplicate = { viewModel.duplicate(card) },
                             onIncrement = { viewModel.adjust(card, 1) },
                             onDecrement = { viewModel.adjust(card, -1) },
                             displayQuantity = entry.quantity,
-                            largeQuantityTargets = true,
+                            showPrice = true,
+                            showDuplicate = true,
+                            duplicateActionEnabled=entry.state=="PENDING" && entry.activeActionId==null && entry.appliedQuantity==0L && entry.quantity<=Int.MAX_VALUE.toLong() && summary.phase in setOf(TransferPhase.REVIEW_READY,TransferPhase.REVIEW_REQUIRED),
+                            collectionActionEnabled=entry.quantity<=Int.MAX_VALUE.toLong() && ((entry.state=="WISHLIST_APPLIED" && summary.phase!=TransferPhase.DISCARDED) || (entry.state=="PENDING" && entry.activeActionId==null && entry.appliedQuantity==0L && summary.phase in setOf(TransferPhase.REVIEW_READY,TransferPhase.REVIEW_REQUIRED))),
+                            wishlistActionEnabled=entry.quantity<=Int.MAX_VALUE.toLong() && entry.state=="PENDING" && entry.activeActionId==null && entry.appliedQuantity==0L && summary.phase in setOf(TransferPhase.REVIEW_READY,TransferPhase.REVIEW_REQUIRED),
+                            quantityEditable = entry.quantity <= Int.MAX_VALUE.toLong(),
+                            onQuantityClick = null,
                         )
-                        if (entry.appliedQuantity == 0L && entry.activeActionId == null && entry.state == "PENDING") {
-                            MagicCtaButton(
-                                onClick = { correcting = entry; correctedQuantity = "" },
-                                text = "Set quantity",
-                                style = MagicCtaStyle.Ghost,
-                                modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                            )
-                        }
+                        if(entry.state in setOf("APPLIED","WISHLIST_APPLIED"))Text(stringResource(if(entry.state=="APPLIED")R.string.import_added_collection else R.string.import_added_wishlist),color=mc.lifePositive,style=ty.labelMedium,modifier=Modifier.padding(horizontal=spacing.lg))
+                        if(entry.quantity>Int.MAX_VALUE.toLong()) Text(stringResource(R.string.import_quantity_unsupported),color=mc.lifeNegative,style=ty.bodySmall,modifier=Modifier.padding(horizontal=spacing.lg))
                     }
                 }
-
-                item {
+                }
+                if(details) {
+                items(state.cards.filter { card -> state.entries.any { it.id==card.id && it.quantity>Int.MAX_VALUE.toLong() && it.state=="PENDING" } },key={"issue:${it.id}"}) { card ->
+                    val entry=state.entries.first { it.id==card.id }
                     TransferPanel {
-                        TransferSectionTitle("Apply or inspect", "Bulk actions include entries across every page.")
-                        Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                            MagicCtaButton(
-                                onClick = viewModel::firstPage,
-                                text = "First page",
-                                style = MagicCtaStyle.Ghost,
-                                modifier = Modifier.weight(1f).heightIn(min = actionHeight),
-                            )
-                            MagicCtaButton(
-                                onClick = viewModel::nextPage,
-                                text = "Next 50",
-                                enabled = state.cursor != null,
-                                style = MagicCtaStyle.Outlined,
-                                modifier = Modifier.weight(1f).heightIn(min = actionHeight),
-                            )
-                        }
-                        MagicCtaButton(
-                            onClick = { request(TransferDestination.COLLECTION, null) },
-                            text = "Add pending + wishlist to collection",
-                            modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                        )
-                        MagicCtaButton(
-                            onClick = { request(TransferDestination.WISHLIST, null) },
-                            text = "Add all pending to wishlist",
-                            style = MagicCtaStyle.Outlined,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                        )
-                        MagicCtaButton(
-                            onClick = viewModel::errors,
-                            text = "Review errors",
-                            style = MagicCtaStyle.Ghost,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                        )
-                        MagicCtaButton(
-                            onClick = { viewModel.inventory() },
-                            text = "Source inventory, including previous attempts",
-                            style = MagicCtaStyle.Ghost,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                        )
-                        if (state.inventoryCursor != null) {
-                            MagicCtaButton(
-                                onClick = { viewModel.inventory(true) },
-                                text = "Next source inventory page",
-                                style = MagicCtaStyle.Ghost,
-                                modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                            )
-                        }
-                        MagicCtaButton(
-                            onClick = { reportPicker.launch("collection-transfer-report.csv") },
-                            text = "Save complete report",
-                            enabled = !state.reporting,
-                            style = MagicCtaStyle.Outlined,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                        )
-                        if (state.reporting) MagicProgressBar()
+                        Text(card.card.name,style=ty.titleMedium,color=mc.textPrimary)
+                        Text(stringResource(R.string.import_original_quantity,entry.quantity),style=ty.bodyMedium,color=mc.textSecondary)
+                        MagicCtaButton(text=stringResource(R.string.import_copy_29),onClick={correcting=entry;quantityConsent=viewModel.captureSession();correctedQuantity=""},modifier=Modifier.fillMaxWidth())
+                        MagicCtaButton(text=stringResource(R.string.action_remove),style=MagicCtaStyle.Outlined,onClick={viewModel.exclude(card)},modifier=Modifier.fillMaxWidth())
                     }
                 }
-
-                items(state.provenance, key = { "provenance:${it.file.value}" }) { source ->
-                    TransferPanel {
-                        Text("Source ${source.file.value.take(8)}", style = ty.titleMedium, color = mc.textPrimary)
-                        Text(
-                            "${source.records} records · ${source.copies} original copies",
-                            style = ty.bodySmall,
-                            color = mc.textSecondary,
-                        )
-                    }
-                }
-                state.errors?.let { errors ->
+                state.errors?.takeIf { it.total>0L }?.let { errors ->
                     item {
                         TransferSectionTitle(
-                            title = "Import errors",
-                            subtitle = "${errors.total} errors. Showing up to 200 examples.",
+                            title = stringResource(R.string.import_copy_22),
+                            subtitle = stringResource(R.string.import_error_count,errors.total),
                         )
                     }
                     items(errors.examples, key = { "error:${it.file.value}:${it.ordinal}" }) { error ->
                         TransferPanel {
-                            Text("Record ${error.ordinal}", style = ty.labelLarge, color = mc.textSecondary)
+                            Text(stringResource(R.string.import_record_number,error.ordinal), style = ty.labelLarge, color = mc.textSecondary)
                             Text(error.preview, style = ty.bodySmall, color = mc.textPrimary)
                         }
                     }
                 }
             }
         }
-        MagicToastHost(toast)
+        }
+        if(state.editing==null)key(state.presentationSession) { MagicToastHost(toast) }
+        }
+        }
     }
 
-    confirm?.let { action ->
-        val confirmationText = when {
-            action.entryId == null && action.destination == TransferDestination.COLLECTION ->
-                "Add every pending entry and retained wishlist entry to collection, including pages not currently visible. Completed wishlist quantities remain unchanged. This explicit action assigns unchosen entries to collection."
-            action.entryId == null ->
-                "Add every pending entry to wishlist, including pages not currently visible. This explicit action assigns unchosen entries to wishlist."
-            else -> "Add only this entry. Other entries keep their decisions."
-        }
-        MagicAlertDialog(
-            onDismissRequest = { confirm = null },
-            title = "Confirm ${action.destination.name.lowercase()}",
-            text = confirmationText,
-            buttons = {
-                MagicCtaButton(
-                    onClick = {
-                        viewModel.action(
-                            action.destination,
-                            action.entryId,
-                            action.generation,
-                            action.payloadVersion,
-                            action.entryVersion,
-                            acceptLosses,
-                            acceptRepeats,
-                        )
-                        confirm = null
-                    },
-                    text = "Confirm",
-                    modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                )
-                MagicCtaButton(
-                    onClick = { confirm = null },
-                    text = "Cancel",
-                    style = MagicCtaStyle.Ghost,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                )
-            },
-            content = {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                    MagicCtaButton(
-                        onClick = { acceptLosses = !acceptLosses },
-                        text = if (acceptLosses) "Omissions accepted" else "Accept reported errors and exclusions",
-                        style = MagicCtaStyle.Outlined,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                    )
-                    MagicCtaButton(
-                        onClick = { acceptRepeats = !acceptRepeats },
-                        text = if (acceptRepeats) "Repeated files accepted" else "Accept repeated files",
-                        style = MagicCtaStyle.Outlined,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
-                    )
-                }
-            },
-        )
-    }
     discard?.let { consent ->
         MagicAlertDialog(
             onDismissRequest = { discard = null },
-            title = "Discard pending entries?",
-            text = "Already applied collection and wishlist copies remain unchanged.",
+            title = stringResource(R.string.import_clear_title),
+            text = stringResource(R.string.import_clear_description),
             confirmColor = MagicCtaColor.Error,
             buttons = {
                 MagicCtaButton(
                     onClick = { viewModel.discard(consent); discard = null },
-                    text = "Discard pending",
+                    text = stringResource(R.string.import_copy_27),
                     color = MagicCtaColor.Error,
                     modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
                 )
                 MagicCtaButton(
                     onClick = { discard = null },
-                    text = "Cancel",
-                    style = MagicCtaStyle.Ghost,
+                    text = stringResource(R.string.import_copy_28),
+                    style = MagicCtaStyle.Outlined,
                     modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
                 )
             },
@@ -774,6 +481,7 @@ private fun DurableTransferReview(viewModel: DurableTransferViewModel, onBack: (
             viewModel::update,
             viewModel::showVariants,
             maxQty = Int.MAX_VALUE,
+            extraContent = { key(state.presentationSession) { MagicToastHost(toast) } },
         )
         if (state.showVariants) {
             VariantSelectorSheet(
@@ -791,18 +499,18 @@ private fun DurableTransferReview(viewModel: DurableTransferViewModel, onBack: (
         val chosen = correctedQuantity.toLongOrNull()?.takeIf { it in 1L..Int.MAX_VALUE.toLong() }
         MagicAlertDialog(
             onDismissRequest = { correcting = null },
-            title = "Choose an explicit quantity",
+            title = stringResource(R.string.import_copy_29),
             content = {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.md)) {
                     Text(
-                        "Original quantity: ${entry.quantity}. Attributes and source records remain unchanged.",
+                        stringResource(R.string.import_original_quantity,entry.quantity),
                         color = mc.textSecondary,
                         style = ty.bodySmall,
                     )
                     OutlinedTextField(
                         value = correctedQuantity,
                         onValueChange = { correctedQuantity = it.filter(Char::isDigit).take(19) },
-                        label = { Text("Quantity (1–2147483647)") },
+                        label = { Text(stringResource(R.string.import_copy_30)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -820,16 +528,16 @@ private fun DurableTransferReview(viewModel: DurableTransferViewModel, onBack: (
             buttons = {
                 MagicCtaButton(
                     onClick = {
-                        chosen?.let { viewModel.correctQuantity(entry.id, entry.version, it); correcting = null }
+                        chosen?.let { viewModel.correctQuantity(entry.id, entry.version, it, quantityConsent); correcting = null }
                     },
-                    text = "Save chosen quantity",
+                    text = stringResource(R.string.import_copy_31),
                     enabled = chosen != null,
                     modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
                 )
                 MagicCtaButton(
                     onClick = { correcting = null },
-                    text = "Cancel",
-                    style = MagicCtaStyle.Ghost,
+                    text = stringResource(R.string.import_copy_32),
+                    style = MagicCtaStyle.Outlined,
                     modifier = Modifier.fillMaxWidth().heightIn(min = actionHeight),
                 )
             },
@@ -896,5 +604,32 @@ private fun TransferStatusPill(label: String, accent: Color = MaterialTheme.magi
     }
 }
 
-private fun String.displayName(): String =
-    lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase)
+
+
+@Composable
+private fun transferPhaseLabel(phase: TransferPhase): String = stringResource(when(phase) {
+    TransferPhase.RECEIVING, TransferPhase.PARSING -> R.string.import_receiving
+    TransferPhase.RESOLVING -> R.string.import_finding
+    TransferPhase.APPLYING -> R.string.import_applying
+    TransferPhase.WAITING_NETWORK -> R.string.import_wait_network
+    TransferPhase.PAUSED_BY_USER, TransferPhase.PAUSED_OWNER -> R.string.import_saved
+    TransferPhase.COMPLETED, TransferPhase.COMPLETED_WITH_EXCLUSIONS -> R.string.import_completed
+    TransferPhase.REVIEW_READY -> R.string.import_ready
+    TransferPhase.REVIEW_REQUIRED, TransferPhase.WAITING_FILE_DECISION, TransferPhase.REJECTED -> R.string.import_review_issues
+    TransferPhase.FAILED_RETRYABLE -> R.string.import_retry
+    TransferPhase.DISCARDED -> R.string.import_discarded
+})
+
+@Composable
+private fun transferFailureLabel(failure: TransferPresentationFailure): String = stringResource(when(failure) {
+    TransferPresentationFailure.STORAGE -> R.string.import_failure_storage
+    TransferPresentationFailure.RECEIVE -> R.string.import_failure_receive
+    TransferPresentationFailure.REVIEW_CHANGED -> R.string.import_failure_review
+    TransferPresentationFailure.PAGE -> R.string.import_failure_page
+    TransferPresentationFailure.QUANTITY_OVERFLOW -> R.string.import_failure_quantity
+    TransferPresentationFailure.VARIANT_COLLISION -> R.string.import_failure_variant_collision
+    TransferPresentationFailure.OWNER -> R.string.import_failure_owner
+    TransferPresentationFailure.REPORT -> R.string.import_failure_report
+    TransferPresentationFailure.VARIANTS -> R.string.import_failure_variants
+    TransferPresentationFailure.UNAVAILABLE -> R.string.import_unavailable
+})

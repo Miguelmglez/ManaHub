@@ -23,8 +23,8 @@ class AndroidTransferReportWriter(
     private val filesDir: File,
     private val openOutput: (Uri)->OutputStream = { uri -> resolver.openOutputStream(uri,"wt") ?: throw TransferStorageException(TransferError.STORAGE_FAILURE) },
 ) {
-    suspend fun write(id: TransferJobId,owner: TransferOwner,target: Uri): Long=withContext(Dispatchers.IO) {
-        val captured=sessions.currentSession
+    suspend fun write(id: TransferJobId,owner: TransferOwner,target: Uri,expectedSession: TransferSession.Available?=null): Long=withContext(Dispatchers.IO) {
+        val captured=expectedSession ?: sessions.currentSession
         val reportContext=currentCoroutineContext()
         fun guard() {
             if((captured as? TransferSession.Available)?.owner!=owner || sessions.currentSession!=captured || !observer.matchesObserved(owner))throw TransferReadException(TransferError.OWNER_CHANGED)
@@ -33,6 +33,7 @@ class AndroidTransferReportWriter(
         val dao=database.collectionTransferDao()
         val version=dao.getJob(id.value,owner.storageKey()) ?: throw TransferReadException(TransferError.NOT_FOUND)
         var records=0L
+        guard()
         BufferedWriter(OutputStreamWriter(openOutput(target),Charsets.UTF_8),64*1024).use { writer ->
             fun line(vararg values: Any?) { writer.appendLine(values.joinToString(",") { value -> "\"${value?.toString().orEmpty().replace("\"","\"\"")}\"" }) }
             line("File or action ID","File or action state","Selected","Retired","Ordinal or entry ID","Record kind","Record state","Quantity (source record or entry snapshot)","Printing","Foil","Condition","Language","Error","Preview","Destination","Original record or rejected source","Original text availability")

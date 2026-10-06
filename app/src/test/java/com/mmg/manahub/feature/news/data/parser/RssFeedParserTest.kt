@@ -8,19 +8,10 @@ import org.junit.Test
 /**
  * Unit tests for [RssFeedParser] — News feature improvements Phase 6 (dedup hardening).
  *
- * SCOPE NOTE: this class only covers [RssFeedParser.normalizeUrlForHash] / [RssFeedParser.hashUrl]
- * / [RssFeedParser.parseDate], the pure (no-Android-API) companion members. [RssFeedParser.parse]
- * and [RssFeedParser.detectChannelLanguage] — which cover the guid-vs-link dedup-identity selection
- * and the channel-language detection required by the Phase 6 / Phase 2 checklists — both call
- * `android.util.Xml.newPullParser()` internally. This project's unit tests run with
- * `testOptions.unitTests.isReturnDefaultValues = true` and have **no Robolectric dependency**, so
- * that call returns `null` under a plain JVM unit test (confirmed empirically: every test that
- * invoked `parser.parse(...)` failed with an NPE, and `detectChannelLanguage(...)` silently
- * returned null because its own `catch (_: Exception)` swallows the resulting exception). Testing
- * those two methods requires either adding a `testImplementation(libs.robolectric)` dependency (a
- * build-file change — out of this agent's scope, route through `android-kotlin-architect`) or
- * extracting the guid-selection / language-detection logic into pure functions that don't need a
- * live `XmlPullParser`. Flagged in the task summary as a suspected test-infra gap, not fixed here.
+ * SCOPE NOTE: only the pure companion members are covered here. [RssFeedParser.parse] calls
+ * `android.util.Xml.newPullParser()`, which returns null under a plain JVM unit test (no Robolectric).
+ * Channel metadata (title/link/language) is parsed by the pure `FeedDocument` helper in
+ * `:shared:core-domain` and covered by `FeedDocumentTest` in commonTest.
  *
  * GROUP 1 — normalizeUrlForHash: tracking-param stripping, case-folding, fragment stripping
  * GROUP 2 — hashUrl: stable/deterministic MD5-based id

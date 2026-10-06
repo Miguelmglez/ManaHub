@@ -135,9 +135,6 @@ fun HomeScreen(
     // Daily Puzzle (ADR-006), Batch B2 — kept OUTSIDE HomeUiState for the same reason, see
     // HomeViewModel.dailyPuzzleFlow's KDoc.
     val dailyPuzzle by viewModel.dailyPuzzleFlow.collectAsStateWithLifecycle()
-    // Competitive feature, Phase 5 — kept OUTSIDE HomeUiState for the same reason, see
-    // HomeViewModel.competitiveEnabledFlow's KDoc.
-    val competitiveEnabled by viewModel.competitiveEnabledFlow.collectAsStateWithLifecycle()
     val widgetReadiness by viewModel.widgetReadiness.collectAsStateWithLifecycle()
     val widgetExtras by viewModel.widgetExtrasFlow.collectAsStateWithLifecycle()
     val rulesTipIndex by viewModel.rulesTipIndexFlow.collectAsStateWithLifecycle()
@@ -228,8 +225,7 @@ fun HomeScreen(
                 is HomeAction.SelectCommunityDecksCategory,
                 is HomeAction.SelectCommunityDecksFormat,
                 HomeAction.RollRulesTip,
-                HomeAction.ResetNewsFilters,
-                    -> viewModel.onAction(action)
+                -> viewModel.onAction(action)
                 // RateApp needs an Activity context to launch the store; resolve it upstream.
                 HomeAction.RateApp -> onAction(action)
                 else -> onAction(action)
@@ -271,10 +267,9 @@ fun HomeScreen(
             currentLayout = uiState.layout,
             isAuthenticated = uiState.isAuthenticated,
             gamificationEnabled = uiState.gamificationEnabled,
-            competitiveEnabled = competitiveEnabled,
-            onAddWidget = {type-> viewModel.onAction(HomeAction.AddWidget(type))},
-            onRemoveWidget = {type-> viewModel.onAction(HomeAction.RemoveWidget(type))},
-            onUpdateLayout = {layout-> viewModel.onAction(HomeAction.UpdateLayout(layout))},
+            onAddWidget = { type -> viewModel.onAction(HomeAction.AddWidget(type)) },
+            onRemoveWidget = { type -> viewModel.onAction(HomeAction.RemoveWidget(type)) },
+            onUpdateLayout = { layout -> viewModel.onAction(HomeAction.UpdateLayout(layout)) },
             onCreateAccount = {
                 showGallerySheet = false
                 onAction(HomeAction.CreateAccount)

@@ -49,10 +49,8 @@ import com.mmg.manahub.core.model.TradeStatus
 import com.mmg.manahub.core.model.TradeSuggestion
 import com.mmg.manahub.core.model.TrendingSnapshot
 import com.mmg.manahub.core.model.WidgetSize
-import com.mmg.manahub.core.model.news.ContentSource
-import com.mmg.manahub.core.model.news.NewsFilterPrefs
+import com.mmg.manahub.core.model.news.FeedContentFilter
 import com.mmg.manahub.core.model.news.NewsItem
-import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.core.model.puzzle.Puzzle
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
@@ -68,6 +66,7 @@ import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.HOME_TR
 import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.MAX_NEWS
 import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.MIN_DISCOVER_SET_CARDS
 import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.SUGGESTIONS_MAX_AGE_MS
+import com.mmg.manahub.feature.news.domain.feed.filterFeed
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
@@ -451,39 +450,21 @@ class HomeViewModel(
 
     // ── News ───────────────────────────────────────────────────────────────────
 
-    /** Persisted news filter selection, shared with the full News screen. */
-    private val newsFiltersFlow: StateFlow<NewsFilterPrefs> =
-        userPrefsDataStore.observeNewsFilters()
-            .distinctUntilChanged()
-            .catch {
-                reportFlowError("news_filters", it)
-                emit(NewsFilterPrefs.DEFAULT)
-            }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), NewsFilterPrefs.DEFAULT)
-
-    /**
-     * Recent news filtered by the SAME persisted filters the News screen uses, de-duplicated by id
-     * (the row's lazy keys) and capped at [MAX_NEWS]. Null while loading.
-     */
+    /** Latest items from FOLLOWED sources (same rule as the MTG Today feed), capped at [MAX_NEWS]. Null while loading. */
     private val recentNewsFlow: StateFlow<List<NewsItem>?> =
         combine(
             getNewsFeedUseCase(),
             manageSourcesUseCase.observeSources(),
-            newsFiltersFlow,
-        ) { items, sources, filters ->
-            applyNewsFilters(items, sources, filters).distinctBy { it.id }.take(MAX_NEWS)
+        ) { items, sources ->
+            val followedIds = sources.filter { it.isEnabled }.map { it.id }.toSet()
+            filterFeed(items, followedIds, FeedContentFilter.ALL, selectedSourceId = null, query = "", sourceNames = emptyMap())
+                .take(MAX_NEWS)
         }
             .catch {
                 reportFlowError("recent_news", it)
                 emit(emptyList())
             }
             .stateInLoading()
-
-    /** True when the persisted news filters differ from the English-only default. */
-    private val newsFiltersActiveFlow: StateFlow<Boolean> =
-        newsFiltersFlow
-            .map { it != NewsFilterPrefs.DEFAULT }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
 
     // ── Discover ───────────────────────────────────────────────────────────────
 
@@ -732,10 +713,6 @@ class HomeViewModel(
             CoreSnapshot(library = library, activity = activity, account = account, prefs = prefs)
         }
 
-        val newsFlow = combine(recentNewsFlow, newsFiltersActiveFlow) { news, filtersActive ->
-            NewsBundle(items = news, filtersActive = filtersActive)
-        }
-
         val gameStatsFlow = combine(statsSnapshotState, activeTournamentState) { stats, tournament ->
             GameStatsBundle(stats = stats, tournament = tournament)
         }
@@ -763,7 +740,7 @@ class HomeViewModel(
             )
         }
 
-        combine(coreFlow, newsFlow, dataFlow) { core, news, data -> buildUiState(core, news, data) }
+        combine(coreFlow, recentNewsFlow, dataFlow) { core, news, data -> buildUiState(core, news, data) }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
@@ -869,25 +846,13 @@ class HomeViewModel(
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), DailyPuzzleWidgetState.Loading)
         }
 
-    private val competitiveEnabledState: StateFlow<Boolean?> =
-        userPrefsDataStore.competitiveEnabledFlow
-            .catch { emit(false) }
-            .stateInLoading()
-
-    /** Whether the [HomeWidgetType.COMPETITIVE] tile is visible (runtime DataStore flag). */
-    val competitiveEnabledFlow: StateFlow<Boolean> =
-        competitiveEnabledState
-            .map { it ?: false }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
-
     /** The out-of-[HomeUiState] inputs of [HomeWidgetType.isReady]. */
     val widgetExtrasFlow: StateFlow<HomeWidgetExtras> =
-        combine(trendingLoadedFlow, communityDecksFlow, dailyPuzzleFlow, competitiveEnabledState) { trendingLoaded, decks, puzzle, competitive ->
+        combine(trendingLoadedFlow, communityDecksFlow, dailyPuzzleFlow) { trendingLoaded, decks, puzzle ->
             HomeWidgetExtras(
                 trendingLoaded = trendingLoaded,
                 communityDecks = decks,
                 dailyPuzzle = puzzle,
-                competitiveEnabled = competitive,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), HomeWidgetExtras())
 
@@ -1350,7 +1315,6 @@ class HomeViewModel(
             is HomeAction.SelectCommunityDecksCategory -> selectCommunityDecksCategory(action.category)
             is HomeAction.SelectCommunityDecksFormat -> selectCommunityDecksFormat(action.format)
             HomeAction.RollRulesTip -> rollRulesTip()
-            HomeAction.ResetNewsFilters -> resetNewsFilters()
             HomeAction.RateApp -> Unit // the UI handles the store deep link
             else -> Unit // navigation intents are resolved by AppNavGraph
         }
@@ -1366,12 +1330,6 @@ class HomeViewModel(
     fun skipFirstStep(stepId: String) {
         crashlytics.log("home_first_step_skipped: $stepId")
         persistPreference("first_step_skip") { userPrefsDataStore.skipFirstStep(stepId) }
-    }
-
-    /** Clears the persisted News filters back to the English-only default. */
-    fun resetNewsFilters() {
-        crashlytics.log("home_news_filters_reset")
-        persistPreference("news_filters_reset") { userPrefsDataStore.resetNewsFilters() }
     }
 
     /** Dismisses the current account nudge, starting its 48-hour cooldown. */
@@ -1453,7 +1411,7 @@ class HomeViewModel(
 
     // ── Reduction ─────────────────────────────────────────────────────────────
 
-    private fun buildUiState(core: CoreSnapshot, news: NewsBundle, data: DataBundle): HomeUiState {
+    private fun buildUiState(core: CoreSnapshot, recentNews: List<NewsItem>?, data: DataBundle): HomeUiState {
         val gate = core.account.gate
         val signedIn = gate is AuthGate.SignedIn
         val summary = core.library.summary
@@ -1556,8 +1514,7 @@ class HomeViewModel(
             quickStartActions = prefs?.quickStart ?: QuickStartAction.defaults,
             quickStartLoaded = prefs != null,
             libraryStats = libraryStats,
-            recentNews = news.items,
-            newsFiltersActive = news.filtersActive,
+            recentNews = recentNews,
             accountNudge = nudge,
             accountNudgeResolved = nudgeResolved,
             playerName = playerName,
@@ -1827,11 +1784,6 @@ class HomeViewModel(
         val randomCardLoadState: DiscoverLoadState = DiscoverLoadState.LOADING,
     )
 
-    private data class NewsBundle(
-        val items: List<NewsItem>?,
-        val filtersActive: Boolean,
-    )
-
     private data class TradesSnapshot(
         val proposals: ProposalsView?,
         val suggestionPreviews: List<TradeSuggestionPreview>?,
@@ -1954,7 +1906,7 @@ class HomeViewModel(
         /**
          * Default widget layouts, applied ONLY when nothing has been persisted yet. Signed-out leads with
          * what works without an account; signed-in with the user's own data. Gallery-only widgets
-         * (wishlist, gamification, trending, puzzle, competitive...) keep the board short.
+         * (wishlist, gamification, trending, puzzle...) keep the board short.
          */
         private val DEFAULT_LAYOUT_SIGNED_OUT = listOf(
             WidgetInstance(HomeWidgetType.GREETING_HEADER, WidgetSize.MEDIUM),
@@ -2105,33 +2057,3 @@ private fun HomeWidgetType.defaultSize(): WidgetSize =
  */
 enum class DiscoverLoadState { LOADING, LOADED, FAILED }
 
-/**
- * Applies the persisted [NewsFilterPrefs] to [items] using the SAME logic as the full News
- * screen: keep only items from enabled sources, whose source language is selected, whose
- * content type is selected, and (when an explicit allowlist is set) whose source id is in it.
- *
- * @param sources the known content sources (supplies the enabled set + per-source language).
- */
-private fun applyNewsFilters(
-    items: List<NewsItem>,
-    sources: List<ContentSource>,
-    filters: NewsFilterPrefs,
-): List<NewsItem> {
-    val languageMap = sources.associate { it.id to it.language }
-    val enabledSourceIds = sources.filter { it.isEnabled }.map { it.id }.toSet()
-    return items
-        .filter { it.sourceId in enabledSourceIds }
-        .filter { (languageMap[it.sourceId] ?: "en") in filters.languages }
-        .filter { item ->
-            when (item) {
-                is NewsItem.Article -> SourceType.ARTICLE in filters.types
-                is NewsItem.Video -> SourceType.VIDEO in filters.types
-            }
-        }
-        .filter { item ->
-            // `sourceIds` lives in :shared:core-model, so it cannot be smart-cast across the module
-            // boundary — capture it in a local val before the null check.
-            val allowedSourceIds = filters.sourceIds
-            allowedSourceIds == null || item.sourceId in allowedSourceIds
-        }
-}

@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.carddetail.presentation
 
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterTransition
@@ -16,7 +17,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -121,6 +125,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.data.network.RateLimitExhaustedException
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardFace
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.PreferredCurrency
@@ -734,6 +739,151 @@ private fun FaceFlippable(
     }
 }
 
+@Composable
+private fun CardFaceDetails(
+    card: Card,
+    face: CardFace?,
+    faceIndex: Int,
+    selectionController: CardDetailTextSelectionController,
+    onLinkOpenFailed: () -> Unit,
+) {
+    val name = face?.printedName?.takeIf { it.isNotBlank() }
+        ?: faceValue(card.printedName, faceIndex)?.takeIf { it.isNotBlank() }
+        ?: face?.name
+        ?: faceValue(card.name, faceIndex)
+        ?: card.name
+    val manaCost = face?.manaCost ?: if (face == null) faceValue(card.manaCost, faceIndex) else null
+    val typeText = if (face != null) {
+        face.typeLine
+    } else {
+        faceValue(
+            if (faceIndex == 0) card.printedTypeLine?.takeIf { it.isNotBlank() } ?: card.typeLine
+            else card.typeLine,
+            faceIndex,
+        )
+    }
+    val oracleDisplayText = if (face != null) {
+        face.oracleText
+    } else {
+        faceValue(card.printedText?.takeIf { it.isNotBlank() } ?: card.oracleText, faceIndex)
+    }
+    val flavorText = face?.flavorText ?: if (face == null) faceValue(card.flavorText, faceIndex) else null
+    val facePower = face?.power
+    val faceToughness = face?.toughness
+    val faceLoyalty = face?.loyalty
+    val faceDefense = face?.defense
+    val cardPower = card.power
+    val cardToughness = card.toughness
+    val cardLoyalty = card.loyalty
+    val ptOrLoyalty = when {
+        face != null && facePower != null && faceToughness != null -> "$facePower/$faceToughness"
+        faceLoyalty != null -> stringResource(R.string.carddetail_loyalty_value, faceLoyalty)
+        faceDefense != null -> stringResource(R.string.carddetail_defense_value, faceDefense)
+        face != null -> null
+        cardPower != null && cardToughness != null -> "$cardPower/$cardToughness"
+        cardLoyalty != null -> stringResource(R.string.carddetail_loyalty_value, cardLoyalty)
+        else -> null
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+        ) {
+            CardDetailSelectableText(
+                selectionController = selectionController,
+                onOpenFailed = onLinkOpenFailed,
+            ) {
+                CardName(name, style = MaterialTheme.magicTypography.titleLarge)
+            }
+            Spacer(Modifier.weight(1f))
+            manaCost?.takeIf { it.isNotBlank() }?.let {
+                ManaCostImages(manaCost = it, symbolSize = 20.dp)
+            }
+        }
+
+        typeText?.takeIf { it.isNotBlank() }?.let {
+            CardDetailSelectableText(
+                selectionController = selectionController,
+                onOpenFailed = onLinkOpenFailed,
+            ) {
+                Text(
+                    text = it,
+                    style = MaterialTheme.magicTypography.labelLarge,
+                    color = MaterialTheme.magicColors.textSecondary,
+                )
+            }
+        }
+
+        if (!oracleDisplayText.isNullOrEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.magicColors.surfaceVariant,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                CardDetailSelectableText(
+                    selectionController = selectionController,
+                    onOpenFailed = onLinkOpenFailed,
+                ) {
+                    OracleText(
+                        text = oracleDisplayText,
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                        modifier = Modifier.padding(MaterialTheme.spacing.md),
+                    )
+                }
+            }
+        }
+
+        flavorText?.takeIf { it.isNotBlank() }?.let {
+            CardDetailSelectableText(
+                selectionController = selectionController,
+                onOpenFailed = onLinkOpenFailed,
+            ) {
+                Text(
+                    text = "\"$it\"",
+                    style = MaterialTheme.magicTypography.bodySmall,
+                    fontStyle = FontStyle.Italic,
+                    color = MaterialTheme.magicColors.textSecondary,
+                )
+            }
+        }
+
+        ptOrLoyalty?.let {
+            val colors = MaterialTheme.magicColors
+            Surface(
+                color = colors.secondaryAccent.copy(alpha = 0.08f),
+                border = BorderStroke(1.dp, colors.secondaryAccent),
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text(
+                    text = it,
+                    style = MaterialTheme.magicTypography.titleMedium,
+                    color = colors.secondaryAccent,
+                    modifier = Modifier.padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.xs),
+                )
+            }
+        }
+    }
+}
+
+private fun faceValue(value: String?, faceIndex: Int): String? {
+    if (value == null) return null
+    val parts = value.split(" // ")
+    return when {
+        parts.size > 1 -> parts.getOrNull(faceIndex)?.trim()
+        faceIndex == 0 -> value
+        else -> null
+    }
+}
+
+private fun faceName(card: Card, face: CardFace?, faceIndex: Int): String =
+    face?.printedName?.takeIf { it.isNotBlank() }
+        ?: faceValue(card.printedName, faceIndex)?.takeIf { it.isNotBlank() }
+        ?: face?.name
+        ?: faceValue(card.name, faceIndex)
+        ?: card.name
+
 private object SearchWebContextMenuKey
 
 private class CardDetailTextSelectionController {
@@ -857,7 +1007,9 @@ private fun CardDetailContent(
     onLinkOpenFailed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    var showBackFace by remember { mutableStateOf(false) }
+    var showBackFace by rememberSaveable(card.scryfallId) { mutableStateOf(false) }
+    var showIncludedFace by rememberSaveable(card.scryfallId) { mutableStateOf(false) }
+    val hasDoubleFacedImage = card.imageBackNormal != null
     val rotation by animateFloatAsState(
         targetValue = if (showBackFace) -180f else 0f,
         animationSpec = tween(durationMillis = 500),
@@ -866,6 +1018,7 @@ private fun CardDetailContent(
 
     val frontFace = card.cardFaces?.firstOrNull()
     val backFace = card.cardFaces?.getOrNull(1)
+    val hasIncludedFace = !hasDoubleFacedImage && backFace != null
     var yourFolderExpanded by rememberSaveable(card.scryfallId) { mutableStateOf(true) }
     var collectionExpanded by rememberSaveable(card.scryfallId) { mutableStateOf(true) }
     var tradeExpanded by rememberSaveable(card.scryfallId) { mutableStateOf(true) }
@@ -1008,85 +1161,88 @@ private fun CardDetailContent(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            // Name + badges
-            FaceFlippable(
-                rotation = rotation,
-                modifier = Modifier.animateEnterIn(
-                    animatedVisibilityScope,
-                    staggeredEnter,
-                )
-            ) { isBack ->
-                val name = if (isBack) {
-                    backFace?.printedName ?: card.printedName ?: card.name
-                } else {
-                    frontFace?.printedName ?: card.printedName ?: card.name
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    CardDetailSelectableText(
+            if (hasDoubleFacedImage) {
+                FaceFlippable(
+                    rotation = rotation,
+                    modifier = Modifier.animateEnterIn(animatedVisibilityScope, staggeredEnter),
+                ) { isBack ->
+                    CardFaceDetails(
+                        card = card,
+                        face = if (isBack) backFace else frontFace,
+                        faceIndex = if (isBack) 1 else 0,
                         selectionController = selectionController,
-                        onOpenFailed = onLinkOpenFailed,
-                    ) {
-                        CardName(name, style = MaterialTheme.magicTypography.titleLarge)
-                    }
-                    Spacer(
-                        modifier = Modifier.weight(1f)
+                        onLinkOpenFailed = onLinkOpenFailed,
                     )
-                    card.manaCost?.let { cost ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            val costs = cost.split(" // ")
-                            costs.forEachIndexed { index, singleCost ->
-                                ManaCostImages(manaCost = singleCost, symbolSize = 20.dp)
-                                if (index < costs.size - 1) {
-                                    Text(
-                                        " // ",
-                                        style = MaterialTheme.magicTypography.titleMedium,
-                                        color = MaterialTheme.magicColors.textSecondary,
-                                        modifier = Modifier.padding(horizontal = MaterialTheme.spacing.xxs)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                }
+            } else if (hasIncludedFace) {
+                AnimatedContent(
+                    targetState = showIncludedFace,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateEnterIn(animatedVisibilityScope, staggeredEnter),
+                    transitionSpec = {
+                        val direction = if (targetState) 1 else -1
+                        (slideInHorizontally(tween(350)) { width -> direction * width } + fadeIn(tween(250))) togetherWith
+                            (slideOutHorizontally(tween(350)) { width -> -direction * width } + fadeOut(tween(180)))
+                    },
+                    label = "IncludedCardDetails",
+                ) { showingIncludedFace ->
+                    CardFaceDetails(
+                        card = card,
+                        face = if (showingIncludedFace) backFace else frontFace,
+                        faceIndex = if (showingIncludedFace) 1 else 0,
+                        selectionController = selectionController,
+                        onLinkOpenFailed = onLinkOpenFailed,
+                    )
+                }
+
+                MagicCtaButton(
+                    onClick = { showIncludedFace = !showIncludedFace },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp),
+                    text = stringResource(
+                        R.string.carddetail_show_card_face,
+                        faceName(
+                            card = card,
+                            face = if (showIncludedFace) frontFace else backFace,
+                            faceIndex = if (showIncludedFace) 0 else 1,
+                        ),
+                    ),
+                    style = MagicCtaStyle.Outlined,
+                    color = MagicCtaColor.Accent,
+                    size = MagicCtaSize.Compact,
+                    icon = { Icon(Icons.Default.SwapHoriz, contentDescription = null) },
+                )
+            } else {
+                FaceFlippable(
+                    rotation = rotation,
+                    modifier = Modifier.animateEnterIn(animatedVisibilityScope, staggeredEnter),
+                ) { isBack ->
+                    CardFaceDetails(
+                        card = card,
+                        face = if (isBack) backFace else frontFace,
+                        faceIndex = if (isBack) 1 else 0,
+                        selectionController = selectionController,
+                        onLinkOpenFailed = onLinkOpenFailed,
+                    )
                 }
             }
 
-            // Mana cost + type
+            // Set symbol and edition describe the physical printing, so they stay outside face transitions.
             Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
                 modifier = Modifier.animateEnterIn(
                     animatedVisibilityScope,
                     slideInVertically(
                         initialOffsetY = { it / 2 },
-                        animationSpec = tween(500, delayMillis = 100)
+                        animationSpec = tween(500, delayMillis = 100),
                     ) + fadeIn(tween(400, delayMillis = 100)),
-                )
+                ),
             ) {
-
-                FaceFlippable(rotation = rotation) { isBack ->
-                    val typeText = if (isBack) {
-                        backFace?.typeLine ?: card.typeLine
-                    } else {
-                        frontFace?.typeLine ?: card.printedTypeLine.takeUnless { it.isNullOrEmpty() } ?: card.typeLine
-                    }
-                    CardDetailSelectableText(
-                        selectionController = selectionController,
-                        onOpenFailed = onLinkOpenFailed,
-                    ) {
-                        Text(
-                            text = typeText,
-                            style = MaterialTheme.magicTypography.labelLarge,
-                            color = MaterialTheme.magicColors.textSecondary,
-                        )
-                    }
-                }
-
-                // Set Icon + Set Name
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
                 ) {
                     SetSymbol(
                         setCode = card.setCode,
@@ -1105,96 +1261,6 @@ private fun CardDetailContent(
                     }
                 }
             }
-
-            // Oracle / printed text
-            FaceFlippable(
-                rotation = rotation,
-                modifier = Modifier.animateEnterIn(
-                    animatedVisibilityScope,
-                    slideInVertically(
-                        initialOffsetY = { it / 3 },
-                        animationSpec = tween(600, delayMillis = 200)
-                    ) + fadeIn(tween(500, delayMillis = 200)),
-                )
-            ) { isBack ->
-                val oracleDisplayText = if (isBack) {
-                    backFace?.oracleText
-                } else {
-                    frontFace?.oracleText ?: card.printedText.takeUnless { it.isNullOrEmpty() } ?: card.oracleText
-                }
-                if (!oracleDisplayText.isNullOrEmpty()) {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.magicColors.surfaceVariant,
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        CardDetailSelectableText(
-                            selectionController = selectionController,
-                            onOpenFailed = onLinkOpenFailed,
-                        ) {
-                            OracleText(
-                                text = oracleDisplayText,
-                                style = MaterialTheme.magicTypography.bodyMedium,
-                                modifier = Modifier.padding(12.dp),
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Flavor text
-            FaceFlippable(rotation = rotation) { isBack ->
-                val flavorText = if (isBack) backFace?.flavorText else frontFace?.flavorText ?: card.flavorText
-                flavorText?.let {
-                    CardDetailSelectableText(
-                        selectionController = selectionController,
-                        onOpenFailed = onLinkOpenFailed,
-                    ) {
-                        Text(
-                            text = "\"$it\"",
-                            style = MaterialTheme.magicTypography.bodySmall,
-                            fontStyle = FontStyle.Italic,
-                            color = MaterialTheme.magicColors.textSecondary,
-                        )
-                    }
-                }
-            }
-
-            // Power/Toughness or Loyalty
-            FaceFlippable(rotation = rotation) { isBack ->
-                val face = if (isBack) backFace else frontFace
-                val ptOrLoyalty = when {
-                    face != null -> {
-                        when {
-                            face.power != null && face.toughness != null -> "${face.power}/${face.toughness}"
-                            face.loyalty != null -> stringResource(R.string.carddetail_loyalty_value, face.loyalty!!)
-                            else -> null
-                        }
-                    }
-                    card.power != null && card.toughness != null -> "${card.power}/${card.toughness}"
-                    card.loyalty != null -> stringResource(R.string.carddetail_loyalty_value, card.loyalty!!)
-                    else -> null
-                }
-
-                if (ptOrLoyalty != null) {
-                    val mc = MaterialTheme.magicColors
-                    Surface(
-                        color = mc.secondaryAccent.copy(alpha = 0.08f),
-                        border = BorderStroke(1.dp, mc.secondaryAccent),
-                        shape = RoundedCornerShape(8.dp),
-                    ) {
-                        Text(
-                            text = ptOrLoyalty,
-                            style = MaterialTheme.magicTypography.titleMedium,
-                            color = mc.secondaryAccent,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-            }
-
-
             // Prices + Collection Section (grouped for fluid entry)
             Column(
                 verticalArrangement = Arrangement.spacedBy(16.dp),

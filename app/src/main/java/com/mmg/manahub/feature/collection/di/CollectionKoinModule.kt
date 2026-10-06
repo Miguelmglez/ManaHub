@@ -129,7 +129,7 @@ fun collectionKoinModule(
     factory { com.mmg.manahub.feature.collection.presentation.CollectionSelectionRuntime(get(),get(),get(),get()) }
     viewModel { com.mmg.manahub.feature.collection.presentation.importexport.TransferIntakeViewModel(get(),androidContext().contentResolver,get(),get(),get(),get(),get()) }
     single { com.mmg.manahub.feature.collection.data.AndroidTransferReportWriter(get(),get(),get(),androidContext().contentResolver,androidContext().filesDir) }
-    viewModel { parameters -> com.mmg.manahub.feature.collection.presentation.importexport.DurableTransferViewModel(parameters.get(),get(),get(),get(),get(),get(),get(),get(),androidContext().contentResolver,get()) }
+    viewModel { parameters -> com.mmg.manahub.feature.collection.presentation.importexport.DurableTransferViewModel(parameters.get(),get(),get(),get(),get(),get(),get(),get(),androidContext().contentResolver,get(),get()) }
     single { RoomTransferCollectionExecutor(get(),get(),System::currentTimeMillis,{
         get<ProgressionEventBus>().emit(ProgressionEvent.CollectionChanged(Clock.System.now()))
         if((get<TransferSessionGate>().currentSession as? com.mmg.manahub.core.domain.collection.transfer.TransferSession.Available)?.owner is com.mmg.manahub.core.domain.collection.transfer.TransferOwner.Account)

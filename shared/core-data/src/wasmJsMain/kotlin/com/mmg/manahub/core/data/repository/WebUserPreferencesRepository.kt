@@ -6,7 +6,6 @@ import com.mmg.manahub.core.model.AppLanguage
 import com.mmg.manahub.core.model.CardLanguage
 import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.model.UserPreferences
@@ -95,13 +94,6 @@ class WebUserPreferencesRepository(
     }
 
     private suspend fun readPreferences(): UserPreferences {
-        val newsLanguages = keyValueStore.getString(KEY_NEWS_LANGUAGES)
-            ?.let { encoded -> runCatching { json.decodeFromString<List<String>>(encoded) }.getOrNull() }
-            ?.mapNotNull { code -> NewsLanguage.entries.find { it.code == code } }
-            ?.toSet()
-            ?.ifEmpty { null }
-            ?: setOf(NewsLanguage.ENGLISH)
-
         return UserPreferences(
             appLanguage = AppLanguage.fromCode(
                 keyValueStore.getString(KEY_APP_LANGUAGE) ?: AppLanguage.ENGLISH.code
@@ -109,7 +101,6 @@ class WebUserPreferencesRepository(
             cardLanguage = CardLanguage.fromCode(
                 keyValueStore.getString(KEY_CARD_LANGUAGE) ?: CardLanguage.ENGLISH.code
             ),
-            newsLanguages = newsLanguages,
             preferredCurrency = PreferredCurrency.fromCode(
                 keyValueStore.getString(KEY_PREFERRED_CURRENCY) ?: PreferredCurrency.EUR.code
             ),
@@ -134,11 +125,6 @@ class WebUserPreferencesRepository(
     override suspend fun setCardLanguage(language: CardLanguage) {
         keyValueStore.putString(KEY_CARD_LANGUAGE, language.code)
         _preferences.update { it.copy(cardLanguage = language) }
-    }
-
-    override suspend fun setNewsLanguages(languages: Set<NewsLanguage>) {
-        keyValueStore.putString(KEY_NEWS_LANGUAGES, json.encodeToString(languages.map { it.code }))
-        _preferences.update { it.copy(newsLanguages = languages) }
     }
 
     override suspend fun setPreferredCurrency(currency: PreferredCurrency) {
@@ -180,7 +166,6 @@ class WebUserPreferencesRepository(
     private fun defaultPreferences() = UserPreferences(
         appLanguage = AppLanguage.ENGLISH,
         cardLanguage = CardLanguage.ENGLISH,
-        newsLanguages = setOf(NewsLanguage.ENGLISH),
         preferredCurrency = PreferredCurrency.EUR,
         collectionViewMode = CollectionViewMode.GRID,
     )
@@ -194,7 +179,6 @@ class WebUserPreferencesRepository(
     private companion object {
         const val KEY_APP_LANGUAGE = "app_language"
         const val KEY_CARD_LANGUAGE = "card_language"
-        const val KEY_NEWS_LANGUAGES = "news_languages"
         const val KEY_PREFERRED_CURRENCY = "preferred_currency"
         const val KEY_COLLECTION_VIEW_MODE = "collection_view_mode"
         const val KEY_COLLECTION_GROUPING_MODE = "collection_grouping_mode"

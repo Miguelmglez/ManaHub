@@ -4,7 +4,6 @@ import com.mmg.manahub.core.model.AppLanguage
 import com.mmg.manahub.core.model.CardLanguage
 import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.model.UserPreferences
@@ -27,7 +26,6 @@ interface UserPreferencesRepository {
 
     suspend fun setAppLanguage(language: AppLanguage)
     suspend fun setCardLanguage(language: CardLanguage)
-    suspend fun setNewsLanguages(languages: Set<NewsLanguage>)
     suspend fun setPreferredCurrency(currency: PreferredCurrency)
     suspend fun saveLastPriceRefresh(timestamp: Long)
     suspend fun saveUserDefinedTag(tag: UserDefinedTag)

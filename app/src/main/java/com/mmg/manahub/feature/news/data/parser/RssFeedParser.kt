@@ -2,7 +2,6 @@ package com.mmg.manahub.feature.news.data.parser
 
 import android.util.Xml
 import com.mmg.manahub.core.data.local.entity.NewsArticleEntity
-import com.mmg.manahub.core.model.news.NewsFilterPrefs
 import org.xmlpull.v1.XmlPullParser
 import java.io.StringReader
 import java.net.URI
@@ -134,46 +133,6 @@ class RssFeedParser {
             }
         }
         return items
-    }
-
-    /**
-     * Best-effort detection of a top-level RSS 2.0 `<channel><language>` element (ignores any
-     * `<language>` nested inside an item/entry). Returns a 2-letter code only when it's one of
-     * [NewsFilterPrefs.SUPPORTED_NEWS_LANGUAGES]; null otherwise (Atom/YouTube feeds have no such
-     * element, and this must never throw — it's a nice-to-have UI pre-select, not load-bearing).
-     */
-    fun detectChannelLanguage(xml: String): String? = try {
-        val parser = Xml.newPullParser()
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
-        parser.setInput(StringReader(xml))
-
-        var isAtom = false
-        var insideItem = false
-        var detected: String? = null
-
-        loop@ while (parser.next() != XmlPullParser.END_DOCUMENT) {
-            when (parser.eventType) {
-                XmlPullParser.START_TAG -> {
-                    val tag = parser.name
-                    when {
-                        tag == "feed" -> isAtom = true
-                        tag == "item" || (isAtom && tag == "entry") -> insideItem = true
-                        !insideItem && tag == "language" -> {
-                            val code = readText(parser).trim().take(2).lowercase(Locale.ENGLISH)
-                            detected = code.takeIf { it in NewsFilterPrefs.SUPPORTED_NEWS_LANGUAGES }
-                            break@loop
-                        }
-                    }
-                }
-                XmlPullParser.END_TAG -> {
-                    val tag = parser.name
-                    if (tag == "item" || (isAtom && tag == "entry")) insideItem = false
-                }
-            }
-        }
-        detected
-    } catch (_: Exception) {
-        null
     }
 
     private fun readText(parser: XmlPullParser): String {

@@ -83,9 +83,9 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -816,11 +816,11 @@ private fun CombatMechanicsSection(stats: CollectionStats) {
             CombatStatsBox(
                 avgPower = stats.avgPower ?: 0.0,
                 avgToughness = stats.avgToughness ?: 0.0,
-                modifier = Modifier.weight(1.2f),
+                modifier = Modifier.weight(1.4f),
             )
 
             PremiumCard(
-                modifier = Modifier.weight(0.8f).heightIn(min = 100.dp),
+                modifier = Modifier.weight(0.6f).heightIn(min = 100.dp),
                 border = BorderStroke(1.dp, manaGradient),
             ) {
                 Column(

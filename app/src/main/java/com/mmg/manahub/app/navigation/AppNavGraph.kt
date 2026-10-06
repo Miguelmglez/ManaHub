@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -74,7 +76,6 @@ import com.mmg.manahub.feature.carddetail.presentation.CardDetailScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionScreen
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckDetailScreen
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksScreen
-import com.mmg.manahub.feature.competitive.presentation.CompetitiveScreen
 import com.mmg.manahub.feature.decks.presentation.DECK_STUDIO_SELECT_BUILD_TAB_KEY
 import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
 import com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardScreen
@@ -97,9 +98,9 @@ import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import com.mmg.manahub.feature.home.presentation.HomeAction
 import com.mmg.manahub.feature.home.presentation.HomeHeroState
 import com.mmg.manahub.feature.home.presentation.HomeScreen
-import com.mmg.manahub.feature.news.presentation.NewsScreen
-import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.manahub.feature.news.presentation.VideoPlayerScreen
+import com.mmg.manahub.feature.today.presentation.MtgTodayScreen
+import com.mmg.manahub.feature.today.presentation.TodayTab
 import com.mmg.manahub.feature.playtest.presentation.hand.PlaytestHandScreen
 import com.mmg.manahub.feature.playtest.presentation.setup.PlaytestSetupScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileScreen
@@ -299,10 +300,16 @@ fun AppNavGraph(
     }
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
+    val importOriginState=backStack?.lifecycle?.currentStateFlow?.collectAsState()?.value
+    var showImportSheet by rememberSaveable { mutableStateOf(false) }
+    com.mmg.manahub.feature.collection.presentation.importexport.CollectionImportHost(
+        transferIntake, showImportSheet && transferRoutingAllowed && importOriginState==androidx.lifecycle.Lifecycle.State.RESUMED, { showImportSheet = false },
+        { id -> navController.navigate(Screen.ImportCards.createRoute(id)) { launchSingleTop = true } },
+    )
     val receivedTransfers by transferIntake.pending.collectAsStateWithLifecycle()
     val transferIntakeError by transferIntake.error.collectAsStateWithLifecycle()
     LaunchedEffect(transferIntakeError) {
-        transferIntakeError?.let { inviteToastState.show(it,MagicToastType.ERROR);transferIntake.clearError() }
+        transferIntakeError?.takeIf { !showImportSheet }?.let { inviteToastState.show(context.getString(com.mmg.manahub.feature.collection.presentation.importexport.intakeFailureResource(it)),MagicToastType.ERROR);transferIntake.clearError() }
     }
     LaunchedEffect(receivedTransfers,recoverySessionState,pendingRecoveryMarker,currentRoute,transferRoutingAllowed) {
         if(!transferRoutingAllowed || currentRoute==null || recoverySessionState==com.mmg.manahub.core.domain.auth.SessionState.Loading ||
@@ -313,6 +320,7 @@ fun AppNavGraph(
                   if(shown==id)transferIntake.routed(id)
                   return@LaunchedEffect
               }
+              showImportSheet = false
               navController.navigate(Screen.ImportCards.createRoute(id)) { launchSingleTop=true }
             transferIntake.routed(id)
         }
@@ -433,18 +441,18 @@ fun AppNavGraph(
                                         val destination = tip?.rulesDestination() ?: com.mmg.manahub.core.model.rules.RulesDestination.Index()
                                         navController.navigateRules(destination, "home_tip")
                                     }
-                                    HomeAction.OpenImportCollection -> navController.navigate(Screen.ImportCards.createRoute())
+                                    HomeAction.OpenImportCollection -> { showImportSheet = true }
                                     HomeAction.ScanCard -> navController.navigate(Screen.CollectionScanner.route)
                                     HomeAction.SearchCard -> navController.navigate(Screen.CollectionAddCard.createRoute())
                                     HomeAction.CreateDeck -> navController.navigate(Screen.DeckStudio.createRoute(null))
                                     HomeAction.DraftGuide -> navController.navigate(Screen.Draft.route)
                                     HomeAction.DraftSimulator -> navController.navigate(Screen.Draft.route)
                                     HomeAction.OpenLibrary -> navController.navigateTab(Screen.Collection.baseRoute)
-                                    HomeAction.OpenDecks -> navController.navigate(Screen.Collection.routeWithTab("decks"))
-                                    HomeAction.OpenNews -> navController.navigate(Screen.News.route)
+                                    HomeAction.OpenDecks -> navController.navigateTab(Screen.Collection.routeWithTab("decks"))
+                                    HomeAction.OpenNews -> navController.navigate(Screen.MtgToday.baseRoute)
                                     HomeAction.OpenStats -> navController.navigate(Screen.Stats.route)
                                     HomeAction.OpenFriends -> navController.navigate(Screen.FriendsList.route)
-                                    HomeAction.OpenTrades -> navController.navigate(Screen.Collection.routeWithTab("trades"))
+                                    HomeAction.OpenTrades -> navController.navigateTab(Screen.Collection.routeWithTab("trades"))
                         HomeAction.OpenCommunityDecks -> navController.navigate(Screen.CommunityDecks.route)
                         // Home widget board overhaul, TASK 5b/5c — opens the deck detail NATIVELY
                         // instead of the old SOCIAL_HUB slide's external-browser redirect.
@@ -461,10 +469,10 @@ fun AppNavGraph(
                                         if (deckId != null) {
                                             navController.navigate(Screen.PlaytestSetup.createRoute(deckId))
                                         } else {
-                                            navController.navigate(Screen.Collection.routeWithTab("decks"))
+                                            navController.navigateTab(Screen.Collection.routeWithTab("decks"))
                                         }
                                     }
-                                    HomeAction.ImproveRecentDeck -> navController.navigate(Screen.Collection.routeWithTab("decks"))
+                                    HomeAction.ImproveRecentDeck -> navController.navigateTab(Screen.Collection.routeWithTab("decks"))
                                     // CustomizeQuickStart, SaveQuickStart, DismissAccountNudge, RateApp are
                                     // handled inside HomeScreen / HomeViewModel.
                                     HomeAction.CustomizeQuickStart -> Unit
@@ -523,9 +531,6 @@ fun AppNavGraph(
                                             setReleasedAt = action.set.releasedAt,
                                         )
                                     )
-                                    is HomeAction.OpenCompetitive->{
-                                        navController.navigate(Screen.Competitive.route)
-                                    }
                                     is HomeAction.OpenMultiAdd -> navController.navigate(Screen.CollectionAddCard.createRoute(multi = true))
                                     // ── Widget board: handled in HomeScreen/VM ───────────
                                     HomeAction.OpenWidgetGallery,
@@ -535,7 +540,6 @@ fun AppNavGraph(
                                     HomeAction.RefreshDiscover,
                                     HomeAction.RefreshRandomCard,
                                     is HomeAction.SelectDiscoverSet,
-                                    HomeAction.ResetNewsFilters,
                                     is HomeAction.MoveWidget,
                                     is HomeAction.AddWidget,
                                     is HomeAction.RemoveWidget,
@@ -564,7 +568,7 @@ fun AppNavGraph(
                         ),
                     ) { backStackEntry ->
                         CollectionScreen(
-                            onImportCards={navController.navigate(Screen.ImportCards.createRoute())},
+                            onImportCards={showImportSheet = true},
                             // G.1 fix: read the "tab" arg directly off THIS backStackEntry (always
                             // reflects the current navigate() call, e.g. "decks" from the Draft
                             // Simulator hand-off) rather than relying on CollectionViewModel's
@@ -605,6 +609,11 @@ fun AppNavGraph(
                     composable(
                         route = Screen.CollectionAddCard.route,
                         arguments = listOf(
+                            navArgument(AddCardLaunchArgs.ARG_SET_CODE) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
                             navArgument(AddCardLaunchArgs.ARG_MULTI) {
                                 type = NavType.BoolType
                                 defaultValue = false
@@ -651,8 +660,11 @@ fun AppNavGraph(
                         Screen.ImportCards.route,
                         arguments=listOf(navArgument("jobId") { type=NavType.StringType; nullable=true; defaultValue=null }),
                     ) { entry ->
-                        com.mmg.manahub.feature.collection.presentation.importexport.DurableTransferScreen(
-                            entry.arguments?.getString("jobId"),transferIntake,{navController.popBackStack()},
+                        val importId = entry.arguments?.getString("jobId")
+                        if (importId.isNullOrBlank()) {
+                            LaunchedEffect(entry) { navController.popBackStack(); showImportSheet = true }
+                        } else com.mmg.manahub.feature.collection.presentation.importexport.DurableTransferScreen(
+                            importId,transferIntake,{navController.popBackStack()},
                             { id -> navController.navigate(Screen.ImportCards.createRoute(id)) { popUpTo(Screen.ImportCards.route){inclusive=true};launchSingleTop=true } },
                         )
                     }
@@ -955,7 +967,6 @@ fun AppNavGraph(
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
-                    onManageNewsSources = { navController.navigate(Screen.NewsSourcesSettings.route) },
                     onManageTagDictionary = { navController.navigate(Screen.TagDictionary.route) },
                     onManageAccount = { navController.navigate(Screen.AccountManagement.route) },
                 )
@@ -965,20 +976,23 @@ fun AppNavGraph(
                 TagDictionaryScreen(onBack = { navController.popBackStack() })
             }
 
-            // ── News ──────────────────────────────────────────────────────────
-            composable(Screen.News.route) {
-                NewsScreen(
+            // ── MTG Today ─────────────────────────────────────────────────────
+            composable(
+                route = Screen.MtgToday.route,
+                arguments = listOf(
+                    navArgument("tab") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { backStackEntry ->
+                MtgTodayScreen(
+                    initialTab = TodayTab.fromRouteId(backStackEntry.arguments?.getString("tab")),
                     onBack = { navController.popBackStack() },
-
                     onVideoClick = { videoId, title ->
                         navController.navigate(Screen.NewsVideoPlayer.createRoute(videoId, title))
                     },
-                )
-            }
-
-            composable(Screen.NewsSourcesSettings.route) {
-                NewsSourcesSettingsScreen(
-                    onBack = { navController.popBackStack() },
                 )
             }
 
@@ -1796,15 +1810,6 @@ fun AppNavGraph(
                             }
                         }
                     },
-                )
-            }
-            composable(
-                route = Screen.Competitive.route,
-            ){
-                CompetitiveScreen(
-                    onBack = {
-                        navController.popBackStack()
-                    }
                 )
             }
         }

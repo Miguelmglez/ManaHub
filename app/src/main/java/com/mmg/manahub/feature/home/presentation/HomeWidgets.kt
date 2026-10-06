@@ -638,7 +638,6 @@ fun HomeWidgetHost(
                 HomeWidgetType.TRADES_HUB -> TradesHubWidget(uiState, metrics.tradesSlideHeight, onAction)
                 HomeWidgetType.TRENDING_COMMANDERS -> TrendingCommandersWidget(trending, onAction)
                 HomeWidgetType.DAILY_PUZZLE -> DailyPuzzleWidget(dailyPuzzle, onAction)
-                HomeWidgetType.COMPETITIVE -> CompetitiveWidget(onAction)
             }
         }
     }
@@ -671,7 +670,6 @@ private fun widgetHeaderTitleClickAction(type: HomeWidgetType): HomeAction? = wh
     HomeWidgetType.CARD_OF_THE_DAY,
     HomeWidgetType.GET_STARTED,
     HomeWidgetType.GREETING_HEADER,
-    HomeWidgetType.COMPETITIVE,
     -> null
 }
 
@@ -781,47 +779,6 @@ private fun DailyPuzzleWidget(
                     )
                 }
             }
-        }
-    }
-}
-
-/**
- * Static launcher tile into the Competitive screen (metagame rankings, 17lands Limited ratings,
- * event locator, Pro Tour news filter) — Competitive feature, Phase 5. Carries no widget-level
- * data of its own (unlike [DailyPuzzleWidget]/[TrendingCommandersWidget]): the actual sections
- * live on [com.mmg.manahub.feature.competitive.presentation.CompetitiveScreen] itself, so this
- * tile is a single CTA card, mirroring [QuickActionsWidget]'s "whole body is one big tap target"
- * shape.
- */
-@Composable
-private fun CompetitiveWidget(onAction: (HomeAction) -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    WidgetShell(
-        onClick = { onAction(HomeAction.OpenCompetitive) },
-        onClickLabel = stringResourceSafe(R.string.widget_title_competitive),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = stringResourceSafe(R.string.home_widget_desc_competitive),
-                style = ty.bodyMedium,
-                color = mc.textPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(end = spacing.sm),
-            )
-            MagicCtaButton(
-                onClick = { onAction(HomeAction.OpenCompetitive) },
-                text = stringResourceSafe(R.string.widget_title_competitive),
-                style = MagicCtaStyle.Outlined,
-                color = MagicCtaColor.Gold,
-            )
         }
     }
 }
@@ -2990,20 +2947,19 @@ private fun NewsWidget(
     if (news == null) return
     WidgetShell {
         if (news.isEmpty()) {
-            WidgetEmptyBody(
-                message = stringResourceSafe(R.string.home_news_empty),
-                actionLabel = stringResourceSafe(R.string.home_news_reset_filters),
-                onAction = { onAction(HomeAction.ResetNewsFilters) },
-            )
+            NewsEmptyBody(onAction = onAction)
             return@WidgetShell
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
             items(news.take(MAX_NEWS_PREVIEW), key = { it.id }) { item ->
                 NewsItemCard(
                     item = item,
-                    orientation = NewsItemOrientation.VERTICAL,
+                    orientation = NewsItemOrientation.HORIZONTAL,
                     placeholderPainter = painterResource(Res.drawable.mtg_card_back),
+                    showDescription = false,
+                    showContentType = false,
                     titleMinLines = NEWS_TITLE_LINES,
+                    compact = true,
                     modifier = Modifier.width(HomeNewsCardWidth).height(cardHeight),
                     onClick = { onAction(HomeAction.OpenNewsUrl(item.url)) },
                 )
@@ -3017,6 +2973,21 @@ private fun NewsWidget(
 
 /** News titles always reserve two lines so every card in the row has the same height. */
 private const val NEWS_TITLE_LINES = 2
+
+/** Empty body of the News widget: nothing from followed sources yet, so point at MTG Today to follow some. */
+@Composable
+private fun NewsEmptyBody(onAction: (HomeAction) -> Unit) {
+    val spacing = MaterialTheme.spacing
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+        WidgetEmptyBody(stringResourceSafe(R.string.home_news_empty))
+        MagicCtaButton(
+            onClick = { onAction(HomeAction.OpenNews) },
+            text = stringResourceSafe(R.string.home_news_open_today),
+            style = MagicCtaStyle.Outlined,
+            color = MagicCtaColor.Primary,
+        )
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  RULES_TIP — one tip at a time; the header's roll button picks another

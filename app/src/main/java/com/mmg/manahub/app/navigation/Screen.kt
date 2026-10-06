@@ -40,16 +40,17 @@ sealed class Screen(val route: String) {
      * AddCard search. Optional query args: `multi` opens "Select multiple" mode; `source` +
      * `sourceId` preload a deck's cards as the browse list (and force multi mode).
      */
-    object CollectionAddCard  : Screen("collection/add?multi={multi}&source={source}&sourceId={sourceId}") {
+    object CollectionAddCard  : Screen("collection/add?multi={multi}&source={source}&sourceId={sourceId}&setCode={setCode}") {
         const val baseRoute = "collection/add"
 
         /** Deck sources AddCard can preload; [value] is the raw `source` nav argument. */
         enum class Source(val value: String) { DECK("deck"), COMMUNITY("community") }
 
         /** Builds the route; the defaults open the plain search. */
-        fun createRoute(multi: Boolean = false, source: Source? = null, sourceId: String? = null): String {
+        fun createRoute(multi: Boolean = false, source: Source? = null, sourceId: String? = null, setCode: String? = null): String {
             val params = buildList {
                 if (multi) add("multi=true")
+                if (!setCode.isNullOrBlank()) add("setCode=${Uri.encode(setCode)}")
                 if (source != null && !sourceId.isNullOrBlank()) {
                     add("source=${source.value}")
                     add("sourceId=${Uri.encode(sourceId)}")
@@ -314,17 +315,18 @@ sealed class Screen(val route: String) {
         fun route(id: Long) = "tournament/$id"
     }
 
-    // ── News ──────────────────────────────────────────────────────────────────
-    object News : Screen("news")
-    object NewsSourcesSettings : Screen("news_sources_settings")
+    // ── MTG Today (news feed, saved items, sources) ──────────────────────────
+    object MtgToday : Screen("today?tab={tab}") {
+        /** Opens the Feed tab. */
+        const val baseRoute = "today"
+
+        /** Builds a route that opens [tab] (a `TodayTab.routeId`, e.g. "sources"). */
+        fun routeWithTab(tab: String) = "today?tab=$tab"
+    }
     object NewsVideoPlayer : Screen("news/video/{videoId}?title={title}") {
         fun createRoute(videoId: String, title: String) =
             "news/video/${Uri.encode(videoId)}?title=${Uri.encode(title)}"
     }
-
-    // ── Competitive ──────────────────────────────────────────────────────────────────
-
-    object Competitive : Screen("competitive")
 
     // ── Draft ─────────────────────────────────────────────────────────────────
     object Draft : Screen("draft")

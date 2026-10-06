@@ -35,10 +35,8 @@ data class HomeUiState(
     /** True once [quickStartActions] reflects the persisted choice rather than the defaults. */
     val quickStartLoaded: Boolean = false,
     val libraryStats: LibraryStats? = null,
-    /** Up to 3 latest news/video items. Null while the initial DB query is still pending. */
+    /** Latest news/video items from followed sources. Null while the initial DB query is still pending. */
     val recentNews: List<NewsItem>? = null,
-    /** True when the persisted news filters differ from the English-only default (drives the Reset CTA). */
-    val newsFiltersActive: Boolean = false,
     val accountNudge: AccountNudge? = null,
     /** True once [accountNudge] is definitive (null then means "no nudge", not "not computed yet"). */
     val accountNudgeResolved: Boolean = false,

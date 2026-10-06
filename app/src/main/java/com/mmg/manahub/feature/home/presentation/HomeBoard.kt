@@ -108,7 +108,6 @@ internal fun boardWidgetsToRender(
             HomeWidgetType.GET_STARTED ->
                 !heroTakesSlot(state.hero, state.firstStepsCompletionSeen, holdCompletedHero)
             HomeWidgetType.DAILY_PUZZLE -> !puzzleEnabled
-            HomeWidgetType.COMPETITIVE -> extras.competitiveEnabled == false
             // Keeps its slot while loading; only a confirmed empty result removes it.
             HomeWidgetType.TRENDING_COMMANDERS -> extras.trendingLoaded && trendingEmpty
             else -> widget.type.isGamification && !state.gamificationEnabled

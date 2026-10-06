@@ -98,6 +98,9 @@ data class TransferSummary(
     val wishlistCompletedEntries: Long = 0L,
     val wishlistCompletedCopies: Long = 0L,
     val filesFrozen: Boolean = false,
+    val invalidPendingEntries: Long = 0L,
+    val retainedWishlistEntries: Long = 0L,
+    val retainedWishlistCopies: Long = 0L,
 )
 
 /** Lightweight aggregate; full card metadata is hydrated only for visible pages. */
@@ -115,13 +118,37 @@ data class TransferReviewEntry(
     val version: Long = 0L,
     val activeActionId: TransferActionId? = null,
     val state: String = "PENDING",
+    val sourceEntryId: String? = null,
 )
+
+/** Ownership guidance remains distinct from operational failures and never authorizes reassignment. */
+enum class TransferOwnerChoice { NEUTRAL_RECEIPT, SESSION_CHANGED, OTHER_ACCOUNT }
+
+/** Closed presentation categories map to localized platform resources without exposing external causes. */
+enum class TransferPresentationFailure { STORAGE, RECEIVE, REVIEW_CHANGED, PAGE, QUANTITY_OVERFLOW, VARIANT_COLLISION, OWNER, REPORT, VARIANTS, UNAVAILABLE }
+
+/** Intake failures retain bounded resource identities rather than provider messages. */
+enum class TransferIntakeFailure { INVALID_DELIVERY, TOO_MANY_FILES, RECEIVE, RECOVERY }
 
 /** Keyset cursor is tied to a review generation, never an offset into mutable data. */
 data class TransferPageCursor(val generation: Long, val afterId: String)
 
 /** Repository implementations enforce a maximum of fifty rows per review page. */
 data class TransferPage(val entries: List<TransferReviewEntry>, val next: TransferPageCursor?) {
+    init { require(entries.size <= TransferLimits.REVIEW_PAGE_SIZE) }
+}
+
+/** Pending rows and durable outcomes are queried independently before hydration. */
+enum class TransferReviewScope { PENDING, QUEUE, COLLECTION, WISHLIST, EXCLUDED }
+
+/** Both directions use an exclusive stable entry identifier instead of mutable offsets. */
+enum class TransferPageDirection { FORWARD, BACKWARD }
+
+/** A review anchor belongs to exactly one job, generation and visible scope. */
+data class TransferReviewCursor(val jobId: TransferJobId, val generation: Long, val scope: TransferReviewScope, val anchorId: String)
+
+/** Entries always arrive in ascending order; boundary anchors support a bounded reloadable window. */
+data class TransferReviewPage(val entries: List<TransferReviewEntry>, val previous: TransferReviewCursor?, val next: TransferReviewCursor?) {
     init { require(entries.size <= TransferLimits.REVIEW_PAGE_SIZE) }
 }
 
@@ -137,9 +164,11 @@ interface CollectionTransferRepository {
     suspend fun bindReceipt(id: TransferJobId, owner: TransferOwner, authGeneration: Long, origin: TransferOrigin, destinationChosen: Boolean = false): TransferMutationResult
     fun observeSummary(id: TransferJobId, owner: TransferOwner): Flow<TransferSummary?>
     suspend fun readPage(id: TransferJobId, owner: TransferOwner, cursor: TransferPageCursor?): TransferPage
+    suspend fun readReviewPage(id: TransferJobId, owner: TransferOwner, cursor: TransferReviewCursor?, scope: TransferReviewScope = TransferReviewScope.PENDING, direction: TransferPageDirection = TransferPageDirection.FORWARD): TransferReviewPage = throw TransferReadException(TransferError.DESTINATION_UNAVAILABLE)
     suspend fun selectFile(id: TransferJobId, owner: TransferOwner, file: TransferFileId, generation: Long, selected: Boolean): TransferMutationResult
     suspend fun includeRepeatedFile(id: TransferJobId, owner: TransferOwner, file: TransferFileId, generation: Long): TransferMutationResult
     suspend fun editPendingEntry(id: TransferJobId, owner: TransferOwner, generation: Long, entry: TransferReviewEntry): TransferMutationResult
+    suspend fun duplicatePendingEntry(id: TransferJobId, owner: TransferOwner, generation: Long, payloadVersion: Long, entryId: String, entryVersion: Long, newEntryId: String): TransferMutationResult = TransferMutationResult.Rejected(TransferError.DESTINATION_UNAVAILABLE)
     suspend fun acknowledgeReview(id: TransferJobId, owner: TransferOwner, confirmation: TransferConfirmation): TransferMutationResult
     suspend fun pause(id: TransferJobId, owner: TransferOwner): TransferMutationResult
     suspend fun resume(id: TransferJobId, owner: TransferOwner): TransferMutationResult

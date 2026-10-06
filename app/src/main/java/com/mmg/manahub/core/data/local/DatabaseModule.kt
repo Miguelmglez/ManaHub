@@ -11,8 +11,6 @@ import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
 import com.mmg.manahub.core.data.local.dao.ComboCacheDao
 import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
-import com.mmg.manahub.core.data.local.dao.CompetitiveLimitedRatingsCacheDao
-import com.mmg.manahub.core.data.local.dao.CompetitiveMetaCacheDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
@@ -175,11 +173,13 @@ object DatabaseModule {
                 MIGRATION_58_59,
                 MIGRATION_59_60,
                 MIGRATION_60_61,
-                    MIGRATION_61_62,
-                    MIGRATION_62_63,
-                    MIGRATION_63_64,
-                    MIGRATION_64_65,
-                    MIGRATION_65_66,
+                MIGRATION_61_62,
+                MIGRATION_62_63,
+                MIGRATION_63_64,
+                MIGRATION_64_65,
+                MIGRATION_65_66,
+                MIGRATION_66_67,
+                MIGRATION_67_68,
             )
             .build()
 
@@ -808,8 +808,4 @@ object DatabaseModule {
     @Provides fun provideComboCacheDao(db: MtgDatabase): ComboCacheDao = db.comboCacheDao()
     @Provides fun provideCardStrategyTagsCacheDao(db: MtgDatabase): CardStrategyTagsCacheDao = db.cardStrategyTagsCacheDao()
     @Provides fun providePuzzleDao(db: MtgDatabase): PuzzleDao = db.puzzleDao()
-    @Provides fun provideCompetitiveMetaCacheDao(db: MtgDatabase): CompetitiveMetaCacheDao = db.competitiveMetaCacheDao()
-    @Provides fun provideCompetitiveLimitedRatingsCacheDao(db: MtgDatabase): CompetitiveLimitedRatingsCacheDao = db.competitiveLimitedRatingsCacheDao()
 }
-
-

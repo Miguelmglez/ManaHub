@@ -7,7 +7,6 @@ import com.mmg.manahub.core.data.remote.push.PushTokenRemoteDataSource
 import com.mmg.manahub.core.model.AppLanguage
 import com.mmg.manahub.core.model.CardLanguage
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.UserPreferences
 import com.mmg.manahub.core.push.RegisterPushTokenWorker
@@ -64,7 +63,6 @@ class PushTokenRepositoryImplTest {
         UserPreferences(
             appLanguage = appLanguage,
             cardLanguage = CardLanguage.ENGLISH,
-            newsLanguages = setOf(NewsLanguage.ENGLISH),
             preferredCurrency = PreferredCurrency.USD,
             collectionViewMode = CollectionViewMode.GRID,
         )

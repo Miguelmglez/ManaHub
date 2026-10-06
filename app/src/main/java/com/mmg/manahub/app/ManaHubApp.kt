@@ -23,8 +23,6 @@ import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
 import com.mmg.manahub.core.data.local.dao.ComboCacheDao
 import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
-import com.mmg.manahub.core.data.local.dao.CompetitiveLimitedRatingsCacheDao
-import com.mmg.manahub.core.data.local.dao.CompetitiveMetaCacheDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
@@ -106,7 +104,6 @@ import com.mmg.manahub.feature.collection.di.COLLECTION_IMPORT_QUEUE
 import com.mmg.manahub.feature.collection.di.collectionKoinModule
 import com.mmg.manahub.core.data.local.MtgDatabase
 import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
-import com.mmg.manahub.feature.competitive.di.competitiveKoinModule
 import com.mmg.manahub.feature.decks.di.commanderSpellbookKoinModule
 import com.mmg.manahub.feature.decks.di.communityAggregateKoinModule
 import com.mmg.manahub.feature.decks.di.decksKoinModule
@@ -276,12 +273,6 @@ class ManaHubApp : Application(), KoinComponent {
     // Commander Spellbook combo cache (Deck Engine Unification plan D7, Phase 4.3 — synergy
     // browser Combos tab) bridge dep. Unrelated to communityAggregateDao above.
     @Inject lateinit var comboCacheDao: ComboCacheDao
-
-    // Competitive feature (Phase 5) bridge deps: the two Room-owned cache DAOs for the
-    // `manahub-competitive` Cloudflare Worker's weekly meta snapshots + 17lands Limited ratings.
-    // Unrelated to communityAggregateDao/comboCacheDao above.
-    @Inject lateinit var competitiveMetaCacheDao: CompetitiveMetaCacheDao
-    @Inject lateinit var competitiveLimitedRatingsCacheDao: CompetitiveLimitedRatingsCacheDao
 
     // Card strategy tags cache (offline tag pipeline precomputed tags) — Deck Engine Unification
     // plan D8, Phase 5c. Serves cardStrategyTagsKoinModule (CardDetailViewModel's read point); the
@@ -568,10 +559,6 @@ class ManaHubApp : Application(), KoinComponent {
                 searchWidgetsKoinModule(),
                 gamificationKoinModule(),
                 decksKoinModule(),
-                competitiveKoinModule(
-                    metaCacheDao = competitiveMetaCacheDao,
-                    limitedRatingsCacheDao = competitiveLimitedRatingsCacheDao,
-                ),
                 gameKoinModule(
                     observeSession = observeSessionUseCase,
                     updateLife = updateLifeUseCase,

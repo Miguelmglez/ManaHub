@@ -15,6 +15,7 @@ import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.queue.AddAllToCollectionResult
 import com.mmg.manahub.core.domain.usecase.queue.CardQueueActions
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
+import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardAddOrigin
@@ -109,6 +110,7 @@ class AddCardViewModel(
         if (args.multi || args.deckSource != null) enableMultiSelectMode()
         args.entryPoint?.let(::logEntryPointOnce)
         args.deckSource?.let(::loadDeckSource)
+        args.setCode?.let { code -> onAdvancedQuerySearch(AdvancedSearchQuery(criteria = listOf(SearchCriterion.CardSet(setOf(code))))) }
         viewModelScope.launch {
             val dataFlow = combine(
                 textQueryFlow.debounce(400L),
@@ -209,7 +211,7 @@ class AddCardViewModel(
                 }
                 
             // Launch spotlight feed fetch
-            loadSpotlightFeed()
+            if (activeQueryFlow.value == null) loadSpotlightFeed()
         }
     }
 

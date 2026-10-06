@@ -10,6 +10,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
@@ -112,6 +116,7 @@ fun CollectionExportSheet(
         containerColor = mc.backgroundSecondary,
         shape = BottomSheetShape,
     ) {
+        TransferSheetHeader(stringResource(R.string.collection_export_title), stringResource(R.string.import_close_export), onDismiss)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -120,7 +125,6 @@ fun CollectionExportSheet(
                 .padding(bottom = sp.xl),
             verticalArrangement = Arrangement.spacedBy(sp.sm),
         ) {
-            Text(stringResource(R.string.collection_export_title), style = ty.titleLarge, color = mc.textPrimary)
             Text(stringResource(R.string.collection_export_format_label), style = ty.labelLarge, color = mc.textSecondary)
             Column(
                 modifier = Modifier.selectableGroup(),
@@ -285,4 +289,13 @@ fun UnresolvedLinesDialog(
             }
         },
     )
+}
+
+/** Fixed, stateless header shared by collection transfer sheets. */
+@Composable
+internal fun TransferSheetHeader(title: String, closeDescription: String, onClose: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = MaterialTheme.spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = onClose) { Icon(Icons.Default.Close, closeDescription, tint = MaterialTheme.magicColors.textPrimary) }
+        Text(title, style = MaterialTheme.magicTypography.titleLarge, color = MaterialTheme.magicColors.textPrimary, modifier = Modifier.weight(1f))
+    }
 }

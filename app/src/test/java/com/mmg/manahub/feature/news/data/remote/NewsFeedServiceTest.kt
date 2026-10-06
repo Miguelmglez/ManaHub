@@ -6,6 +6,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -22,6 +23,7 @@ import org.junit.Test
  * GROUP 2 — 304 Not Modified: short-circuits to [FeedFetchResult.NotModified], no body read
  * GROUP 3 — conditional-GET request headers: sent only when etag/lastModified are non-blank
  * GROUP 4 — failure paths: non-2xx/non-304 status, and network-level exceptions
+ * GROUP 5 — fetchPage (source resolution): https-only gate, redirects, typed failures, body cap
  */
 class NewsFeedServiceTest {
 
@@ -188,5 +190,81 @@ class NewsFeedServiceTest {
         val result = service.fetchFeed(url())
 
         assertTrue("a network-level failure must be captured as Result.failure, not thrown", result.isFailure)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 5 — fetchPage
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private val plainHttpService by lazy { NewsFeedService(OkHttpClient(), httpsOnly = false) }
+
+    @Test
+    fun `given an http url then fetchPage refuses it without making a request`() = runTest {
+        val result = service.fetchPage(url("/page"))
+
+        assertEquals(PageFetchException.Reason.NOT_HTTPS, (result.exceptionOrNull() as PageFetchException).reason)
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun `given a page then its body, final url and content type are returned`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("<html></html>").addHeader("Content-Type", "text/html"))
+
+        val page = plainHttpService.fetchPage(url("/page")).getOrThrow()
+
+        assertEquals("<html></html>", page.body)
+        assertEquals(url("/page"), page.finalUrl)
+        assertEquals("text/html", page.contentType)
+        val request = server.takeRequest()
+        assertEquals("en", request.getHeader("Accept-Language"))
+        assertNull("the consent cookie is only sent to YouTube", request.getHeader("Cookie"))
+    }
+
+    @Test
+    fun `given a redirect then the final url is the redirect target`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(301).addHeader("Location", url("/moved")))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("<rss></rss>"))
+
+        val page = plainHttpService.fetchPage(url("/page")).getOrThrow()
+
+        assertEquals(url("/moved"), page.finalUrl)
+    }
+
+    @Test
+    fun `given an error status then the failure is typed and its message has no url`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(404))
+
+        val error = plainHttpService.fetchPage(url("/secret-path")).exceptionOrNull() as PageFetchException
+
+        assertEquals(PageFetchException.Reason.HTTP_ERROR, error.reason)
+        assertEquals(404, error.httpCode)
+        assertFalse(error.message.orEmpty().contains("secret-path"))
+    }
+
+    @Test
+    fun `given a blank body then the failure is EMPTY_BODY`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("   "))
+
+        val error = plainHttpService.fetchPage(url("/page")).exceptionOrNull() as PageFetchException
+
+        assertEquals(PageFetchException.Reason.EMPTY_BODY, error.reason)
+    }
+
+    @Test
+    fun `given a body over the cap then only the first MAX_PAGE_BYTES are read`() = runTest {
+        val oversized = "a".repeat((NewsFeedService.MAX_PAGE_BYTES + 1024).toInt())
+        server.enqueue(MockResponse().setResponseCode(200).setBody(oversized))
+
+        val page = plainHttpService.fetchPage(url("/page")).getOrThrow()
+
+        assertEquals(NewsFeedService.MAX_PAGE_BYTES.toInt(), page.body.length)
+    }
+
+    @Test
+    fun `given a malformed url then fetchPage fails instead of throwing`() = runTest {
+        val result = plainHttpService.fetchPage("not a url")
+
+        assertTrue(result.isFailure)
+        assertEquals(0, server.requestCount)
     }
 }

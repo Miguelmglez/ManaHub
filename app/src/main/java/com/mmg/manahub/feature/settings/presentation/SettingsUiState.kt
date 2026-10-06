@@ -3,7 +3,6 @@ package com.mmg.manahub.feature.settings.presentation
 import com.mmg.manahub.core.model.AppLanguage
 import com.mmg.manahub.core.model.CardLanguage
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.UserPreferences
 import com.mmg.manahub.core.ui.theme.AppTheme
@@ -40,7 +39,6 @@ data class PreferencesState(
     val userPreferences: UserPreferences = UserPreferences(
         appLanguage = AppLanguage.ENGLISH,
         cardLanguage = CardLanguage.ENGLISH,
-        newsLanguages = setOf(NewsLanguage.ENGLISH),
         preferredCurrency = PreferredCurrency.USD,
         collectionViewMode = CollectionViewMode.GRID,
     )

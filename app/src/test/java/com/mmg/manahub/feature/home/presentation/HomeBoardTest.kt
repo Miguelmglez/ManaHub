@@ -75,23 +75,15 @@ class HomeBoardTest {
         val state = HomeUiState(
             layout = layoutOf(
                 HomeWidgetType.DAILY_PUZZLE,
-                HomeWidgetType.COMPETITIVE,
                 HomeWidgetType.PROGRESSION_HUB,
                 HomeWidgetType.MTG_NEWS,
             ),
             gamificationEnabled = false,
         )
 
-        val rendered = render(state, HomeWidgetExtras(competitiveEnabled = false), puzzleEnabled = false)
+        val rendered = render(state, HomeWidgetExtras(), puzzleEnabled = false)
 
         assertEquals(listOf(HomeWidgetType.MTG_NEWS), rendered)
-    }
-
-    @Test
-    fun `competitive keeps its slot until its flag is known`() {
-        val state = HomeUiState(layout = layoutOf(HomeWidgetType.COMPETITIVE))
-
-        assertEquals(listOf(HomeWidgetType.COMPETITIVE), render(state, HomeWidgetExtras(competitiveEnabled = null)))
     }
 
     @Test
@@ -215,7 +207,7 @@ class HomeBoardTest {
     fun `news cards reserve a two-line title`() {
         val metrics = computeHomeWidgetMetrics(lineHeights(1f), Spacing())
         val thumbnail = HomeNewsCardWidth * 9f / 16f
-        val twoLineCard: Dp = thumbnail + 12.dp * 2 + 24.dp * 2 + 6.dp + 14.dp
+        val twoLineCard: Dp = thumbnail + 8.dp * 2 + 20.dp * 2 + 6.dp + 14.dp
 
         assertTrue(metrics.newsCardHeight >= twoLineCard)
     }

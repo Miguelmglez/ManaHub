@@ -27,4 +27,7 @@ data class ContentSourceEntity(
     /** HTTP `Last-Modified` response header captured on the last 200 (v45). */
     @ColumnInfo(name = "last_modified")
     val lastModified: String? = null,
+    /** HTTPS page opened by "Open site"/"Open channel" (v57); null until known. */
+    @ColumnInfo(name = "site_url")
+    val siteUrl: String? = null,
 )

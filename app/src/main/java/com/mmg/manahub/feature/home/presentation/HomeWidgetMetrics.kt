@@ -25,7 +25,7 @@ internal val HomeDeckTileWidth: Dp = 160.dp
 internal val HomeDraftSetTileWidth: Dp = 160.dp
 
 /** Width of a news card (MTG News). */
-internal val HomeNewsCardWidth: Dp = 220.dp
+internal val HomeNewsCardWidth: Dp = 170.dp
 
 /** Minimum hub slide height; the real height grows with the font scale. */
 internal val HubSlideMinHeight: Dp = 140.dp
@@ -133,8 +133,8 @@ fun computeHomeWidgetMetrics(lh: HomeLineHeights, sp: Spacing): HomeWidgetMetric
         DraftSetCompactPadding * 2 + DraftSetCompactIconSize + lh.titleMedium * 2 + lh.labelSmall + SlotSlack,
     )
 
-    // NewsItemCard(VERTICAL, titleMinLines = 2): 16:9 thumbnail + padded [2-line title, gap, meta].
-    val newsCard = HomeNewsCardWidth * 9f / 16f + sp.md * 2 + lh.bodyLarge * 2 + NewsMetaGap +
+    // Preserve the compact MTG News slot after moving the shared card to a full-image overlay.
+    val newsCard = HomeNewsCardWidth * 9f / 16f + sp.sm * 2 + lh.bodyMedium * 2 + NewsMetaGap +
         lh.labelSmall + SlotSlack
 
     val gameStatsSlide = maxOf(
@@ -191,7 +191,6 @@ fun computeHomeWidgetMetrics(lh: HomeLineHeights, sp: Spacing): HomeWidgetMetric
         HomeWidgetType.COMMUNITY_DECKS to shell + deckTileWithOwner,
         HomeWidgetType.TRENDING_COMMANDERS to shell + deckTile,
         HomeWidgetType.DAILY_PUZZLE to shell + singleCta + SlotSlack,
-        HomeWidgetType.COMPETITIVE to shell + singleCta + SlotSlack,
     )
 
     return HomeWidgetMetrics(

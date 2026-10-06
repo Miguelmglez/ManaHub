@@ -1,7 +1,7 @@
 package com.mmg.manahub.core.ui.components
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,9 +16,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -28,38 +29,50 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import kotlinx.coroutines.launch
 
 private val PULL_TRIGGER_HEIGHT = 56.dp
 private val PULL_MAX_DRAG_HEIGHT = 96.dp
 
 data class PullRefreshState(
     val nestedScrollConnection: NestedScrollConnection,
-    val headerHeightDp: Dp,
-    val dragFraction: Float,
-)
+    val headerHeightPx: State<Float>,
+    private val density: Density,
+    private val triggerPx: Float,
+) {
+    val headerHeightDp: Dp
+        get() = with(density) { headerHeightPx.value.toDp() }
+
+    val dragFraction: Float
+        get() = (headerHeightPx.value / triggerPx).coerceIn(0f, 1f)
+}
 
 @Composable
 fun rememberPullRefreshState(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
 ): PullRefreshState {
-    val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val triggerPx = with(density) { PULL_TRIGGER_HEIGHT.toPx() }
     val maxDragPx = with(density) { PULL_MAX_DRAG_HEIGHT.toPx() }
 
-    val headerHeight = remember { Animatable(0f) }
+    val headerHeightPx = remember { mutableFloatStateOf(0f) }
     val currentIsRefreshing by rememberUpdatedState(isRefreshing)
     val currentOnRefresh by rememberUpdatedState(onRefresh)
 
     LaunchedEffect(isRefreshing) {
-        if (!isRefreshing && headerHeight.value > 0f) {
-            headerHeight.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+        if (!isRefreshing && headerHeightPx.floatValue > 0f) {
+            animate(
+                initialValue = headerHeightPx.floatValue,
+                targetValue = 0f,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+            ) { value, _ ->
+                headerHeightPx.floatValue = value
+            }
         }
     }
 
@@ -67,9 +80,9 @@ fun rememberPullRefreshState(
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 if (currentIsRefreshing) return Offset.Zero
-                if (available.y < 0f && headerHeight.value > 0f) {
-                    val toConsume = (-available.y).coerceAtMost(headerHeight.value)
-                    scope.launch { headerHeight.snapTo(headerHeight.value - toConsume) }
+                if (available.y < 0f && headerHeightPx.floatValue > 0f) {
+                    val toConsume = (-available.y).coerceAtMost(headerHeightPx.floatValue)
+                    headerHeightPx.floatValue -= toConsume
                     return Offset(0f, -toConsume)
                 }
                 return Offset.Zero
@@ -82,9 +95,9 @@ fun rememberPullRefreshState(
             ): Offset {
                 if (currentIsRefreshing) return Offset.Zero
                 if (source == NestedScrollSource.UserInput && available.y > 0f) {
-                    val resistance = if (headerHeight.value > triggerPx) 0.35f else 0.65f
-                    val newH = (headerHeight.value + available.y * resistance).coerceIn(0f, maxDragPx)
-                    scope.launch { headerHeight.snapTo(newH) }
+                    val resistance = if (headerHeightPx.floatValue > triggerPx) 0.35f else 0.65f
+                    headerHeightPx.floatValue =
+                        (headerHeightPx.floatValue + available.y * resistance).coerceIn(0f, maxDragPx)
                     return available
                 }
                 return Offset.Zero
@@ -92,11 +105,23 @@ fun rememberPullRefreshState(
 
             override suspend fun onPreFling(available: Velocity): Velocity {
                 if (!currentIsRefreshing) {
-                    if (headerHeight.value >= triggerPx) {
+                    if (headerHeightPx.floatValue >= triggerPx) {
                         currentOnRefresh()
-                        headerHeight.animateTo(triggerPx, spring(stiffness = Spring.StiffnessMedium))
+                        animate(
+                            initialValue = headerHeightPx.floatValue,
+                            targetValue = triggerPx,
+                            animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                        ) { value, _ ->
+                            headerHeightPx.floatValue = value
+                        }
                     } else {
-                        headerHeight.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                        animate(
+                            initialValue = headerHeightPx.floatValue,
+                            targetValue = 0f,
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        ) { value, _ ->
+                            headerHeightPx.floatValue = value
+                        }
                     }
                 }
                 return super.onPreFling(available)
@@ -104,13 +129,11 @@ fun rememberPullRefreshState(
         }
     }
 
-    val headerHeightDp: Dp = with(density) { headerHeight.value.toDp() }
-    val dragFraction = (headerHeight.value / triggerPx).coerceIn(0f, 1f)
-
     return PullRefreshState(
         nestedScrollConnection = nestedScrollConnection,
-        headerHeightDp = headerHeightDp,
-        dragFraction = dragFraction,
+        headerHeightPx = headerHeightPx,
+        density = density,
+        triggerPx = triggerPx,
     )
 }
 

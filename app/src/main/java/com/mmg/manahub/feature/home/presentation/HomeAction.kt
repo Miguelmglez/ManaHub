@@ -115,12 +115,6 @@ sealed interface HomeAction {
      */
     data class SelectDiscoverSet(val set: com.mmg.manahub.core.model.MagicSet?) : HomeAction
 
-    /**
-     * Resets the persisted News filters (languages/types/sources) back to their defaults
-     * (English-only). Handled in [HomeViewModel] via DataStore.
-     */
-    object ResetNewsFilters : HomeAction
-
     // ── Per-widget navigation intents (resolved by AppNavGraph) ─────────────────
     object OpenDraftSimulator : HomeAction
     object OpenDraftGuide : HomeAction
@@ -129,9 +123,6 @@ sealed interface HomeAction {
 
     /** Opens the Profile screen on the Quests tab (gamification Phase 2). */
     object OpenProfileQuests : HomeAction
-
-    /** Opens the Competitive screen (gamification Phase 2). */
-    object OpenCompetitive : HomeAction
 
     /** Opens the Daily Puzzle screen (ADR-006), from either the widget's title/CTA. */
     object OpenDailyPuzzle : HomeAction

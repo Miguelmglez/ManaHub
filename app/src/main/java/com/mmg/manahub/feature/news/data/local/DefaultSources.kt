@@ -14,6 +14,7 @@ object DefaultSources {
             type = "ARTICLE",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.mtggoldfish.com",
         ),
         ContentSourceEntity(
             id = "default_article_scg",
@@ -22,6 +23,7 @@ object DefaultSources {
             type = "ARTICLE",
             isDefault = true,
             language = "en",
+            siteUrl = "https://articles.starcitygames.com",
         ),
         ContentSourceEntity(
             id = "default_article_cardkingdom",
@@ -30,6 +32,7 @@ object DefaultSources {
             type = "ARTICLE",
             isDefault = true,
             language = "en",
+            siteUrl = "https://blog.cardkingdom.com",
         ),
         ContentSourceEntity(
             id = "default_article_draftsim",
@@ -38,6 +41,7 @@ object DefaultSources {
             type = "ARTICLE",
             isDefault = true,
             language = "en",
+            siteUrl = "https://draftsim.com",
         ),
         ContentSourceEntity(
             id = "default_article_mtgazone",
@@ -46,6 +50,7 @@ object DefaultSources {
             type = "ARTICLE",
             isDefault = true,
             language = "en",
+            siteUrl = "https://mtgazone.com",
         ),
         ContentSourceEntity(
             id = "default_article_mtgrocks",
@@ -54,6 +59,7 @@ object DefaultSources {
             type = "ARTICLE",
             isDefault = true,
             language = "en",
+            siteUrl = "https://mtgrocks.com",
         ),
         // Verified 2026-07-14 via curl (HTTP 200 + valid RSS + item count) — News feature
         // improvements Phase 7.
@@ -65,6 +71,7 @@ object DefaultSources {
             type = "ARTICLE",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.hipstersofthecoast.com",
         ),
         ContentSourceEntity(
             id = "default_article_commandersherald",
@@ -74,6 +81,7 @@ object DefaultSources {
             type = "ARTICLE",
             isDefault = true,
             language = "en",
+            siteUrl = "https://commandersherald.com",
         ),
         ContentSourceEntity(
             id = "default_article_quietspeculation",
@@ -82,6 +90,7 @@ object DefaultSources {
             type = "ARTICLE",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.quietspeculation.com",
         ),
         ContentSourceEntity(
             id = "default_article_wargamer",
@@ -92,6 +101,7 @@ object DefaultSources {
             type = "ARTICLE",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.wargamer.com/magic-the-gathering",
         ),
         // Rejected 2026-07-14 (News feature improvements Phase 7) — no entity added:
         //   Bleeding Cool MTG    — redirects to a 404 `path.php`, dead feed url.
@@ -141,6 +151,7 @@ object DefaultSources {
             type = "ARTICLE",
             isDefault = true,
             language = "es",
+            siteUrl = "https://www.magicblogtk.com",
         ),
     )
 
@@ -166,6 +177,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.youtube.com/channel/UC8ZGymAvfP97qJabgqUkz4A",
         ),
         ContentSourceEntity(
             id = "default_video_command_zone",
@@ -174,6 +186,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.youtube.com/channel/UCLsiaNUb42gRAP7ewbJ0ecQ",
         ),
         ContentSourceEntity(
             id = "default_video_tolarian",
@@ -182,6 +195,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.youtube.com/channel/UC7-hR5EfgpM6oHfiGDkxfMA",
         ),
         ContentSourceEntity(
             id = "default_video_mtggoldfish",
@@ -190,6 +204,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.youtube.com/channel/UCVOzdxodlqNC2Y3KSvVQiVA",
         ),
         ContentSourceEntity(
             id = "default_video_rhystic",
@@ -198,6 +213,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.youtube.com/channel/UC8e0Sg8TmRRFJytjEGhmVTg",
         ),
         ContentSourceEntity(
             id = "default_video_nitpicking",
@@ -209,6 +225,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.youtube.com/channel/UCrLsxBysUHnpSKRpXMbMVzg",
         ),
         ContentSourceEntity(
             id = "default_video_good_morning",
@@ -219,6 +236,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.youtube.com/channel/UCvE8Mza7uRuiYlwiSDyJi9A",
         ),
         ContentSourceEntity(
             id = "default_video_pleasant_kenobi",
@@ -228,6 +246,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.youtube.com/channel/UC_b074DeDtbHukufPf2O1kw",
         ),
         ContentSourceEntity(
             id = "default_video_legenvd",
@@ -237,6 +256,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.youtube.com/channel/UCd0kth9C1hqJiaoedeBZ0cQ",
         ),
         ContentSourceEntity(
             id = "default_video_loadingreadyrun",
@@ -246,6 +266,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.youtube.com/channel/UCwjN2uVdL9A0i3gaIHKFzuA",
         ),
         // Verified 2026-07-14 (News feature improvements Phase 7) — 15 entries each, all active.
         ContentSourceEntity(
@@ -255,6 +276,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.youtube.com/channel/UC7339iJMCETmek3jdx9LOkg",
         ),
         ContentSourceEntity(
             id = "default_video_covertgoblue",
@@ -263,6 +285,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.youtube.com/channel/UC-UZjHl2kZ-6XKBLgbFgGAQ",
         ),
         ContentSourceEntity(
             id = "default_video_cardmarket_magic",
@@ -271,6 +294,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "en",
+            siteUrl = "https://www.youtube.com/channel/UCwatLpmoIeoL9egqVW2Cxbw",
         ),
     )
 
@@ -301,6 +325,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "es",
+            siteUrl = "https://www.youtube.com/channel/UCaWvebWif9HQblQlrgte7YA",
         ),
         ContentSourceEntity(
             id = "default_video_magicblogtk_es",
@@ -309,6 +334,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "es",
+            siteUrl = "https://www.youtube.com/channel/UC6LNy6IqI76s7emSw0zCZ2g",
         ),
         // Verified 2026-07-14: 15 entries, cEDH deck-tech content, uploads multiple times daily.
         ContentSourceEntity(
@@ -318,6 +344,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "es",
+            siteUrl = "https://www.youtube.com/channel/UCQsXkyjcL1gck9zaHgzBFLA",
         ),
     )
 
@@ -342,6 +369,7 @@ object DefaultSources {
             type = "VIDEO",
             isDefault = true,
             language = "de",
+            siteUrl = "https://www.youtube.com/channel/UCwzLpT-Jk3yh19yzRG5OFPQ",
         ),
     )
 

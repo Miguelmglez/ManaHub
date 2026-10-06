@@ -4,7 +4,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Feed
 import androidx.compose.material.icons.filled.Flag
@@ -242,33 +241,8 @@ enum class HomeWidgetType(
         category = WidgetCategory.DISCOVER,
         audience = WidgetAudience.ALL,
         icon = Icons.Default.Extension,
-    ),
-
-    // ── Competitive (Phase 5) ────────────────────────────────────────────────────
-    /** Launcher tile into the Competitive screen (metagame rankings, 17lands Limited ratings,
-     * event locator, Pro Tour news filter). Gallery-only/opt-in (NOT in either default layout,
-     * matching [TRENDING_COMMANDERS]/[DAILY_PUZZLE]'s board-length discipline) and gated by the
-     * `competitiveEnabledFlow` DataStore flag (reactive, unlike [DAILY_PUZZLE]'s compile-time
-     * [com.mmg.manahub.feature.puzzle.presentation.PuzzleFeatureFlags] gate — see
-     * [HomeViewModel.competitiveEnabledFlow], kept OUTSIDE [HomeUiState] for the same reason as
-     * `trendingFlow`/`dailyPuzzleFlow`). */
-    COMPETITIVE(
-        persistedId = "competitive",
-        defaultTitleRes = R.string.widget_title_competitive,
-        supportedSizes = setOf(WidgetSize.MEDIUM),
-        category = WidgetCategory.COMMUNITY,
-        audience = WidgetAudience.ALL,
-        icon = Icons.Default.EmojiEvents,
     );
 
-   /* MULTI_CARD_ADD(
-    persistedId = "multi_card_add",
-    defaultTitleRes = R.string.widget_title_multi_card_add,
-    supportedSizes = setOf(WidgetSize.MEDIUM),
-    category = WidgetCategory.COLLECTION,
-    audience = WidgetAudience.ALL,
-    icon = Icons.Default.CollectionsBookmark,
-    );*/
 
     /** True for widgets that belong to the gamification system (hidden when the toggle is off). */
     val isGamification: Boolean
