@@ -127,6 +127,7 @@ import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaHubBottomSheetSelector
 import com.mmg.manahub.core.ui.components.ManaTabItem
 import com.mmg.manahub.core.ui.components.ManaTabRow
+import com.mmg.manahub.core.ui.components.MovementRow
 import com.mmg.manahub.core.ui.components.rememberFabVisibility
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.mtg_card_back
@@ -162,7 +163,6 @@ import com.mmg.manahub.feature.decks.presentation.components.FindingsList
 import com.mmg.manahub.feature.decks.presentation.components.GroupHeader
 import com.mmg.manahub.feature.decks.presentation.components.HealthScoreRing
 import com.mmg.manahub.feature.decks.presentation.components.MagicLandSuggestionStatic
-import com.mmg.manahub.core.ui.components.MovementRow
 import com.mmg.manahub.feature.decks.presentation.components.PillarTile
 import com.mmg.manahub.feature.decks.presentation.components.ScoreLimiterHint
 import com.mmg.manahub.feature.decks.presentation.components.StrategyPlanChip
@@ -571,7 +571,6 @@ fun DeckStudioScreen(
                             enabled = true,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = spacing.md)
                                 .height(56.dp)
                         )
                     }
