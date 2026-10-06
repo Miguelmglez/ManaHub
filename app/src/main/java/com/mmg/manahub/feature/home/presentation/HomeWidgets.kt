@@ -1180,12 +1180,11 @@ private fun ContextHeroWidget(hero: HomeHeroState, onAction: (HomeAction) -> Uni
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Auto-advancing onboarding carousel backed by a [HorizontalPager].
+ * User-controlled onboarding carousel backed by a [HorizontalPager].
  *
  * Each page shows an icon badge, a title, a subtitle, and a small top-right dismiss
- * affordance (≥48dp touch target). The pager auto-advances every 4 seconds while the user is not
- * actively swiping ([androidx.compose.foundation.pager.PagerState.isScrollInProgress] pauses the
- * timer automatically). Chevron nav icons let the user browse without waiting.
+ * affordance (≥48dp touch target). Pages change only through user interaction, using swipes or
+ * navigation controls.
  *
  * Stateless — driven entirely by the pager state and the two callback lambdas.
  *
@@ -1213,17 +1212,6 @@ internal fun FirstStepsCarousel(
     // Re-key the pager whenever the number of steps changes (e.g. a step is skipped),
     // so the current page index can never point past the end of the list.
     val pagerState = rememberPagerState(pageCount = { steps.size })
-
-    // Auto-advance while the user is not actively swiping. isScrollInProgress flips to
-    // true during a drag/fling, which cancels and restarts this effect — pausing the timer.
-    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
-        if (!pagerState.isScrollInProgress) {
-            delay(4_000L)
-            if (steps.size > 1) {
-                pagerState.animateScrollToPage((pagerState.currentPage + 1) % steps.size)
-            }
-        }
-    }
 
     WidgetShell {
         WidgetSectionHeader(
@@ -1801,8 +1789,8 @@ private fun QuickActionTile(
 private val LocalHubSlideHeight = compositionLocalOf { HubSlideMinHeight }
 
 /**
- * A reusable auto-sliding pager used by the hub widgets (game stats, collection, trades). Shows
- * [slides] one at a time, auto-advancing every 4 seconds while the user is not actively swiping.
+ * A reusable pager used by the hub widgets (game stats, collection, trades). Shows [slides] one at
+ * a time, optionally auto-advancing every 4 seconds while the user is not actively swiping.
  * Every slide renders at [slideHeight] (the hub's tallest slide, font-scale aware) so advancing
  * never resizes the widget. Renders [emptyContent] when [slides] is empty.
  */
@@ -1813,6 +1801,7 @@ private fun <T> AutoSlideHub(
     slideContent: @Composable (T) -> Unit,
     emptyContent: @Composable () -> Unit = { WidgetEmptyBody(stringResourceSafe(R.string.home_widget_empty)) },
     showDots: Boolean = true,
+    autoAdvance: Boolean = true,
 ) {
     val spacing = MaterialTheme.spacing
     val coroutineScope = rememberCoroutineScope()
@@ -1823,8 +1812,8 @@ private fun <T> AutoSlideHub(
     }
 
     val pagerState = rememberPagerState(pageCount = { slides.size })
-    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
-        if (!pagerState.isScrollInProgress) {
+    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress, autoAdvance) {
+        if (autoAdvance && !pagerState.isScrollInProgress) {
             delay(4_000L)
             if (slides.size > 1) {
                 pagerState.animateScrollToPage((pagerState.currentPage + 1) % slides.size)
@@ -2277,6 +2266,7 @@ private fun CollectionStatsHubWidget(uiState: HomeUiState, slideHeight: Dp, onAc
             emptyContent = { WidgetEmptyBody(stringResourceSafe(R.string.home_collection_color_empty)) },
             slideContent = { slide -> CollectionSlideContent(slide, onAction) },
             showDots = true,
+            autoAdvance = false,
         )
     }
 }
