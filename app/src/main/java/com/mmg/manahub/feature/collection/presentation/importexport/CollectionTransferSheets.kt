@@ -63,12 +63,13 @@ fun CollectionTransferActionsSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = mc.backgroundSecondary,
         shape = BottomSheetShape,
+        dragHandle = null,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = sp.lg, vertical = sp.sm)
-                .padding(bottom = sp.xl),
+                .padding(horizontal = sp.lg)
+                .padding(top = sp.md, bottom = sp.xl),
             verticalArrangement = Arrangement.spacedBy(sp.sm),
         ) {
             Text(
@@ -115,6 +116,7 @@ fun CollectionExportSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = mc.backgroundSecondary,
         shape = BottomSheetShape,
+        dragHandle = null,
     ) {
         TransferSheetHeader(stringResource(R.string.collection_export_title), stringResource(R.string.import_close_export), onDismiss)
         Column(
@@ -294,7 +296,13 @@ fun UnresolvedLinesDialog(
 /** Fixed, stateless header shared by collection transfer sheets. */
 @Composable
 internal fun TransferSheetHeader(title: String, closeDescription: String, onClose: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = MaterialTheme.spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = MaterialTheme.spacing.sm)
+            .padding(top = MaterialTheme.spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         IconButton(onClick = onClose) { Icon(Icons.Default.Close, closeDescription, tint = MaterialTheme.magicColors.textPrimary) }
         Text(title, style = MaterialTheme.magicTypography.titleLarge, color = MaterialTheme.magicColors.textPrimary, modifier = Modifier.weight(1f))
     }

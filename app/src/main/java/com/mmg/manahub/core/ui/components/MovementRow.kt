@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -96,7 +97,7 @@ fun MovementRow(
                                         }
                                     } else Modifier
                                 )
-                                .padding(vertical = spacing.sm, horizontal = spacing.xs),
+                                .padding(vertical = spacing.xs, horizontal = 2.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(spacing.xs, Alignment.CenterVertically),
                         ) {
@@ -111,7 +112,9 @@ fun MovementRow(
                                 style = ty.labelSmall,
                                 color = effectiveTint,
                                 textAlign = TextAlign.Center,
-                                softWrap = true
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                softWrap = false
                             )
                         }
                     }

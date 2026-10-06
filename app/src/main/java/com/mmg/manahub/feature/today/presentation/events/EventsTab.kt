@@ -465,13 +465,6 @@ private fun TrendLinkCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-
-            Text(
-                text = "OPEN",
-                style = ty.labelSmall,
-                color = mc.secondaryAccent,
-                maxLines = 1,
-            )
         }
     }
 }

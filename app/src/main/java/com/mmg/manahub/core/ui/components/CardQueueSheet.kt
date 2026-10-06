@@ -6,18 +6,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -61,9 +57,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -342,7 +338,6 @@ fun EditQueuedCardSheet(
 }
 
 @Composable
-@OptIn(ExperimentalLayoutApi::class)
 internal fun QueueCardItem(
     entry: QueuedCard,
     preferredCurrency: PreferredCurrency,
@@ -384,7 +379,7 @@ internal fun QueueCardItem(
                 .fillMaxWidth()
                 .padding(horizontal = spacing.lg),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(spacing.lg)
+            horizontalArrangement = Arrangement.spacedBy(spacing.md)
         ) {
             AsyncImage(
                 model = entry.card.imageArtCrop ?: entry.card.imageNormal,
@@ -397,18 +392,23 @@ internal fun QueueCardItem(
                     .clip(ChipShape)
             )
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(spacing.xxs)
+            ) {
                 CardName(
                     name = entry.card.name,
                     style = ty.titleMedium,
                     color = mc.textPrimary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(Modifier.height(spacing.xs))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     SetSymbol(
                         setCode = entry.card.setCode,
                         rarity = CardRarity.fromString(entry.card.rarity),
@@ -420,53 +420,64 @@ internal fun QueueCardItem(
                         style = ty.labelMedium,
                         color = mc.textSecondary,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
                 }
 
-                Spacer(Modifier.height(spacing.sm))
-
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                    verticalArrangement = Arrangement.spacedBy(spacing.sm),
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                        LanguageBadge(langCode = entry.language)
-                        AttrTag(entry.condition)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(spacing.xxs)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            LanguageBadge(langCode = entry.language)
+                            AttrTag(entry.condition)
 
-                        if (entry.isFoil) {
-                            AttrTag(stringResource(R.string.scanner_foil))
+                            if (entry.isFoil) {
+                                FoilBadge()
+                            }
+
+                            // Any printing/language of the same oracle identity counts as owned.
+                            if (isInCollection) {
+                                Icon(
+                                    imageVector = Icons.Rounded.CollectionsBookmark,
+                                    contentDescription = stringResource(R.string.scanner_already_in_collection),
+                                    tint = mc.primaryAccent,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
                         }
 
-                        // Any printing/language of the same oracle identity counts as owned.
-                        if (isInCollection) {
-                            Icon(
-                                imageVector = Icons.Rounded.CollectionsBookmark,
-                                contentDescription = stringResource(R.string.scanner_already_in_collection),
-                                tint = mc.primaryAccent,
-                                modifier = Modifier.size(16.dp),
+                        if (showPrice) {
+                            Text(
+                                text = PriceFormatter.formatFromScryfall(
+                                    if (entry.isFoil) entry.card.priceUsdFoil else entry.card.priceUsd,
+                                    if (entry.isFoil) entry.card.priceEurFoil else entry.card.priceEur,
+                                    preferredCurrency,
+                                ),
+                                style = ty.labelSmall.copy(fontWeight = FontWeight.Bold, color = priceInk),
                             )
                         }
+                    }
+
                     QuantitySelector(
                         quantity = displayQuantity,
                         cardName = entry.card.name,
                         onQuantityClick = onQuantityClick,
                         enabled = !isWriteInFlight && quantityEditable,
                         onIncrement = onIncrement,
-                        onDecrement = onDecrement
+                        onDecrement = onDecrement,
+                        modifier = Modifier.padding(start = spacing.sm)
                     )
                 }
-
-                Spacer(Modifier.height(spacing.sm))
-
-                if (showPrice) Text(
-                    text = PriceFormatter.formatFromScryfall(
-                        if (entry.isFoil) entry.card.priceUsdFoil else entry.card.priceUsd,
-                        if (entry.isFoil) entry.card.priceEurFoil else entry.card.priceEur,
-                        preferredCurrency,
-                    ),
-                    style = ty.labelLarge.copy(fontWeight = FontWeight.Bold, color = priceInk),
-                )
             }
         }
 
@@ -539,20 +550,20 @@ private fun QuantitySelector(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.xs)
     ) {
-        IconButton(onClick = onDecrement, enabled = enabled && quantity > 1L, modifier = Modifier.size(48.dp)) {
-            Icon(Icons.Default.Remove, stringResource(R.string.import_decrease_quantity, cardName), tint = if (enabled) mc.textPrimary else mc.textDisabled, modifier = Modifier.size(16.dp))
+        IconButton(onClick = onDecrement, enabled = enabled && quantity > 1L, modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Default.Remove, stringResource(R.string.import_decrease_quantity, cardName), tint = if (enabled) mc.textPrimary else mc.textDisabled, modifier = Modifier.size(14.dp))
         }
         Text(
             text = quantity.toString(),
-            style = ty.titleLarge.copy(fontWeight = FontWeight.Bold),
+            style = ty.labelLarge.copy(fontWeight = FontWeight.Bold),
             color = mc.secondaryAccent,
-            modifier = Modifier.widthIn(min = 48.dp).heightIn(min = 48.dp).wrapContentHeight(Alignment.CenterVertically).then(
+            modifier = Modifier.widthIn(min = 20.dp).then(
                 if (onQuantityClick != null) Modifier.clickable(onClick = onQuantityClick) else Modifier
             ),
             textAlign = TextAlign.Center
         )
-        IconButton(onClick = onIncrement, enabled = enabled && quantity < Int.MAX_VALUE.toLong(), modifier = Modifier.size(48.dp)) {
-            Icon(Icons.Default.Add, stringResource(R.string.import_increase_quantity, cardName), tint = if (enabled) mc.textPrimary else mc.textDisabled, modifier = Modifier.size(16.dp))
+        IconButton(onClick = onIncrement, enabled = enabled && quantity < Int.MAX_VALUE.toLong(), modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Default.Add, stringResource(R.string.import_increase_quantity, cardName), tint = if (enabled) mc.textPrimary else mc.textDisabled, modifier = Modifier.size(14.dp))
         }
     }
 }
