@@ -9,7 +9,7 @@ The Desktop prompt is historical input; ADR-012 supersedes its algorithm, accept
 
 User direction: execute with the project agents, one agent per task, sequentially. Close and verify each bounded task before assigning the next. Keep this file updated so another session or device can resume from evidence.
 
-Current checkpoint: **B1-01 closed**, with final corrected schema2 inventory and40 passing tool tests. B0-01 and B0-02 are also closed. Staged security review passed; next: B1-02 canonical label enrichment. Production visual recognition is not implemented or validated; no scanner source, reference images or models have been changed/downloaded.
+Current checkpoint: **B1-02 closed** with validated canonical labels; next is docs security review then B1-03 physical geometry. B0-01/B0-02/B1-01 and their staged security review are closed; prior checkpoint saved in local commit43b85904. No push/publication has occurred. Production visual recognition is not implemented or validated; no scanner source, reference images or models have been changed/downloaded.
 
 ## Starting state
 
@@ -19,7 +19,7 @@ Current checkpoint: **B1-01 closed**, with final corrected schema2 inventory and
 - Pre-existing unrelated untracked artifact: `scripts/__pycache__/`. Preserve it.
 - Android scanner remains excluded from the KMP migration; web work remains paused.
 - Miguel confirmed an attached Pixel 6a is available for tests. Read-only adb verification found Android 17/API 37 and 4 KB pages. No additional physical devices have been supplied.
-- Private photo sample supplied by Miguel: `E:/Projects/scanner_muster`. Inventory and visual inspection completed: 97 JPEG files, 381,329,720 bytes, all decodable, no byte-identical duplicates. This is a development sample with observed titles/languages annotated; canonical identity, exact printing, quads and independence remain separate pending fields.
+- Private photo sample supplied by Miguel: `E:/Projects/scanner_muster`. Inventory and visual inspection completed: 97 JPEG files, 381,329,720 bytes, all decodable, no byte-identical duplicates. This is a development sample: all97 identities/panel mappings are verified,30 printing metadata identities confirmed and67 candidate-only; quads, finishes and capture independence remain pending.
 - Prior measurements in the Desktop prompt have not been reproduced and are not acceptance evidence.
 
 ## Task ledger
@@ -30,7 +30,8 @@ Current checkpoint: **B1-01 closed**, with final corrected schema2 inventory and
 | B0-02: development-sample labels and annotation contract | android-unit-test-writer | Closed: annotation validation PASS | [Report](../scanner-v2/sample-labels.md): 97 observed titles/languages, 102 title fields; no user questions. Catalog/printing/quad ground truth pending. |
 | B1-01: bounded streaming metadata ingestion tool | android-kotlin-architect | Closed: corrected inventory PASS | Schema2/generator2.0 full rebuild and replay passed: 118,601 accepted raw/normalized records, SQL integrity/FK checks passed. Live Art Series/token/prepare/front_card corrections verified; Final [report](../scanner-v2/catalog-ingest.md) closes the task; final replay8.157s preserved counts/hash. Separate from image downloads/model experiments. |
 | B1-01R: staged security review | android-security-auditor | Closed: PASS | Ten owned paths checked; no secrets/forced ignored files, parser/transport/recovery reviewed. No Android visual/offline certification. |
-| B1-02: canonical development-label enrichment | Unassigned | Ready for sequential assignment | Resolve identity/visible-face relationships from verified metadata, preserve ambiguous printing candidates, validate all 97 records. |
+| B1-02: canonical development-label enrichment | android-unit-test-writer | Closed: validation PASS | [Report](../scanner-v2/canonical-labels.md):97 identities,102 panels,4 reverse mappings,30 printing metadata identities,67 candidate-only;8 semantic regressions passed. |
+| B1-03: manually verified physical quadrilaterals | Unassigned | Ready after checkpoint review | Annotate all97 decoded photographs with physical card corners, independent of detector evaluation; preserve source and corner-review provenance. |
 | Block 1: remaining catalog and comparative benchmark | Unassigned | Pending label/quad/reference contracts | Separate bounded tasks for coordinates, references, localizers and A/B/C comparison; no algorithm selection in advance. |
 | Block 2: Android viability and pipeline selection | Unassigned | Pending benchmark evidence | Physical runtime, parity, memory and latency measurements required. |
 | Block 3: pack and operation | Unassigned | Pending selected recipe | Signed compatibility unit, transactional activation, rollback and kill switch. |
@@ -59,6 +60,8 @@ B1-01 first-pass live-data review (historical; corrected before closure): the fi
 B1-01 corrected projection evidence (2026-10-07): schema2/generator2.0 was regenerated in a new output directory against the exact same immutable snapshot. 40 offline tests passed. Coverage reports 118,601 source records and accepted printings, 122,517 physical image surfaces, 108,830 eligible image references, 38,708 actual Oracle IDs and 55,841 distinct surface illustration IDs. SQL integrity is ok, FK violations0, checkpoint118601, missing face-parent identity links0 and raw-parent mismatches0. Source limits remain finite (all_parts1024 versus observed maximum374); Art Series has zero policy conflicts, prepare has122 root surfaces and all315 front_card records remain explicit negatives. Initial corrected invocation310.049s, lifetime peak working set45,694,976 bytes; SQLite883,347,456 bytes. These are desktop tool measurements, not recognition or Android performance. Detailed final replay/runtime/source hashes belong to the task report; future consumers must inspect lowres/missing/nonpaper/nonplayable/language/unresolved-related-target counts.
 Security review (2026-10-07): android-security-auditor passed the staged tools/contracts checkpoint, including secret scan, ignored-file check, parameterized parser/SQLite, finite resource/transport bounds and resumable source-prefix validation. google-services.json stayed ignored/unstaged; private photos, snapshots and databases were not staged. diff whitespace check passed. No Android visual/offline quality claim is made by this gate.
 
+Graph maintenance (2026-10-07): the relative CLI update returned no code files. Absolute-path extraction found2747files; a duplicate manual invocation was stopped after verifying its exact process identity. The normal post-commit hook rebuilt the ignored graph successfully at13:38:27 local time:33579nodes,61705edges,2435communities. The remaining redundant manual update was stopped after that success. No force overwrite/shrink was used, and no graph artifacts were added to Git. Large HTML visualization was skipped by the tool limit; source graph/report updated.
+
 ## Prerequisites to prepare
 
 | Resource | When required | Status / responsibility |
@@ -83,7 +86,7 @@ Security review (2026-10-07): android-security-auditor passed the staged tools/c
 - Miguel authorized preparing the labels from the photos and consulting only uncertain cases. Unreadable edition/collector/language fields remain unknown until verified; do not turn a plausible visual identification into exact-print ground truth.
 - No explicit negative/unknown scenes or generic card backs were observed. Add negatives and separately captured held-out sessions before quality evaluation.
 - All inspected images belong to development/smoke use. Do not repurpose them as an untouched final evaluation set or infer statistical independence from filenames.
-- B0-02 observed-label annotation is complete and independently validated against all originals: 97 primary titles, 102 visible title fields, languages 60 English / 32 Spanish / 5 German. No clarification needed from Miguel. Canonical English names are proposals pending catalog verification; verified catalog identities/exact printings remain 0 and all 97 quads remain pending. See [annotation report](../scanner-v2/sample-labels.md).
+- B0-02 observed-label annotation is complete and independently validated against all originals: 97 primary titles, 102 visible title fields, languages 60 English / 32 Spanish / 5 German. No clarification needed from Miguel. Canonical English names are proposals pending catalog verification; at that immutable B0 checkpoint verified catalog identities/exact printings were0. B1-02 subsequently verifies97 identities and30 printing metadata identities in a new version; all97 quads remain pending. See [annotation report](../scanner-v2/sample-labels.md).
 - Private annotated manifest: `E:/Projects/ManaHub-build/scanner-v2/dataset/sample-manifest.json`, SHA-256 `de25a6185ffbc6c74cda2ede9bbe3c98e8898e4b011d534ae139997cf5096a85`. Run its private `validate-sample-manifest.py` with `C:/Python314/python.exe` after moving artifacts. Preserve original bytes; update machine-local roots explicitly.
 
 ### Observed-label acceptance (B0-02 closed)
@@ -105,6 +108,18 @@ Security review (2026-10-07): android-security-auditor passed the staged tools/c
 - Validate source hashes, parent/face links, printing identity/language consistency, completed/pending counts and preserved development split. Ask Miguel only about unresolved visible evidence after inspection.
 - Close with a tracked summary and private reproducible artifacts. Quads, negative scenes, independent captures and recognition quality remain separate subsequent tasks.
 
+Canonical enrichment validation (2026-10-07, B1-02 closed): private `dataset/canonical-validation-v2.json` is PASS. It checks97 photo hashes/dimensions,4036 evidence objects,102 visible panels,97 verified identities representing79 distinct parent Oracles,4 reverse mappings and8 semantic regression cases. Printing metadata identity is confirmed for30 samples (20 local,10 targeted supplement);67 remain candidate-only,20 have verified appearance references and0 finishes are confirmed. Identity evidence:77 local catalog,20 targeted metadata;60 canonical English title matches,36 localized printed-name bridges and1 explicit bilingual rules/cost/stat/flip comparison. Targeted preparation made27 public metadata requests (26 card objects,1 not-found),129483 response bytes, zero photo uploads. Manifest `dataset/sample-manifest-v2-canonical.json` SHA2792d7e306dce7df438040b6a75411dc4b6173c0222721634ddfe8d8152d68a9. All97 quads and capture independence remain pending. None of these counts measures recognition.
+
+### Physical quadrilateral annotation acceptance (B1-03)
+
+- Retain original and canonical-enrichment manifests; produce a separate versioned geometry annotation linked by sample ID/source SHA and exact decoded width/height.
+- Inspect each original at sufficient resolution and label the physical card boundary, not a sleeve or guide. Store four clockwise corners in the declared EXIF-aware decoded coordinate system, starting at the smallest (y,x) pair; canonical upright orientation is a separate field. For rounded corners, use the estimated intersection of the adjacent straight physical card edges, recording uncertainty instead of choosing the sleeve corner.
+- Proposed points may assist review but are never automatically scored as ground truth. Verify every corner overlay manually; retain review provenance and uncertainty for glare, rounded corners or a hidden boundary.
+- Validate finite in-bounds coordinates, distinct corners, convex non-self-intersecting geometry, source dimensions and ordering. Do not use a fixed aspect-ratio rejection on photographed perspective or assign detector accuracy from the same predictions that generated labels.
+- Deliver completed/pending/uncertain counts with private overlays/coordinates and a tracked summary. Human-visible coordinates support development localization error measurement; they do not establish held-out independence or certify recognition.
+
+Ten verified localized supplemental printings are preparation evidence outside the default_cards inventory. Future downloaded local packs must include accepted language/printing payload before offering them offline; these supplements are not a scanner backend dependency.
+
 ## Portable artifact handoff
 
 Git carries the tool source, contracts and evidence summaries, not the private photographs or generated databases. Transfer these external artifacts privately when changing devices; preserve bytes/hashes and update local path roots explicitly.
@@ -113,9 +128,12 @@ Git carries the tool source, contracts and evidence summaries, not the private p
 |---|---|---|
 | Original development photographs | `E:/Projects/scanner_muster` | Preserve all 97 originals and validate against the inventory before annotation/evaluation. |
 | Photo inventory and observed-label manifest | `E:/Projects/ManaHub-build/scanner-v2/{photo-inventory,dataset}` | Carry the inventory, manifest, annotation review and validator; the label manifest hash is recorded above. |
+| Enriched canonical labels and evidence | `E:/Projects/ManaHub-build/scanner-v2/dataset` | Carry sample-manifest-v2-canonical.json, validation/review, artifact index, source-evidence-v2, official-evidence-v2 and scripts. SHA2792d7e306dce7df438040b6a75411dc4b6173c0222721634ddfe8d8152d68a9; validator accepts relocated photo/catalog roots. |
 | Immutable default_cards metadata | `E:/Projects/ManaHub-build/scanner-v2/catalog/cache/default-cards-20261007090547.jsonl.gz` | Carry its `.verified.json` marker; SHA-256 `43da5fff200a7c8087eaa5b7bf80a64cc17998a7f92ad6b9d7508bafaef5f0d0`. Source date 2026-10-07T09:05:47.951Z; 78,779,281 compressed bytes, 633,902,189 expanded bytes, 118,601 records. Download and schema2 full ingestion/replay are verified; recognition/coverage acceptance remains separate. |
 | Catalog database, coverage and runtime reports | `E:/Projects/ManaHub-build/scanner-v2/catalog/default-cards-v2` | Current schema2/generator2.0 inventory; historical v1 remains at default-cards for comparison. Copy only after the writer has closed; pair with the exact snapshot/tool schema. Use the local snapshot command in the ingestion report to validate/replay. |
 | Baseline XML/log/source evidence | Paths in B0-01 and B1-01 reports | Keep privately if detailed reproduction/audit is needed; Android acceptance claims still require physical evidence. |
+
+B1-02 resumed with the same agent after an account usage-limit interruption and Miguel's explicit continue instruction. Its final report resolves the initial reverse/name proposals, including Obsianus Golem and normal-card/prepared-panel collisions. Original observations remain immutable; new versioned labels carry their own field-level verification evidence.
 
 ## Next-session procedure
 
