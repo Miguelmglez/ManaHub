@@ -431,6 +431,7 @@ graphify-out/
 !/docs/scanner-v2/sample-labels.md
 !/docs/scanner-v2/catalog-ingest.md
 !/docs/scanner-v2/canonical-labels.md
+!/docs/scanner-v2/physical-quads.md
 /.claude/skills/compose-ui/SKILL.md
 /.claude/skills/compose-ui/references/visual-loop-setup.md
 /.claude/skills/compose-ui/references/components.md
