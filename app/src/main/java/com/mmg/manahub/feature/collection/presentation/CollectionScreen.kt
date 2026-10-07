@@ -472,19 +472,8 @@ private fun CardsTabContent(
 
     val hasActiveSearchOrFilter = uiState.searchQuery.isNotBlank() || filterCount > 0
 
-    // Genuinely empty collection (nothing added yet, nothing to filter) — full-screen state,
-    // no header needed since there's no search/filter UI to offer yet.
+    // Genuinely empty collection (nothing added yet, nothing to filter).
     val emptyCards = if(pagedCards==null)uiState.cards.isEmpty() else (uiState.selectionSummary?.groups ?: 0L)==0L
-    if (emptyCards && !hasActiveSearchOrFilter && !uiState.isLoading) {
-        EmptyState(
-            icon        = Icons.Default.CollectionsBookmark,
-            title       = stringResource(R.string.collection_empty_title),
-            subtitle    = stringResource(R.string.collection_empty_subtitle),
-            actionLabel = stringResource(R.string.collection_empty_action),
-            onAction    = onAddCardClick,
-        )
-        return
-    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // ── Card list / grid / filtered-to-zero content ──────────────────
@@ -501,6 +490,17 @@ private fun CardsTabContent(
             ) {
                 MagicLoadingSpinner()
             }
+        } else if (emptyCards && !hasActiveSearchOrFilter) {
+            EmptyState(
+                icon        = Icons.Default.CollectionsBookmark,
+                title       = stringResource(R.string.collection_empty_title),
+                subtitle    = stringResource(R.string.collection_empty_subtitle),
+                actionLabel = stringResource(R.string.collection_empty_action),
+                onAction    = onAddCardClick,
+                modifier    = Modifier
+                    .fillMaxSize()
+                    .padding(top = headerHeightDp),
+            )
         } else if (emptyCards) {
             // Rows whose card is not cached yet are skipped by the projection, so "empty" would be
             // a lie while any of them are outstanding — the list is INCOMPLETE, not empty
