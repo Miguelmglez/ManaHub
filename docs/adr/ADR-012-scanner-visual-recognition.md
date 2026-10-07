@@ -1,6 +1,6 @@
 # Scanner V2: reconocimiento visual de cartas — plan definitivo de ejecución
 
-Fecha: 2026-10-04. Estado: diseño para implementación posterior; ninguna prueba de reconocimiento nuevo ejecutada todavía.
+Fecha de decisión: 2026-10-04. Precisión de alcance: 2026-10-07. Estado: ejecución de inventario y herramientas iniciada; motor visual y pruebas de reconocimiento nuevo pendientes. Seguimiento: `docs/plans/scanner-v2-progress.md`.
 
 Este documento sustituye `C:\Users\Miguel\Desktop\prompt-scanner-v2-art-recognition.md` como especificación de ejecución. Es una referencia duradera, conservada en `docs/adr/`, no un plan temporal. La implementación se hará en una tarea posterior. Las cifras de aceptación son objetivos, no resultados obtenidos.
 
@@ -10,7 +10,7 @@ Construir un scanner local capaz de localizar una carta física completa, correg
 
 La arquitectura elegida separa **localización → normalización → recuperación de candidatos → verificación → decisión temporal → selección de impresión → cola existente**. El motor recupera identidades de un catálogo actualizable, no clasifica entre una lista fija de nombres. Se recomienda búsqueda mediante embeddings compactos y verificación de características locales; pHash es el baseline obligatorio y una posible señal auxiliar. El algoritmo concreto se congela tras una comparación reproducible y una prueba temprana en Android. No se prohíbe ML por el fracaso anterior ni se da por hecho que cualquier embedding funcionará.
 
-Un paquete descargable de cientos de MB es aceptable. La prioridad es precisión, cobertura y comportamiento estable; el límite práctico está en la RAM, el tiempo por captura, la temperatura y la instalación fiable. El catálogo y los modelos se distribuyen desde Cloudflare R2; las imágenes de cámara permanecen en el dispositivo.
+Un paquete descargable de cientos de MB es aceptable. La prioridad es precisión, cobertura y comportamiento estable; el límite práctico está en la RAM, el tiempo por captura, la temperatura y la instalación fiable. El catálogo y los modelos se distribuyen desde Cloudflare R2; las imágenes de cámara permanecen en el dispositivo. Miguel precisó el 2026-10-07 que, tras descargar el catálogo pertinente, la identificación, la comprobación de candidatos y la resolución de impresión deben ejecutarse en el dispositivo sin consultas al backend. El catálogo debe incluir el payload versionado necesario para resolver localmente un `Card` válido de sus impresiones elegibles; no se exige red para comprobar una carta durante el escaneo visual.
 
 La primera entrega cubre una carta objetivo por vez, completamente visible, con libertad razonable de posición y rotación dentro del visor. La guía ayuda a encuadrar, pero no exige alinear la ilustración a un rectángulo exacto. Reconocer varias cartas simultáneamente, oclusiones fuertes, cartas dentro de slabs y autenticar falsificaciones quedan fuera de la primera entrega. Mostrar una carta en otra pantalla o un proxy visualmente idéntico puede producir la misma identidad: esto no es autenticación.
 
@@ -31,7 +31,7 @@ La primera entrega cubre una carta objetivo por vez, completamente visible, con 
 | 10 fotos, tres sets y 20 cartas de tuning | Sirven para depurar, no para aceptar el producto. Se exige catálogo completo y conjunto físico independiente. |
 | Muestra de 100.000 pares para calibrar colisiones | No descubre los vecinos difíciles de cada referencia. Se necesita evaluación de vecinos cercanos y falsos positivos por presentación. |
 | Archivo total de 4–8 MB | Ni el propio formato cumple necesariamente: 130.000 × 56 = 7,28 MB, antes de tabla de strings, nombres y cabecera. Los hashes solos ocupan 4,16 MB. |
-| Motor siempre resuelve `Card` por Internet | Se separa reconocer offline de hidratar datos; no se bloquea la cámara por red ni se promete guardado offline de un `Card` incompleto. |
+| Motor siempre resuelve `Card` por Internet | Identidad, candidatos e impresión se resuelven localmente; el pack contiene el payload validado de las impresiones elegibles. No se fabrican campos vacíos ni se consulta el backend para completar la comprobación del scanner visual. |
 | Borrar todo el antiguo pipeline al final | Revalidar primero: gran parte ya fue eliminada en agosto. No borrar por una lista histórica. |
 | Añadir Quick Mode / Lookup Only a un sheet antiguo | El código actual cambió. Se define la nueva conducta sin resucitar ajustes antiguos como arreglo oportunista. |
 | Kill switch y diseños especiales en backlog | Kill switch entra antes de beta; borderless/showcase y full-art forman parte de la evaluación principal. |
@@ -231,7 +231,7 @@ Reconocer el arte ofrece el conjunto de impresiones compatibles. Aplicar set blo
 
 Cuando hay varias impresiones visualmente indistinguibles, mostrar selección. Un modo rápido visual puede proponer una impresión por preferencia explícita y visible, pero debe marcarla como elección predeterminada, no impresión detectada. En beta la política inicial es estricta. El selector usa mappings locales de arte/cara, paginación de impresión/idioma y el componente existente cuando sus contratos encajen; no utiliza el nombre como identidad única.
 
-Paquete mínimo obligatorio: identidad, nombre, mappings suficientes y metadatos para mostrar candidatos offline. La selección sin red puede identificar y mostrar `NeedsPrinting`/`NeedsDetails`; solo entra a cola cuando existe un `Card` completo en caché o se resuelve por `CardRepository`. La primera entrega garantiza **reconocimiento offline**, no guardado offline universal de cartas nunca cacheadas. Ese límite debe mostrarse claramente. Si se exige también ese guardado, extender el pack con payload completo versionado y su mapeador validado antes de prometerlo; no simularlo con campos vacíos.
+Paquete mínimo obligatorio: identidad, nombre, mappings de cara/padre e impresión, metadatos para mostrar candidatos offline y payload completo versionado suficiente para construir un `Card` válido de cada impresión elegible. El mapeador y su compatibilidad se validan antes de activar el pack. Identificación, verificación y selección de impresión no usan `CardRepository` remoto ni backend como comprobación o fallback obligatorio. `NeedsPrinting` puede requerir una elección local del usuario; un payload ausente/corrupto produce `NeedsDetails` o indisponibilidad explícita y no entrega una carta incompleta a la cola. Una impresión fuera de la cobertura instalada no se certifica por consulta de red. La cola conserva sus comprobaciones de propietario y su persistencia; la sincronización normal de la colección después de una adición confirmada mantiene su contrato.
 
 Toda llamada de catálogo en la app pasa por repositorios/colas existentes; no llamar a Scryfall por frame ni reintroducir tormentas. Preservar owner/generation y badges acotados del scanner, cola colección/wishlist/deck, commits transaccionales y emisión de XP una sola vez por acción real. Ningún ensayo escribe automáticamente en la colección del usuario.
 
@@ -292,7 +292,7 @@ La prueba «no necesita leer el nombre» exige cumplir las mismas puertas de cob
 
 Al menos tres teléfonos físicos: Android 10/API29 de capacidad baja, gama media reciente y gama alta; incluir fabricantes/cámaras/SoC distintos, dispositivo con páginas de 16 KB cuando haya bibliotecas nativas y delegados CPU/GPU realmente utilizados. Emulador sirve para UI/contratos, no para certificar reconocimiento físico, calentamiento ni autofocus. Verificar binarios OpenCV/LiteRT empaquetados y ABIs; usar `imgproc` no implica que el AAR contenga solo ese módulo. [Android: páginas de 16 KB](https://developer.android.com/guide/practices/page-sizes), [LiteRT: medición](https://ai.google.dev/edge/litert/models/measurement).
 
-Pruebas unitarias/contrato: writer-reader independiente, parsing malicioso/corrupto, paridad, transformaciones, score/gap entre identidades, orientación antes de crop, mappings de caras/meld, catálogo incompleto, impresión/idioma, engine switch, estado stale, presupuesto de red, cancelación nativa, propiedad de buffers y no duplicación de cola.
+Pruebas unitarias/contrato: resolución de caras traseras a su padre, payload local completo con caché ordinaria vacía y spies remotos que demuestren cero peticiones durante identificación/verificación/selección/adaptación a cola; writer-reader independiente, parsing malicioso/corrupto, paridad, transformaciones, score/gap entre identidades, orientación antes de crop, mappings de caras/meld, catálogo incompleto, impresión/idioma, engine switch, estado stale, presupuesto de red, cancelación nativa, propiedad de buffers y no duplicación de cola.
 
 Instrumentación: descarga cortada/reanudada, proceso muerto antes/después de activación, disco lleno, checksum/firma inválidos, versión incompatible, rollback, consulta concurrente con update, restauración de preferencias/cola, ausencia de red, foto cacheada inexistente, 20 entradas/salidas, pausa/reanudación, rotación, overlays, permisos revocados, cambio de cuenta/target y resultados tardíos. Verificar torch después de rebind y cámara detenida tras sheet. No cerrar ni recrear incorrectamente los singletons OCR/sonido.
 
@@ -310,7 +310,7 @@ No comenzar la construcción completa de UI/distribución antes de demostrar rec
 | 1. Catálogo y benchmark | Ingesta reanudable, layout/face inventory, baseline pHash, localizadores y alternativas B/C; pipeline `match/evaluate`; catálogo completo para evaluación. | Reporte reproducible de cobertura, errores y shortlist. Pruebas de nombre enmascarado. Corregir aquí antes de expansión de producto. |
 | 2. Viabilidad móvil y selección | Exportar modelo candidato; harness de CameraX/paridad/CPU, comparación ANN-exacta, memoria y latencia en teléfonos; congelar pipeline y recipe. | Un candidato cumple objetivos técnicos iniciales y calidad de calibración. Si ninguno pasa, iterar detector/dataset/representación; no rebajar el plan a pHash por defecto. |
 | 3. Pack y operación | `FORMAT.md`, manifiesto firmado, generador reproducible, instalador privado, resume/atomicidad/rollback, estado de pack y kill switch. | Corrupción, process death, compatibilidad y actualización concurrente probados; pack de beta verificable. |
-| 4. Integración scanner | Scheduler, track/evidencia, estados visuales, selección de impresión y adaptador a cola; OCR legacy aislado y paridad de conducta; UI accesible. | Tests afectados verdes y aceptación OCR sin regresión; reconocimiento offline y límites de hidratación visibles. |
+| 4. Integración scanner | Scheduler, track/evidencia, estados visuales, selección de impresión y adaptador a cola; OCR legacy aislado y paridad de conducta; UI accesible. | Tests afectados verdes y aceptación OCR sin regresión; identidad/impresión/Card válidos resueltos localmente y cero peticiones de comprobación al backend. |
 | 5. Calidad y beta | Evaluación congelada contra catálogo completo, matriz física, híbrido y ablaciones, prueba térmica, revisión de UI/telemetría/seguridad. | Puertas de §10 con intervalos, conteos y artefactos; beta opt-in sin convertir visual en default. |
 | 6. Promoción | Comparar beta, incidencias y correcciones manuales; rollback ensayado; runbook y memorias actualizados. | Activar visual por defecto solo al aprobar todas las puertas; OCR accesible. Sin evidencia suficiente permanece opt-in. |
 
@@ -327,7 +327,7 @@ Responsables de ejecución: `android-kotlin-architect` para Kotlin/Gradle Androi
 
 ## 12. Entregables y definición de terminado
 
-- Código integrado con OCR legacy conservado, visual independiente y adaptación a la cola existente.
+- Código integrado con OCR legacy conservado, visual independiente y adaptación a la cola existente. Tras instalar el catálogo, resolver localmente identidad, caras traseras, impresión y payload `Card` válido sin comprobaciones de backend; verificar con red desactivada y contadores de peticiones remotas.
 - Generador, receta fijada, contrato de formato, corpus/splits privados y reportes reproducibles; resultados rastreables a commit, pack y hardware.
 - Pack beta/stable publicado solo después de sus verificaciones; descarga recuperable, firma, fallback al último válido y kill switch operativo.
 - Dataset/metadata de cobertura por cara/layout/idioma; catálogo no descrito como «todas las cartas» si tiene huecos.
