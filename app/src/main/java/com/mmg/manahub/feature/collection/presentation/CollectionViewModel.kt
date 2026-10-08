@@ -111,9 +111,25 @@ class CollectionViewModel(
     private val _uiState = MutableStateFlow(CollectionUiState())
     val uiState: StateFlow<CollectionUiState> = _uiState.asStateFlow()
     val pagedCards get()=selectionRuntime?.paging
+    /** Snapshot and Paging data committed for one visible collection generation. */
+    val selectionPresentation get()=selectionRuntime?.runtimeState
+    /** Captured summary and query used to build the current paging generation. */
+    val selectionSnapshot get()=selectionRuntime?.snapshot
+    /** Capture failure retained until the user retries or the runtime succeeds. */
+    val selectionLoadError get()=selectionRuntime?.error
+    /** Generation whose first page has completed. */
+    val pageReadyGeneration get()=selectionRuntime?.pageReadyGeneration
 
-    /** Activates snapshot refresh only while the Cards destination is resumed. */
+    /** Activates snapshot refresh while the Cards destination remains visible in the back stack. */
     fun setCardsActive(active: Boolean) { selectionRuntime?.setActive(active) }
+
+    /** Retries a failed collection snapshot capture. */
+    fun retryCollectionLoad() { selectionRuntime?.retry() }
+
+    /** Confirms that Paging delivered the first page for a visible snapshot generation. */
+    suspend fun confirmCollectionGeneration(generation: Long) {
+        selectionRuntime?.confirmGeneration(generation)
+    }
 
     // Raw unfiltered collection from Room (non-deleted entries)
     private val _allCards = MutableStateFlow<List<UserCardWithCard>>(emptyList())
@@ -202,15 +218,15 @@ class CollectionViewModel(
 
             selectionRuntime.start(viewModelScope, selectionQueryFlow)
             viewModelScope.launch {
-                combine(selectionRuntime.summary, selectionRuntime.loading, selectionRuntime.error) { summary, loading, error ->
-                    Triple(summary, loading, error)
-                }.collect { (summary, loading, error) ->
+                selectionRuntime.runtimeState.collect { state ->
                     _uiState.update {
                         it.copy(
-                            selectionSummary = summary,
-                            isLoading = loading,
-                            error = error,
-                            uncachedSourceRows = (summary?.missingMetadataRows ?: 0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                            selectionSummary = state.snapshot?.summary,
+                            isLoading = state.isLoading,
+                            error = state.error,
+                            uncachedSourceRows = (state.snapshot?.summary?.missingMetadataRows ?: 0L)
+                                .coerceAtMost(Int.MAX_VALUE.toLong())
+                                .toInt(),
                         )
                     }
                 }

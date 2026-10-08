@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Search
@@ -68,29 +69,37 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.currentStateAsState
+import androidx.paging.LoadState
+import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionQuery
@@ -162,16 +171,106 @@ fun CollectionScreen(
     initialTabArg:            String? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val pagedCards = viewModel.pagedCards?.collectAsLazyPagingItems()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val lifecycleState = lifecycle.currentStateAsState().value
+    val isResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+    val isStarted = lifecycleState.isAtLeast(Lifecycle.State.STARTED)
+    val selectionPresentationFlow = viewModel.selectionPresentation
+    val selectionPresentation by if (selectionPresentationFlow != null) {
+        selectionPresentationFlow.collectAsStateWithLifecycle()
+    } else {
+        remember { mutableStateOf<CollectionSelectionRuntimeState?>(null) }
+    }
+    var displayedSelectionPresentation by remember(viewModel) {
+        mutableStateOf<CollectionSelectionRuntimeState?>(null)
+    }
+    val incomingGeneration = selectionPresentation?.snapshot?.generation
+    val displayedGeneration = displayedSelectionPresentation?.snapshot?.generation ?: incomingGeneration
+    val hasPendingDisplay = displayedSelectionPresentation?.snapshot != null &&
+        incomingGeneration != null && incomingGeneration != displayedGeneration
+    val displayedPagingFlow = remember(
+        selectionPresentationFlow,
+        displayedGeneration,
+        displayedSelectionPresentation?.snapshot?.generation,
+    ) {
+        if (displayedSelectionPresentation?.snapshot == null || displayedGeneration == null) {
+            null
+        } else {
+            selectionPresentationFlow?.map { state ->
+                if (state.snapshot?.generation == displayedGeneration) {
+                    state.pagingData
+                } else {
+                    displayedSelectionPresentation?.pagingData ?: PagingData.empty()
+                }
+            }?.distinctUntilChanged()
+        }
+    }
+    val displayedPagedCards = displayedPagingFlow?.collectAsLazyPagingItems()
+    val incomingPagingFlow = remember(selectionPresentationFlow, incomingGeneration) {
+        selectionPresentationFlow?.map { state ->
+            if (incomingGeneration == null || state.snapshot?.generation == incomingGeneration) {
+                state.pagingData
+            } else {
+                PagingData.empty()
+            }
+        }?.distinctUntilChanged()
+    }
+    val incomingPagedCards = incomingPagingFlow?.collectAsLazyPagingItems()
+    val pagedCards = if (hasPendingDisplay) displayedPagedCards else incomingPagedCards
+    val incomingRefreshState = incomingPagedCards?.loadState?.refresh
+    val incomingPageReady = incomingGeneration != null &&
+        selectionPresentation?.pageReadyGeneration == incomingGeneration &&
+        incomingRefreshState is LoadState.NotLoading &&
+        (selectionPresentation?.snapshot?.summary?.groups == 0L ||
+            (incomingPagedCards?.itemCount ?: 0) > 0)
+
+    LaunchedEffect(selectionPresentation?.snapshot?.generation, selectionPresentation?.snapshot == null) {
+        if (selectionPresentation?.snapshot == null) {
+            displayedSelectionPresentation = null
+        } else if (displayedSelectionPresentation == null) {
+            selectionPresentation?.let { displayedSelectionPresentation = it }
+        }
+    }
+    LaunchedEffect(incomingGeneration, hasPendingDisplay, incomingPageReady, isResumed) {
+        if (incomingPageReady && isResumed) {
+            withFrameNanos { }
+            val latest = selectionPresentationFlow?.value
+            val latestSnapshot = latest?.snapshot
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
+                latest != null && latestSnapshot != null && incomingGeneration != null &&
+                latestSnapshot.generation == incomingGeneration &&
+                latest.pageReadyGeneration == incomingGeneration &&
+                incomingPagedCards?.loadState?.refresh is LoadState.NotLoading &&
+                (latestSnapshot.summary.groups == 0L || (incomingPagedCards?.itemCount ?: 0) > 0)
+            ) {
+                if (hasPendingDisplay) displayedSelectionPresentation = latest
+                viewModel.confirmCollectionGeneration(incomingGeneration)
+            }
+        }
+    }
+    val visibleState = when {
+        selectionPresentationFlow != null && selectionPresentation?.snapshot == null -> selectionPresentation
+        displayedSelectionPresentation == null -> selectionPresentation
+        displayedSelectionPresentation?.snapshot?.generation == incomingGeneration -> selectionPresentation
+        else -> displayedSelectionPresentation
+    }
+    val contentPresentation = visibleState?.let { displayed ->
+        displayed.copy(
+            isLoading = selectionPresentation?.isLoading ?: uiState.isLoading,
+            error = selectionPresentation?.error,
+        )
+    }
+    val pendingPageFailed = hasPendingDisplay && incomingRefreshState is LoadState.Error
+    val onRetryPageLoad: () -> Unit = {
+        if (pendingPageFailed) incomingPagedCards?.retry() else pagedCards?.retry()
+    }
     var showAdvancedSearch by remember { mutableStateOf(false) }
     var showTransferActions by remember { mutableStateOf(false) }
     val toastState = rememberMagicToastState()
     // Sheets render in their own window above the NavHost: unmount them while navigating away.
-    val isResumed = LocalLifecycleOwner.current.lifecycle
-        .currentStateAsState().value.isAtLeast(Lifecycle.State.RESUMED)
 
-    LaunchedEffect(isResumed, uiState.selectedTab) {
-        viewModel.setCardsActive(isResumed && uiState.selectedTab == CollectionTab.CARDS)
+    LaunchedEffect(isStarted, uiState.selectedTab) {
+        viewModel.setCardsActive(isStarted && uiState.selectedTab == CollectionTab.CARDS)
     }
     DisposableEffect(viewModel) {
         onDispose { viewModel.setCardsActive(false) }
@@ -189,6 +288,9 @@ fun CollectionScreen(
     CollectionContent(
         uiState               = uiState,
         pagedCards            = pagedCards,
+        selectionPresentation = contentPresentation,
+        pendingPageFailed     = pendingPageFailed,
+        onRetryPageLoad       = onRetryPageLoad,
         toastState            = toastState,
         onOverflowClick       = { showTransferActions = true },
         onCardClick           = onCardClick,
@@ -206,6 +308,7 @@ fun CollectionScreen(
             advancedSearchViewModel.clearAll()
         },
         onErrorDismissed      = viewModel::onErrorDismissed,
+        onRetryCollectionLoad  = viewModel::retryCollectionLoad,
         onShowAdvancedSearch  = { showAdvancedSearch = true },
         onSync                = viewModel::onSync,
         onTabSelected         = viewModel::onTabSelected,
@@ -285,6 +388,9 @@ fun CollectionScreen(
 private fun CollectionContent(
     uiState:              CollectionUiState,
     pagedCards: androidx.paging.compose.LazyPagingItems<com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionGroup>?,
+    selectionPresentation: CollectionSelectionRuntimeState?,
+    pendingPageFailed: Boolean,
+    onRetryPageLoad: () -> Unit,
     toastState:           MagicToastState,
     onOverflowClick:      () -> Unit,
     onCardClick:          (String, String?) -> Unit,
@@ -296,6 +402,7 @@ private fun CollectionContent(
     onSearchQueryChange:  (String) -> Unit,
     onClearFilters:       () -> Unit,
     onErrorDismissed:     () -> Unit,
+    onRetryCollectionLoad: () -> Unit,
     onShowAdvancedSearch: () -> Unit,
     onSync:               () -> Unit,
     onTabSelected:        (CollectionTab) -> Unit,
@@ -406,13 +513,17 @@ private fun CollectionContent(
                 when (uiState.selectedTab) {
                     CollectionTab.CARDS -> CardsTabContent(
                         uiState               = uiState,
-        pagedCards            = pagedCards,
+                        pagedCards            = pagedCards,
+                        selectionPresentation = selectionPresentation,
+                        pendingPageFailed     = pendingPageFailed,
+                        onRetryPageLoad       = onRetryPageLoad,
                         onCardClick           = onCardClick,
                         onAddCardClick        = onAddCardClick,
                         onSearchQueryChange   = onSearchQueryChange,
                         onClearFilters        = onClearFilters,
                         onShowAdvancedSearch  = onShowAdvancedSearch,
                         onViewModeToggle      = onViewModeToggle,
+                        onRetryCollectionLoad = onRetryCollectionLoad,
                         gridState             = gridState,
                         listState             = listState,
                         sharedTransitionScope = sharedTransitionScope,
@@ -432,9 +543,11 @@ private fun CollectionContent(
                 }
             }
 
-            // Error dismissal
+            // Snapshot failures remain visible until the user retries; legacy errors stay transient.
             uiState.error?.let {
-                LaunchedEffect(it) { onErrorDismissed() }
+                if (uiState.selectedTab != CollectionTab.CARDS || pagedCards == null) {
+                    LaunchedEffect(it, uiState.selectedTab) { onErrorDismissed() }
+                }
             }
         }
 
@@ -451,136 +564,44 @@ private fun CollectionContent(
 private fun CardsTabContent(
     uiState:              CollectionUiState,
     pagedCards: androidx.paging.compose.LazyPagingItems<com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionGroup>?,
+    selectionPresentation: CollectionSelectionRuntimeState?,
+    pendingPageFailed: Boolean,
+    onRetryPageLoad: () -> Unit,
     onCardClick:          (String, String?) -> Unit,
     onAddCardClick:       () -> Unit,
     onSearchQueryChange:  (String) -> Unit,
     onClearFilters:       () -> Unit,
     onShowAdvancedSearch: () -> Unit,
     onViewModeToggle:     () -> Unit,
+    onRetryCollectionLoad: () -> Unit,
     gridState:            LazyGridState,
     listState:            LazyListState,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val mc = MaterialTheme.magicColors
+    val loadingAnnouncement = stringResource(R.string.state_loading)
     val filterCount = uiState.activeFilterCount
-    var showSortMenu by remember { mutableStateOf(false) }
+    val selectionSnapshot = selectionPresentation?.snapshot
+    val selectionLoadError = selectionPresentation?.error
+    val pageRefreshState = pagedCards?.loadState?.refresh
+    val pageItemCount = pagedCards?.itemCount ?: 0
+    val hasCurrentPage = pageItemCount > 0
 
-    val density = LocalDensity.current
-    var headerHeightPx by remember { mutableFloatStateOf(0f) }
-    val headerHeightDp: Dp = with(density) { headerHeightPx.toDp() }
+    val presentation = collectionCardsPresentation(
+        uiState = uiState,
+        selectionPresentation = selectionPresentation,
+        hasPagedSource = pagedCards != null,
+        hasCurrentPage = hasCurrentPage,
+        pageRefreshState = pageRefreshState,
+        pendingPageFailed = pendingPageFailed,
+    )
 
-    val hasActiveSearchOrFilter = uiState.searchQuery.isNotBlank() || filterCount > 0
-
-    val hasSummary = uiState.selectionSummary != null
-    val isSummaryEmpty = uiState.selectionSummary != null && uiState.selectionSummary.groups == 0L
-    val emptyCards = if (pagedCards == null) uiState.cards.isEmpty() else isSummaryEmpty
-
-    if (emptyCards && !hasActiveSearchOrFilter && !uiState.isLoading && hasSummary) {
-        EmptyState(
-            icon        = Icons.Default.CollectionsBookmark,
-            title       = stringResource(R.string.collection_empty_title),
-            subtitle    = stringResource(R.string.collection_empty_subtitle),
-            actionLabel = stringResource(R.string.collection_empty_action),
-            onAction    = onAddCardClick,
-        )
-        return
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        // ── Card list / grid / filtered-to-zero content ──────────────────
-        // A search/filter combination that legitimately matches zero cards must NOT drop the
-        // header below (search bar + advanced-search filters are the only way back) — only the
-        // content area swaps to a scoped empty message, keyed off the SAME headerHeightDp offset
-        // CardGrid/CardList already use.
-        if (uiState.isLoading && !hasSummary) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = headerHeightDp),
-                contentAlignment = Alignment.Center,
-            ) {
-                MagicLoadingSpinner()
-            }
-        } else if (emptyCards && hasSummary) {
-            // Rows whose card is not cached yet are skipped by the projection, so "empty" would be
-            // a lie while any of them are outstanding — the list is INCOMPLETE, not empty
-            // (ADR-008: ownership data never depends on cache metadata).
-            val isHydrating = uiState.uncachedSourceRows > 0
-            // An empty wishlist / trade list is not a failed search, so it says so in its own words
-            // instead of "no cards match" — but keeps the same clear-filters escape hatch.
-            val isEmptySource = !isHydrating &&
-                uiState.collectionSource != CollectionSource.COLLECTION &&
-                uiState.searchQuery.isBlank() && filterCount == 1
-            EmptyState(
-                icon        = when {
-                    isHydrating -> Icons.Default.CloudDownload
-                    isEmptySource -> Icons.Default.CollectionsBookmark
-                    else -> Icons.Default.Search
-                },
-                title       = when {
-                    isHydrating -> stringResource(R.string.collection_source_hydrating_title)
-                    !isEmptySource -> stringResource(R.string.collection_no_results_title)
-                    uiState.collectionSource == CollectionSource.WISHLIST ->
-                        stringResource(R.string.collection_wishlist_empty_title)
-                    else -> stringResource(R.string.collection_for_trade_empty_title)
-                },
-                subtitle    = when {
-                    isHydrating -> pluralStringResource(
-                        R.plurals.collection_source_hydrating_subtitle,
-                        uiState.uncachedSourceRows,
-                        uiState.uncachedSourceRows,
-                    )
-                    !isEmptySource -> stringResource(R.string.collection_no_results_subtitle)
-                    uiState.collectionSource == CollectionSource.WISHLIST ->
-                        stringResource(R.string.collection_wishlist_empty_subtitle)
-                    else -> stringResource(R.string.collection_for_trade_empty_subtitle)
-                },
-                actionLabel = stringResource(R.string.collection_no_results_action),
-                onAction    = {
-                    // Clears BOTH the plain search text and any advanced-search filters — a
-                    // zero-result state can be caused by either one alone, and `onClearFilters`
-                    // by itself only resets the advanced query, leaving the search bar text (and
-                    // the empty result) unchanged.
-                    onSearchQueryChange("")
-                    onClearFilters()
-                },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = headerHeightDp),
-            )
-        } else {
-            if(pagedCards!=null)PagedCollectionCards(pagedCards,uiState.selectionSummary,uiState.viewMode,uiState.groupingMode,gridState,listState,headerHeightDp,onCardClick,sharedTransitionScope,animatedVisibilityScope) else when (uiState.viewMode) {
-                CollectionViewMode.GRID -> CardGrid(
-                    cards        = uiState.cards,
-                    sections     = uiState.sections,
-                    groupingMode = uiState.groupingMode,
-                    onCardClick  = onCardClick,
-                    state        = gridState,
-                    sharedTransitionScope = sharedTransitionScope,
-                    animatedVisibilityScope = animatedVisibilityScope,
-                    topPadding   = headerHeightDp,
-                )
-                CollectionViewMode.LIST -> CardList(
-                    cards        = uiState.cards,
-                    sections     = uiState.sections,
-                    groupingMode = uiState.groupingMode,
-                    onCardClick  = onCardClick,
-                    state        = listState,
-                    sharedTransitionScope = sharedTransitionScope,
-                    animatedVisibilityScope = animatedVisibilityScope,
-                    topPadding   = headerHeightDp,
-                )
-            }
-        }
-
-        // ── Collapsible header (slides up/down) ──────────────────────────
+    Column(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .zIndex(1f)
-                .background(mc.background)
-                .onSizeChanged { headerHeightPx = it.height.toFloat() }
+                .background(mc.background),
         ) {
             // Stale data warning
             AnimatedVisibility(visible = uiState.hasStaleCards) {
@@ -639,9 +660,7 @@ private fun CardsTabContent(
                 )
             }
 
-            // Same honesty rule as the empty state: a rendered list that silently drops uncached
-            // rows must say the count is still growing, never present itself as complete.
-            AnimatedVisibility(visible = uiState.uncachedSourceRows > 0 && !emptyCards) {
+            AnimatedVisibility(visible = presentation.showHydrationNotice) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -658,8 +677,8 @@ private fun CardsTabContent(
                     Text(
                         text = pluralStringResource(
                             R.plurals.collection_source_hydrating_notice,
-                            uiState.uncachedSourceRows,
-                            uiState.uncachedSourceRows,
+                            presentation.uncachedSourceRows,
+                            presentation.uncachedSourceRows,
                         ),
                         style = MaterialTheme.magicTypography.bodySmall,
                         color = mc.textSecondary,
@@ -668,7 +687,6 @@ private fun CardsTabContent(
             }
 
             // Card count + Sort/View controls
-            val totalCopies = uiState.selectionSummary?.copies ?: uiState.cards.sumOf { it.totalQuantity.toLong() }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -680,9 +698,9 @@ private fun CardsTabContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (!uiState.isLoading) {
+                    if (presentation.groupCount != null && presentation.copyCount != null) {
                         Text(
-                            text = "${uiState.selectionSummary?.groups ?: uiState.cards.size.toLong()} ${stringResource(R.string.collection_unique_cards)} · $totalCopies ${stringResource(R.string.collection_total_copies)}",
+                            text = "${presentation.groupCount} ${stringResource(R.string.collection_unique_cards)} · ${presentation.copyCount} ${stringResource(R.string.collection_total_copies)}",
                             style = MaterialTheme.magicTypography.labelLarge,
                             color = mc.textSecondary,
                             modifier = Modifier.weight(1f)
@@ -704,8 +722,273 @@ private fun CardsTabContent(
             }
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
         }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (presentation.body != CollectionCardsBody.CONTENT) {
+                            Modifier.clearAndSetSemantics { }
+                        } else Modifier
+                    ),
+            ) {
+                if (pagedCards != null) {
+                    PagedCollectionCards(
+                        cards = pagedCards,
+                        summary = selectionSnapshot?.summary,
+                        mode = uiState.viewMode,
+                        grouping = uiState.groupingMode,
+                        gridState = gridState,
+                        listState = listState,
+                        topPadding = 0.dp,
+                        onCardClick = onCardClick,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    )
+                } else {
+                    when (uiState.viewMode) {
+                        CollectionViewMode.GRID -> CardGrid(
+                            cards = uiState.cards,
+                            sections = uiState.sections,
+                            groupingMode = uiState.groupingMode,
+                            onCardClick = onCardClick,
+                            state = gridState,
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                        CollectionViewMode.LIST -> CardList(
+                            cards = uiState.cards,
+                            sections = uiState.sections,
+                            groupingMode = uiState.groupingMode,
+                            onCardClick = onCardClick,
+                            state = listState,
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                    }
+                }
+            }
+
+            if (presentation.body != CollectionCardsBody.CONTENT) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(mc.background)
+                        .pointerInput(presentation.body) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Main)
+                                    event.changes.forEach { change ->
+                                        if (!change.isConsumed) change.consume()
+                                    }
+                                }
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    when (presentation.body) {
+                        CollectionCardsBody.LOADING -> Box(
+                            modifier = Modifier.semantics {
+                                contentDescription = loadingAnnouncement
+                                liveRegion = LiveRegionMode.Polite
+                            },
+                        ) {
+                            MagicLoadingSpinner()
+                        }
+                        CollectionCardsBody.LOAD_ERROR -> EmptyState(
+                            icon = Icons.Default.ErrorOutline,
+                            title = stringResource(R.string.state_error),
+                            subtitle = selectionLoadError,
+                            actionLabel = stringResource(R.string.action_retry),
+                            onAction = {
+                                if (selectionLoadError != null) {
+                                    onRetryCollectionLoad()
+                                } else {
+                                    onRetryPageLoad()
+                                }
+                            },
+                        )
+                        CollectionCardsBody.EMPTY_COLLECTION -> EmptyState(
+                            icon = Icons.Default.CollectionsBookmark,
+                            title = stringResource(R.string.collection_empty_title),
+                            subtitle = stringResource(R.string.collection_empty_subtitle),
+                            actionLabel = stringResource(R.string.collection_empty_action),
+                            onAction = onAddCardClick,
+                        )
+                        CollectionCardsBody.EMPTY_SOURCE,
+                        CollectionCardsBody.HYDRATING,
+                        CollectionCardsBody.NO_RESULTS -> {
+                            val isHydrating = presentation.body == CollectionCardsBody.HYDRATING
+                            val isEmptySource = presentation.body == CollectionCardsBody.EMPTY_SOURCE
+                            EmptyState(
+                                icon = when {
+                                    isHydrating -> Icons.Default.CloudDownload
+                                    isEmptySource -> Icons.Default.CollectionsBookmark
+                                    else -> Icons.Default.Search
+                                },
+                                title = when {
+                                    isHydrating -> stringResource(R.string.collection_source_hydrating_title)
+                                    !isEmptySource -> stringResource(R.string.collection_no_results_title)
+                                    uiState.collectionSource == CollectionSource.WISHLIST ->
+                                        stringResource(R.string.collection_wishlist_empty_title)
+                                    else -> stringResource(R.string.collection_for_trade_empty_title)
+                                },
+                                subtitle = when {
+                                    isHydrating -> pluralStringResource(
+                                        R.plurals.collection_source_hydrating_subtitle,
+                                        presentation.uncachedSourceRows,
+                                        presentation.uncachedSourceRows,
+                                    )
+                                    !isEmptySource -> stringResource(R.string.collection_no_results_subtitle)
+                                    uiState.collectionSource == CollectionSource.WISHLIST ->
+                                        stringResource(R.string.collection_wishlist_empty_subtitle)
+                                    else -> stringResource(R.string.collection_for_trade_empty_subtitle)
+                                },
+                                actionLabel = stringResource(R.string.collection_no_results_action),
+                                onAction = {
+                                    // Reset both query inputs so the empty result always has a recovery path.
+                                    onSearchQueryChange("")
+                                    onClearFilters()
+                                },
+                            )
+                        }
+                        CollectionCardsBody.CONTENT -> Unit
+                    }
+                }
+            }
+        }
     }
 }
+
+private enum class CollectionCardsBody {
+    LOADING,
+    LOAD_ERROR,
+    EMPTY_COLLECTION,
+    EMPTY_SOURCE,
+    HYDRATING,
+    NO_RESULTS,
+    CONTENT,
+}
+
+private data class CollectionCardsPresentation(
+    val body: CollectionCardsBody,
+    val groupCount: Long?,
+    val copyCount: Long?,
+    val uncachedSourceRows: Int,
+    val loadError: String? = null,
+) {
+    val showHydrationNotice: Boolean
+        get() = body == CollectionCardsBody.CONTENT && uncachedSourceRows > 0
+}
+
+private fun collectionCardsPresentation(
+    uiState: CollectionUiState,
+    selectionPresentation: CollectionSelectionRuntimeState?,
+    hasPagedSource: Boolean,
+    hasCurrentPage: Boolean,
+    pageRefreshState: LoadState?,
+    pendingPageFailed: Boolean,
+): CollectionCardsPresentation {
+    val selectionSnapshot = selectionPresentation?.snapshot
+    val selectionLoadError = selectionPresentation?.error
+    val summary = if (hasPagedSource) selectionSnapshot?.summary else uiState.selectionSummary
+    val isLoading = selectionPresentation?.isLoading ?: uiState.isLoading
+    val snapshotMatchesUi = !hasPagedSource || (
+        selectionSnapshot != null &&
+            selectionSnapshot.query == uiState.toSelectionQuery()
+        )
+    val pageGenerationReady = selectionSnapshot != null &&
+        selectionPresentation?.pageReadyGeneration == selectionSnapshot.generation
+    val firstPagePending = hasPagedSource &&
+        summary != null &&
+        !hasCurrentPage &&
+        !pageGenerationReady &&
+        pageRefreshState !is LoadState.Error
+    val uncachedSourceRows = (summary?.missingMetadataRows ?: uiState.uncachedSourceRows.toLong())
+        .coerceAtMost(Int.MAX_VALUE.toLong())
+        .toInt()
+
+    if (pendingPageFailed) {
+        return CollectionCardsPresentation(
+            body = CollectionCardsBody.LOAD_ERROR,
+            groupCount = null,
+            copyCount = null,
+            uncachedSourceRows = uncachedSourceRows,
+        )
+    }
+
+    if (isLoading || !snapshotMatchesUi || selectionLoadError != null
+    ) {
+        return CollectionCardsPresentation(
+            body = if (selectionLoadError != null && !isLoading) {
+                CollectionCardsBody.LOAD_ERROR
+            } else {
+                CollectionCardsBody.LOADING
+            },
+            groupCount = null,
+            copyCount = null,
+            uncachedSourceRows = uncachedSourceRows,
+            loadError = selectionLoadError,
+        )
+    }
+
+    if (hasPagedSource && pageRefreshState is LoadState.Error && !hasCurrentPage) {
+        return CollectionCardsPresentation(
+            body = CollectionCardsBody.LOAD_ERROR,
+            groupCount = null,
+            copyCount = null,
+            uncachedSourceRows = uncachedSourceRows,
+        )
+    }
+
+    if (firstPagePending || pageRefreshState is LoadState.Loading) {
+        return CollectionCardsPresentation(
+            body = CollectionCardsBody.LOADING,
+            groupCount = null,
+            copyCount = null,
+            uncachedSourceRows = uncachedSourceRows,
+        )
+    }
+
+    val groupCount = summary?.groups ?: uiState.cards.size.toLong()
+    val copyCount = summary?.copies ?: uiState.cards.sumOf { it.totalQuantity.toLong() }
+    val hasNoResults = groupCount == 0L
+    val isHydrating = uncachedSourceRows > 0
+    val sourceFilterCount = if (uiState.collectionSource == CollectionSource.COLLECTION) 0 else 1
+    val hasActiveSearchOrFilter = uiState.searchQuery.isNotBlank() ||
+        uiState.activeFilterCount > sourceFilterCount
+
+    val body = when {
+        hasNoResults && isHydrating -> CollectionCardsBody.HYDRATING
+        hasNoResults && uiState.collectionSource == CollectionSource.COLLECTION && !hasActiveSearchOrFilter ->
+            CollectionCardsBody.EMPTY_COLLECTION
+        hasNoResults && uiState.collectionSource != CollectionSource.COLLECTION && !hasActiveSearchOrFilter ->
+            CollectionCardsBody.EMPTY_SOURCE
+        hasNoResults -> CollectionCardsBody.NO_RESULTS
+        else -> CollectionCardsBody.CONTENT
+    }
+
+    return CollectionCardsPresentation(
+        body = body,
+        groupCount = groupCount,
+        copyCount = copyCount,
+        uncachedSourceRows = uncachedSourceRows,
+    )
+}
+
+private fun CollectionUiState.toSelectionQuery() = CollectionSelectionQuery(
+    source = collectionSource,
+    search = searchQuery,
+    advanced = activeQuery,
+    sort = CollectionSelectionSort.valueOf(sortOrder.name),
+    ascending = sortDirection == SortDirection.ASC,
+    grouping = groupingMode,
+)
 
 @Composable
 private fun CollectionTopBar(
@@ -788,8 +1071,7 @@ private fun CardGrid(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     topPadding: Dp = 0.dp,
 ) {
-    // In-memory only (resets on leaving the screen) — same lifetime as the rest of this
-    // screen's transient UI state (e.g. showSortMenu).
+    // In-memory only; collapsed groups reset when leaving the screen.
     val collapsedSections = remember { mutableStateMapOf<String, Boolean>() }
 
     LazyVerticalGrid(

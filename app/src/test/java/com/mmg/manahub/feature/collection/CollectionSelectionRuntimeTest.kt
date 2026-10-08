@@ -89,4 +89,48 @@ class CollectionSelectionRuntimeTest {
         cleanup.complete(Unit)
         job.cancelAndJoin()
     }
+
+    @Test fun newQuerySetsLoadingTrueAndSameQueryReactivatedDoesNotSetLoadingTrue()=runTest {
+        val gate=TransferSessionGate().also { it.changeOwner(owner) }
+        val raw=MutableStateFlow<SessionState>(SessionState.Unauthenticated)
+        val observer=mockk<TransferAuthSessionObserver>()
+        every { observer.identities } returns raw
+        every { observer.matchesObserved(owner) } returns true
+        val repository=mockk<CollectionSelectionRepository>()
+        val query2 = query.copy(search = "Black Lotus")
+        val captureDeferred = CompletableDeferred<Unit>()
+        coEvery { repository.capture(owner, query) } returns CollectionSelectionSummary("snapshot",3,7,0,emptyList())
+        coEvery { repository.capture(owner, query2) } coAnswers {
+            captureDeferred.await()
+            CollectionSelectionSummary("snapshot2",1,1,0,emptyList())
+        }
+        coEvery { repository.discard(any(),any()) } just Runs
+        val events=MutableSharedFlow<Unit>(replay=1).also { it.tryEmit(Unit) }
+        val runtime=CollectionSelectionRuntime(mockk<MtgDatabase>(),repository,gate,observer) { events }
+        val queryFlow=MutableStateFlow(query)
+        val job=runtime.start(backgroundScope, queryFlow)
+
+        runtime.setActive(true); runCurrent(); advanceTimeBy(301); runCurrent()
+        assertFalse(runtime.loading.value)
+        assertNotNull(runtime.summary.value)
+
+        // Deactivate (e.g. navigate away to detail)
+        runtime.setActive(false); runCurrent()
+
+        // Reactivate with same query (e.g. return from detail)
+        runtime.setActive(true); runCurrent()
+        assertFalse(runtime.loading.value)
+
+        // Change query (e.g. new search)
+        queryFlow.value = query2
+        runCurrent()
+        assertTrue(runtime.loading.value)
+
+        captureDeferred.complete(Unit)
+        runCurrent(); advanceTimeBy(301); runCurrent()
+        assertFalse(runtime.loading.value)
+        assertEquals("snapshot2", runtime.summary.value?.id)
+
+        job.cancelAndJoin()
+    }
 }
