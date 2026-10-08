@@ -50,9 +50,13 @@ import com.mmg.manahub.feature.collection.presentation.importexport.CollectionEx
 import com.mmg.manahub.core.domain.collection.transfer.transferCountBucket
 import com.mmg.manahub.feature.collection.presentation.importexport.PendingExportShare
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
+import com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionQuery
+import com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionSort
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,8 +64,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -161,17 +168,51 @@ class CollectionViewModel(
         }
         _uiState.update { it.copy(selectedTab = initialTab) }
 
-        if(selectionRuntime==null) {
+        if (selectionRuntime == null) {
             observeCollection()
             observeWishlist()
             observeOpenForTrade()
         } else {
-            selectionRuntime.start(viewModelScope,_uiState.map { state ->
-                com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionQuery(state.collectionSource,state.searchQuery,state.activeQuery,com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionSort.valueOf(state.sortOrder.name),state.sortDirection==SortDirection.ASC,state.groupingMode)
-            }.distinctUntilChanged())
+            @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
+            val selectionQueryFlow = combine(
+                _uiState.map { it.collectionSource }.distinctUntilChanged(),
+                searchQueryFlow.flatMapLatest { query ->
+                    if (query.isBlank()) flowOf(query) else flowOf(query).debounce(SEARCH_DEBOUNCE_MS)
+                }.distinctUntilChanged(),
+                _uiState.map { it.activeQuery }.distinctUntilChanged(),
+                _uiState.map { it.sortOrder }.distinctUntilChanged(),
+                _uiState.map { it.sortDirection }.distinctUntilChanged(),
+                _uiState.map { it.groupingMode }.distinctUntilChanged(),
+            ) { flows: Array<Any?> ->
+                val source = flows[0] as CollectionSource
+                val search = flows[1] as String
+                val activeQuery = flows[2] as AdvancedSearchQuery?
+                val sortOrder = flows[3] as SortOrder
+                val sortDir = flows[4] as SortDirection
+                val grouping = flows[5] as CollectionGroupingMode
+                CollectionSelectionQuery(
+                    source = source,
+                    search = search,
+                    advanced = activeQuery,
+                    sort = CollectionSelectionSort.valueOf(sortOrder.name),
+                    ascending = sortDir == SortDirection.ASC,
+                    grouping = grouping,
+                )
+            }.distinctUntilChanged()
+
+            selectionRuntime.start(viewModelScope, selectionQueryFlow)
             viewModelScope.launch {
-                kotlinx.coroutines.flow.combine(selectionRuntime.summary,selectionRuntime.loading,selectionRuntime.error) { summary,loading,error -> Triple(summary,loading,error) }.collect { (summary,loading,error) ->
-                    _uiState.update { it.copy(selectionSummary=summary,isLoading=loading,error=error,uncachedSourceRows=(summary?.missingMetadataRows ?: 0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()) }
+                combine(selectionRuntime.summary, selectionRuntime.loading, selectionRuntime.error) { summary, loading, error ->
+                    Triple(summary, loading, error)
+                }.collect { (summary, loading, error) ->
+                    _uiState.update {
+                        it.copy(
+                            selectionSummary = summary,
+                            isLoading = loading,
+                            error = error,
+                            uncachedSourceRows = (summary?.missingMetadataRows ?: 0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                        )
+                    }
                 }
             }
         }
@@ -542,7 +583,8 @@ class CollectionViewModel(
     }
 
     fun onSortChange(sort: SortOrder) {
-        _uiState.update { it.copy(sortOrder = sort) }
+        val defaultDirection = if (sort == SortOrder.NAME) SortDirection.ASC else SortDirection.DESC
+        _uiState.update { it.copy(sortOrder = sort, sortDirection = defaultDirection) }
         analyticsHelper.logEvent("collection_sort_changed", mapOf("sort_order" to sort.name))
         applyFilters()
         viewModelScope.launch {

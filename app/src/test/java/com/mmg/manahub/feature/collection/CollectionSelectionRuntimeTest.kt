@@ -55,13 +55,14 @@ class CollectionSelectionRuntimeTest {
         runtime.setActive(true);runCurrent()
         repeat(10) { events.emit(Unit);advanceTimeBy(20) }
         advanceTimeBy(301);runCurrent()
-        coVerify(exactly=1) { repository.capture(owner,query) }
+        coVerify(exactly=2) { repository.capture(owner,query) }
         assertEquals(7L,runtime.summary.value?.copies)
         runtime.setActive(false);runCurrent()
-        assertNull(runtime.summary.value)
+        assertNotNull(runtime.summary.value)
+        assertEquals(7L,runtime.summary.value?.copies)
         repeat(10) { events.emit(Unit) }
         advanceTimeBy(1000);runCurrent()
-        coVerify(exactly=1) { repository.capture(owner,query) }
+        coVerify(exactly=2) { repository.capture(owner,query) }
         job.cancelAndJoin()
     }
 
@@ -70,7 +71,9 @@ class CollectionSelectionRuntimeTest {
         val raw=MutableStateFlow<SessionState>(SessionState.Unauthenticated)
         val observer=mockk<TransferAuthSessionObserver>()
         every { observer.identities } returns raw
-        every { observer.matchesObserved(owner) } answers { raw.value!=SessionState.Loading }
+        every { observer.matchesObserved(owner) } returns true
+        val owner2=TransferOwner.Account("runtime-owner-2")
+        every { observer.matchesObserved(owner2) } returns true
         val repository=mockk<CollectionSelectionRepository>()
         coEvery { repository.capture(owner,query) } returns CollectionSelectionSummary("snapshot",3,7,0,emptyList())
         val cleanup=CompletableDeferred<Unit>()
@@ -80,7 +83,7 @@ class CollectionSelectionRuntimeTest {
         val job=runtime.start(backgroundScope,MutableStateFlow(query))
         runtime.setActive(true);runCurrent();advanceTimeBy(301);runCurrent()
         assertNotNull(runtime.summary.value)
-        raw.value=SessionState.Loading;runCurrent()
+        gate.changeOwner(owner2);runCurrent()
         assertNull(runtime.summary.value)
         assertTrue(runtime.tags.isEmpty())
         cleanup.complete(Unit)

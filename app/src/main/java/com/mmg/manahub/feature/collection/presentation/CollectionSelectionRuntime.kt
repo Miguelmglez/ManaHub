@@ -53,45 +53,69 @@ class CollectionSelectionRuntime(
             }
         }.flow
 
-    @OptIn(ExperimentalCoroutinesApi::class,FlowPreview::class)
-    fun start(scope: CoroutineScope,query: Flow<CollectionSelectionQuery>): Job=scope.launch {
-        combine(sessions.sessions,observer.identities,query,active) { session,_,selection,visible -> Request(session,selection,visible) }
-            .onEach { clear() }
-            .collectLatest request@ { request ->
-                val captured=request.session
-                val available=(captured as? TransferSession.Available)?.takeIf { request.active && observer.matchesObserved(it.owner) } ?: return@request
-                coroutineScope {
-                    var snapshot: String?=null
-                    var pagingJob: Job?=null
-                    try {
-                        invalidations().debounce(300).collectLatest refresh@ {
-                            mutableLoading.value=mutableSummary.value==null
-                            var candidate: String?=null
-                            try {
-                                val result=repository.capture(available.owner,request.selection)
-                                candidate=result.id
-                                if(sessions.currentSession!=captured || !observer.matchesObserved(available.owner))return@refresh
-                                pagingJob?.cancelAndJoin()
-                                val previous=snapshot
-                                snapshot=result.id;candidate=null
-                                mutableSummary.value=result;tags=result.tags;mutableError.value=null;mutableLoading.value=false
-                                pagingJob=launch {
-                                    pager(available.owner,result.id,captured).cachedIn(this).collectLatest { data ->
-                                        if(sessions.currentSession==captured && observer.matchesObserved(available.owner))mutablePaging.value=data
-                                    }
-                                }
-                                previous?.let { id -> withContext(NonCancellable+Dispatchers.IO) { repository.discard(available.owner,id) } }
-                            } catch(cancelled: CancellationException) { throw cancelled }
-                            catch(_: Exception) { if(sessions.currentSession==captured && observer.matchesObserved(available.owner)){mutableError.value="Collection could not be prepared. Try again.";mutableLoading.value=false} }
-                            finally { candidate?.let { id -> withContext(NonCancellable+Dispatchers.IO) { repository.discard(available.owner,id) } } }
-                        }
-                    } finally {
-                        withContext(NonCancellable+Dispatchers.IO) {
+    @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
+    fun start(scope: CoroutineScope, query: Flow<CollectionSelectionQuery>): Job = scope.launch {
+        var lastOwner: TransferOwner? = null
+
+        combine(sessions.sessions, observer.identities, query, active) { session, _, selection, visible ->
+            Request(session, selection, visible)
+        }.onEach { request ->
+            val currentOwner = (request.session as? TransferSession.Available)?.owner
+            if (currentOwner != lastOwner) {
+                clear()
+                lastOwner = currentOwner
+            }
+        }.collectLatest request@ { request ->
+            val captured = request.session
+            val currentOwner = (captured as? TransferSession.Available)?.owner
+
+            if (currentOwner == null || !request.active || !observer.matchesObserved(currentOwner)) {
+                return@request
+            }
+
+            coroutineScope {
+                var snapshot: String? = null
+                var pagingJob: Job? = null
+                try {
+                    val triggers = flow {
+                        emit(Unit)
+                        emitAll(invalidations().debounce(300))
+                    }
+                    triggers.collectLatest refresh@ {
+                        if (mutableSummary.value == null) mutableLoading.value = true
+                        var candidate: String? = null
+                        try {
+                            val result = repository.capture(currentOwner, request.selection)
+                            candidate = result.id
+                            if (sessions.currentSession != captured || !observer.matchesObserved(currentOwner)) return@refresh
                             pagingJob?.cancelAndJoin()
-                            snapshot?.let { id -> repository.discard(available.owner,id) }
+                            val previous = snapshot
+                            snapshot = result.id; candidate = null
+                            mutableSummary.value = result; tags = result.tags; mutableError.value = null; mutableLoading.value = false
+                            pagingJob = launch {
+                                pager(currentOwner, result.id, captured).cachedIn(this).collectLatest { data ->
+                                    if (sessions.currentSession == captured && observer.matchesObserved(currentOwner)) mutablePaging.value = data
+                                }
+                            }
+                            previous?.let { id -> withContext(NonCancellable + Dispatchers.IO) { repository.discard(currentOwner, id) } }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            if (sessions.currentSession == captured && observer.matchesObserved(currentOwner)) {
+                                mutableError.value = "Collection could not be prepared. Try again."
+                                mutableLoading.value = false
+                            }
+                        } finally {
+                            candidate?.let { id -> withContext(NonCancellable + Dispatchers.IO) { repository.discard(currentOwner, id) } }
                         }
+                    }
+                } finally {
+                    withContext(NonCancellable + Dispatchers.IO) {
+                        pagingJob?.cancelAndJoin()
+                        snapshot?.let { id -> repository.discard(currentOwner, id) }
                     }
                 }
             }
+        }
     }
 }

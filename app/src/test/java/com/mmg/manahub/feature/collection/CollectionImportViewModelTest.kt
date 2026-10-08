@@ -366,11 +366,10 @@ class CollectionImportViewModelTest {
 
     @Test
     fun `emptying the review one entry at a time closes the sheet`() = runTest(testDispatcher) {
-        coEvery { userCardRepository.addOrIncrementBatch(any(), any()) } returns emptyList()
+        coEvery { userCardRepository.addOrIncrementBatch(any(), any()) } returns listOf(com.mmg.manahub.core.domain.repository.AddOutcome.CREATED_NEW)
         queue.add(entry("a"))
         val vm = buildViewModel()
         vm.onOpenQueueSheet()
-        vm.onToggleAutoDeleteOnAdd()
 
         vm.onAddEntryToCollection(queue.queue.value.single())
         advanceUntilIdle()

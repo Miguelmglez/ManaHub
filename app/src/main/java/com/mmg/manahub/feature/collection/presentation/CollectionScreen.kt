@@ -64,7 +64,6 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -91,8 +90,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.currentStateAsState
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionQuery
+import com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionSort
 import com.mmg.manahub.core.model.CollectionCardGroup
 import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionSection
@@ -120,10 +122,8 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.collection.presentation.components.CollectionMergeConflictSheet
-import com.mmg.manahub.feature.collection.presentation.importexport.DurableExportHost
-import com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionQuery
-import com.mmg.manahub.core.domain.collection.transfer.CollectionSelectionSort
 import com.mmg.manahub.feature.collection.presentation.importexport.CollectionTransferActionsSheet
+import com.mmg.manahub.feature.collection.presentation.importexport.DurableExportHost
 import com.mmg.manahub.feature.decks.presentation.DeckListScreen
 import com.mmg.manahub.feature.trades.presentation.TradesScreen
 import org.koin.androidx.compose.koinViewModel
@@ -472,10 +472,11 @@ private fun CardsTabContent(
 
     val hasActiveSearchOrFilter = uiState.searchQuery.isNotBlank() || filterCount > 0
 
-    // Genuinely empty collection (nothing added yet, nothing to filter) — full-screen state,
-    // no header needed since there's no search/filter UI to offer yet.
-    val emptyCards = if(pagedCards==null)uiState.cards.isEmpty() else (uiState.selectionSummary?.groups ?: 0L)==0L
-    if (emptyCards && !hasActiveSearchOrFilter && !uiState.isLoading) {
+    val hasSummary = uiState.selectionSummary != null
+    val isSummaryEmpty = uiState.selectionSummary != null && uiState.selectionSummary.groups == 0L
+    val emptyCards = if (pagedCards == null) uiState.cards.isEmpty() else isSummaryEmpty
+
+    if (emptyCards && !hasActiveSearchOrFilter && !uiState.isLoading && hasSummary) {
         EmptyState(
             icon        = Icons.Default.CollectionsBookmark,
             title       = stringResource(R.string.collection_empty_title),
@@ -492,7 +493,7 @@ private fun CardsTabContent(
         // header below (search bar + advanced-search filters are the only way back) — only the
         // content area swaps to a scoped empty message, keyed off the SAME headerHeightDp offset
         // CardGrid/CardList already use.
-        if (uiState.isLoading) {
+        if (uiState.isLoading && !hasSummary) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -501,7 +502,7 @@ private fun CardsTabContent(
             ) {
                 MagicLoadingSpinner()
             }
-        } else if (emptyCards) {
+        } else if (emptyCards && hasSummary) {
             // Rows whose card is not cached yet are skipped by the projection, so "empty" would be
             // a lie while any of them are outstanding — the list is INCOMPLETE, not empty
             // (ADR-008: ownership data never depends on cache metadata).
